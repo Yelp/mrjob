@@ -211,6 +211,7 @@ def _scan_for_input_uri(log_file_uri, runner):
 
     Helper function for :py:func:`scan_task_attempt_logs()`
     """
+    # TODO: does this work on 3.x AMIs?
     syslog_uri = posixpath.join(
         posixpath.dirname(log_file_uri), 'syslog')
     if log_file_uri.endswith('.gz'):

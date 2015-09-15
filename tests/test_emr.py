@@ -1451,7 +1451,7 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
         """
         self.runner.cleanup()
 
-    def test_ssh_comes_first(self):
+    def test_exception_in_s3_logs_beats_ssh(self):
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/s-ONE')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/userlogs')
@@ -1462,18 +1462,15 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
         mock_ssh_file('testmaster', ssh_lone_log_path,
                       HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n')
 
-        # Put a 'more interesting' error in S3 to make sure that the
-        # 'less interesting' one from SSH is read and S3 is never
-        # looked at. This would never happen in reality because the
-        # logs should be identical, but it makes for an easy test
-        # of SSH overriding S3.
+        # Put a 'more interesting' error in S3
         self.add_mock_s3_data({'walrus': {
             TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
                 TRACEBACK_START + PY_EXCEPTION,
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
-                         SSH_PREFIX + self.runner._address + ssh_lone_log_path)
+                         's3://walrus/' + TASK_ATTEMPTS_DIR +
+                         'attempt_201007271720_0002_m_000126_0/stderr')
 
     def test_ssh_works_with_slaves(self):
         self.add_slave()

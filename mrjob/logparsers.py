@@ -24,15 +24,7 @@ from mrjob.parse import find_python_traceback
 from mrjob.parse import find_timeout_error
 from mrjob.parse import parse_hadoop_counters_from_line
 
-
-
 log = logging.getLogger(__name__)
-
-# Constants used to distinguish between different kinds of logs
-TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
-STEP_LOGS = 'STEP_LOGS'
-JOB_LOGS = 'JOB_LOGS'
-NODE_LOGS = 'NODE_LOGS'
 
 # regex for matching task-attempts log URIs
 TASK_ATTEMPTS_LOG_URI_RE = re.compile(

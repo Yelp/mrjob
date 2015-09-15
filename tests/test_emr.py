@@ -1397,6 +1397,7 @@ class CounterFetchingTestCase(MockBotoTestCase):
     def _mock_step(self, jar):
         return MockEmrObject(
             config=MockEmrObject(jar=jar),
+            id='s-FAKE',
             name=self.runner._job_key,
             status=MockEmrObject(state='COMPLETED'))
 
@@ -2274,6 +2275,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
                 config=MockEmrObject(args=[]),
+                id='s-FAKE',
                 name='dummy',
                 status=MockEmrObject(
                     state='COMPLETED',
@@ -2295,6 +2297,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
                 config=MockEmrObject(args=[]),
+                id='s-FAKE',
                 name='dummy',
                 status=MockEmrObject(
                     state='COMPLETED',

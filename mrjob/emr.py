@@ -2424,11 +2424,7 @@ class EMRJobRunner(MRJobRunner):
                 self._address = cluster.masterpublicdnsname
             except boto.exception.S3ResponseError:
                 # Raised when cluster doesn't exist
-                raise IOError('Could not get job flow information')
-            except boto.exception.EmrResponseError:
-                # Raised by very old versions of boto (sometime before 2.4)
-                # when cluster doesn't exist
-                raise IOError('Could not get job flow information')
+                pass
 
         return self._address
 

@@ -215,50 +215,57 @@ def _prettyprint_relevant(log_type_to_uri_list):
 
 
 def list_relevant(runner, step_nums):
-    _prettyprint_relevant(_ls_logs(_RELEVANT_LOG_TYPES, step_nums))
+    _prettyprint_relevant(_ls_relevant_logs_by_type(step_nums))
 
-
-def _ls_logs(runner, log_types, step_nums=None):
-    """Return a map from log type to a list of log URIs."""
+def _ls_relevant_logs_by_type(runner, step_nums=None):
     # TODO: integrate this into EMRJobRunner
     step_num_to_id = runner._step_num_to_id()
 
     return dict((log_type, runner._ls_logs(log_type,
                                            step_nums=step_nums,
                                            step_num_to_id=step_num_to_id))
-                for log_type in log_types)
+                for log_type in _RELEVANT_LOG_TYPES)
+
+
+def _ls_logs(runner, log_type, step_nums=None):
+    # TODO: integrate this into EMRJobRunner
+    step_num_to_id = runner._step_num_to_id()
+
+    return runner._ls_logs(log_type,
+                           step_nums=step_nums,
+                           step_num_to_id=step_num_to_id)
 
 
 def list_all(runner):
-    prettyprint_paths(_ls_logs(runner, 'all')['all'])
+    prettyprint_paths(_ls_logs(runner, 'all'))
 
 
-def cat_from_list(runner, path_list):
+def cat_from_list(fs, path_list):
     for path in path_list:
         print('===', path, '===')
-        for line in runner.cat(path):
+        for line in fs.cat(path):
             print(line.rstrip())
         print()
 
 
-def _cat_from_relevant(runner, log_type_to_uri_list):
+def _cat_from_relevant(fs, log_type_to_uri_list):
     print('Task attempts:')
-    cat_from_list(runner, log_type_to_uri_list['task'])
+    cat_from_list(fs, log_type_to_uri_list['task'])
     print('Steps:')
-    cat_from_list(runner, log_type_to_uri_list['step'])
+    cat_from_list(fs, log_type_to_uri_list['step'])
     print('Jobs:')
-    cat_from_list(runner, log_type_to_uri_list['job'])
+    cat_from_list(fs, log_type_to_uri_list['job'])
     print('Slaves:')
-    cat_from_list(runner, log_type_to_uri_list['node'])
+    cat_from_list(fs, log_type_to_uri_list['node'])
 
 
 def cat_relevant(runner, step_nums):
-    _cat_from_relevant(runner,
-                       _ls_logs(runner, _RELEVANT_LOG_TYPES, step_nums))
+    _cat_from_relevant(runner.fs,
+                       _ls_relevant_logs_by_type(runner, step_nums))
 
 
 def cat_all(runner):
-    cat_from_list(runner, _ls_logs(runner, 'all')['all'])
+    cat_from_list(runner.fs, _ls_logs(runner, 'all'))
 
 
 def find_failure(runner, step_num):

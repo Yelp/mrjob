@@ -169,7 +169,7 @@ def ls_logs(fs, log_type,
                     log_paths.append(log_path)
             except IOError:
                 # problem with this log path, try another one
-                log.warning("couldn't ls %" % log_subdir)
+                log.warning("couldn't ls %s" % log_subdir)
 
         if log_paths:
             return _sorted_log_paths(log_paths, log_re,
@@ -207,7 +207,7 @@ def _ssh_log_subdirs(fs, log_type, ssh_host, node_log_path):
     as well, which involves requesting their list of hostnames.
     """
     # bail out if fs doesn't support it (fetching slave addresses would fail)
-    if not (ssh_host and fs.can_handle_path('ssh://' + ssh_host)):
+    if not (ssh_host and fs.can_handle_path('ssh://%s/' % ssh_host)):
         return []
 
     # fix/check node_log_path

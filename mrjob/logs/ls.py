@@ -32,7 +32,7 @@ _S3_LOG_TYPE_TO_RELATIVE_PATH = dict(
     all='',
     job='jobs',
     node='node',
-    steps='steps',
+    step='steps',
     task='task-attempts',
 )
 
@@ -275,6 +275,6 @@ def _sorted_log_paths(log_paths, log_re, step_num_to_id=None):
         m_groups = m.groupdict()
         return [sort_key_for_m_group(m_groups, name) for name in
                 ('step_num', 'step_id', 'task_type', 'attempt_num',
-                 'stream', 'task_num', 'timestamp')]
+                 'stream', 'task_num', 'timestamp')] + [log_path]
 
     return sorted(log_paths, key=sort_key)

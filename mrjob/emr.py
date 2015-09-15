@@ -670,6 +670,15 @@ class EMRJobRunner(MRJobRunner):
         log.info("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
 
+    # TODO: stop fetching/accessing s3_job_log_uri directly
+    def _log_dir(self):
+        """Get the URI of the log directory for this job's cluster."""
+        if not self._s3_job_log_uri:
+            cluster = self._describe_cluster()
+            self._set_s3_job_log_uri(cluster)
+
+        return self._s3_job_log_uri
+
     def _set_s3_job_log_uri(self, cluster):
         """Given a job flow description, set self._s3_job_log_uri. This allows
         us to call self.ls(), etc. without running the job.
@@ -1778,11 +1787,13 @@ class EMRJobRunner(MRJobRunner):
             self.fs, task_attempt_logs, step_logs, job_logs)
 
     def _ls_logs(self, log_type, step_nums=None, step_num_to_id=None):
+        # TODO: cache this as we go. We only need to know it if
+        # step_nums is set
         if step_num_to_id is None:
             step_num_to_id = self._step_num_to_id()
 
         return ls_logs(self.fs, log_type,
-                       log_dir=self._s3_job_log_uri,
+                       log_dir=self._log_dir(),
                        ssh_host=self._address_of_master(),
                        step_nums=step_nums,
                        step_num_to_id=step_num_to_id)

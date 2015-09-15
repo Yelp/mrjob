@@ -69,22 +69,18 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import LogFetchError
 from mrjob.job import MRJob
-from mrjob.logparsers import TASK_ATTEMPT_LOGS
-from mrjob.logparsers import STEP_LOGS
-from mrjob.logparsers import JOB_LOGS
-from mrjob.logparsers import NODE_LOGS
 from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_connect_opts
 from mrjob.options import alphabetize_options
 from mrjob.util import scrape_options_into_new_groups
 
+_RELEVANT_LOG_TYPES = ['job', 'node', 'step', 'task']
+
+
 
 def main(args=None):
     option_parser = make_option_parser()
-    try:
-        options = parse_args(option_parser, args)
-    except OptionError:
-        option_parser.error('This tool takes exactly one argument.')
+    options = parse_args(option_parser, args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
@@ -132,8 +128,9 @@ def parse_args(option_parser, cl_args=None):
 
     # should be one argument, the job flow ID
     if len(args) != 1:
-        raise OptionError('Must supply one positional argument as the job'
-                          ' flow ID', option_parser)
+        # this exits the function
+        option_parser.error(
+            'Must supply one positional argument as the job flow ID')
 
     options.emr_job_flow_id = args[0]
 
@@ -212,34 +209,26 @@ def prettyprint_paths(paths):
 
 def _prettyprint_relevant(log_type_to_uri_list):
     print('Task attempts:')
-    prettyprint_paths(log_type_to_uri_list[TASK_ATTEMPT_LOGS])
+    prettyprint_paths(log_type_to_uri_list['task'])
     print('Steps:')
-    prettyprint_paths(log_type_to_uri_list[STEP_LOGS])
+    prettyprint_paths(log_type_to_uri_list['step'])
     print('Jobs:')
-    prettyprint_paths(log_type_to_uri_list[JOB_LOGS])
+    prettyprint_paths(log_type_to_uri_list['job'])
     print('Nodes:')
-    prettyprint_paths(log_type_to_uri_list[NODE_LOGS])
+    prettyprint_paths(log_type_to_uri_list['node'])
 
 
 def list_relevant(runner, step_nums):
-    cluster_step_ids = runner._step_ids_for_cluster()
+    step_num_to_id = runner._step_num_to_id()
 
-    try:
-        logs = {
-            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
-            STEP_LOGS: runner.ls_step_logs_ssh(step_nums, cluster_step_ids),
-            JOB_LOGS: runner.ls_job_logs_ssh(step_nums),
-            NODE_LOGS: runner.ls_node_logs_ssh(),
-        }
-        _prettyprint_relevant(logs)
-    except LogFetchError:
-        logs = {
-            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
-            STEP_LOGS: runner.ls_step_logs_s3(step_nums, cluster_step_ids),
-            JOB_LOGS: runner.ls_job_logs_s3(step_nums),
-            NODE_LOGS: runner.ls_node_logs_s3(),
-        }
-        _prettyprint_relevant(logs)
+    logs = {}
+
+    for log_type in _RELEVANT_LOG_TYPES:
+        logs[log_type] = runner._ls_logs(log_type,
+                                         step_nums=step_nums,
+                                         step_num_to_id=step_num_to_id)
+
+    _prettyprint_relevant(logs)
 
 
 def list_all(runner):
@@ -259,30 +248,30 @@ def cat_from_list(runner, path_list):
 
 def _cat_from_relevant(runner, log_type_to_uri_list):
     print('Task attempts:')
-    cat_from_list(runner, log_type_to_uri_list[TASK_ATTEMPT_LOGS])
+    cat_from_list(runner, log_type_to_uri_list['task'])
     print('Steps:')
-    cat_from_list(runner, log_type_to_uri_list[STEP_LOGS])
+    cat_from_list(runner, log_type_to_uri_list['step'])
     print('Jobs:')
-    cat_from_list(runner, log_type_to_uri_list[JOB_LOGS])
+    cat_from_list(runner, log_type_to_uri_list['job'])
     print('Slaves:')
-    cat_from_list(runner, log_type_to_uri_list[NODE_LOGS])
+    cat_from_list(runner, log_type_to_uri_list['node'])
 
 
 def cat_relevant(runner, step_nums):
     try:
         logs = {
-            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_ssh(step_nums),
-            STEP_LOGS: runner.ls_step_logs_ssh(step_nums),
-            JOB_LOGS: runner.ls_job_logs_ssh(step_nums),
-            NODE_LOGS: runner.ls_node_logs_ssh(),
+            'task': runner.ls_task_attempt_logs_ssh(step_nums),
+            'step': runner.ls_step_logs_ssh(step_nums),
+            'job': runner.ls_job_logs_ssh(step_nums),
+            'node': runner.ls_node_logs_ssh(),
         }
         _cat_from_relevant(runner, logs)
     except LogFetchError:
         logs = {
-            TASK_ATTEMPT_LOGS: runner.ls_task_attempt_logs_s3(step_nums),
-            STEP_LOGS: runner.ls_step_logs_s3(step_nums),
-            JOB_LOGS: runner.ls_job_logs_s3(step_nums),
-            NODE_LOGS: runner.ls_node_logs_s3(),
+            'task': runner.ls_task_attempt_logs_s3(step_nums),
+            'step': runner.ls_step_logs_s3(step_nums),
+            'job': runner.ls_job_logs_s3(step_nums),
+            'node': runner.ls_node_logs_s3(),
         }
         _cat_from_relevant(runner, logs)
 

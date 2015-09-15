@@ -196,12 +196,8 @@ def _parse_task_attempts(fs, log_paths):
             lines = _parsed_error(fs, path, find_hadoop_java_stack_trace)
 
         if lines:
-            task_num = int(m_groups['task_num'])
-            task_type = m_groups.get('task_type')
-            if task_num == 0 and task_type in ('m', None):
-                input_uri = _scan_for_input_uri(path, fs)
-            else:
-                input_uri = None
+            input_uri = _scan_for_input_uri(path, fs)
+
             return {
                 'lines': lines,
                 'log_file_uri': path,
@@ -217,6 +213,8 @@ def _scan_for_input_uri(log_file_uri, runner):
     """
     syslog_uri = posixpath.join(
         posixpath.dirname(log_file_uri), 'syslog')
+    if log_file_uri.endswith('.gz'):
+        syslog_uri += '.gz'
 
     syslog_lines = runner.cat(syslog_uri)
     if syslog_lines:

@@ -62,7 +62,7 @@ _STEP_LOG_RE = re.compile(
 _TASK_LOG_RE = re.compile(
     r'^.*/attempt_'                        # attempt_
     r'(?P<timestamp>\d+)_'                 # 201203222119_
-    r'(?P<step_num>\d+)_'                # 0001_
+    r'(?P<step_num>\d+)_'                  # 0001_
     r'(?P<task_type>\w)_'                  # m_
     r'(?P<task_num>\d+)_'                  # 000000_
     r'(?P<attempt_num>\d+)/'               # 3/
@@ -273,4 +273,4 @@ def _sorted_log_paths(log_paths, log_re, step_num_to_id=None):
                 ('step_num', 'step_id', 'task_type', 'attempt_num',
                  'stream', 'task_num', 'timestamp')]
 
-    return sorted(log_paths, sort_key)
+    return sorted(log_paths, key=sort_key)

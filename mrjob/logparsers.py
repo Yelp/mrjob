@@ -14,7 +14,6 @@
 """Parsing classes to find errors in Hadoop logs"""
 import logging
 import posixpath
-import re
 
 from mrjob.logs.ls import _JOB_LOG_RE
 from mrjob.logs.ls import _TASK_LOG_RE

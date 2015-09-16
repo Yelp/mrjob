@@ -100,8 +100,6 @@ from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
-from mrjob.ssh import SSH_LOG_ROOT
-from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line

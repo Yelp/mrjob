@@ -15,6 +15,7 @@
 from tests.py2 import TestCase
 
 from mrjob.logs.ls import _JOB_LOG_RE
+from mrjob.logs.ls import _TASK_LOG_RE
 
 
 class LogRegexTestCase(TestCase):
@@ -29,7 +30,7 @@ class LogRegexTestCase(TestCase):
         self.assertEqual(m.group('step_num'), '0011')
         self.assertEqual(m.group('user'), 'hadoop')
 
-    def test_emr_job_re_on_3_x_ami(self):
+    def test_job_log_re_on_3_x_ami(self):
         uri = 'ssh://ec2-52-24-131-73.us-west-2.compute.amazonaws.com/mnt/var/log/hadoop/history/2015/08/31/000000/job_1441057410014_0011-1441057493406-hadoop-streamjob6928722756977481487.jar-1441057604210-2-1-SUCCEEDED-default-1441057523674.jhist'  # noqa
 
         m = _JOB_LOG_RE.match(uri)
@@ -38,3 +39,31 @@ class LogRegexTestCase(TestCase):
         self.assertEqual(m.group('timestamp'), '1441057410014')
         self.assertEqual(m.group('step_num'), '0011')
         self.assertEqual(m.group('user'), 'hadoop')
+
+    def test_task_re_on_2_x_ami(self):
+        uri = 's3://mrjob-35cdec11663cb1cb/tmp/logs/j-3J3Y9EBUUBRFW/task-attempts/job_201508312315_0002/attempt_201508312315_0002_m_000000_0/syslog'  # noqa
+
+        m = _TASK_LOG_RE.match(uri)
+
+        self.assertTrue(m)
+        self.assertEqual(m.group('timestamp'), '201508312315')
+        self.assertEqual(m.group('step_num'), '0002')
+        self.assertEqual(m.group('task_type'), 'm')
+        self.assertEqual(m.group('yarn_attempt_num'), None)
+        self.assertEqual(m.group('task_num'), '000000')
+        self.assertEqual(m.group('attempt_num'), '0')
+        self.assertEqual(m.group('stream'), 'syslog')
+
+    def test_task_re_on_3_x_ami(self):
+        uri = 's3://mrjob-35cdec11663cb1cb/tmp/logs/j-21QKHYM5WJJHS/task-attempts/application_1441057410014_0001/container_1441057410014_0001_01_000004/stderr.gz'  # noqa
+
+        m = _TASK_LOG_RE.match(uri)
+
+        self.assertTrue(m)
+        self.assertEqual(m.group('timestamp'), '1441057410014')
+        self.assertEqual(m.group('step_num'), '0001')
+        self.assertEqual(m.group('task_type'), None)
+        self.assertEqual(m.group('yarn_attempt_num'), '01')
+        self.assertEqual(m.group('task_num'), '000004')
+        self.assertEqual(m.group('attempt_num'), None)
+        self.assertEqual(m.group('stream'), 'stderr')

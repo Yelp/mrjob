@@ -41,7 +41,7 @@ _DEFAULT_NODE_LOG_PATH = '/mnt/var/log/hadoop'
 
 # match a job log path
 # TODO: is this really a timestamp on YARN?
-_JOB_LOG_RE = re.compile(
+_JOB_LOG_PATH_RE = re.compile(
     r'^.*?'     # sometimes there is a number at the beginning, and the
                 # containing directory can be almost anything.
     r'job_(?P<timestamp>\d+)_(?P<step_num>\d+)'  # oh look, meaningful data!
@@ -54,17 +54,17 @@ _JOB_LOG_RE = re.compile(
 # TODO: update this to match YARN too (use "application")
 # TODO: actually, that may be more like the task attempt logs?
 # TODO: not really sure what node logs are for
-_NODE_LOG_RE = re.compile(
+_NODE_LOG_PATH_RE = re.compile(
     r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
 
 # match a step log path (including s-AAAAAAA step IDs on EMR)
-_STEP_LOG_RE = re.compile(
+_STEP_LOG_PATH_RE = re.compile(
     r'^.*/((?P<step_num>\d+)|(?P<step_id>s-[A-Z0-9]+))'
     r'/(?P<stream>syslog|stderr)(\.gz)?$')
 
 # match a task attempt log path
 # TODO: this is different on 3.x AMIs (and maybe YARN)
-_TASK_LOG_RE = re.compile(
+_TASK_LOG_PATH_RE = re.compile(
     r'^.*/(?:attempt|container)_'                        # attempt_
     r'(?P<timestamp>\d+)_'                               # 201203222119_
     r'(?P<step_num>\d+)_'                                # 0001_
@@ -76,10 +76,10 @@ _TASK_LOG_RE = re.compile(
 # map from log type to a regex matching it
 _LOG_TYPE_TO_RE = dict(
     all=re.compile(r'.*'),
-    job=_JOB_LOG_RE,
-    node=_NODE_LOG_RE,
-    step=_STEP_LOG_RE,
-    task=_TASK_LOG_RE,
+    job=_JOB_LOG_PATH_RE,
+    node=_NODE_LOG_PATH_RE,
+    step=_STEP_LOG_PATH_RE,
+    task=_TASK_LOG_PATH_RE,
 )
 
 # where to look for logs when SSHing in
@@ -121,8 +121,8 @@ def ls_logs(fs, log_type,
 
     Everything except fs and log_type should be a keyword argument.
     """
-    log_re = _LOG_TYPE_TO_RE.get(log_type)
-    if log_re is None:
+    log_path_re = _LOG_TYPE_TO_RE.get(log_type)
+    if log_path_re is None:
         return None
 
     # generate list of valid step_ids
@@ -148,7 +148,7 @@ def ls_logs(fs, log_type,
             log.info('looking for %s logs in %s' % (log_type, log_subdir))
             try:
                 for log_path in fs.ls(log_subdir):
-                    m = log_re.match(log_path)
+                    m = log_path_re.match(log_path)
                     if not m:
                         continue
 
@@ -173,7 +173,7 @@ def ls_logs(fs, log_type,
                 log.warning("couldn't ls %s" % log_subdir)
 
         if log_paths:
-            return _sorted_log_paths(log_paths, log_re,
+            return _sorted_log_paths(log_paths, log_path_re,
                                      step_num_to_id=step_num_to_id)
 
     # couldn't find anything
@@ -245,7 +245,7 @@ def _ssh_log_subdirs(fs, log_type, ssh_host, node_log_path):
     return ['ssh://%s%s' % (host, log_path) for host in hosts]
 
 
-def _sorted_log_paths(log_paths, log_re, step_num_to_id=None):
+def _sorted_log_paths(log_paths, log_path_re, step_num_to_id=None):
     """Order log paths so that the ones most useful for diagnosing
     failure (usually, the latest ones) come first."""
     step_id_to_num = dict((v, k) for k, v in (step_num_to_id or {}).items())
@@ -271,7 +271,7 @@ def _sorted_log_paths(log_paths, log_re, step_num_to_id=None):
             return group_value or ''
 
     def sort_key(log_path):
-        m = log_re.match(log_path)
+        m = log_path_re.match(log_path)
         if not m:
             return []  # this shouldn't happen, see ls_logs(), above
 

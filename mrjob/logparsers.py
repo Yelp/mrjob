@@ -15,8 +15,8 @@
 import logging
 import posixpath
 
-from mrjob.logs.ls import _JOB_LOG_RE
-from mrjob.logs.ls import _TASK_LOG_RE
+from mrjob.logs.ls import _JOB_LOG_PATH_RE
+from mrjob.logs.ls import _TASK_LOG_PATH_RE
 from mrjob.parse import find_hadoop_java_stack_trace
 from mrjob.parse import find_input_uri_for_mapper
 from mrjob.parse import find_interesting_hadoop_streaming_error
@@ -61,7 +61,7 @@ def _parse_task_attempts(fs, log_paths):
     tasks_seen = set()
     for path in log_paths:
         # skip subsequent logs for same task
-        m = _TASK_LOG_RE.match(path)
+        m = _TASK_LOG_PATH_RE.match(path)
         if not m:
             continue
 
@@ -140,7 +140,7 @@ def scan_for_counters_in_files(log_file_uris, fs, hadoop_version):
     relevant_logs = []  # list of (sort key, URI)
 
     for log_file_uri in log_file_uris:
-        m = _JOB_LOG_RE.match(log_file_uri)
+        m = _JOB_LOG_PATH_RE.match(log_file_uri)
         if not m:
             continue
 

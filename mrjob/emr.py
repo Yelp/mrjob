@@ -77,10 +77,6 @@ from mrjob.iam import FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.ls import ls_logs
-from mrjob.logparsers import EMR_JOB_LOG_URI_RE
-from mrjob.logparsers import NODE_LOG_URI_RE
-from mrjob.logparsers import EMR_STEP_LOG_URI_RE
-from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
 from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.parse import HADOOP_STREAMING_JAR_RE

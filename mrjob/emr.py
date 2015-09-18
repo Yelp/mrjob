@@ -1234,8 +1234,12 @@ class EMRJobRunner(MRJobRunner):
     def _job_flow_args(self, persistent=False, steps=None):
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
+        api_params = {}
 
-        args['ami_version'] = self._opts['ami_version']
+        if self._opts['release_label']:
+            api_params['ReleaseLabel'] = self._opts['release_label']
+        else:
+            args['ami_version'] = self._opts['ami_version']
 
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
@@ -1331,8 +1335,6 @@ class EMRJobRunner(MRJobRunner):
 
         # boto's connect_emr() has keyword args for these, but they override
         # emr_api_params, which is not what we want.
-        api_params = {}
-
         api_params['VisibleToAllUsers'] = str(bool(
             self._opts['visible_to_all_users'])).lower()
 

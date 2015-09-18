@@ -730,9 +730,9 @@ MRJob uses boto to manipulate/access S3.
     one, it creates one with a random name. This option is then set to `tmp/`
     in this bucket (e.g. ``s3://mrjob-01234567890abcdef/tmp/``).
 
-    .. versionchanged::
+    .. versionchanged:: 0.5.0
 
-       This option used to be called ``s3_tmp_dir``.
+       This option used to be called ``s3_scratch_uri``.
 
 .. mrjob-opt::
     :config: s3_sync_wait_time
@@ -791,7 +791,7 @@ SSH access and tunneling
     colons separate range endpoints.
 
 .. mrjob-opt::
-   :config: ssh_tunnel
+    :config: ssh_tunnel
     :switch: --ssh-tunnel, --no-ssh-tunnel
     :type: boolean
     :set: emr

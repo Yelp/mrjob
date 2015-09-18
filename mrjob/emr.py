@@ -209,10 +209,13 @@ def _describe_cluster(emr_conn, cluster_id, *args, **kwargs):
     """
     Cluster = boto.emr.emrobject.Cluster
     try:
+        # temporarily monkey-patch Cluster.Fields
+        # not using patch here because it's an external dependency
+        # in Python 2
         orig_fields = Cluster.Fields
         Cluster.Fields = Cluster.Fields | set(['ReleaseLabel'])
 
-        return _describe_cluster(emr_conn, cluster_id, *args, **kwargs)
+        return emr_conn.describe_cluster(cluster_id, *args, **kwargs)
     finally:
         Cluster.Fields = orig_fields
 

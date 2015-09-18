@@ -75,6 +75,7 @@ setup(
         'mrjob.examples.mr_postfix_bounce',
         'mrjob.examples.mr_travelling_salesman',
         'mrjob.fs',
+        'mrjob.logs',
         'mrjob.tools',
         'mrjob.tools.emr',
     ],

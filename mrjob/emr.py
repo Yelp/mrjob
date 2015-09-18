@@ -59,7 +59,6 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
-from mrjob.aws import random_identifier
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import _map_version
 from mrjob.compat import version_gte
@@ -77,10 +76,7 @@ from mrjob.iam import FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
-from mrjob.logparsers import EMR_JOB_LOG_URI_RE
-from mrjob.logparsers import NODE_LOG_URI_RE
-from mrjob.logparsers import EMR_STEP_LOG_URI_RE
-from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
+from mrjob.logs.ls import ls_logs
 from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
@@ -104,13 +100,11 @@ from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
-from mrjob.ssh import SSH_LOG_ROOT
-from mrjob.ssh import SSH_PREFIX
-from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
+from mrjob.util import random_identifier
 
 
 log = logging.getLogger(__name__)
@@ -265,10 +259,6 @@ def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
 
     time.sleep(sync_wait_time)
     return _lock_acquire_step_2(key, job_key)
-
-
-class LogFetchError(Exception):
-    pass
 
 
 class EMRRunnerOptionStore(RunnerOptionStore):
@@ -670,6 +660,15 @@ class EMRJobRunner(MRJobRunner):
         log.info("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
 
+    # TODO: stop fetching/accessing s3_job_log_uri directly
+    def _log_dir(self):
+        """Get the URI of the log directory for this job's cluster."""
+        if not self._s3_job_log_uri:
+            cluster = self._describe_cluster()
+            self._set_s3_job_log_uri(cluster)
+
+        return self._s3_job_log_uri
+
     def _set_s3_job_log_uri(self, cluster):
         """Given a job flow description, set self._s3_job_log_uri. This allows
         us to call self.ls(), etc. without running the job.
@@ -701,10 +700,6 @@ class EMRJobRunner(MRJobRunner):
         return s3_uri
 
     @property
-    def _ssh_key_name(self):
-        return self._job_key + '.pem'
-
-    @property
     def fs(self):
         """:py:class:`~mrjob.fs.base.Filesystem` object for SSH, S3, and the
         local filesystem.
@@ -719,8 +714,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['ec2_key_pair_file']:
                 self._ssh_fs = SSHFilesystem(
                     ssh_bin=self._opts['ssh_bin'],
-                    ec2_key_pair_file=self._opts['ec2_key_pair_file'],
-                    key_name=self._ssh_key_name)
+                    ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
                 self._fs = CompositeFilesystem(self._ssh_fs, self._s3_fs,
                                                LocalFilesystem())
@@ -1002,14 +996,6 @@ class EMRJobRunner(MRJobRunner):
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:
             random.setstate(random_state)
-
-    def _enable_slave_ssh_access(self):
-        if self._ssh_fs and not self._ssh_key_is_copied:
-            ssh_copy_key(
-                self._opts['ssh_bin'],
-                self._address_of_master(),
-                self._opts['ec2_key_pair_file'],
-                self._ssh_key_name)
 
     ### Running the job ###
 
@@ -1678,158 +1664,6 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_key, step_num + 1)
 
-    ### LOG FETCHING/PARSING ###
-
-    def _enforce_path_regexp(self, paths, regexp, filters=None):
-        """Helper for log fetching functions to filter out unwanted
-        logs.
-
-        filters maps from regexp group to a list of thing to match
-        """
-        # convert filters to a map from group_name to sets of strings
-        str_set_filters = {}
-        for group_name, values in (filters or {}).items():
-            if values:
-                str_set_filters[group_name] = set(str(v) for v in values)
-
-        for path in paths:
-            m = regexp.match(path)
-            if not m:
-                continue
-
-            if any(m.group(group_name) not in values
-                   for group_name, values in str_set_filters.items()):
-                continue
-
-            yield path
-
-    ## SSH LOG FETCHING
-
-    def _ssh_path(self, relative):
-        return (
-            SSH_PREFIX + self._address_of_master() + SSH_LOG_ROOT + '/' +
-            relative)
-
-    def _ls_ssh_logs(self, relative_path):
-        """List logs over SSH by path relative to log root directory"""
-        try:
-            self._enable_slave_ssh_access()
-            log.debug('Search %s for logs' % self._ssh_path(relative_path))
-            return self.ls(self._ssh_path(relative_path))
-        except IOError as e:
-            raise LogFetchError(e)
-
-    def _ls_slave_ssh_logs(self, addr, relative_path):
-        """List logs over multi-hop SSH by path relative to log root directory
-        """
-        self._enable_slave_ssh_access()
-        root_path = '%s%s!%s%s' % (SSH_PREFIX,
-                                   self._address_of_master(),
-                                   addr,
-                                   SSH_LOG_ROOT + '/' + relative_path)
-        log.debug('Search %s for logs' % root_path)
-        return self.ls(root_path)
-
-    def ls_task_attempt_logs_ssh(self, step_nums):
-        all_paths = []
-        try:
-            all_paths.extend(self._ls_ssh_logs('userlogs/'))
-        except IOError:
-            # sometimes the master doesn't have these
-            pass
-        if not all_paths:
-            # get them from the slaves instead (takes a little longer)
-            try:
-                for addr in self._addresses_of_slaves():
-                    logs = self._ls_slave_ssh_logs(addr, 'userlogs/')
-                    all_paths.extend(logs)
-            except IOError:
-                # sometimes the slaves don't have them either
-                pass
-        return self._enforce_path_regexp(all_paths,
-                                         TASK_ATTEMPTS_LOG_URI_RE,
-                                         filters=dict(step_num=step_nums))
-
-    def ls_step_logs_ssh(self, step_nums, cluster_step_ids):
-        # step nums are 1-indexed
-        if step_nums is None:
-            step_ids = None
-        else:
-            step_ids = [cluster_step_ids[step_num - 1]
-                        for step_num in step_nums
-                        if step_num <= len(cluster_step_ids)]
-
-        self._enable_slave_ssh_access()
-        return self._enforce_path_regexp(
-            self._ls_ssh_logs('steps/'),
-            EMR_STEP_LOG_URI_RE,
-            filters=dict(step_id=step_ids))
-
-    def ls_job_logs_ssh(self, step_nums):
-        self._enable_slave_ssh_access()
-        return self._enforce_path_regexp(self._ls_ssh_logs('history/'),
-                                         EMR_JOB_LOG_URI_RE,
-                                         filters=dict(step_num=step_nums))
-
-    def ls_node_logs_ssh(self):
-        self._enable_slave_ssh_access()
-        all_paths = []
-        for addr in self._addresses_of_slaves():
-            logs = self._ls_slave_ssh_logs(addr, '')
-            all_paths.extend(logs)
-        return self._enforce_path_regexp(all_paths, NODE_LOG_URI_RE)
-
-    def ls_all_logs_ssh(self):
-        """List all log files in the log root directory"""
-        return self._ls_ssh_logs('')
-
-    ## S3 LOG FETCHING ##
-
-    def _ls_s3_logs(self, relative_path):
-        """List logs over S3 by path relative to log root directory"""
-        if not self._s3_job_log_uri:
-            self._set_s3_job_log_uri(self._describe_cluster())
-
-        if not self._s3_job_log_uri:
-            raise LogFetchError('Could not determine S3 job log URI')
-
-        full_path = self._s3_job_log_uri + relative_path
-        log.debug('Search %s for logs' % full_path)
-        return self.ls(full_path)
-
-    def ls_task_attempt_logs_s3(self, step_nums):
-        return self._enforce_path_regexp(self._ls_s3_logs('task-attempts/'),
-                                         TASK_ATTEMPTS_LOG_URI_RE,
-                                         filters=dict(step_num=step_nums))
-
-    def ls_step_logs_s3(self, step_nums, cluster_step_ids):
-        if step_nums is None:
-            step_ids = None
-        else:
-            # step nums are 1-indexed
-            step_ids = [cluster_step_ids[step_num - 1]
-                        for step_num in step_nums
-                        if step_num <= len(cluster_step_ids)]
-
-        return self._enforce_path_regexp(self._ls_s3_logs('steps/'),
-                                         EMR_STEP_LOG_URI_RE,
-                                         filters=dict(step_id=step_ids))
-
-    def ls_job_logs_s3(self, step_nums):
-        return self._enforce_path_regexp(self._ls_s3_logs('jobs/'),
-                                         EMR_JOB_LOG_URI_RE,
-                                         filters=dict(step_num=step_nums))
-
-    def ls_node_logs_s3(self):
-        return self._enforce_path_regexp(self._ls_s3_logs('node/'),
-                                         NODE_LOG_URI_RE)
-
-    def ls_all_logs_s3(self):
-        """List all log files in the S3 log root directory"""
-        if not self._s3_job_log_uri:
-            self._set_s3_job_log_uri(self._describe_cluster())
-        return self.ls(self._s3_job_log_uri)
-
     ## LOG PARSING ##
 
     def _fetch_counters(self, step_nums, lg_step_num_mapping=None,
@@ -1850,20 +1684,23 @@ class EMRJobRunner(MRJobRunner):
 
         self._counters = []
         new_counters = {}
-        if self._opts['ec2_key_pair_file']:
-            try:
-                new_counters = self._fetch_counters_ssh(lg_step_nums)
-            except LogFetchError:
-                new_counters = self._fetch_counters_s3(
-                    lg_step_nums, skip_s3_wait)
-            except IOError:
-                # Can get 'file not found' if test suite was lazy or Hadoop
-                # logs moved. We shouldn't crash in either case.
-                new_counters = self._fetch_counters_s3(
-                    lg_step_nums, skip_s3_wait)
+
+        # TODO: do we need this?
+        if not skip_s3_wait:
+            self._wait_for_s3_eventual_consistency()
+
+        uris = self._ls_logs('job', lg_step_nums)
+
+        if uris:
+            new_counters = scan_for_counters_in_files(
+                uris, self.fs, self.get_hadoop_version())
         else:
-            log.info('ec2_key_pair_file not specified, going to S3')
-            new_counters = self._fetch_counters_s3(lg_step_nums, skip_s3_wait)
+            cluster = self._describe_cluster()
+            if not self._cluster_is_done(cluster):
+                log.info("Counters may not have been uploaded to S3 yet."
+                         " Try again in 5 minutes with:"
+                         " mrjob fetch-logs --counters %s" %
+                         cluster.id)
 
         # step_nums is relative to the start of the job flow
         # we only want them relative to the job
@@ -1873,35 +1710,6 @@ class EMRJobRunner(MRJobRunner):
                     new_counters.get(lg_step_num_mapping[step_num], {}))
             else:
                 self._counters.append({})
-
-    def _fetch_counters_ssh(self, step_nums):
-        uris = list(self.ls_job_logs_ssh(step_nums))
-        log.info('Fetching counters from SSH...')
-        return scan_for_counters_in_files(uris, self,
-                                          self.get_hadoop_version())
-
-    def _fetch_counters_s3(self, step_nums, skip_s3_wait=False):
-        log.info('Fetching counters from S3...')
-
-        if not skip_s3_wait:
-            self._wait_for_s3_eventual_consistency()
-
-        try:
-            uris = self.ls_job_logs_s3(step_nums)
-            results = scan_for_counters_in_files(uris, self,
-                                                 self.get_hadoop_version())
-
-            if not results:
-                cluster = self._describe_cluster()
-                if not self._cluster_is_done(cluster):
-                    log.info("Counters may not have been uploaded to S3 yet."
-                             " Try again in 5 minutes with:"
-                             " mrjob fetch-logs --counters %s" %
-                             cluster.id)
-            return results
-        except LogFetchError as e:
-            log.info("Unable to fetch counters: %s" % e)
-            return {}
 
     def counters(self):
         return self._counters
@@ -1928,56 +1736,32 @@ class EMRJobRunner(MRJobRunner):
             step, the URI of the input file that caused the error
             (otherwise None)
         """
-        cluster_step_ids = self._step_ids_for_cluster()
-
-        if self._opts['ec2_key_pair_file']:
-            try:
-                return self._find_probable_cause_of_failure_ssh(
-                    step_nums, cluster_step_ids, lg_step_nums)
-            except LogFetchError:
-                return self._find_probable_cause_of_failure_s3(
-                    step_nums, cluster_step_ids, lg_step_nums)
-        else:
-            log.info('ec2_key_pair_file not specified, going to S3')
-            return self._find_probable_cause_of_failure_s3(
-                step_nums, cluster_step_ids, lg_step_nums)
-
-    def _find_probable_cause_of_failure_ssh(self, step_nums, cluster_step_ids,
-                                            lg_step_nums=None):
-        # empty list is a valid value for lg_step_nums, but it is an optional
-        # parameter
         if lg_step_nums is None:
             lg_step_nums = step_nums
 
-        try:
-            self._enable_slave_ssh_access()
-            task_attempt_logs = self.ls_task_attempt_logs_ssh(step_nums)
-            step_logs = self.ls_step_logs_ssh(lg_step_nums, cluster_step_ids)
-            job_logs = self.ls_job_logs_ssh(step_nums)
-        except IOError as e:
-            raise LogFetchError(e)
-        log.info('Scanning SSH logs for probable cause of failure')
+        step_num_to_id = self._step_num_to_id()
+
+        task_attempt_logs = self._ls_logs('task', step_nums,
+                                          step_num_to_id=step_num_to_id)
+        step_logs = self._ls_logs('step', step_nums,
+                                  step_num_to_id=step_num_to_id)
+        job_logs = self._ls_logs('job', step_nums,
+                                 step_num_to_id=step_num_to_id)
+
         return best_error_from_logs(
-            self.fs, task_attempt_logs, step_logs, job_logs,
-            cluster_step_ids=cluster_step_ids)
+            self.fs, task_attempt_logs, step_logs, job_logs)
 
-    def _find_probable_cause_of_failure_s3(self, step_nums, cluster_step_ids,
-                                           lg_step_nums=None):
-        # empty list is a valid value for lg_step_nums, but it is an optional
-        # parameter
-        if lg_step_nums is None:
-            lg_step_nums = step_nums
+    def _ls_logs(self, log_type, step_nums=None, step_num_to_id=None):
+        # TODO: cache this as we go. We only need to know it if
+        # step_nums is set
+        if step_num_to_id is None:
+            step_num_to_id = self._step_num_to_id()
 
-        log.info('Scanning S3 logs for probable cause of failure')
-        self._wait_for_s3_eventual_consistency()
-        self._wait_for_cluster_to_terminate()
-
-        task_attempt_logs = self.ls_task_attempt_logs_s3(step_nums)
-        step_logs = self.ls_step_logs_s3(step_nums, cluster_step_ids)
-        job_logs = self.ls_job_logs_s3(lg_step_nums)
-        return best_error_from_logs(
-            self.fs, task_attempt_logs, step_logs, job_logs,
-            cluster_step_ids=cluster_step_ids)
+        return ls_logs(self.fs, log_type,
+                       log_dir=self._log_dir(),
+                       ssh_host=self._address_of_master(),
+                       step_nums=step_nums,
+                       step_num_to_id=step_num_to_id)
 
     ### Bootstrapping ###
 
@@ -2560,8 +2344,13 @@ class EMRJobRunner(MRJobRunner):
         emr_conn = self.make_emr_conn()
         return list(_yield_all_steps(emr_conn, self._cluster_id))
 
-    def _step_ids_for_cluster(self):
-        return [step.id for step in self._list_steps_for_cluster()]
+    def _step_num_to_id(self):
+        if self._cluster_id is None:
+            return {}
+
+        return dict((step_num, step.id)
+            for step_num, step in
+            enumerate(self._list_steps_for_cluster(), start=1))
 
     def get_hadoop_version(self):
         if self._hadoop_version is None:
@@ -2600,16 +2389,11 @@ class EMRJobRunner(MRJobRunner):
             try:
                 cluster = self._describe_cluster()
                 if cluster.status.state not in ('RUNNING', 'WAITING'):
-                    raise IOError('Cannot ssh to master;'
-                                  ' job flow not waiting or running')
+                    return None
                 self._address = cluster.masterpublicdnsname
             except boto.exception.S3ResponseError:
                 # Raised when cluster doesn't exist
-                raise IOError('Could not get job flow information')
-            except boto.exception.EmrResponseError:
-                # Raised by very old versions of boto (sometime before 2.4)
-                # when cluster doesn't exist
-                raise IOError('Could not get job flow information')
+                pass
 
         return self._address
 

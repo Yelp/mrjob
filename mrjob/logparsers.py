@@ -14,8 +14,9 @@
 """Parsing classes to find errors in Hadoop logs"""
 import logging
 import posixpath
-import re
 
+from mrjob.logs.ls import _JOB_LOG_PATH_RE
+from mrjob.logs.ls import _TASK_LOG_PATH_RE
 from mrjob.parse import find_hadoop_java_stack_trace
 from mrjob.parse import find_input_uri_for_mapper
 from mrjob.parse import find_interesting_hadoop_streaming_error
@@ -25,120 +26,8 @@ from mrjob.parse import parse_hadoop_counters_from_line
 
 log = logging.getLogger(__name__)
 
-# Constants used to distinguish between different kinds of logs
-TASK_ATTEMPT_LOGS = 'TASK_ATTEMPT_LOGS'
-STEP_LOGS = 'STEP_LOGS'
-JOB_LOGS = 'JOB_LOGS'
-NODE_LOGS = 'NODE_LOGS'
-
-# regex for matching task-attempts log URIs
-TASK_ATTEMPTS_LOG_URI_RE = re.compile(
-    r'^.*/attempt_'                 # attempt_
-    r'(?P<timestamp>\d+)_'          # 201203222119_
-    r'0*(?P<step_num>\d+)_'         # 0001_
-    r'(?P<node_type>\w)_'           # m_
-    r'(?P<node_num>\d+)_'           # 000000_
-    r'(?P<attempt_num>\d+)/'        # 3/
-    r'(?P<stream>stderr|syslog)(\.gz)?$')  # stderr
-
-# regex for matching step log URIs
-HADOOP_STEP_LOG_URI_RE = re.compile(
-    r'^.*/(?P<step_num>\d+)/(?P<stream>syslog|stderr)(\.gz)?$')
-
-# EMR uses step IDs rather than step numbers (see #1117)
-EMR_STEP_LOG_URI_RE = re.compile(
-    r'^.*/(?P<step_id>s-[A-Z0-9]+)/(?P<stream>syslog|stderr)(\.gz)?$')
-
-# regex for matching job log URIs. There is some variety in how these are
-# formatted, so this expression is pretty general.
-EMR_JOB_LOG_URI_RE = re.compile(
-    r'^.*?'     # sometimes there is a number at the beginning, and the
-                # containing directory can be almost anything.
-    r'job_(?P<timestamp>\d+)_0*(?P<step_num>\d+)'  # oh look, meaningful data!
-    r'([_-]\d+)?'  # sometimes there is a number here.
-    r'[_-]hadoop[_-]streamjob(\d+).jar'
-    r'(-[A-Za-z0-9-]+\.jhist)?' # this happens on YARN
-    r'$')
-# TODO: should update this too, or possibly merge with EMR_JOB_LOG_URI_RE
-HADOOP_JOB_LOG_URI_RE = re.compile(
-    r'^.*?/job_(?P<timestamp>\d+)_0*(?P<step_num>\d+)'
-    r'_(?P<mystery_string_1>\d+)'
-    r'_(?P<user>.*?)_streamjob(?P<mystery_string_2>\d+).jar$')
-
-# regex for matching slave log URIs
-NODE_LOG_URI_RE = re.compile(
-    r'^.*?/hadoop-hadoop-(jobtracker|namenode).*.out$')
-
-
-def _filter_sort(logs, exprs, sort_key_func):
-    """Return *logs* that match any compiled regex in *exprs*. *sort_key_func*
-    should be a function that takes the groupdict() of the regex match result
-    and returns a sort key. Each log is in a duple (info, log_path) where info
-    is the groupdict() of the regex match object.
-    """
-    relevant = []
-    for path in logs:
-        for e in exprs:
-            m = e.match(path)
-            m = e.match(path)
-            if m:
-                relevant.append((m.groupdict(), path))
-                break
-
-    def sort_key_wrapper(items):
-        # item[0] is the match groupdict()
-        return sort_key_func(items[0])
-
-    return sorted(relevant, reverse=True, key=sort_key_wrapper)
-
-
-### Helpers to sort different kinds of logs
-
-
-def _sorted_task_attempts(logs):
-    return _filter_sort(
-        logs,
-        [TASK_ATTEMPTS_LOG_URI_RE],
-        lambda info: (
-            info['step_num'], info['node_type'],
-            info['attempt_num'],
-            info['stream'] == 'stderr',
-            info['node_num']))
-
-
-# TODO: this is wrong, and doesn't work on Hadoop
-def _sorted_steps(logs, cluster_step_ids=None):
-    if cluster_step_ids is None:
-        return _sorted_steps_hadoop(logs)
-    else:
-        return _sorted_steps_emr(logs, cluster_step_ids)
-
-
-def _sorted_steps_hadoop(logs):
-    return _filter_sort(
-        logs,
-        [HADOOP_STEP_LOG_URI_RE],
-        lambda info: (int(info['step_num']), info['stream'] == 'stderr'))
-
-
-def _sorted_steps_emr(logs, cluster_step_ids):
-    return _filter_sort(
-        logs,
-        [EMR_STEP_LOG_URI_RE],
-        lambda info: (cluster_step_ids.index(info['step_id'])
-                      if info['step_id'] in cluster_step_ids else -1,
-                      info['stream'] == 'stderr'))
-
-
-def _sorted_jobs(logs):
-    return _filter_sort(
-        logs,
-        [EMR_JOB_LOG_URI_RE, HADOOP_JOB_LOG_URI_RE],
-        lambda info: (info['timestamp'], info['step_num']))
-
 
 ### Helpers for log parsing logic
-
 
 def _parsed_error(fs, path, parse_func):
     """If log lines at *path* (as downloaded by *fs*, which in 0.3.5 is a
@@ -151,11 +40,11 @@ def _parsed_error(fs, path, parse_func):
     return parse_func(lines)
 
 
-def _parse_simple_logs(fs, logs, parse_func):
+def _parse_simple_logs(fs, log_paths, parse_func):
     """Return the relevant lines of the first error in the files at *logs*, or
     None if none found.
     """
-    for _, path in logs:
+    for path in log_paths:
         lines = _parsed_error(fs, path, parse_func)
         if lines:
             return {
@@ -165,17 +54,24 @@ def _parse_simple_logs(fs, logs, parse_func):
             }
 
 
-def _parse_task_attempts(fs, logs):
+def _parse_task_attempts(fs, log_paths):
     """Like :py:func:`_parse_simple_logs()`, but with lots of special cases for
     task attempt logs
     """
     tasks_seen = set()
-    for info, path in logs:
-        task_info = (info['step_num'], info['node_type'],
-                     info['node_num'], info['stream'])
-        if task_info in tasks_seen:
+    for path in log_paths:
+        # skip subsequent logs for same task
+        m = _TASK_LOG_PATH_RE.match(path)
+        if not m:
             continue
-        tasks_seen.add(task_info)
+
+        m_groups = m.groupdict()
+        task_key = tuple(m_groups.get(k) for k in
+                         ['step_num', 'task_type', 'task_num', 'stream'])
+        if task_key in tasks_seen:
+            continue
+
+        tasks_seen.add(task_key)
 
         # Python tracebacks should win in a single file, but Java tracebacks
         # should win for later attempts
@@ -186,10 +82,8 @@ def _parse_task_attempts(fs, logs):
             lines = _parsed_error(fs, path, find_hadoop_java_stack_trace)
 
         if lines:
-            if info.get('node_type', None) == 'm':
-                input_uri = _scan_for_input_uri(path, fs)
-            else:
-                input_uri = None
+            input_uri = _scan_for_input_uri(path, fs)
+
             return {
                 'lines': lines,
                 'log_file_uri': path,
@@ -203,8 +97,11 @@ def _scan_for_input_uri(log_file_uri, runner):
 
     Helper function for :py:func:`scan_task_attempt_logs()`
     """
+    # TODO: verify that this works on 3.x AMIs
     syslog_uri = posixpath.join(
         posixpath.dirname(log_file_uri), 'syslog')
+    if log_file_uri.endswith('.gz'):
+        syslog_uri += '.gz'
 
     syslog_lines = runner.cat(syslog_uri)
     if syslog_lines:
@@ -214,12 +111,7 @@ def _scan_for_input_uri(log_file_uri, runner):
         return None
 
 
-def best_error_from_logs(fs, task_attempts, steps, jobs,
-                         cluster_step_ids=None):
-    task_attempts = _sorted_task_attempts(task_attempts)
-    steps = _sorted_steps(steps, cluster_step_ids=cluster_step_ids)
-    jobs = _sorted_jobs(jobs)
-
+def best_error_from_logs(fs, task_attempts, steps, jobs):
     val = _parse_task_attempts(fs, task_attempts)
     if val:
         return val
@@ -241,26 +133,23 @@ def _timeout_error_wrapper(lines):
     return ['Task timeout after %d seconds\n' % n] if n else None
 
 
-def scan_for_counters_in_files(log_file_uris, runner, hadoop_version):
-    """Scan *log_file_uris* for counters, using *runner* for file system access
+def scan_for_counters_in_files(log_file_uris, fs, hadoop_version):
+    """Scan *log_file_uris* for counters, using *fs* for file system access
     """
     counters = {}
     relevant_logs = []  # list of (sort key, URI)
 
     for log_file_uri in log_file_uris:
-        match = EMR_JOB_LOG_URI_RE.match(log_file_uri)
-        if match is None:
-            match = HADOOP_JOB_LOG_URI_RE.match(log_file_uri)
-
-        if not match:
+        m = _JOB_LOG_PATH_RE.match(log_file_uri)
+        if not m:
             continue
 
-        relevant_logs.append((match.group('step_num'), log_file_uri))
+        relevant_logs.append((int(m.group('step_num')), log_file_uri))
 
     relevant_logs.sort()
 
     for _, log_file_uri in relevant_logs:
-        log_lines = runner.cat(log_file_uri)
+        log_lines = fs.cat(log_file_uri)
         if not log_lines:
             continue
 

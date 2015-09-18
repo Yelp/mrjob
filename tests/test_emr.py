@@ -1138,8 +1138,8 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
         self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
 
         # need this to make step mapping work
-        self.runner._step_ids_for_cluster = Mock(
-            return_value=['s-ONE', 's-TWO', 's-THREE', 's-FOUR'])
+        self.runner._step_num_to_id = Mock(
+            return_value={1: 's-ONE', 2: 's-TWO', 3: 's-THREE', 4: 's-FOUR'})
 
     def cleanup_runner(self):
         self.runner.cleanup()
@@ -1241,7 +1241,6 @@ class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
                          'attempt_201007271720_0002_m_000004_0/syslog')
 
     def test_later_step_logs_win(self):
-        # TODO: we're currently just sorting alphabetically by step ID
         self.add_mock_s3_data({'walrus': {
             LOG_DIR + 'steps/s-THREE/syslog':
                 HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
@@ -1397,6 +1396,7 @@ class CounterFetchingTestCase(MockBotoTestCase):
     def _mock_step(self, jar):
         return MockEmrObject(
             config=MockEmrObject(jar=jar),
+            id='s-FAKE',
             name=self.runner._job_key,
             status=MockEmrObject(state='COMPLETED'))
 
@@ -1407,10 +1407,10 @@ class CounterFetchingTestCase(MockBotoTestCase):
             self._mock_step(jar='x.jar'),
         ]
 
-        self.runner._fetch_counters_s3 = Mock(return_value={})
+        self.runner._ls_logs = Mock(return_value={})
 
         self.runner._wait_for_job_to_complete()
-        self.runner._fetch_counters_s3.assert_called_with([], False)
+        self.runner._ls_logs.assert_called_with('job', [])
 
     def test_interleaved_log_generating_steps(self):
         self.mock_cluster.status.state = 'TERMINATED'
@@ -1421,10 +1421,11 @@ class CounterFetchingTestCase(MockBotoTestCase):
             self._mock_step(jar='hadoop.streaming.jar'),
         ]
 
-        self.runner._fetch_counters_s3 = Mock(return_value={})
+        self.runner._ls_logs = Mock(return_value=[])
 
         self.runner._wait_for_job_to_complete()
-        self.runner._fetch_counters_s3.assert_called_with([1, 2], False)
+
+        self.runner._ls_logs.assert_called_with('job', [1, 2])
 
 
 class LogFetchingFallbackTestCase(MockBotoTestCase):
@@ -1450,7 +1451,7 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
         """
         self.runner.cleanup()
 
-    def test_ssh_comes_first(self):
+    def test_exception_in_s3_logs_beats_ssh(self):
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/s-ONE')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
         mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/userlogs')
@@ -1461,18 +1462,15 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
         mock_ssh_file('testmaster', ssh_lone_log_path,
                       HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n')
 
-        # Put a 'more interesting' error in S3 to make sure that the
-        # 'less interesting' one from SSH is read and S3 is never
-        # looked at. This would never happen in reality because the
-        # logs should be identical, but it makes for an easy test
-        # of SSH overriding S3.
+        # Put a 'more interesting' error in S3
         self.add_mock_s3_data({'walrus': {
             TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
                 TRACEBACK_START + PY_EXCEPTION,
         }})
         failure = self.runner._find_probable_cause_of_failure([1, 2])
         self.assertEqual(failure['log_file_uri'],
-                         SSH_PREFIX + self.runner._address + ssh_lone_log_path)
+                         's3://walrus/' + TASK_ATTEMPTS_DIR +
+                         'attempt_201007271720_0002_m_000126_0/stderr')
 
     def test_ssh_works_with_slaves(self):
         self.add_slave()
@@ -1500,7 +1498,7 @@ class LogFetchingFallbackTestCase(MockBotoTestCase):
 
     def test_ssh_fails_to_s3(self):
         # the runner will try to use SSH and find itself unable to do so,
-        # throwing a LogFetchError and triggering S3 fetching.
+        # triggering S3 fetching.
         self.runner._address = None
 
         # Put a different error into S3
@@ -1655,8 +1653,6 @@ class TestSSHLs(MockBotoTestCase):
         self.assertEqual(
             sorted(self.runner.ls('ssh://testmaster/test')),
             ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
-
-        self.runner._enable_slave_ssh_access()
 
         self.assertEqual(
             list(self.runner.ls('ssh://testmaster!testslave0/test')),
@@ -2276,6 +2272,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
                 config=MockEmrObject(args=[]),
+                id='s-FAKE',
                 name='dummy',
                 status=MockEmrObject(
                     state='COMPLETED',
@@ -2297,6 +2294,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
                 config=MockEmrObject(args=[]),
+                id='s-FAKE',
                 name='dummy',
                 status=MockEmrObject(
                     state='COMPLETED',

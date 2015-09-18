@@ -22,6 +22,7 @@ import itertools
 import logging
 import os
 import pipes
+import random
 import shlex
 import sys
 import tarfile
@@ -355,6 +356,11 @@ def populate_option_groups_with_options(assignments, indexed_options):
         # Sort alphabetically for help
         opt_group.option_list = sorted(opt_group.option_list,
                                        key=lambda item: item.get_opt_string())
+
+
+def random_identifier():
+    """A random 16-digit hex string."""
+    return '%016x' % random.randint(0, 2 ** 64 - 1)
 
 
 def read_file(path, fileobj=None, yields_lines=True, cleanup=None):

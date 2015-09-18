@@ -54,6 +54,7 @@ import logging
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _describe_cluster
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_steps
@@ -606,7 +607,7 @@ def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
             emr_conn, created_after=created_after):
         cluster_id = cluster_summary.id
 
-        cluster = emr_conn.describe_cluster(cluster_id)
+        cluster = _describe_cluster(emr_conn, cluster_id)
         cluster.steps = list(_yield_all_steps(emr_conn, cluster_id))
         cluster.bootstrapactions = list(
             _yield_all_bootstrap_actions(emr_conn, cluster_id))

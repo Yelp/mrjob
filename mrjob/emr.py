@@ -203,6 +203,20 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
             yield step
 
 
+def _describe_cluster(emr_conn, cluster_id, *args, **kwargs):
+    """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
+    that adds the ReleaseLable field.
+    """
+    Cluster = boto.emr.emrobject.Cluster
+    try:
+        orig_fields = Cluster.Fields
+        Cluster.Fields = Cluster.Fields | set(['ReleaseLabel'])
+
+        return _describe_cluster(emr_conn, cluster_id, *args, **kwargs)
+    finally:
+        Cluster.Fields = orig_fields
+
+
 def _list_steps(emr_conn, cluster_id, *args, **kwargs):
     """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
     that works around around `boto's startdatetime bug
@@ -2413,7 +2427,7 @@ class EMRJobRunner(MRJobRunner):
 
         for cluster_summary in _yield_all_clusters(
                 emr_conn, cluster_states=['WAITING']):
-            cluster = emr_conn.describe_cluster(cluster_summary.id)
+            cluster = _describe_cluster(emr_conn, cluster_summary.id)
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for
@@ -2553,7 +2567,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
-        return emr_conn.describe_cluster(self._cluster_id)
+        return _describe_cluster(emr_conn, self._cluster_id)
 
     def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls

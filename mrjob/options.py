@@ -603,7 +603,7 @@ def add_emr_instance_opts(opt_group):
         # AMI
         opt_group.add_option(
             '--ami-version', dest='ami_version', default=None,
-            help=('AMI Version to use, e.g. "2.4.11" (default "latest").')),
+            help=('AMI Version to use, e.g. "2.4.11"')),
 
         # instance types
         opt_group.add_option(

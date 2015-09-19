@@ -24,8 +24,8 @@ from datetime import datetime
 from io import BytesIO
 
 try:
+    import boto.emr.connection
     from boto.emr.connection import EmrConnection
-    from boto.emr.emrobject import ClusterTimeline
     from boto.emr.instance_group import InstanceGroup
     from boto.emr.step import JarStep
     import boto.exception
@@ -34,6 +34,7 @@ try:
 except ImportError:
     boto = None
 
+from mrjob.compat import _map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_values
 from mrjob.emr import EMRJobRunner
@@ -75,13 +76,14 @@ AMI_VERSION_ALIASES = {
 }
 
 # versions of hadoop for each AMI
-AMI_HADOOP_VERSION_UPDATES = [
-    ('1.0.0', '0.20'),
-    ('2.0.0', '0.20.205'),
-    ('2.2.0', '1.0.3'),
-    ('3.0.0', '2.2.0'),
-    ('3.1.0', '2.4.0'),
-]
+AMI_HADOOP_VERSION_UPDATES = {
+    '1.0.0': '0.20',
+    '2.0.0': '0.20.205',
+    '2.2.0': '1.0.3',
+    '3.0.0': '2.2.0',
+    '3.1.0': '2.4.0',
+    '4.0.0': '2.6.0',
+}
 
 # extra step to use when debugging_step=True is passed to run_jobflow()
 DEBUGGING_STEP = JarStep(
@@ -715,6 +717,17 @@ class MockEmrConnection(object):
                 visible_to_all_users = (
                     api_params['VisibleToAllUsers'] == 'true')
 
+        release_label = None
+        if api_params and api_params.get('ReleaseLabel'):
+            release_label = api_params['ReleaseLabel']
+
+        if release_label and ami_version:
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'Only one AMI version and release label may be specified.'
+                    ' Provided AMI: %s, release label: %s.' % (
+                        ami_version, release_label)))
+
         # API no longer allows you to explicitly specify 1.x versions
         if ami_version and ami_version.startswith('1.'):
             raise boto.exception.EmrResponseError(
@@ -722,18 +735,22 @@ class MockEmrConnection(object):
                     'Job flow role is not compatible with the supplied'
                     ' AMI version'))
 
-        # pick running AMI version
-        running_ami_version = AMI_VERSION_ALIASES.get(ami_version, ami_version)
-
-        # determine Hadoop version
-        for av, hv in reversed(AMI_HADOOP_VERSION_UPDATES):
-            if version_gte(running_ami_version, av):
-                running_hadoop_version = hv
-                break
+        # determine hadoop version
+        running_ami_version = None
+        if release_label:
+            running_hadoop_version = _map_version(
+                AMI_HADOOP_VERSION_UPDATES, release_label.lstrip('emr-'))
         else:
-            running_hadoop_version = hv
+            # only need this if ami_version param is set
+            running_ami_version = AMI_VERSION_ALIASES.get(
+                ami_version, ami_version)
+
+            # determine Hadoop version
+            running_hadoop_version = _map_version(
+                AMI_HADOOP_VERSION_UPDATES, running_ami_version)
 
         # if hadoop_version is set, it should match
+        # (this is probably no longer relevant to mrjob)
         if not (hadoop_version is None or
                 hadoop_version == running_hadoop_version):
             raise boto.exception.EmrResponseError(
@@ -749,6 +766,7 @@ class MockEmrConnection(object):
         assert cluster_id not in self.mock_emr_clusters
 
         cluster = MockEmrObject(
+            # todo: this is stored in configurations for 4.x AMIs
             applications=[MockEmrObject(
                 name='hadoop',
                 version=running_hadoop_version,
@@ -765,6 +783,7 @@ class MockEmrConnection(object):
             masterpublicdnsname='mockmaster',
             name=name,
             normalizedinstancehours='0',
+            releaselabel=release_label,
             requestedamiversion=ami_version,
             runningamiversion=running_ami_version,
             servicerole=service_role,
@@ -1043,7 +1062,7 @@ class MockEmrConnection(object):
 
         # make sure that we only call list_steps() when we've patched
         # around https://github.com/boto/boto/issues/3268
-        if 'StartDateTime' not in ClusterTimeline.Fields:
+        if 'StartDateTime' not in boto.emr.connection.ClusterTimeline.Fields:
             raise Exception('called un-patched version of list_steps()!')
 
         if marker is not None:

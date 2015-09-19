@@ -54,7 +54,6 @@ import logging
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import _describe_cluster
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_steps
@@ -65,6 +64,7 @@ from mrjob.options import alphabetize_options
 from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import STEP_NAME_RE
 from mrjob.parse import iso8601_to_datetime
+from mrjob.patched_boto import patched_describe_cluster
 from mrjob.util import strip_microseconds
 
 log = logging.getLogger(__name__)
@@ -607,7 +607,7 @@ def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
             emr_conn, created_after=created_after):
         cluster_id = cluster_summary.id
 
-        cluster = _describe_cluster(emr_conn, cluster_id)
+        cluster = patched_describe_cluster(emr_conn, cluster_id)
         cluster.steps = list(_yield_all_steps(emr_conn, cluster_id))
         cluster.bootstrapactions = list(
             _yield_all_bootstrap_actions(emr_conn, cluster_id))

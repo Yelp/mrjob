@@ -620,6 +620,8 @@ def jobconf_from_dict(jobconf, name, default=None):
     return default
 
 
+# TODO: reversing the arguments makes more sense. do that before
+# exposing this function
 def _map_version(version_map, version):
     """Look up value in the given dictionary which maps versions
     (as strings) to the value for that version and later.

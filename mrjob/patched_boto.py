@@ -20,6 +20,7 @@ of mrjob!
 import boto.emr.connection
 from boto.emr.emrobject import Cluster
 from boto.emr.emrobject import ClusterTimeline
+from boto.emr.emrobject import EmrObject
 from boto.resultset import ResultSet
 
 
@@ -57,6 +58,23 @@ def patched_list_steps(emr_conn, *args, **kwargs):
         boto.emr.connection.ClusterTimeline = ClusterTimeline
 
 
+class Configuration(EmrObject):
+    """The Configuration class, per
+    http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_Cluster.html.
+
+    Looks like in practice, Applications is returned with 4.x AMIs too.
+    """
+    Fields = set(['Classification'])
+
+    def __init__(self, connection=None):
+        self.connection = connection
+
+    def startElement(self, name, attrs, connection):
+        if name == 'Properties':
+            self.properties = ResultSet([('member', KeyValue)])
+            return self.properties
+
+
 class PatchedCluster(Cluster):
     """Cluster class, plus the ReleaseLabel and Configurations fields."""
 
@@ -74,7 +92,7 @@ class PatchedCluster(Cluster):
             return self.configurations
 
         return super(PatchedCluster, self).startElement(
-            self, name, attrs, connection)
+            name, attrs, connection)
 
 
 class PatchedClusterTimeline(ClusterTimeline):

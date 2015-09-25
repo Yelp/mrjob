@@ -766,7 +766,6 @@ class MockEmrConnection(object):
         assert cluster_id not in self.mock_emr_clusters
 
         cluster = MockEmrObject(
-            # todo: this is stored in configurations for 4.x AMIs
             applications=[MockEmrObject(
                 name='hadoop',
                 version=running_hadoop_version,

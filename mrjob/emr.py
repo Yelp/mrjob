@@ -338,6 +338,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['aws_region'] = _DEFAULT_AWS_REGION
 
         self._fix_ec2_instance_opts()
+        self._fix_release_label_opt()
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
@@ -457,6 +458,16 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                         self[opt_name] = None
                 except ValueError:
                     pass  # maybe EMR will accept non-floats?
+
+    def _fix_release_label_opt(self):
+        """If *release_label* is not set and *ami_version* is set to version
+        4 or higher (which the EMR API won't accept), set *release_label*
+        to "emr-" plus *ami_version*. (Leave *ami_version* as-is;
+        *release_label* overrides it anyway.)"""
+        if (not self['release_label'] and
+            self['ami_version'] != 'latest' and
+            version_gte(self['ami_version'], '4')):
+            self['release_label'] = 'emr-' + self['ami_version']
 
 
 class EMRJobRunner(MRJobRunner):
@@ -1198,16 +1209,10 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['release_label']:
             api_params['ReleaseLabel'] = self._opts['release_label']
         else:
-            ami_version = self._opts['ami_version']
-            # don't pass 'latest' to version_gte(), causes TypeError
-            if ami_version != 'latest' and version_gte(ami_version, '4'):
-                api_params['ReleaseLabel'] = 'emr-' + ami_version
-            else:
-                args['ami_version'] = ami_version
+            args['ami_version'] = self._opts['ami_version']
 
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
-
         # The old, simple API, available if we're not using task instances
         # or bid prices
         if not (self._opts['num_ec2_task_instances'] or

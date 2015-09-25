@@ -766,7 +766,7 @@ class MockEmrConnection(object):
         applications = [MockEmrObject(
                 name=hadoop_name,
                 version=running_hadoop_version,
-        )],
+        )]
 
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunner uses

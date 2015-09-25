@@ -120,7 +120,7 @@ LOG_GENERATING_STEP_NAME_RE = HADOOP_STREAMING_JAR_RE
 _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '2': dict(name='job tracker', path='/jobtracker.jsp', port=9100),
     '3': dict(name='resource manager', path='/cluster', port=9026),
-    '4': dict(name='resource manager', path='/cluster', port=8032),
+    '4': dict(name='resource manager', path='/cluster', port=8088),
 }
 
 MAX_SSH_RETRIES = 20
@@ -1584,7 +1584,8 @@ class EMRJobRunner(MRJobRunner):
                             if progress is not None:
                                 log.info(' %5.1f%% complete' % progress)
                     finally:
-                        tunnel_handle.close()
+                        if tunnel_handle is not None:
+                            tunnel_handle.close()
 
                 # once a step is running, it's safe to set up the ssh tunnel to
                 # the job tracker

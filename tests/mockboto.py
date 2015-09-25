@@ -34,7 +34,7 @@ try:
 except ImportError:
     boto = None
 
-from mrjob.compat import _map_version
+from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_values
 from mrjob.emr import EMRJobRunner
@@ -749,8 +749,8 @@ class MockEmrConnection(object):
             running_ami_version = ami_version
 
         # determine hadoop version
-        running_hadoop_version = _map_version(
-            AMI_HADOOP_VERSION_UPDATES, ami_version)
+        running_hadoop_version = map_version(
+            ami_version, AMI_HADOOP_VERSION_UPDATES)
 
         # if hadoop_version is set, it should match AMI version
         # (this is probably no longer relevant to mrjob)

@@ -60,7 +60,7 @@ from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
-from mrjob.compat import _map_version
+from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -891,8 +891,8 @@ class EMRJobRunner(MRJobRunner):
         path: path to start page of job tracker/resource manager
         port: port job tracker/resource manager is running on.
         """
-        return _map_version(_AMI_VERSION_TO_SSH_TUNNEL_CONFIG,
-                            self.get_ami_version())
+        return map_version(self.get_ami_version(),
+                           _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
 
     def _set_up_ssh_tunnel(self, host):
         """set up the ssh tunnel to the job tracker, if it's not currently

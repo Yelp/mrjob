@@ -620,16 +620,20 @@ def jobconf_from_dict(jobconf, name, default=None):
     return default
 
 
-# TODO: reversing the arguments makes more sense. do that before
-# exposing this function
-def _map_version(version_map, version):
-    """Look up value in the given dictionary which maps versions
-    (as strings) to the value for that version and later.
+def map_version(version, version_map):
+    """Allows you to look up something by version (e.g. which jobconf variable
+    to use, specifying only the versions where that value changed.
 
-    For efficiency, version_map can also be a list of tuples of
-    (LooseVersion(version_as_string), value), with oldest versions first.
+    *version* is a string
 
-    If there are no matches, use the value for the earliest version.
+    *version_map* is a map from version (as a string) that a value changed
+    to the new value.
+
+    For efficiency, *version_map* can also be a list of tuples of
+    ``(LooseVersion(version_as_string), value)``, with oldest versions first.
+
+    If *version* is less than any version in *version_map*, use the value for
+    the earliest version in *version_map*.
     """
     if not version_map:
         raise ValueError
@@ -652,7 +656,7 @@ def translate_jobconf(variable, version):
     a variable we recognize, leave as-is.
     """
     if variable in _JOBCONF_MAP:
-        return _map_version(_JOBCONF_MAP[variable], version)
+        return map_version(version, _JOBCONF_MAP[variable])
     else:
         return variable
 

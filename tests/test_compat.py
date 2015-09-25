@@ -17,13 +17,13 @@
 import os
 from distutils.version import LooseVersion
 
-from mrjob.compat import jobconf_from_env
 from mrjob.compat import jobconf_from_dict
+from mrjob.compat import jobconf_from_env
+from mrjob.compat import map_version
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_generic_jobconf
-from mrjob.compat import _map_version
 
 from tests.py2 import TestCase
 from tests.py2 import patch
@@ -134,9 +134,9 @@ class CompatTestCase(TestCase):
 class MapVersionTestCase(TestCase):
 
     def test_empty(self):
-        self.assertRaises(ValueError, _map_version, None, '0.5.0')
-        self.assertRaises(ValueError, _map_version, {}, '0.5.0'),
-        self.assertRaises(ValueError, _map_version, [], '0.5.0')
+        self.assertRaises(ValueError, map_version, '0.5.0', None)
+        self.assertRaises(ValueError, map_version, '0.5.0', {})
+        self.assertRaises(ValueError, map_version, '0.5.0', [])
 
     def test_dict(self):
         version_map = {
@@ -145,15 +145,15 @@ class MapVersionTestCase(TestCase):
             '3': 'baz',
         }
 
-        self.assertEqual(_map_version(version_map, '1.1'), 'foo')
+        self.assertEqual(map_version('1.1', version_map), 'foo')
         # test exact match
-        self.assertEqual(_map_version(version_map, '2'), 'bar')
+        self.assertEqual(map_version('2', version_map), 'bar')
         # versions are just minimums
-        self.assertEqual(_map_version(version_map, '4.5'), 'baz')
+        self.assertEqual(map_version('4.5', version_map), 'baz')
         # compare versions, not strings
-        self.assertEqual(_map_version(version_map, '11.11'), 'baz')
+        self.assertEqual(map_version('11.11', version_map), 'baz')
         # fall back to lowest version
-        self.assertEqual(_map_version(version_map, '0.1'), 'foo')
+        self.assertEqual(map_version('0.1', version_map), 'foo')
 
     def test_list_of_tuples(self):
         version_map = [
@@ -162,8 +162,8 @@ class MapVersionTestCase(TestCase):
             (LooseVersion('3'), 'baz'),
         ]
 
-        self.assertEqual(_map_version(version_map, '1.1'), 'foo')
-        self.assertEqual(_map_version(version_map, '2'), 'bar')
-        self.assertEqual(_map_version(version_map, '4.5'), 'baz')
-        self.assertEqual(_map_version(version_map, '11.11'), 'baz')
-        self.assertEqual(_map_version(version_map, '0.1'), 'foo')
+        self.assertEqual(map_version('1.1', version_map), 'foo')
+        self.assertEqual(map_version('2', version_map), 'bar')
+        self.assertEqual(map_version('4.5', version_map), 'baz')
+        self.assertEqual(map_version('11.11', version_map), 'baz')
+        self.assertEqual(map_version('0.1', version_map), 'foo')

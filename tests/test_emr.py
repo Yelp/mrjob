@@ -616,8 +616,12 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
             runner.run()
             self.assertEqual(runner.get_ami_version(), '4.0.0')
             self.assertEqual(runner.get_hadoop_version(), '2.6.0')
-            self.assertEqual(runner._describe_cluster().releaselabel,
+
+            cluster = runner._describe_cluster()
+            self.assertEqual(getattr(cluster, 'releaselabel', ''),
                              'emr-4.0.0')
+            self.assertEqual(getattr(cluster, 'requestedamiversion', ''), '')
+            self.assertEqual(getattr(cluster, 'runningamiversion', ''), '')
 
     def test_ami_version_4_0_0_via_ami_version_option(self):
         # mrjob should also be smart enough to handle this
@@ -625,8 +629,12 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
             runner.run()
             self.assertEqual(runner.get_ami_version(), '4.0.0')
             self.assertEqual(runner.get_hadoop_version(), '2.6.0')
-            self.assertEqual(runner._describe_cluster().releaselabel,
+
+            cluster = runner._describe_cluster()
+            self.assertEqual(getattr(cluster, 'releaselabel', ''),
                              'emr-4.0.0')
+            self.assertEqual(getattr(cluster, 'requestedamiversion', ''), '')
+            self.assertEqual(getattr(cluster, 'runningamiversion', ''), '')
 
     def test_hadoop_version_option_does_nothing(self):
         with logger_disabled('mrjob.emr'):

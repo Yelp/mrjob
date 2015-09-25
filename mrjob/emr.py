@@ -2377,7 +2377,7 @@ class EMRJobRunner(MRJobRunner):
                 self._ami_version = release_label.lstrip('emr-')
 
         for a in cluster.applications:
-            if a.name == 'hadoop':
+            if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs
                 self._hadoop_version = a.version
 
         # TODO: could get masterpublicdnsname too

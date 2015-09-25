@@ -761,6 +761,13 @@ class MockEmrConnection(object):
                     'The requested AMI version does not support the requested'
                     ' Hadoop version'))
 
+        # build applications list
+        hadoop_name = 'Hadoop' if version_gte(ami_version, '4') else 'hadoop'
+        applications = [MockEmrObject(
+                name=hadoop_name,
+                version=running_hadoop_version,
+        )],
+
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunner uses
         steps = steps or []
@@ -769,10 +776,7 @@ class MockEmrConnection(object):
         assert cluster_id not in self.mock_emr_clusters
 
         cluster = MockEmrObject(
-            applications=[MockEmrObject(
-                name='hadoop',
-                version=running_hadoop_version,
-            )],
+            applications=applications,
             autoterminate=('false' if keep_alive else 'true'),
             ec2instanceattributes=MockEmrObject(
                 ec2availabilityzone=availability_zone,

@@ -603,12 +603,12 @@ def add_emr_instance_opts(opt_group):
         # AMI
         opt_group.add_option(
             '--ami-version', dest='ami_version', default=None,
-            help=('AMI Version to use, e.g. "2.4.11"')),
+            help=('AMI Version to use, e.g. "2.4.11", "3.8.0", "4.0.0"')),
 
         opt_group.add_option(
             '--release-label', dest='release_label', default=None,
-            help=('Release Label (e.g. "emr-4.0.0"). Use this'
-                  ' for 4.x AMIs.')),
+            help=('Release Label (e.g. "emr-4.0.0"). Overrides'
+                  ' --ami-version')),
 
         # instance types
         opt_group.add_option(

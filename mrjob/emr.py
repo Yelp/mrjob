@@ -1383,6 +1383,12 @@ class EMRJobRunner(MRJobRunner):
         }
 
         step_args = []
+
+        # on 4.x AMIs, everything goes through command-runner.jar
+        if self._opts['release_label']:
+            streaming_step_kwargs['jar'] = 'command-runner.jar'
+            step_args.append('hadoop-streaming')
+
         step_args.extend(self._upload_args(self._upload_mgr))
         step_args.extend(self._hadoop_args_for_step(step_num))
 

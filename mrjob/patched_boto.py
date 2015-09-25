@@ -21,6 +21,7 @@ import boto.emr.connection
 from boto.emr.emrobject import Cluster
 from boto.emr.emrobject import ClusterTimeline
 from boto.emr.emrobject import EmrObject
+from boto.emr.emrobject import KeyValue
 from boto.resultset import ResultSet
 
 
@@ -67,10 +68,16 @@ class Configuration(EmrObject):
     Fields = set(['Classification'])
 
     def __init__(self, connection=None):
-        self.connection = connection
+        super(Configuration, self).__init__(connection=connection)
+        self.configurations = None
+        self.properties = None
 
     def startElement(self, name, attrs, connection):
-        if name == 'Properties':
+        if name == 'Configuration':
+            # configurations can contain themselves
+            self.configurations = ResultSet([('member', Configuration)])
+            return self.configurations
+        elif name == 'Properties':
             self.properties = ResultSet([('member', KeyValue)])
             return self.properties
 

@@ -1198,7 +1198,12 @@ class EMRJobRunner(MRJobRunner):
         if self._opts['release_label']:
             api_params['ReleaseLabel'] = self._opts['release_label']
         else:
-            args['ami_version'] = self._opts['ami_version']
+            ami_version = self._opts['ami_version']
+            # don't pass 'latest' to version_gte(), causes TypeError
+            if ami_version != 'latest' and version_gte(ami_version, '4'):
+                api_params['ReleaseLabel'] = 'emr-' + ami_version
+            else:
+                args['ami_version'] = ami_version
 
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
@@ -2363,7 +2368,14 @@ class EMRJobRunner(MRJobRunner):
 
         cluster = self._describe_cluster()
 
-        self._ami_version = cluster.runningamiversion
+        # AMI version might be in RunningAMIVersion (2.x, 3.x)
+        # or ReleaseLabel (4.x)
+        self._ami_version = getattr(cluster, 'runningamiversion', None)
+        if not self._ami_version:
+            release_label = getattr(cluster, 'releaselabel', None)
+            if release_label:
+                self._ami_version = release_label.lstrip('emr-')
+
         for a in cluster.applications:
             if a.name == 'hadoop':
                 self._hadoop_version = a.version

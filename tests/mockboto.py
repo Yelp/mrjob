@@ -735,21 +735,24 @@ class MockEmrConnection(object):
                     'Job flow role is not compatible with the supplied'
                     ' AMI version'))
 
-        # determine hadoop version
-        running_ami_version = None
+        # figure out actual ami version (ami_version) and params for
+        # 2.x and 3.x clusters (requested_ami_version,
+        # running_ami_version)
         if release_label:
-            running_hadoop_version = _map_version(
-                AMI_HADOOP_VERSION_UPDATES, release_label.lstrip('emr-'))
+            ami_version = release_label.lstrip('emr-')
+            requested_ami_version = None
+            running_ami_version = None
         else:
-            # only need this if ami_version param is set
-            running_ami_version = AMI_VERSION_ALIASES.get(
-                ami_version, ami_version)
+            requested_ami_version = ami_version
+            # translate "latest" and None
+            ami_version = AMI_VERSION_ALIASES.get(ami_version, ami_version)
+            running_ami_version = ami_version
 
-            # determine Hadoop version
-            running_hadoop_version = _map_version(
-                AMI_HADOOP_VERSION_UPDATES, running_ami_version)
+        # determine hadoop version
+        running_hadoop_version = _map_version(
+            AMI_HADOOP_VERSION_UPDATES, ami_version)
 
-        # if hadoop_version is set, it should match
+        # if hadoop_version is set, it should match AMI version
         # (this is probably no longer relevant to mrjob)
         if not (hadoop_version is None or
                 hadoop_version == running_hadoop_version):
@@ -783,7 +786,7 @@ class MockEmrConnection(object):
             name=name,
             normalizedinstancehours='0',
             releaselabel=release_label,
-            requestedamiversion=ami_version,
+            requestedamiversion=requested_ami_version,
             runningamiversion=running_ami_version,
             servicerole=service_role,
             status=MockEmrObject(
@@ -818,13 +821,13 @@ class MockEmrConnection(object):
                     master_instance_type, slave_instance_type, num_instances))
 
         # 3.x AMIs don't support m1.small
-        if running_ami_version.startswith('3.') and any(
+        if version_gte(ami_version, '3') and any(
                 ig.instancetype == 'm1.small'
                 for ig in cluster._instancegroups):
             raise boto.exception.EmrResponseError(
                 400, 'Bad Request', body=err_xml(
                     'm1.small instance type is not supported with AMI'
-                    ' version %s' % running_ami_version))
+                    ' version %s' % ami_version))
 
         # will handle steps arg in a moment
         cluster._steps = []

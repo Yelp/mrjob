@@ -2966,6 +2966,8 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
             self.runner, '_step_output_uri', return_value=['output']))
         self.start(patch.object(
             self.runner, '_get_streaming_jar', return_value=['streaming.jar']))
+        self.start(patch.object(
+            self.runner, 'get_ami_version', return_value='3.8.0'))
 
         self.start(patch.object(boto.emr, 'StreamingStep', dict))
         self.runner._hadoop_version = '0.20'
@@ -2987,6 +2989,26 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
             mapper=(PYTHON_BIN + ' my_job.py --step-num=0 --mapper'),
             reducer=None,
         )
+
+    def test_basic_mapper_on_4_x_ami(self):
+        # 4.x AMIs use an intermediary jar to run streaming steps.
+        # Everything else works the same way, so no need to
+        # have multiple 4.x AMI tests
+        self.runner.get_ami_version.return_value = '4.0.0'
+
+        self._assert_streaming_step(
+            {
+                'jar': 'command-runner.jar',
+                'step_args': ['hadoop-streaming'],
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+            },
+            mapper=(PYTHON_BIN + ' my_job.py --step-num=0 --mapper'),
+            reducer=None,
+        )
+
 
     def test_basic_reducer(self):
         self._assert_streaming_step(

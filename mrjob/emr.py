@@ -2103,7 +2103,13 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['emr_job_flow_pool_name'] != pool_name:
                 return
 
-            if self._opts['ami_version'] == 'latest':
+            if self._opts['release_label']:
+                # just check for exact match. EMR doesn't have a concept
+                # of partial release labels like it does for AMI versions.
+                if (gettattr(cluster, 'releaselabel', '') !=
+                    self._opts['release_label']):
+                    return
+            elif self._opts['ami_version'] == 'latest':
                 # look for other clusters where "latest" was requested
                 if getattr(cluster, 'requestedamiversion', '') != 'latest':
                     return

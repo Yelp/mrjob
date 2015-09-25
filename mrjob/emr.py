@@ -1385,7 +1385,7 @@ class EMRJobRunner(MRJobRunner):
         step_args = []
 
         # on 4.x AMIs, everything goes through command-runner.jar
-        if self._opts['release_label']:
+        if version_gte(self.get_ami_version(), '4'):
             streaming_step_kwargs['jar'] = 'command-runner.jar'
             step_args.append('hadoop-streaming')
 

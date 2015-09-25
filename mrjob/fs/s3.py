@@ -182,7 +182,6 @@ class S3Filesystem(Filesystem):
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
-        s3_conn = self.make_s3_conn()
         for uri in self.ls(path_glob):
             key = self.get_s3_key(uri)
             if key:

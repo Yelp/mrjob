@@ -34,6 +34,10 @@ class Filesystem(object):
     * :py:class:`mrjob.fs.ssh.SSHFilesystem`: ``ssh://hostname/path``
     """
 
+    def can_handle_path(self, path):
+        """Can we handle this path at all?"""
+        False
+
     def cat(self, path_glob):
         """cat all files matching **path_glob**, decompressing if necessary"""
         for filename in self.ls(path_glob):

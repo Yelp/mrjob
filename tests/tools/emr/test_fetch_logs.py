@@ -57,7 +57,8 @@ class LogFetchingTestCase(ToolTestCase):
 
     def test_bad_args(self):
         self.monkey_patch_argv()
-        self.assertRaises(OptionError, parse_args, (make_option_parser(),))
+        self.monkey_patch_stderr()
+        self.assertRaises(SystemExit, parse_args, (make_option_parser(),))
 
     def test_runner_kwargs(self):
         self.monkey_patch_argv('--quiet', 'j-MOCKCLUSTER0')

@@ -171,7 +171,7 @@ class RunnerOptionStore(OptionStore):
 
         for path, mrjob_conf_opts in unsanitized_opt_dicts:
             self.cascading_dicts.append(self.validated_options(
-                mrjob_conf_opts, from_where=('from %s' % path)))
+                mrjob_conf_opts, from_where=(' from %s' % path)))
 
         self.cascading_dicts.append(opts)
 

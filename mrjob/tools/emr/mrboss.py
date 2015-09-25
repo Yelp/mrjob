@@ -56,7 +56,9 @@ from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_connect_opts
 from mrjob.options import alphabetize_options
+from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_run_with_recursion
+from mrjob.util import random_identifier
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import shlex_split
 
@@ -110,16 +112,25 @@ def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     """
     master_addr = runner._address_of_master()
     addresses = [master_addr]
+
+    ssh_bin = runner._opts['ssh_bin']
+    ec2_key_pair_file = runner._opts['ec2_key_pair_file']
+
+    keyfile = None
     if runner._opts['num_ec2_instances'] > 1:
         addresses += ['%s!%s' % (master_addr, slave_addr)
                       for slave_addr in runner._addresses_of_slaves()]
+        # copying key file like a boss (name of keyfile doesn't really matter)
+        keyfile = 'mrboss-%s.pem' % random_identifier()
+        ssh_copy_key(ssh_bin, master_addr, ec2_key_pair_file, keyfile)
 
     for addr in addresses:
+
         stdout, stderr = ssh_run_with_recursion(
-            runner._opts['ssh_bin'],
+            ssh_bin,
             addr,
-            runner._opts['ec2_key_pair_file'],
-            runner._ssh_key_name,
+            ec2_key_pair_file,
+            keyfile,
             cmd_args,
         )
 

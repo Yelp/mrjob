@@ -36,9 +36,7 @@ from mrjob.conf import combine_paths
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.composite import CompositeFilesystem
-from mrjob.logparsers import TASK_ATTEMPTS_LOG_URI_RE
-from mrjob.logparsers import HADOOP_STEP_LOG_URI_RE
-from mrjob.logparsers import HADOOP_JOB_LOG_URI_RE
+from mrjob.logs.ls import ls_logs
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import best_error_from_logs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
@@ -531,11 +529,13 @@ class HadoopJobRunner(MRJobRunner):
 
                 yield path
 
-    def _ls_logs(self, relative_path):
+    def _ls_logs(self, log_type, step_nums=None):
         """List logs on the local filesystem by path relative to log root
         directory
         """
-        return self.ls(os.path.join(self._hadoop_log_dir, relative_path))
+        return ls_logs(self.fs, log_type,
+                       log_dir=self._hadoop_log_dir,
+                       step_nums=step_nums)
 
     def _fetch_counters(self, step_nums, skip_s3_wait=False):
         """Read Hadoop counters from local logs.
@@ -544,10 +544,7 @@ class HadoopJobRunner(MRJobRunner):
         step_nums -- the steps belonging to us, so that we can ignore errors
                      from other jobs run with the same timestamp
         """
-        job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
-                                             HADOOP_JOB_LOG_URI_RE,
-                                             step_nums)
-        uris = list(job_logs)
+        uris = self._ls_logs('job', step_nums)
         new_counters = scan_for_counters_in_files(uris, self,
                                                   self.get_hadoop_version())
 
@@ -559,22 +556,10 @@ class HadoopJobRunner(MRJobRunner):
         return self._counters
 
     def _find_probable_cause_of_failure(self, step_nums):
-        all_task_attempt_logs = []
-        try:
-            all_task_attempt_logs.extend(self._ls_logs('userlogs/'))
-        except IOError:
-            # sometimes the master doesn't have these
-            pass
-        # TODO: get these logs from slaves if possible
-        task_attempt_logs = self._enforce_path_regexp(all_task_attempt_logs,
-                                                      TASK_ATTEMPTS_LOG_URI_RE,
-                                                      step_nums)
-        step_logs = self._enforce_path_regexp(self._ls_logs('steps/'),
-                                              HADOOP_STEP_LOG_URI_RE,
-                                              step_nums)
-        job_logs = self._enforce_path_regexp(self._ls_logs('history/'),
-                                             HADOOP_JOB_LOG_URI_RE,
-                                             step_nums)
+        task_attempt_logs = self._ls_logs('task')
+        step_logs = self._ls_logs('step')
+        job_logs = self._ls_logs('job')
+
         log.info('Scanning logs for probable cause of failure')
         return best_error_from_logs(self, task_attempt_logs, step_logs,
                                     job_logs)

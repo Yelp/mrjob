@@ -1931,13 +1931,21 @@ class EMRJobRunner(MRJobRunner):
         writeln('__mrjob_PWD=$PWD')
         writeln()
 
-        # download files using hadoop fs
+        # download files
         writeln('# download files and mark them executable')
+
+        if self._opts['release_label']:
+            # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
+            cp_to_local = 'aws s3 cp'
+        else:
+            # on the 2.x and 3.x AMIs, use hadoop
+            cp_to_local = 'hadoop fs -copyToLocal'
+
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            writeln('hadoop fs -copyToLocal %s $__mrjob_PWD/%s' %
-                    (pipes.quote(uri), pipes.quote(name)))
+            writeln('%s %s $__mrjob_PWD/%s' %
+                    (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # make everything executable, like Hadoop Distributed Cache
             writeln('chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
         writeln()

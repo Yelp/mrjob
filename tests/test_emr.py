@@ -2096,6 +2096,57 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ami-version', '2.0'])
 
+    def test_pooling_with_4_x_ami_version(self):
+        # this actually uses release label internally
+        _, cluster_id = self.make_pooled_cluster(ami_version='4.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '4.0.0'])
+
+    def test_pooling_with_release_label(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--release-label', 'emr-4.0.0'])
+
+    def test_dont_join_pool_with_wrong_release_label(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.1')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--release-label', 'emr-4.0.0'])
+
+    def test_dont_join_pool_without_release_label(self):
+        _, cluster_id = self.make_pooled_cluster(ami_version='2.2')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--release-label', 'emr-4.0.0'])
+
+    def test_matching_release_label_and_ami_version(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '4.0.0'])
+
+    def test_non_matching_release_label_and_ami_version(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '2.2'])
+
+    def test_release_label_hides_ami_version(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--release-label', 'emr-4.0.0',
+            '--ami-version', '1.0.0'])
+
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
         _, cluster_id = self.make_pooled_cluster(

@@ -2106,7 +2106,7 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['release_label']:
                 # just check for exact match. EMR doesn't have a concept
                 # of partial release labels like it does for AMI versions.
-                if (gettattr(cluster, 'releaselabel', '') !=
+                if (getattr(cluster, 'releaselabel', '') !=
                     self._opts['release_label']):
                     return
             elif self._opts['ami_version'] == 'latest':

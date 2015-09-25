@@ -57,18 +57,17 @@ do
     UPTIME=$(cat /proc/uptime | cut -f 1 -d .)
     SECS_TO_END_OF_HOUR=$(expr 3600 - $UPTIME % 3600)
 
-    # first time through this loop, we just initialize LAST_ACTIVE
-    # might as well nice hadoop; if there's other activity, it's Hadoop jobs
+    # if LAST_ACTIVE hasn't been initialized, hadoop hasn't been installed
+    # yet (this happens on 4.x AMIs), or there are jobs running, just set
+    # LAST_ACTIVE to UPTIME
     if [ -z "$LAST_ACTIVE" ] || \
+	! which hadoop > /dev/null || \
         nice hadoop job -list 2> /dev/null | grep -q '^\s*job_'
     then
         LAST_ACTIVE=$UPTIME
-
-        # echo 0 $SECS_TO_END_OF_HOUR
     else
+	# the cluster is idle! how long has this been going on?
         SECS_IDLE=$(expr $UPTIME - $LAST_ACTIVE)
-
-        # echo $SECS_IDLE $SECS_TO_END_OF_HOUR
 
         if expr $SECS_IDLE '>' $MAX_SECS_IDLE '&' \
             $SECS_TO_END_OF_HOUR '<' $MIN_SECS_TO_END_OF_HOUR > /dev/null

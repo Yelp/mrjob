@@ -1417,9 +1417,10 @@ class CounterFetchingTestCase(MockBotoTestCase):
         self.assertEqual(self.runner.counters(),
                          [{'Job Counters ': {'Launched reduce tasks': 1}}])
 
-    def _mock_step(self, jar):
+    def _mock_step(self, jar, args=()):
         return MockEmrObject(
-            config=MockEmrObject(jar=jar),
+            config=MockEmrObject(jar=jar,
+                                 args=[MockEmrObject(value=a) for a in args]),
             id='s-FAKE',
             name=self.runner._job_key,
             status=MockEmrObject(state='COMPLETED'))
@@ -1440,9 +1441,12 @@ class CounterFetchingTestCase(MockBotoTestCase):
         self.mock_cluster.status.state = 'TERMINATED'
         self.mock_cluster._steps = [
             self._mock_step(jar='x.jar'),
-            self._mock_step(jar='hadoop.streaming.jar'),
+            self._mock_step(jar='hadoop.streaming.jar', args=['-mapper']),
             self._mock_step(jar='x.jar'),
-            self._mock_step(jar='hadoop.streaming.jar'),
+            # jar for 4.x steps don't have "streaming" in the name;
+            # look for -mapper in the args
+            self._mock_step(jar='command-runner.jar',
+                            args=['hadoop-streaming', '-mapper']),
         ]
 
         self.runner._ls_logs = Mock(return_value=[])

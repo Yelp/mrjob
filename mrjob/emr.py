@@ -112,10 +112,6 @@ from mrjob.util import random_identifier
 
 log = logging.getLogger(__name__)
 
-# not all steps generate task attempt logs. for now, conservatively check for
-# streaming steps, which always generate them.
-LOG_GENERATING_STEP_NAME_RE = HADOOP_STREAMING_JAR_RE
-
 # how to set up the SSH tunnel for various AMI versions
 _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '2': dict(name='job tracker', path='/jobtracker.jsp', port=9100),
@@ -1511,13 +1507,20 @@ class EMRJobRunner(MRJobRunner):
             total_step_time = 0.0
             step_nums = []  # step numbers belonging to us. 1-indexed
             # "lg_step" stands for "log generating step"
+
+            # TODO: this lg stuff confuses me and is about to be refactored
+            # once I do some hand-testing on which steps actually generate
+            # logs
             lg_step_num_mapping = {}
 
             steps = self._list_steps_for_cluster()
             latest_lg_step_num = 0
+
+            def is_lg_step(step):
+                return any(arg.value == '-mapper' for arg in step.config.args)
+
             for i, step in enumerate(steps):
-                if LOG_GENERATING_STEP_NAME_RE.match(
-                        posixpath.basename(getattr(step.config, 'jar', ''))):
+                if is_lg_step(step):
                     latest_lg_step_num += 1
 
                 # ignore steps belonging to other jobs
@@ -1525,8 +1528,7 @@ class EMRJobRunner(MRJobRunner):
                     continue
 
                 step_nums.append(i + 1)
-                if LOG_GENERATING_STEP_NAME_RE.match(
-                        posixpath.basename(getattr(step.config, 'jar', ''))):
+                if is_lg_step(step):
                     lg_step_num_mapping[i + 1] = latest_lg_step_num
 
                 step_states.append(step.status.state)

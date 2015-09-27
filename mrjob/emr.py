@@ -18,7 +18,6 @@ import logging
 import os
 import os.path
 import pipes
-import posixpath
 import random
 import signal
 import socket
@@ -79,7 +78,6 @@ from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.ls import ls_logs
 from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
-from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -139,6 +137,12 @@ _DEFAULT_AWS_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_AMI_VERSION = '3.7.0'
+
+# Hadoop streaming jar on 1-3.x AMIs
+_PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
+
+# intermediary jar used on 4.x AMIs
+_4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
 
 def s3_key_to_uri(s3_key):
@@ -346,8 +350,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ec2_core_instance_type': 'm1.medium',
             'ec2_master_instance_type': 'm1.medium',
             'emr_job_flow_pool_name': 'default',
-            'hadoop_streaming_jar_on_emr': (
-                '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),
             'hadoop_version': None,  # override runner default
             'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
@@ -805,7 +807,7 @@ class EMRJobRunner(MRJobRunner):
             self._upload_mgr.add(path)
 
         if self._opts['hadoop_streaming_jar']:
-            self._upload_mgr.add(path)
+            self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
         for step in self._get_steps():
             if step.get('jar'):
@@ -1369,22 +1371,19 @@ class EMRJobRunner(MRJobRunner):
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
     def _build_streaming_step(self, step_num):
-        streaming_step_kwargs = {
-            'name': '%s: Step %d of %d' % (
+        jar, step_arg_prefix = self._get_streaming_jar_and_step_arg_prefix()
+
+        streaming_step_kwargs = dict(
+            action_on_failure=self._action_on_failure,
+            input=self._step_input_uris(step_num),
+            jar=jar,
+            name='%s: Step %d of %d' % (
                 self._job_key, step_num + 1, self._num_steps()),
-            'input': self._step_input_uris(step_num),
-            'output': self._step_output_uri(step_num),
-            'jar': self._get_streaming_jar(),
-            'action_on_failure': self._action_on_failure,
-        }
+            output=self._step_output_uri(step_num),
+        )
 
         step_args = []
-
-        # on 4.x AMIs, everything goes through command-runner.jar
-        if version_gte(self.get_ami_version(), '4'):
-            streaming_step_kwargs['jar'] = 'command-runner.jar'
-            step_args.append('hadoop-streaming')
-
+        step_args.extend(step_arg_prefix)  # add 'hadoop-streaming' for 4.x
         step_args.extend(self._upload_args(self._upload_mgr))
         step_args.extend(self._hadoop_args_for_step(step_num))
 
@@ -1431,11 +1430,17 @@ class EMRJobRunner(MRJobRunner):
             step_args=step_args,
             action_on_failure=self._action_on_failure)
 
-    def _get_streaming_jar(self):
+    def _get_streaming_jar_and_step_arg_prefix(self):
         if self._opts['hadoop_streaming_jar']:
-            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar'])
+            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar']), []
+        elif self._opts['hadoop_streaming_jar_on_emr']:
+            return self._opts['hadoop_streaming_jar_on_emr'], []
+        elif version_gte(self.get_ami_version(), '4'):
+            # 4.x AMIs use an intermediary jar
+            return _4_X_INTERMEDIARY_JAR, ['hadoop-streaming']
         else:
-            return self._opts['hadoop_streaming_jar_on_emr']
+            # 2.x and 3.x AMIs just use a regular old streaming jar
+            return _PRE_4_X_STREAMING_JAR, []
 
     def _launch_emr_job(self):
         """Create an empty jobflow on EMR, and set self._cluster_id to

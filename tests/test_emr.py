@@ -29,8 +29,10 @@ from io import BytesIO
 import mrjob
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _4_X_INTERMEDIARY_JAR
 from mrjob.emr import _DEFAULT_AMI_VERSION
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _yield_all_bootstrap_actions
@@ -3032,7 +3034,8 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.start(patch.object(
             self.runner, '_step_output_uri', return_value=['output']))
         self.start(patch.object(
-            self.runner, '_get_streaming_jar', return_value=['streaming.jar']))
+            self.runner, '_get_streaming_jar_and_step_arg_prefix',
+            return_value=('streaming.jar', [])))
         self.start(patch.object(
             self.runner, 'get_ami_version', return_value='3.8.0'))
 
@@ -3056,26 +3059,6 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
             mapper=(PYTHON_BIN + ' my_job.py --step-num=0 --mapper'),
             reducer=None,
         )
-
-    def test_basic_mapper_on_4_x_ami(self):
-        # 4.x AMIs use an intermediary jar to run streaming steps.
-        # Everything else works the same way, so no need to
-        # have multiple 4.x AMI tests
-        self.runner.get_ami_version.return_value = '4.0.0'
-
-        self._assert_streaming_step(
-            {
-                'jar': 'command-runner.jar',
-                'step_args': ['hadoop-streaming'],
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                },
-            },
-            mapper=(PYTHON_BIN + ' my_job.py --step-num=0 --mapper'),
-            reducer=None,
-        )
-
 
     def test_basic_reducer(self):
         self._assert_streaming_step(
@@ -3134,6 +3117,83 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
                 PYTHON_BIN +
                 " my_job.py --step-num=0 --mapper'"),
         )
+
+
+class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
+
+    def launch_runner(self, *args):
+        """make and launch runner, so cluster is created and files
+        are uploaded."""
+        runner = self.make_runner(*args)
+        runner._launch()
+        return runner
+
+    def test_default(self):
+        runner = self.launch_runner()
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (_PRE_4_X_STREAMING_JAR, []))
+
+    def test_pre_4_x_ami(self):
+        runner = self.launch_runner('--ami-version', '3.8.0')
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (_PRE_4_X_STREAMING_JAR, []))
+
+    def test_4_x_ami(self):
+        runner = self.launch_runner('--ami-version', '4.0.0')
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (_4_X_INTERMEDIARY_JAR, ['hadoop-streaming']))
+
+    def test_hadoop_streaming_jar_on_emr_on_pre_4_x_ami(self):
+        runner = self.launch_runner(
+            '--ami-version', '3.8.0',
+            '--hadoop-streaming-jar-on-emr', 'justice.jar')
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         ('justice.jar', []))
+
+    def test_hadoop_streaming_jar_on_emr_on_4_x_ami(self):
+        # don't use the intermediary jar if a jar is specified explicitly
+        runner = self.launch_runner(
+            '--ami-version', '4.0.0',
+            '--hadoop-streaming-jar-on-emr', 'justice.jar')
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         ('justice.jar', []))
+
+    def test_hadoop_streaming_jar_on_pre_4_x_ami(self):
+        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
+        open(jar_path, 'w').close()
+
+        runner = self.launch_runner(
+            '--ami-version', '3.8.0',
+            '--hadoop-streaming-jar', jar_path)
+
+        jar_uri = runner._upload_mgr.uri(jar_path)
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (jar_uri, []))
+
+    def test_hadoop_streaming_jar_on_4_x_ami(self):
+        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
+        open(jar_path, 'w').close()
+
+        runner = self.launch_runner(
+            '--ami-version', '4.0.0',
+            '--hadoop-streaming-jar', jar_path)
+
+        jar_uri = runner._upload_mgr.uri(jar_path)
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (jar_uri, []))
+
+    def test_local_streaming_jar_beats_jar_on_emr(self):
+        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
+        open(jar_path, 'w').close()
+
+        runner = self.launch_runner(
+            '--hadoop-streaming-jar', jar_path,
+            '--hadoop-streaming-jar-on-emr', 'justice.jar')
+
+        jar_uri = runner._upload_mgr.uri(jar_path)
+
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (jar_uri, []))
 
 
 class JarStepTestCase(MockBotoTestCase):

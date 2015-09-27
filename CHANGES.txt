@@ -26,6 +26,8 @@ v0.5.0, 2015-??-?? -- ???
      * removed iam_job_flow_role option (use iam_instance_profile)
      * removed support for _$folder$ keys, which EMR no longer creates
      * custom hadoop_streaming_jar gets properly uploaded
+     * 4.x AMIs are supported (#1105)
+       * added --release-label switch (--ami-version 4.0.0 also works)
    * Hadoop
      * hdfs_scratch_dir option is now hadoop_tmp_dir (#318)
  * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())

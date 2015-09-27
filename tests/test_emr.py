@@ -3042,81 +3042,102 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.start(patch.object(boto.emr, 'StreamingStep', dict))
         self.runner._hadoop_version = '0.20'
 
-    def _assert_streaming_step(self, step, **kwargs):
-        self.runner._steps = [step]
-        d = self.runner._build_streaming_step(0)
-        for k, v in kwargs.items():
-            self.assertEqual(d[k], v)
+    def _get_streaming_step(self, step):
+        with patch.object(self.runner, '_steps', [step]):
+            return self.runner._build_streaming_step(0)
 
     def test_basic_mapper(self):
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                },
-            },
-            mapper=(PYTHON_BIN + ' my_job.py --step-num=0 --mapper'),
-            reducer=None,
-        )
+        ss = self._get_streaming_step(
+            dict(type='streaming', mapper=dict(type='script')))
+
+        self.assertEqual(ss['mapper'],
+                         PYTHON_BIN + ' my_job.py --step-num=0 --mapper')
+        self.assertEqual(ss['combiner'], None)
+        self.assertEqual(ss['reducer'], None)
 
     def test_basic_reducer(self):
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'reducer': {
-                    'type': 'script',
-                },
-            },
-            mapper="cat",
-            reducer=(PYTHON_BIN +
-                     ' my_job.py --step-num=0 --reducer'),
-        )
+        ss = self._get_streaming_step(
+            dict(type='streaming', reducer=dict(type='script')))
+
+        self.assertEqual(ss['mapper'], 'cat')
+        self.assertEqual(ss['combiner'], None)
+        self.assertEqual(ss['reducer'],
+                         PYTHON_BIN + ' my_job.py --step-num=0 --reducer')
+
+        self.assertEqual(ss['jar'], 'streaming.jar')
+        self.assertEqual(ss['step_args'][:1], ['-files'])  # no prefix
 
     def test_pre_filters(self):
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                    'pre_filter': 'grep anything',
-                },
-                'combiner': {
-                    'type': 'script',
-                    'pre_filter': 'grep nothing',
-                },
-                'reducer': {
-                    'type': 'script',
-                    'pre_filter': 'grep something',
-                },
-            },
-            mapper=("bash -c 'grep anything | " +
-                    PYTHON_BIN +
-                    " my_job.py --step-num=0 --mapper'"),
-            combiner=("bash -c 'grep nothing | " +
-                      PYTHON_BIN +
-                      " my_job.py --step-num=0 --combiner'"),
-            reducer=("bash -c 'grep something | " +
-                     PYTHON_BIN +
-                     " my_job.py --step-num=0 --reducer'"),
-        )
+        ss = self._get_streaming_step(
+            dict(type='streaming',
+                 mapper=dict(
+                     type='script',
+                     pre_filter='grep anything'),
+                 combiner=dict(
+                     type='script',
+                     pre_filter='grep nothing'),
+                 reducer=dict(
+                     type='script',
+                     pre_filter='grep something')))
+
+        self.assertEqual(ss['mapper'],
+                         "bash -c 'grep anything | " +
+                         PYTHON_BIN +
+                         " my_job.py --step-num=0 --mapper'")
+        self.assertEqual(ss['combiner'],
+                         "bash -c 'grep nothing | " +
+                         PYTHON_BIN +
+                         " my_job.py --step-num=0 --combiner'")
+        self.assertEqual(ss['reducer'],
+                         "bash -c 'grep something | " +
+                         PYTHON_BIN +
+                         " my_job.py --step-num=0 --reducer'")
 
     def test_pre_filter_escaping(self):
-        # ESCAPE ALL THE THINGS!!!
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                    'pre_filter': bash_wrap("grep 'anything'"),
-                },
-            },
-            mapper=(
-                "bash -c 'bash -c '\\''grep"
-                " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
-                PYTHON_BIN +
-                " my_job.py --step-num=0 --mapper'"),
-        )
+        ss = self._get_streaming_step(
+            dict(type='streaming',
+                 mapper=dict(
+                     type='script',
+                     pre_filter=bash_wrap("grep 'anything'"))))
+
+        self.assertEqual(
+            ss['mapper'],
+            "bash -c 'bash -c '\\''grep"
+            " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
+            PYTHON_BIN +
+            " my_job.py --step-num=0 --mapper'")
+        self.assertEqual(
+            ss['combiner'], None)
+        self.assertEqual(
+            ss['reducer'], None)
+
+    def test_default_streaming_jar_and_step_arg_prefix(self):
+        ss = self._get_streaming_step(
+            dict(type='streaming', mapper=dict(type='script')))
+
+        self.assertEqual(ss['jar'], 'streaming.jar')
+
+        # step_args should be -files script_uri#script_name
+        self.assertEqual(len(ss['step_args']), 2)
+        self.assertEqual(ss['step_args'][0], '-files')
+        self.assertTrue(ss['step_args'][1].endswith('#my_job.py'))
+
+    def test_custom_streaming_jar_and_step_arg_prefix(self):
+        # test integration with custom jar options. See
+        # StreamingJarAndStepArgPrefixTestCase below.
+        self.runner._get_streaming_jar_and_step_arg_prefix.return_value = (
+            ('launch.jar', ['streaming', '-v']))
+
+        ss = self._get_streaming_step(
+            dict(type='streaming', mapper=dict(type='script')))
+
+        self.assertEqual(ss['jar'], 'launch.jar')
+
+        # step_args should be -files script_uri#script_name
+        self.assertEqual(len(ss['step_args']), 4)
+        self.assertEqual(ss['step_args'][:2], ['streaming', '-v'])
+        self.assertEqual(ss['step_args'][2], '-files')
+        self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
 
 
 class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):

@@ -1393,10 +1393,7 @@ class EMRJobRunner(MRJobRunner):
             self._hadoop_streaming_commands(step_num))
 
         streaming_step_kwargs['mapper'] = mapper
-
-        if combiner:
-            streaming_step_kwargs['combiner'] = combiner
-
+        streaming_step_kwargs['combiner'] = combiner
         streaming_step_kwargs['reducer'] = reducer
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)

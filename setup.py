@@ -69,8 +69,8 @@ setup(
     entry_points=dict(
         console_scripts=[
             'mrjob=mrjob.cmd:main',
-            'mrjob%d=mrjob.cmd:main' % sys.version_info[:1],
-            'mrjob%d.%d=mrjob.cmd:main' % sys.version_info[:2],
+            'mrjob-%d=mrjob.cmd:main' % sys.version_info[:1],
+            'mrjob-%d.%d=mrjob.cmd:main' % sys.version_info[:2],
         ]
     ),
     license='Apache',

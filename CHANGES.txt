@@ -1,6 +1,7 @@
 v0.5.0, 2015-??-?? -- ???
  * requires boto 2.35.0 or newer (#980)
  * jobs:
+   * is_mapper_or_reducer() renamed to is_task() (#1072)
    * mr() no longer takes positional arguments (#814)
    * removed jar() (use mrjob.step.JarStep)
    * removed testing methods parse_counters() and parse_output()

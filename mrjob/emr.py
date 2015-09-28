@@ -368,6 +368,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,
             'num_ec2_task_instances': 0,
+            'pool_wait_minutes': 0,
             's3_sync_wait_time': 5.0,
             's3_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],

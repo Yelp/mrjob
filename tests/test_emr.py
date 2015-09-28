@@ -2938,6 +2938,28 @@ class JobWaitTestCase(MockBotoTestCase):
         self.assertEqual(self.sleep_counter, 2)
 
 
+class PoolWaitMinutesOptionTestCase(MockBotoTestCase):
+
+    MRJOB_CONF_CONTENTS = {'runners': {'emr': {
+        'check_emr_status_every': 0.00,
+        's3_sync_wait_time': 0.00,
+        'pool_wait_minutes': 11,
+    }}}
+
+    def test_default_pool_wait_minutes(self):
+        runner = self.make_runner('--no-conf')
+        self.assertEqual(runner._opts['pool_wait_minutes'], 0)
+
+    def test_pool_wait_minutes_from_mrjob_conf(self):
+        # tests issue #1070
+        runner = self.make_runner()
+        self.assertEqual(runner._opts['pool_wait_minutes'], 11)
+
+    def test_pool_wait_minutes_from_command_line(self):
+        runner = self.make_runner('--pool-wait-minutes', '12')
+        self.assertEqual(runner._opts['pool_wait_minutes'], 12)
+
+
 class BuildStreamingStepTestCase(MockBotoTestCase):
 
     def setUp(self):

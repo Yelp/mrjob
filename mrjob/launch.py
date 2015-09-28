@@ -318,13 +318,19 @@ class MRJobLauncher(object):
                 self.runner_opt_group, self.hadoop_emr_opt_group,
                 self.emr_opt_group, self.hadoop_opts_opt_group)
 
-    def is_mapper_or_reducer(self):
-        """True if this is a mapper/reducer.
+    def is_task(self):
+        """True if this is a mapper, combiner, or reducer.
 
         This is mostly useful inside :py:meth:`load_options`, to disable
         loading options when we aren't running inside Hadoop Streaming.
         """
         return False
+
+    def is_mapper_or_reducer(self):
+        """The old name for :py:meth:`is_task`. Going away in v0.6.0"""
+        log.warning('is_mapper_or_reducer() has been renamed to is_task().'
+                    ' This alias will be removed in v0.6.0')
+        return self.is_task()
 
     def add_passthrough_option(self, *args, **kwargs):
         """Function to create options which both the job runner

@@ -1,155 +1,9 @@
 EMR Bootstrapping Cookbook
 ==========================
 
-Bootstrapping allows you to configure EMR machines to your needs.
+Bootstrapping allows you to run commands to customize EMR machines, at the
+time the cluster is created.
 
-AMI 2.x and AMI 3.x version differences
------------------------------------------------
-AMI versions 2.x are based on `Debian 6.0.2 (Squeeze)
-<http://www.debian.org/News/2011/20110625>`_.  The package management system is ``apt-get``. Any package distributed with Debian Squeeze should be available.
-
-AMI versions 3.x are based on `Amazon Linux Release 2012.09
-<https://aws.amazon.com/amazon-linux-ami/2012.09-release-notes/>`_. This major bump changed the package management system to ``yum``. You can view the list of RPM packages Amazon distributed with the 2012.09.1 release `here
-<https://aws.amazon.com/amazon-linux-ami/2012.09-packages/>`__.
-
-You can follow the AMI changelog `here
-<http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-ami.html>`__.
-
-Installing Python packages with pip
------------------------------------
-
-First you need to install :command:`pip`.
-
-For AMI 2.x versions use ``apt-get``:
-
-.. code-block:: sh
-
-   --bootstrap 'sudo apt-get install -y python-pip'
-
-For AMI 3.x versions use ``yum``:
-
-.. code-block:: sh
-
-   --bootstrap 'sudo yum install -y python-pip'
-
-Then install the packages you want:
-
-.. code-block:: sh
-
-    --bootstrap 'sudo pip install --upgrade mr3po ujson'
-
-To support both AMI 2.x and AMI 3.x:
-
-.. code-block:: sh
-
-    --bootstrap 'sudo apt-get install -y python-pip || sudo yum install -y python-pip'
-
-Or, equivalently, in :file:`mrjob.conf`:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        - sudo apt-get install -y python-pip || sudo yum install -y python-pip
-        - sudo pip install boto mr3po
-
-Installing ujson
-----------------
-
-mrjob can use Python's built-in JSON library, but the ujson library is much
-faster.
-
-To use the latest (fastest) version of ujson, do:
-
-.. code-block:: sh
-
-    --bootstrap 'sudo pip install --upgrade ujson'
-
-Other ways to use pip to install Python packages
-------------------------------------------------
-
-If you have a lot of dependencies, best practice is to make a
-`pip requirements file <http://www.pip-installer.org/en/latest/cookbook.html>`_
-and use the ``-r`` switch:
-
-.. code-block:: sh
-
-    --bootstrap 'sudo pip install -r path/to/requirements.txt#'
-
-Note that :command:`pip` can also install from tarballs (which is useful
-for custom-built packages):
-
-.. code-block:: sh
-
-    --bootstrap 'sudo pip install $MY_PYTHON_PKGS/*.tar.gz#'
-
-Installing Debian packages on AMI 2.x:
---------------------------------------
-
-As we did with :command:`pip`, you can use ``apt-get`` to install any
-package from the Debian archive. For example, to install Python 3:
-
-.. code-block:: sh
-
-    --bootstrap 'sudo apt-get install -y python3'
-
-If you have particular ``.deb`` files you want to install, do:
-
-.. code-block:: sh
-
-    --bootstrap 'sudo dpkg -i path/to/packages/*.deb#'
-
-Installing RPM Packages on AMI 3.x:
------------------------------------
-
-Conversely, while running on an AMI 3.x you can install the Python 3 RPM archive by using ``yum``:
-
-.. code-block:: sh
-
-    --bootstrap 'sudo yum install -y python3'
-
-Likewise, if you have a particular ``.rpm`` files you want to install, do:
-
-.. code-block:: sh
-
-    --bootstrap 'sudo yum install -y path/to/packages/*.rpm#'
-
-.. _bootstrap-python-source:
-
-Installing Python from source
------------------------------
-
-If you're using an AMI version before 3.7.0, and you want to use Python 2.7,
-or any version of Python 3 there is not an easy way to upgrade
-Python from a package (okay, technically, the 2.x AMIs have a Python 3.1
-package, but that's not helpful.)
-
-Here's what to add to your :file:`mrjob.conf` to download the Python source,
-compile, and install it:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        - wget -S -T 10 -t 5 https://www.python.org/ftp/python/x.y.z/Python-x.y.z.tgz
-        - tar xvfz Python-x.y.z.tgz
-        - cd Python-x.y.z
-        - ./configure && make && sudo make install
-        - cd ..
-        - sudo rm /usr/bin/python
-        - sudo ln -s /usr/local/bin/pythonx.y /usr/bin/python
-        bootstrap_python: false  # don't try to auto-install Python
-        python_bin: python  # make this config work in Python 3 too
-
-Replace *x.y.z* with the version of Python you want. Note that the
-python binary we symlink to is named *pythonx.y*, not *pythonx.y.z*.
-
-:mrjob-opt:`bootstrap_mrjob` runs *last*, so mrjob *will* get bootstrapped
-into your newly upgraded version of Python. If you use other
-bootstrap commands to install/upgrade Python libraries, you should also
-run them *after* upgrading Python.
 
 When to use bootstrap, and when to use setup
 --------------------------------------------
@@ -160,3 +14,248 @@ Generally, you want to use :mrjob-opt:`bootstrap` for things that are
 part of your general production environment, and :mrjob-opt:`setup`
 for things that are specific to your particular job. This makes things
 work as expected if you are :ref:`pooling-job-flows`.
+
+All these examples use :mrjob-opt:`bootstrap`. Not saying it's a good idea, but
+all these examples will work with :mrjob-opt:`setup` as well (yes, Hadoop
+tasks on EMR apparently have access to :command:`sudo`).
+
+
+.. _bootstrap-pip:
+
+Installing Python packages with pip
+-----------------------------------
+
+:command:`pip` is the standard way to install Python packages.
+
+on Python 2
+^^^^^^^^^^^
+
+mrjob installs :command:`pip` by default in Python 2 (see
+:mrjob-opt:`bootstrap_mrjob`), so all you have to do is run it with
+:command:`sudo`:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - sudo pip install dateglob mr3po
+
+(Just using ``dateglob`` and ``mr3po`` as examples.)
+
+You can also install packages from a requirements file:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - sudo pip install -r /local/path/of/requirements.txt#
+
+Or a tarball:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - sudo pip install /local/path/of/tarball.tar.gz#
+
+If you turned off :mrjob-opt:`bootstrap_mrjob` but still want :command:`pip`,
+the relevant package is ``python-pip``; see :ref:`bootstrap-system-packages`.
+
+.. _bootstrap-pip-py3:
+
+on Python 3
+^^^^^^^^^^^
+
+Python 3 is available on AMI versions 3.7.0 and later, but Amazon's package
+is very minimal; it doesn't include Python source, or even :command:`pip`.
+
+If you want to install a pure-python package, it's enough to install
+pip using `PyPA's get-pip.py script <http://pip-python3.readthedocs.org/en/latest/installing.html>`__:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - wget -S -T 10 -t 5 https://bootstrap.pypa.io/get-pip.py
+        - sudo python3 get-pip.py
+        - sudo python3 -m pip install dateglob mr3po
+
+This works with requirements files or tarballs too:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        ...
+        - sudo python3 -m pip install -r /local/path/of/requirements.txt#
+        - sudo python3 -m pip install /local/path/of/tarball.tar.gz#
+
+If you want to install a Python package with C bindings (e.g. ``numpy``)
+you'll first need to compile Python from source. See
+:ref:`Installing ujson on Python 3 <bootstrap-ujson-py3>` for how this works.
+
+
+Installing ujson
+----------------
+
+``ujson`` is a fast, pure-C library; if installed, mrjob will automatically
+use it to turbocharge JSON-serialization.
+
+on Python 2
+^^^^^^^^^^^
+
+On Python 2, mrjob automatically installs ``ujson`` for you. Done! (If you
+turned off :mrjob-opt:`bootstrap_mrjob`, the relevant Python package is
+``ujson``; see :ref:`bootstrap-pip`.)
+
+.. _bootstrap-ujson-py3:
+
+on Python 3
+^^^^^^^^^^^
+
+Amazon's ``python34`` package doesn't have the bindings to compile Python
+packages that use C, so let's skip that and install Python from source instead:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - wget -S -T 10 -t 5 https://www.python.org/ftp/python/3.y.z/Python-3.y.z.tgz
+        - tar xfz Python-3.y.z.tgz
+        - cd Python-3.y.z; ./configure && make && sudo make install; cd ..
+        - sudo /usr/local/bin/python -m pip install ujson
+        bootstrap_python: false
+        python_bin: /usr/local/bin/python
+
+(Replace ``3.y.z`` with the specific version of Python you want.)
+
+The downside is that it will now take an extra 5-10 minutes for your cluster
+to spin up (because it's compiling Python), so you have to weigh that against
+the potential speed improvement from ``ujson``. If it matters, try it and see
+what's faster.
+
+The most efficient solution would be to build your own Python 3 RPM and just
+install that, but that's beyond the scope of this cookbook.
+
+
+.. _bootstrap-system-packages:
+
+Installing System Packages
+--------------------------
+
+EMR gives you access to a variety of different Amazon Machine Images, or AMIs
+for short (see :mrjob-opt:`ami_version`).
+
+2.x AMIs
+^^^^^^^^
+
+The 2.x AMIs are based on `Debian 6.0.2 (Squeeze)
+<http://www.debian.org/News/2011/20110625>`_, and use :command:`apt-get`. For
+example, to install Cython:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - sudo apt-get install -y cython
+
+Don't forget the ``-y``; otherwise your bootstrap script will hang waiting for
+user input that will never come.
+
+The full list of Squeeze packages is
+`here <https://packages.debian.org/squeeze/>`__. Squeeze was
+released in February 2011, so none of these packages are going to be
+super up-to-date.
+
+3.x and 4.x AMIs
+^^^^^^^^^^^^^^^^
+
+Starting with 3.0.0, EMR AMIs use Amazon Linux, which uses :command:`yum` to
+install packages. For example, to install NumPy:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - sudo yum install -y python-numpy
+
+(Don't forget the ``-y``!)
+
+AMI versions 3.7.0 and later use Amazon Linux 2015.03; here is
+`the full list of 2015.03 packages <http://aws.amazon.com/amazon-linux-ami/2015.03-packages/>`__.
+
+If you need to use an earlier AMI version, look it up
+`here <http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/ami-versions-supported.html>`__
+and then go to ``http://aws.amazon.com/amazon-linux-ami/YYYY.MM-packages``
+(replace ``YYYY.MM`` with the Amazon Linux version).
+
+Keep in mind that Amazon Linux has zero support for Python 3 outside
+the ``python34`` and ``python34-docs`` packages themselves;
+:ref:`install and use pip <bootstrap-pip-py3>` instead.
+
+I don't know or care which AMI version I'm using
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Yeah, and a lot of packages probably have the same name in both distributions
+anyway, right?
+
+Here's a trick you can use to install, for example, ``python-pip`` on any AMI:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - sudo apt-get install -y python-pip || sudo yum install -y python-pip
+
+Installing Python from source
+-----------------------------
+
+We mostly covered this when we
+:ref:`installed ujson on Python 3 <bootstrap-ujson-py3>`, but here it
+is, for reference:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - wget -S -T 10 -t 5 https://www.python.org/ftp/python/x.y.z/Python-x.y.z.tgz
+        - tar xfz Python-x.y.z.tgz
+        - cd Python-x.y.z; ./configure && make && sudo make install; cd ..
+        bootstrap_python: false
+        python_bin: /usr/local/bin/python
+
+(Replace ``x.y.z`` with a specific version of Python.)
+
+Python 3.4+ comes with :command:`pip` by default, but earlier versions do not,
+so you'll want to tack on ``get-pip.py``:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        ...
+        - wget -S -T 10 -t 5 https://bootstrap.pypa.io/get-pip.py
+        - sudo /usr/local/bin/python get-pip.py
+
+Also, :command:`pip` will be installed in ``/usr/local/bin``, which is not in
+the path for :command:`sudo`. Running pip with the :command:`python` binary
+you just compiled will work for any version of Python:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        ...
+        - sudo /usr/local/bin/python -m pip ...

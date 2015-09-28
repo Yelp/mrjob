@@ -66,6 +66,13 @@ setup(
         'Topic :: System :: Distributed Computing',
     ],
     description='Python MapReduce framework',
+    entry_points=dict(
+        console_scripts=[
+            'mrjob=mrjob.cmd:main',
+            'mrjob%d=mrjob.cmd:main' % sys.version_info[:1],
+            'mrjob%d.%d=mrjob.cmd:main' % sys.version_info[:2],
+        ]
+    ),
     license='Apache',
     long_description=open('README.rst').read(),
     name='mrjob',
@@ -86,7 +93,6 @@ setup(
         'mrjob.examples.mr_postfix_bounce': ['*.json'],
         'mrjob.examples.mr_travelling_salesman': ['example_graphs/*.json'],
     },
-    scripts=['bin/mrjob'],
     url='http://github.com/Yelp/mrjob',
     version=mrjob.__version__,
     **setuptools_kwargs

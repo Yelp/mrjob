@@ -216,6 +216,8 @@ Here's a trick you can use to install, for example, ``python-pip`` on any AMI:
         bootstrap:
         - sudo apt-get install -y python-pip || sudo yum install -y python-pip
 
+.. _installing-python-from-source:
+
 Installing Python from source
 -----------------------------
 

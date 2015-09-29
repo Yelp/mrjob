@@ -655,6 +655,12 @@ def translate_jobconf(variable, version):
         return variable
 
 
+def get_all_jobconf_variants(variable):
+    """Get all known variants of the given jobconf variable."""
+    return sorted(
+        set([variable] + list(_JOBCONF_MAP.get(variable, {}).values())))
+
+
 def supports_combiners_in_hadoop_streaming(version):
     """Return ``True`` if this version of Hadoop Streaming supports combiners
     (i.e. >= 0.20.203), otherwise False.

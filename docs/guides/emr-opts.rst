@@ -448,7 +448,9 @@ and install another Python binary.
     ``pip install path/to/tarballs/*.tar.gz#`` to :mrjob-opt:`bootstrap`
     instead.
 
-    .. warning:: This option is not supported at all in Python 3.
+    In addition to being deprecated, this option only works in Python 2.
+    See :ref:`Installing packages with pip on Python 3 <using-pip-py3>`
+    to see how to do this on Python 3.
 
 .. mrjob-opt::
     :config: bootstrap_scripts

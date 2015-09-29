@@ -1727,7 +1727,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
 
         # use all the bootstrap options
-        runner_kwargs = dict(conf_paths=[],
+        runner = EMRJobRunner(conf_paths=[],
                               bootstrap=[
                                   PYTHON_BIN + ' ' +
                                   foo_py_path + '#bar.py',
@@ -1735,13 +1735,8 @@ class TestMasterBootstrapScript(MockBotoTestCase):
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
                               bootstrap_files=['/tmp/quz'],
                               bootstrap_mrjob=True,
+                              bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
-
-        # bootstrap_python_packages is not supported on Python 3
-        if PY2:
-            runner_kwargs['bootstrap_python_packages'] = [yelpy_tar_gz_path]
-
-        runner = EMRJobRunner(**runner_kwargs)
 
         runner._add_bootstrap_files_for_upload()
 
@@ -1804,19 +1799,6 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)
         self.assertIn('$__mrjob_PWD/s.sh', lines)
-
-    def test_bootstrap_python_packages_on_py2_only(self):
-        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
-        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
-
-        runner_kwargs = dict(bootstrap_python_packages=[yelpy_tar_gz_path],
-                             conf_paths=[])
-
-        if PY2:
-            with logger_disabled('mrjob.emr'):
-                EMRJobRunner(**runner_kwargs)
-        else:
-            self.assertRaises(Exception, EMRJobRunner, **runner_kwargs)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,

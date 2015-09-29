@@ -1884,29 +1884,28 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
-            if not PY2:
-                raise Exception(
+            if PY2:
+                log.warning(
+                    "bootstrap_python_packages is deprecated since v0.4.2 and"
+                    " will be removed in v0.6.0. Consider using bootstrap"
+                    " instead.")
+
+                # this works on any AMI version
+                bootstrap.append(['sudo apt-get install -y python-pip || '
+                                  'sudo yum install -y python-pip'])
+
+                for path in self._opts['bootstrap_python_packages']:
+                    path_dict = parse_legacy_hash_path('file', path)
+                    # don't worry about inspecting the tarball; pip is smart
+                    # enough to deal with that
+                    bootstrap.append(['sudo pip install ', path_dict])
+
+            else:
+                log.warning(
                     'bootstrap_python_packages is deprecated and is not'
                     ' supported on Python 3. See'
                     ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
                     '-cookbook.html#using-pip for an alternative.')
-
-            # Rather than keeping mrjob in sync with AMI versions, just
-            # run whatever package manager works (until
-            # bootstrap_python_packages becomes obsolete, and we can
-            # rip this code out entirely)
-            bootstrap.append(['sudo apt-get install -y python-pip || '
-                              'sudo yum install -y python-pip'])
-            # Print a warning
-            log.warning(
-                "bootstrap_python_packages is deprecated since v0.4.2 and will"
-                " be removed in v0.6.0. Consider using bootstrap instead.")
-
-        for path in self._opts['bootstrap_python_packages']:
-            path_dict = parse_legacy_hash_path('file', path)
-            # don't worry about inspecting the tarball; pip is smart
-            # enough to deal with that
-            bootstrap.append(['sudo pip install ', path_dict])
 
         # setup_cmds
         if self._opts['bootstrap_cmds']:

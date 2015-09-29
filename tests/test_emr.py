@@ -1727,7 +1727,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
 
         # use all the bootstrap options
-        runner = EMRJobRunner(conf_paths=[],
+        runner_kwargs = dict(conf_paths=[],
                               bootstrap=[
                                   PYTHON_BIN + ' ' +
                                   foo_py_path + '#bar.py',
@@ -1735,8 +1735,13 @@ class TestMasterBootstrapScript(MockBotoTestCase):
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
                               bootstrap_files=['/tmp/quz'],
                               bootstrap_mrjob=True,
-                              bootstrap_python_packages=[yelpy_tar_gz_path],
                               bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
+
+        # bootstrap_python_packages is not supported on Python 3
+        if PY2:
+            runner_kwargs['bootstrap_python_packages'] = [yelpy_tar_gz_path]
+
+        runner = EMRJobRunner(**runner_kwargs)
 
         runner._add_bootstrap_files_for_upload()
 
@@ -1767,9 +1772,10 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         assertScriptDownloads('s3://walrus/scripts/ohnoes.sh')
         assertScriptDownloads('/tmp/quz', 'quz')
         assertScriptDownloads(runner._mrjob_tar_gz_path)
-        assertScriptDownloads(yelpy_tar_gz_path)
         assertScriptDownloads('speedups.sh')
         assertScriptDownloads('/tmp/s.sh')
+        if PY2:
+            assertScriptDownloads(yelpy_tar_gz_path)
 
         # check scripts get run
 
@@ -1791,12 +1797,26 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
-        self.assertIn('sudo apt-get install -y python-pip || '
-                'sudo yum install -y python-pip', lines)
-        self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
+        if PY2:
+            self.assertIn('sudo apt-get install -y python-pip || '
+                          'sudo yum install -y python-pip', lines)
+            self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)
         self.assertIn('$__mrjob_PWD/s.sh', lines)
+
+    def test_bootstrap_python_packages_on_py2_only(self):
+        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
+        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
+
+        runner_kwargs = dict(bootstrap_python_packages=[yelpy_tar_gz_path],
+                             conf_paths=[])
+
+        if PY2:
+            with logger_disabled('mrjob.emr'):
+                EMRJobRunner(**runner_kwargs)
+        else:
+            self.assertRaises(Exception, EMRJobRunner, **runner_kwargs)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,

@@ -427,9 +427,9 @@ and install another Python binary.
    :command:`pip` *or* ``ujson`` by default on Python 3.
 
    If you just need pure
-   Python packages, see :ref:`Installing pip on Python 3 <bootstrap-pip-py3>`.
+   Python packages, see :ref:`Installing pip on Python 3 <using-pip-py3>`.
    If you'd like ``ujson`` or other C packages as well, see
-   :ref:`Installing ujson on Python 3 <bootstrap-ujson-py3>`. (The latter
+   :ref:`Installing ujson on Python 3 <using-ujson-py3>`. (The latter
    will also support Python 3 on any AMI because it compiles Python from
    source.)
 
@@ -447,6 +447,8 @@ and install another Python binary.
     Paths of python modules tarballs to install on EMR. Pass
     ``pip install path/to/tarballs/*.tar.gz#`` to :mrjob-opt:`bootstrap`
     instead.
+
+    .. warning:: This option is not supported at all in Python 3.
 
 .. mrjob-opt::
     :config: bootstrap_scripts

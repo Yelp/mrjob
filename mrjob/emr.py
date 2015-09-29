@@ -1884,9 +1884,13 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
-            # 1.x and 2.x AMIs use Debian (apt-get) and 3.x AMIs use
-            # Amazon Linux (yum). Who knows what 4.x AMIs will use?
-            #
+            if not PY2:
+                raise Exception(
+                    'bootstrap_python_packages is deprecated and is not'
+                    ' supported on Python 3. See'
+                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                    '-cookbook.html#using-pip for an alternative.')
+
             # Rather than keeping mrjob in sync with AMI versions, just
             # run whatever package manager works (until
             # bootstrap_python_packages becomes obsolete, and we can

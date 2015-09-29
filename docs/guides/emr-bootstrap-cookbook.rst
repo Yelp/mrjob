@@ -20,7 +20,7 @@ all these examples will work with :mrjob-opt:`setup` as well (yes, Hadoop
 tasks on EMR apparently have access to :command:`sudo`).
 
 
-.. _bootstrap-pip:
+.. _using-pip:
 
 Installing Python packages with pip
 -----------------------------------
@@ -64,7 +64,7 @@ Or a tarball:
 If you turned off :mrjob-opt:`bootstrap_mrjob` but still want :command:`pip`,
 the relevant package is ``python-pip``; see :ref:`bootstrap-system-packages`.
 
-.. _bootstrap-pip-py3:
+.. _using-pip-py3:
 
 on Python 3
 ^^^^^^^^^^^
@@ -97,7 +97,7 @@ This works with requirements files or tarballs too:
 
 If you want to install a Python package with C bindings (e.g. ``numpy``)
 you'll first need to compile Python from source. See
-:ref:`Installing ujson on Python 3 <bootstrap-ujson-py3>` for how this works.
+:ref:`Installing ujson on Python 3 <using-ujson-py3>` for how this works.
 
 
 Installing ujson
@@ -111,9 +111,9 @@ on Python 2
 
 On Python 2, mrjob automatically installs ``ujson`` for you. Done! (If you
 turned off :mrjob-opt:`bootstrap_mrjob`, the relevant Python package is
-``ujson``; see :ref:`bootstrap-pip`.)
+``ujson``; see :ref:`using-pip`.)
 
-.. _bootstrap-ujson-py3:
+.. _using-ujson-py3:
 
 on Python 3
 ^^^^^^^^^^^
@@ -199,7 +199,7 @@ and then go to ``http://aws.amazon.com/amazon-linux-ami/YYYY.MM-packages``
 
 Keep in mind that Amazon Linux has zero support for Python 3 outside
 the ``python34`` and ``python34-docs`` packages themselves;
-:ref:`install and use pip <bootstrap-pip-py3>` instead.
+:ref:`install and use pip <using-pip-py3>` instead.
 
 I don't know or care which AMI version I'm using
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -222,7 +222,7 @@ Installing Python from source
 -----------------------------
 
 We mostly covered this when we
-:ref:`installed ujson on Python 3 <bootstrap-ujson-py3>`, but here it
+:ref:`installed ujson on Python 3 <using-ujson-py3>`, but here it
 is, for reference:
 
 .. code-block:: yaml

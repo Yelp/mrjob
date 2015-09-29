@@ -1688,20 +1688,6 @@ class TestNoBoto(TestCase):
 
 class TestMasterBootstrapScript(MockBotoTestCase):
 
-    def setUp(self):
-        super(TestMasterBootstrapScript, self).setUp()
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        super(TestMasterBootstrapScript, self).tearDown()
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
     def test_usr_bin_env(self):
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=True,
@@ -1913,20 +1899,6 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
 
 class EMRNoMapperTest(MockBotoTestCase):
-
-    def setUp(self):
-        super(EMRNoMapperTest, self).setUp()
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        super(EMRNoMapperTest, self).tearDown()
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
 
     def test_no_mapper(self):
         # read from STDIN, a local file, and a remote file

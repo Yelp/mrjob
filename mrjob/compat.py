@@ -655,8 +655,9 @@ def translate_jobconf(variable, version):
         return variable
 
 
-def get_all_jobconf_variants(variable):
-    """Get all known variants of the given jobconf variable."""
+def translate_jobconf_for_all_versions(variable):
+    """Get all known variants of the given jobconf variable.
+    Unlike :py:func:`translate_jobconf`, returns a list."""
     return sorted(
         set([variable] + list(_JOBCONF_MAP.get(variable, {}).values())))
 

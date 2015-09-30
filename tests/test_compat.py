@@ -22,6 +22,7 @@ from mrjob.compat import jobconf_from_dict
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
+from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_generic_jobconf
 from mrjob.compat import _map_version
 
@@ -108,6 +109,14 @@ class CompatTestCase(TestCase):
                          'user.name')
         self.assertEqual(translate_jobconf('user.name', '2.0'),
                          'mapreduce.job.user.name')
+
+        self.assertEqual(translate_jobconf('foo.bar', '2.0'), 'foo.bar')
+
+    def test_translate_jobconf_for_all_versions(self):
+        self.assertEqual(translate_jobconf_for_all_versions('user.name'),
+                         ['mapreduce.job.user.name', 'user.name'])
+        self.assertEqual(translate_jobconf_for_all_versions('foo.bar'),
+                         ['foo.bar'])
 
     def test_supports_combiners(self):
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),

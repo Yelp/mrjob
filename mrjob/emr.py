@@ -363,7 +363,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'emr_job_flow_pool_name': 'default',
             'hadoop_streaming_jar_on_emr': (
                 '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),
-            'hadoop_version': None,  # override runner default
             'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,

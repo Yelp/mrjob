@@ -31,8 +31,8 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 
-from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import supports_combiners_in_hadoop_streaming
+from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -197,7 +197,6 @@ class RunnerOptionStore(OptionStore):
             'check_input_paths': True,
             'cleanup': ['ALL'],
             'cleanup_on_failure': ['NONE'],
-            'hadoop_version': '0.20',
             'local_tmp_dir': tempfile.gettempdir(),
             'owner': owner,
             'sh_bin': ['sh', '-ex'],
@@ -1159,8 +1158,38 @@ class MRJobRunner(object):
         step = self._get_step(step_num)
         jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
 
-        return translate_jobconf_dict(
+        # if user is using the wrong jobconfs, add in the correct ones
+        self._update_jobconf_for_hadoop_version(
             jobconf, self.get_hadoop_version())
+
+        return jobconf
+
+    def _update_jobconf_for_hadoop_version(self, jobconf, hadoop_version):
+        """If *jobconf* (a dict) contains jobconf variables from the wrong
+        version of Hadoop, add variables for the right one.
+
+        If *hadoop_version* is empty, do nothing.
+        """
+        if not hadoop_version:  # this happens for sim runner
+            return
+
+        translations = {}  # for warning, below
+
+        for key, value in sorted(jobconf.items()):
+            new_key = translate_jobconf(key, hadoop_version)
+            if new_key not in jobconf:
+                jobconf[new_key] = value
+                translations[key] = new_key
+
+        if translations:
+            log.warning(
+                "Detected hadoop configuration property names that"
+                " do not match hadoop version %s:"
+                "\nThey have been translated as follows\n %s",
+                hadoop_version,
+                '\n'.join([
+                    "%s: %s" % (key, new_key) for key, new_key
+                    in sorted(translations.items())]))
 
     def _hadoop_args_for_step(self, step_num):
         """Build a list of extra arguments to the hadoop binary.

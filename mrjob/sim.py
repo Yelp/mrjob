@@ -20,9 +20,9 @@ import os
 import shutil
 import stat
 
-from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import translate_jobconf
+from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.runner import MRJobRunner
@@ -428,10 +428,7 @@ class SimMRJobRunner(MRJobRunner):
         """
         version = self.get_hadoop_version()
 
-        # auto-translate jobconf variables from the wrong version, like
-        # other runners do
-        user_jobconf = translate_jobconf_dict(
-            self._jobconf_for_step(step_num), version)
+        user_jobconf = self._jobconf_for_step(step_num)
 
         simulated_jobconf = self._simulate_jobconf_for_step(
             step_num, step_type, task_num, working_dir, **split_kwargs)
@@ -509,9 +506,15 @@ class SimMRJobRunner(MRJobRunner):
         if input_length is not None:
             j['mapreduce.map.input.length'] = str(input_length)
 
-        # translate to correct version
         version = self.get_hadoop_version()
-        j = dict((translate_jobconf(k, version), v) for k, v in j.items())
+        if version:
+            # translate to correct version
+            j = dict((translate_jobconf(k, version), v) for k, v in j.items())
+        else:
+            # use all versions
+            j = dict((variant, v)
+                     for k, v in j.items()
+                     for variant in translate_jobconf_for_all_versions(k))
 
         return j
 

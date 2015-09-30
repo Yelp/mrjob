@@ -90,7 +90,7 @@ class JobConfFromDictTestCase(TestCase):
             jobconf_from_dict({}, 'user.defined', 'beauty'), 'beauty')
 
 
-class CompatTestCase(TestCase):
+class TranslateJobConfTestCase(TestCase):
 
     def test_translate_jobconf(self):
         self.assertEqual(translate_jobconf('user.name', '0.18'),
@@ -112,11 +112,19 @@ class CompatTestCase(TestCase):
 
         self.assertEqual(translate_jobconf('foo.bar', '2.0'), 'foo.bar')
 
+    def test_version_may_not_be_None(self):
+        self.assertRaises(TypeError, translate_jobconf, 'user.name', None)
+        # test unknown variables too, since they don't go through map_version()
+        self.assertRaises(TypeError, translate_jobconf, 'foo.bar', None)
+
     def test_translate_jobconf_for_all_versions(self):
         self.assertEqual(translate_jobconf_for_all_versions('user.name'),
                          ['mapreduce.job.user.name', 'user.name'])
         self.assertEqual(translate_jobconf_for_all_versions('foo.bar'),
                          ['foo.bar'])
+
+
+class MiscCompatTestCase(TestCase):
 
     def test_supports_combiners(self):
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),
@@ -146,6 +154,10 @@ class MapVersionTestCase(TestCase):
         self.assertRaises(ValueError, map_version, '0.5.0', None)
         self.assertRaises(ValueError, map_version, '0.5.0', {})
         self.assertRaises(ValueError, map_version, '0.5.0', [])
+
+    def test_version_may_not_be_None(self):
+        self.assertEqual(map_version('1', {'1': 'foo'}), 'foo')
+        self.assertRaises(TypeError, map_version, None, {'1': 'foo'})
 
     def test_dict(self):
         version_map = {

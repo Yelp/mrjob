@@ -635,6 +635,9 @@ def map_version(version, version_map):
     If *version* is less than any version in *version_map*, use the value for
     the earliest version in *version_map*.
     """
+    if version is None:
+        raise TypeError
+
     if not version_map:
         raise ValueError
 
@@ -655,6 +658,9 @@ def translate_jobconf(variable, version):
     """Translate *variable* to Hadoop version *version*. If it's not
     a variable we recognize, leave as-is.
     """
+    if version is None:
+        raise TypeError
+
     if variable in _JOBCONF_MAP:
         return map_version(version, _JOBCONF_MAP[variable])
     else:

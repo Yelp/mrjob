@@ -674,47 +674,9 @@ def translate_jobconf_for_all_versions(variable):
         set([variable] + list(_JOBCONF_MAP.get(variable, {}).values())))
 
 
-def supports_combiners_in_hadoop_streaming(version):
-    """Return ``True`` if this version of Hadoop Streaming supports combiners
-    (i.e. >= 0.20.203), otherwise False.
-    """
-    return version_gte(version, '0.20')
 
 
-def supports_new_distributed_cache_options(version):
-    """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
-    ``-cacheArchive``
-    """
-    # Although Hadoop 0.20 supports these options, that support is buggy:
-    # https://issues.apache.org/jira/browse/MAPREDUCE-2361
-    # https://issues.apache.org/jira/browse/HADOOP-6334
-    # The bug was fixed in Hadoop 0.20.203.0:
-    # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
-    return version_gte(version, '0.20.203')
-
-
-def uses_020_counters(version):
-    return version_gte(version, '0.20')
-
-
-def uses_generic_jobconf(version):
-    """Use ``-D`` instead of ``-jobconf``"""
-    return version_gte(version, '0.20')
-
-
-def version_gte(version, cmp_version_str):
-    """Return ``True`` if version >= *cmp_version_str*."""
-
-    if not isinstance(version, string_types):
-        raise TypeError('%r is not a string' % version)
-
-    if not isinstance(cmp_version_str, string_types):
-        raise TypeError('%r is not a string' % cmp_version_str)
-
-    return LooseVersion(version) >= LooseVersion(cmp_version_str)
-
-
-def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
+def translate_jobconf_dict(jobconf, hadoop_version=None):
     """Translates the configuration property name to match those that
     are accepted in hadoop_version. Prints a warning message if any
     configuration property name does not match the name in the hadoop
@@ -753,3 +715,44 @@ def add_translated_jobconf_for_all_versions(jobconf):
             translated_jobconf[translated_var] = value
 
     return translated_jobconf
+
+
+
+def supports_combiners_in_hadoop_streaming(version):
+    """Return ``True`` if this version of Hadoop Streaming supports combiners
+    (i.e. >= 0.20.203), otherwise False.
+    """
+    return version_gte(version, '0.20')
+
+
+def supports_new_distributed_cache_options(version):
+    """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
+    ``-cacheArchive``
+    """
+    # Although Hadoop 0.20 supports these options, that support is buggy:
+    # https://issues.apache.org/jira/browse/MAPREDUCE-2361
+    # https://issues.apache.org/jira/browse/HADOOP-6334
+    # The bug was fixed in Hadoop 0.20.203.0:
+    # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
+    return version_gte(version, '0.20.203')
+
+
+def uses_020_counters(version):
+    return version_gte(version, '0.20')
+
+
+def uses_generic_jobconf(version):
+    """Use ``-D`` instead of ``-jobconf``"""
+    return version_gte(version, '0.20')
+
+
+def version_gte(version, cmp_version_str):
+    """Return ``True`` if version >= *cmp_version_str*."""
+
+    if not isinstance(version, string_types):
+        raise TypeError('%r is not a string' % version)
+
+    if not isinstance(cmp_version_str, string_types):
+        raise TypeError('%r is not a string' % cmp_version_str)
+
+    return LooseVersion(version) >= LooseVersion(cmp_version_str)

@@ -20,7 +20,7 @@ import os
 import shutil
 import stat
 
-from mrjob.compat import add_translated_jobconf_for_hadoop_version
+from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_dicts
@@ -430,7 +430,7 @@ class SimMRJobRunner(MRJobRunner):
 
         # auto-translate jobconf variables from the wrong version, like
         # other runners do
-        user_jobconf = add_translated_jobconf_for_hadoop_version(
+        user_jobconf = translate_jobconf_dict(
             self._jobconf_for_step(step_num), version)
 
         simulated_jobconf = self._simulate_jobconf_for_step(

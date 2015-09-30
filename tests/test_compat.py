@@ -17,7 +17,7 @@
 import os
 from distutils.version import LooseVersion
 
-from mrjob.compat import add_translated_jobconf_for_hadoop_version
+from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env
 from mrjob.compat import map_version
@@ -127,7 +127,7 @@ class TranslateJobConfTestCase(TestCase):
         self.assertEqual(translate_jobconf_for_all_versions('foo.bar'),
                          ['foo.bar'])
 
-    def test_add_translated_jobconf_for_hadoop_version(self):
+    def test_translate_jobconf_dict(self):
         jobconf = {
             'user.name': 'dave',
             'foo.bar': 'baz',
@@ -138,12 +138,12 @@ class TranslateJobConfTestCase(TestCase):
             log_to_stream('mrjob.compat', stderr)
 
             translated_jobconf_1_0 = (
-                add_translated_jobconf_for_hadoop_version(jobconf, '1.0'))
+                translate_jobconf_dict(jobconf, '1.0'))
             self.assertEqual(translated_jobconf_1_0, jobconf)
             self.assertEqual(stderr.getvalue(), '')
 
             translated_jobconf_2_0 = (
-                add_translated_jobconf_for_hadoop_version(jobconf, '2.0'))
+                translate_jobconf_dict(jobconf, '2.0'))
             self.assertEqual(translated_jobconf_2_0, {
                 'foo.bar': 'baz',
                 'mapreduce.job.user.name': 'dave',

@@ -31,7 +31,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 
-from mrjob.compat import add_translated_jobconf_for_hadoop_version
+from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
@@ -1159,7 +1159,7 @@ class MRJobRunner(object):
         step = self._get_step(step_num)
         jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
 
-        return add_translated_jobconf_for_hadoop_version(
+        return translate_jobconf_dict(
             jobconf, self.get_hadoop_version())
 
     def _hadoop_args_for_step(self, step_num):

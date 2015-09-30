@@ -29,7 +29,6 @@ from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_opts
 from mrjob.options import add_hadoop_emr_opts
 from mrjob.options import add_hadoop_opts
-from mrjob.options import add_hadoop_shared_opts
 from mrjob.options import add_local_opts
 from mrjob.options import add_protocol_opts
 from mrjob.options import add_runner_opts
@@ -285,14 +284,6 @@ class MRJobLauncher(object):
         add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
         add_basic_opts(self.runner_opt_group)
 
-        self.hadoop_opts_opt_group = OptionGroup(
-            self.option_parser,
-            'Configuring or emulating Hadoop (these apply when you set -r'
-            ' hadoop, -r emr, or -r local)')
-        self.option_parser.add_option_group(self.hadoop_opts_opt_group)
-
-        add_hadoop_shared_opts(self.hadoop_opts_opt_group)
-
         # options for inline/local runners
         self.local_opt_group = OptionGroup(
             self.option_parser,
@@ -321,8 +312,7 @@ class MRJobLauncher(object):
         # options for running the job on EMR
         self.emr_opt_group = OptionGroup(
             self.option_parser,
-            'Running on Amazon Elastic MapReduce (these apply when you set -r'
-            ' emr)')
+            'Running on EMR (these apply when you set -r emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
 
         add_emr_opts(self.emr_opt_group)
@@ -330,7 +320,7 @@ class MRJobLauncher(object):
     def all_option_groups(self):
         return (self.option_parser, self.proto_opt_group,
                 self.runner_opt_group, self.hadoop_emr_opt_group,
-                self.emr_opt_group, self.hadoop_opts_opt_group)
+                self.emr_opt_group, self.local_opt_group)
 
     def is_task(self):
         """True if this is a mapper, combiner, or reducer.
@@ -448,8 +438,7 @@ class MRJobLauncher(object):
             sys.exit(0)
 
         if self.options.help_hadoop:
-            print_help_for_groups(self.hadoop_emr_opt_group,
-                                  self.hadoop_opts_opt_group)
+            print_help_for_groups(self.hadoop_emr_opt_group)
             sys.exit(0)
 
         if self.options.help_local:

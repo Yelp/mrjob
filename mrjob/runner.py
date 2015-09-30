@@ -94,8 +94,6 @@ _CLEANUP_DEPRECATED_ALIASES = {
     'SCRATCH': 'TMP',
 }
 
-_STEP_RE = re.compile(r'^M?C?R?$')
-
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
 

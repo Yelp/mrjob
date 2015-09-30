@@ -199,14 +199,18 @@ def add_runner_opts(opt_group, default_runner='local'):
     ]
 
 
-def add_hadoop_shared_opts(opt_group):
-    """Options for ``hadoop``, ``local``, and ``emr`` runners"""
+def add_local_opts(opt_group):
+    """Options for ``inline`` and ``local`` runners."""
     return [
         opt_group.add_option(
             '--hadoop-version', dest='hadoop_version', default=None,
-            help=('Version of Hadoop to specify to EMR or to emulate for -r'
-                  ' local. Default is 0.20.')),
+            help=('Specific version of Hadoop to simulate')),
+    ]
 
+
+def add_hadoop_shared_opts(opt_group):
+    """Options for ``hadoop``, ``local``, and ``emr`` runners"""
+    return [
         # for more info about jobconf:
         # http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
         opt_group.add_option(

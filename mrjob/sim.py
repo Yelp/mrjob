@@ -36,6 +36,10 @@ log = logging.getLogger(__name__)
 
 class SimRunnerOptionStore(RunnerOptionStore):
 
+    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
+        'hadoop_version',
+    ]))
+
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'cmdenv': combine_local_envs,
     })

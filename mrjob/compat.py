@@ -729,3 +729,15 @@ def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
 
     translated_jobconf.update(jobconf)
     return translated_jobconf
+
+
+def add_translated_jobconf_for_all_versions(jobconf):
+    """Update *jobconf* to include all possible variants of each
+    configuration name."""
+    translated_jobconf = {}
+
+    for var, value in jobconf.items():
+        for translated_var in translate_jobconf_for_all_versions(key):
+            translated_jobconf[translated_var] = value
+
+    return translated_jobconf

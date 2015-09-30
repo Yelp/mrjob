@@ -17,13 +17,13 @@
 import os
 from distutils.version import LooseVersion
 
-from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env
 from mrjob.compat import map_version
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
+from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_generic_jobconf
 from mrjob.py2 import StringIO
@@ -142,6 +142,15 @@ class TranslateJobConfTestCase(TestCase):
             self.assertEqual(translated_jobconf_1_0, jobconf)
             self.assertEqual(stderr.getvalue(), '')
 
+            translated_jobconf_agnostic = (
+                translate_jobconf_dict(jobconf))
+            self.assertEqual(translated_jobconf_agnostic, {
+                'foo.bar': 'baz',
+                'mapreduce.job.user.name': 'dave',
+                'user.name': 'dave',
+            })
+            self.assertEqual(stderr.getvalue(), '')
+
             translated_jobconf_2_0 = (
                 translate_jobconf_dict(jobconf, '2.0'))
             self.assertEqual(translated_jobconf_2_0, {
@@ -149,8 +158,10 @@ class TranslateJobConfTestCase(TestCase):
                 'mapreduce.job.user.name': 'dave',
                 'user.name': 'dave',
             })
-            self.assertIn('do not match hadoop version', stderr.getvalue())
-            self.assertIn('mapreduce.job.user.name', stderr.getvalue())
+            self.assertIn('do not match hadoop version',
+                          stderr.getvalue())
+            self.assertIn('user.name: mapreduce.job.user.name',
+                          stderr.getvalue())
 
 
 class MiscCompatTestCase(TestCase):

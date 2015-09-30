@@ -674,8 +674,6 @@ def translate_jobconf_for_all_versions(variable):
         set([variable] + list(_JOBCONF_MAP.get(variable, {}).values())))
 
 
-
-
 def translate_jobconf_dict(jobconf, hadoop_version=None):
     """Translates the configuration property name to match those that
     are accepted in hadoop_version. Prints a warning message if any
@@ -685,37 +683,36 @@ def translate_jobconf_dict(jobconf, hadoop_version=None):
     :return: a map consisting of the original and translated configuration
              property names and values.
     """
-    translated_jobconf = {}
-    mismatch_key_to_translated_key = {}
-    for key, value in jobconf.items():
-        new_key = translate_jobconf(key, hadoop_version)
-        if key != new_key:
-            translated_jobconf[new_key] = value
-            mismatch_key_to_translated_key[key] = new_key
+    translated_jobconf = jobconf.copy()
+    translation_warnings = {}
 
-    if mismatch_key_to_translated_key:
+    for variable, value in jobconf.items():
+        if hadoop_version:
+            variants = [translate_jobconf(variable, hadoop_version)]
+        else:
+            variants = translate_jobconf_for_all_versions(variable)
+
+        for variant in variants:
+            if variant in jobconf:
+                # this happens if variant == variable or
+                # if the variant was in jobconf to start with
+                continue
+
+            translated_jobconf[variant] = value
+
+            if hadoop_version:
+                translation_warnings[variable] = variant
+
+    if translation_warnings:
         log.warning("Detected hadoop configuration property names that"
                     " do not match hadoop version %s:"
                     "\nThe have been translated as follows\n %s",
                     hadoop_version,
-                    '\n'.join(["%s: %s" % (key, value) for key, value
-                               in mismatch_key_to_translated_key.items()]))
-
-    translated_jobconf.update(jobconf)
-    return translated_jobconf
-
-
-def add_translated_jobconf_for_all_versions(jobconf):
-    """Update *jobconf* to include all possible variants of each
-    configuration name."""
-    translated_jobconf = {}
-
-    for var, value in jobconf.items():
-        for translated_var in translate_jobconf_for_all_versions(key):
-            translated_jobconf[translated_var] = value
+                    '\n'.join([
+                        "%s: %s" % (variable, variant) for variable, variant
+                        in sorted(translation_warnings.items())]))
 
     return translated_jobconf
-
 
 
 def supports_combiners_in_hadoop_streaming(version):

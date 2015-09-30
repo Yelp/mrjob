@@ -717,29 +717,43 @@ def translate_jobconf_dict(jobconf, hadoop_version=None):
 
 def supports_combiners_in_hadoop_streaming(version):
     """Return ``True`` if this version of Hadoop Streaming supports combiners
-    (i.e. >= 0.20.203), otherwise False.
+    (i.e. >= 0.20.203), otherwise ``False``.
+
+    If version is empty, returns ``True``
     """
-    return version_gte(version, '0.20')
+    if not version:
+        return True
+    else:
+        return version_gte(version, '0.20')
 
 
 def supports_new_distributed_cache_options(version):
     """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
-    ``-cacheArchive``
+    ``-cacheArchive``. If version is empty, returns ``True``
     """
-    # Although Hadoop 0.20 supports these options, that support is buggy:
-    # https://issues.apache.org/jira/browse/MAPREDUCE-2361
-    # https://issues.apache.org/jira/browse/HADOOP-6334
-    # The bug was fixed in Hadoop 0.20.203.0:
-    # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
-    return version_gte(version, '0.20.203')
+    if not version:
+        return True
+    else:
+        # Although Hadoop 0.20 supports these options, that support is buggy:
+        # https://issues.apache.org/jira/browse/MAPREDUCE-2361
+        # https://issues.apache.org/jira/browse/HADOOP-6334
+        # The bug was fixed in Hadoop 0.20.203.0:
+        # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
+        return version_gte(version, '0.20.203')
 
 
 def uses_020_counters(version):
+    """Does this version of Hadoop log counters the same way as Hadoop 0.20?"""
+    # TODO: YARN has a different counter style anyway; this probably belongs
+    # in log parsing code.
     return version_gte(version, '0.20')
 
 
 def uses_generic_jobconf(version):
-    """Use ``-D`` instead of ``-jobconf``"""
+    """Use ``-D`` instead of ``-jobconf``. Defaults to ``True`` if
+    *version* is empty."""
+    if not version:
+        return True
     return version_gte(version, '0.20')
 
 

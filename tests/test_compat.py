@@ -175,17 +175,27 @@ class MiscCompatTestCase(TestCase):
                          True)
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.20.203'),
                          True)
+        # default to True
+        self.assertEqual(supports_combiners_in_hadoop_streaming(None), True)
+
 
     def test_uses_generic_jobconf(self):
         self.assertEqual(uses_generic_jobconf('0.18'), False)
         self.assertEqual(uses_generic_jobconf('0.20'), True)
         self.assertEqual(uses_generic_jobconf('0.21'), True)
 
+        # default to True
+        self.assertEqual(uses_generic_jobconf(None), True)
+
     def test_cache_opts(self):
         self.assertEqual(supports_new_distributed_cache_options('0.18'), False)
         self.assertEqual(supports_new_distributed_cache_options('0.20'), False)
         self.assertEqual(
             supports_new_distributed_cache_options('0.20.203'), True)
+
+        # default to True
+        self.assertEqual(
+            supports_new_distributed_cache_options(None), True)
 
 
 class MapVersionTestCase(TestCase):

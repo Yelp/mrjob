@@ -5,21 +5,31 @@ Since mrjob is geared toward Hadoop, there are a few Hadoop-specific options.
 However, due to the difference between the different runners, the Hadoop
 platform, and Elastic MapReduce, they are not all available for all runners.
 
-Options available to local, hadoop, and emr runners
----------------------------------------------------
 
-These options are both used by Hadoop and simulated by the ``local`` runner to
-some degree.
+Options specific to the local and inline runners
+------------------------------------------------
 
 .. mrjob-opt::
     :config: hadoop_version
     :switch: --hadoop-version
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: inferred from environment/AWS
+    :default: ``None``
 
-    Set the version of Hadoop to simulate in the ``local`` or ``inline``
-    runner.
+    Set the version of Hadoop to simulate (this currently only matters for
+    :mrjob-opt:`jobconf`).
+
+    If you don't set this, the ``local`` and
+    ``inline`` runners will run in a version-agnostic mode, where anytime
+    the runner sets a simulated jobconf variable, it'll use *every* possible
+    name for it (e.g. ``user.name`` *and* ``mapreduce.job.user.name``).
+
+
+Options available to local, hadoop, and emr runners
+---------------------------------------------------
+
+These options are both used by Hadoop and simulated by the ``local``
+and ``inline`` runners to some degree.
 
 .. mrjob-opt::
     :config: jobconf
@@ -32,6 +42,7 @@ some degree.
     property name to value.  Equivalent to passing ``['-jobconf',
     'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to
     :mrjob-opt:`hadoop_extra_args`.
+
 
 Options available to hadoop and emr runners
 -------------------------------------------

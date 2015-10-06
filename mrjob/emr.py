@@ -356,6 +356,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'ami_version': _DEFAULT_AMI_VERSION,
             'aws_region': _DEFAULT_AWS_REGION,
+            'bootstrap_python': True,
             'check_emr_status_every': 30,
             'cleanup_on_failure': ['JOB'],
             'ec2_core_instance_type': 'm1.medium',
@@ -1832,20 +1833,33 @@ class EMRJobRunner(MRJobRunner):
     def _bootstrap_python(self):
         """Return a (possibly empty) list of parsed commands (in the same
         format as returned by parse_setup_cmd())'"""
-        if PY2:
-            if self._opts['bootstrap_python']:
-                log.warning('bootstrap_python does nothing in Python 2')
-        # Python 3
-        elif (self._opts['bootstrap_python'] or
-            self._opts['bootstrap_python'] is None):
+        if not self._opts['bootstrap_python']:
+            return []
 
+        if PY2:
+            # Python 2 is already installed; install pip and ujson
+
+            # (We also install python-pip for bootstrap_python_packages,
+            # but there's no harm in running these commands twice, and
+            # bootstrap_python_packages is deprecated anyway.)
+            return [
+                ['sudo apt-get install -y python-pip || '
+                 'sudo yum install -y python-pip'],
+                ['sudo pip install --upgrade ujson'],
+            ]
+        else:
+            # the best we can do is install the Python 3.4 package
+            # (getting pip and ujson on Python 3 is much harder on EMR;
+            # see docs/guides/emr-bootstrap-cookbook.rst)
+
+            # we have to have at least on AMI 3.7.0
             if (self._opts['ami_version'] == 'latest' or
                 not version_gte(self._opts['ami_version'], '3.7.0')):
                 log.warning(
                     'bootstrapping Python 3 will probably not work on'
                     ' AMIs prior to 3.7.0. For an alternative, see:'
                     ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                    '-cookbook.html#upgrading-python-from-source')
+                    '-cookbook.html#installing-python-from-source')
 
             return [['sudo yum install -y python34']]
 
@@ -1870,25 +1884,28 @@ class EMRJobRunner(MRJobRunner):
 
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
-            # 1.x and 2.x AMIs use Debian (apt-get) and 3.x AMIs use
-            # Amazon Linux (yum). Who knows what 4.x AMIs will use?
-            #
-            # Rather than keeping mrjob in sync with AMI versions, just
-            # run whatever package manager works (until
-            # bootstrap_python_packages becomes obsolete, and we can
-            # rip this code out entirely)
-            bootstrap.append(['sudo apt-get install -y python-pip || '
-                              'sudo yum install -y python-pip'])
-            # Print a warning
-            log.warning(
-                "bootstrap_python_packages is deprecated since v0.4.2 and will"
-                " be removed in v0.6.0. Consider using bootstrap instead.")
+            if PY2:
+                log.warning(
+                    "bootstrap_python_packages is deprecated since v0.4.2 and"
+                    " will be removed in v0.6.0. Consider using bootstrap"
+                    " instead.")
 
-        for path in self._opts['bootstrap_python_packages']:
-            path_dict = parse_legacy_hash_path('file', path)
-            # don't worry about inspecting the tarball; pip is smart
-            # enough to deal with that
-            bootstrap.append(['sudo pip install ', path_dict])
+                # this works on any AMI version
+                bootstrap.append(['sudo apt-get install -y python-pip || '
+                                  'sudo yum install -y python-pip'])
+
+                for path in self._opts['bootstrap_python_packages']:
+                    path_dict = parse_legacy_hash_path('file', path)
+                    # don't worry about inspecting the tarball; pip is smart
+                    # enough to deal with that
+                    bootstrap.append(['sudo pip install ', path_dict])
+
+            else:
+                log.warning(
+                    'bootstrap_python_packages is deprecated and is not'
+                    ' supported on Python 3. See'
+                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                    '-cookbook.html#using-pip for an alternative.')
 
         # setup_cmds
         if self._opts['bootstrap_cmds']:

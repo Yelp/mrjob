@@ -27,9 +27,9 @@ from optparse import OptionParser
 from mrjob.conf import combine_dicts
 from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_opts
-from mrjob.options import add_hadoop_opts
 from mrjob.options import add_hadoop_emr_opts
-from mrjob.options import add_hadoop_shared_opts
+from mrjob.options import add_hadoop_opts
+from mrjob.options import add_local_opts
 from mrjob.options import add_protocol_opts
 from mrjob.options import add_runner_opts
 from mrjob.options import alphabetize_options
@@ -261,6 +261,11 @@ class MRJobLauncher(object):
             help='show Hadoop-related options')
 
         self.option_parser.add_option(
+            '--help-local', dest='help_local', action='store_true',
+            default=False,
+            help='show local/inline runner-related options')
+
+        self.option_parser.add_option(
             '--help-runner', dest='help_runner', action='store_true',
             default=False, help='show runner-related options')
 
@@ -279,13 +284,13 @@ class MRJobLauncher(object):
         add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
         add_basic_opts(self.runner_opt_group)
 
-        self.hadoop_opts_opt_group = OptionGroup(
+        # options for inline/local runners
+        self.local_opt_group = OptionGroup(
             self.option_parser,
-            'Configuring or emulating Hadoop (these apply when you set -r'
-            ' hadoop, -r emr, or -r local)')
-        self.option_parser.add_option_group(self.hadoop_opts_opt_group)
+            'Running locally (these apply when you set -r inline or -r local)')
+        self.option_parser.add_option_group(self.local_opt_group)
 
-        add_hadoop_shared_opts(self.hadoop_opts_opt_group)
+        add_local_opts(self.local_opt_group)
 
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
@@ -307,8 +312,7 @@ class MRJobLauncher(object):
         # options for running the job on EMR
         self.emr_opt_group = OptionGroup(
             self.option_parser,
-            'Running on Amazon Elastic MapReduce (these apply when you set -r'
-            ' emr)')
+            'Running on EMR (these apply when you set -r emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
 
         add_emr_opts(self.emr_opt_group)
@@ -316,7 +320,7 @@ class MRJobLauncher(object):
     def all_option_groups(self):
         return (self.option_parser, self.proto_opt_group,
                 self.runner_opt_group, self.hadoop_emr_opt_group,
-                self.emr_opt_group, self.hadoop_opts_opt_group)
+                self.emr_opt_group, self.local_opt_group)
 
     def is_task(self):
         """True if this is a mapper, combiner, or reducer.
@@ -434,8 +438,11 @@ class MRJobLauncher(object):
             sys.exit(0)
 
         if self.options.help_hadoop:
-            print_help_for_groups(self.hadoop_emr_opt_group,
-                                  self.hadoop_opts_opt_group)
+            print_help_for_groups(self.hadoop_emr_opt_group)
+            sys.exit(0)
+
+        if self.options.help_local:
+            print_help_for_groups(self.local_opt_group)
             sys.exit(0)
 
         if self.options.help_runner:
@@ -470,7 +477,6 @@ class MRJobLauncher(object):
             'hadoop_input_format': self.hadoop_input_format(),
             'hadoop_output_format': self.hadoop_output_format(),
             'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
-            'hadoop_version': self.options.hadoop_version,
             'input_paths': self.args,
             'interpreter': self.options.interpreter,
             'jobconf': self.jobconf(),
@@ -501,7 +507,9 @@ class MRJobLauncher(object):
 
         Re-define this if you want finer control when running jobs locally.
         """
-        return self.job_runner_kwargs()
+        return combine_dicts(
+            self.job_runner_kwargs(),
+            self._get_kwargs_from_opt_group(self.local_opt_group))
 
     def local_job_runner_kwargs(self):
         """Keyword arguments to create create runners when
@@ -512,7 +520,9 @@ class MRJobLauncher(object):
 
         Re-define this if you want finer control when running jobs locally.
         """
-        return self.job_runner_kwargs()
+        return combine_dicts(
+            self.job_runner_kwargs(),
+            self._get_kwargs_from_opt_group(self.local_opt_group))
 
     def emr_job_runner_kwargs(self):
         """Keyword arguments to create create runners when

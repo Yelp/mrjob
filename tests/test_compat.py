@@ -17,16 +17,20 @@
 import os
 from distutils.version import LooseVersion
 
-from mrjob.compat import jobconf_from_env
 from mrjob.compat import jobconf_from_dict
+from mrjob.compat import jobconf_from_env
+from mrjob.compat import map_version
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
+from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_generic_jobconf
-from mrjob.compat import _map_version
+from mrjob.py2 import StringIO
+from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
 from tests.py2 import patch
+from tests.quiet import no_handlers_for_logger
 
 
 class GetJobConfValueTestCase(TestCase):
@@ -89,7 +93,7 @@ class JobConfFromDictTestCase(TestCase):
             jobconf_from_dict({}, 'user.defined', 'beauty'), 'beauty')
 
 
-class CompatTestCase(TestCase):
+class TranslateJobConfTestCase(TestCase):
 
     def test_translate_jobconf(self):
         self.assertEqual(translate_jobconf('user.name', '0.18'),
@@ -109,6 +113,22 @@ class CompatTestCase(TestCase):
         self.assertEqual(translate_jobconf('user.name', '2.0'),
                          'mapreduce.job.user.name')
 
+        self.assertEqual(translate_jobconf('foo.bar', '2.0'), 'foo.bar')
+
+    def test_version_may_not_be_None(self):
+        self.assertRaises(TypeError, translate_jobconf, 'user.name', None)
+        # test unknown variables too, since they don't go through map_version()
+        self.assertRaises(TypeError, translate_jobconf, 'foo.bar', None)
+
+    def test_translate_jobconf_for_all_versions(self):
+        self.assertEqual(translate_jobconf_for_all_versions('user.name'),
+                         ['mapreduce.job.user.name', 'user.name'])
+        self.assertEqual(translate_jobconf_for_all_versions('foo.bar'),
+                         ['foo.bar'])
+
+
+class MiscCompatTestCase(TestCase):
+
     def test_supports_combiners(self):
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),
                          False)
@@ -118,11 +138,17 @@ class CompatTestCase(TestCase):
                          True)
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.20.203'),
                          True)
+        # default to True
+        self.assertEqual(supports_combiners_in_hadoop_streaming(None), True)
+
 
     def test_uses_generic_jobconf(self):
         self.assertEqual(uses_generic_jobconf('0.18'), False)
         self.assertEqual(uses_generic_jobconf('0.20'), True)
         self.assertEqual(uses_generic_jobconf('0.21'), True)
+
+        # default to True
+        self.assertEqual(uses_generic_jobconf(None), True)
 
     def test_cache_opts(self):
         self.assertEqual(supports_new_distributed_cache_options('0.18'), False)
@@ -130,13 +156,21 @@ class CompatTestCase(TestCase):
         self.assertEqual(
             supports_new_distributed_cache_options('0.20.203'), True)
 
+        # default to True
+        self.assertEqual(
+            supports_new_distributed_cache_options(None), True)
+
 
 class MapVersionTestCase(TestCase):
 
     def test_empty(self):
-        self.assertRaises(ValueError, _map_version, None, '0.5.0')
-        self.assertRaises(ValueError, _map_version, {}, '0.5.0'),
-        self.assertRaises(ValueError, _map_version, [], '0.5.0')
+        self.assertRaises(ValueError, map_version, '0.5.0', None)
+        self.assertRaises(ValueError, map_version, '0.5.0', {})
+        self.assertRaises(ValueError, map_version, '0.5.0', [])
+
+    def test_version_may_not_be_None(self):
+        self.assertEqual(map_version('1', {'1': 'foo'}), 'foo')
+        self.assertRaises(TypeError, map_version, None, {'1': 'foo'})
 
     def test_dict(self):
         version_map = {
@@ -145,15 +179,15 @@ class MapVersionTestCase(TestCase):
             '3': 'baz',
         }
 
-        self.assertEqual(_map_version(version_map, '1.1'), 'foo')
+        self.assertEqual(map_version('1.1', version_map), 'foo')
         # test exact match
-        self.assertEqual(_map_version(version_map, '2'), 'bar')
+        self.assertEqual(map_version('2', version_map), 'bar')
         # versions are just minimums
-        self.assertEqual(_map_version(version_map, '4.5'), 'baz')
+        self.assertEqual(map_version('4.5', version_map), 'baz')
         # compare versions, not strings
-        self.assertEqual(_map_version(version_map, '11.11'), 'baz')
+        self.assertEqual(map_version('11.11', version_map), 'baz')
         # fall back to lowest version
-        self.assertEqual(_map_version(version_map, '0.1'), 'foo')
+        self.assertEqual(map_version('0.1', version_map), 'foo')
 
     def test_list_of_tuples(self):
         version_map = [
@@ -162,8 +196,8 @@ class MapVersionTestCase(TestCase):
             (LooseVersion('3'), 'baz'),
         ]
 
-        self.assertEqual(_map_version(version_map, '1.1'), 'foo')
-        self.assertEqual(_map_version(version_map, '2'), 'bar')
-        self.assertEqual(_map_version(version_map, '4.5'), 'baz')
-        self.assertEqual(_map_version(version_map, '11.11'), 'baz')
-        self.assertEqual(_map_version(version_map, '0.1'), 'foo')
+        self.assertEqual(map_version('1.1', version_map), 'foo')
+        self.assertEqual(map_version('2', version_map), 'bar')
+        self.assertEqual(map_version('4.5', version_map), 'baz')
+        self.assertEqual(map_version('11.11', version_map), 'baz')
+        self.assertEqual(map_version('0.1', version_map), 'foo')

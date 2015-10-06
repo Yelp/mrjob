@@ -14,6 +14,7 @@
 # limitations under the License.
 """Test the job flow termination tool"""
 from mrjob.emr import EMRJobRunner
+from mrjob.patched_boto import patched_describe_cluster
 from mrjob.tools.emr.terminate_job_flow import main as terminate_main
 from mrjob.tools.emr.terminate_job_flow import make_option_parser
 
@@ -33,5 +34,5 @@ class TerminateToolTestCase(ToolTestCase):
         terminate_main()
 
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        cluster = emr_conn.describe_cluster(cluster_id)
+        cluster = patched_describe_cluster(emr_conn, cluster_id)
         self.assertEqual(cluster.status.state, 'TERMINATED')

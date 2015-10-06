@@ -29,8 +29,10 @@ from io import BytesIO
 import mrjob
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _4_X_INTERMEDIARY_JAR
 from mrjob.emr import _DEFAULT_AMI_VERSION
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _yield_all_bootstrap_actions
@@ -599,18 +601,42 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
             self.assertEqual(runner.get_hadoop_version(), '1.0.3')
 
     def test_ami_version_3_0(self):
-        with self.make_runner('--ami-version', '3.0',
-                              '--ec2-instance-type', 'm1.medium') as runner:
+        with self.make_runner('--ami-version', '3.0') as runner:
             runner.run()
             self.assertEqual(runner.get_ami_version(), '3.0.4')
             self.assertEqual(runner.get_hadoop_version(), '2.2.0')
 
     def test_ami_version_3_8_0(self):
-        with self.make_runner('--ami-version', '3.8.0',
-                              '--ec2-instance-type', 'm1.medium') as runner:
+        with self.make_runner('--ami-version', '3.8.0') as runner:
             runner.run()
             self.assertEqual(runner.get_ami_version(), '3.8.0')
             self.assertEqual(runner.get_hadoop_version(), '2.4.0')
+
+    def test_ami_version_4_0_0_via_release_label_option(self):
+        # the way EMR wants us to set 4.x AMI versions
+        with self.make_runner('--release-label', 'emr-4.0.0') as runner:
+            runner.run()
+            self.assertEqual(runner.get_ami_version(), '4.0.0')
+            self.assertEqual(runner.get_hadoop_version(), '2.6.0')
+
+            cluster = runner._describe_cluster()
+            self.assertEqual(getattr(cluster, 'releaselabel', ''),
+                             'emr-4.0.0')
+            self.assertEqual(getattr(cluster, 'requestedamiversion', ''), '')
+            self.assertEqual(getattr(cluster, 'runningamiversion', ''), '')
+
+    def test_ami_version_4_0_0_via_ami_version_option(self):
+        # mrjob should also be smart enough to handle this
+        with self.make_runner('--ami-version', '4.0.0') as runner:
+            runner.run()
+            self.assertEqual(runner.get_ami_version(), '4.0.0')
+            self.assertEqual(runner.get_hadoop_version(), '2.6.0')
+
+            cluster = runner._describe_cluster()
+            self.assertEqual(getattr(cluster, 'releaselabel', ''),
+                             'emr-4.0.0')
+            self.assertEqual(getattr(cluster, 'requestedamiversion', ''), '')
+            self.assertEqual(getattr(cluster, 'runningamiversion', ''), '')
 
     def test_hadoop_version_option_does_nothing(self):
         with logger_disabled('mrjob.emr'):
@@ -1393,9 +1419,10 @@ class CounterFetchingTestCase(MockBotoTestCase):
         self.assertEqual(self.runner.counters(),
                          [{'Job Counters ': {'Launched reduce tasks': 1}}])
 
-    def _mock_step(self, jar):
+    def _mock_step(self, jar, args=()):
         return MockEmrObject(
-            config=MockEmrObject(jar=jar),
+            config=MockEmrObject(jar=jar,
+                                 args=[MockEmrObject(value=a) for a in args]),
             id='s-FAKE',
             name=self.runner._job_key,
             status=MockEmrObject(state='COMPLETED'))
@@ -1416,9 +1443,12 @@ class CounterFetchingTestCase(MockBotoTestCase):
         self.mock_cluster.status.state = 'TERMINATED'
         self.mock_cluster._steps = [
             self._mock_step(jar='x.jar'),
-            self._mock_step(jar='hadoop.streaming.jar'),
+            self._mock_step(jar='hadoop.streaming.jar', args=['-mapper']),
             self._mock_step(jar='x.jar'),
-            self._mock_step(jar='hadoop.streaming.jar'),
+            # jar for 4.x steps don't have "streaming" in the name;
+            # look for -mapper in the args
+            self._mock_step(jar='command-runner.jar',
+                            args=['hadoop-streaming', '-mapper']),
         ]
 
         self.runner._ls_logs = Mock(return_value=[])
@@ -2057,6 +2087,57 @@ class PoolMatchingTestCase(MockBotoTestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
             '--ami-version', '2.0'])
+
+    def test_pooling_with_4_x_ami_version(self):
+        # this actually uses release label internally
+        _, cluster_id = self.make_pooled_cluster(ami_version='4.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '4.0.0'])
+
+    def test_pooling_with_release_label(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--release-label', 'emr-4.0.0'])
+
+    def test_dont_join_pool_with_wrong_release_label(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.1')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--release-label', 'emr-4.0.0'])
+
+    def test_dont_join_pool_without_release_label(self):
+        _, cluster_id = self.make_pooled_cluster(ami_version='2.2')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--release-label', 'emr-4.0.0'])
+
+    def test_matching_release_label_and_ami_version(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '4.0.0'])
+
+    def test_non_matching_release_label_and_ami_version(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--ami-version', '2.2'])
+
+    def test_release_label_hides_ami_version(self):
+        _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '--release-label', 'emr-4.0.0',
+            '--ami-version', '1.0.0'])
 
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
@@ -2950,86 +3031,187 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.start(patch.object(
             self.runner, '_step_output_uri', return_value=['output']))
         self.start(patch.object(
-            self.runner, '_get_streaming_jar', return_value=['streaming.jar']))
+            self.runner, '_get_streaming_jar_and_step_arg_prefix',
+            return_value=('streaming.jar', [])))
+        self.start(patch.object(
+            self.runner, 'get_ami_version', return_value='3.8.0'))
 
         self.start(patch.object(boto.emr, 'StreamingStep', dict))
         self.runner._hadoop_version = '0.20'
 
-    def _assert_streaming_step(self, step, **kwargs):
-        self.runner._steps = [step]
-        d = self.runner._build_streaming_step(0)
-        for k, v in kwargs.items():
-            self.assertEqual(d[k], v)
+    def _get_streaming_step(self, step):
+        with patch.object(self.runner, '_steps', [step]):
+            return self.runner._build_streaming_step(0)
 
     def test_basic_mapper(self):
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                },
-            },
-            mapper=(PYTHON_BIN + ' my_job.py --step-num=0 --mapper'),
-            reducer=None,
-        )
+        ss = self._get_streaming_step(
+            dict(type='streaming', mapper=dict(type='script')))
+
+        self.assertEqual(ss['mapper'],
+                         PYTHON_BIN + ' my_job.py --step-num=0 --mapper')
+        self.assertEqual(ss['combiner'], None)
+        self.assertEqual(ss['reducer'], None)
 
     def test_basic_reducer(self):
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'reducer': {
-                    'type': 'script',
-                },
-            },
-            mapper="cat",
-            reducer=(PYTHON_BIN +
-                     ' my_job.py --step-num=0 --reducer'),
-        )
+        ss = self._get_streaming_step(
+            dict(type='streaming', reducer=dict(type='script')))
+
+        self.assertEqual(ss['mapper'], 'cat')
+        self.assertEqual(ss['combiner'], None)
+        self.assertEqual(ss['reducer'],
+                         PYTHON_BIN + ' my_job.py --step-num=0 --reducer')
+
+        self.assertEqual(ss['jar'], 'streaming.jar')
+        self.assertEqual(ss['step_args'][:1], ['-files'])  # no prefix
 
     def test_pre_filters(self):
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                    'pre_filter': 'grep anything',
-                },
-                'combiner': {
-                    'type': 'script',
-                    'pre_filter': 'grep nothing',
-                },
-                'reducer': {
-                    'type': 'script',
-                    'pre_filter': 'grep something',
-                },
-            },
-            mapper=("bash -c 'grep anything | " +
-                    PYTHON_BIN +
-                    " my_job.py --step-num=0 --mapper'"),
-            combiner=("bash -c 'grep nothing | " +
-                      PYTHON_BIN +
-                      " my_job.py --step-num=0 --combiner'"),
-            reducer=("bash -c 'grep something | " +
-                     PYTHON_BIN +
-                     " my_job.py --step-num=0 --reducer'"),
-        )
+        ss = self._get_streaming_step(
+            dict(type='streaming',
+                 mapper=dict(
+                     type='script',
+                     pre_filter='grep anything'),
+                 combiner=dict(
+                     type='script',
+                     pre_filter='grep nothing'),
+                 reducer=dict(
+                     type='script',
+                     pre_filter='grep something')))
+
+        self.assertEqual(ss['mapper'],
+                         "bash -c 'grep anything | " +
+                         PYTHON_BIN +
+                         " my_job.py --step-num=0 --mapper'")
+        self.assertEqual(ss['combiner'],
+                         "bash -c 'grep nothing | " +
+                         PYTHON_BIN +
+                         " my_job.py --step-num=0 --combiner'")
+        self.assertEqual(ss['reducer'],
+                         "bash -c 'grep something | " +
+                         PYTHON_BIN +
+                         " my_job.py --step-num=0 --reducer'")
 
     def test_pre_filter_escaping(self):
-        # ESCAPE ALL THE THINGS!!!
-        self._assert_streaming_step(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                    'pre_filter': bash_wrap("grep 'anything'"),
-                },
-            },
-            mapper=(
-                "bash -c 'bash -c '\\''grep"
-                " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
-                PYTHON_BIN +
-                " my_job.py --step-num=0 --mapper'"),
-        )
+        ss = self._get_streaming_step(
+            dict(type='streaming',
+                 mapper=dict(
+                     type='script',
+                     pre_filter=bash_wrap("grep 'anything'"))))
+
+        self.assertEqual(
+            ss['mapper'],
+            "bash -c 'bash -c '\\''grep"
+            " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
+            PYTHON_BIN +
+            " my_job.py --step-num=0 --mapper'")
+        self.assertEqual(
+            ss['combiner'], None)
+        self.assertEqual(
+            ss['reducer'], None)
+
+    def test_default_streaming_jar_and_step_arg_prefix(self):
+        ss = self._get_streaming_step(
+            dict(type='streaming', mapper=dict(type='script')))
+
+        self.assertEqual(ss['jar'], 'streaming.jar')
+
+        # step_args should be -files script_uri#script_name
+        self.assertEqual(len(ss['step_args']), 2)
+        self.assertEqual(ss['step_args'][0], '-files')
+        self.assertTrue(ss['step_args'][1].endswith('#my_job.py'))
+
+    def test_custom_streaming_jar_and_step_arg_prefix(self):
+        # test integration with custom jar options. See
+        # StreamingJarAndStepArgPrefixTestCase below.
+        self.runner._get_streaming_jar_and_step_arg_prefix.return_value = (
+            ('launch.jar', ['streaming', '-v']))
+
+        ss = self._get_streaming_step(
+            dict(type='streaming', mapper=dict(type='script')))
+
+        self.assertEqual(ss['jar'], 'launch.jar')
+
+        # step_args should be -files script_uri#script_name
+        self.assertEqual(len(ss['step_args']), 4)
+        self.assertEqual(ss['step_args'][:2], ['streaming', '-v'])
+        self.assertEqual(ss['step_args'][2], '-files')
+        self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
+
+
+class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
+
+    def launch_runner(self, *args):
+        """make and launch runner, so cluster is created and files
+        are uploaded."""
+        runner = self.make_runner(*args)
+        runner._launch()
+        return runner
+
+    def test_default(self):
+        runner = self.launch_runner()
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (_PRE_4_X_STREAMING_JAR, []))
+
+    def test_pre_4_x_ami(self):
+        runner = self.launch_runner('--ami-version', '3.8.0')
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (_PRE_4_X_STREAMING_JAR, []))
+
+    def test_4_x_ami(self):
+        runner = self.launch_runner('--ami-version', '4.0.0')
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (_4_X_INTERMEDIARY_JAR, ['hadoop-streaming']))
+
+    def test_hadoop_streaming_jar_on_emr_on_pre_4_x_ami(self):
+        runner = self.launch_runner(
+            '--ami-version', '3.8.0',
+            '--hadoop-streaming-jar-on-emr', 'justice.jar')
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         ('justice.jar', []))
+
+    def test_hadoop_streaming_jar_on_emr_on_4_x_ami(self):
+        # don't use the intermediary jar if a jar is specified explicitly
+        runner = self.launch_runner(
+            '--ami-version', '4.0.0',
+            '--hadoop-streaming-jar-on-emr', 'justice.jar')
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         ('justice.jar', []))
+
+    def test_hadoop_streaming_jar_on_pre_4_x_ami(self):
+        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
+        open(jar_path, 'w').close()
+
+        runner = self.launch_runner(
+            '--ami-version', '3.8.0',
+            '--hadoop-streaming-jar', jar_path)
+
+        jar_uri = runner._upload_mgr.uri(jar_path)
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (jar_uri, []))
+
+    def test_hadoop_streaming_jar_on_4_x_ami(self):
+        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
+        open(jar_path, 'w').close()
+
+        runner = self.launch_runner(
+            '--ami-version', '4.0.0',
+            '--hadoop-streaming-jar', jar_path)
+
+        jar_uri = runner._upload_mgr.uri(jar_path)
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (jar_uri, []))
+
+    def test_local_streaming_jar_beats_jar_on_emr(self):
+        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
+        open(jar_path, 'w').close()
+
+        runner = self.launch_runner(
+            '--hadoop-streaming-jar', jar_path,
+            '--hadoop-streaming-jar-on-emr', 'justice.jar')
+
+        jar_uri = runner._upload_mgr.uri(jar_path)
+
+        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
+                         (jar_uri, []))
 
 
 class JarStepTestCase(MockBotoTestCase):

@@ -25,8 +25,6 @@ from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_generic_jobconf
-from mrjob.py2 import StringIO
-from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
 from tests.py2 import patch

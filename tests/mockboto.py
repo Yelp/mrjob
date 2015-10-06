@@ -24,8 +24,8 @@ from datetime import datetime
 from io import BytesIO
 
 try:
+    import boto.emr.connection
     from boto.emr.connection import EmrConnection
-    from boto.emr.emrobject import ClusterTimeline
     from boto.emr.instance_group import InstanceGroup
     from boto.emr.step import JarStep
     import boto.exception
@@ -34,6 +34,7 @@ try:
 except ImportError:
     boto = None
 
+from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_values
 from mrjob.emr import EMRJobRunner
@@ -75,13 +76,14 @@ AMI_VERSION_ALIASES = {
 }
 
 # versions of hadoop for each AMI
-AMI_HADOOP_VERSION_UPDATES = [
-    ('1.0.0', '0.20'),
-    ('2.0.0', '0.20.205'),
-    ('2.2.0', '1.0.3'),
-    ('3.0.0', '2.2.0'),
-    ('3.1.0', '2.4.0'),
-]
+AMI_HADOOP_VERSION_UPDATES = {
+    '1.0.0': '0.20',
+    '2.0.0': '0.20.205',
+    '2.2.0': '1.0.3',
+    '3.0.0': '2.2.0',
+    '3.1.0': '2.4.0',
+    '4.0.0': '2.6.0',
+}
 
 # extra step to use when debugging_step=True is passed to run_jobflow()
 DEBUGGING_STEP = JarStep(
@@ -715,6 +717,17 @@ class MockEmrConnection(object):
                 visible_to_all_users = (
                     api_params['VisibleToAllUsers'] == 'true')
 
+        release_label = None
+        if api_params and api_params.get('ReleaseLabel'):
+            release_label = api_params['ReleaseLabel']
+
+        if release_label and ami_version:
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'Only one AMI version and release label may be specified.'
+                    ' Provided AMI: %s, release label: %s.' % (
+                        ami_version, release_label)))
+
         # API no longer allows you to explicitly specify 1.x versions
         if ami_version and ami_version.startswith('1.'):
             raise boto.exception.EmrResponseError(
@@ -722,24 +735,38 @@ class MockEmrConnection(object):
                     'Job flow role is not compatible with the supplied'
                     ' AMI version'))
 
-        # pick running AMI version
-        running_ami_version = AMI_VERSION_ALIASES.get(ami_version, ami_version)
-
-        # determine Hadoop version
-        for av, hv in reversed(AMI_HADOOP_VERSION_UPDATES):
-            if version_gte(running_ami_version, av):
-                running_hadoop_version = hv
-                break
+        # figure out actual ami version (ami_version) and params for
+        # 2.x and 3.x clusters (requested_ami_version,
+        # running_ami_version)
+        if release_label:
+            ami_version = release_label.lstrip('emr-')
+            requested_ami_version = None
+            running_ami_version = None
         else:
-            running_hadoop_version = hv
+            requested_ami_version = ami_version
+            # translate "latest" and None
+            ami_version = AMI_VERSION_ALIASES.get(ami_version, ami_version)
+            running_ami_version = ami_version
 
-        # if hadoop_version is set, it should match
+        # determine hadoop version
+        running_hadoop_version = map_version(
+            ami_version, AMI_HADOOP_VERSION_UPDATES)
+
+        # if hadoop_version is set, it should match AMI version
+        # (this is probably no longer relevant to mrjob)
         if not (hadoop_version is None or
                 hadoop_version == running_hadoop_version):
             raise boto.exception.EmrResponseError(
                 400, 'Bad Request', body=err_xml(
                     'The requested AMI version does not support the requested'
                     ' Hadoop version'))
+
+        # build applications list
+        hadoop_name = 'Hadoop' if version_gte(ami_version, '4') else 'hadoop'
+        applications = [MockEmrObject(
+                name=hadoop_name,
+                version=running_hadoop_version,
+        )]
 
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunner uses
@@ -749,10 +776,7 @@ class MockEmrConnection(object):
         assert cluster_id not in self.mock_emr_clusters
 
         cluster = MockEmrObject(
-            applications=[MockEmrObject(
-                name='hadoop',
-                version=running_hadoop_version,
-            )],
+            applications=applications,
             autoterminate=('false' if keep_alive else 'true'),
             ec2instanceattributes=MockEmrObject(
                 ec2availabilityzone=availability_zone,
@@ -765,7 +789,8 @@ class MockEmrConnection(object):
             masterpublicdnsname='mockmaster',
             name=name,
             normalizedinstancehours='0',
-            requestedamiversion=ami_version,
+            releaselabel=release_label,
+            requestedamiversion=requested_ami_version,
             runningamiversion=running_ami_version,
             servicerole=service_role,
             status=MockEmrObject(
@@ -800,13 +825,13 @@ class MockEmrConnection(object):
                     master_instance_type, slave_instance_type, num_instances))
 
         # 3.x AMIs don't support m1.small
-        if running_ami_version.startswith('3.') and any(
+        if version_gte(ami_version, '3') and any(
                 ig.instancetype == 'm1.small'
                 for ig in cluster._instancegroups):
             raise boto.exception.EmrResponseError(
                 400, 'Bad Request', body=err_xml(
                     'm1.small instance type is not supported with AMI'
-                    ' version %s' % running_ami_version))
+                    ' version %s' % ami_version))
 
         # will handle steps arg in a moment
         cluster._steps = []
@@ -1043,7 +1068,7 @@ class MockEmrConnection(object):
 
         # make sure that we only call list_steps() when we've patched
         # around https://github.com/boto/boto/issues/3268
-        if 'StartDateTime' not in ClusterTimeline.Fields:
+        if 'StartDateTime' not in boto.emr.connection.ClusterTimeline.Fields:
             raise Exception('called un-patched version of list_steps()!')
 
         if marker is not None:

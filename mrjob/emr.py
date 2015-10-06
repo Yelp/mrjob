@@ -18,7 +18,6 @@ import logging
 import os
 import os.path
 import pipes
-import posixpath
 import random
 import signal
 import socket
@@ -79,7 +78,6 @@ from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.ls import ls_logs
 from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
-from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -87,6 +85,8 @@ from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
+from mrjob.patched_boto import patched_describe_cluster
+from mrjob.patched_boto import patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
@@ -107,16 +107,14 @@ from mrjob.util import shlex_split
 from mrjob.util import random_identifier
 
 
-log = logging.getLogger(__name__)
 
-# not all steps generate task attempt logs. for now, conservatively check for
-# streaming steps, which always generate them.
-LOG_GENERATING_STEP_NAME_RE = HADOOP_STREAMING_JAR_RE
+log = logging.getLogger(__name__)
 
 # how to set up the SSH tunnel for various AMI versions
 _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '2': dict(name='job tracker', path='/jobtracker.jsp', port=9100),
     '3': dict(name='resource manager', path='/cluster', port=9026),
+    '4': dict(name='resource manager', path='/cluster', port=8088),
 }
 
 MAX_SSH_RETRIES = 20
@@ -139,6 +137,12 @@ _DEFAULT_AWS_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_AMI_VERSION = '3.7.0'
+
+# Hadoop streaming jar on 1-3.x AMIs
+_PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
+
+# intermediary jar used on 4.x AMIs
+_4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
 
 def s3_key_to_uri(s3_key):
@@ -189,30 +193,13 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
     """Get all steps for the cluster, making successive API calls
     if necessary.
 
-    Calls :py:func:`_list_steps`, to work around `boto's startdatetime bug
-    <https://github.com/boto/boto/issues/3268>`__.
+    Calls :py:func:`~mrjob.patched_boto.patched_list_steps`, to work around
+    `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
     """
-    for resp in _repeat(_list_steps, emr_conn, cluster_id, *args, **kwargs):
+    for resp in _repeat(patched_list_steps, emr_conn, cluster_id,
+                        *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
-
-
-def _list_steps(emr_conn, cluster_id, *args, **kwargs):
-    """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
-    that works around around `boto's startdatetime bug
-    <https://github.com/boto/boto/issues/3268>`__.
-    """
-    Timeline = boto.emr.emrobject.ClusterTimeline
-    try:
-        # temporarily monkey-patch ClusterTimeline.Fields
-        # not using patch here because it's an external dependency
-        # in Python 2
-        orig_fields = Timeline.Fields
-        Timeline.Fields = Timeline.Fields | set(['StartDateTime'])
-
-        return emr_conn.list_steps(cluster_id, *args, **kwargs)
-    finally:
-        Timeline.Fields = orig_fields
 
 
 def make_lock_uri(s3_tmp_dir, emr_job_flow_id, step_num):
@@ -310,6 +297,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'num_ec2_task_instances',
         'pool_emr_job_flows',
         'pool_wait_minutes',
+        'release_label',
         's3_endpoint',
         's3_log_uri',
         's3_sync_wait_time',
@@ -350,6 +338,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['aws_region'] = _DEFAULT_AWS_REGION
 
         self._fix_ec2_instance_opts()
+        self._fix_release_label_opt()
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
@@ -362,8 +351,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ec2_core_instance_type': 'm1.medium',
             'ec2_master_instance_type': 'm1.medium',
             'emr_job_flow_pool_name': 'default',
-            'hadoop_streaming_jar_on_emr': (
-                '/home/hadoop/contrib/streaming/hadoop-streaming.jar'),
             'mins_to_end_of_hour': 5.0,
             'num_ec2_core_instances': 0,
             'num_ec2_instances': 1,
@@ -470,6 +457,16 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                         self[opt_name] = None
                 except ValueError:
                     pass  # maybe EMR will accept non-floats?
+
+    def _fix_release_label_opt(self):
+        """If *release_label* is not set and *ami_version* is set to version
+        4 or higher (which the EMR API won't accept), set *release_label*
+        to "emr-" plus *ami_version*. (Leave *ami_version* as-is;
+        *release_label* overrides it anyway.)"""
+        if (not self['release_label'] and
+            self['ami_version'] != 'latest' and
+            version_gte(self['ami_version'], '4')):
+            self['release_label'] = 'emr-' + self['ami_version']
 
 
 class EMRJobRunner(MRJobRunner):
@@ -811,7 +808,7 @@ class EMRJobRunner(MRJobRunner):
             self._upload_mgr.add(path)
 
         if self._opts['hadoop_streaming_jar']:
-            self._upload_mgr.add(path)
+            self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
         for step in self._get_steps():
             if step.get('jar'):
@@ -1206,12 +1203,15 @@ class EMRJobRunner(MRJobRunner):
     def _job_flow_args(self, persistent=False, steps=None):
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
+        api_params = {}
 
-        args['ami_version'] = self._opts['ami_version']
+        if self._opts['release_label']:
+            api_params['ReleaseLabel'] = self._opts['release_label']
+        else:
+            args['ami_version'] = self._opts['ami_version']
 
         if self._opts['aws_availability_zone']:
             args['availability_zone'] = self._opts['aws_availability_zone']
-
         # The old, simple API, available if we're not using task instances
         # or bid prices
         if not (self._opts['num_ec2_task_instances'] or
@@ -1303,8 +1303,6 @@ class EMRJobRunner(MRJobRunner):
 
         # boto's connect_emr() has keyword args for these, but they override
         # emr_api_params, which is not what we want.
-        api_params = {}
-
         api_params['VisibleToAllUsers'] = str(bool(
             self._opts['visible_to_all_users'])).lower()
 
@@ -1374,16 +1372,19 @@ class EMRJobRunner(MRJobRunner):
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
     def _build_streaming_step(self, step_num):
-        streaming_step_kwargs = {
-            'name': '%s: Step %d of %d' % (
+        jar, step_arg_prefix = self._get_streaming_jar_and_step_arg_prefix()
+
+        streaming_step_kwargs = dict(
+            action_on_failure=self._action_on_failure,
+            input=self._step_input_uris(step_num),
+            jar=jar,
+            name='%s: Step %d of %d' % (
                 self._job_key, step_num + 1, self._num_steps()),
-            'input': self._step_input_uris(step_num),
-            'output': self._step_output_uri(step_num),
-            'jar': self._get_streaming_jar(),
-            'action_on_failure': self._action_on_failure,
-        }
+            output=self._step_output_uri(step_num),
+        )
 
         step_args = []
+        step_args.extend(step_arg_prefix)  # add 'hadoop-streaming' for 4.x
         step_args.extend(self._upload_args(self._upload_mgr))
         step_args.extend(self._hadoop_args_for_step(step_num))
 
@@ -1393,10 +1394,7 @@ class EMRJobRunner(MRJobRunner):
             self._hadoop_streaming_commands(step_num))
 
         streaming_step_kwargs['mapper'] = mapper
-
-        if combiner:
-            streaming_step_kwargs['combiner'] = combiner
-
+        streaming_step_kwargs['combiner'] = combiner
         streaming_step_kwargs['reducer'] = reducer
 
         return boto.emr.StreamingStep(**streaming_step_kwargs)
@@ -1430,11 +1428,17 @@ class EMRJobRunner(MRJobRunner):
             step_args=step_args,
             action_on_failure=self._action_on_failure)
 
-    def _get_streaming_jar(self):
+    def _get_streaming_jar_and_step_arg_prefix(self):
         if self._opts['hadoop_streaming_jar']:
-            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar'])
+            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar']), []
+        elif self._opts['hadoop_streaming_jar_on_emr']:
+            return self._opts['hadoop_streaming_jar_on_emr'], []
+        elif version_gte(self.get_ami_version(), '4'):
+            # 4.x AMIs use an intermediary jar
+            return _4_X_INTERMEDIARY_JAR, ['hadoop-streaming']
         else:
-            return self._opts['hadoop_streaming_jar_on_emr']
+            # 2.x and 3.x AMIs just use a regular old streaming jar
+            return _PRE_4_X_STREAMING_JAR, []
 
     def _launch_emr_job(self):
         """Create an empty jobflow on EMR, and set self._cluster_id to
@@ -1506,13 +1510,20 @@ class EMRJobRunner(MRJobRunner):
             total_step_time = 0.0
             step_nums = []  # step numbers belonging to us. 1-indexed
             # "lg_step" stands for "log generating step"
+
+            # TODO: this lg stuff confuses me and is about to be refactored
+            # once I do some hand-testing on which steps actually generate
+            # logs
             lg_step_num_mapping = {}
 
             steps = self._list_steps_for_cluster()
             latest_lg_step_num = 0
+
+            def is_lg_step(step):
+                return any(arg.value == '-mapper' for arg in step.config.args)
+
             for i, step in enumerate(steps):
-                if LOG_GENERATING_STEP_NAME_RE.match(
-                        posixpath.basename(getattr(step.config, 'jar', ''))):
+                if is_lg_step(step):
                     latest_lg_step_num += 1
 
                 # ignore steps belonging to other jobs
@@ -1520,8 +1531,7 @@ class EMRJobRunner(MRJobRunner):
                     continue
 
                 step_nums.append(i + 1)
-                if LOG_GENERATING_STEP_NAME_RE.match(
-                        posixpath.basename(getattr(step.config, 'jar', ''))):
+                if is_lg_step(step):
                     lg_step_num_mapping[i + 1] = latest_lg_step_num
 
                 step_states.append(step.status.state)
@@ -1585,7 +1595,8 @@ class EMRJobRunner(MRJobRunner):
                             if progress is not None:
                                 log.info(' %5.1f%% complete' % progress)
                     finally:
-                        tunnel_handle.close()
+                        if tunnel_handle is not None:
+                            tunnel_handle.close()
 
                 # once a step is running, it's safe to set up the ssh tunnel to
                 # the job tracker
@@ -1948,13 +1959,21 @@ class EMRJobRunner(MRJobRunner):
         writeln('__mrjob_PWD=$PWD')
         writeln()
 
-        # download files using hadoop fs
+        # download files
         writeln('# download files and mark them executable')
+
+        if self._opts['release_label']:
+            # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
+            cp_to_local = 'aws s3 cp'
+        else:
+            # on the 2.x and 3.x AMIs, use hadoop
+            cp_to_local = 'hadoop fs -copyToLocal'
+
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            writeln('hadoop fs -copyToLocal %s $__mrjob_PWD/%s' %
-                    (pipes.quote(uri), pipes.quote(name)))
+            writeln('%s %s $__mrjob_PWD/%s' %
+                    (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # make everything executable, like Hadoop Distributed Cache
             writeln('chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
         writeln()
@@ -2105,7 +2124,13 @@ class EMRJobRunner(MRJobRunner):
             if self._opts['emr_job_flow_pool_name'] != pool_name:
                 return
 
-            if self._opts['ami_version'] == 'latest':
+            if self._opts['release_label']:
+                # just check for exact match. EMR doesn't have a concept
+                # of partial release labels like it does for AMI versions.
+                if (getattr(cluster, 'releaselabel', '') !=
+                    self._opts['release_label']):
+                    return
+            elif self._opts['ami_version'] == 'latest':
                 # look for other clusters where "latest" was requested
                 if getattr(cluster, 'requestedamiversion', '') != 'latest':
                     return
@@ -2213,7 +2238,7 @@ class EMRJobRunner(MRJobRunner):
 
         for cluster_summary in _yield_all_clusters(
                 emr_conn, cluster_states=['WAITING']):
-            cluster = emr_conn.describe_cluster(cluster_summary.id)
+            cluster = patched_describe_cluster(emr_conn, cluster_summary.id)
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for
@@ -2353,7 +2378,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
-        return emr_conn.describe_cluster(self._cluster_id)
+        return patched_describe_cluster(emr_conn, self._cluster_id)
 
     def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls
@@ -2390,9 +2415,16 @@ class EMRJobRunner(MRJobRunner):
 
         cluster = self._describe_cluster()
 
-        self._ami_version = cluster.runningamiversion
+        # AMI version might be in RunningAMIVersion (2.x, 3.x)
+        # or ReleaseLabel (4.x)
+        self._ami_version = getattr(cluster, 'runningamiversion', None)
+        if not self._ami_version:
+            release_label = getattr(cluster, 'releaselabel', None)
+            if release_label:
+                self._ami_version = release_label.lstrip('emr-')
+
         for a in cluster.applications:
-            if a.name == 'hadoop':
+            if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs
                 self._hadoop_version = a.version
 
         # TODO: could get masterpublicdnsname too

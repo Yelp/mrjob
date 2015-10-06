@@ -94,6 +94,9 @@ Job flow creation and configuration
     .. _`the AWS docs on specifying the AMI version`:
         http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
 
+    This works for 4.x AMIs as well; mrjob will just prepend ``emr-`` and
+    use that as the :mrjob-opt:`release_label`.
+
     .. warning::
 
         The 1.x series of AMIs is no longer supported because they use Python
@@ -311,6 +314,24 @@ Job flow creation and configuration
     EC2 billing hour the job flow can automatically terminate itself.
 
     .. versionadded:: 0.4.1
+
+.. mrjob-opt::
+    :config: release_label
+    :switch: --release-label
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: ``None``
+
+    EMR Release to use (e.g. ``emr-4.0.0``). This overrides
+    :mrjob-opt:`ami_version`.
+
+    For more information about Release Labels, see
+    `Differences Introduced in 4.x`_.
+
+    .. _`Differences Introduced in 4.x`:
+        http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-release-differences.html
+
+    .. versionadded:: 0.5.0
 
 .. mrjob-opt::
     :config: visible_to_all_users

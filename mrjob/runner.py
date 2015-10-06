@@ -853,7 +853,7 @@ class MRJobRunner(object):
             step_num, 'reducer')
 
         if (combiner is not None and
-                not supports_combiners_in_hadoop_streaming(version)):
+            not supports_combiners_in_hadoop_streaming(version)):
 
             # krazy hack to support combiners on hadoop <0.20
             bash_wrap_mapper = True

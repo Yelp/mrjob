@@ -622,7 +622,7 @@ def jobconf_from_dict(jobconf, name, default=None):
 
 def map_version(version, version_map):
     """Allows you to look up something by version (e.g. which jobconf variable
-    to use), specifying only the versions where that value changed.
+    to use, specifying only the versions where that value changed.
 
     *version* is a string
 

@@ -5,8 +5,14 @@ python:
   - "pypy"
   - "3.3"
   - "3.4"
+  - "3.5"
+  - "3.5-dev"
+  - "nightly"
   - "pypy3"
 matrix:
+  allow-failures:
+    - python: "3.5-dev"
+    - python: "nightly"
   fast_finish: true
 # command to install dependencies. We definitely want to test against
 # ujson, but it isn't available on PyPy.

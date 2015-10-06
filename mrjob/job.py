@@ -827,8 +827,8 @@ class MRJob(MRJobLauncher):
     def all_option_groups(self):
         return super(MRJob, self).all_option_groups() + (self.mux_opt_group,)
 
-    def is_mapper_or_reducer(self):
-        """True if this is a mapper/reducer.
+    def is_task(self):
+        """True if this is a mapper, combiner, or reducer.
 
         This is mostly useful inside :py:meth:`load_options`, to disable
         loading options when we aren't running inside Hadoop Streaming.
@@ -1075,6 +1075,7 @@ class MRJob(MRJobLauncher):
                 else:
                     filtered_val = 'false'
 
+            # TODO: why would a jobconf variable be named 'hadoop_version'?
             # hadoop_version should be a string
             elif (key == 'hadoop_version' and
                     isinstance(unfiltered_val, float)):

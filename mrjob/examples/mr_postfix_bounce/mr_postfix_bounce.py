@@ -140,7 +140,7 @@ class MRPostfixBounce(MRJob):
 
     def load_options(self, args):
         super(MRPostfixBounce, self).load_options(args=args)
-        if self.is_mapper_or_reducer():
+        if self.is_task():
             with open(self.options.bounce_processing_rules) as bounce_rules_f:
                 self.bounce_processing_rules = json.load(bounce_rules_f)
 

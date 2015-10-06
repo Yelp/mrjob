@@ -124,6 +124,14 @@ def add_runner_opts(opt_group, default_runner='local'):
             '--interpreter', dest='interpreter', default=None,
             help=('Non-python command to run your script, e.g. "ruby".')),
 
+        # for more info about jobconf:
+        # http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
+        opt_group.add_option(
+            '--jobconf', dest='jobconf', default=[], action='append',
+            help=('-jobconf arg to pass through to hadoop streaming; should'
+                  ' take the form KEY=VALUE. You can use --jobconf multiple'
+                  ' times.')),
+
         opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
             action='store_false', default=None,
@@ -199,21 +207,12 @@ def add_runner_opts(opt_group, default_runner='local'):
     ]
 
 
-def add_hadoop_shared_opts(opt_group):
-    """Options for ``hadoop``, ``local``, and ``emr`` runners"""
+def add_local_opts(opt_group):
+    """Options for ``inline`` and ``local`` runners."""
     return [
         opt_group.add_option(
             '--hadoop-version', dest='hadoop_version', default=None,
-            help=('Version of Hadoop to specify to EMR or to emulate for -r'
-                  ' local. Default is 0.20.')),
-
-        # for more info about jobconf:
-        # http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
-        opt_group.add_option(
-            '--jobconf', dest='jobconf', default=[], action='append',
-            help=('-jobconf arg to pass through to hadoop streaming; should'
-                  ' take the form KEY=VALUE. You can use --jobconf multiple'
-                  ' times.')),
+            help=('Specific version of Hadoop to simulate')),
     ]
 
 
@@ -345,11 +344,11 @@ def add_emr_run_opts(opt_group):
                   " tracker/resource manager")),
 
         opt_group.add_option(
-            '--pool-wait-minutes', dest='pool_wait_minutes', default=0,
+            '--pool-wait-minutes', dest='pool_wait_minutes', default=None,
             type='int',
             help=('Wait for a number of minutes for a job flow to finish'
                   ' if a job finishes, pick up their job flow. Otherwise'
-                  ' create a new one. (default 0)')),
+                  " create a new one. (0, the default, means don't wait)")),
 
         opt_group.add_option(
             '--ssh-bin', dest='ssh_bin', default=None,

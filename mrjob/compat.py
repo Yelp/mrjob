@@ -635,6 +635,9 @@ def map_version(version, version_map):
     If *version* is less than any version in *version_map*, use the value for
     the earliest version in *version_map*.
     """
+    if version is None:
+        raise TypeError
+
     if not version_map:
         raise ValueError
 
@@ -655,37 +658,102 @@ def translate_jobconf(variable, version):
     """Translate *variable* to Hadoop version *version*. If it's not
     a variable we recognize, leave as-is.
     """
+    if version is None:
+        raise TypeError
+
     if variable in _JOBCONF_MAP:
         return map_version(version, _JOBCONF_MAP[variable])
     else:
         return variable
 
 
+def translate_jobconf_for_all_versions(variable):
+    """Get all known variants of the given jobconf variable.
+    Unlike :py:func:`translate_jobconf`, returns a list."""
+    return sorted(
+        set([variable] + list(_JOBCONF_MAP.get(variable, {}).values())))
+
+
+def translate_jobconf_dict(jobconf, hadoop_version=None):
+    """Translates the configuration property name to match those that
+    are accepted in hadoop_version. Prints a warning message if any
+    configuration property name does not match the name in the hadoop
+    version. Combines the original jobconf with the translated jobconf.
+
+    :return: a map consisting of the original and translated configuration
+             property names and values.
+    """
+    translated_jobconf = jobconf.copy()
+    translation_warnings = {}
+
+    for variable, value in jobconf.items():
+        if hadoop_version:
+            variants = [translate_jobconf(variable, hadoop_version)]
+        else:
+            variants = translate_jobconf_for_all_versions(variable)
+
+        for variant in variants:
+            if variant in jobconf:
+                # this happens if variant == variable or
+                # if the variant was in jobconf to start with
+                continue
+
+            translated_jobconf[variant] = value
+
+            if hadoop_version:
+                translation_warnings[variable] = variant
+
+    if translation_warnings:
+        log.warning("Detected hadoop configuration property names that"
+                    " do not match hadoop version %s:"
+                    "\nThe have been translated as follows\n %s",
+                    hadoop_version,
+                    '\n'.join([
+                        "%s: %s" % (variable, variant) for variable, variant
+                        in sorted(translation_warnings.items())]))
+
+    return translated_jobconf
+
+
 def supports_combiners_in_hadoop_streaming(version):
     """Return ``True`` if this version of Hadoop Streaming supports combiners
-    (i.e. >= 0.20.203), otherwise False.
+    (i.e. >= 0.20.203), otherwise ``False``.
+
+    If version is empty, returns ``True``
     """
-    return version_gte(version, '0.20')
+    if not version:
+        return True
+    else:
+        return version_gte(version, '0.20')
 
 
 def supports_new_distributed_cache_options(version):
     """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
-    ``-cacheArchive``
+    ``-cacheArchive``. If version is empty, returns ``True``
     """
-    # Although Hadoop 0.20 supports these options, that support is buggy:
-    # https://issues.apache.org/jira/browse/MAPREDUCE-2361
-    # https://issues.apache.org/jira/browse/HADOOP-6334
-    # The bug was fixed in Hadoop 0.20.203.0:
-    # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
-    return version_gte(version, '0.20.203')
+    if not version:
+        return True
+    else:
+        # Although Hadoop 0.20 supports these options, that support is buggy:
+        # https://issues.apache.org/jira/browse/MAPREDUCE-2361
+        # https://issues.apache.org/jira/browse/HADOOP-6334
+        # The bug was fixed in Hadoop 0.20.203.0:
+        # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
+        return version_gte(version, '0.20.203')
 
 
 def uses_020_counters(version):
+    """Does this version of Hadoop log counters the same way as Hadoop 0.20?"""
+    # TODO: YARN has a different counter style anyway; this probably belongs
+    # in log parsing code.
     return version_gte(version, '0.20')
 
 
 def uses_generic_jobconf(version):
-    """Use ``-D`` instead of ``-jobconf``"""
+    """Use ``-D`` instead of ``-jobconf``. Defaults to ``True`` if
+    *version* is empty."""
+    if not version:
+        return True
     return version_gte(version, '0.20')
 
 
@@ -699,32 +767,3 @@ def version_gte(version, cmp_version_str):
         raise TypeError('%r is not a string' % cmp_version_str)
 
     return LooseVersion(version) >= LooseVersion(cmp_version_str)
-
-
-def add_translated_jobconf_for_hadoop_version(jobconf, hadoop_version):
-    """Translates the configuration property name to match those that
-    are accepted in hadoop_version. Prints a warning message if any
-    configuration property name does not match the name in the hadoop
-    version. Combines the original jobconf with the translated jobconf.
-
-    :return: a map consisting of the original and translated configuration
-             property names and values.
-    """
-    translated_jobconf = {}
-    mismatch_key_to_translated_key = {}
-    for key, value in jobconf.items():
-        new_key = translate_jobconf(key, hadoop_version)
-        if key != new_key:
-            translated_jobconf[new_key] = value
-            mismatch_key_to_translated_key[key] = new_key
-
-    if mismatch_key_to_translated_key:
-        log.warning("Detected hadoop configuration property names that"
-                    " do not match hadoop version %s:"
-                    "\nThe have been translated as follows\n %s",
-                    hadoop_version,
-                    '\n'.join(["%s: %s" % (key, value) for key, value
-                               in mismatch_key_to_translated_key.items()]))
-
-    translated_jobconf.update(jobconf)
-    return translated_jobconf

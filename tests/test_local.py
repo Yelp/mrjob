@@ -517,6 +517,16 @@ class LocalMRJobRunnerJobConfTestCase(SimRunnerJobConfTestCase):
 
 class CompatTestCase(EmptyMrjobConfTestCase):
 
+    def test_environment_variables_version_agnostic(self):
+        job = MRWordCount(['-r', 'local'])
+        with job.make_runner() as runner:
+            simulated_jobconf = runner._simulate_jobconf_for_step(
+                0, 'mapper', 0, '/tmp/foo')
+            self.assertIn(
+                'mapred.cache.localArchives', simulated_jobconf)
+            self.assertIn(
+                'mapreduce.job.cache.local.archives', simulated_jobconf)
+
     def test_environment_variables_018(self):
         job = MRWordCount(['-r', 'local', '--hadoop-version', '0.18'])
         with job.make_runner() as runner:

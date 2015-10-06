@@ -1718,20 +1718,6 @@ class TestNoBoto(TestCase):
 
 class TestMasterBootstrapScript(MockBotoTestCase):
 
-    def setUp(self):
-        super(TestMasterBootstrapScript, self).setUp()
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        super(TestMasterBootstrapScript, self).tearDown()
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
-
     def test_usr_bin_env(self):
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=True,
@@ -1797,9 +1783,10 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         assertScriptDownloads('s3://walrus/scripts/ohnoes.sh')
         assertScriptDownloads('/tmp/quz', 'quz')
         assertScriptDownloads(runner._mrjob_tar_gz_path)
-        assertScriptDownloads(yelpy_tar_gz_path)
         assertScriptDownloads('speedups.sh')
         assertScriptDownloads('/tmp/s.sh')
+        if PY2:
+            assertScriptDownloads(yelpy_tar_gz_path)
 
         # check scripts get run
 
@@ -1821,9 +1808,10 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
-        self.assertIn('sudo apt-get install -y python-pip || '
-                'sudo yum install -y python-pip', lines)
-        self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
+        if PY2:
+            self.assertIn('sudo apt-get install -y python-pip || '
+                          'sudo yum install -y python-pip', lines)
+            self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)
         self.assertIn('$__mrjob_PWD/s.sh', lines)
@@ -1943,20 +1931,6 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
 
 class EMRNoMapperTest(MockBotoTestCase):
-
-    def setUp(self):
-        super(EMRNoMapperTest, self).setUp()
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        super(EMRNoMapperTest, self).tearDown()
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
 
     def test_no_mapper(self):
         # read from STDIN, a local file, and a remote file
@@ -3019,6 +2993,29 @@ class JobWaitTestCase(MockBotoTestCase):
         self.assertEqual(self.sleep_counter, 2)
 
 
+class PoolWaitMinutesOptionTestCase(MockBotoTestCase):
+
+    def test_default_pool_wait_minutes(self):
+        runner = self.make_runner('--no-conf')
+        self.assertEqual(runner._opts['pool_wait_minutes'], 0)
+
+    def test_pool_wait_minutes_from_mrjob_conf(self):
+        # tests issue #1070
+        MRJOB_CONF_WITH_POOL_WAIT_MINUTES = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'pool_wait_minutes': 11,
+        }}}
+
+        with mrjob_conf_patcher(MRJOB_CONF_WITH_POOL_WAIT_MINUTES):
+            runner = self.make_runner()
+            self.assertEqual(runner._opts['pool_wait_minutes'], 11)
+
+    def test_pool_wait_minutes_from_command_line(self):
+        runner = self.make_runner('--pool-wait-minutes', '12')
+        self.assertEqual(runner._opts['pool_wait_minutes'], 12)
+
+
 class BuildStreamingStepTestCase(MockBotoTestCase):
 
     def setUp(self):
@@ -3482,41 +3479,32 @@ class SecurityTokenTestCase(MockBotoTestCase):
 
 class BootstrapPythonTestCase(MockBotoTestCase):
 
+    if PY2:
+        EXPECTED_BOOTSTRAP = [
+            ['sudo apt-get install -y python-pip || '
+             'sudo yum install -y python-pip'],
+             ['sudo pip install --upgrade ujson']]
+    else:
+        EXPECTED_BOOTSTRAP = [['sudo yum install -y python34']]
+
     def test_default(self):
         mr_job = MRTwoStepJob(['-r', 'emr'])
         with mr_job.make_runner() as runner:
-            self.assertEqual(runner._opts['bootstrap_python'], None)
-
-            if PY2:
-                self.assertEqual(runner._bootstrap_python(), [])
-                self.assertEqual(runner._bootstrap, [])
-            else:
-                self.assertEqual(runner._bootstrap_python(),
-                                 [['sudo yum install -y python34']])
-                self.assertEqual(runner._bootstrap,
-                                 [['sudo yum install -y python34']])
+            self.assertEqual(runner._opts['bootstrap_python'], True)
+            self.assertEqual(runner._bootstrap_python(),
+                             self.EXPECTED_BOOTSTRAP)
+            self.assertEqual(runner._bootstrap,
+                             self.EXPECTED_BOOTSTRAP)
 
     def test_bootstrap_python_switch(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap-python'])
 
-        with no_handlers_for_logger('mrjob.emr'):
-            stderr = StringIO()
-            log_to_stream('mrjob.emr', stderr)
-
-            with mr_job.make_runner() as runner:
-                self.assertEqual(runner._opts['bootstrap_python'], True)
-
-                if PY2:
-                    self.assertEqual(runner._bootstrap_python(), [])
-                    self.assertEqual(runner._bootstrap, [])
-                    self.assertIn('bootstrap_python does nothing in Python 2',
-                                  stderr.getvalue())
-                else:
-                    self.assertEqual(runner._bootstrap_python(),
-                                     [['sudo yum install -y python34']])
-                    self.assertEqual(runner._bootstrap,
-                                     [['sudo yum install -y python34']])
-                    self.assertNotIn('bootstrap', stderr.getvalue())
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._opts['bootstrap_python'], True)
+            self.assertEqual(runner._bootstrap_python(),
+                             self.EXPECTED_BOOTSTRAP)
+            self.assertEqual(runner._bootstrap,
+                             self.EXPECTED_BOOTSTRAP)
 
     def test_no_bootstrap_python_switch(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--no-bootstrap-python'])
@@ -3533,14 +3521,13 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             log_to_stream('mrjob.emr', stderr)
 
             with mr_job.make_runner() as runner:
-                if PY2:
-                    self.assertEqual(runner._bootstrap_python(), [])
-                    self.assertEqual(runner._bootstrap, [])
-                else:
-                    self.assertEqual(runner._bootstrap_python(),
-                                     [['sudo yum install -y python34']])
-                    self.assertEqual(runner._bootstrap,
-                                     [['sudo yum install -y python34']])
+                self.assertEqual(runner._opts['bootstrap_python'], True)
+                self.assertEqual(runner._bootstrap_python(),
+                             self.EXPECTED_BOOTSTRAP)
+                self.assertEqual(runner._bootstrap,
+                                 self.EXPECTED_BOOTSTRAP)
+
+                if not PY2:
                     self.assertIn('will probably not work', stderr.getvalue())
 
     def test_ami_version_3_6_0(self):
@@ -3550,14 +3537,12 @@ class BootstrapPythonTestCase(MockBotoTestCase):
         self._test_old_ami_version('latest')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
-        with patch('mrjob.emr.EMRJobRunner._bootstrap_python',
-                   return_value=[['sudo yum install-python-already']]):
-            mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])
+        mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])
 
-            with mr_job.make_runner() as runner:
-                self.assertEqual(
-                    runner._bootstrap,
-                    [['sudo yum install-python-already'], ['true']])
+        with mr_job.make_runner() as runner:
+            self.assertEqual(
+                runner._bootstrap,
+                self.EXPECTED_BOOTSTRAP + [['true']])
 
 
 class EMRTagsTestCase(MockBotoTestCase):

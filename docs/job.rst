@@ -80,7 +80,7 @@ configuration options.
 .. automethod:: MRJob.add_passthrough_option
 .. automethod:: MRJob.add_file_option
 .. automethod:: MRJob.load_options
-.. automethod:: MRJob.is_mapper_or_reducer
+.. automethod:: MRJob.is_task
 
 .. autoattribute:: MRJob.OPTION_CLASS
 

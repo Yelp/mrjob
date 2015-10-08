@@ -516,7 +516,7 @@ class LocalMRJobRunnerJobConfTestCase(SimRunnerJobConfTestCase):
     RUNNER = 'local'
 
 
-class LocalMRJobRunnerNoMapperTestCase(SimRunnerJobConfTestCase):
+class LocalMRJobRunnerNoMapperTestCase(SimRunnerNoMapperTestCase):
 
     RUNNER = 'local'
 

@@ -362,7 +362,8 @@ class SimRunnerNoMapperTestCase(SandboxedTestCase):
     def test_step_with_no_mapper(self):
         mr_job = MRNoMapper(['-r', self.RUNNER])
 
-        mr_job.sandbox(stdin=BytesIO(b'bar\nqux\n'))
+        mr_job.sandbox(stdin=BytesIO(
+            b'one fish two fish\nred fish blue fish\n'))
 
         with mr_job.make_runner() as runner:
             runner.run()
@@ -371,7 +372,8 @@ class SimRunnerNoMapperTestCase(SandboxedTestCase):
                        for line in runner.stream_output()]
 
             self.assertEqual(sorted(results),
-                             [(1, ['bar', 'qux']), (2, [None])])
+                             [(1, ['blue', 'one', 'red', 'two']),
+                              (4, ['fish'])])
 
 
 class ErrorOnBadPathsTestCase(TestCase):

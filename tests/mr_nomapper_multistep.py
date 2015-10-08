@@ -18,16 +18,16 @@ from mrjob.step import MRStep
 
 
 class MRNoMapper(MRJob):
+    """Maps word count to a sorted list of words with that count."""
+    def mapper(self, _, line):
+        for word in line.split():
+            yield word, 1
 
-    def mapper(self, key, value):
-        yield key, value
-        yield value, key
+    def reducer(self, word, ones):
+        yield sum(ones), word
 
-    def reducer(self, key, values):
-        yield len(list(values)), key
-
-    def reducer2(self, key, values):
-        yield key, sorted(values)
+    def reducer2(self, count, words):
+        yield count, list(words)
 
     def steps(self):
         return [MRStep(mapper=self.mapper, reducer=self.reducer),

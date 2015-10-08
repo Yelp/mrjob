@@ -362,7 +362,7 @@ class SimRunnerNoMapperTestCase(SandboxedTestCase):
     def test_step_with_no_mapper(self):
         mr_job = MRNoMapper(['-r', self.RUNNER])
 
-        mr_job.sandbox(stdin=StringIO('bar\nqux\n'))
+        mr_job.sandbox(stdin=BytesIO(b'bar\nqux\n'))
 
         with mr_job.make_runner() as runner:
             runner.run()

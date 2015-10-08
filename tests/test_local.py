@@ -47,6 +47,7 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_inline import SimRunnerJobConfTestCase
+from tests.test_inline import SimRunnerNoMapperTestCase
 
 
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
@@ -511,6 +512,11 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
 
 class LocalMRJobRunnerJobConfTestCase(SimRunnerJobConfTestCase):
+
+    RUNNER = 'local'
+
+
+class LocalMRJobRunnerNoMapperTestCase(SimRunnerJobConfTestCase):
 
     RUNNER = 'local'
 

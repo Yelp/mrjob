@@ -1,5 +1,6 @@
 # Copyright 2009-2011 Yelp
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -23,13 +24,13 @@ class MRNoMapper(MRJob):
         yield value, key
 
     def reducer(self, key, values):
-        yield key, len(list(values))
+        yield len(list(values)), key
 
-    def reducer2(self, key, value):
-        yield key, value
+    def reducer2(self, key, values):
+        yield key, sorted(values)
 
     def steps(self):
-        return [MRStep(self.mapper, self.reducer),
+        return [MRStep(mapper=self.mapper, reducer=self.reducer),
                 MRStep(reducer=self.reducer2)]
 
 

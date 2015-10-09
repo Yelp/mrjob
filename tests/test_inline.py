@@ -28,6 +28,7 @@ from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 from mrjob.sim import _error_on_bad_paths
 from mrjob.step import MRStep
+from tests.mr_no_mapper import MRNoMapper
 from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
@@ -213,7 +214,7 @@ class NoMRJobConfTestCase(TestCase):
 
 
 
-class SimRunnerJobConfTestCase(SandboxedTestCase):
+class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
     # this class is also used to test local mode
     RUNNER = 'inline'
@@ -350,6 +351,29 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             self.assertEqual(runner.counters()[0]['count']['mapper_init'], 2)
             # the job sets its own mapred.map.tasks to 4 for the 2nd step
             self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
+
+
+class InlineMRJobRunnerNoMapperTestCase(SandboxedTestCase):
+
+    RUNNER = 'inline'
+
+    # tests #1141. Also used by local mapper
+
+    def test_step_with_no_mapper(self):
+        mr_job = MRNoMapper(['-r', self.RUNNER])
+
+        mr_job.sandbox(stdin=BytesIO(
+            b'one fish two fish\nred fish blue fish\n'))
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            results = [mr_job.parse_output_line(line)
+                       for line in runner.stream_output()]
+
+            self.assertEqual(sorted(results),
+                             [(1, ['blue', 'one', 'red', 'two']),
+                              (4, ['fish'])])
 
 
 class ErrorOnBadPathsTestCase(TestCase):

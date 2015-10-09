@@ -1,5 +1,6 @@
 # Copyright 2009-2011 Yelp
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,19 +18,19 @@ from mrjob.step import MRStep
 
 
 class MRNoMapper(MRJob):
+    """Maps word count to a sorted list of words with that count."""
+    def mapper(self, _, line):
+        for word in line.split():
+            yield word, 1
 
-    def mapper(self, key, value):
-        yield key, value
-        yield value, key
+    def reducer(self, word, ones):
+        yield sum(ones), word
 
-    def reducer(self, key, values):
-        yield key, len(list(values))
-
-    def reducer2(self, key, value):
-        yield key, value
+    def reducer2(self, count, words):
+        yield count, list(words)
 
     def steps(self):
-        return [MRStep(self.mapper, self.reducer),
+        return [MRStep(mapper=self.mapper, reducer=self.reducer),
                 MRStep(reducer=self.reducer2)]
 
 

@@ -18,6 +18,7 @@ process. Useful for debugging."""
 import logging
 import os
 from io import BytesIO
+from shutil import copyfile
 
 from mrjob.job import MRJob
 from mrjob.parse import parse_mr_job_stderr
@@ -116,6 +117,11 @@ class InlineMRJobRunner(SimMRJobRunner):
     def _run_step(self, step_num, step_type, input_path, output_path,
                   working_dir, env, child_stdin=None):
         step = self._get_step(step_num)
+
+        # if no mapper, just pass the data through (see #1141)
+        if step_type == 'mapper' and not step.get('mapper'):
+            copyfile(input_path, output_path)
+            return
 
         # Passing local=False ensures the job uses proper names for file
         # options (see issue #851 on github)

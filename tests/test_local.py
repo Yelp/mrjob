@@ -46,7 +46,8 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
-from tests.test_inline import SimRunnerJobConfTestCase
+from tests.test_inline import InlineMRJobRunnerJobConfTestCase
+from tests.test_inline import InlineMRJobRunnerNoMapperTestCase
 
 
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
@@ -510,7 +511,12 @@ class LocalBootstrapMrjobTestCase(TestCase):
                 self.assertFalse(script_mrjob_dir.startswith(local_tmp_dir))
 
 
-class LocalMRJobRunnerJobConfTestCase(SimRunnerJobConfTestCase):
+class LocalMRJobRunnerJobConfTestCase(InlineMRJobRunnerJobConfTestCase):
+
+    RUNNER = 'local'
+
+
+class LocalMRJobRunnerNoMapperTestCase(InlineMRJobRunnerNoMapperTestCase):
 
     RUNNER = 'local'
 

@@ -212,14 +212,14 @@ class HadoopJobRunner(MRJobRunner):
         if not self._hadoop_version:
             stdout = self.invoke_hadoop(['version'], return_stdout=True)
             if stdout:
-                first_line = stdout.split('\n')[0]
+                first_line = stdout.split(b'\n')[0]
                 m = HADOOP_VERSION_RE.match(first_line)
                 if m:
-                    self._hadoop_version = m.group('version')
+                    self._hadoop_version = to_string(m.group('version'))
                     log.info("Using Hadoop version %s" % self._hadoop_version)
-                    return self._hadoop_version
-            self._hadoop_version = '0.20.203'
-            log.info("Unable to determine Hadoop version. Assuming 0.20.203.")
+                else:
+                    raise Exception('Unable to determine Hadoop version.')
+
         return self._hadoop_version
 
     def _run(self):

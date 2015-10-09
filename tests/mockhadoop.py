@@ -462,7 +462,7 @@ def hadoop_version(stdout, stderr, environ, *args):
 #  -r 911707
 # Compiled by chrisdo on Fri Feb 19 08:07:34 UTC 2010
 # """)
-    stderr.write("Hadoop " + environ['MOCK_HADOOP_VERSION'])
+    stdout.write("Hadoop " + environ['MOCK_HADOOP_VERSION'])
     return 0
 
 

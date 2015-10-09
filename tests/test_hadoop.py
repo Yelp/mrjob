@@ -146,6 +146,13 @@ class MockHadoopTestCase(SandboxedTestCase):
         self.add_mrjob_to_pythonpath()
 
 
+class GetHadoopVersionTestCase(MockHadoopTestCase):
+
+    def test_get_hadoop_version(self):
+        runner = HadoopJobRunner()
+        self.assertEqual(runner.get_hadoop_version(), '1.2.0')
+
+
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def _test_end_to_end(self, args=()):

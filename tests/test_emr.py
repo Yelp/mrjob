@@ -62,6 +62,7 @@ from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
+from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -1930,25 +1931,26 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertTrue(runner.path_exists(actions[1].scriptpath))
 
 
-class EMRNoMapperTest(MockBotoTestCase):
+class EMRNoMapperTestCase(MockBotoTestCase):
 
     def test_no_mapper(self):
         # read from STDIN, a local file, and a remote file
         stdin = BytesIO(b'foo\nbar\n')
 
         local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as local_input_file:
-            local_input_file.write('bar\nqux\n')
+        with open(local_input_path, 'wb') as local_input_file:
+            local_input_file.write(b'one fish two fish\nred fish blue fish\n')
 
         remote_input_path = 's3://walrus/data/foo'
         self.add_mock_s3_data({'walrus': {'data/foo': b'foo\n'}})
 
         # setup fake output
         self.mock_emr_output = {('j-MOCKCLUSTER0', 1): [
-            b'1\t"qux"\n2\t"bar"\n', b'2\t"foo"\n5\tnull\n']}
+            b'1\t["blue", "one", "red", "two"]\n',
+            b'4\t["fish"]\n']}
 
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '-', local_input_path, remote_input_path])
+        mr_job = MRNoMapper(['-r', 'emr', '-v',
+                             '-', local_input_path, remote_input_path])
         mr_job.sandbox(stdin=stdin)
 
         results = []
@@ -1961,7 +1963,8 @@ class EMRNoMapperTest(MockBotoTestCase):
                 results.append((key, value))
 
         self.assertEqual(sorted(results),
-                         [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+                          [(1, ['blue', 'one', 'red', 'two']),
+                           (4, ['fish'])])
 
 
 class PoolMatchingTestCase(MockBotoTestCase):

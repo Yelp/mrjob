@@ -152,6 +152,12 @@ class GetHadoopVersionTestCase(MockHadoopTestCase):
         runner = HadoopJobRunner()
         self.assertEqual(runner.get_hadoop_version(), '1.2.0')
 
+    def test_missing_hadoop_version(self):
+        with patch.dict('os.environ', MOCK_HADOOP_VERSION=''):
+            runner = HadoopJobRunner()
+            self.assertRaises(Exception, runner.get_hadoop_version)
+
+
 
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 

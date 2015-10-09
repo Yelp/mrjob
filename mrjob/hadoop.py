@@ -217,9 +217,9 @@ class HadoopJobRunner(MRJobRunner):
                 if m:
                     self._hadoop_version = to_string(m.group('version'))
                     log.info("Using Hadoop version %s" % self._hadoop_version)
-                    return self._hadoop_version
-            self._hadoop_version = '0.20.203'
-            log.info("Unable to determine Hadoop version. Assuming 0.20.203.")
+                else:
+                    raise Exception('Unable to determine Hadoop version.')
+
         return self._hadoop_version
 
     def _run(self):

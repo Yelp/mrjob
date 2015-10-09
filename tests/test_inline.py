@@ -28,7 +28,7 @@ from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 from mrjob.sim import _error_on_bad_paths
 from mrjob.step import MRStep
-from tests.mr_nomapper_multistep import MRNoMapper
+from tests.mr_no_mapper import MRNoMapper
 from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
@@ -214,7 +214,7 @@ class NoMRJobConfTestCase(TestCase):
 
 
 
-class SimRunnerJobConfTestCase(SandboxedTestCase):
+class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
     # this class is also used to test local mode
     RUNNER = 'inline'
@@ -353,7 +353,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
             self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
 
 
-class SimRunnerNoMapperTestCase(SandboxedTestCase):
+class InlineMRJobRunnerNoMapperTestCase(SandboxedTestCase):
 
     RUNNER = 'inline'
 

@@ -225,6 +225,7 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
         '%srwxrwxrwx - %s %s 2010-10-01 15:16 %s' %
         (file_type, user_and_group, size, hdfs_path))
 
+
 def hadoop_fs_lsr(stdout, stderr, environ, *args):
     """Implements hadoop fs -lsr."""
     hdfs_path_globs = args or ['']

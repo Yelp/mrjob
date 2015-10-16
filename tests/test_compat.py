@@ -25,6 +25,7 @@ from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_generic_jobconf
+from mrjob.compat import uses_yarn
 
 from tests.py2 import TestCase
 from tests.py2 import patch
@@ -157,6 +158,13 @@ class MiscCompatTestCase(TestCase):
         # default to True
         self.assertEqual(
             supports_new_distributed_cache_options(None), True)
+
+    def test_uses_yarn(self):
+        self.assertEqual(uses_yarn('0.22'), False)
+        self.assertEqual(uses_yarn('0.23'), True)
+        self.assertEqual(uses_yarn('0.24'), True)
+        self.assertEqual(uses_yarn('1.0.0'), False)
+        self.assertEqual(uses_yarn('2.0.0'), True)
 
 
 class MapVersionTestCase(TestCase):

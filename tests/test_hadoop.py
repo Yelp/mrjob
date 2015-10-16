@@ -22,6 +22,7 @@ from io import BytesIO
 from subprocess import CalledProcessError
 from subprocess import check_call
 
+from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import find_hadoop_streaming_jar
 from mrjob.hadoop import fully_qualify_hdfs_path
@@ -158,7 +159,6 @@ class GetHadoopVersionTestCase(MockHadoopTestCase):
             self.assertRaises(Exception, runner.get_hadoop_version)
 
 
-
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def _test_end_to_end(self, args=()):
@@ -280,6 +280,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
     def test_end_to_end_with_disabled_input_path_check(self):
         self._test_end_to_end(['--no-check-input-paths'])
 
+    def test_end_to_end_with_hadoop_2_0(self):
+        with patch.dict('os.environ', MOCK_HADOOP_VERSION='2.0.0'):
+            self._test_end_to_end()
+
 
 class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
@@ -295,7 +299,6 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             mr_job_script='my_job.py', stdin=BytesIO())
         self.runner._add_job_files_for_upload()
 
-        self.runner._hadoop_version='0.20.204'
         self.start(patch.object(self.runner, '_upload_args',
                                 return_value=['new_upload_args']))
         self.start(patch.object(self.runner, '_pre_0_20_upload_args',
@@ -306,6 +309,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                                 return_value=['hdfs_step_input_files']))
         self.start(patch.object(self.runner, '_hdfs_step_output_dir',
                                 return_value='hdfs_step_output_dir'))
+        self.start(patch.object(HadoopFilesystem, 'get_hadoop_version',
+                                return_value='1.2.0'))
         self.runner._script_path = 'my_job.py'
 
         self._new_basic_args = [
@@ -328,7 +333,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             self._new_basic_args + args)
 
     def _assert_streaming_step_old(self, step, args):
-        self.runner._hadoop_version = '0.18'
+        HadoopFilesystem.get_hadoop_version.return_value = '0.18'
         self.runner._steps = [step]
         self.assertEqual(
             self.runner._args_for_streaming_step(0),

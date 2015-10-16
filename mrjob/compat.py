@@ -757,6 +757,13 @@ def uses_generic_jobconf(version):
     return version_gte(version, '0.20')
 
 
+def uses_yarn(version):
+    """Basically, is this Hadoop 2? This also handles versions in the
+    zero series (0.23+) where YARN originated."""
+    return (version_gte(version, '2') or
+            version_gte(version, '0.23') and not version_gte(version, '1'))
+
+
 def version_gte(version, cmp_version_str):
     """Return ``True`` if version >= *cmp_version_str*."""
 

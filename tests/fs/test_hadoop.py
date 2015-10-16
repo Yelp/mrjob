@@ -125,12 +125,19 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.assertEqual(self.fs.du('hdfs:///more/data2'), 4)
         self.assertEqual(self.fs.du('hdfs:///more/data3'), 4)
 
-    def test_mkdir(self):
-        for hadoop_version in ['0.20.0', '0.23.0', '1.2.0', '2.0.0']:
-            self.env['MOCK_HADOOP_VERSION'] = hadoop_version
-            self.fs.mkdir('hdfs:///d')
-            local_path = os.path.join(self.tmp_dir, 'mock_hdfs_root', 'd')
-            self.assertEqual(os.path.isdir(local_path), True)
+    def _test_mkdir(self):
+        self.fs.mkdir('hdfs:///d/ave')
+        local_path = os.path.join(self.tmp_dir, 'mock_hdfs_root', 'd', 'ave')
+        self.assertEqual(os.path.isdir(local_path), True)
+
+    def test_mkdir_hadoop_1(self):
+        self.env['MOCK_HADOOP_VERSION'] = '1.2.0'
+        self._test_mkdir()
+
+    def test_mkdir_hadoop_2(self):
+        # this catches issue #991
+        self.env['MOCK_HADOOP_VERSION'] = '2.0.0'
+        self._test_mkdir()
 
     def test_path_exists_no(self):
         path = 'hdfs:///f'

@@ -20,6 +20,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
+from mrjob.compat import uses_yarn
 from mrjob.fs.base import Filesystem
 from mrjob.py2 import to_string
 from mrjob.parse import is_uri
@@ -31,29 +32,53 @@ from mrjob.util import read_file
 log = logging.getLogger(__name__)
 
 # used by mkdir()
-HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
+_HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
 
 # used by ls() and path_exists()
 _HADOOP_LS_NO_SUCH_FILE = re.compile(
     br'^lsr?: Cannot access .*: No such file or directory.')
 
 # used by rm() (see below)
-HADOOP_RMR_NO_SUCH_FILE = re.compile(br'^rmr: hdfs://.*$')
+_HADOOP_RMR_NO_SUCH_FILE = re.compile(br'^rmr: hdfs://.*$')
+
+# find version string in "Hadoop 0.20.203" etc.
+_HADOOP_VERSION_RE = re.compile(br'^.*?(?P<version>(\d|\.)+).*?$')
+
 
 
 class HadoopFilesystem(Filesystem):
     """Filesystem for URIs accepted by ``hadoop fs``. Typically you will get
     one of these via ``HadoopJobRunner().fs``, composed with
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
+
+    This also helps with other invocations of the ``hadoop`` binary, such
+    as ``hadoop version`` (see :py:meth:`invoke_hadoop`).
     """
 
     def __init__(self, hadoop_bin):
         """:param hadoop_bin: path to ``hadoop`` binary"""
         super(HadoopFilesystem, self).__init__()
         self._hadoop_bin = hadoop_bin
+        self._hadoop_version = None  # cache for get_hadoop_version()
 
     def can_handle_path(self, path):
         return is_uri(path)
+
+    def get_hadoop_version(self):
+        """Invoke the hadoop executable to determine its version"""
+        # mkdir() needs this
+        if not self._hadoop_version:
+            stdout = self.invoke_hadoop(['version'], return_stdout=True)
+            if stdout:
+                first_line = stdout.split(b'\n')[0]
+                m = _HADOOP_VERSION_RE.match(first_line)
+                if m:
+                    self._hadoop_version = to_string(m.group('version'))
+                    log.info("Using Hadoop version %s" % self._hadoop_version)
+                else:
+                    raise Exception('Unable to determine Hadoop version.')
+
+        return self._hadoop_version
 
     def invoke_hadoop(self, args, ok_returncodes=None, ok_stderr=None,
                       return_stdout=False):
@@ -190,9 +215,16 @@ class HadoopFilesystem(Filesystem):
         return read_file(filename, cat_proc.stdout, cleanup=cleanup)
 
     def mkdir(self, path):
+        version = self.get_hadoop_version()
+
+        # use -p on Hadoop 2 (see #991, #845)
+        if uses_yarn(version):
+            args = ['fs', '-mkdir', '-p', path]
+        else:
+            args = ['fs', '-mkdir', path]
+
         try:
-            self.invoke_hadoop(
-                ['fs', '-mkdir', path], ok_stderr=[HADOOP_FILE_EXISTS_RE])
+            self.invoke_hadoop(args, ok_stderr=[_HADOOP_FILE_EXISTS_RE])
         except CalledProcessError:
             raise IOError("Could not mkdir %s" % path)
 
@@ -231,7 +263,7 @@ class HadoopFilesystem(Filesystem):
             try:
                 self.invoke_hadoop(
                     ['fs', '-rmr', path_glob],
-                    return_stdout=True, ok_stderr=[HADOOP_RMR_NO_SUCH_FILE])
+                    return_stdout=True, ok_stderr=[_HADOOP_RMR_NO_SUCH_FILE])
             except CalledProcessError:
                 raise IOError("Could not rm %s" % path_glob)
 

@@ -56,9 +56,6 @@ HADOOP_STREAMING_OUTPUT_RE = re.compile(br'^(\S+ \S+ \S+ \S+: )?(.*)$')
 HADOOP_JOB_TIMESTAMP_RE = re.compile(
     br'(INFO: )?Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
 
-# find version string in "Hadoop 0.20.203" etc.
-HADOOP_VERSION_RE = re.compile(br'^.*?(?P<version>(\d|\.)+).*?$')
-
 
 def find_hadoop_streaming_jar(path):
     """Return the path of the hadoop streaming jar inside the given
@@ -193,9 +190,6 @@ class HadoopJobRunner(MRJobRunner):
         self._job_timestamp = None
         self._start_step_num = 0
 
-        # init hadoop version cache
-        self._hadoop_version = None
-
     @property
     def fs(self):
         """:py:class:`mrjob.fs.base.Filesystem` object for HDFS and the local
@@ -209,18 +203,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def get_hadoop_version(self):
         """Invoke the hadoop executable to determine its version"""
-        if not self._hadoop_version:
-            stdout = self.invoke_hadoop(['version'], return_stdout=True)
-            if stdout:
-                first_line = stdout.split(b'\n')[0]
-                m = HADOOP_VERSION_RE.match(first_line)
-                if m:
-                    self._hadoop_version = to_string(m.group('version'))
-                    log.info("Using Hadoop version %s" % self._hadoop_version)
-                else:
-                    raise Exception('Unable to determine Hadoop version.')
-
-        return self._hadoop_version
+        return self.fs.get_hadoop_version()
 
     def _run(self):
         self._check_input_exists()
@@ -253,31 +236,11 @@ class HadoopJobRunner(MRJobRunner):
     def _upload_local_files_to_hdfs(self):
         """Copy files managed by self._upload_mgr to HDFS
         """
-        self._mkdir_on_hdfs(self._upload_mgr.prefix)
+        self.fs.mkdir(self._upload_mgr.prefix)
 
         log.info('Copying local files into %s' % self._upload_mgr.prefix)
         for path, uri in self._upload_mgr.path_to_uri().items():
             self._upload_to_hdfs(path, uri)
-
-    def _mkdir_on_hdfs(self, path):
-        log.debug('Making directory %s on HDFS' % path)
-
-        hadoop_version = self.get_hadoop_version()
-        # from version 0.23 / 2.x on, -mkdir needs a -p option to create
-        # parent directories
-
-        # version == 0.23
-        if ((mrjob.compat.version_gte(hadoop_version, "0.23") and
-             not mrjob.compat.version_gte(hadoop_version, "0.24"))):
-            self.invoke_hadoop(['fs', '-mkdir', '-p', path])
-
-        # version >= 2.0
-        elif mrjob.compat.version_gte(hadoop_version, "2.0"):
-            self.invoke_hadoop(['fs', '-mkdir', '-p', path])
-
-        # for version 0.20, 1.x
-        else:
-            self.invoke_hadoop(['fs', '-mkdir', path])
 
     def _upload_to_hdfs(self, path, target):
         log.debug('Uploading %s -> %s on HDFS' % (path, target))

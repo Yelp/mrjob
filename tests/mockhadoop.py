@@ -42,6 +42,7 @@ import shutil
 import stat
 import sys
 
+from mrjob.compat import uses_yarn
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
 
@@ -224,6 +225,7 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
         '%srwxrwxrwx - %s %s 2010-10-01 15:16 %s' %
         (file_type, user_and_group, size, hdfs_path))
 
+
 def hadoop_fs_lsr(stdout, stderr, environ, *args):
     """Implements hadoop fs -lsr."""
     hdfs_path_globs = args or ['']
@@ -308,14 +310,16 @@ def hadoop_fs_mkdir(stdout, stderr, environ, *args):
         return -1
 
     failed = False
-    if environ['MOCK_HADOOP_VERSION'] in ['0.23.0', '2.0.0']:
-        # for version 0.23 and 2.0 or above, expect a -p parameter for mkdir
+
+    version = environ['MOCK_HADOOP_VERSION']
+
+    if uses_yarn(version):
+        # expect a -p parameter for mkdir
         if args[0] == '-p':
             args = args[1:]
         else:
             failed = True
-    else: # version 0.20, 1.2
-        pass
+
     for path in args:
         real_path = hdfs_path_to_real_path(path, environ)
         if os.path.exists(real_path):

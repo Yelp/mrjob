@@ -165,16 +165,13 @@ class MRJobLauncher(object):
 
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
-        # have to import here so that we can still run the MRJob
-        # without importing boto
-        from mrjob.emr import EMRJobRunner
-        from mrjob.hadoop import HadoopJobRunner
-        from mrjob.local import LocalMRJobRunner
-
         if self.options.runner == 'emr':
+            # avoid requiring dependencies (such as boto) for other runners
+            from mrjob.emr import EMRJobRunner
             return EMRJobRunner(**self.emr_job_runner_kwargs())
 
         elif self.options.runner == 'hadoop':
+            from mrjob.hadoop import HadoopJobRunner
             return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
 
         elif self.options.runner == 'inline':
@@ -183,6 +180,7 @@ class MRJobLauncher(object):
 
         else:
             # run locally by default
+            from mrjob.local import LocalMRJobRunner
             return LocalMRJobRunner(**self.local_job_runner_kwargs())
 
     @classmethod

@@ -158,7 +158,6 @@ class GetHadoopVersionTestCase(MockHadoopTestCase):
             self.assertRaises(Exception, runner.get_hadoop_version)
 
 
-
 class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def _test_end_to_end(self, args=()):
@@ -279,6 +278,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
     def test_end_to_end_with_disabled_input_path_check(self):
         self._test_end_to_end(['--no-check-input-paths'])
+
+    def test_end_to_end_with_hadoop_2_0(self):
+        with patch.dict('os.environ', MOCK_HADOOP_VERSION='2.0.0'):
+            self._test_end_to_end()
 
 
 class StreamingArgsTestCase(EmptyMrjobConfTestCase):

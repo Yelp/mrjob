@@ -600,7 +600,6 @@ def parse_hadoop_counters_from_line(line, hadoop_version=None):
 
     :return: (counter_dict, step_num) or (None, None)
     """
-    # start with 2.x parsing, which parses the entire line as JSON
     if (hadoop_version is None or
         version_gte(hadoop_version, '2') or
         (version_gte(hadoop_version, '0.21') and

@@ -20,7 +20,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
-from mrjob.compat import version_gte
+from mrjob.compat import uses_yarn
 from mrjob.fs.base import Filesystem
 from mrjob.py2 import to_string
 from mrjob.parse import is_uri
@@ -217,9 +217,8 @@ class HadoopFilesystem(Filesystem):
     def mkdir(self, path):
         version = self.get_hadoop_version()
 
-        # use -p on Hadoop 2
-        if (version_gte(version, '2') or
-            version_gte(version, '0.23') and not version_gte(version, '1')):
+        # use -p on Hadoop 2 (see #991, #845)
+        if uses_yarn(version):
             args = ['fs', '-mkdir', '-p', path]
         else:
             args = ['fs', '-mkdir', path]

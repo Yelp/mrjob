@@ -42,7 +42,7 @@ import shutil
 import stat
 import sys
 
-from mrjob.compat import version_gte
+from mrjob.compat import uses_yarn
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
 
@@ -313,9 +313,8 @@ def hadoop_fs_mkdir(stdout, stderr, environ, *args):
 
     version = environ['MOCK_HADOOP_VERSION']
 
-    if (version_gte(version, '2') or
-        version_gte(version, '0.23') and not version_gte(version, '1')):
-        # for Hadoop 2, expect a -p parameter for mkdir
+    if uses_yarn(version):
+        # expect a -p parameter for mkdir
         if args[0] == '-p':
             args = args[1:]
         else:

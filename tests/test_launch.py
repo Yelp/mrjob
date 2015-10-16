@@ -32,6 +32,7 @@ from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
 from tests.sandbox import patch_fs_s3
 
@@ -72,15 +73,14 @@ class MRCustomJobLauncher(MRJobLauncher):
 ### Test cases ###
 
 
-class MakeRunnerTestCase(TestCase):
+class MakeRunnerTestCase(SandboxedTestCase):
 
     def setUp(self):
+        self.start(patch.dict(sys.modules))
+
         for name in sorted(sys.modules):
             if name.split('.')[0] == 'boto' or name == 'mrjob.emr':
                 del sys.modules[name]
-
-        # use this to detect when boto is imported
-        sys.modules.pop('boto', None)
 
     def test_local_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'local', ''])
@@ -106,7 +106,7 @@ class MakeRunnerTestCase(TestCase):
         with no_handlers_for_logger('mrjob'):
             with patch_fs_s3():
                 with launcher.make_runner() as runner:
-                    # we dumped mrjob.emr in setUp, so reload
+                    # we dumped mrjob.emr in setUp(), so import here
                     from mrjob.emr import EMRJobRunner
                     self.assertIsInstance(runner, EMRJobRunner)
 

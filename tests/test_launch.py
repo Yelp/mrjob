@@ -22,7 +22,6 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.conf import combine_envs
-from mrjob.emr import EMRJobRunner
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
@@ -75,11 +74,21 @@ class MRCustomJobLauncher(MRJobLauncher):
 
 class MakeRunnerTestCase(TestCase):
 
+    def setUp(self):
+        for name in sorted(sys.modules):
+            if name.split('.')[0] == 'boto' or name == 'mrjob.emr':
+                del sys.modules[name]
+
+        # use this to detect when boto is imported
+        sys.modules.pop('boto', None)
+
     def test_local_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'local', ''])
         with no_handlers_for_logger('mrjob.runner'):
             with launcher.make_runner() as runner:
                 self.assertIsInstance(runner, LocalMRJobRunner)
+
+        self.assertNotIn('boto', sorted(sys.modules))
 
     def test_hadoop_runner(self):
         # you can't instantiate a HadoopJobRunner without Hadoop installed
@@ -90,12 +99,19 @@ class MakeRunnerTestCase(TestCase):
                 with launcher.make_runner() as runner:
                     self.assertIsInstance(runner, HadoopJobRunner)
 
+        self.assertNotIn('boto', sorted(sys.modules))
+
     def test_emr_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'emr', ''])
         with no_handlers_for_logger('mrjob'):
             with patch_fs_s3():
                 with launcher.make_runner() as runner:
+                    # we dumped mrjob.emr in setUp, so reload
+                    from mrjob.emr import EMRJobRunner
                     self.assertIsInstance(runner, EMRJobRunner)
+
+        self.assertIn('boto', sorted(sys.modules))
+
 
 
 class NoOutputTestCase(TestCase):

@@ -1,6 +1,8 @@
 #!/bin/sh
 
 # Copyright 2013 Lyft
+# Copyright 2014 Alex Konradi
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -59,10 +61,13 @@ do
 
     # if LAST_ACTIVE hasn't been initialized, hadoop hasn't been installed
     # yet (this happens on 4.x AMIs), or there are jobs running, just set
-    # LAST_ACTIVE to UPTIME
+    # LAST_ACTIVE to UPTIME. This also checks yarn application if it
+    # exists (see #1145)
     if [ -z "$LAST_ACTIVE" ] || \
 	! which hadoop > /dev/null || \
-        nice hadoop job -list 2> /dev/null | grep -q '^\s*job_'
+        nice hadoop job -list 2> /dev/null | grep -q '^\s*job_' || \
+	nice yarn application -list 2> /dev/null | grep -v 'Total number' | \
+	    grep -q RUNNING
     then
         LAST_ACTIVE=$UPTIME
     else

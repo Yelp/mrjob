@@ -22,7 +22,6 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.conf import combine_envs
-from mrjob.emr import EMRJobRunner
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
@@ -33,6 +32,7 @@ from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
 from tests.sandbox import patch_fs_s3
 
@@ -73,13 +73,22 @@ class MRCustomJobLauncher(MRJobLauncher):
 ### Test cases ###
 
 
-class MakeRunnerTestCase(TestCase):
+class MakeRunnerTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        self.start(patch.dict(sys.modules))
+
+        for name in sorted(sys.modules):
+            if name.split('.')[0] == 'boto' or name == 'mrjob.emr':
+                del sys.modules[name]
 
     def test_local_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'local', ''])
         with no_handlers_for_logger('mrjob.runner'):
             with launcher.make_runner() as runner:
                 self.assertIsInstance(runner, LocalMRJobRunner)
+
+        self.assertNotIn('boto', sorted(sys.modules))
 
     def test_hadoop_runner(self):
         # you can't instantiate a HadoopJobRunner without Hadoop installed
@@ -90,12 +99,19 @@ class MakeRunnerTestCase(TestCase):
                 with launcher.make_runner() as runner:
                     self.assertIsInstance(runner, HadoopJobRunner)
 
+        self.assertNotIn('boto', sorted(sys.modules))
+
     def test_emr_runner(self):
         launcher = MRJobLauncher(args=['--no-conf', '-r', 'emr', ''])
         with no_handlers_for_logger('mrjob'):
             with patch_fs_s3():
                 with launcher.make_runner() as runner:
+                    # we dumped mrjob.emr in setUp(), so import here
+                    from mrjob.emr import EMRJobRunner
                     self.assertIsInstance(runner, EMRJobRunner)
+
+        self.assertIn('boto', sorted(sys.modules))
+
 
 
 class NoOutputTestCase(TestCase):

@@ -161,6 +161,11 @@ class HadoopFilesystem(Filesystem):
 
         for line in BytesIO(stdout):
             line = line.rstrip(b'\r\n')
+
+            # ignore total item count
+            if line.startswith(b'Found '):
+                continue
+
             fields = line.split(b' ')
 
             # Throw out directories

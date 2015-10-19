@@ -48,7 +48,9 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.env['MOCK_HDFS_ROOT'] = self.makedirs('mock_hdfs_root')
         self.env['MOCK_HADOOP_OUTPUT'] = self.makedirs('mock_hadoop_output')
         self.env['USER'] = 'mrjob_tests'
-        # don't set MOCK_HADOOP_LOG, we get command history other ways
+        # don't set MOCK_HADOOP_LOG, we get command history other ways]
+
+        self.env['MOCK_HADOOP_VERSION'] = '2.7.1'
 
     def make_mock_file(self, name, contents='contents'):
         return self.makefile(os.path.join('mock_hdfs_root', name), contents)

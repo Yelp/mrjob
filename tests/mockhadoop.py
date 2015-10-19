@@ -226,9 +226,35 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
         (file_type, user_and_group, size, hdfs_path))
 
 
+
+def hadoop_fs_ls(stdout, stderr, environ, *args):
+    """Implements hadoop fs -ls."""
+    version = environ['MOCK_HADOOP_VERSION']
+
+    if uses_yarn(version) and args and args[0] == '-R':
+        path_args = args[1:]
+        recursive = True
+    else:
+        path_args = args
+        recursive = False
+
+    return _hadoop_fs_ls('ls', stdout, stderr, environ,
+                         path_args=path_args, recursive=recursive)
+
+
 def hadoop_fs_lsr(stdout, stderr, environ, *args):
     """Implements hadoop fs -lsr."""
-    hdfs_path_globs = args or ['']
+    version = environ['MOCK_HADOOP_VERSION']
+    if uses_yarn(version):
+        print("lsr: DEPRECATED: Please use 'ls -R' instead.", file=stderr)
+
+    return _hadoop_fs_ls(
+        'lsr', stdout, stderr, environ, path_args=args, recursive=True)
+
+
+def _hadoop_fs_ls(cmd_name, stdout, stderr, environ, path_args, recursive):
+    """Helper for hadoop_fs_ls() and hadoop_fs_lsr()."""
+    hdfs_path_globs = path_args or ['']
 
     failed = False
     for hdfs_path_glob in hdfs_path_globs:
@@ -240,67 +266,45 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
         real_paths = glob.glob(real_path_glob)
 
         paths = []
-        max_size = 0
 
         if not real_paths:
-            print((
-                'lsr: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob), file=stderr)
+            print('%s: Cannot access %s: No such file or directory.' %
+                  (cmd_name, hdfs_path_glob), file=stderr)
             failed = True
         else:
             for real_path in real_paths:
                 if os.path.isdir(real_path):
-                    for dirpath, dirnames, filenames in os.walk(real_path):
-                        paths.append((dirpath, scheme, netloc, 0))
-                        for filename in filenames:
-                            path = os.path.join(dirpath, filename)
-                            size = os.path.getsize(path)
-                            max_size = size if size > max_size else max_size
+                    if recursive:
+                        for dirpath, dirnames, filenames in os.walk(real_path):
+                            paths.append((dirpath, scheme, netloc, 0))
+                            for filename in filenames:
+                                path = os.path.join(dirpath, filename)
+                                size = os.path.getsize(path)
+                                paths.append((path, scheme, netloc, size))
+                    else:
+                        for filename in os.listdir(real_path):
+                            path = os.path.join(real_path, filename)
+                            if os.path.isdir(path):
+                                size = 0
+                            else:
+                                size = os.path.getsize(path)
                             paths.append((path, scheme, netloc, size))
                 else:
-                    paths.append((real_path, scheme, netloc, 0))
+                    size = os.path.getsize(real_path)
+                    paths.append((real_path, scheme, netloc, size))
 
-        for path in paths:
-            print(_hadoop_ls_line(*path + (max_size, environ)), file=stdout)
-
-    if failed:
-        return -1
-    else:
-        return 0
-
-
-def hadoop_fs_ls(stdout, stderr, environ, *args):
-    """Implements hadoop fs -ls."""
-    hdfs_path_globs = args or ['']
-
-    failed = False
-    for hdfs_path_glob in hdfs_path_globs:
-        parsed = urlparse(hdfs_path_glob)
-        scheme = parsed.scheme
-        netloc = parsed.netloc
-
-        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
-        real_paths = glob.glob(real_path_glob)
-
-        paths = []
-        max_size = 0
-
-        if not real_paths:
-            print((
-                'ls: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob), file=stderr)
-            failed = True
-        else:
-            for real_path in real_paths:
-                paths.append((real_path, scheme, netloc, 0))
-
-        for path in paths:
-            print(_hadoop_ls_line(*path + (max_size, environ)), file=stdout)
+        if paths:
+            print('Found %d items' % len(paths), file=stdout)
+            max_size = max(size for _, __, ___, size in paths)
+            for path in paths:
+                print(_hadoop_ls_line(*path + (max_size, environ)),
+                      file=stdout)
 
     if failed:
         return -1
     else:
         return 0
+
 
 
 def hadoop_fs_mkdir(stdout, stderr, environ, *args):

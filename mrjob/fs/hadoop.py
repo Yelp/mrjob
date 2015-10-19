@@ -151,11 +151,17 @@ class HadoopFilesystem(Filesystem):
         components = urlparse(path_glob)
         hdfs_prefix = '%s://%s' % (components.scheme, components.netloc)
 
+        version = self.get_hadoop_version()
+
+        # use ls -R on Hadoop 2 (see #1152)
+        if uses_yarn(version):
+            args = ['fs', '-ls', '-R', path_glob]
+        else:
+            args = ['fs', '-lsr', path_glob]
+
         try:
-            stdout = self.invoke_hadoop(
-                ['fs', '-lsr', path_glob],
-                return_stdout=True,
-                ok_stderr=[_HADOOP_LS_NO_SUCH_FILE])
+            stdout = self.invoke_hadoop(args, return_stdout=True,
+                                        ok_stderr=[_HADOOP_LS_NO_SUCH_FILE])
         except CalledProcessError:
             raise IOError("Could not ls %s" % path_glob)
 

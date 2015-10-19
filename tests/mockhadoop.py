@@ -22,8 +22,6 @@ MOCK_HADOOP_OUTPUT -- a directory containing directories containing
 fake job output (to add output, use add_mock_output())
 MOCK_HADOOP_CMD_LOG -- optional: if this is set, append arguments passed
 to the fake hadoop binary to this script, one line per invocation
-MOCK_HADOOP_LS_RETURNS_FULL_URIS -- optional: if true, ls returns full URIs
-when passed URIs.
 
 This is designed to run as: python -m tests.mockhadoop <hadoop args>
 
@@ -88,6 +86,10 @@ def get_mock_hadoop_output():
         return os.path.join(os.environ['MOCK_HADOOP_OUTPUT'], dirnames[0])
     else:
         return None
+
+
+def mock_hadoop_uses_yarn(environ):
+    return uses_yarn(environ['MOCK_HADOOP_VERSION'])
 
 
 def hdfs_path_to_real_path(hdfs_path, environ):
@@ -215,7 +217,7 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
         user_and_group = 'dave supergroup'
 
     # newer Hadoop returns fully qualified URIs (see Pull Request #577)
-    if scheme and environ.get('MOCK_HADOOP_LS_RETURNS_FULL_URIS'):
+    if scheme and mock_hadoop_uses_yarn(environ):
         hdfs_path = '%s://%s%s' % (scheme, netloc, hdfs_path)
 
     # figure out the padding
@@ -229,9 +231,7 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
 
 def hadoop_fs_ls(stdout, stderr, environ, *args):
     """Implements hadoop fs -ls."""
-    version = environ['MOCK_HADOOP_VERSION']
-
-    if uses_yarn(version) and args and args[0] == '-R':
+    if mock_hadoop_uses_yarn(environ) and args and args[0] == '-R':
         path_args = args[1:]
         recursive = True
     else:
@@ -244,8 +244,7 @@ def hadoop_fs_ls(stdout, stderr, environ, *args):
 
 def hadoop_fs_lsr(stdout, stderr, environ, *args):
     """Implements hadoop fs -lsr."""
-    version = environ['MOCK_HADOOP_VERSION']
-    if uses_yarn(version):
+    if mock_hadoop_uses_yarn(environ):
         print("lsr: DEPRECATED: Please use 'ls -R' instead.", file=stderr)
 
     return _hadoop_fs_ls(
@@ -315,9 +314,7 @@ def hadoop_fs_mkdir(stdout, stderr, environ, *args):
 
     failed = False
 
-    version = environ['MOCK_HADOOP_VERSION']
-
-    if uses_yarn(version):
+    if mock_hadoop_uses_yarn(environ):
         # expect a -p parameter for mkdir
         if args[0] == '-p':
             args = args[1:]

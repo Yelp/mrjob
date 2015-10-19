@@ -17,8 +17,6 @@
 import os
 from distutils.version import LooseVersion
 
-from mrjob.compat import fs_ls_supports_r
-from mrjob.compat import fs_rm_supports_r
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env
 from mrjob.compat import map_version
@@ -129,16 +127,6 @@ class TranslateJobConfTestCase(TestCase):
 
 
 class MiscCompatTestCase(TestCase):
-
-    def test_fs_ls_supports_r(self):
-        self.assertEqual(fs_ls_supports_r('1.0.4'), False)
-        self.assertEqual(fs_ls_supports_r('2.4.1'), False)
-        self.assertEqual(fs_ls_supports_r('2.5.2'), True)
-
-    def test_fs_rm_supports_r(self):
-        self.assertEqual(fs_rm_supports_r('1.0.4'), False)
-        self.assertEqual(fs_rm_supports_r('2.4.1'), False)
-        self.assertEqual(fs_rm_supports_r('2.5.2'), True)
 
     def test_supports_combiners(self):
         self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),

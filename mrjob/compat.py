@@ -567,15 +567,6 @@ def _dict_list_to_compat_map(dict_list):
 
 _JOBCONF_MAP = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
 
-def fs_ls_supports_r(version):
-    """Does ``hadoop fs -ls -R ...`` work?"""
-    return version_gte(version, '2.5')
-
-
-def fs_rm_supports_r(version):
-    """Does ``hadoop fs -rm -R ...`` work?"""
-    return version_gte(version, '2.5')
-
 
 def jobconf_from_env(variable, default=None):
     """Get the value of a jobconf variable from the runtime environment.

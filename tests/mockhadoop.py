@@ -414,6 +414,40 @@ def hadoop_fs_rmr(stdout, stderr, environ, *args):
         return 0
 
 
+# TODO: use this to implement rm/rmr
+def _hadoop_fs_rm(cmd_name, stdout, stderr, environ, path_args, recursive):
+    """Implements hadoop fs -rmr."""
+    # in Hadoop 2, this is:
+    # -rm: Not enough arguments: expected 1 but got 0
+    # Usage: hadoop fs [generic options] -rm [-f] [-r|-R] [-skipTrash] <src> ...
+
+    # TODO: should probably use -skipTrash
+    if len(args) < 1:
+        stderr.write('Usage: java FsShell [-rmr [-skipTrash] <src>]')
+
+    if args[0] == '-skipTrash':
+        args = args[1:]
+
+    failed = False
+    for path in args:
+        real_path = hdfs_path_to_real_path(path, environ)
+        if os.path.isdir(real_path):
+            shutil.rmtree(real_path)
+        elif os.path.exists(real_path):
+            os.remove(real_path)
+        else:
+            stderr.write(
+                'rmr: cannot remove %s: No such file or directory.' % path)
+            failed = True
+
+    if failed:
+        return -1
+    else:
+        return 0
+
+
+
+
 def hadoop_fs_test(stdout, stderr, environ, *args):
     """Implements hadoop fs -test."""
     if len(args) < 1:

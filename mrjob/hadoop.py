@@ -244,7 +244,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def _upload_to_hdfs(self, path, target):
         log.debug('Uploading %s -> %s on HDFS' % (path, target))
-        self.invoke_hadoop(['fs', '-put', path, target])
+        self.fs._put(path, target)
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""
@@ -469,9 +469,8 @@ class HadoopJobRunner(MRJobRunner):
 
         if self._hdfs_tmp_dir:
             log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)
-
             try:
-                self.invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
+                self.fs.rm(self._hdfs_tmp_dir)
             except Exception as e:
                 log.exception(e)
 

@@ -36,10 +36,10 @@ _HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
 
 # used by ls() and path_exists()
 _HADOOP_LS_NO_SUCH_FILE = re.compile(
-    br'^lsr?: Cannot access .*: No such file or directory.')
+    br'^lsr?: Cannot access .*: No such file.*$')
 
 # used by rm() (see below)
-_HADOOP_RMR_NO_SUCH_FILE = re.compile(br'^rmr: hdfs://.*$')
+_HADOOP_RM_NO_SUCH_FILE = re.compile(br'^rmr?: .*No such file.*$')
 
 # find version string in "Hadoop 0.20.203" etc.
 _HADOOP_VERSION_RE = re.compile(br'^.*?(?P<version>(\d|\.)+).*?$')
@@ -151,16 +151,27 @@ class HadoopFilesystem(Filesystem):
         components = urlparse(path_glob)
         hdfs_prefix = '%s://%s' % (components.scheme, components.netloc)
 
+        version = self.get_hadoop_version()
+
+        # use ls -R on Hadoop 2 (see #1152)
+        if uses_yarn(version):
+            args = ['fs', '-ls', '-R', path_glob]
+        else:
+            args = ['fs', '-lsr', path_glob]
+
         try:
-            stdout = self.invoke_hadoop(
-                ['fs', '-lsr', path_glob],
-                return_stdout=True,
-                ok_stderr=[_HADOOP_LS_NO_SUCH_FILE])
+            stdout = self.invoke_hadoop(args, return_stdout=True,
+                                        ok_stderr=[_HADOOP_LS_NO_SUCH_FILE])
         except CalledProcessError:
             raise IOError("Could not ls %s" % path_glob)
 
         for line in BytesIO(stdout):
             line = line.rstrip(b'\r\n')
+
+            # ignore total item count
+            if line.startswith(b'Found '):
+                continue
+
             fields = line.split(b' ')
 
             # Throw out directories
@@ -247,25 +258,29 @@ class HadoopFilesystem(Filesystem):
     def path_join(self, dirname, filename):
         return posixpath.join(dirname, filename)
 
+    def _put(self, local_path, target):
+        # used by HadoopMRJobRunner._upload_to_hdfs()
+
+        # not exposing this method because it's not part of the general FS
+        # interface. Probably want to add cp() at some point
+        self.invoke_hadoop(['fs', '-put', local_path, target])
+
     def rm(self, path_glob):
         if not is_uri(path_glob):
             super(HadoopFilesystem, self).rm(path_glob)
 
-        if self.path_exists(path_glob):
-            # hadoop fs -rmr will print something like:
-            # Moved to trash: hdfs://hdnamenode:54310/user/dave/asdf
-            # to STDOUT, which we don't care about.
-            #
-            # if we ask to delete a path that doesn't exist, it prints
-            # to STDERR something like:
-            # rmr: <path>
-            # which we can safely ignore
-            try:
-                self.invoke_hadoop(
-                    ['fs', '-rmr', path_glob],
-                    return_stdout=True, ok_stderr=[_HADOOP_RMR_NO_SUCH_FILE])
-            except CalledProcessError:
-                raise IOError("Could not rm %s" % path_glob)
+        version = self.get_hadoop_version()
+        if uses_yarn(version):
+            args = ['fs', '-rm', '-R', '-f', '-skipTrash', path_glob]
+        else:
+            args = ['fs', '-rmr', '-skipTrash', path_glob]
+
+        try:
+            self.invoke_hadoop(
+                args,
+                return_stdout=True, ok_stderr=[_HADOOP_RM_NO_SUCH_FILE])
+        except CalledProcessError:
+            raise IOError("Could not rm %s" % path_glob)
 
     def touchz(self, dest):
         try:

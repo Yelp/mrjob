@@ -32,6 +32,8 @@ v0.5.0, 2015-??-?? -- ???
        * added --release-label switch (--ami-version 4.0.0 also works)
    * Hadoop
      * hdfs_scratch_dir option is now hadoop_tmp_dir (#318)
+     * use fs -ls -R and fs -rm -R in YARN (#1152)
+     * fs.rm() now uses -skipTrash
  * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())
  * Python-version-specific mrjob commands (#1104)
  * mrjob.util:

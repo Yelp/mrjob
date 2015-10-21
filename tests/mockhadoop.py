@@ -415,31 +415,101 @@ def hadoop_fs_rmr(stdout, stderr, environ, *args):
         return 0
 
 
-# TODO: use this to implement rm/rmr
-def _hadoop_fs_rm(cmd_name, stdout, stderr, environ, path_args, recursive):
-    """Implements hadoop fs -rmr."""
-    # in Hadoop 2, this is:
-    # -rm: Not enough arguments: expected 1 but got 0
-    # Usage: hadoop fs [generic options] -rm [-f] [-r|-R] [-skipTrash] <src> ...
+def hadoop_fs_rm(stdout, stderr, environ, *args):
+    """Implements hadoop fs -rm."""
+    # parse args
+    recursive = False
+    force = False
 
-    # TODO: should probably use -skipTrash
-    if len(args) < 1:
-        stderr.write('Usage: java FsShell [-rmr [-skipTrash] <src>]')
+    yarn = mock_hadoop_uses_yarn(environ)
 
-    if args[0] == '-skipTrash':
-        args = args[1:]
+    for i, arg in enumerate(args):
+        # -r/-R and -f are only available in YARN
+        if yarn and arg in ('-r', '-R'):
+            recursive = True
+        elif yarn and arg == '-f':
+            force = True
+        elif arg == '-skipTrash':
+            pass  # we don't emulate trash
+        elif arg.startswith('-'):
+            # don't know what the pre-YARN version of this, doesn't matter
+            print('-rm: Illegal option %s' % arg, file=stderr)
+            return -1
+        else:
+            # BSD-style args: all switches at the beginning
+            break
 
-    failed = False
-    for path in args:
+        path_args = args[i:]
+
+    if not path_args:
+        if yarn:
+            print('-rm: Not enough arguments: expected 1 but got 0',
+                  file=stderr)
+            print('Usage: hadoop fs [generic options] -rm [-f] [-r|-R]'
+                  ' [-skipTrash] <src> ...', file=stderr)
+        else:
+            print('Usage: java FsShell [-rm [-skipTrash] <src>]', file=stderr)
+
+        return -1
+
+    return _hadoop_fs_rm('rm', stdout, stderr, environ,
+                         path_args=path_args, recursive=recursive,
+                         force=force)
+
+
+def hadoop_fs_rmr(stdout, stderr, environ, *args):
+    yarn = mock_hadoop_uses_yarn(environ)
+
+    if yarn:
+        print("rmr: DEPRECATED: Please use 'rm -r' instead.", file=stderr)
+
+    if args and args[0] == '-skipTrash':
+        path_args = args[1:]
+    else:
+        path_args = args
+
+    if not path_args:
+        if yarn:
+            print('-rmr: Not enough arguments: expected 1 but got 0',
+                  file=stderr)
+            # -skipTrash isn't mentioned in usage, at least in 2.5.2
+            print('Usage: hadoop fs [generic options] -rmr'
+                  ' <src> ...', file=stderr)
+        else:
+            print('Usage: java FsShell [-rmr [-skipTrash] <src>]', file=stderr)
+
+        return -1
+
+    return _hadoop_fs_rm('rmr', stdout, stderr, environ,
+                         path_args=path_args, recursive=True, force=False)
+
+
+def _hadoop_fs_rm(cmd_name, stdout, stderr, environ,
+                  path_args, recursive, force):
+    """Helper for hadoop_fs_rm() and hadoop_fs_rmr()."""
+    # use an array so that fail() can update it
+    failed = []
+
+    def fail(path, msg):
+        if mock_hadoop_uses_yarn(environ):
+            print('%s `%s`: %s' % (cmd_name, path, msg), file=stderr)
+        else:
+            print('%s: cannot remove %s: %s.' % (cmd_name, path, msg),
+                  file=stderr)
+        failed.append(True)
+
+    for path in path_args:
         real_path = hdfs_path_to_real_path(path, environ)
         if os.path.isdir(real_path):
-            shutil.rmtree(real_path)
+            if recursive:
+                shutil.rmtree(real_path)
+            else:
+                fail(path, 'Is a directory')
         elif os.path.exists(real_path):
             os.remove(real_path)
         else:
-            stderr.write(
-                'rmr: cannot remove %s: No such file or directory.' % path)
-            failed = True
+            if not force:
+                fail(path, 'No such file or directory')
 
     if failed:
         return -1

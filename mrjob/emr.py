@@ -669,7 +669,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _set_s3_job_log_uri(self, cluster):
         """Given a job flow description, set self._s3_job_log_uri. This allows
-        us to call self.ls(), etc. without running the job.
+        us to call self.fs.ls(), etc. without running the job.
         """
         log_uri = getattr(cluster, 'loguri', '')
         if log_uri:

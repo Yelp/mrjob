@@ -146,7 +146,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             local_tmp_dir = runner._get_local_tmp_dir()
             # make sure cleanup hasn't happened yet
             self.assertTrue(os.path.exists(local_tmp_dir))
-            self.assertTrue(any(runner.ls(runner.get_output_dir())))
+            self.assertTrue(any(runner.fs.ls(runner.get_output_dir())))
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster.status.state, 'TERMINATED')
@@ -187,7 +187,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
         # make sure cleanup happens
         self.assertFalse(os.path.exists(local_tmp_dir))
-        self.assertFalse(any(runner.ls(runner.get_output_dir())))
+        self.assertFalse(any(runner.fs.ls(runner.get_output_dir())))
 
         # job should get terminated
         emr_conn = runner.make_emr_conn()
@@ -1682,16 +1682,16 @@ class TestSSHLs(MockBotoTestCase):
                       posixpath.join('test', 'three'), b'')
 
         self.assertEqual(
-            sorted(self.runner.ls('ssh://testmaster/test')),
+            sorted(self.runner.fs.ls('ssh://testmaster/test')),
             ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
 
         self.assertEqual(
-            list(self.runner.ls('ssh://testmaster!testslave0/test')),
+            list(self.runner.fs.ls('ssh://testmaster!testslave0/test')),
             ['ssh://testmaster!testslave0/test/three'])
 
         # ls() is a generator, so the exception won't fire until we list() it
         self.assertRaises(IOError, list,
-                          self.runner.ls('ssh://testmaster/does_not_exist'))
+                          self.runner.fs.ls('ssh://testmaster/does_not_exist'))
 
 
 class TestNoBoto(TestCase):
@@ -3237,7 +3237,7 @@ class JarStepTestCase(MockBotoTestCase):
 
             self.assertIn(fake_jar, runner._upload_mgr.path_to_uri())
             jar_uri = runner._upload_mgr.uri(fake_jar)
-            self.assertTrue(runner.ls(jar_uri))
+            self.assertTrue(runner.fs.ls(jar_uri))
 
             emr_conn = runner.make_emr_conn()
             steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))

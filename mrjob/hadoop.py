@@ -220,7 +220,7 @@ class HadoopJobRunner(MRJobRunner):
                 continue  # STDIN always exists
 
             if self._opts['check_input_paths']:
-                if not self.path_exists(path):
+                if not self.fs.path_exists(path):
                     raise AssertionError(
                         'Input path %s does not exist!' % (path,))
 

@@ -20,8 +20,9 @@ MOCK_HDFS_ROOT -- root dir for our fake filesystem(s). Used regardless of
 URI scheme or host (so this is also the root of every S3 bucket).
 MOCK_HADOOP_OUTPUT -- a directory containing directories containing
 fake job output (to add output, use add_mock_output())
+MOCK_HADOOP_VERSION -- version of Hadoop to emulate (e.g. '2.7.1').
 MOCK_HADOOP_CMD_LOG -- optional: if this is set, append arguments passed
-to the fake hadoop binary to this script, one line per invocation
+to the fake hadoop binary to this file, one line per invocation
 
 This is designed to run as: python -m tests.mockhadoop <hadoop args>
 

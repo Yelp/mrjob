@@ -286,3 +286,11 @@ class S3Filesystem(Filesystem):
         bucket = self.get_bucket(bucket_name)
         for key in bucket.list(key_prefix):
             yield key
+
+    def get_all_buckets(self):
+        """Get a stream of all buckets owned by this user on S3."""
+        return self.make_s3_conn().get_all_buckets()
+
+    def create_bucket(self, bucket_name, location=''):
+        """Create a bucket on S3, optionally setting location constraint."""
+        return self.make_s3_conn().create_bucket(bucket_name, location='')

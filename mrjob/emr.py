@@ -633,7 +633,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _set_s3_tmp_dir(self):
         """Helper for _fix_s3_tmp_and_log_uri_opts"""
-        buckets = self.fs.make_s3_conn().get_all_buckets()
+        buckets = self.fs.get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
         # Loop over buckets until we find one that is not region-
@@ -679,12 +679,11 @@ class EMRJobRunner(MRJobRunner):
     def _create_s3_tmp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
         if self._s3_tmp_bucket_to_create:
-            s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as temp space' %
                      self._s3_tmp_bucket_to_create)
             location = s3_location_constraint_for_region(
                 self._opts['aws_region'])
-            s3_conn.create_bucket(
+            self.fs.create_bucket(
                 self._s3_tmp_bucket_to_create, location=location)
             self._s3_tmp_bucket_to_create = None
 

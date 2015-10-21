@@ -476,10 +476,10 @@ class MRJobRunner(object):
 
                 path = base
 
-        for filename in self.ls(output_dir):
+        for filename in self.fs.ls(output_dir):
             subpath = filename[len(output_dir):]
             if not any(name.startswith('_') for name in split_path(subpath)):
-                for line in self._cat_file(filename):
+                for line in self.fs._cat_file(filename):
                     yield line
 
     def _cleanup_mode(self, mode=None):

@@ -133,7 +133,7 @@ class SimMRJobRunner(MRJobRunner):
         log.debug('setting up working dir in %s' % working_dir)
 
         # create the working directory
-        self.mkdir(working_dir)
+        self.fs.mkdir(working_dir)
 
         files = self._working_dir_mgr.name_to_path('file').items()
         # give all our files names, and symlink or unarchive them
@@ -154,7 +154,7 @@ class SimMRJobRunner(MRJobRunner):
 
         if not os.path.isdir(self._output_dir):
             log.debug('Creating output directory %s' % self._output_dir)
-            self.mkdir(self._output_dir)
+            self.fs.mkdir(self._output_dir)
 
     def _check_step_works_with_runner(self, step_dict):
         """ Raise an exception if the runner cannot run this step
@@ -336,7 +336,7 @@ class SimMRJobRunner(MRJobRunner):
         # determine the size of each file split
         total_size = 0
         for input_path in input_paths_to_split:
-            for path in self.ls(input_path):
+            for path in self.fs.ls(input_path):
                 total_size += os.stat(path)[stat.ST_SIZE]
         split_size = total_size / num_splits
 

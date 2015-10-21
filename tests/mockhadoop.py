@@ -438,11 +438,10 @@ def hadoop_fs_rm(stdout, stderr, environ, *args):
             return -1
         else:
             # BSD-style args: all switches at the beginning
+            path_args = args[i:]
             break
-
-        path_args = args[i:]
-
-    if not path_args:
+    else:
+        # no path arguments
         if yarn:
             print('-rm: Not enough arguments: expected 1 but got 0',
                   file=stderr)

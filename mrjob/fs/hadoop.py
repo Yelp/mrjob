@@ -263,17 +263,20 @@ class HadoopFilesystem(Filesystem):
             super(HadoopFilesystem, self).rm(path_glob)
 
         if self.path_exists(path_glob):
-            # hadoop fs -rmr will print something like:
-            # Moved to trash: hdfs://hdnamenode:54310/user/dave/asdf
-            # to STDOUT, which we don't care about.
-            #
             # if we ask to delete a path that doesn't exist, it prints
             # to STDERR something like:
             # rmr: <path>
             # which we can safely ignore
+            version = self.get_hadoop_version()
+
+            if uses_yarn(version):
+                args = ['fs', '-rm', '-R', '-skipTrash', path_glob]
+            else:
+                args = ['fs', '-rmr', '-skipTrash', path_glob]
+
             try:
                 self.invoke_hadoop(
-                    ['fs', '-rmr', path_glob],
+                    args,
                     return_stdout=True, ok_stderr=[_HADOOP_RM_NO_SUCH_FILE])
             except CalledProcessError:
                 raise IOError("Could not rm %s" % path_glob)

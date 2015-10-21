@@ -2468,8 +2468,8 @@ class EMRJobRunner(MRJobRunner):
         log.debug('creating IAM connection to %s' % host)
 
         raw_iam_conn = boto.connect_iam(
-            aws_access_key_id=self._aws_access_key_id,
-            aws_secret_access_key=self._aws_secret_access_key,
+            aws_access_key_id=self._opts['aws_access_key_id'],
+            aws_secret_access_key=self._opts['aws_secret_access_key'],
             host=host,
             security_token=self._opts['aws_security_token'])
 

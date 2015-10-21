@@ -293,4 +293,5 @@ class S3Filesystem(Filesystem):
 
     def create_bucket(self, bucket_name, location=''):
         """Create a bucket on S3, optionally setting location constraint."""
-        return self.make_s3_conn().create_bucket(bucket_name, location='')
+        return self.make_s3_conn().create_bucket(
+            bucket_name, location=location)

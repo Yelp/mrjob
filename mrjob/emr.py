@@ -2308,7 +2308,7 @@ class EMRJobRunner(MRJobRunner):
             # guarantee the ordering of dicts -- they can vary
             # depending on insertion/deletion order.
             sorted(
-                (name, self.md5sum(path)) for name, path
+                (name, self.fs.md5sum(path)) for name, path
                 in self._bootstrap_dir_mgr.name_to_path('file').items()
                 if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],

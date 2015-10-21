@@ -426,12 +426,12 @@ class MRJobRunner(object):
             self._fs = LocalFilesystem()
         return self._fs
 
-    def __getattr__(self, name):
-        # For backward compatibility, forward filesystem methods
-        try:
-            return getattr(self.fs, name)
-        except AttributeError:
-            raise AttributeError(name)
+    #def __getattr__(self, name):
+    #    # For backward compatibility, forward filesystem methods
+    #    try:
+    #        return getattr(self.fs, name)
+    #    except AttributeError:
+    #        raise AttributeError(name)
 
     ### Running the job and parsing output ###
 

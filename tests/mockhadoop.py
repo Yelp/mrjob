@@ -518,8 +518,6 @@ def _hadoop_fs_rm(cmd_name, stdout, stderr, environ,
         return 0
 
 
-
-
 def hadoop_fs_test(stdout, stderr, environ, *args):
     """Implements hadoop fs -test."""
     if len(args) < 1:

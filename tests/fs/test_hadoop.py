@@ -147,6 +147,15 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.fs.rm('hdfs:///f')
         self.assertEqual(os.path.exists(local_path), False)
 
+    def test_rm_recursive(self):
+        local_path = self.make_mock_file('foo/bar')
+        self.assertEqual(os.path.exists(local_path), True)
+        self.fs.rm('hdfs:///foo')  # remove containing directory
+        self.assertEqual(os.path.exists(local_path), False)
+
+    def test_rm_nonexistent(self):
+        self.fs.rm('hdfs:///baz')
+
     def test_touchz(self):
         # mockhadoop doesn't implement this.
         pass

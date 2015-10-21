@@ -254,7 +254,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
             list(runner.stream_output())
 
-        conn = runner.make_s3_conn()
+        conn = runner.fs.make_s3_conn()
         bucket = conn.get_bucket(tmp_bucket)
         self.assertEqual(len(list(bucket.list())), tmp_len)
 
@@ -3462,7 +3462,7 @@ class SecurityTokenTestCase(MockBotoTestCase):
         self.assertIn('security_token', iam_kwargs)
         self.assertEqual(iam_kwargs['security_token'], security_token)
 
-        runner.make_s3_conn()
+        runner.fs.make_s3_conn()
 
         self.assertTrue(self.mock_s3.called)
         s3_kwargs = self.mock_s3.call_args[1]

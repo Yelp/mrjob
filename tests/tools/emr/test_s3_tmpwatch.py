@@ -57,7 +57,7 @@ class S3TmpWatchTestCase(MockBotoTestCase):
                                           'data/bar': b'bar\n',
                                           'data/qux': b'qux\n'}})
 
-        s3_conn = runner.make_s3_conn()
+        s3_conn = runner.fs.make_s3_conn()
         bucket_name, key_name = parse_s3_uri(remote_input_path)
         bucket = s3_conn.get_bucket(bucket_name)
 

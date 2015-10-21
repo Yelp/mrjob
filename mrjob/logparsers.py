@@ -103,7 +103,7 @@ def _scan_for_input_uri(log_file_uri, runner):
     if log_file_uri.endswith('.gz'):
         syslog_uri += '.gz'
 
-    syslog_lines = runner.cat(syslog_uri)
+    syslog_lines = runner.fs.cat(syslog_uri)
     if syslog_lines:
         log.debug('scanning %s for input URI' % syslog_uri)
         return find_input_uri_for_mapper(syslog_lines)

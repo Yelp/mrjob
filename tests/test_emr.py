@@ -2762,19 +2762,19 @@ class TestCatFallback(MockBotoTestCase):
         runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp',
                               conf_paths=[])
 
-        self.assertEqual(list(runner.cat('s3://walrus/one')), [b'one_text'])
+        self.assertEqual(list(runner.fs.cat('s3://walrus/one')), [b'one_text'])
 
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_paths=[])
         self.prepare_runner_for_ssh(runner)
         mock_ssh_file('testmaster', 'etc/init.d', b'meow')
 
-        ssh_cat_gen = runner.cat(
+        ssh_cat_gen = runner.fs.cat(
             SSH_PREFIX + runner._address + '/etc/init.d')
         self.assertEqual(list(ssh_cat_gen)[0].rstrip(), b'meow')
         self.assertRaises(
             IOError, list,
-            runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
+            runner.fs.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
 
     def test_ssh_cat_errlog(self):
         # A file *containing* an error message shouldn't cause an error.
@@ -2784,7 +2784,7 @@ class TestCatFallback(MockBotoTestCase):
         error_message = b'cat: logs/err.log: No such file or directory\n'
         mock_ssh_file('testmaster', 'logs/err.log', error_message)
         self.assertEqual(
-            list(runner.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
+            list(runner.fs.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
             [error_message])
 
 

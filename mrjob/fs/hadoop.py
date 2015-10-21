@@ -36,10 +36,10 @@ _HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
 
 # used by ls() and path_exists()
 _HADOOP_LS_NO_SUCH_FILE = re.compile(
-    br'^lsr?: Cannot access .*: No such file or directory.')
+    br'^lsr?: Cannot access .*: No such file.*$')
 
 # used by rm() (see below)
-_HADOOP_RMR_NO_SUCH_FILE = re.compile(br'^rmr: hdfs://.*$')
+_HADOOP_RM_NO_SUCH_FILE = re.compile(br'^rmr?: .*No such file.*$')
 
 # find version string in "Hadoop 0.20.203" etc.
 _HADOOP_VERSION_RE = re.compile(br'^.*?(?P<version>(\d|\.)+).*?$')
@@ -274,7 +274,7 @@ class HadoopFilesystem(Filesystem):
             try:
                 self.invoke_hadoop(
                     ['fs', '-rmr', path_glob],
-                    return_stdout=True, ok_stderr=[_HADOOP_RMR_NO_SUCH_FILE])
+                    return_stdout=True, ok_stderr=[_HADOOP_RM_NO_SUCH_FILE])
             except CalledProcessError:
                 raise IOError("Could not rm %s" % path_glob)
 

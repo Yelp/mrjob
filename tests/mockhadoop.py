@@ -433,6 +433,7 @@ def hadoop_fs_rm(stdout, stderr, environ, *args):
             pass  # we don't emulate trash
         elif arg.startswith('-'):
             # don't know what the pre-YARN version of this, doesn't matter
+            # It's really '-rm', not 'rm'. Because it's about args?
             print('-rm: Illegal option %s' % arg, file=stderr)
             return -1
         else:

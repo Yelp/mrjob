@@ -93,7 +93,7 @@ def s3_cleanup(glob_path, time_old, dry_run=False, **runner_kwargs):
     log.info('Deleting all files in %s that are older than %s' %
              (glob_path, time_old))
 
-    for path in runner.ls(glob_path):
+    for path in runner.fs.ls(glob_path):
         bucket_name, key_name = parse_s3_uri(path)
         bucket = runner.fs.get_bucket(bucket_name)
 

@@ -16,7 +16,6 @@ import os.path
 import posixpath
 
 from mrjob.parse import is_uri
-from mrjob.py2 import urljoin
 
 log = logging.getLogger(__name__)
 

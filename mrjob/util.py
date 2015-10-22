@@ -666,7 +666,7 @@ def to_lines(chunks):
 
 
 def unique(items):
-    """Yield items from *item*, skipping duplicates."""
+    """Yield items from *item* in order, skipping duplicates."""
     seen = set()
 
     for item in items:

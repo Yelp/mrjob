@@ -16,6 +16,7 @@
 import os
 import os.path
 import random
+import stat
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from shutil import rmtree

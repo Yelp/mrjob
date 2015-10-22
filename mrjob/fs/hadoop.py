@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os.path
 import posixpath
 import re
 from io import BytesIO
@@ -27,6 +28,7 @@ from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+from mrjob.util import which
 
 
 log = logging.getLogger(__name__)
@@ -55,14 +57,68 @@ class HadoopFilesystem(Filesystem):
     as ``hadoop version`` (see :py:meth:`invoke_hadoop`).
     """
 
-    def __init__(self, hadoop_bin):
-        """:param hadoop_bin: path to ``hadoop`` binary"""
+    def __init__(self, hadoop_bin=None, hadoop_home=None):
+        """Create a Hadoop filesystem
+
+        :param hadoop_bin: ``hadoop`` binary, as a list of args
+        :param hadoop_home: Hint about where to find the Hadoop binary
+
+        hadoop_home is deprecated and will no longer be needed in v0.6.0.
+        """
         super(HadoopFilesystem, self).__init__()
         self._hadoop_bin = hadoop_bin
+        self._hadoop_home = hadoop_home
         self._hadoop_version = None  # cache for get_hadoop_version()
 
     def can_handle_path(self, path):
         return is_uri(path)
+
+    def get_hadoop_bin(self):
+        """Return the hadoop binary, searching for it if need be."""
+        if not self._hadoop_bin:
+            self._hadoop_bin = self._find_hadoop_bin()
+        return self._hadoop_bin
+
+    def _find_hadoop_bin(self):
+        """Look for the hadoop binary in any plausible place. If all
+        else fails, return ``['hadoop']``.
+        """
+        def yield_paths(self):
+            if self._hadoop_home:
+                yield self._hadoop_home
+
+            yield None  # use $PATH
+
+            for name in 'HADOOP_PREFIX', 'HADOOP_HOME', 'HADOOP_INSTALL':
+                path = os.environ.get(name)
+                if path:
+                    yield os.path.join(path, 'bin')
+
+            # They use $HADOOP_INSTALL/hadoop/bin here:
+            # https://wiki.apache.org/hadoop/GettingStartedWithHadoop
+            if os.environ.get('HADOOP_INSTALL'):
+                yield os.path.join(
+                    os.environ['HADOOP_INSTALL'], 'hadoop', 'bin')
+
+            # Maybe it's in $HADOOP_MAPRED_HOME? $HADOOP_YARN_HOME? Don't give
+            # up. Don't worry about duplicates
+            for name, path in sorted(os.environ.items()):
+                if name.startswith('HADOOP_') and name.endswith('_HOME'):
+                    yield os.path.join(path, 'bin')
+
+        for path in unique(yield_paths()):
+            if path in paths_tried:
+                continue
+
+            log.info('Looking for hadoop binary in %s' % (path or '$PATH'))
+
+            hadoop_bin = which('hadoop', path=path)
+
+            if hadoop_bin:
+                return [hadoop_bin]
+        else:
+            log.info("Falling back to 'hadoop'")
+            return ['hadoop']
 
     def get_hadoop_version(self):
         """Invoke the hadoop executable to determine its version"""
@@ -96,7 +152,7 @@ class HadoopFilesystem(Filesystem):
             than logging it. If this is False, we return the returncode
             instead.
         """
-        args = self._hadoop_bin + args
+        args = self.get_hadoop_bin() + args
 
         log.debug('> %s' % cmd_line(args))
 
@@ -205,7 +261,7 @@ class HadoopFilesystem(Filesystem):
 
     def _cat_file(self, filename):
         # stream from HDFS
-        cat_args = self._hadoop_bin + ['fs', '-cat', filename]
+        cat_args = self.get_hadoop_bin() + ['fs', '-cat', filename]
         log.debug('> %s' % cmd_line(cat_args))
 
         cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)

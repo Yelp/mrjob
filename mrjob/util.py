@@ -24,6 +24,7 @@ import os
 import pipes
 import random
 import shlex
+import shutil
 import sys
 import tarfile
 import zipfile
@@ -31,6 +32,7 @@ import zlib
 from collections import defaultdict
 from copy import deepcopy
 from datetime import timedelta
+from distutils.spawn import find_executable
 from logging import getLogger
 
 try:
@@ -663,6 +665,18 @@ def to_lines(chunks):
         yield b''.join(leftovers)
 
 
+def unique(items):
+    """Yield items from *item*, skipping duplicates."""
+    seen = set()
+
+    for item in items:
+        if item in seen:
+            continue
+        else:
+            yield item
+            seen.add(item)
+
+
 def unarchive(archive_path, dest):
     """Extract the contents of a tar or zip file at *archive_path* into the
     directory *dest*.
@@ -697,3 +711,17 @@ def unarchive(archive_path, dest):
                         dest_file.write(archive.read(name))
     else:
         raise IOError('Unknown archive type: %s' % (archive_path,))
+
+
+def which(cmd, path=None):
+    """Like the UNIX which command: search in *path* for the executable named
+    *cmd*. *path* defaults to :envvar:`PATH`.
+
+    This is basically ``shutil.which()`` (which was introduced in Python 3.3)
+    without the *mode* argument. Best practice is to always specify *path*
+    as a keyword argument.
+    """
+    if hasattr(shutil, 'which'):
+        return which(cmd, path=path)
+    else:
+        return find_executable(cmd, path=path)

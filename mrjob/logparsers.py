@@ -91,7 +91,7 @@ def _parse_task_attempts(fs, log_paths):
             }
 
 
-def _scan_for_input_uri(log_file_uri, runner):
+def _scan_for_input_uri(log_file_uri, fs):
     """Scan the syslog file corresponding to log_file_uri for
     information about the input file.
 
@@ -103,7 +103,7 @@ def _scan_for_input_uri(log_file_uri, runner):
     if log_file_uri.endswith('.gz'):
         syslog_uri += '.gz'
 
-    syslog_lines = runner.fs.cat(syslog_uri)
+    syslog_lines = fs.cat(syslog_uri)
     if syslog_lines:
         log.debug('scanning %s for input URI' % syslog_uri)
         return find_input_uri_for_mapper(syslog_lines)

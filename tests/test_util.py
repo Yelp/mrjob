@@ -635,10 +635,7 @@ class WhichTestCase(SandboxedTestCase):
     def setUp(self):
         super(WhichTestCase, self).setUp()
 
-        self.shekondar_path = self.makefile('shekondar', b'')
-        # mark it as executable
-        os.chmod(self.shekondar_path,
-                 os.stat(self.shekondar_path).st_mode | stat.S_IXUSR)
+        self.shekondar_path = self.makefile('shekondar', executable=True)
 
     def test_explicit_path(self):
         self.assertEqual(which('shekondar', path=self.tmp_dir),

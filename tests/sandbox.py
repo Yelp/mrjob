@@ -124,13 +124,17 @@ class SandboxedTestCase(EmptyMrjobConfTestCase):
             os.makedirs(abs_path)
         return abs_path
 
-    def makefile(self, path, contents):
+    def makefile(self, path, contents=b'', executable=False):
         self.makedirs(os.path.split(path)[0])
         abs_path = os.path.join(self.tmp_dir, path)
 
         mode = 'wb' if isinstance(contents, bytes) else 'w'
         with open(abs_path, mode) as f:
             f.write(contents)
+        if executable:
+            os.chmod(abs_path,
+                     os.stat(abs_path).st_mode | stat.S_IXUSR)
+
         return abs_path
 
     def abs_paths(self, *paths):

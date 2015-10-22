@@ -26,6 +26,7 @@ from io import BytesIO
 from subprocess import CalledProcessError
 
 from mrjob.conf import combine_dicts
+from mrjob.hadoop import HadoopJobRunner
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.parse import JOB_KEY_RE
@@ -930,3 +931,28 @@ class BootstrapMRJobTestCase(TestCase):
         runner = MRJobRunner(
             conf_paths=[], interpreter=['ruby'], bootstrap_mrjob=True)
         self.assertEqual(runner._bootstrap_mrjob(), True)
+
+
+class FSPassthroughTestCase(TestCase):
+
+    def test_passthrough(self):
+        runner = InlineMRJobRunner()
+
+        with no_handlers_for_logger('mrjob.runner'):
+            self.assertEqual(runner.ls, runner.fs.ls)
+            # no special rules for underscore methods
+            self.assertEqual(runner._cat_file, runner.fs._cat_file)
+
+    def test_prefer_own_methods(self):
+        # TODO: currently can't initialize HadoopRunner without setting these
+        runner = HadoopMRJobRunner(
+            hadoop_bin='hadoop',
+            hadoop_home='kansas',
+            hadoop_streaming_jar='streaming.jar')
+
+        with no_handlers_for_logger('mrjob.runner'):
+            self.assertEqual(runner.ls, runner.fs.ls)
+
+            # Hadoop Runner has its own version
+            self.assertNotEqual(runner.get_hadoop_version,
+                                runner.fs.get_hadoop_version)

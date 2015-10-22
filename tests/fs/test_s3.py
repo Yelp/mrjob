@@ -104,19 +104,19 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(self.fs.du('s3://walrus/data/foo'), 5)
         self.assertEqual(self.fs.du('s3://walrus/data/bar/baz'), 3)
 
-    def test_path_exists(self):
+    def test_exists(self):
         self.add_mock_s3_data({
             'walrus': {'data/foo': b'abcd'}})
-        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), True)
-        self.assertEqual(self.fs.path_exists('s3://walrus/data/bar'), False)
+        self.assertEqual(self.fs.exists('s3://walrus/data/foo'), True)
+        self.assertEqual(self.fs.exists('s3://walrus/data/bar'), False)
 
     def test_rm(self):
         self.add_mock_s3_data({
             'walrus': {'data/foo': b'abcd'}})
 
-        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), True)
+        self.assertEqual(self.fs.exists('s3://walrus/data/foo'), True)
         self.fs.rm('s3://walrus/data/foo')
-        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), False)
+        self.assertEqual(self.fs.exists('s3://walrus/data/foo'), False)
 
 
 class S3FSRegionTestCase(MockBotoTestCase):

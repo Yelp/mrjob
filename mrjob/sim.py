@@ -549,7 +549,7 @@ def _error_on_bad_paths(fs, paths):
     for path in paths:
         if path == '-':
             return
-        if fs.path_exists(path):
+        if fs.exists(path):
             return
 
     raise ValueError("At least one valid path is required. "

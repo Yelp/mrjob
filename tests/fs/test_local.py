@@ -91,25 +91,25 @@ class LocalFSTestCase(SandboxedTestCase):
 
     def test_path_exists_no(self):
         path = os.path.join(self.tmp_dir, 'f')
-        self.assertEqual(self.fs.path_exists(path), False)
+        self.assertEqual(self.fs.exists(path), False)
 
     def test_path_exists_yes(self):
         path = self.makefile('f', 'contents')
-        self.assertEqual(self.fs.path_exists(path), True)
+        self.assertEqual(self.fs.exists(path), True)
 
     def test_rm_file(self):
         path = self.makefile('f', 'contents')
-        self.assertEqual(self.fs.path_exists(path), True)
+        self.assertEqual(self.fs.exists(path), True)
 
         self.fs.rm(path)
-        self.assertEqual(self.fs.path_exists(path), False)
+        self.assertEqual(self.fs.exists(path), False)
 
     def test_rm_dir(self):
         path = self.makedirs('foobar')
-        self.assertEqual(self.fs.path_exists(path), True)
+        self.assertEqual(self.fs.exists(path), True)
 
         self.fs.rm(path)
-        self.assertEqual(self.fs.path_exists(path), False)
+        self.assertEqual(self.fs.exists(path), False)
 
     def test_touchz(self):
         path = os.path.join(self.tmp_dir, 'f')

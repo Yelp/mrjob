@@ -164,7 +164,7 @@ class S3Filesystem(Filesystem):
         """
         pass
 
-    def path_exists(self, path_glob):
+    def exists(self, path_glob):
         """Does the given path exist?
 
         If dest is a directory (ends with a "/"), we check if there are
@@ -177,7 +177,7 @@ class S3Filesystem(Filesystem):
             paths = []
         return any(paths)
 
-    def path_join(self, dirname, filename):
+    def join(self, dirname, filename):
         return posixpath.join(dirname, filename)
 
     def rm(self, path_glob):

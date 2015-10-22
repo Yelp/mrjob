@@ -1850,7 +1850,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertEqual(actions[2].name, 'master')
 
         # make sure master bootstrap script is on S3
-        self.assertTrue(runner.fs.path_exists(actions[2].scriptpath))
+        self.assertTrue(runner.fs.exists(actions[2].scriptpath))
 
     def test_bootstrap_mrjob_uses_python_bin(self):
         # use all the bootstrap options
@@ -1898,7 +1898,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertEqual(actions[1].name, 'master')
 
         # make sure master bootstrap script is on S3
-        self.assertTrue(runner.fs.path_exists(actions[1].scriptpath))
+        self.assertTrue(runner.fs.exists(actions[1].scriptpath))
 
 
 class EMRNoMapperTestCase(MockBotoTestCase):

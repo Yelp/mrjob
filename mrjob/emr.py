@@ -748,7 +748,7 @@ class EMRJobRunner(MRJobRunner):
                 if is_uri(path) and not is_s3_uri(path):
                     continue  # can't check non-S3 URIs, hope for the best
 
-                if not self.fs.path_exists(path):
+                if not self.fs.exists(path):
                     raise AssertionError(
                         'Input path %s does not exist!' % (path,))
 
@@ -757,7 +757,7 @@ class EMRJobRunner(MRJobRunner):
         provisioning a cluster only to have Hadoop refuse to launch.
         """
         try:
-            if self.fs.path_exists(self._output_dir):
+            if self.fs.exists(self._output_dir):
                 raise IOError(
                     'Output path %s already exists!' % (self._output_dir,))
         except boto.exception.S3ResponseError:

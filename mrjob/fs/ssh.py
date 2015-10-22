@@ -130,7 +130,7 @@ class SSHFilesystem(Filesystem):
     def mkdir(self, dest):
         raise IOError()  # not implemented
 
-    def path_exists(self, path_glob):
+    def exists(self, path_glob):
         # just fall back on ls(); it's smart
         paths = self.ls(path_glob)
         try:
@@ -139,7 +139,7 @@ class SSHFilesystem(Filesystem):
             path_exists = False
         return path_exists
 
-    def path_join(self, dirname, filename):
+    def join(self, dirname, filename):
         return posixpath.join(dirname, filename)
 
     def rm(self, path_glob):

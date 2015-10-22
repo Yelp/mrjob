@@ -48,10 +48,10 @@ class LocalFilesystem(Filesystem):
         if not os.path.isdir(path):
             os.makedirs(path)
 
-    def path_exists(self, path_glob):
+    def exists(self, path_glob):
         return bool(glob.glob(path_glob))
 
-    def path_join(self, dirname, filename):
+    def join(self, dirname, filename):
         """Join a directory name and filename."""
         return os.path.join(dirname, filename)
 

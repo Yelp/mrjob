@@ -139,10 +139,6 @@ class SSHFSTestCase(MockSubprocessTestCase):
         path = 'ssh://testmaster/f'
         self.assertEqual(self.fs.exists(path), True)
 
-    def test_join(self):
-        self.assertEqual(self.fs.join('ssh://testmaster', 'path'),
-                         'ssh://testmaster/path')
-
     def test_rm(self):
         self.make_master_file('f', 'contents')
         # not implemented

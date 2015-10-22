@@ -110,10 +110,6 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(self.fs.exists('s3://walrus/data/foo'), True)
         self.assertEqual(self.fs.exists('s3://walrus/data/bar'), False)
 
-    def test_join(self):
-        self.assertEqual(self.fs.join('s3://bucket', 'key'),
-                         's3://bucket/key')
-
     def test_rm(self):
         self.add_mock_s3_data({
             'walrus': {'data/foo': b'abcd'}})

@@ -89,11 +89,11 @@ class LocalFSTestCase(SandboxedTestCase):
         self.fs.mkdir(path)
         self.assertEqual(os.path.isdir(path), True)
 
-    def test_path_exists_no(self):
+    def test_exists_no(self):
         path = os.path.join(self.tmp_dir, 'f')
         self.assertEqual(self.fs.exists(path), False)
 
-    def test_path_exists_yes(self):
+    def test_exists_yes(self):
         path = self.makefile('f', 'contents')
         self.assertEqual(self.fs.exists(path), True)
 

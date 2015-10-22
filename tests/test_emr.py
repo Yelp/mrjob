@@ -2907,8 +2907,6 @@ class JobWaitTestCase(MockBotoTestCase):
                 self.mock_cluster_ids.append(cluster_id)
 
         self.start(patch.object(EMRJobRunner, 'make_emr_conn'))
-        self.start(patch.object(S3Filesystem, 'make_s3_conn',
-                                side_effect=self.connect_s3))
         self.start(patch.object(EMRJobRunner, '_usable_clusters',
                                 side_effect=side_effect_usable_clusters))
         self.start(patch.object(EMRJobRunner, '_lock_uri',

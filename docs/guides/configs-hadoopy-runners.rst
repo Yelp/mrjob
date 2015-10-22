@@ -131,9 +131,13 @@ Options available to hadoop runner only
     :switch: --hadoop-home
     :type: :ref:`path <data-type-path>`
     :set: hadoop
-    :default: :envvar:`HADOOP_HOME`
+    :default: ``None``
 
-    Alternative to setting the :envvar:`HADOOP_HOME` environment variable.
+    Hint about where to find the hadoop binary and streaming jar. Instead, just
+    set :mrjob:opt:`hadoop_bin` and/or :mrjob:opt:`hadoop_streaming_jar` as
+    needed.
+
+    .. deprecated: 0.5.0
 
 .. mrjob-opt::
     :config: hadoop_tmp_dir

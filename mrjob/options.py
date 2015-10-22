@@ -260,12 +260,14 @@ def add_hadoop_opts(opt_group):
     return [
         opt_group.add_option(
             '--hadoop-bin', dest='hadoop_bin', default=None,
-            help='hadoop binary. Defaults to $HADOOP_HOME/bin/hadoop'),
+            help='path to hadoop binary'),
 
         opt_group.add_option(
             '--hadoop-home', dest='hadoop_home',
             default=None,
-            help='Alternative to setting $HADOOP_HOME'),
+            help='Deprecated hint about where to find hadoop binary and'
+                 ' streaming jar. Just set $HADOOP_HOME or use the'
+                 ' --hadoop-bin and --hadoop-streaming-jar switches.'),
 
         opt_group.add_option(
             '--hadoop-tmp-dir', dest='hdfs_tmp_dir',

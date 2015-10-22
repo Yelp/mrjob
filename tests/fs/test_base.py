@@ -16,7 +16,9 @@ import posixpath
 
 from mrjob.fs.base import Filesystem
 
+from tests.py2 import TestCase
 from tests.py2 import patch
+from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 
 
@@ -52,3 +54,24 @@ class JoinTestCase(SandboxedTestCase):
 
         self.assertFalse(os.path.join.called)
         self.assertFalse(posixpath.join.called)
+
+
+class DeprecatedAliasesTestCase(TestCase):
+
+    def test_path_exists(self):
+        fs = Filesystem()
+
+        with patch.object(fs, 'exists'):
+            with no_handlers_for_logger('mrjob.fs.base'):
+                fs.path_exists('foo')
+
+            fs.exists.assert_called_once_with('foo')
+
+    def test_path_join(self):
+        fs = Filesystem()
+
+        with patch.object(fs, 'join'):
+            with no_handlers_for_logger('mrjob.fs.base'):
+                fs.path_join('foo', 'bar')
+
+            fs.join.assert_called_once_with('foo', 'bar')

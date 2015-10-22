@@ -144,6 +144,8 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_join(self):
         self.assertEqual(self.fs.join('hdfs://host', 'path'),
                          'hdfs://host/path')
+        self.assertEqual(self.fs.join('hdfs://host', 'hdfs://host2/path'),
+                         'hdfs://host2/path')
 
     def test_rm(self):
         local_path = self.make_mock_file('f')

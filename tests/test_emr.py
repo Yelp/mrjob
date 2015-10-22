@@ -1628,36 +1628,6 @@ class TestEMREndpoints(MockBotoTestCase):
                          'elasticmapreduce.us-west-1.amazonaws.com')
 
 
-class TestS3Ls(MockBotoTestCase):
-
-    def test_s3_ls(self):
-        self.add_mock_s3_data(
-            {'walrus': {'one': b'', 'two': b'', 'three': b''}})
-
-        runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp',
-                              conf_paths=[])
-
-        self.assertEqual(set(runner._s3_ls('s3://walrus/')),
-                         set(['s3://walrus/one',
-                              's3://walrus/two',
-                              's3://walrus/three',
-                              ]))
-
-        self.assertEqual(set(runner._s3_ls('s3://walrus/t')),
-                         set(['s3://walrus/two',
-                              's3://walrus/three',
-                              ]))
-
-        self.assertEqual(set(runner._s3_ls('s3://walrus/t/')),
-                         set([]))
-
-        # if we ask for a nonexistent bucket, we should get some sort
-        # of exception (in practice, buckets with random names will
-        # probably be owned by other people, and we'll get some sort
-        # of permissions error)
-        self.assertRaises(Exception, set, runner._s3_ls('s3://lolcat/'))
-
-
 class TestSSHLs(MockBotoTestCase):
 
     def setUp(self):

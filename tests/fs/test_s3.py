@@ -164,3 +164,32 @@ class S3FSRegionTestCase(MockBotoTestCase):
         # can't access this bucket from wrong endpoint!
         self.assertRaises(boto.exception.S3ResponseError,
                           fs.get_bucket, 'walrus-west')
+
+
+class TestS3Ls(MockBotoTestCase):
+
+    def test_s3_ls(self):
+        self.add_mock_s3_data(
+            {'walrus': {'one': b'', 'two': b'', 'three': b''}})
+
+        fs = S3Filesystem()
+
+        self.assertEqual(set(fs._s3_ls('s3://walrus/')),
+                         set(['s3://walrus/one',
+                              's3://walrus/two',
+                              's3://walrus/three',
+                              ]))
+
+        self.assertEqual(set(fs._s3_ls('s3://walrus/t')),
+                         set(['s3://walrus/two',
+                              's3://walrus/three',
+                              ]))
+
+        self.assertEqual(set(fs._s3_ls('s3://walrus/t/')),
+                         set([]))
+
+        # if we ask for a nonexistent bucket, we should get some sort
+        # of exception (in practice, buckets with random names will
+        # probably be owned by other people, and we'll get some sort
+        # of permissions error)
+        self.assertRaises(Exception, set, fs._s3_ls('s3://lolcat/'))

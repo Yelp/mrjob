@@ -25,6 +25,8 @@ from tests.sandbox import SandboxedTestCase
 class JoinTestCase(SandboxedTestCase):
 
     def setUp(self):
+        super(JoinTestCase, self).setUp()
+
         # os.path.join() and posixpath.join() do the same thing in
         # UNIX and OS X, so track which one we called
         self.start(patch('os.path.join', wraps=os.path.join))

@@ -945,7 +945,7 @@ class FSPassthroughTestCase(TestCase):
 
     def test_prefer_own_methods(self):
         # TODO: currently can't initialize HadoopRunner without setting these
-        runner = HadoopMRJobRunner(
+        runner = HadoopJobRunner(
             hadoop_bin='hadoop',
             hadoop_home='kansas',
             hadoop_streaming_jar='streaming.jar')

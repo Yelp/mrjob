@@ -51,10 +51,6 @@ class LocalFilesystem(Filesystem):
     def exists(self, path_glob):
         return bool(glob.glob(path_glob))
 
-    def join(self, dirname, filename):
-        """Join a directory name and filename."""
-        return os.path.join(dirname, filename)
-
     def rm(self, path_glob):
         for path in glob.glob(path_glob):
             if os.path.isdir(path):

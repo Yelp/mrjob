@@ -177,9 +177,6 @@ class S3Filesystem(Filesystem):
             paths = []
         return any(paths)
 
-    def join(self, dirname, filename):
-        return posixpath.join(dirname, filename)
-
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
         for uri in self.ls(path_glob):

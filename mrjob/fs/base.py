@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os.path
 
+from mrjob.parse import is_uri
+from mrjob.py2 import urljoin
 
 log = logging.getLogger(__name__)
 
@@ -73,7 +76,10 @@ class Filesystem(object):
 
     def join(self, dirname, filename):
         """Join *filename* onto *dirname* (which may be a URI)"""
-        raise NotImplementedError
+        if is_uri(dirname) or is_uri(filename):
+            return urljoin(dirname, filename)
+        else:
+            return os.path.join(dirname, filename)
 
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already

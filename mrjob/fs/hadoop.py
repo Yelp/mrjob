@@ -255,9 +255,6 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not check path %s" % path_glob)
 
-    def join(self, dirname, filename):
-        return posixpath.join(dirname, filename)
-
     def _put(self, local_path, target):
         # used by HadoopMRJobRunner._upload_to_hdfs()
 

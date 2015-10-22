@@ -137,9 +137,6 @@ class SSHFilesystem(Filesystem):
         except IOError:
             return False
 
-    def join(self, dirname, filename):
-        return posixpath.join(dirname, filename)
-
     def rm(self, path_glob):
         raise IOError()  # not implemented
 

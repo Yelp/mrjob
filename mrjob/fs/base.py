@@ -1,4 +1,4 @@
-# Copyright 2009-2012 Yelp and Contributors
+# Copyright 2009-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,7 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import os.path
+import posixpath
 
+from mrjob.parse import is_uri
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +67,22 @@ class Filesystem(object):
     def _cat_file(self, path):
         raise NotImplementedError
 
+    def exists(self, path_glob):
+        """Does the given path/URI exist?
+
+        Corresponds roughly to: ``hadoop fs -test -e path_glob``
+        """
+        raise NotImplementedError
+
+    def join(self, dirname, filename):
+        """Join *filename* onto *dirname* (which may be a URI)"""
+        if is_uri(filename):
+            return filename
+        elif is_uri(dirname):
+            return posixpath.join(dirname, filename)
+        else:
+            return os.path.join(dirname, filename)
+
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already
         exist).
@@ -73,14 +92,22 @@ class Filesystem(object):
         raise NotImplementedError
 
     def path_exists(self, path_glob):
-        """Does the given path exist?
+        """Alias for :py:meth:`exists`. Going away in v0.6.0
 
-        Corresponds roughly to: ``hadoop fs -test -e path_glob``
+        .. deprecated: 0.5.0
         """
-        raise NotImplementedError
+        log.warning('path_exists() has been renamed to exists(). This'
+                    ' alias will be removed in v0.6.0')
+        return self.exists(path_glob)
 
     def path_join(self, dirname, filename):
-        raise NotImplementedError
+        """Alias for :py:meth:`join`. Going away in v0.6.0
+
+        .. deprecated: 0.5.0
+        """
+        log.warning('path_join() has been renamed to join(). This'
+                    ' alias will be removed in v0.6.0')
+        return self.join(dirname, filename)
 
     def rm(self, path_glob):
         """Recursively delete the given file/directory, if it exists

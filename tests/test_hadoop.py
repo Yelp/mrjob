@@ -203,7 +203,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             local_tmp_dir = runner._get_local_tmp_dir()
             # make sure cleanup hasn't happened yet
             assert os.path.exists(local_tmp_dir)
-            assert any(runner.ls(runner.get_output_dir()))
+            assert any(runner.fs.ls(runner.get_output_dir()))
 
             # make sure we're writing to the correct path in HDFS
             hdfs_root = os.environ['MOCK_HDFS_ROOT']
@@ -265,7 +265,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
-        assert not any(runner.ls(runner.get_output_dir()))
+        assert not any(runner.fs.ls(runner.get_output_dir()))
 
     def test_end_to_end(self):
         self._test_end_to_end()

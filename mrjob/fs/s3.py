@@ -164,7 +164,7 @@ class S3Filesystem(Filesystem):
         """
         pass
 
-    def path_exists(self, path_glob):
+    def exists(self, path_glob):
         """Does the given path exist?
 
         If dest is a directory (ends with a "/"), we check if there are
@@ -176,9 +176,6 @@ class S3Filesystem(Filesystem):
         except boto.exception.S3ResponseError:
             paths = []
         return any(paths)
-
-    def path_join(self, dirname, filename):
-        return posixpath.join(dirname, filename)
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
@@ -286,3 +283,12 @@ class S3Filesystem(Filesystem):
         bucket = self.get_bucket(bucket_name)
         for key in bucket.list(key_prefix):
             yield key
+
+    def get_all_buckets(self):
+        """Get a stream of all buckets owned by this user on S3."""
+        return self.make_s3_conn().get_all_buckets()
+
+    def create_bucket(self, bucket_name, location=''):
+        """Create a bucket on S3, optionally setting location constraint."""
+        return self.make_s3_conn().create_bucket(
+            bucket_name, location=location)

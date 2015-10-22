@@ -633,7 +633,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _set_s3_tmp_dir(self):
         """Helper for _fix_s3_tmp_and_log_uri_opts"""
-        buckets = self.fs.make_s3_conn().get_all_buckets()
+        buckets = self.fs.get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
         # Loop over buckets until we find one that is not region-
@@ -669,7 +669,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _set_s3_job_log_uri(self, cluster):
         """Given a job flow description, set self._s3_job_log_uri. This allows
-        us to call self.ls(), etc. without running the job.
+        us to call self.fs.ls(), etc. without running the job.
         """
         log_uri = getattr(cluster, 'loguri', '')
         if log_uri:
@@ -679,12 +679,11 @@ class EMRJobRunner(MRJobRunner):
     def _create_s3_tmp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
         if self._s3_tmp_bucket_to_create:
-            s3_conn = self.make_s3_conn()
             log.info('creating S3 bucket %r to use as temp space' %
                      self._s3_tmp_bucket_to_create)
             location = s3_location_constraint_for_region(
                 self._opts['aws_region'])
-            s3_conn.create_bucket(
+            self.fs.create_bucket(
                 self._s3_tmp_bucket_to_create, location=location)
             self._s3_tmp_bucket_to_create = None
 
@@ -749,7 +748,7 @@ class EMRJobRunner(MRJobRunner):
                 if is_uri(path) and not is_s3_uri(path):
                     continue  # can't check non-S3 URIs, hope for the best
 
-                if not self.path_exists(path):
+                if not self.fs.exists(path):
                     raise AssertionError(
                         'Input path %s does not exist!' % (path,))
 
@@ -758,7 +757,7 @@ class EMRJobRunner(MRJobRunner):
         provisioning a cluster only to have Hadoop refuse to launch.
         """
         try:
-            if self.fs.path_exists(self._output_dir):
+            if self.fs.exists(self._output_dir):
                 raise IOError(
                     'Output path %s already exists!' % (self._output_dir,))
         except boto.exception.S3ResponseError:
@@ -1034,7 +1033,7 @@ class EMRJobRunner(MRJobRunner):
         if self._s3_tmp_dir:
             try:
                 log.info('Removing all files in %s' % self._s3_tmp_dir)
-                self.rm(self._s3_tmp_dir)
+                self.fs.rm(self._s3_tmp_dir)
                 self._s3_tmp_dir = None
             except Exception as e:
                 log.exception(e)
@@ -1048,7 +1047,7 @@ class EMRJobRunner(MRJobRunner):
                 and not self._opts['pool_emr_job_flows']:
             try:
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
-                self.rm(self._s3_job_log_uri)
+                self.fs.rm(self._s3_job_log_uri)
                 self._s3_job_log_uri = None
             except Exception as e:
                 log.exception(e)
@@ -2309,7 +2308,7 @@ class EMRJobRunner(MRJobRunner):
             # guarantee the ordering of dicts -- they can vary
             # depending on insertion/deletion order.
             sorted(
-                (name, self.md5sum(path)) for name, path
+                (name, self.fs.md5sum(path)) for name, path
                 in self._bootstrap_dir_mgr.name_to_path('file').items()
                 if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
@@ -2469,8 +2468,8 @@ class EMRJobRunner(MRJobRunner):
         log.debug('creating IAM connection to %s' % host)
 
         raw_iam_conn = boto.connect_iam(
-            aws_access_key_id=self._aws_access_key_id,
-            aws_secret_access_key=self._aws_secret_access_key,
+            aws_access_key_id=self._opts['aws_access_key_id'],
+            aws_secret_access_key=self._opts['aws_secret_access_key'],
             host=host,
             security_token=self._opts['aws_security_token'])
 

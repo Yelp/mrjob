@@ -146,7 +146,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             local_tmp_dir = runner._get_local_tmp_dir()
             # make sure cleanup hasn't happened yet
             self.assertTrue(os.path.exists(local_tmp_dir))
-            self.assertTrue(any(runner.ls(runner.get_output_dir())))
+            self.assertTrue(any(runner.fs.ls(runner.get_output_dir())))
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster.status.state, 'TERMINATED')
@@ -187,7 +187,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
         # make sure cleanup happens
         self.assertFalse(os.path.exists(local_tmp_dir))
-        self.assertFalse(any(runner.ls(runner.get_output_dir())))
+        self.assertFalse(any(runner.fs.ls(runner.get_output_dir())))
 
         # job should get terminated
         emr_conn = runner.make_emr_conn()
@@ -254,7 +254,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
             list(runner.stream_output())
 
-        conn = runner.make_s3_conn()
+        conn = runner.fs.make_s3_conn()
         bucket = conn.get_bucket(tmp_bucket)
         self.assertEqual(len(list(bucket.list())), tmp_len)
 
@@ -1628,36 +1628,6 @@ class TestEMREndpoints(MockBotoTestCase):
                          'elasticmapreduce.us-west-1.amazonaws.com')
 
 
-class TestS3Ls(MockBotoTestCase):
-
-    def test_s3_ls(self):
-        self.add_mock_s3_data(
-            {'walrus': {'one': b'', 'two': b'', 'three': b''}})
-
-        runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp',
-                              conf_paths=[])
-
-        self.assertEqual(set(runner._s3_ls('s3://walrus/')),
-                         set(['s3://walrus/one',
-                              's3://walrus/two',
-                              's3://walrus/three',
-                              ]))
-
-        self.assertEqual(set(runner._s3_ls('s3://walrus/t')),
-                         set(['s3://walrus/two',
-                              's3://walrus/three',
-                              ]))
-
-        self.assertEqual(set(runner._s3_ls('s3://walrus/t/')),
-                         set([]))
-
-        # if we ask for a nonexistent bucket, we should get some sort
-        # of exception (in practice, buckets with random names will
-        # probably be owned by other people, and we'll get some sort
-        # of permissions error)
-        self.assertRaises(Exception, set, runner._s3_ls('s3://lolcat/'))
-
-
 class TestSSHLs(MockBotoTestCase):
 
     def setUp(self):
@@ -1682,16 +1652,16 @@ class TestSSHLs(MockBotoTestCase):
                       posixpath.join('test', 'three'), b'')
 
         self.assertEqual(
-            sorted(self.runner.ls('ssh://testmaster/test')),
+            sorted(self.runner.fs.ls('ssh://testmaster/test')),
             ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
 
         self.assertEqual(
-            list(self.runner.ls('ssh://testmaster!testslave0/test')),
+            list(self.runner.fs.ls('ssh://testmaster!testslave0/test')),
             ['ssh://testmaster!testslave0/test/three'])
 
         # ls() is a generator, so the exception won't fire until we list() it
         self.assertRaises(IOError, list,
-                          self.runner.ls('ssh://testmaster/does_not_exist'))
+                          self.runner.fs.ls('ssh://testmaster/does_not_exist'))
 
 
 class TestNoBoto(TestCase):
@@ -1880,7 +1850,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertEqual(actions[2].name, 'master')
 
         # make sure master bootstrap script is on S3
-        self.assertTrue(runner.path_exists(actions[2].scriptpath))
+        self.assertTrue(runner.fs.exists(actions[2].scriptpath))
 
     def test_bootstrap_mrjob_uses_python_bin(self):
         # use all the bootstrap options
@@ -1928,7 +1898,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertEqual(actions[1].name, 'master')
 
         # make sure master bootstrap script is on S3
-        self.assertTrue(runner.path_exists(actions[1].scriptpath))
+        self.assertTrue(runner.fs.exists(actions[1].scriptpath))
 
 
 class EMRNoMapperTestCase(MockBotoTestCase):
@@ -2762,19 +2732,19 @@ class TestCatFallback(MockBotoTestCase):
         runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp',
                               conf_paths=[])
 
-        self.assertEqual(list(runner.cat('s3://walrus/one')), [b'one_text'])
+        self.assertEqual(list(runner.fs.cat('s3://walrus/one')), [b'one_text'])
 
     def test_ssh_cat(self):
         runner = EMRJobRunner(conf_paths=[])
         self.prepare_runner_for_ssh(runner)
         mock_ssh_file('testmaster', 'etc/init.d', b'meow')
 
-        ssh_cat_gen = runner.cat(
+        ssh_cat_gen = runner.fs.cat(
             SSH_PREFIX + runner._address + '/etc/init.d')
         self.assertEqual(list(ssh_cat_gen)[0].rstrip(), b'meow')
         self.assertRaises(
             IOError, list,
-            runner.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
+            runner.fs.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
 
     def test_ssh_cat_errlog(self):
         # A file *containing* an error message shouldn't cause an error.
@@ -2784,7 +2754,7 @@ class TestCatFallback(MockBotoTestCase):
         error_message = b'cat: logs/err.log: No such file or directory\n'
         mock_ssh_file('testmaster', 'logs/err.log', error_message)
         self.assertEqual(
-            list(runner.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
+            list(runner.fs.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
             [error_message])
 
 
@@ -2937,8 +2907,6 @@ class JobWaitTestCase(MockBotoTestCase):
                 self.mock_cluster_ids.append(cluster_id)
 
         self.start(patch.object(EMRJobRunner, 'make_emr_conn'))
-        self.start(patch.object(S3Filesystem, 'make_s3_conn',
-                                side_effect=self.connect_s3))
         self.start(patch.object(EMRJobRunner, '_usable_clusters',
                                 side_effect=side_effect_usable_clusters))
         self.start(patch.object(EMRJobRunner, '_lock_uri',
@@ -3237,7 +3205,7 @@ class JarStepTestCase(MockBotoTestCase):
 
             self.assertIn(fake_jar, runner._upload_mgr.path_to_uri())
             jar_uri = runner._upload_mgr.uri(fake_jar)
-            self.assertTrue(runner.ls(jar_uri))
+            self.assertTrue(runner.fs.ls(jar_uri))
 
             emr_conn = runner.make_emr_conn()
             steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
@@ -3376,7 +3344,7 @@ class MultiPartUploadTestCase(MockBotoTestCase):
         with patch.object(runner, '_upload_parts', wraps=runner._upload_parts):
             self.upload_data(runner, data)
 
-            s3_key = runner.get_s3_key(self.TEST_S3_URI)
+            s3_key = runner.fs.get_s3_key(self.TEST_S3_URI)
             self.assertEqual(s3_key.get_contents_as_string(), data)
             self.assertEqual(runner._upload_parts.called, expect_multipart)
 
@@ -3431,7 +3399,7 @@ class MultiPartUploadTestCase(MockBotoTestCase):
         with patch.object(runner, '_upload_parts', side_effect=IOError):
             self.assertRaises(IOError, self.upload_data, runner, data)
 
-            s3_key = runner.get_s3_key(self.TEST_S3_URI)
+            s3_key = runner.fs.get_s3_key(self.TEST_S3_URI)
             self.assertTrue(s3_key.mock_multipart_upload_was_cancelled())
 
 
@@ -3462,7 +3430,7 @@ class SecurityTokenTestCase(MockBotoTestCase):
         self.assertIn('security_token', iam_kwargs)
         self.assertEqual(iam_kwargs['security_token'], security_token)
 
-        runner.make_s3_conn()
+        runner.fs.make_s3_conn()
 
         self.assertTrue(self.mock_s3.called)
         s3_kwargs = self.mock_s3.call_args[1]

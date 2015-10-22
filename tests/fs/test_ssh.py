@@ -84,7 +84,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
     def test_cat_uncompressed(self):
         self.make_master_file(os.path.join('data', 'foo'), 'foo\nfoo\n')
-        remote_path = self.fs.path_join('ssh://testmaster/data', 'foo')
+        remote_path = self.fs.join('ssh://testmaster/data', 'foo')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          [b'foo\n', b'foo\n'])
@@ -92,7 +92,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
     def test_cat_bz2(self):
         self.make_master_file(os.path.join('data', 'foo.bz2'),
                               bz2.compress(b'foo\n' * 1000))
-        remote_path = self.fs.path_join('ssh://testmaster/data', 'foo.bz2')
+        remote_path = self.fs.join('ssh://testmaster/data', 'foo.bz2')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          [b'foo\n'] * 1000)
@@ -100,7 +100,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
     def test_cat_gz(self):
         self.make_master_file(os.path.join('data', 'foo.gz'),
                               gzip_compress(b'foo\n' * 10000))
-        remote_path = self.fs.path_join('ssh://testmaster/data', 'foo.gz')
+        remote_path = self.fs.join('ssh://testmaster/data', 'foo.gz')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          [b'foo\n'] * 10000)
@@ -130,14 +130,14 @@ class SSHFSTestCase(MockSubprocessTestCase):
         # not implemented
         self.assertRaises(IOError, self.fs.mkdir, 'ssh://testmaster/d')
 
-    def test_path_exists_no(self):
+    def test_exists_no(self):
         path = 'ssh://testmaster/f'
-        self.assertEqual(self.fs.path_exists(path), False)
+        self.assertEqual(self.fs.exists(path), False)
 
-    def test_path_exists_yes(self):
+    def test_exists_yes(self):
         self.make_master_file('f', 'contents')
         path = 'ssh://testmaster/f'
-        self.assertEqual(self.fs.path_exists(path), True)
+        self.assertEqual(self.fs.exists(path), True)
 
     def test_rm(self):
         self.make_master_file('f', 'contents')

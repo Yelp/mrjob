@@ -130,17 +130,12 @@ class SSHFilesystem(Filesystem):
     def mkdir(self, dest):
         raise IOError()  # not implemented
 
-    def path_exists(self, path_glob):
+    def exists(self, path_glob):
         # just fall back on ls(); it's smart
-        paths = self.ls(path_glob)
         try:
-            path_exists = any(paths)
+            return any(self.ls(path_glob))
         except IOError:
-            path_exists = False
-        return path_exists
-
-    def path_join(self, dirname, filename):
-        return posixpath.join(dirname, filename)
+            return False
 
     def rm(self, path_glob):
         raise IOError()  # not implemented

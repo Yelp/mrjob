@@ -94,7 +94,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_cat_uncompressed(self):
         self.make_mock_file('data/foo', 'foo\nfoo\n')
 
-        remote_path = self.fs.path_join('hdfs:///data', 'foo')
+        remote_path = self.fs.join('hdfs:///data', 'foo')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          [b'foo\n', b'foo\n'])
@@ -102,7 +102,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_cat_bz2(self):
         self.make_mock_file('data/foo.bz2', bz2.compress(b'foo\n' * 1000))
 
-        remote_path = self.fs.path_join('hdfs:///data', 'foo.bz2')
+        remote_path = self.fs.join('hdfs:///data', 'foo.bz2')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          [b'foo\n'] * 1000)
@@ -110,7 +110,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
     def test_cat_gz(self):
         self.make_mock_file('data/foo.gz', gzip_compress(b'foo\n' * 10000))
 
-        remote_path = self.fs.path_join('hdfs:///data', 'foo.gz')
+        remote_path = self.fs.join('hdfs:///data', 'foo.gz')
 
         self.assertEqual(list(self.fs._cat_file(remote_path)),
                          [b'foo\n'] * 10000)
@@ -132,14 +132,14 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         local_path = os.path.join(self.tmp_dir, 'mock_hdfs_root', 'd', 'ave')
         self.assertEqual(os.path.isdir(local_path), True)
 
-    def test_path_exists_no(self):
+    def test_exists_no(self):
         path = 'hdfs:///f'
-        self.assertEqual(self.fs.path_exists(path), False)
+        self.assertEqual(self.fs.exists(path), False)
 
-    def test_path_exists_yes(self):
+    def test_exists_yes(self):
         self.make_mock_file('f')
         path = 'hdfs:///f'
-        self.assertEqual(self.fs.path_exists(path), True)
+        self.assertEqual(self.fs.exists(path), True)
 
     def test_rm(self):
         local_path = self.make_mock_file('f')

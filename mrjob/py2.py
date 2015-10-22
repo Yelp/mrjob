@@ -131,24 +131,25 @@ else:
     from io import StringIO
 StringIO  # quiet, pyflakes
 
-# urlparse() (in most cases you should use ``mrjob.parse.urlparse()``)
+# urllib stuff
+# in most cases you should use ``mrjob.parse.urlparse()``
 if PY2:
+    from urlparse import ParseResult
     from urllib import quote
     from urllib import unquote
     from urllib2 import urlopen
     from urlparse import urlparse
-    from urlparse import ParseResult
 else:
+    from urllib.parse import ParseResult
     from urllib.parse import quote
     from urllib.parse import unquote
     from urllib.request import urlopen
     from urllib.parse import urlparse
-    from urllib.parse import ParseResult
+ParseResult
 quote
 unquote
 urlopen
 urlparse
-ParseResult
 
 
 def to_string(s):

@@ -34,7 +34,7 @@ log = logging.getLogger(__name__)
 # used by mkdir()
 _HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
 
-# used by ls() and path_exists()
+# used by ls() and exists()
 _HADOOP_LS_NO_SUCH_FILE = re.compile(
     br'^lsr?: Cannot access .*: No such file.*$')
 
@@ -239,7 +239,7 @@ class HadoopFilesystem(Filesystem):
         except CalledProcessError:
             raise IOError("Could not mkdir %s" % path)
 
-    def path_exists(self, path_glob):
+    def exists(self, path_glob):
         """Does the given path exist?
 
         If dest is a directory (ends with a "/"), we check if there are
@@ -254,9 +254,6 @@ class HadoopFilesystem(Filesystem):
             return (return_code == 0)
         except CalledProcessError:
             raise IOError("Could not check path %s" % path_glob)
-
-    def path_join(self, dirname, filename):
-        return posixpath.join(dirname, filename)
 
     def _put(self, local_path, target):
         # used by HadoopMRJobRunner._upload_to_hdfs()

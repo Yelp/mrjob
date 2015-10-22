@@ -26,6 +26,8 @@ import re
 import shutil
 import sys
 import tempfile
+from inspect import isfunction
+from inspect import ismethod
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
@@ -429,9 +431,23 @@ class MRJobRunner(object):
     def __getattr__(self, name):
         # For backward compatibility, forward filesystem methods
         try:
-            return getattr(self.fs, name)
+            value = getattr(self.fs, name)
         except AttributeError:
             raise AttributeError(name)
+
+        # friendly deprecation warning
+        is_func = ismethod(value) or isfunction(value)
+        log.warning(
+            'deprecated: %s %s.fs.%s%s directly'
+            ' (%s.%s is going away in v0.6.0)' % (
+                'call' if is_func else 'access',
+                self.__class__.__name__,
+                name,
+                '()' if is_func else '',
+                self.__class__.__name__,
+                name))
+
+        return value
 
     ### Running the job and parsing output ###
 
@@ -476,10 +492,10 @@ class MRJobRunner(object):
 
                 path = base
 
-        for filename in self.ls(output_dir):
+        for filename in self.fs.ls(output_dir):
             subpath = filename[len(output_dir):]
             if not any(name.startswith('_') for name in split_path(subpath)):
-                for line in self._cat_file(filename):
+                for line in self.fs._cat_file(filename):
                     yield line
 
     def _cleanup_mode(self, mode=None):

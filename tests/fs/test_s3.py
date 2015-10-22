@@ -104,19 +104,19 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(self.fs.du('s3://walrus/data/foo'), 5)
         self.assertEqual(self.fs.du('s3://walrus/data/bar/baz'), 3)
 
-    def test_path_exists(self):
+    def test_exists(self):
         self.add_mock_s3_data({
             'walrus': {'data/foo': b'abcd'}})
-        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), True)
-        self.assertEqual(self.fs.path_exists('s3://walrus/data/bar'), False)
+        self.assertEqual(self.fs.exists('s3://walrus/data/foo'), True)
+        self.assertEqual(self.fs.exists('s3://walrus/data/bar'), False)
 
     def test_rm(self):
         self.add_mock_s3_data({
             'walrus': {'data/foo': b'abcd'}})
 
-        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), True)
+        self.assertEqual(self.fs.exists('s3://walrus/data/foo'), True)
         self.fs.rm('s3://walrus/data/foo')
-        self.assertEqual(self.fs.path_exists('s3://walrus/data/foo'), False)
+        self.assertEqual(self.fs.exists('s3://walrus/data/foo'), False)
 
 
 class S3FSRegionTestCase(MockBotoTestCase):
@@ -164,3 +164,32 @@ class S3FSRegionTestCase(MockBotoTestCase):
         # can't access this bucket from wrong endpoint!
         self.assertRaises(boto.exception.S3ResponseError,
                           fs.get_bucket, 'walrus-west')
+
+
+class TestS3Ls(MockBotoTestCase):
+
+    def test_s3_ls(self):
+        self.add_mock_s3_data(
+            {'walrus': {'one': b'', 'two': b'', 'three': b''}})
+
+        fs = S3Filesystem()
+
+        self.assertEqual(set(fs._s3_ls('s3://walrus/')),
+                         set(['s3://walrus/one',
+                              's3://walrus/two',
+                              's3://walrus/three',
+                              ]))
+
+        self.assertEqual(set(fs._s3_ls('s3://walrus/t')),
+                         set(['s3://walrus/two',
+                              's3://walrus/three',
+                              ]))
+
+        self.assertEqual(set(fs._s3_ls('s3://walrus/t/')),
+                         set([]))
+
+        # if we ask for a nonexistent bucket, we should get some sort
+        # of exception (in practice, buckets with random names will
+        # probably be owned by other people, and we'll get some sort
+        # of permissions error)
+        self.assertRaises(Exception, set, fs._s3_ls('s3://lolcat/'))

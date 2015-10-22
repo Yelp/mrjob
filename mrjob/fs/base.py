@@ -13,6 +13,7 @@
 # limitations under the License.
 import logging
 import os.path
+import posixpath
 
 from mrjob.parse import is_uri
 from mrjob.py2 import urljoin
@@ -76,8 +77,10 @@ class Filesystem(object):
 
     def join(self, dirname, filename):
         """Join *filename* onto *dirname* (which may be a URI)"""
-        if is_uri(dirname) or is_uri(filename):
-            return urljoin(dirname, filename)
+        if is_uri(filename):
+            return filename
+        elif is_uri(dirname):
+            return posixpath.join(dirname, filename)
         else:
             return os.path.join(dirname, filename)
 

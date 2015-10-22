@@ -75,10 +75,10 @@ class CompositeFilesystem(Filesystem):
         return self._do_action('mkdir', path)
 
     def exists(self, path_glob):
-        return self._do_action('path_exists', path_glob)
+        return self._do_action('exists', path_glob)
 
     def join(self, dirname, filename):
-        return self._do_action('path_join', dirname, filename)
+        return self._do_action('join', dirname, filename)
 
     def rm(self, path_glob):
         return self._do_action('rm', path_glob)

@@ -384,8 +384,8 @@ class ErrorOnBadPathsTestCase(TestCase):
 
     def test_with_paths(self):
         _error_on_bad_paths(self.fs, self.paths)
-        self.fs.path_exists.assert_called_once_with(self.paths[0])
+        self.fs.exists.assert_called_once_with(self.paths[0])
 
     def test_no_paths(self):
-        self.fs.path_exists.return_value = False
+        self.fs.exists.return_value = False
         self.assertRaises(ValueError, _error_on_bad_paths, self.fs, self.paths)

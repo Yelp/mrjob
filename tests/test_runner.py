@@ -939,9 +939,19 @@ class FSPassthroughTestCase(TestCase):
         runner = InlineMRJobRunner()
 
         with no_handlers_for_logger('mrjob.runner'):
+            stderr = StringIO()
+            log_to_stream('mrjob.runner', stderr)
+
             self.assertEqual(runner.ls, runner.fs.ls)
             # no special rules for underscore methods
             self.assertEqual(runner._cat_file, runner.fs._cat_file)
+
+            self.assertIn(
+                'deprecated: call InlineMRJobRunner.fs.ls() directly',
+                stderr.getvalue())
+            self.assertIn(
+                'deprecated: call InlineMRJobRunner.fs._cat_file() directly',
+                stderr.getvalue())
 
     def test_prefer_own_methods(self):
         # TODO: currently can't initialize HadoopRunner without setting these
@@ -951,8 +961,35 @@ class FSPassthroughTestCase(TestCase):
             hadoop_streaming_jar='streaming.jar')
 
         with no_handlers_for_logger('mrjob.runner'):
+            stderr = StringIO()
+            log_to_stream('mrjob.runner', stderr)
+
             self.assertEqual(runner.ls, runner.fs.ls)
 
             # Hadoop Runner has its own version
             self.assertNotEqual(runner.get_hadoop_version,
                                 runner.fs.get_hadoop_version)
+
+            self.assertIn(
+                'deprecated: call HadoopJobRunner.fs.ls() directly',
+                stderr.getvalue())
+            self.assertNotIn('get_hadoop_version', stderr.getvalue())
+
+
+    def test_pass_through_fields(self):
+        # TODO: currently can't initialize HadoopRunner without setting these
+        runner = HadoopJobRunner(
+            hadoop_bin='hadoooooooooop',
+            hadoop_home='kansas',
+            hadoop_streaming_jar='streaming.jar')
+
+        with no_handlers_for_logger('mrjob.runner'):
+            stderr = StringIO()
+            log_to_stream('mrjob.runner', stderr)
+
+            self.assertEqual(runner._hadoop_bin, runner.fs._hadoop_bin)
+
+            # deprecation warning is different for non-functions
+            self.assertIn(
+                'deprecated: access HadoopJobRunner.fs._hadoop_bin directly',
+                stderr.getvalue())

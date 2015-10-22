@@ -73,47 +73,6 @@ class MRCustomJobLauncher(MRJobLauncher):
 ### Test cases ###
 
 
-class MakeRunnerTestCase(SandboxedTestCase):
-
-    def setUp(self):
-        self.start(patch.dict(sys.modules))
-
-        for name in sorted(sys.modules):
-            if name.split('.')[0] == 'boto' or name == 'mrjob.emr':
-                del sys.modules[name]
-
-    def test_local_runner(self):
-        launcher = MRJobLauncher(args=['--no-conf', '-r', 'local', ''])
-        with no_handlers_for_logger('mrjob.runner'):
-            with launcher.make_runner() as runner:
-                self.assertIsInstance(runner, LocalMRJobRunner)
-
-        self.assertNotIn('boto', sorted(sys.modules))
-
-    def test_hadoop_runner(self):
-        # you can't instantiate a HadoopJobRunner without Hadoop installed
-        launcher = MRJobLauncher(args=['--no-conf', '-r', 'hadoop', '',
-                                       '--hadoop-streaming-jar', 'HUNNY'])
-        with no_handlers_for_logger('mrjob.runner'):
-            with patch.dict(os.environ, {'HADOOP_HOME': '100-Acre Wood'}):
-                with launcher.make_runner() as runner:
-                    self.assertIsInstance(runner, HadoopJobRunner)
-
-        self.assertNotIn('boto', sorted(sys.modules))
-
-    def test_emr_runner(self):
-        launcher = MRJobLauncher(args=['--no-conf', '-r', 'emr', ''])
-        with no_handlers_for_logger('mrjob'):
-            with patch_fs_s3():
-                with launcher.make_runner() as runner:
-                    # we dumped mrjob.emr in setUp(), so import here
-                    from mrjob.emr import EMRJobRunner
-                    self.assertIsInstance(runner, EMRJobRunner)
-
-        self.assertIn('boto', sorted(sys.modules))
-
-
-
 class NoOutputTestCase(TestCase):
 
     def test_no_output(self):

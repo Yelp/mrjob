@@ -1033,7 +1033,7 @@ class EMRJobRunner(MRJobRunner):
         if self._s3_tmp_dir:
             try:
                 log.info('Removing all files in %s' % self._s3_tmp_dir)
-                self.rm(self._s3_tmp_dir)
+                self.fs.rm(self._s3_tmp_dir)
                 self._s3_tmp_dir = None
             except Exception as e:
                 log.exception(e)
@@ -1047,7 +1047,7 @@ class EMRJobRunner(MRJobRunner):
                 and not self._opts['pool_emr_job_flows']:
             try:
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
-                self.rm(self._s3_job_log_uri)
+                self.fs.rm(self._s3_job_log_uri)
                 self._s3_job_log_uri = None
             except Exception as e:
                 log.exception(e)

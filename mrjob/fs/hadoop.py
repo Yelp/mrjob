@@ -28,6 +28,7 @@ from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+from mrjob.util import unique
 from mrjob.util import which
 
 
@@ -83,11 +84,9 @@ class HadoopFilesystem(Filesystem):
         """Look for the hadoop binary in any plausible place. If all
         else fails, return ``['hadoop']``.
         """
-        def yield_paths(self):
+        def yield_paths():
             if self._hadoop_home:
                 yield self._hadoop_home
-
-            yield None  # use $PATH
 
             for name in 'HADOOP_PREFIX', 'HADOOP_HOME', 'HADOOP_INSTALL':
                 path = os.environ.get(name)
@@ -100,6 +99,8 @@ class HadoopFilesystem(Filesystem):
                 yield os.path.join(
                     os.environ['HADOOP_INSTALL'], 'hadoop', 'bin')
 
+            yield None  # use $PATH
+
             # Maybe it's in $HADOOP_MAPRED_HOME? $HADOOP_YARN_HOME? Don't give
             # up. Don't worry about duplicates
             for name, path in sorted(os.environ.items()):
@@ -107,9 +108,6 @@ class HadoopFilesystem(Filesystem):
                     yield os.path.join(path, 'bin')
 
         for path in unique(yield_paths()):
-            if path in paths_tried:
-                continue
-
             log.info('Looking for hadoop binary in %s' % (path or '$PATH'))
 
             hadoop_bin = which('hadoop', path=path)

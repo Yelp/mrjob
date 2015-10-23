@@ -14,6 +14,7 @@
 import bz2
 import gzip
 import os
+from os.path import join
 
 from mrjob.fs.local import LocalFilesystem
 
@@ -58,7 +59,7 @@ class LocalFSTestCase(SandboxedTestCase):
 
     def test_ls_recurse(self):
         self.makefile('f', 'contents')
-        self.makefile('d/f2', 'contents')
+        self.makefile(join('d', 'f2'), 'contents')
         self.assertEqual(sorted(list(self.fs.ls(self.tmp_dir))),
                          sorted(self.abs_paths('f', 'd/f2')))
 
@@ -67,7 +68,7 @@ class LocalFSTestCase(SandboxedTestCase):
         self.assertEqual(list(self.fs._cat_file(path)), [b'bar\n', b'foo\n'])
 
     def test_cat_gz(self):
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz_path = join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'wb')
         input_gz.write(b'foo\nbar\n')
         input_gz.close()
@@ -76,7 +77,7 @@ class LocalFSTestCase(SandboxedTestCase):
                          [b'foo\n', b'bar\n'])
 
     def test_cat_bz2(self):
-        input_bz2_path = os.path.join(self.tmp_dir, 'input.bz2')
+        input_bz2_path = join(self.tmp_dir, 'input.bz2')
         input_bz2 = bz2.BZ2File(input_bz2_path, 'wb')
         input_bz2.write(b'bar\nbar\nfoo\n')
         input_bz2.close()
@@ -85,12 +86,12 @@ class LocalFSTestCase(SandboxedTestCase):
                          [b'bar\n', b'bar\n', b'foo\n'])
 
     def test_mkdir(self):
-        path = os.path.join(self.tmp_dir, 'dir')
+        path = join(self.tmp_dir, 'dir')
         self.fs.mkdir(path)
         self.assertEqual(os.path.isdir(path), True)
 
     def test_exists_no(self):
-        path = os.path.join(self.tmp_dir, 'f')
+        path = join(self.tmp_dir, 'f')
         self.assertEqual(self.fs.exists(path), False)
 
     def test_exists_yes(self):
@@ -112,7 +113,7 @@ class LocalFSTestCase(SandboxedTestCase):
         self.assertEqual(self.fs.exists(path), False)
 
     def test_touchz(self):
-        path = os.path.join(self.tmp_dir, 'f')
+        path = join(self.tmp_dir, 'f')
         self.fs.touchz(path)
         self.fs.touchz(path)
         with open(path, 'w') as f:

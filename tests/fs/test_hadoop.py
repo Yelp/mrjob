@@ -13,13 +13,18 @@
 # limitations under the License.
 import bz2
 import os
+from os.path import join
 
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs import hadoop as fs_hadoop
+from mrjob.util import which
 
 from tests.compress import gzip_compress
 from tests.fs import MockSubprocessTestCase
 from tests.mockhadoop import main as mock_hadoop_main
+from tests.py2 import patch
+from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 
 
 class HadoopFSTestCase(MockSubprocessTestCase):
@@ -166,3 +171,97 @@ class Hadoop1FSTestCase(HadoopFSTestCase):
         super(Hadoop1FSTestCase, self).set_up_mock_hadoop()
 
         self.env['MOCK_HADOOP_VERSION'] = '1.0.0'
+
+
+class FindHadoopBinTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(FindHadoopBinTestCase, self).setUp()
+
+        # track calls to which()
+        self.which = self.start(patch('mrjob.fs.hadoop.which', wraps=which))
+
+        # keep which() from searching in /bin, etc.
+        os.environ['PATH'] = self.tmp_dir
+
+    def test_do_nothing_on_init(self):
+        fs = HadoopFilesystem()
+
+        self.assertFalse(self.which.called)
+
+    def test_fallback(self):
+        fs = HadoopFilesystem()
+
+        self.assertFalse(self.which.called)
+
+        with no_handlers_for_logger('mrjob.fs.hadoop'):
+            self.assertEqual(fs.get_hadoop_bin(), ['hadoop'])
+
+        self.which.assert_called_once_with('hadoop', path=None)
+
+    def test_predefined_hadoop_bin(self):
+        fs = HadoopFilesystem(hadoop_bin=['hadoop', '-v'])
+
+        self.assertEqual(fs.get_hadoop_bin(), ['hadoop', '-v'])
+
+        self.assertFalse(self.which.called)
+
+    def _test_environment_variable(self, name, expect_failure=False):
+        fs = HadoopFilesystem()
+
+        fake_hadoop_bin = self.makefile(join(name.lower(), 'bin', 'hadoop'),
+                                        executable=True)
+
+        os.environ[name] = join(self.tmp_dir, name.lower())
+
+        with no_handlers_for_logger('mrjob.fs.hadoop'):
+            hadoop_bin = fs.get_hadoop_bin()
+
+        if expect_failure:
+            self.assertEqual(hadoop_bin, ['hadoop'])
+        else:
+            self.assertEqual(hadoop_bin, [fake_hadoop_bin])
+
+    def test_hadoop_prefix(self):
+        self._test_environment_variable('HADOOP_PREFIX')
+
+    def test_hadoop_home(self):
+        self._test_environment_variable('HADOOP_HOME')
+
+    def test_hadoop_install(self):
+        self._test_environment_variable('HADOOP_INSTALL')
+
+    def test_hadoop_install_hadoop_subdir(self):
+        fs = HadoopFilesystem()
+
+        fake_hadoop_bin = self.makefile(
+            join('install', 'hadoop', 'bin', 'hadoop'),
+            executable=True)
+
+        os.environ['HADOOP_INSTALL'] = join(self.tmp_dir, 'install')
+
+        with no_handlers_for_logger('mrjob.fs.hadoop'):
+            self.assertEqual(fs.get_hadoop_bin(), [fake_hadoop_bin])
+
+    def test_path(self):
+        fs = HadoopFilesystem()
+
+        # PATH is set to self.tmp_dir
+        fake_hadoop_bin = self.makefile('hadoop', executable=True)
+
+        with no_handlers_for_logger('mrjob.fs.hadoop'):
+            self.assertEqual(fs.get_hadoop_bin(), [fake_hadoop_bin])
+
+    def test_hadoop_mapred_home(self):
+        self._test_environment_variable('HADOOP_MAPRED_HOME')
+
+    def test_hadoop_whatever_home(self):
+        self._test_environment_variable('HADOOP_WHATEVER_HOME')
+
+    def test_other_environment_variable(self):
+        self._test_environment_variable('YARN_HADOOP_MRJOB_DIR',
+                                        expect_failure=True)
+
+    # TODO: test hadoop_home
+
+    # TODO: test precedence

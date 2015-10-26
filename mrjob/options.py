@@ -270,7 +270,7 @@ def add_hadoop_opts(opt_group):
                  ' --hadoop-bin and --hadoop-streaming-jar switches.'),
 
         opt_group.add_option(
-            '--hadoop-tmp-dir', dest='hdfs_tmp_dir',
+            '--hadoop-tmp-dir', dest='hadoop_tmp_dir',
             default=None,
             help='Temp space on HDFS (default is tmp/mrjob)'),
 

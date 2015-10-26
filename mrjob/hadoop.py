@@ -165,19 +165,19 @@ class HadoopJobRunner(MRJobRunner):
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
-        self._hdfs_tmp_dir = fully_qualify_hdfs_path(
+        self._hadoop_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(
                 self._opts['hadoop_tmp_dir'], self._job_key))
 
         # Keep track of local files to upload to HDFS. We'll add them
         # to this manager just before we need them.
-        hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
+        hdfs_files_dir = posixpath.join(self._hadoop_tmp_dir, 'files', '')
         self._upload_mgr = UploadDirManager(hdfs_files_dir)
 
         # Set output dir if it wasn't set explicitly
         self._output_dir = fully_qualify_hdfs_path(
             self._output_dir or
-            posixpath.join(self._hdfs_tmp_dir, 'output'))
+            posixpath.join(self._hadoop_tmp_dir, 'output'))
 
         # Running jobs via hadoop assigns a new timestamp to each job.
         # Running jobs via mrjob only adds steps.
@@ -524,22 +524,22 @@ class HadoopJobRunner(MRJobRunner):
                     for p in self._get_input_paths()]
         else:
             return [posixpath.join(
-                self._hdfs_tmp_dir, 'step-output', str(step_num))]
+                self._hadoop_tmp_dir, 'step-output', str(step_num))]
 
     def _hdfs_step_output_dir(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:
             return posixpath.join(
-                self._hdfs_tmp_dir, 'step-output', str(step_num + 1))
+                self._hadoop_tmp_dir, 'step-output', str(step_num + 1))
 
     def _cleanup_local_tmp(self):
         super(HadoopJobRunner, self)._cleanup_local_tmp()
 
-        if self._hdfs_tmp_dir:
-            log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)
+        if self._hadoop_tmp_dir:
+            log.info('deleting %s from HDFS' % self._hadoop_tmp_dir)
             try:
-                self.fs.rm(self._hdfs_tmp_dir)
+                self.fs.rm(self._hadoop_tmp_dir)
             except Exception as e:
                 log.exception(e)
 

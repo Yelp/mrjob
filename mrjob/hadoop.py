@@ -71,21 +71,6 @@ _EMR_HADOOP_STREAMING_JAR_DIRS = [
 ]
 
 
-def find_hadoop_streaming_jar(path):
-    """Return the path of the hadoop streaming jar inside the given
-    directory tree, or None if we can't find it.
-    """
-    for (dirpath, _, filenames) in os.walk(path):
-        # os.walk is alphabetical, but within the same directory,
-        # pick the hadoop streaming jar with the shortest name
-        # (e.g. hadoop-streaming.jar, not hadoop-streaming-1.0.3.jar)
-        for filename in sorted(filenames, key=lambda f: len(f)):
-            if HADOOP_STREAMING_JAR_RE.match(filename):
-                return os.path.join(dirpath, filename)
-    else:
-        return None
-
-
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
     if is_uri(path):
@@ -228,11 +213,7 @@ class HadoopJobRunner(MRJobRunner):
         if not (self._hadoop_streaming_jar or
                 self._searched_for_hadoop_streaming_jar):
 
-            for path in unique(self._hadoop_streaming_jar_dirs()):
-                log.info('Looking for Hadoop streaming jar in %s' % path)
-                self._hadoop_streaming_jar = find_hadoop_streaming_jar(path)
-                if self._hadoop_streaming_jar:
-                    break
+            self._hadoop_streaming_jar = self._find_hadoop_streaming_jar()
 
             if self._hadoop_streaming_jar:
                 log.info('Found Hadoop streaming jar: %s' %
@@ -240,10 +221,30 @@ class HadoopJobRunner(MRJobRunner):
             else:
                 log.warning('Hadoop streaming jar not found. Use'
                             ' --hadoop-streaming-jar')
-                # no need to search twice
-                self._searched_for_hadoop_streaming_jar = True
+
+            self._searched_for_hadoop_streaming_jar = True
 
         return self._hadoop_streaming_jar
+
+    def _find_hadoop_streaming_jar(self):
+        """Search for the hadoop streaming jar. See
+        :py:meth:`_hadoop_streaming_jar_dirs` for where we search."""
+
+        for path in unique(self._hadoop_streaming_jar_dirs()):
+            log.info('Looking for Hadoop streaming jar in %s' % path)
+
+            streaming_jars = []
+            for path in self.fs.ls(path):
+                if HADOOP_STREAMING_JAR_RE.match(os.path.basename(path)):
+                    streaming_jars.append(path)
+
+                if streaming_jars:
+                    # prefer shorter paths, so that e.g.
+                    # hadoop-streaming.jar beats hadoop-streaming-1.0.3.jar
+                    streaming_jars.sort(key=lambda p: (len(p), p))
+                    return streaming_jars[0]
+
+        return None
 
     def _hadoop_streaming_jar_dirs(self):
         """Yield all possible places to look for the Hadoop streaming jar."""
@@ -266,7 +267,7 @@ class HadoopJobRunner(MRJobRunner):
             if name.startswith('HADOOP_') and name.endswith('_HOME'):
                 yield path
 
-        # use hard-coded EMR paths
+        # use hard-coded paths to work out-of-the-box on EMR
         for path in _EMR_HADOOP_STREAMING_JAR_DIRS:
             yield path
 

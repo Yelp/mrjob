@@ -24,7 +24,6 @@ from subprocess import check_call
 
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
-from mrjob.hadoop import find_hadoop_streaming_jar
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
 from mrjob.util import bash_wrap
@@ -79,36 +78,26 @@ class TestFullyQualifyHDFSPath(TestCase):
                          'foo://bar/baz')
 
 
-class TestHadoopHomeRegression(SandboxedTestCase):
-
-    def test_hadoop_home_regression(self):
-        # kill $HADOOP_HOME if it exists
-        try:
-            del os.environ['HADOOP_HOME']
-        except KeyError:
-            pass
-
-        with patch('mrjob.hadoop.find_hadoop_streaming_jar',
-                   return_value='some.jar'):
-            HadoopJobRunner(hadoop_home=self.tmp_dir, conf_paths=[])
-
-
 class TestFindHadoopStreamingJar(SandboxedTestCase):
 
-    def test_find_hadoop_streaming_jar(self):
-        # not just any jar will do
-        with patch.object(os, 'walk', return_value=[
-            ('/some_dir', None, 'mason.jar')]):
-            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
+    def setUp(self):
+        super(TestFindHadoopStreamingJar, self).setUp()
 
-        # should match streaming jar
-        with patch.object(os, 'walk', return_value=[
-            ('/some_dir', None, 'hadoop-0.20.2-streaming.jar')]):
-            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
+        self.mock_paths = []
 
-        # shouldn't find anything in an empty dir
-        with patch.object(os, 'walk', return_value=[]):
-            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
+        def mock_ls(path):  # don't bother to support globs
+            return (p for p in sorted(self.mock_paths) if p.startswith(path))
+
+        self.start(patch('mrjob.fs.local.LocalFilesystem.ls',
+                         side_effect=mock_ls))
+
+        os.environ.clear()
+
+        self.runner = HadoopJobRunner()
+
+    def test_empty_fs(self):
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
 
 
 class MockHadoopTestCase(SandboxedTestCase):

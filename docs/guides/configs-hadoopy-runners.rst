@@ -122,9 +122,22 @@ Options available to hadoop runner only
     :switch: --hadoop-bin
     :type: :ref:`command <data-type-command>`
     :set: hadoop
-    :default: :mrjob-opt:`hadoop_home` plus ``bin/hadoop``
+    :default: (automatic)
 
     Name/path of your hadoop program (may include arguments).
+
+    mrjob tries its best to find your hadoop binary, checking all of the
+    following places for an executable file named ``hadoop``:
+
+    * :mrjob-opt:`hadoop_home`/``bin``
+    * ``$HADOOP_PREFIX/bin``
+    * ``$HADOOP_HOME/bin``
+    * ``$HADOOP_INSTALL/bin``
+    * ``$HADOOP_INSTALL/hadoop/bin``
+    * ``$PATH``
+    * ``$HADOOP_*_HOME/bin`` (in alphabetical order by environment variable name)
+
+    If all else fails, we just use ``hadoop`` and hope for the best.
 
 .. mrjob-opt::
     :config: hadoop_home
@@ -134,7 +147,7 @@ Options available to hadoop runner only
     :default: ``None``
 
     Hint about where to find the hadoop binary and streaming jar. Instead, just
-    set :mrjob:opt:`hadoop_bin` and/or :mrjob:opt:`hadoop_streaming_jar` as
+    set :mrjob-opt:`hadoop_bin` and/or :mrjob-opt:`hadoop_streaming_jar` as
     needed.
 
     .. deprecated: 0.5.0

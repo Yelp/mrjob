@@ -62,17 +62,23 @@ HADOOP_JOB_TIMESTAMP_RE = re.compile(
 # don't look for the hadoop streaming jar here!
 _BAD_HADOOP_HOMES = ['/', '/usr', '/usr/local']
 
+# places to look for the Hadoop streaming jar if we're inside EMR
+_EMR_HADOOP_STREAMING_JAR_DIRS = [
+    # for the 2.x and 3.x AMIs (the 2.x AMIs also set $HADOOP_HOME properly)
+    '/home/hadoop/contrib',
+    # for the 4.x AMIs
+    '/usr/lib/hadoop-mapreduce',
+]
+
 
 def find_hadoop_streaming_jar(path):
     """Return the path of the hadoop streaming jar inside the given
     directory tree, or None if we can't find it.
     """
     for (dirpath, _, filenames) in os.walk(path):
+        # os.walk is alphabetical, but within the same directory,
         # pick the hadoop streaming jar with the shortest name
         # (e.g. hadoop-streaming.jar, not hadoop-streaming-1.0.3.jar)
-        #
-        # it's safe enough to assume that any jars we *do* find are
-        # in the same directory, so don't worry about directory ordering
         for filename in sorted(filenames, key=lambda f: len(f)):
             if HADOOP_STREAMING_JAR_RE.match(filename):
                 return os.path.join(dirpath, filename)
@@ -259,6 +265,10 @@ class HadoopJobRunner(MRJobRunner):
         for name, path in sorted(os.environ.items()):
             if name.startswith('HADOOP_') and name.endswith('_HOME'):
                 yield path
+
+        # use hard-coded EMR paths
+        for path in _EMR_HADOOP_STREAMING_JAR_DIRS:
+            yield path
 
     def _run(self):
         self._check_input_exists()

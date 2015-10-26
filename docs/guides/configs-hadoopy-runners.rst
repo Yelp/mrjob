@@ -63,11 +63,30 @@ Options available to hadoop and emr runners
     :switch: --hadoop-streaming-jar
     :type: :ref:`string <data-type-string>`
     :set: all
-    :default: automatic
+    :default: (automatic)
 
-    Path to a custom hadoop streaming jar. This is optional for the ``hadoop``
-    runner, which will search for it in :envvar:`HADOOP_HOME`. The emr runner
-    can take a path either local to your machine or on S3.
+    Path to a custom hadoop streaming jar.
+
+    On EMR, this can be either a local path or a URI (``s3://...``). If you
+    want to use a jar at a path on the master node, use
+    :mrjob-opt:`hadoop_streaming_jar_on_emr`.
+
+    On Hadoop, mrjob tries its best to find your hadoop streaming jar,
+    searching these directories (recursively) for a ``.jar`` file with
+    ``hadoop`` followed by ``streaming`` in its name:
+
+    * :mrjob-opt:`hadoop_home` (the runner option)
+    * ``$HADOOP_PREFIX``
+    * ``$HADOOP_HOME``
+    * ``$HADOOP_INSTALL``
+    * ``$HADOOP_MAPRED_HOME``
+    * the parent of the directory containing the Hadoop binary (see :mrjob-opt:`hadoop_bin`), unless it's one of ``/``, ``/usr`` or ``/usr/local``
+    * ``$HADOOP_*_HOME`` (in alphabetical order by environment variable name)
+    * ``/home/hadoop/contrib``
+    * ``/usr/lib/hadoop-mapreduce``
+
+    (The last two paths allow the Hadoop runner to work out-of-the box
+    inside EMR.)
 
 .. mrjob-opt::
     :config: label

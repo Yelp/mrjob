@@ -259,6 +259,19 @@ class FindHadoopBinTestCase(SandboxedTestCase):
     def test_path(self):
         self._test_environment_variable('PATH')
 
+    def test_two_part_path(self):
+        hadoop_path1 = join(self.tmp_dir, 'path1')
+        hadoop_path1_bin = self.makefile(join(hadoop_path1, 'hadoop'),
+                                         executable=True)
+        hadoop_path2 = join(self.tmp_dir, 'path2')
+        hadoop_path2_bin = self.makefile(join(hadoop_path2, 'hadoop'),
+                                         executable=True)
+
+        os.environ['PATH'] = ':'.join([hadoop_path1, hadoop_path2])
+
+        with no_handlers_for_logger('mrjob.fs.hadoop'):
+            self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_path1_bin])
+
     def test_hadoop_mapred_home(self):
         self._test_environment_variable('HADOOP_MAPRED_HOME', 'bin')
 

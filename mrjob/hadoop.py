@@ -15,6 +15,7 @@ import errno
 import getpass
 import logging
 import os
+import os.path
 import posixpath
 import re
 from subprocess import Popen
@@ -45,6 +46,8 @@ from mrjob.parse import is_uri
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
+from mrjob.util import unique
+from mrjob.util import which
 
 
 log = logging.getLogger(__name__)
@@ -56,12 +59,21 @@ HADOOP_STREAMING_OUTPUT_RE = re.compile(br'^(\S+ \S+ \S+ \S+: )?(.*)$')
 HADOOP_JOB_TIMESTAMP_RE = re.compile(
     br'(INFO: )?Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
 
+# don't look for the hadoop streaming jar here!
+_BAD_HADOOP_HOMES = ['/', '/usr', '/usr/local']
+
 
 def find_hadoop_streaming_jar(path):
     """Return the path of the hadoop streaming jar inside the given
-    directory tree, or None if we can't find it."""
+    directory tree, or None if we can't find it.
+    """
     for (dirpath, _, filenames) in os.walk(path):
-        for filename in filenames:
+        # pick the hadoop streaming jar with the shortest name
+        # (e.g. hadoop-streaming.jar, not hadoop-streaming-1.0.3.jar)
+        #
+        # it's safe enough to assume that any jars we *do* find are
+        # in the same directory, so don't worry about directory ordering
+        for filename in sorted(filenames, key=lambda f: len(f)):
             if HADOOP_STREAMING_JAR_RE.match(filename):
                 return os.path.join(dirpath, filename)
     else:
@@ -78,6 +90,7 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
 
 
+# TODO: redo log dir stuff
 def hadoop_log_dir(hadoop_home=None):
     """Return the path where Hadoop stores logs.
 
@@ -93,6 +106,29 @@ def hadoop_log_dir(hadoop_home=None):
         if hadoop_home is None:
             hadoop_home = os.environ['HADOOP_HOME']
         return os.path.join(hadoop_home, 'logs')
+
+
+def hadoop_prefix_from_bin(hadoop_bin):
+    """Given a path to the hadoop binary, return the path of the implied
+    hadoop home, or None if we don't know.
+
+    Don't return the parent directory of directories in the default
+    path (not ``/``, ``/usr``, or ``/usr/local``).
+    """
+    # resolve unqualified binary name (relative paths are okay)
+    if os.path.sep not in hadoop_bin:
+        hadoop_bin = which(hadoop_bin)
+        if not hadoop_bin:
+            return None
+
+    # use parent of hadoop_bin's directory
+    hadoop_home = os.path.abspath(
+        os.path.join(os.path.realpath(os.path.dirname(hadoop_bin)), '..'))
+
+    if hadoop_home in _BAD_HADOOP_HOMES:
+        return None
+
+    return hadoop_home
 
 
 class HadoopRunnerOptionStore(RunnerOptionStore):
@@ -113,39 +149,9 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hdfs_scratch_dir': 'hadoop_tmp_dir',
     })
 
-    def __init__(self, alias, opts, conf_paths):
-        super(HadoopRunnerOptionStore, self).__init__(alias, opts, conf_paths)
-
-        # fix hadoop_home
-        if not self['hadoop_home']:
-            raise Exception(
-                'you must set $HADOOP_HOME, or pass in hadoop_home explicitly')
-        self['hadoop_home'] = os.path.abspath(self['hadoop_home'])
-
-        # fix hadoop_bin
-        if not self['hadoop_bin']:
-            self['hadoop_bin'] = [
-                os.path.join(self['hadoop_home'], 'bin', 'hadoop')]
-
-        # fix hadoop_streaming_jar
-        if not self['hadoop_streaming_jar']:
-            log.debug('Looking for hadoop streaming jar in %s' %
-                      self['hadoop_home'])
-            self['hadoop_streaming_jar'] = find_hadoop_streaming_jar(
-                self['hadoop_home'])
-
-            if not self['hadoop_streaming_jar']:
-                raise Exception(
-                    "Couldn't find streaming jar in %s, bailing out" %
-                    self['hadoop_home'])
-
-        log.debug('Hadoop streaming jar is %s' %
-                  self['hadoop_streaming_jar'])
-
     def default_options(self):
         super_opts = super(HadoopRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
-            'hadoop_home': os.environ.get('HADOOP_HOME'),
             'hadoop_tmp_dir': 'tmp/mrjob',
         })
 
@@ -182,13 +188,15 @@ class HadoopJobRunner(MRJobRunner):
             self._output_dir or
             posixpath.join(self._hdfs_tmp_dir, 'output'))
 
-        self._hadoop_log_dir = hadoop_log_dir(self._opts['hadoop_home'])
-
         # Running jobs via hadoop assigns a new timestamp to each job.
         # Running jobs via mrjob only adds steps.
         # Store both of these values to enable log parsing.
         self._job_timestamp = None
         self._start_step_num = 0
+
+        # Keep track of where the hadoop streaming jar is
+        self._hadoop_streaming_jar = self._opts['hadoop_streaming_jar']
+        self._searched_for_hadoop_streaming_jar = False
 
     @property
     def fs(self):
@@ -204,6 +212,53 @@ class HadoopJobRunner(MRJobRunner):
     def get_hadoop_version(self):
         """Invoke the hadoop executable to determine its version"""
         return self.fs.get_hadoop_version()
+
+    def get_hadoop_bin(self):
+        """Find the hadoop binary. A list: binary followed by arguments."""
+        return self.fs.get_hadoop_bin()
+
+    def get_hadoop_streaming_jar(self):
+        """Find the path of the hadoop streaming jar, or None if not found."""
+        if not (self._hadoop_streaming_jar or
+                self._searched_for_hadoop_streaming_jar):
+
+            for path in unique(self._hadoop_streaming_jar_dirs()):
+                log.info('Looking for Hadoop streaming jar in %s' % path)
+                self._hadoop_streaming_jar = find_hadoop_streaming_jar(path)
+                if self._hadoop_streaming_jar:
+                    break
+
+            if self._hadoop_streaming_jar:
+                log.info('Found Hadoop streaming jar: %s' %
+                         self._hadoop_streaming_jar)
+            else:
+                log.warning('Hadoop streaming jar not found. Use'
+                            ' --hadoop-streaming-jar')
+                # no need to search twice
+                self._searched_for_hadoop_streaming_jar = True
+
+        return self._hadoop_streaming_jar
+
+    def _hadoop_streaming_jar_dirs(self):
+        """Yield all possible places to look for the Hadoop streaming jar."""
+        if self._opts['hadoop_home']:
+            yield self._opts['hadoop_home']
+
+        for name in ('HADOOP_PREFIX', 'HADOOP_HOME', 'HADOOP_INSTALL',
+                     'HADOOP_MAPRED_HOME'):
+            path = os.environ.get(name)
+            if path:
+                yield path
+
+        # guess it from the path of the Hadoop binary
+        hadoop_home = hadoop_prefix_from_bin(self.get_hadoop_bin()[0])
+        if hadoop_home:
+            yield hadoop_home
+
+        # try HADOOP_*_HOME
+        for name, path in sorted(os.environ.items()):
+            if name.startswith('HADOOP_') and name.endswith('_HOME'):
+                yield path
 
     def _run(self):
         self._check_input_exists()
@@ -371,8 +426,11 @@ class HadoopJobRunner(MRJobRunner):
     def _args_for_streaming_step(self, step_num):
         version = self.get_hadoop_version()
 
-        args = (self._opts['hadoop_bin'] +
-                          ['jar', self._opts['hadoop_streaming_jar']])
+        hadoop_streaming_jar = self.get_hadoop_streaming_jar()
+        if not hadoop_streaming_jar:
+            raise Exception('no Hadoop streaming jar')
+
+        args = self.get_hadoop_bin() + ['jar', hadoop_streaming_jar]
 
         # -files/-archives (generic options, new-style)
         if supports_new_distributed_cache_options(version):
@@ -429,7 +487,7 @@ class HadoopJobRunner(MRJobRunner):
         else:
             jar = step['jar']
 
-        args = (self._opts['hadoop_bin'] + ['jar', jar])
+        args = self.get_hadoop_bin() + ['jar', jar]
 
         if step.get('main_class'):
             args.append(step['main_class'])
@@ -495,6 +553,13 @@ class HadoopJobRunner(MRJobRunner):
         """List logs on the local filesystem by path relative to log root
         directory
         """
+        return []
+        # TODO: redo this to look in
+        # $HADOOP_LOG_DIR
+        # dirname(hadoop_bin[0])/../logs
+        # <output_dir>/_logs
+        # ??? other places ???
+
         return ls_logs(self.fs, log_type,
                        log_dir=self._hadoop_log_dir,
                        step_nums=step_nums)

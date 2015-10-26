@@ -722,6 +722,6 @@ def which(cmd, path=None):
     as a keyword argument.
     """
     if hasattr(shutil, 'which'):
-        return which(cmd, path=path)
+        return shutil.which(cmd, path=path)
     else:
         return find_executable(cmd, path=path)

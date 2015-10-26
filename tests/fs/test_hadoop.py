@@ -184,84 +184,125 @@ class FindHadoopBinTestCase(SandboxedTestCase):
         # keep which() from searching in /bin, etc.
         os.environ['PATH'] = self.tmp_dir
 
-    def test_do_nothing_on_init(self):
-        fs = HadoopFilesystem()
+        # create basic HadoopFilesystem (okay to overwrite)
+        self.fs = HadoopFilesystem()
 
+    def _add_hadoop_bin_for_envvar(self, envvar, *dirnames):
+        """Add a fake "Hadoop" binary to its own subdirectory of
+        ``self.tmp_dir``, and set *os.environ[envvar]* to point at it. You can
+        use *dirnames* to put the binary in a subdirectory of
+        *os.environ[envvar]* (e.g. ``'bin'``).
+
+        return the path to the fake Hadoop binary.
+        """
+        os.environ[envvar] = join(self.tmp_dir, envvar.lower())
+
+        hadoop_bin_path = join(join(os.environ[envvar], *dirnames), 'hadoop')
+
+        self.makefile(hadoop_bin_path, executable=True)
+
+        return hadoop_bin_path
+
+    # tests without environment variables
+
+    def test_do_nothing_on_init(self):
         self.assertFalse(self.which.called)
 
     def test_fallback(self):
-        fs = HadoopFilesystem()
-
         self.assertFalse(self.which.called)
 
         with no_handlers_for_logger('mrjob.fs.hadoop'):
-            self.assertEqual(fs.get_hadoop_bin(), ['hadoop'])
+            self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
 
         self.which.assert_called_once_with('hadoop', path=None)
 
     def test_predefined_hadoop_bin(self):
-        fs = HadoopFilesystem(hadoop_bin=['hadoop', '-v'])
+        self.fs = HadoopFilesystem(hadoop_bin=['hadoop', '-v'])
 
-        self.assertEqual(fs.get_hadoop_bin(), ['hadoop', '-v'])
+        self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop', '-v'])
 
         self.assertFalse(self.which.called)
 
-    def _test_environment_variable(self, name, expect_failure=False):
-        fs = HadoopFilesystem()
+    def test_deprecated_hadoop_home_option(self):
+        hadoop_home = join(self.tmp_dir, 'hadoop_home_option')
+        hadoop_bin = self.makefile(join(hadoop_home, 'bin', 'hadoop'),
+                                   executable=True)
 
-        fake_hadoop_bin = self.makefile(join(name.lower(), 'bin', 'hadoop'),
-                                        executable=True)
-
-        os.environ[name] = join(self.tmp_dir, name.lower())
+        # deprecation warning is in HadoopJobRunner
+        self.fs = HadoopFilesystem(hadoop_home=hadoop_home)
 
         with no_handlers_for_logger('mrjob.fs.hadoop'):
-            hadoop_bin = fs.get_hadoop_bin()
+            self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_bin])
 
-        if expect_failure:
-            self.assertEqual(hadoop_bin, ['hadoop'])
-        else:
-            self.assertEqual(hadoop_bin, [fake_hadoop_bin])
+    # environment variable tests
+
+    def _test_environment_variable(self, envvar, *dirnames):
+        """Check if we can find the hadoop binary from *envvar*"""
+        # okay to add after HadoopFilesystem() created; it hasn't looked yet
+        hadoop_bin = self._add_hadoop_bin_for_envvar(envvar, *dirnames)
+
+        with no_handlers_for_logger('mrjob.fs.hadoop'):
+            self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_bin])
 
     def test_hadoop_prefix(self):
-        self._test_environment_variable('HADOOP_PREFIX')
+        self._test_environment_variable('HADOOP_PREFIX', 'bin')
 
-    def test_hadoop_home(self):
-        self._test_environment_variable('HADOOP_HOME')
+    def test_hadoop_home_envvar(self):
+        self._test_environment_variable('HADOOP_HOME', 'bin')
 
     def test_hadoop_install(self):
-        self._test_environment_variable('HADOOP_INSTALL')
+        self._test_environment_variable('HADOOP_INSTALL', 'bin')
 
     def test_hadoop_install_hadoop_subdir(self):
-        fs = HadoopFilesystem()
-
-        fake_hadoop_bin = self.makefile(
-            join('install', 'hadoop', 'bin', 'hadoop'),
-            executable=True)
-
-        os.environ['HADOOP_INSTALL'] = join(self.tmp_dir, 'install')
-
-        with no_handlers_for_logger('mrjob.fs.hadoop'):
-            self.assertEqual(fs.get_hadoop_bin(), [fake_hadoop_bin])
+        self._test_environment_variable('HADOOP_INSTALL', 'hadoop', 'bin')
 
     def test_path(self):
-        fs = HadoopFilesystem()
-
-        # PATH is set to self.tmp_dir
-        fake_hadoop_bin = self.makefile('hadoop', executable=True)
-
-        with no_handlers_for_logger('mrjob.fs.hadoop'):
-            self.assertEqual(fs.get_hadoop_bin(), [fake_hadoop_bin])
+        self._test_environment_variable('PATH')
 
     def test_hadoop_mapred_home(self):
-        self._test_environment_variable('HADOOP_MAPRED_HOME')
+        self._test_environment_variable('HADOOP_MAPRED_HOME', 'bin')
 
-    def test_hadoop_whatever_home(self):
-        self._test_environment_variable('HADOOP_WHATEVER_HOME')
+    def test_hadoop_anything_home(self):
+        self._test_environment_variable('HADOOP_ANYTHING_HOME', 'bin')
 
     def test_other_environment_variable(self):
-        self._test_environment_variable('YARN_HADOOP_MRJOB_DIR',
-                                        expect_failure=True)
+        self._add_hadoop_bin_for_envvar('HADOOP_YARN_MRJOB_DIR', 'bin')
 
-    # TODO: test hadoop_home
+        with no_handlers_for_logger('mrjob.fs.hadoop'):
+            self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
 
-    # TODO: test precedence
+    # precedence tests
+
+    def test_deprecated_hadoop_home_option_beats_hadoop_prefix(self):
+        self._add_hadoop_bin_for_envvar('HADOOP_PREFIX', 'bin')
+        self.test_deprecated_hadoop_home_option()
+
+    def test_hadoop_prefix_beats_hadoop_home_envvar(self):
+        self._add_hadoop_bin_for_envvar('HADOOP_HOME', 'bin')
+        self.test_hadoop_prefix()
+
+    def test_hadoop_home_envvar_beats_hadoop_install(self):
+        self._add_hadoop_bin_for_envvar('HADOOP_INSTALL', 'bin')
+        self.test_hadoop_home_envvar()
+
+    def test_hadoop_install_beats_hadoop_install_subdir(self):
+        self._add_hadoop_bin_for_envvar('HADOOP_INSTALL', 'hadoop', 'bin')
+        # verify that this test and test_hadoop_install() use same value
+        # for $HADOOP_INSTALL
+        hadoop_install = os.environ['HADOOP_INSTALL']
+
+        self.test_hadoop_install()
+
+        self.assertEqual(hadoop_install, os.environ['HADOOP_INSTALL'])
+
+    def test_hadoop_install_hadoop_subdir_beats_path(self):
+        self._add_hadoop_bin_for_envvar('PATH')
+        self.test_hadoop_install_hadoop_subdir()
+
+    def test_path_beats_hadoop_mapred_home(self):
+        self._add_hadoop_bin_for_envvar('HADOOP_MAPRED_HOME', 'bin')
+        self.test_path()
+
+    def test_hadoop_anything_home_is_alphabetical(self):
+        self._add_hadoop_bin_for_envvar('HADOOP_MAPRED_HOME', 'bin')
+        self.test_hadoop_anything_home()

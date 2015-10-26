@@ -86,7 +86,7 @@ class HadoopFilesystem(Filesystem):
         """
         def yield_paths():
             if self._hadoop_home:
-                yield self._hadoop_home
+                yield os.path.join(self._hadoop_home, 'bin')
 
             for name in 'HADOOP_PREFIX', 'HADOOP_HOME', 'HADOOP_INSTALL':
                 path = os.environ.get(name)
@@ -102,7 +102,7 @@ class HadoopFilesystem(Filesystem):
             yield None  # use $PATH
 
             # Maybe it's in $HADOOP_MAPRED_HOME? $HADOOP_YARN_HOME? Don't give
-            # up. Don't worry about duplicates
+            # up. Don't worry about duplicates; they're de-duplicated below
             for name, path in sorted(os.environ.items()):
                 if name.startswith('HADOOP_') and name.endswith('_HOME'):
                     yield os.path.join(path, 'bin')

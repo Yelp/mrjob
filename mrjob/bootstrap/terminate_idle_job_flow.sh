@@ -64,10 +64,10 @@ do
     # LAST_ACTIVE to UPTIME. This also checks yarn application if it
     # exists (see #1145)
     if [ -z "$LAST_ACTIVE" ] || \
-	! which hadoop > /dev/null || \
+        ! which hadoop > /dev/null || \
         nice hadoop job -list 2> /dev/null | grep -q '^\s*job_' || \
-	nice yarn application -list 2> /dev/null | grep -v 'Total number' | \
-	    grep -q RUNNING
+	[[ -e $(which yarn) ]] && nice yarn application -list 2> /dev/null | grep -v 'Total number' | \
+	grep -q RUNNING
     then
         LAST_ACTIVE=$UPTIME
     else

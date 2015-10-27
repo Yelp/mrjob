@@ -66,8 +66,9 @@ do
     if [ -z "$LAST_ACTIVE" ] || \
         ! which hadoop > /dev/null || \
         nice hadoop job -list 2> /dev/null | grep -q '^\s*job_' || \
-	[[ -e $(which yarn) ]] && nice yarn application -list 2> /dev/null | grep -v 'Total number' | \
-	grep -q RUNNING
+        (which yarn > /dev/null && \
+            nice yarn application -list 2> /dev/null | \
+            grep -v 'Total number' | grep -q RUNNING)
     then
         LAST_ACTIVE=$UPTIME
     else

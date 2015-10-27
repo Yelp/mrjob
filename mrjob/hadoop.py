@@ -15,7 +15,6 @@ import errno
 import getpass
 import logging
 import os
-import os.path
 import posixpath
 import re
 from subprocess import Popen
@@ -96,7 +95,7 @@ def hadoop_log_dir(hadoop_home=None):
         # http://wiki.apache.org/hadoop/HowToConfigure
         if hadoop_home is None:
             hadoop_home = os.environ['HADOOP_HOME']
-        return os.path.join(hadoop_home, 'logs')
+        return posixpath.join(hadoop_home, 'logs')
 
 
 def hadoop_prefix_from_bin(hadoop_bin):
@@ -107,14 +106,14 @@ def hadoop_prefix_from_bin(hadoop_bin):
     path (not ``/``, ``/usr``, or ``/usr/local``).
     """
     # resolve unqualified binary name (relative paths are okay)
-    if os.path.sep not in hadoop_bin:
+    if '/' not in hadoop_bin:
         hadoop_bin = which(hadoop_bin)
         if not hadoop_bin:
             return None
 
     # use parent of hadoop_bin's directory
-    hadoop_home = os.path.abspath(
-        os.path.join(os.path.realpath(os.path.dirname(hadoop_bin)), '..'))
+    hadoop_home = posixpath.abspath(
+        posixpath.join(posixpath.realpath(posixpath.dirname(hadoop_bin)), '..'))
 
     if hadoop_home in _BAD_HADOOP_HOMES:
         return None
@@ -229,20 +228,24 @@ class HadoopJobRunner(MRJobRunner):
     def _find_hadoop_streaming_jar(self):
         """Search for the hadoop streaming jar. See
         :py:meth:`_hadoop_streaming_jar_dirs` for where we search."""
-
         for path in unique(self._hadoop_streaming_jar_dirs()):
             log.info('Looking for Hadoop streaming jar in %s' % path)
 
             streaming_jars = []
             for path in self.fs.ls(path):
-                if HADOOP_STREAMING_JAR_RE.match(os.path.basename(path)):
+                if HADOOP_STREAMING_JAR_RE.match(posixpath.basename(path)):
                     streaming_jars.append(path)
 
-                if streaming_jars:
-                    # prefer shorter paths, so that e.g.
-                    # hadoop-streaming.jar beats hadoop-streaming-1.0.3.jar
-                    streaming_jars.sort(key=lambda p: (len(p), p))
-                    return streaming_jars[0]
+            if streaming_jars:
+                # prefer shorter names and shallower paths
+                def sort_key(p):
+                    return (len('/'.split(p)),
+                            len(posixpath.basename(p)),
+                            p)
+
+                streaming_jars.sort(key=sort_key)
+
+                return streaming_jars[0]
 
         return None
 
@@ -314,7 +317,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""
-        stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
+        stdin_path = posixpath.join(self._get_local_tmp_dir(), 'STDIN')
          # prompt user, so they don't think the process has stalled
         log.info('reading from STDIN')
 

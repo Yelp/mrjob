@@ -78,10 +78,10 @@ class TestFullyQualifyHDFSPath(TestCase):
                          'foo://bar/baz')
 
 
-class TestFindHadoopStreamingJar(SandboxedTestCase):
+class TestGetHadoopStreamingJar(SandboxedTestCase):
 
     def setUp(self):
-        super(TestFindHadoopStreamingJar, self).setUp()
+        super(TestGetHadoopStreamingJar, self).setUp()
 
         self.mock_paths = []
 
@@ -97,6 +97,108 @@ class TestFindHadoopStreamingJar(SandboxedTestCase):
 
     def test_empty_fs(self):
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    def test_deprecated_hadoop_home_option(self):
+        self.runner = HadoopJobRunner(hadoop_home='/ha/do/op/home-option')
+
+        self.mock_paths.append('/ha/do/op/home-option/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/home-option/hadoop-streaming.jar')
+
+    # TODO: test infer from hadoop bin, hard-coded EMR paths
+
+    # test environment variables
+
+    def test_hadoop_prefix(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op/prefix'
+        self.mock_paths.append('/ha/do/op/prefix/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/prefix/hadoop-streaming.jar')
+
+    def test_hadoop_home(self):
+        os.environ['HADOOP_HOME'] = '/ha/do/op/home'
+        self.mock_paths.append('/ha/do/op/home/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/home/hadoop-streaming.jar')
+
+    def test_hadoop_install(self):
+        os.environ['HADOOP_INSTALL'] = '/ha/do/op/install'
+        self.mock_paths.append('/ha/do/op/install/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/install/hadoop-streaming.jar')
+
+    def test_hadoop_mapred_home(self):
+        os.environ['HADOOP_MAPRED_HOME'] = '/ha/do/op/mapred-home'
+        self.mock_paths.append('/ha/do/op/mapred-home/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/mapred-home/hadoop-streaming.jar')
+
+    # TODO: test hadoop_anything_home
+
+    # TODO: test relative priority of environment variables
+
+    # tests of alternate jar names and paths
+
+    def test_subdirs(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+        self.mock_paths.append('/ha/do/op/contrib/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/contrib/hadoop-streaming.jar')
+
+    def test_hadoop_streaming_jar_name_with_version(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-2.6.0-amzn-0.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/hadoop-streaming-2.6.0-amzn-0.jar')
+
+    def test_skip_hadoop_streaming_source_jar(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        # Googled it; it really is named *-sources.jar, not *-source.jar
+        self.mock_paths.append(
+            '/ha/do/op/hadoop-streaming-2.0.0-mr1-cdh4.3.1-sources.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    # tests of multiple matching options
+
+    def test_pick_shortest_name(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-1.0.3.jar')
+        self.mock_paths.append('/ha/do/op/hadoop-streaming.jar')
+
+        # hadoop-streaming-1.0.3.jar comes first in alphabetical order
+        self.assertEqual(sorted(self.mock_paths), self.mock_paths)
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/hadoop-streaming.jar')
+
+    def test_pick_shallowest_subpath(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-1.0.3.jar')
+        self.mock_paths.append('/ha/do/op/old/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/hadoop-streaming-1.0.3.jar')
+
+    def test_fall_back_to_alphabetical_order(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        # Googled it; it really is named *-sources.jar, not *-source.jar
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-a.jar')
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-b.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/hadoop-streaming-a.jar')
+
+
 
 
 

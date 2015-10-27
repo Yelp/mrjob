@@ -2,7 +2,7 @@
 
 # Copyright 2013 Lyft
 # Copyright 2014 Alex Konradi
-# Copyright 2015 Yelp
+# Copyright 2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

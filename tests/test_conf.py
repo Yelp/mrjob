@@ -25,6 +25,7 @@ except ImportError:
 from mock import patch
 
 import mrjob.conf
+from mrjob.conf import ClearedValue
 from mrjob.conf import combine_cmd_lists
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -39,6 +40,7 @@ from mrjob.conf import conf_object_at_path
 from mrjob.conf import dump_mrjob_conf
 from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
+from mrjob.conf import _load_yaml_with_clear_tag
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import logger_disabled
@@ -453,3 +455,14 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
             [bar_path, foo_path, foo_path,
              os.path.join(self.tmp_dir, 'q*'),
              's3://walrus/foo'])
+
+
+class LoadYAMLWithClearTag(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_load_yaml_with_clear_tag('!clear'),
+                         ClearedValue(None))
+
+    def test_null(self):
+        self.assertEqual(_load_yaml_with_clear_tag('!clear null'),
+                         ClearedValue(None))

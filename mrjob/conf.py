@@ -100,6 +100,39 @@ class OptionStore(dict):
 ### READING AND WRITING mrjob.conf ###
 
 
+class ClearedValue(object):
+    """Wrap a value tagged with !clear in mrjob.conf"""
+
+    def __init__(self, value):
+        self.value = value
+
+    def __repr__(self):
+        return '%s(%s)' % (self.__class__.__name__, repr(self.value))
+
+
+def _cleared_value_constructor(loader, node):
+    # tried construct_object(), got an unconstructable recursive node warning
+    if isinstance(node, yaml.MappingNode):
+        value = loader.construct_mapping(node)
+    elif isinstance(node, yaml.ScalarNode):
+        value = loader.construct_scalar(node)
+    elif isinstance(node, yaml.SequenceNode):
+        value = loader.construct_sequence(node)
+    else:
+        raise TypeError
+
+    return ClearedValue(value)
+
+
+def _load_yaml_with_clear_tag(stream):
+    loader = yaml.SafeLoader(stream)
+    loader.add_constructor('!clear', _cleared_value_constructor)
+    try:
+        return loader.get_single_data()
+    finally:
+        loader.dispose()
+
+
 def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
 
@@ -420,7 +453,7 @@ def combine_opts(combiners, *opts_list):
 ### PRIORITY ###
 
 
-# TODO 0.4: Move inside OptionStore
+# TODO: Move inside OptionStore
 def calculate_opt_priority(opts, opt_dicts):
     """Keep track of where in the order opts were specified,
     to handle opts that affect the same thing (e.g. ec2_*instance_type).

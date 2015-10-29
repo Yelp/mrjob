@@ -106,6 +106,12 @@ class ClearedValue(object):
     def __init__(self, value):
         self.value = value
 
+    def __eq__(self, other):
+        if isinstance(other, ClearedValue):
+            return self.value == other.value
+        else:
+            return False
+
     def __repr__(self):
         return '%s(%s)' % (self.__class__.__name__, repr(self.value))
 

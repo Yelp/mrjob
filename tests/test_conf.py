@@ -550,19 +550,20 @@ class LoadYAMLWithClearTag(unittest.TestCase):
 
 class FixClearTag(unittest.TestCase):
 
-    # clear tags are always stripped at top level
-
     def test_none(self):
         self.assertEqual(_fix_clear_tags(None), None)
-        self.assertEqual(_fix_clear_tags(ClearedValue(None)), None)
+        self.assertEqual(_fix_clear_tags(ClearedValue(None)),
+                         ClearedValue(None))
 
     def test_string(self):
         self.assertEqual(_fix_clear_tags('foo'), 'foo')
-        self.assertEqual(_fix_clear_tags(ClearedValue('foo')), 'foo')
+        self.assertEqual(_fix_clear_tags(ClearedValue('foo')),
+                         ClearedValue('foo'))
 
     def test_int(self):
         self.assertEqual(_fix_clear_tags(18), 18)
-        self.assertEqual(_fix_clear_tags(ClearedValue(18)), 18)
+        self.assertEqual(_fix_clear_tags(ClearedValue(18)),
+                         ClearedValue(18))
 
     def test_list(self):
         self.assertEqual(_fix_clear_tags(['foo', 'bar']),
@@ -571,21 +572,21 @@ class FixClearTag(unittest.TestCase):
         # here, !clear is only stripped because it's at the top level
         # see test_nesting() for a ClearedValue([...]) as a dict key
         self.assertEqual(_fix_clear_tags(ClearedValue(['foo', 'bar'])),
-                         ['foo', 'bar'])
+                         ClearedValue(['foo', 'bar']))
 
         self.assertEqual(_fix_clear_tags(['foo', ClearedValue('bar')]),
-                         ['foo', 'bar'])
+                         ['bar'])
 
         self.assertEqual(
             _fix_clear_tags(
                 ClearedValue([ClearedValue('foo'), ClearedValue('bar')])),
-            ['foo', 'bar'])
+            ClearedValue(['bar']))
 
     def test_dict(self):
         self.assertEqual(_fix_clear_tags({'foo': 'bar'}), {'foo': 'bar'})
 
         self.assertEqual(_fix_clear_tags(ClearedValue({'foo': 'bar'})),
-                         {'foo': 'bar'})
+                         ClearedValue({'foo': 'bar'}))
 
         self.assertEqual(_fix_clear_tags({ClearedValue('foo'): 'bar'}),
                          {'foo': ClearedValue('bar')})
@@ -596,7 +597,7 @@ class FixClearTag(unittest.TestCase):
         self.assertEqual(
             _fix_clear_tags(
                 ClearedValue({ClearedValue('foo'): ClearedValue('bar')})),
-            {'foo': ClearedValue('bar')})
+            ClearedValue({'foo': ClearedValue('bar')}))
 
         # ClearedValue('foo') key overrides 'foo' key
         self.assertEqual(
@@ -610,21 +611,18 @@ class FixClearTag(unittest.TestCase):
         self.assertEqual(
             _fix_clear_tags(
                 ClearedValue({'foo': ['bar', {'baz': 'qux'}]})),
-            {'foo': ['bar', {'baz': 'qux'}]})
+            ClearedValue({'foo': ['bar', {'baz': 'qux'}]}))
 
         self.assertEqual(
             _fix_clear_tags(
                 {ClearedValue('foo'): ['bar', {'baz': 'qux'}]}),
             {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
 
-        # here we keep the ClearedValue(...) wrapping the list, because
-        # it's a value in a dict
         self.assertEqual(
             _fix_clear_tags(
                 {'foo': ClearedValue(['bar', {'baz': 'qux'}])}),
             {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
 
-        # ClearedValue inside a list is still meaningless, even when nested
         self.assertEqual(
             _fix_clear_tags(
                 {'foo': [ClearedValue('bar'), {'baz': 'qux'}]}),
@@ -633,7 +631,7 @@ class FixClearTag(unittest.TestCase):
         self.assertEqual(
             _fix_clear_tags(
                 {'foo': ['bar', ClearedValue({'baz': 'qux'})]}),
-            {'foo': ['bar', {'baz': 'qux'}]})
+            {'foo': [{'baz': 'qux'}]})
 
         self.assertEqual(
             _fix_clear_tags(

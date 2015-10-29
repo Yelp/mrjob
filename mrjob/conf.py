@@ -147,30 +147,44 @@ def _load_yaml_with_clear_tag(stream):
 
 
 def _fix_clear_tags(x):
-    """Recursively resolve ClearedValues so that they only wrap values in
-    dictionaries.
+    """Recursively resolve ClearedValues so that ClearedValue(...) can only
+    wrap values in dicts (and in the top-level value we return).
 
-    For dicts, we treat ClearedValue(k): v or ClearedValue(k): ClearedValue(v)
+    In dicts, we treat ClearedValue(k): v or ClearedValue(k): ClearedValue(v)
     as equivalent to k: ClearedValue(k). ClearedValue(k): v1 overrides k: v2.
 
-    For lists, we simply strip ClearedValue
+    In lists, any ClearedValue(...) obliterates values that come before it,
+    and is then unwrapped (this mostly matters for combining options).
     """
-    def _fix(x):
-        if isinstance(x, list):
-            x = [_strip_clear_tag(_fix(v)) for v in x]
-        elif isinstance(x, dict):
-            x = dict((_fix(k), _fix(v)) for k, v in x.items())
-            # handle cleared keys
-            for k, v in list(x.items()):
-                if isinstance(k, ClearedValue):
-                    del x[k]
-                    x[_strip_clear_tag(k)] = ClearedValue(_strip_clear_tag(v))
-        elif isinstance(x, ClearedValue):
-            x = ClearedValue(_fix(x.value))
+    _fix = _fix_clear_tags
 
+    if isinstance(x, list):
+        a = []
+
+        for v in x:
+            if isinstance(v, ClearedValue):
+                a = [_fix(v.value)]
+            else:
+                a.append(_fix(v))
+
+        return a
+
+    elif isinstance(x, dict):
+        d = dict((_fix(k), _fix(v)) for k, v in x.items())
+
+        # handle cleared keys
+        for k, v in list(d.items()):
+            if isinstance(k, ClearedValue):
+                del d[k]
+                d[_strip_clear_tag(k)] = ClearedValue(_strip_clear_tag(v))
+
+        return d
+
+    elif isinstance(x, ClearedValue):
+        return ClearedValue(_fix(x.value))
+
+    else:
         return x
-
-    return _strip_clear_tag(_fix(x))
 
 
 def _strip_clear_tag(v):

@@ -194,15 +194,13 @@ def _cleared_value_representer(dumper, data):
     return node
 
 
-class ClearedValueSafeDumper(yaml.SafeDumper):
-    pass
-
-
-ClearedValueSafeDumper.add_representer(
-    ClearedValue, _cleared_value_representer)
-
-
 def _dump_yaml_with_clear_tags(data, stream=None, **kwds):
+    class ClearedValueSafeDumper(yaml.SafeDumper):
+        pass
+
+    ClearedValueSafeDumper.add_representer(
+        ClearedValue, _cleared_value_representer)
+
     return yaml.dump_all([data], stream, Dumper=ClearedValueSafeDumper, **kwds)
 
 

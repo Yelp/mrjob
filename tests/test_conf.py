@@ -159,6 +159,7 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
     def test_round_trip(self):
         self._test_round_trip({'runners': {'foo': {'qux': 'quux'}}})
 
+    @unittest.skipIf(mrjob.conf.yaml is None, 'no yaml module')
     def test_round_trip_with_clear_tag(self):
         self._test_round_trip(
             {'runners': {'foo': {'qux': ClearedValue('quux')}}})
@@ -513,6 +514,7 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
              's3://walrus/foo'])
 
 
+@unittest.skipIf(mrjob.conf.yaml is None, 'no yaml module')
 class LoadYAMLWithClearTag(unittest.TestCase):
 
     def test_empty(self):

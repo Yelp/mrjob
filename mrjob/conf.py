@@ -135,12 +135,48 @@ def _cleared_value_constructor(loader, node):
 
 
 def _load_yaml_with_clear_tag(stream):
+    """Like yaml.safe_load(), but everything with a !clear tag before it
+    will be wrapped in ClearedValue()."""
     loader = yaml.SafeLoader(stream)
     loader.add_constructor('!clear', _cleared_value_constructor)
     try:
         return loader.get_single_data()
     finally:
         loader.dispose()
+
+
+def _fix_clear_tag(x):
+    """Recursively resolve ClearedValues so that they only wrap values in
+    dictionaries.
+
+    For dicts, we treat ClearedValue(k): v or ClearedValue(k): ClearedValue(v)
+    as equivalent to k: ClearedValue(k). ClearedValue(k): v1 overrides k: v2.
+
+    For lists, we simply strip ClearedValue
+    """
+    def _fix(x):
+        if isinstance(x, list):
+            x = [_strip_clear_tag(_fix(v)) for v in x]
+        elif isinstance(x, dict):
+            x = dict((_fix(k), _fix(v)) for k, v in x.items())
+            # handle cleared keys
+            for k, v in list(x.items()):
+                if isinstance(k, ClearedValue):
+                    del x[k]
+                    x[_strip_clear_tag(k)] = ClearedValue(_strip_clear_tag(v))
+
+        return x
+
+
+    return _strip_clear_tag(_fix(x))
+
+
+def _strip_clear_tag(v):
+    """remove the clear tag from the given value."""
+    if isinstance(v, ClearedValue):
+        return v.value
+    else:
+        return v
 
 
 def find_mrjob_conf():
@@ -188,7 +224,7 @@ def conf_object_at_path(conf_path):
 
     with open(conf_path) as f:
         if yaml:
-            return yaml.safe_load(f)
+            return _fix_clear_tag(_load_yaml_with_clear_tag(f))
         else:
             try:
                 return json.load(f)

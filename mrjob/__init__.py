@@ -67,6 +67,7 @@ __credits__ = [
     'Shusen Liu <liushusen.smart@gmail.com>',
     'Robert Leftwich <rl.0x0@eml.cc>',
     'Adrian Maceiras <amac425@utexas.edu>',
+    'Dallas Marlow <dallas@vineapp.com>',
     'Baris Metin <bmetin@yelp.com>',
     'Konark Modi <modi.konark@gmail.com>',
     'Tetsuya Morimoto <tetsuya.morimoto@gmail.com>',

@@ -154,20 +154,12 @@ def _fix_clear_tags(x):
     as equivalent to k: ClearedValue(k). ClearedValue(k): v1 overrides k: v2.
 
     In lists, any ClearedValue(...) obliterates values that come before it,
-    and is then unwrapped (this mostly matters for combining options).
+    and is then unwrapped, for consistency with _clear_previous_items().
     """
     _fix = _fix_clear_tags
 
     if isinstance(x, list):
-        a = []
-
-        for v in x:
-            if isinstance(v, ClearedValue):
-                a = [_fix(v.value)]
-            else:
-                a.append(_fix(v))
-
-        return a
+        return _clear_previous_items(_fix(item) for item in x)
 
     elif isinstance(x, dict):
         d = dict((_fix(k), _fix(v)) for k, v in x.items())
@@ -185,6 +177,25 @@ def _fix_clear_tags(x):
 
     else:
         return x
+
+
+def _clear_previous_items(items):
+    """Create a list from *items*. If we encounter a :py:class:`ClearedValue`,
+    unwrap it and ignore previous values.
+
+    Unlike :py:func:`_fix_clear_tags()`, this does not recurse into the items
+    in the list (use this to combine items which _fix_clear_tags() has
+    already been called on).
+    """
+    result = []
+
+    for item in items:
+        if isinstance(item, ClearedValue):
+            result = [item.value]
+        else:
+            result.append(item)
+
+    return result
 
 
 def _strip_clear_tag(v):
@@ -342,6 +353,7 @@ def dump_mrjob_conf(conf, f):
     :param f: a file object to write to (e.g. ``open('mrjob.conf', 'w')``)
     """
     if yaml:
+        # TODO: dump clear tags
         yaml.safe_dump(conf, f, default_flow_style=False)
     else:
         json.dump(conf, f, indent=2)

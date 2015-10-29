@@ -460,9 +460,52 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
 class LoadYAMLWithClearTag(unittest.TestCase):
 
     def test_empty(self):
+        self.assertEqual(_load_yaml_with_clear_tag(''),
+                         None)
         self.assertEqual(_load_yaml_with_clear_tag('!clear'),
                          ClearedValue(None))
 
     def test_null(self):
+        self.assertEqual(_load_yaml_with_clear_tag('null'),
+                         None)
         self.assertEqual(_load_yaml_with_clear_tag('!clear null'),
                          ClearedValue(None))
+
+    def test_string(self):
+        self.assertEqual(_load_yaml_with_clear_tag('foo'),
+                         'foo')
+        self.assertEqual(_load_yaml_with_clear_tag('!clear foo'),
+                         ClearedValue('foo'))
+
+    def test_int(self):
+        self.assertEqual(_load_yaml_with_clear_tag('18'),
+                         18)
+        self.assertEqual(_load_yaml_with_clear_tag('!clear 18'),
+                         ClearedValue(18))
+
+    def test_list(self):
+        self.assertEqual(_load_yaml_with_clear_tag('- foo\n- bar'),
+                         ['foo', 'bar'])
+        self.assertEqual(_load_yaml_with_clear_tag('!clear\n- foo\n- bar'),
+                         ClearedValue(['foo', 'bar']))
+        self.assertEqual(_load_yaml_with_clear_tag('- foo\n- !clear bar'),
+                         ['foo', ClearedValue('bar')])
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear\n- !clear foo\n- !clear bar'),
+            ClearedValue([ClearedValue('foo'), ClearedValue('bar')]))
+
+    def test_dict(self):
+        self.assertEqual(_load_yaml_with_clear_tag('foo: bar'),
+                         {'foo': 'bar'})
+        self.assertEqual(_load_yaml_with_clear_tag('!clear\nfoo: bar'),
+                         ClearedValue({'foo': 'bar'}))
+        self.assertEqual(_load_yaml_with_clear_tag('!clear foo: bar'),
+                         {ClearedValue('foo'): 'bar'})
+        self.assertEqual(_load_yaml_with_clear_tag('foo: !clear bar'),
+                         {'foo': ClearedValue('bar')})
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear\n!clear foo: !clear bar'),
+            ClearedValue({ClearedValue('foo'): ClearedValue('bar')}))
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear foo: bar\nfoo: baz'),
+            {ClearedValue('foo'): 'bar', 'foo': 'baz'})

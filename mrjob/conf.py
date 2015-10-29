@@ -112,6 +112,9 @@ class ClearedValue(object):
         else:
             return False
 
+    def __hash__(self):
+        return hash(self.value)
+
     def __repr__(self):
         return '%s(%s)' % (self.__class__.__name__, repr(self.value))
 

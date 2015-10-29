@@ -1,5 +1,6 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -145,7 +146,7 @@ def _load_yaml_with_clear_tag(stream):
         loader.dispose()
 
 
-def _fix_clear_tag(x):
+def _fix_clear_tags(x):
     """Recursively resolve ClearedValues so that they only wrap values in
     dictionaries.
 
@@ -164,9 +165,10 @@ def _fix_clear_tag(x):
                 if isinstance(k, ClearedValue):
                     del x[k]
                     x[_strip_clear_tag(k)] = ClearedValue(_strip_clear_tag(v))
+        elif isinstance(x, ClearedValue):
+            x = ClearedValue(_fix(x.value))
 
         return x
-
 
     return _strip_clear_tag(_fix(x))
 
@@ -224,7 +226,7 @@ def conf_object_at_path(conf_path):
 
     with open(conf_path) as f:
         if yaml:
-            return _fix_clear_tag(_load_yaml_with_clear_tag(f))
+            return _fix_clear_tags(_load_yaml_with_clear_tag(f))
         else:
             try:
                 return json.load(f)

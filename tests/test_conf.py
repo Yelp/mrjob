@@ -1,5 +1,6 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +27,8 @@ from mock import patch
 
 import mrjob.conf
 from mrjob.conf import ClearedValue
+from mrjob.conf import _fix_clear_tags
+from mrjob.conf import _load_yaml_with_clear_tag
 from mrjob.conf import combine_cmd_lists
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -40,7 +43,6 @@ from mrjob.conf import conf_object_at_path
 from mrjob.conf import dump_mrjob_conf
 from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
-from mrjob.conf import _load_yaml_with_clear_tag
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import logger_disabled
@@ -509,3 +511,136 @@ class LoadYAMLWithClearTag(unittest.TestCase):
         self.assertEqual(
             _load_yaml_with_clear_tag('!clear foo: bar\nfoo: baz'),
             {ClearedValue('foo'): 'bar', 'foo': 'baz'})
+
+    def test_nesting(self):
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - baz: qux'),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag(
+                '!clear\n  foo:\n    - bar\n    - baz: qux'),
+            ClearedValue({'foo': ['bar', {'baz': 'qux'}]}))
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear foo:\n  - bar\n  - baz: qux'),
+            {ClearedValue('foo'): ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo: !clear\n  - bar\n  - baz: qux'),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - !clear bar\n  - baz: qux'),
+            {'foo': [ClearedValue('bar'), {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag(
+                'foo:\n  - bar\n  - !clear\n    baz: qux'),
+            {'foo': ['bar', ClearedValue({'baz': 'qux'})]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - !clear baz: qux'),
+            {'foo': ['bar', {ClearedValue('baz'): 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - baz: !clear qux'),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})
+
+
+class FixClearTag(unittest.TestCase):
+
+    # clear tags are always stripped at top level
+
+    def test_none(self):
+        self.assertEqual(_fix_clear_tags(None), None)
+        self.assertEqual(_fix_clear_tags(ClearedValue(None)), None)
+
+    def test_string(self):
+        self.assertEqual(_fix_clear_tags('foo'), 'foo')
+        self.assertEqual(_fix_clear_tags(ClearedValue('foo')), 'foo')
+
+    def test_int(self):
+        self.assertEqual(_fix_clear_tags(18), 18)
+        self.assertEqual(_fix_clear_tags(ClearedValue(18)), 18)
+
+    def test_list(self):
+        self.assertEqual(_fix_clear_tags(['foo', 'bar']),
+                         ['foo', 'bar'])
+
+        # here, !clear is only stripped because it's at the top level
+        # see test_nesting() for a ClearedValue([...]) as a dict key
+        self.assertEqual(_fix_clear_tags(ClearedValue(['foo', 'bar'])),
+                         ['foo', 'bar'])
+
+        self.assertEqual(_fix_clear_tags(['foo', ClearedValue('bar')]),
+                         ['foo', 'bar'])
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue([ClearedValue('foo'), ClearedValue('bar')])),
+            ['foo', 'bar'])
+
+    def test_dict(self):
+        self.assertEqual(_fix_clear_tags({'foo': 'bar'}), {'foo': 'bar'})
+
+        self.assertEqual(_fix_clear_tags(ClearedValue({'foo': 'bar'})),
+                         {'foo': 'bar'})
+
+        self.assertEqual(_fix_clear_tags({ClearedValue('foo'): 'bar'}),
+                         {'foo': ClearedValue('bar')})
+
+        self.assertEqual(_fix_clear_tags({'foo': ClearedValue('bar')}),
+                         {'foo': ClearedValue('bar')})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue({ClearedValue('foo'): ClearedValue('bar')})),
+            {'foo': ClearedValue('bar')})
+
+        # ClearedValue('foo') key overrides 'foo' key
+        self.assertEqual(
+            _fix_clear_tags({ClearedValue('foo'): 'bar', 'foo': 'baz'}),
+            {'foo': ClearedValue('bar')})
+
+    def test_nesting(self):
+        self.assertEqual(_fix_clear_tags({'foo': ['bar', {'baz': 'qux'}]}),
+                         {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue({'foo': ['bar', {'baz': 'qux'}]})),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {ClearedValue('foo'): ['bar', {'baz': 'qux'}]}),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        # here we keep the ClearedValue(...) wrapping the list, because
+        # it's a value in a dict
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ClearedValue(['bar', {'baz': 'qux'}])}),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        # ClearedValue inside a list is still meaningless, even when nested
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': [ClearedValue('bar'), {'baz': 'qux'}]}),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', ClearedValue({'baz': 'qux'})]}),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', {ClearedValue('baz'): 'qux'}]}),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', {'baz': ClearedValue('qux')}]}),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})

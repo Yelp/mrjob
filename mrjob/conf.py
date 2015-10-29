@@ -98,8 +98,48 @@ class OptionStore(dict):
             raise KeyError(key)
 
 
-### READING AND WRITING mrjob.conf ###
+### finding config files ###
 
+def find_mrjob_conf():
+    """Look for :file:`mrjob.conf`, and return its path. Places we look:
+
+    - The location specified by :envvar:`MRJOB_CONF`
+    - :file:`~/.mrjob.conf`
+    - :file:`/etc/mrjob.conf`
+
+    Return ``None`` if we can't find it.
+    """
+    def candidates():
+        if 'MRJOB_CONF' in os.environ:
+            yield expand_path(os.environ['MRJOB_CONF'])
+
+        # $HOME isn't necessarily set on Windows, but ~ works
+        # use os.path.join() so we don't end up mixing \ and /
+        yield expand_path(os.path.join('~', '.mrjob.conf'))
+
+        # this only really makes sense on Unix, so no os.path.join()
+        yield '/etc/mrjob.conf'
+
+    for path in candidates():
+        log.debug('looking for configs in %s' % path)
+        if os.path.exists(path):
+            log.info('using configs in %s' % path)
+            return path
+    else:
+        log.info("no configs found; falling back on auto-configuration")
+        return None
+
+
+def real_mrjob_conf_path(conf_path=None):
+    if conf_path is False:
+        return None
+    elif conf_path is None:
+        return find_mrjob_conf()
+    else:
+        return expand_path(conf_path)
+
+
+### !clear tag ###
 
 class ClearedValue(object):
     """Wrap a value tagged with !clear in mrjob.conf"""
@@ -154,12 +194,12 @@ def _fix_clear_tags(x):
     as equivalent to k: ClearedValue(k). ClearedValue(k): v1 overrides k: v2.
 
     In lists, any ClearedValue(...) obliterates values that come before it,
-    and is then unwrapped, for consistency with _clear_previous_items().
+    and is then unwrapped, for consistency with _resolve_clear_tags_in_list().
     """
     _fix = _fix_clear_tags
 
     if isinstance(x, list):
-        return _clear_previous_items(_fix(item) for item in x)
+        return _resolve_clear_tags_in_list(_fix(item) for item in x)
 
     elif isinstance(x, dict):
         d = dict((_fix(k), _fix(v)) for k, v in x.items())
@@ -179,7 +219,7 @@ def _fix_clear_tags(x):
         return x
 
 
-def _clear_previous_items(items):
+def _resolve_clear_tags_in_list(items):
     """Create a list from *items*. If we encounter a :py:class:`ClearedValue`,
     unwrap it and ignore previous values.
 
@@ -206,44 +246,7 @@ def _strip_clear_tag(v):
         return v
 
 
-def find_mrjob_conf():
-    """Look for :file:`mrjob.conf`, and return its path. Places we look:
-
-    - The location specified by :envvar:`MRJOB_CONF`
-    - :file:`~/.mrjob.conf`
-    - :file:`/etc/mrjob.conf`
-
-    Return ``None`` if we can't find it.
-    """
-    def candidates():
-        if 'MRJOB_CONF' in os.environ:
-            yield expand_path(os.environ['MRJOB_CONF'])
-
-        # $HOME isn't necessarily set on Windows, but ~ works
-        # use os.path.join() so we don't end up mixing \ and /
-        yield expand_path(os.path.join('~', '.mrjob.conf'))
-
-        # this only really makes sense on Unix, so no os.path.join()
-        yield '/etc/mrjob.conf'
-
-    for path in candidates():
-        log.debug('looking for configs in %s' % path)
-        if os.path.exists(path):
-            log.info('using configs in %s' % path)
-            return path
-    else:
-        log.info("no configs found; falling back on auto-configuration")
-        return None
-
-
-def real_mrjob_conf_path(conf_path=None):
-    if conf_path is False:
-        return None
-    elif conf_path is None:
-        return find_mrjob_conf()
-    else:
-        return expand_path(conf_path)
-
+### reading mrjob.conf ###
 
 def conf_object_at_path(conf_path):
     if conf_path is None:
@@ -337,6 +340,8 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
             for path in conf_paths])
 
 
+### writing mrjob.conf ###
+
 def dump_mrjob_conf(conf, f):
     """Write out configuration options to a file.
 
@@ -364,6 +369,11 @@ def dump_mrjob_conf(conf, f):
 
 # combiners generally consider earlier values to be defaults, and later
 # options to override or add on to them.
+
+# combiners assume that the list of values passed to them has already been
+# passed through _fix_clear_tags() (that is, the only place ClearedValue
+# appears is values in dicts).
+
 
 def combine_values(*values):
     """Return the last value in *values* that is not ``None``.
@@ -430,20 +440,34 @@ def combine_dicts(*dicts):
     result = {}
 
     for d in dicts:
-        if d:
-            result.update(d)
+        for k, v in d.items():
+            # delete cleared key
+            if isinstance(v, ClearedValue) and v.value is None:
+                result.pop(k, None)
+
+            # just set the value
+            else:
+                result[k] = _strip_clear_tag(v)
 
     return result
 
 
 def combine_envs(*envs):
     """Combine zero or more dictionaries containing environment variables.
+    Environment variable values may be wrapped in :py:class:`ClearedValue`.
 
     Environment variables later from dictionaries later in the list take
-    priority over those earlier in the list. For variables ending with
-    ``PATH``, we prepend (and add a colon) rather than overwriting.
+    priority over those earlier in the list.
 
-    If you pass in ``None`` in place of a dictionary, it will be ignored.
+    For variables ending with ``PATH``, we prepend (and add a colon) rather
+    than overwriting. Wrapping a path value in :py:class:`ClearedValue`
+    disables this behavior.
+
+    Environment set to ``ClearedValue(None)`` will *delete* environment
+    variables earlier in the list, rather than setting them to ``None``.
+
+    If you pass in ``None`` in place of a dictionary in **envs**, it will be
+    ignored.
     """
     return _combine_envs_helper(envs, local=False)
 
@@ -464,11 +488,19 @@ def _combine_envs_helper(envs, local):
     result = {}
     for env in envs:
         if env:
-            for key, value in env.iteritems():
-                if key.endswith('PATH') and result.get(key):
-                    result[key] = value + pathsep + result[key]
+            for k, v in env.iteritems():
+                # delete cleared keys
+                if isinstance(v, ClearedValue) and v.value is None:
+                    result.pop(k, None)
+
+                # append paths
+                elif (k.endswith('PATH') and result.get(k) and
+                      not isinstance(v, ClearedValue)):
+                    result[k] = v + pathsep + result[k]
+
+                # just set the value
                 else:
-                    result[key] = value
+                    result[k] = _strip_clear_tag(v)
 
     return result
 
@@ -504,19 +536,23 @@ def combine_opts(combiners, *opts_list):
                       combine options by that name. By default, we combine
                       options using :py:func:`combine_values`.
     :param opts_list: one or more dictionaries to combine
+
+    The dict in *opts_list* may not be wrapped in :py:class:`ClearedValue`,
+    but their values may, in which case values of that key from previous
+    opt dicts will be ignored.
     """
     final_opts = {}
 
     keys = set()
     for opts in opts_list:
-        if opts:
+        if isinstance(opts, ClearedValue):
+            raise TypeError
+        elif opts:
             keys.update(opts)
 
     for key in keys:
-        values = []
-        for opts in opts_list:
-            if opts and key in opts:
-                values.append(opts[key])
+        values = _resolve_clear_tags_in_list(
+            opts[key] for opts in opts_list if opts and key in opts)
 
         combine_func = combiners.get(key) or combine_values
         final_opts[key] = combine_func(*values)

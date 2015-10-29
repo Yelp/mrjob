@@ -265,6 +265,27 @@ class CombineDictsTestCase(unittest.TestCase):
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
 
+    def test_None_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'}, {'USER': None}),
+            {'TERM': 'xterm', 'USER': None})
+
+    def test_cleared_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'},
+                          {'USER': ClearedValue('caleb')}),
+            {'TERM': 'xterm', 'USER': 'caleb'})
+
+    def test_deleted_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'},
+                          {'USER': ClearedValue(None)}),
+            {'TERM': 'xterm'})
+
+    def test_dont_accept_wrapped_dicts(self):
+        self.assertRaises(AttributeError,
+                          combine_dicts, ClearedValue({'USER': 'dave'}))
+
 
 class CombineCmdsTestCase(unittest.TestCase):
 
@@ -332,16 +353,31 @@ class CombineEnvsTestCase(unittest.TestCase):
                      {'USER': 'dave', 'TERM': 'xterm'})
 
     def test_paths(self):
-        self.assertEqual(combine_envs(
-            {'PATH': '/bin:/usr/bin',
-             'PYTHONPATH': '/usr/lib/python/site-packages',
-             'PS1': '> '},
-            {'PATH': '/home/dave/bin',
-             'PYTHONPATH': '/home/dave/python',
-             'CLASSPATH': '/home/dave/java',
-             'PS1': '\w> '}),
+        self.assertEqual(
+            combine_envs(
+                {'PATH': '/bin:/usr/bin',
+                 'PYTHONPATH': '/usr/lib/python/site-packages',
+                 'PS1': '> '},
+                {'PATH': '/home/dave/bin',
+                 'PYTHONPATH': '/home/dave/python',
+                 'CLASSPATH': '/home/dave/java',
+                 'PS1': '\w> '}),
             {'PATH': '/home/dave/bin:/bin:/usr/bin',
              'PYTHONPATH': '/home/dave/python:/usr/lib/python/site-packages',
+             'CLASSPATH': '/home/dave/java',
+             'PS1': '\w> '})
+
+    def test_clear_paths(self):
+        self.assertEqual(
+            combine_envs(
+                {'PATH': '/bin:/usr/bin',
+                 'PYTHONPATH': '/usr/lib/python/site-packages',
+                 'PS1': '> '},
+                {'PATH': ClearedValue('/home/dave/bin'),
+                 'PYTHONPATH': ClearedValue(None),
+                 'CLASSPATH': '/home/dave/java',
+                 'PS1': '\w> '}),
+            {'PATH': '/home/dave/bin',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
 
@@ -391,17 +427,37 @@ class CombineOptsTestCase(unittest.TestCase):
         self.assertEqual(combine_opts(combiners={}), {})
 
     def test_combine_opts(self):
-        combiners = {
-            'foo': combine_lists,
-        }
         self.assertEqual(
-            combine_opts(combiners,
+            combine_opts(dict(foo=combine_lists),
                          {'foo': ['bar'], 'baz': ['qux']},
                          {'foo': ['baz'], 'baz': ['quux'], 'bar': 'garply'},
                          None,
                          {}),
             # "baz" doesn't use the list combiner, so ['qux'] is overwritten
             {'foo': ['bar', 'baz'], 'baz': ['quux'], 'bar': 'garply'})
+
+    def test_cleared_opt_values(self):
+        self.assertEqual(
+            combine_opts(dict(foo=combine_lists),
+                         {'foo': ['bar']},
+                         {'foo': ClearedValue(['baz'])}),
+            # ClearedValue(['baz']) overrides bar
+            {'foo': ['baz']})
+
+        self.assertEqual(
+            combine_opts(dict(foo=combine_lists),
+                         {'foo': ['bar']},
+                         {'foo': ClearedValue(None)}),
+            # not None!
+            {'foo': []})
+
+    def test_cant_clear_entire_opt_dicts(self):
+        self.assertRaises(
+            TypeError,
+            combine_opts,
+            dict(foo=combine_lists),
+            {'foo': ['bar']},
+            ClearedValue({'foo': ['baz']}))
 
 
 class CombineAndExpandPathsTestCase(SandboxedTestCase):

@@ -115,7 +115,8 @@ def _cleared_value_constructor(loader, node):
     if isinstance(node, yaml.MappingNode):
         value = loader.construct_mapping(node)
     elif isinstance(node, yaml.ScalarNode):
-        value = loader.construct_scalar(node)
+        # resolve null as None, not u'null'
+        value = yaml.safe_load(node.value)
     elif isinstance(node, yaml.SequenceNode):
         value = loader.construct_sequence(node)
     else:

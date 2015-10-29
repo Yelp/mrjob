@@ -74,9 +74,7 @@ class MRJobConfTestCase(SandboxedTestCase):
             else:
                 return path in self._existing_paths
 
-        p = patch('os.path.exists', side_effect=os_path_exists_stub)
-        p.start()
-        self.addCleanup(p.stop)
+        self.start(patch('os.path.exists', side_effect=os_path_exists_stub))
 
 
 class MRJobBasicConfTestCase(MRJobConfTestCase):
@@ -151,33 +149,26 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
                 load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
                 {})
 
-    def test_round_trip(self):
-        conf = {'runners': {'foo': {'qux': 'quux'}}}
+    def _test_round_trip(self, conf):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         with no_handlers_for_logger('mrjob.conf'):
             self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
 
+    def test_round_trip(self):
+        self._test_round_trip({'runners': {'foo': {'qux': 'quux'}}})
+
+    def test_round_trip_with_clear_tag(self):
+        self._test_round_trip(
+            {'runners': {'foo': {'qux': ClearedValue('quux')}}})
+
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
     def setUp(self):
         super(MRJobConfNoYAMLTestCase, self).setUp()
-        self.blank_out_yaml()
-
-    def tearDown(self):
-        self.restore_yaml()
-        super(MRJobConfNoYAMLTestCase, self).tearDown()
-
-    def blank_out_yaml(self):
-        # This test doesn't care if you have YAML or not, but if you do, get
-        # rid of it temporarily
-        self._real_yaml = mrjob.conf.yaml
-        mrjob.conf.yaml = None
-
-    def restore_yaml(self):
-        mrjob.conf.yaml = self._real_yaml
+        self.start(patch('mrjob.conf.yaml', None))
 
     def test_using_json_and_not_yaml(self):
         conf = {'runners': {'foo': {'qux': 'quux'}}}
@@ -189,6 +180,13 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
         self.assertEqual(contents.replace(' ', '').replace('\n', ''),
                          '{"runners":{"foo":{"qux":"quux"}}}')
+
+    def test_no_support_for_clear_tags(self):
+        conf = {'runners': {'foo': {'qux': ClearedValue('quux')}}}
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        self.assertRaises(TypeError,
+                          dump_mrjob_conf, conf, open(conf_path, 'w'))
 
     def test_json_error(self):
         conf = """

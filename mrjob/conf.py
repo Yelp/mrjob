@@ -186,6 +186,26 @@ def _load_yaml_with_clear_tag(stream):
         loader.dispose()
 
 
+def _cleared_value_representer(dumper, data):
+    if not isinstance(data, ClearedValue):
+        raise TypeError
+    node = dumper.represent_data(data.value)
+    node.tag = '!clear'
+    return node
+
+
+class ClearedValueSafeDumper(yaml.SafeDumper):
+    pass
+
+
+ClearedValueSafeDumper.add_representer(
+    ClearedValue, _cleared_value_representer)
+
+
+def _dump_yaml_with_clear_tags(data, stream=None, **kwds):
+    return yaml.dump_all([data], stream, Dumper=ClearedValueSafeDumper, **kwds)
+
+
 def _fix_clear_tags(x):
     """Recursively resolve ClearedValues so that ClearedValue(...) can only
     wrap values in dicts (and in the top-level value we return).
@@ -358,8 +378,7 @@ def dump_mrjob_conf(conf, f):
     :param f: a file object to write to (e.g. ``open('mrjob.conf', 'w')``)
     """
     if yaml:
-        # TODO: dump clear tags
-        yaml.safe_dump(conf, f, default_flow_style=False)
+        _dump_yaml_with_clear_tags(conf, f, default_flow_style=False)
     else:
         json.dump(conf, f, indent=2)
     f.flush()

@@ -457,14 +457,15 @@ def combine_dicts(*dicts):
     result = {}
 
     for d in dicts:
-        for k, v in d.items():
-            # delete cleared key
-            if isinstance(v, ClearedValue) and v.value is None:
-                result.pop(k, None)
+        if d:
+            for k, v in d.items():
+                # delete cleared key
+                if isinstance(v, ClearedValue) and v.value is None:
+                    result.pop(k, None)
 
-            # just set the value
-            else:
-                result[k] = _strip_clear_tag(v)
+                # just set the value
+                else:
+                    result[k] = _strip_clear_tag(v)
 
     return result
 

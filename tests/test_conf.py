@@ -246,7 +246,7 @@ class CombineDictsTestCase(unittest.TestCase):
             {'TMPDIR': '/var/tmp', 'HOME': '/home/dave'})
 
     def test_skip_None(self):
-        self.assertEqual(combine_envs(None, {'USER': 'dave'}, None,
+        self.assertEqual(combine_dicts(None, {'USER': 'dave'}, None,
                                   {'TERM': 'xterm'}, None),
                      {'USER': 'dave', 'TERM': 'xterm'})
 

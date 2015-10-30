@@ -33,7 +33,9 @@ try:
 except ImportError:
     boto = None
 
+import mrjob.conf
 from mrjob.conf import dump_mrjob_conf
+from mrjob.conf import ClearedValue
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
 from tests.quiet import logger_disabled
@@ -314,6 +316,49 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
         opts = RunnerOptionStore('inline', {}, [path_left, path_right])
         self.assertEqual(opts['jobconf'],
                          dict(from_left=1, from_both=2, from_right=2))
+
+
+@unittest.skipIf(mrjob.conf.yaml is None, 'no yaml module')
+class ClearTagTestCase(ConfigFilesTestCase):
+
+    BASE_CONF = {
+        'runners': {
+            'inline': {
+                'cmdenv': {
+                    'PATH': '/some/dir',
+                },
+                'jobconf': {
+                    'some.property': 'something',
+                },
+                'setup': ['do something'],
+            }
+        }
+    }
+
+    def setUp(self):
+        super(ClearTagTestCase, self).setUp()
+
+        self.base_conf_path = self.save_conf('base.conf', self.BASE_CONF)
+        self.base_opts = RunnerOptionStore('inline', {}, [self.base_conf_path])
+
+    def test_clear_setup(self):
+        opts = self.opts_for_conf('extend.conf', {
+            'include': self.base_conf_path,
+            'runners': {
+                'inline': {
+                    'setup': ClearedValue(['instead do this'])
+                }
+            }
+        })
+
+        self.assertEqual(opts['cmdenv'], self.base_opts['cmdenv'])
+        self.assertEqual(opts['jobconf'], self.base_opts['jobconf'])
+        self.assertEqual(opts['setup'], ['instead do this'])
+
+    # TODO: test clearing cmdenv and jobconf
+
+
+
 
 
 class TestExtraKwargs(ConfigFilesTestCase):

@@ -2773,7 +2773,8 @@ class CleanUpJobTestCase(MockBotoTestCase):
             yield mock_dict
 
     def _quick_runner(self):
-        r = EMRJobRunner(conf_paths=[], ec2_key_pair_file='fake.pem')
+        r = EMRJobRunner(conf_paths=[], ec2_key_pair_file='fake.pem',
+                         pool_emr_job_flows=True)
         r._cluster_id = 'j-ESSEOWENS'
         r._address = 'Albuquerque, NM'
         r._ran_job = False
@@ -2823,6 +2824,13 @@ class CleanUpJobTestCase(MockBotoTestCase):
                               side_effect=die_ssh):
                 r._cleanup_job()
                 self.assertIn('Unable to kill job', stderr.getvalue())
+
+    def test_job_cleanup_mechanics_not_started(self):
+        r = self._quick_runner()
+        r._cluster_id = None
+        with patch.object(mrjob.emr, 'ssh_terminate_single_job') as p:
+            r._cleanup_job()
+            p.assert_not_called()
 
     def test_job_cleanup_mechanics_io_fail(self):
         def die_io(*args, **kwargs):

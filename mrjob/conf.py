@@ -205,19 +205,20 @@ def _dump_yaml_with_clear_tags(data, stream=None, **kwds):
 
 
 def _fix_clear_tags(x):
-    """Recursively resolve ClearedValues so that ClearedValue(...) can only
-    wrap values in dicts (and in the top-level value we return).
+    """Recursively resolve :py:class:`ClearedValue` wrappers so that
+    ``ClearedValue(...)`` can only wrap values in dicts (and in the top-level
+    value we return).
 
-    In dicts, we treat ClearedValue(k): v or ClearedValue(k): ClearedValue(v)
-    as equivalent to k: ClearedValue(k). ClearedValue(k): v1 overrides k: v2.
+    In dicts, we treat ``ClearedValue(k): v`` or
+    ``ClearedValue(k): ClearedValue(v)`` as equivalent to
+    ``k: ClearedValue(v)``. ``ClearedValue(k): v1`` overrides ``k: v2``.
 
-    In lists, any ClearedValue(...) obliterates values that come before it,
-    and is then unwrapped, for consistency with _resolve_clear_tags_in_list().
+    In lists, any ClearedValue wrappers are simply stripped.
     """
     _fix = _fix_clear_tags
 
     if isinstance(x, list):
-        return _resolve_clear_tags_in_list(_fix(item) for item in x)
+        return [_fix(_strip_clear_tag(item)) for item in x]
 
     elif isinstance(x, dict):
         d = dict((_fix(k), _fix(v)) for k, v in x.items())
@@ -239,11 +240,8 @@ def _fix_clear_tags(x):
 
 def _resolve_clear_tags_in_list(items):
     """Create a list from *items*. If we encounter a :py:class:`ClearedValue`,
-    unwrap it and ignore previous values.
-
-    Unlike :py:func:`_fix_clear_tags()`, this does not recurse into the items
-    in the list (use this to combine items which _fix_clear_tags() has
-    already been called on).
+    unwrap it and ignore previous values. Used by ``combine_*()`` functions
+    to combine lists of values.
     """
     result = []
 

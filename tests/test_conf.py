@@ -625,18 +625,16 @@ class FixClearTag(unittest.TestCase):
         self.assertEqual(_fix_clear_tags(['foo', 'bar']),
                          ['foo', 'bar'])
 
-        # here, !clear is only stripped because it's at the top level
-        # see test_nesting() for a ClearedValue([...]) as a dict key
         self.assertEqual(_fix_clear_tags(ClearedValue(['foo', 'bar'])),
                          ClearedValue(['foo', 'bar']))
 
         self.assertEqual(_fix_clear_tags(['foo', ClearedValue('bar')]),
-                         ['bar'])
+                         ['foo', 'bar'])
 
         self.assertEqual(
             _fix_clear_tags(
                 ClearedValue([ClearedValue('foo'), ClearedValue('bar')])),
-            ClearedValue(['bar']))
+            ClearedValue(['foo', 'bar']))
 
     def test_dict(self):
         self.assertEqual(_fix_clear_tags({'foo': 'bar'}), {'foo': 'bar'})
@@ -687,7 +685,7 @@ class FixClearTag(unittest.TestCase):
         self.assertEqual(
             _fix_clear_tags(
                 {'foo': ['bar', ClearedValue({'baz': 'qux'})]}),
-            {'foo': [{'baz': 'qux'}]})
+            {'foo': ['bar', {'baz': 'qux'}]})
 
         self.assertEqual(
             _fix_clear_tags(

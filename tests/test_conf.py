@@ -1,5 +1,6 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +26,9 @@ except ImportError:
 from mock import patch
 
 import mrjob.conf
+from mrjob.conf import ClearedValue
+from mrjob.conf import _fix_clear_tags
+from mrjob.conf import _load_yaml_with_clear_tag
 from mrjob.conf import combine_cmd_lists
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -70,9 +74,7 @@ class MRJobConfTestCase(SandboxedTestCase):
             else:
                 return path in self._existing_paths
 
-        p = patch('os.path.exists', side_effect=os_path_exists_stub)
-        p.start()
-        self.addCleanup(p.stop)
+        self.start(patch('os.path.exists', side_effect=os_path_exists_stub))
 
 
 class MRJobBasicConfTestCase(MRJobConfTestCase):
@@ -147,33 +149,27 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
                 load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
                 {})
 
-    def test_round_trip(self):
-        conf = {'runners': {'foo': {'qux': 'quux'}}}
+    def _test_round_trip(self, conf):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         dump_mrjob_conf(conf, open(conf_path, 'w'))
         with no_handlers_for_logger('mrjob.conf'):
             self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
 
+    def test_round_trip(self):
+        self._test_round_trip({'runners': {'foo': {'qux': 'quux'}}})
+
+    @unittest.skipIf(mrjob.conf.yaml is None, 'no yaml module')
+    def test_round_trip_with_clear_tag(self):
+        self._test_round_trip(
+            {'runners': {'foo': {'qux': ClearedValue('quux')}}})
+
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
     def setUp(self):
         super(MRJobConfNoYAMLTestCase, self).setUp()
-        self.blank_out_yaml()
-
-    def tearDown(self):
-        self.restore_yaml()
-        super(MRJobConfNoYAMLTestCase, self).tearDown()
-
-    def blank_out_yaml(self):
-        # This test doesn't care if you have YAML or not, but if you do, get
-        # rid of it temporarily
-        self._real_yaml = mrjob.conf.yaml
-        mrjob.conf.yaml = None
-
-    def restore_yaml(self):
-        mrjob.conf.yaml = self._real_yaml
+        self.start(patch('mrjob.conf.yaml', None))
 
     def test_using_json_and_not_yaml(self):
         conf = {'runners': {'foo': {'qux': 'quux'}}}
@@ -185,6 +181,13 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
         self.assertEqual(contents.replace(' ', '').replace('\n', ''),
                          '{"runners":{"foo":{"qux":"quux"}}}')
+
+    def test_no_support_for_clear_tags(self):
+        conf = {'runners': {'foo': {'qux': ClearedValue('quux')}}}
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        self.assertRaises(TypeError,
+                          dump_mrjob_conf, conf, open(conf_path, 'w'))
 
     def test_json_error(self):
         conf = """
@@ -243,7 +246,7 @@ class CombineDictsTestCase(unittest.TestCase):
             {'TMPDIR': '/var/tmp', 'HOME': '/home/dave'})
 
     def test_skip_None(self):
-        self.assertEqual(combine_envs(None, {'USER': 'dave'}, None,
+        self.assertEqual(combine_dicts(None, {'USER': 'dave'}, None,
                                   {'TERM': 'xterm'}, None),
                      {'USER': 'dave', 'TERM': 'xterm'})
 
@@ -260,6 +263,27 @@ class CombineDictsTestCase(unittest.TestCase):
              'PYTHONPATH': '/home/dave/python',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
+
+    def test_None_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'}, {'USER': None}),
+            {'TERM': 'xterm', 'USER': None})
+
+    def test_cleared_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'},
+                          {'USER': ClearedValue('caleb')}),
+            {'TERM': 'xterm', 'USER': 'caleb'})
+
+    def test_deleted_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'},
+                          {'USER': ClearedValue(None)}),
+            {'TERM': 'xterm'})
+
+    def test_dont_accept_wrapped_dicts(self):
+        self.assertRaises(AttributeError,
+                          combine_dicts, ClearedValue({'USER': 'dave'}))
 
 
 class CombineCmdsTestCase(unittest.TestCase):
@@ -328,16 +352,31 @@ class CombineEnvsTestCase(unittest.TestCase):
                      {'USER': 'dave', 'TERM': 'xterm'})
 
     def test_paths(self):
-        self.assertEqual(combine_envs(
-            {'PATH': '/bin:/usr/bin',
-             'PYTHONPATH': '/usr/lib/python/site-packages',
-             'PS1': '> '},
-            {'PATH': '/home/dave/bin',
-             'PYTHONPATH': '/home/dave/python',
-             'CLASSPATH': '/home/dave/java',
-             'PS1': '\w> '}),
+        self.assertEqual(
+            combine_envs(
+                {'PATH': '/bin:/usr/bin',
+                 'PYTHONPATH': '/usr/lib/python/site-packages',
+                 'PS1': '> '},
+                {'PATH': '/home/dave/bin',
+                 'PYTHONPATH': '/home/dave/python',
+                 'CLASSPATH': '/home/dave/java',
+                 'PS1': '\w> '}),
             {'PATH': '/home/dave/bin:/bin:/usr/bin',
              'PYTHONPATH': '/home/dave/python:/usr/lib/python/site-packages',
+             'CLASSPATH': '/home/dave/java',
+             'PS1': '\w> '})
+
+    def test_clear_paths(self):
+        self.assertEqual(
+            combine_envs(
+                {'PATH': '/bin:/usr/bin',
+                 'PYTHONPATH': '/usr/lib/python/site-packages',
+                 'PS1': '> '},
+                {'PATH': ClearedValue('/home/dave/bin'),
+                 'PYTHONPATH': ClearedValue(None),
+                 'CLASSPATH': '/home/dave/java',
+                 'PS1': '\w> '}),
+            {'PATH': '/home/dave/bin',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
 
@@ -387,17 +426,37 @@ class CombineOptsTestCase(unittest.TestCase):
         self.assertEqual(combine_opts(combiners={}), {})
 
     def test_combine_opts(self):
-        combiners = {
-            'foo': combine_lists,
-        }
         self.assertEqual(
-            combine_opts(combiners,
+            combine_opts(dict(foo=combine_lists),
                          {'foo': ['bar'], 'baz': ['qux']},
                          {'foo': ['baz'], 'baz': ['quux'], 'bar': 'garply'},
                          None,
                          {}),
             # "baz" doesn't use the list combiner, so ['qux'] is overwritten
             {'foo': ['bar', 'baz'], 'baz': ['quux'], 'bar': 'garply'})
+
+    def test_cleared_opt_values(self):
+        self.assertEqual(
+            combine_opts(dict(foo=combine_lists),
+                         {'foo': ['bar']},
+                         {'foo': ClearedValue(['baz'])}),
+            # ClearedValue(['baz']) overrides bar
+            {'foo': ['baz']})
+
+        self.assertEqual(
+            combine_opts(dict(foo=combine_lists),
+                         {'foo': ['bar']},
+                         {'foo': ClearedValue(None)}),
+            # not None!
+            {'foo': []})
+
+    def test_cant_clear_entire_opt_dicts(self):
+        self.assertRaises(
+            TypeError,
+            combine_opts,
+            dict(foo=combine_lists),
+            {'foo': ['bar']},
+            ClearedValue({'foo': ['baz']}))
 
 
 class CombineAndExpandPathsTestCase(SandboxedTestCase):
@@ -453,3 +512,187 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
             [bar_path, foo_path, foo_path,
              os.path.join(self.tmp_dir, 'q*'),
              's3://walrus/foo'])
+
+
+@unittest.skipIf(mrjob.conf.yaml is None, 'no yaml module')
+class LoadYAMLWithClearTag(unittest.TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_load_yaml_with_clear_tag(''),
+                         None)
+        self.assertEqual(_load_yaml_with_clear_tag('!clear'),
+                         ClearedValue(None))
+
+    def test_null(self):
+        self.assertEqual(_load_yaml_with_clear_tag('null'),
+                         None)
+        self.assertEqual(_load_yaml_with_clear_tag('!clear null'),
+                         ClearedValue(None))
+
+    def test_string(self):
+        self.assertEqual(_load_yaml_with_clear_tag('foo'),
+                         'foo')
+        self.assertEqual(_load_yaml_with_clear_tag('!clear foo'),
+                         ClearedValue('foo'))
+
+    def test_int(self):
+        self.assertEqual(_load_yaml_with_clear_tag('18'),
+                         18)
+        self.assertEqual(_load_yaml_with_clear_tag('!clear 18'),
+                         ClearedValue(18))
+
+    def test_list(self):
+        self.assertEqual(_load_yaml_with_clear_tag('- foo\n- bar'),
+                         ['foo', 'bar'])
+        self.assertEqual(_load_yaml_with_clear_tag('!clear\n- foo\n- bar'),
+                         ClearedValue(['foo', 'bar']))
+        self.assertEqual(_load_yaml_with_clear_tag('- foo\n- !clear bar'),
+                         ['foo', ClearedValue('bar')])
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear\n- !clear foo\n- !clear bar'),
+            ClearedValue([ClearedValue('foo'), ClearedValue('bar')]))
+
+    def test_dict(self):
+        self.assertEqual(_load_yaml_with_clear_tag('foo: bar'),
+                         {'foo': 'bar'})
+        self.assertEqual(_load_yaml_with_clear_tag('!clear\nfoo: bar'),
+                         ClearedValue({'foo': 'bar'}))
+        self.assertEqual(_load_yaml_with_clear_tag('!clear foo: bar'),
+                         {ClearedValue('foo'): 'bar'})
+        self.assertEqual(_load_yaml_with_clear_tag('foo: !clear bar'),
+                         {'foo': ClearedValue('bar')})
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear\n!clear foo: !clear bar'),
+            ClearedValue({ClearedValue('foo'): ClearedValue('bar')}))
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear foo: bar\nfoo: baz'),
+            {ClearedValue('foo'): 'bar', 'foo': 'baz'})
+
+    def test_nesting(self):
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - baz: qux'),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag(
+                '!clear\n  foo:\n    - bar\n    - baz: qux'),
+            ClearedValue({'foo': ['bar', {'baz': 'qux'}]}))
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear foo:\n  - bar\n  - baz: qux'),
+            {ClearedValue('foo'): ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo: !clear\n  - bar\n  - baz: qux'),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - !clear bar\n  - baz: qux'),
+            {'foo': [ClearedValue('bar'), {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag(
+                'foo:\n  - bar\n  - !clear\n    baz: qux'),
+            {'foo': ['bar', ClearedValue({'baz': 'qux'})]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - !clear baz: qux'),
+            {'foo': ['bar', {ClearedValue('baz'): 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - baz: !clear qux'),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})
+
+
+class FixClearTag(unittest.TestCase):
+
+    def test_none(self):
+        self.assertEqual(_fix_clear_tags(None), None)
+        self.assertEqual(_fix_clear_tags(ClearedValue(None)),
+                         ClearedValue(None))
+
+    def test_string(self):
+        self.assertEqual(_fix_clear_tags('foo'), 'foo')
+        self.assertEqual(_fix_clear_tags(ClearedValue('foo')),
+                         ClearedValue('foo'))
+
+    def test_int(self):
+        self.assertEqual(_fix_clear_tags(18), 18)
+        self.assertEqual(_fix_clear_tags(ClearedValue(18)),
+                         ClearedValue(18))
+
+    def test_list(self):
+        self.assertEqual(_fix_clear_tags(['foo', 'bar']),
+                         ['foo', 'bar'])
+
+        self.assertEqual(_fix_clear_tags(ClearedValue(['foo', 'bar'])),
+                         ClearedValue(['foo', 'bar']))
+
+        self.assertEqual(_fix_clear_tags(['foo', ClearedValue('bar')]),
+                         ['foo', 'bar'])
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue([ClearedValue('foo'), ClearedValue('bar')])),
+            ClearedValue(['foo', 'bar']))
+
+    def test_dict(self):
+        self.assertEqual(_fix_clear_tags({'foo': 'bar'}), {'foo': 'bar'})
+
+        self.assertEqual(_fix_clear_tags(ClearedValue({'foo': 'bar'})),
+                         ClearedValue({'foo': 'bar'}))
+
+        self.assertEqual(_fix_clear_tags({ClearedValue('foo'): 'bar'}),
+                         {'foo': ClearedValue('bar')})
+
+        self.assertEqual(_fix_clear_tags({'foo': ClearedValue('bar')}),
+                         {'foo': ClearedValue('bar')})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue({ClearedValue('foo'): ClearedValue('bar')})),
+            ClearedValue({'foo': ClearedValue('bar')}))
+
+        # ClearedValue('foo') key overrides 'foo' key
+        self.assertEqual(
+            _fix_clear_tags({ClearedValue('foo'): 'bar', 'foo': 'baz'}),
+            {'foo': ClearedValue('bar')})
+
+    def test_nesting(self):
+        self.assertEqual(_fix_clear_tags({'foo': ['bar', {'baz': 'qux'}]}),
+                         {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue({'foo': ['bar', {'baz': 'qux'}]})),
+            ClearedValue({'foo': ['bar', {'baz': 'qux'}]}))
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {ClearedValue('foo'): ['bar', {'baz': 'qux'}]}),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ClearedValue(['bar', {'baz': 'qux'}])}),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': [ClearedValue('bar'), {'baz': 'qux'}]}),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', ClearedValue({'baz': 'qux'})]}),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', {ClearedValue('baz'): 'qux'}]}),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', {'baz': ClearedValue('qux')}]}),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})

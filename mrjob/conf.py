@@ -1,5 +1,6 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -97,8 +98,7 @@ class OptionStore(dict):
             raise KeyError(key)
 
 
-### READING AND WRITING mrjob.conf ###
-
+### finding config files ###
 
 def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
@@ -139,13 +139,138 @@ def real_mrjob_conf_path(conf_path=None):
         return expand_path(conf_path)
 
 
+### !clear tag ###
+
+class ClearedValue(object):
+    """Wrap a value tagged with !clear in mrjob.conf"""
+
+    def __init__(self, value):
+        self.value = value
+
+    def __eq__(self, other):
+        if isinstance(other, ClearedValue):
+            return self.value == other.value
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.value)
+
+    def __repr__(self):
+        return '%s(%s)' % (self.__class__.__name__, repr(self.value))
+
+
+def _cleared_value_constructor(loader, node):
+    # tried construct_object(), got an unconstructable recursive node warning
+    if isinstance(node, yaml.MappingNode):
+        value = loader.construct_mapping(node)
+    elif isinstance(node, yaml.ScalarNode):
+        # resolve null as None, not u'null'
+        value = yaml.safe_load(node.value)
+    elif isinstance(node, yaml.SequenceNode):
+        value = loader.construct_sequence(node)
+    else:
+        raise TypeError
+
+    return ClearedValue(value)
+
+
+def _load_yaml_with_clear_tag(stream):
+    """Like yaml.safe_load(), but everything with a !clear tag before it
+    will be wrapped in ClearedValue()."""
+    loader = yaml.SafeLoader(stream)
+    loader.add_constructor('!clear', _cleared_value_constructor)
+    try:
+        return loader.get_single_data()
+    finally:
+        loader.dispose()
+
+
+def _cleared_value_representer(dumper, data):
+    if not isinstance(data, ClearedValue):
+        raise TypeError
+    node = dumper.represent_data(data.value)
+    node.tag = '!clear'
+    return node
+
+
+def _dump_yaml_with_clear_tags(data, stream=None, **kwds):
+    class ClearedValueSafeDumper(yaml.SafeDumper):
+        pass
+
+    ClearedValueSafeDumper.add_representer(
+        ClearedValue, _cleared_value_representer)
+
+    return yaml.dump_all([data], stream, Dumper=ClearedValueSafeDumper, **kwds)
+
+
+def _fix_clear_tags(x):
+    """Recursively resolve :py:class:`ClearedValue` wrappers so that
+    ``ClearedValue(...)`` can only wrap values in dicts (and in the top-level
+    value we return).
+
+    In dicts, we treat ``ClearedValue(k): v`` or
+    ``ClearedValue(k): ClearedValue(v)`` as equivalent to
+    ``k: ClearedValue(v)``. ``ClearedValue(k): v1`` overrides ``k: v2``.
+
+    In lists, any ClearedValue wrappers are simply stripped.
+    """
+    _fix = _fix_clear_tags
+
+    if isinstance(x, list):
+        return [_fix(_strip_clear_tag(item)) for item in x]
+
+    elif isinstance(x, dict):
+        d = dict((_fix(k), _fix(v)) for k, v in x.items())
+
+        # handle cleared keys
+        for k, v in list(d.items()):
+            if isinstance(k, ClearedValue):
+                del d[k]
+                d[_strip_clear_tag(k)] = ClearedValue(_strip_clear_tag(v))
+
+        return d
+
+    elif isinstance(x, ClearedValue):
+        return ClearedValue(_fix(x.value))
+
+    else:
+        return x
+
+
+def _resolve_clear_tags_in_list(items):
+    """Create a list from *items*. If we encounter a :py:class:`ClearedValue`,
+    unwrap it and ignore previous values. Used by ``combine_*()`` functions
+    to combine lists of values.
+    """
+    result = []
+
+    for item in items:
+        if isinstance(item, ClearedValue):
+            result = [item.value]
+        else:
+            result.append(item)
+
+    return result
+
+
+def _strip_clear_tag(v):
+    """remove the clear tag from the given value."""
+    if isinstance(v, ClearedValue):
+        return v.value
+    else:
+        return v
+
+
+### reading mrjob.conf ###
+
 def conf_object_at_path(conf_path):
     if conf_path is None:
         return None
 
     with open(conf_path) as f:
         if yaml:
-            return yaml.safe_load(f)
+            return _fix_clear_tags(_load_yaml_with_clear_tag(f))
         else:
             try:
                 return json.load(f)
@@ -231,6 +356,8 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
             for path in conf_paths])
 
 
+### writing mrjob.conf ###
+
 def dump_mrjob_conf(conf, f):
     """Write out configuration options to a file.
 
@@ -247,7 +374,7 @@ def dump_mrjob_conf(conf, f):
     :param f: a file object to write to (e.g. ``open('mrjob.conf', 'w')``)
     """
     if yaml:
-        yaml.safe_dump(conf, f, default_flow_style=False)
+        _dump_yaml_with_clear_tags(conf, f, default_flow_style=False)
     else:
         json.dump(conf, f, indent=2)
     f.flush()
@@ -257,6 +384,11 @@ def dump_mrjob_conf(conf, f):
 
 # combiners generally consider earlier values to be defaults, and later
 # options to override or add on to them.
+
+# combiners assume that the list of values passed to them has already been
+# passed through _fix_clear_tags() (that is, the only place ClearedValue
+# appears is values in dicts).
+
 
 def combine_values(*values):
     """Return the last value in *values* that is not ``None``.
@@ -324,19 +456,34 @@ def combine_dicts(*dicts):
 
     for d in dicts:
         if d:
-            result.update(d)
+            for k, v in d.items():
+                # delete cleared key
+                if isinstance(v, ClearedValue) and v.value is None:
+                    result.pop(k, None)
+
+                # just set the value
+                else:
+                    result[k] = _strip_clear_tag(v)
 
     return result
 
 
 def combine_envs(*envs):
     """Combine zero or more dictionaries containing environment variables.
+    Environment variable values may be wrapped in :py:class:`ClearedValue`.
 
     Environment variables later from dictionaries later in the list take
-    priority over those earlier in the list. For variables ending with
-    ``PATH``, we prepend (and add a colon) rather than overwriting.
+    priority over those earlier in the list.
 
-    If you pass in ``None`` in place of a dictionary, it will be ignored.
+    For variables ending with ``PATH``, we prepend (and add a colon) rather
+    than overwriting. Wrapping a path value in :py:class:`ClearedValue`
+    disables this behavior.
+
+    Environment set to ``ClearedValue(None)`` will *delete* environment
+    variables earlier in the list, rather than setting them to ``None``.
+
+    If you pass in ``None`` in place of a dictionary in **envs**, it will be
+    ignored.
     """
     return _combine_envs_helper(envs, local=False)
 
@@ -357,11 +504,19 @@ def _combine_envs_helper(envs, local):
     result = {}
     for env in envs:
         if env:
-            for key, value in env.iteritems():
-                if key.endswith('PATH') and result.get(key):
-                    result[key] = value + pathsep + result[key]
+            for k, v in env.iteritems():
+                # delete cleared keys
+                if isinstance(v, ClearedValue) and v.value is None:
+                    result.pop(k, None)
+
+                # append paths
+                elif (k.endswith('PATH') and result.get(k) and
+                      not isinstance(v, ClearedValue)):
+                    result[k] = v + pathsep + result[k]
+
+                # just set the value
                 else:
-                    result[key] = value
+                    result[k] = _strip_clear_tag(v)
 
     return result
 
@@ -397,19 +552,23 @@ def combine_opts(combiners, *opts_list):
                       combine options by that name. By default, we combine
                       options using :py:func:`combine_values`.
     :param opts_list: one or more dictionaries to combine
+
+    The dict in *opts_list* may not be wrapped in :py:class:`ClearedValue`,
+    but their values may, in which case values of that key from previous
+    opt dicts will be ignored.
     """
     final_opts = {}
 
     keys = set()
     for opts in opts_list:
-        if opts:
+        if isinstance(opts, ClearedValue):
+            raise TypeError
+        elif opts:
             keys.update(opts)
 
     for key in keys:
-        values = []
-        for opts in opts_list:
-            if opts and key in opts:
-                values.append(opts[key])
+        values = _resolve_clear_tags_in_list(
+            opts[key] for opts in opts_list if opts and key in opts)
 
         combine_func = combiners.get(key) or combine_values
         final_opts[key] = combine_func(*values)
@@ -420,7 +579,7 @@ def combine_opts(combiners, *opts_list):
 ### PRIORITY ###
 
 
-# TODO 0.4: Move inside OptionStore
+# TODO: Move inside OptionStore
 def calculate_opt_priority(opts, opt_dicts):
     """Keep track of where in the order opts were specified,
     to handle opts that affect the same thing (e.g. ec2_*instance_type).

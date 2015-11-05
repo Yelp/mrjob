@@ -25,7 +25,7 @@ try:
         'install_requires': [
             'boto>=2.6.0',
             'filechunkio',
-            'PyYAML',
+            'PyYAML>=3.10',
             'simplejson>=2.0.9',
         ],
         'provides': ['mrjob'],

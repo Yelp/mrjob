@@ -5,15 +5,15 @@ Bootstrapping allows you to configure EMR machines to your needs.
 
 AMI 2.x and AMI 3.x version differences
 -----------------------------------------------
-AMI versions 2.x are based on `Debian 6.0.2 (Squeeze) 
+AMI versions 2.x are based on `Debian 6.0.2 (Squeeze)
 <http://www.debian.org/News/2011/20110625>`_.  The package management system is ``apt-get``. Any package distributed with Debian Squeeze should be available.
 
-AMI versions 3.x are based on `Amazon Linux Release 2012.09 
+AMI versions 3.x are based on `Amazon Linux Release 2012.09
 <https://aws.amazon.com/amazon-linux-ami/2012.09-release-notes/>`_. This major bump changed the package management system to ``yum``. You can view the list of RPM packages Amazon distributed with the 2012.09.1 release `here
-<https://aws.amazon.com/amazon-linux-ami/2012.09-packages/>`_.
+<https://aws.amazon.com/amazon-linux-ami/2012.09-packages/>`__.
 
-You can follow the AMI changelog `here 
-<http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-ami.html>`_.
+You can follow the AMI changelog `here
+<http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-ami.html>`__.
 
 Installing Python packages with pip
 -----------------------------------
@@ -84,7 +84,7 @@ for custom-built packages):
     --bootstrap 'sudo pip install $MY_PYTHON_PKGS/*.tar.gz#'
 
 Installing Debian packages on AMI 2.x:
---------------------------
+--------------------------------------
 
 As we did with :command:`pip`, you can use ``apt-get`` to install any
 package from the Debian archive. For example, to install Python 3:
@@ -100,7 +100,7 @@ If you have particular ``.deb`` files you want to install, do:
     --bootstrap 'sudo dpkg -i path/to/packages/*.deb#'
 
 Installing RPM Packages on AMI 3.x:
---------------------------
+-----------------------------------
 
 Conversely, while running on an AMI 3.x you can install the Python 3 RPM archive by using ``yum``:
 

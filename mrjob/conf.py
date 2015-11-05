@@ -517,7 +517,7 @@ def _combine_envs_helper(envs, local):
     result = {}
     for env in envs:
         if env:
-            for k, v in env.iteritems():
+            for k, v in env.items():
                 # delete cleared keys
                 if isinstance(v, ClearedValue) and v.value is None:
                     result.pop(k, None)

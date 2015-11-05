@@ -339,7 +339,12 @@ is equivalent to:
         setup:
         - /run/this/other/command
 
-If you find it more readable, you can also put the ``!clear`` tag *before* the
+The ``!clear`` tag overrides any previously read config files, not just
+included ones. For example, you could get the same result by removing the
+``include:`` from ``~/mrjob.conf`` above and running your job with
+``-c ~/mrjob.base.conf -c ~/mrjob.conf``.
+
+If you find it more readable, you may put the ``!clear`` tag *before* the
 key you want to clear. For example,
 
 .. code-block:: yaml

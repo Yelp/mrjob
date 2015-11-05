@@ -339,10 +339,10 @@ is equivalent to:
         setup:
         - /run/this/other/command
 
-The ``!clear`` tag overrides any previously read config files, not just
-included ones. For example, you could get the same result by removing the
-``include:`` from ``~/mrjob.conf`` above and running your job with
-``-c ~/mrjob.base.conf -c ~/mrjob.conf``.
+If you specify multiple config files (e.g.
+``-c ~/mrjob.base.conf -c ~/mrjob.conf``), a ``!clear`` in a later file will
+override earlier files. ``include:`` is really just another way to prepend
+to the list of config files to load.
 
 If you find it more readable, you may put the ``!clear`` tag *before* the
 key you want to clear. For example,

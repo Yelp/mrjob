@@ -325,7 +325,7 @@ class ClearTagTestCase(ConfigFilesTestCase):
         'runners': {
             'inline': {
                 'cmdenv': {
-                    'PATH': '/some/dir',
+                    'PATH': '/some/nice/dir',
                 },
                 'jobconf': {
                     'some.property': 'something',
@@ -341,6 +341,52 @@ class ClearTagTestCase(ConfigFilesTestCase):
         self.base_conf_path = self.save_conf('base.conf', self.BASE_CONF)
         self.base_opts = RunnerOptionStore('inline', {}, [self.base_conf_path])
 
+    def test_clear_cmdenv_path(self):
+        opts = self.opts_for_conf('extend.conf', {
+            'include': self.base_conf_path,
+            'runners': {
+                'inline': {
+                    'cmdenv': {
+                        'PATH': ClearedValue('/some/even/better/dir')
+                    }
+                }
+            }
+        })
+
+        self.assertEqual(opts['cmdenv'], {'PATH': '/some/even/better/dir'})
+        self.assertEqual(opts['jobconf'], self.base_opts['jobconf'])
+        self.assertEqual(opts['setup'], self.base_opts['setup'])
+
+    def test_clear_cmdenv(self):
+        opts = self.opts_for_conf('extend.conf', {
+            'include': self.base_conf_path,
+            'runners': {
+                'inline': {
+                    'cmdenv': ClearedValue({
+                        'USER': 'dave'
+                    })
+                }
+            }
+        })
+
+        self.assertEqual(opts['cmdenv'], {'USER': 'dave'})
+        self.assertEqual(opts['jobconf'], self.base_opts['jobconf'])
+        self.assertEqual(opts['setup'], self.base_opts['setup'])
+
+    def test_clear_jobconf(self):
+        opts = self.opts_for_conf('extend.conf', {
+            'include': self.base_conf_path,
+            'runners': {
+                'inline': {
+                    'jobconf': ClearedValue(None)
+                }
+            }
+        })
+
+        self.assertEqual(opts['cmdenv'], self.base_opts['cmdenv'])
+        self.assertEqual(opts['jobconf'], {})
+        self.assertEqual(opts['setup'], self.base_opts['setup'])
+
     def test_clear_setup(self):
         opts = self.opts_for_conf('extend.conf', {
             'include': self.base_conf_path,
@@ -354,11 +400,6 @@ class ClearTagTestCase(ConfigFilesTestCase):
         self.assertEqual(opts['cmdenv'], self.base_opts['cmdenv'])
         self.assertEqual(opts['jobconf'], self.base_opts['jobconf'])
         self.assertEqual(opts['setup'], ['instead do this'])
-
-    # TODO: test clearing cmdenv and jobconf
-
-
-
 
 
 class TestExtraKwargs(ConfigFilesTestCase):

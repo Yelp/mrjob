@@ -139,7 +139,6 @@ When these are specified more than once, the last non-``None`` value is used.
     :py:func:`shlex.split`, or list of command + arguments. Combined with
     :py:func:`~mrjob.conf.combine_cmds`.
 
-
 .. _data-type-path:
 
 **Path**
@@ -173,13 +172,14 @@ than once, each has custom behavior described below.
 .. _data-type-plain-dict:
 
 **Plain dict**
-    Values specified later override values specified earlier.
+    Values specified later override values specified earlier. Combined with
+    :py:func:`~mrjob.conf.combine_dicts`.
 
 .. _data-type-env-dict:
 
 **Environment variable dict**
     Values specified later override values specified earlier, **except for
-    those with keys ending in ``PATH``**, in which values are concatenated and
+    those with keys ending in PATH**, in which values are concatenated and
     separated by a colon (``:``) rather than overwritten. The later value comes
     first.
 
@@ -187,7 +187,10 @@ than once, each has custom behavior described below.
 
     .. code-block:: yaml
 
-        runners: {emr: {cmdenv: {PATH: "/usr/bin"}}}
+        runners:
+          emr:
+            cmdenv:
+              PATH: /usr/bin
 
     when run with this command::
 
@@ -197,9 +200,12 @@ than once, each has custom behavior described below.
 
         ``/usr/local/bin:/usr/bin``
 
+    The function that handles this is :py:func:`~mrjob.conf.combine_envs`.
+
     **The one exception** to this behavior is in the ``local`` runner, which
     uses the local system separator (on Windows ``;``, on everything else still
-    ``:``) instead of always using ``:``.
+    ``:``) instead of always using ``:``. In local mode, the function that
+    combines config values is :py:func:`~mrjob.conf.combine_local_envs`.
 
 .. _multiple-config-files:
 
@@ -217,9 +223,9 @@ accomplish this, use the ``include`` option:
 
     include: ~/.mrjob.base.conf
     runners:
-        emr:
-            num_ec2_core_instances: 20
-            ec2_core_instance_type: m1.xlarge
+      emr:
+        num_ec2_core_instances: 20
+        ec2_core_instance_type: m1.xlarge
 
 :file:`~/mrjob.very-small.conf`:
 
@@ -227,19 +233,19 @@ accomplish this, use the ``include`` option:
 
     include: $HOME/.mrjob.base.conf
     runners:
-        emr:
-            num_ec2_core_instances: 2
-            ec2_core_instance_type: m1.small
+      emr:
+        num_ec2_core_instances: 2
+        ec2_core_instance_type: m1.small
 
 :file:`~/.mrjob.base.conf`:
 
 .. code-block:: yaml
 
     runners:
-        emr:
-            aws_access_key_id: HADOOPHADOOPBOBADOOP
-            aws_region: us-west-1
-            aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
+      emr:
+        aws_access_key_id: HADOOPHADOOPBOBADOOP
+        aws_region: us-west-1
+        aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
 
 Options that are lists, commands, dictionaries, etc. combine the same way they
 do between the config files and the command line (with combiner functions).
@@ -247,9 +253,9 @@ do between the config files and the command line (with combiner functions).
 You can use ``$ENVIRONMENT_VARIABLES`` and ``~/file_in_your_home_dir`` inside
 ``include``.
 
-You can inherit from multiple config files by passing ``include`` a list instead
-of a string. Files on the right will have precedence over files on the left.
-To continue the above examples, this config:
+You can inherit from multiple config files by passing ``include`` a list
+instead of a string. Files on the right will have precedence over files on the
+left. To continue the above examples, this config:
 
 :file:`~/.mrjob.everything.conf`
 
@@ -266,12 +272,96 @@ will be equivalent to this one:
 .. code-block:: yaml
 
     runners:
-        emr:
-            aws_access_key_id: HADOOPHADOOPBOBADOOP
-            aws_region: us-west-1
-            aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
-            num_ec2_core_instances: 20
-            ec2_core_instace_type: m1.xlarge
+      emr:
+        aws_access_key_id: HADOOPHADOOPBOBADOOP
+        aws_region: us-west-1
+        aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
+        ec2_core_instace_type: m1.xlarge
+        num_ec2_core_instances: 20
 
 In this case, :file:`~/.mrjob.very-large.conf` has taken precedence over
 :file:`~/.mrjob.very-small.conf`.
+
+
+.. _clearing-configs:
+
+Clearing configs
+----------------
+
+Sometimes, you just want to override a list-type config (e.g. ``setup``) or
+a ``*PATH`` environment variable, rather than having mrjob cleverly concatenate
+it with previous configs.
+
+You can do this in YAML config files by tagging the values you want to take
+precedence with the ``!clear`` tag.
+
+For example:
+
+:file:`~/.mrjob.base.conf`
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        aws_access_key_id: HADOOPHADOOPBOBADOOP
+        aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
+        cmdenv:
+          PATH: /this/nice/path
+          PYTHONPATH: /here/be/serpents
+          USER: dave
+        setup:
+        - /run/this/command
+
+:file:`~/.mrjob.conf`
+
+.. code-block:: yaml
+
+    include: ~/mrjob.base.conf
+    runners:
+      emr:
+        cmdenv:
+          PATH: !clear /this/even/better/path/yay
+          PYTHONPATH: !clear
+        setup: !clear
+        - /run/this/other/command
+
+is equivalent to:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        aws_access_key_id: HADOOPHADOOPBOBADOOP
+        aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
+        cmdenv:
+          PATH: /this/even/better/path/yay
+          USER: dave
+        setup:
+        - /run/this/other/command
+
+If you specify multiple config files (e.g.
+``-c ~/mrjob.base.conf -c ~/mrjob.conf``), a ``!clear`` in a later file will
+override earlier files. ``include:`` is really just another way to prepend
+to the list of config files to load.
+
+If you find it more readable, you may put the ``!clear`` tag *before* the
+key you want to clear. For example,
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        !clear setup:
+        - /run/this/other/command
+
+is equivalent to:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        setup: !clear
+        - /run/this/other/command
+
+``!clear`` tags in lists are ignored. You cannot currently clear an entire set
+of configs (e.g. ``runners: emr: !clear ...`` does not work).

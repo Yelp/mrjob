@@ -131,13 +131,24 @@ def find_mrjob_conf():
         return None
 
 
+# TODO: rename and hide this function in v0.5.0
+
 def real_mrjob_conf_path(conf_path=None):
+    """Return the path of a single conf file. If *conf_path* is ``False``,
+    return ``None``, and if it's ``None``, return :py:func:`find_mrjob_conf`.
+    Otherwise, expand environment variables and ``~`` in *conf_path* and
+    return it.
+
+    Confusingly, this function doesn't actually return a "real" path according
+    to ``os.path.realpath()``; it just resolves environment variables and
+    ``~``.
+    """
     if conf_path is False:
         return None
     elif conf_path is None:
-        return os.path.realpath(find_mrjob_conf())
+        return find_mrjob_conf()
     else:
-        return os.path.realpath(expand_path(conf_path))
+        return expand_path(conf_path)
 
 
 ### !clear tag ###
@@ -298,7 +309,8 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     :type conf_path: str
     :param conf_path: location of the file to load
     :type already_loaded: list
-    :param already_loaded: list of :file:`mrjob.conf` paths that have already
+    :param already_loaded: list of real (according to ``os.path.realpath()``)
+                           :file:`mrjob.conf` paths that have already
                            been loaded
     """
     conf_path = real_mrjob_conf_path(conf_path)
@@ -310,7 +322,7 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     if already_loaded is None:
         already_loaded = []
 
-    already_loaded.append(conf_path)
+    already_loaded.append(os.path.realpath(conf_path))
 
     try:
         values = conf['runners'][runner_alias] or {}
@@ -324,9 +336,10 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
             includes = [includes]
 
         for include in includes:
-            include = os.path.realpath(include)
+            # make include relative to conf_path (see #1166)
+            include = os.path.join(os.path.dirname(conf_path), include)
 
-            if include in already_loaded:
+            if os.path.realpath(include) in already_loaded:
                 log.warn('%s tries to recursively include %s! (Already'
                          ' included:  %s)' % (
                              conf_path, conf['include'],

@@ -461,18 +461,6 @@ def combine_cmds(*cmds):
         return list(cmd)
 
 
-def combine_cmd_lists(*seqs_of_cmds):
-    """Concatenate the given commands into a list. Ignore ``None`` values,
-    and parse strings with :py:func:`shlex.split`.
-
-    Returns a list of lists (each sublist contains the command plus arguments).
-    """
-    log.warning(
-        'combine_cmd_lists() is deprecated and will be removed in v0.5.0')
-    seq_of_cmds = combine_lists(*seqs_of_cmds)
-    return [combine_cmds(cmd) for cmd in seq_of_cmds]
-
-
 def combine_dicts(*dicts):
     """Combine zero or more dictionaries. Values from dicts later in the list
     take precedence over values earlier in the list.

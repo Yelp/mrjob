@@ -21,7 +21,6 @@ import mrjob.conf
 from mrjob.conf import ClearedValue
 from mrjob.conf import _fix_clear_tags
 from mrjob.conf import _load_yaml_with_clear_tag
-from mrjob.conf import combine_cmd_lists
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
@@ -314,29 +313,6 @@ class CombineCmdsTestCase(TestCase):
 
     def test_unicode(self):
         self.assertEqual(combine_cmds(u'wunderbar!'), ['wunderbar!'])
-
-
-class CombineCmdsListsCase(TestCase):
-
-    def test_empty(self):
-        with logger_disabled('mrjob.conf'):
-            self.assertEqual(combine_cmd_lists(), [])
-
-    def test_concatenation(self):
-        with logger_disabled('mrjob.conf'):
-            self.assertEqual(
-                combine_cmd_lists(
-                    [['echo', 'foo']],
-                    None,
-                    (['mkdir', 'bar'], ['rmdir', 'bar'])),
-                [['echo', 'foo'], ['mkdir', 'bar'], ['rmdir', 'bar']])
-
-    def test_conversion(self):
-        with logger_disabled('mrjob.conf'):
-            self.assertEqual(
-                combine_cmd_lists(
-                    ['echo "Hello World!"'], None, [('mkdir', '/tmp/baz')]),
-                [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
 
 
 class CombineEnvsTestCase(TestCase):

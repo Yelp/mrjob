@@ -342,14 +342,17 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
         if isinstance(includes, basestring):
             includes = [includes]
 
-        for include in includes:
+        # handle includes in reverse order so that include order takes
+        # precedence over inheritance
+        for include in reversed(includes):
             # make include relative to conf_path (see #1166)
             include = os.path.join(os.path.dirname(conf_path), include)
 
             inherited.extend(
                 load_opts_from_mrjob_conf(
                     runner_alias, include, already_loaded))
-    return inherited + [(conf_path, values)]
+
+    return list(reversed(inherited)) + [(conf_path, values)]
 
 
 def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
@@ -371,10 +374,12 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
         # don't include conf files that were loaded earlier in conf_paths
         already_loaded = []
 
-        return list(chain(*[
+        # load opts in reversed order so that order of conf paths takes
+        # precedence over inheritance
+        return list(reversed(list(chain(*[
             load_opts_from_mrjob_conf(
                 runner_alias, path, already_loaded=already_loaded)
-            for path in conf_paths]))
+            for path in reversed(conf_paths)]))))
 
 
 ### writing mrjob.conf ###

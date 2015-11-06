@@ -424,6 +424,18 @@ class CombineListsTestCase(unittest.TestCase):
     def test_concatenation(self):
         self.assertEqual(combine_lists([1, 2], None, (3, 4)), [1, 2, 3, 4])
 
+    def test_strings(self):
+        self.assertEqual(combine_lists('one', None, 'two', u'three'),
+                         ['one', 'two', u'three'])
+
+    def test_scalars(self):
+        self.assertEqual(combine_lists(None, False, b'\x00', 42, 3.14),
+                         [False, b'\x00', 42, 3.14])
+
+    def test_mix_lists_and_scalars(self):
+        self.assertEqual(combine_lists([1, 2], 3, (4, 5), 6),
+                        [1, 2, 3, 4, 5, 6])
+
 
 class CombineOptsTestCase(unittest.TestCase):
 

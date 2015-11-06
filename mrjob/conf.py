@@ -407,12 +407,24 @@ def combine_lists(*seqs):
 
     Generally this is used for a list of commands we want to run; the
     "default" commands get run before any commands specific to your job.
+
+    .. versionchanged:: 0.4.6
+       Strings and non-sequence objects (e.g. numbers) are treated as
+       single-item lists.
     """
     result = []
 
     for seq in seqs:
-        if seq:
-            result.extend(seq)
+        if seq is None:
+            continue
+
+        if isinstance(seq, basestring):
+            result.append(seq)
+        else:
+            try:
+                result.extend(seq)
+            except:
+                result.append(seq)
 
     return result
 

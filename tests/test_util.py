@@ -453,7 +453,7 @@ class ArchiveTestCase(TestCase):
             'tar.bz2',
             ['tar', 'cjhf', '%(archive_name)s', '%(files_to_archive)s'])
 
-    @skipIf(not which('jar'), 'no jar command')
+    @skipIf(which('jar') is None, 'no jar command')
     def test_unarchive_jar(self):
         # this test requires that jar is present
         self.archive_and_unarchive(

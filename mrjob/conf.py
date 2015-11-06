@@ -322,8 +322,15 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     if already_loaded is None:
         already_loaded = []
 
-    already_loaded.append(os.path.realpath(conf_path))
+    # don't load same conf file twice
+    real_conf_path = os.path.realpath(conf_path)
 
+    if real_conf_path in already_loaded:
+        return []
+    else:
+        already_loaded.append(real_conf_path)
+
+    # get configs for our runner out of conf file
     try:
         values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
@@ -339,15 +346,9 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
             # make include relative to conf_path (see #1166)
             include = os.path.join(os.path.dirname(conf_path), include)
 
-            if os.path.realpath(include) in already_loaded:
-                log.warn('%s tries to recursively include %s! (Already'
-                         ' included:  %s)' % (
-                             conf_path, conf['include'],
-                             ', '.join(already_loaded)))
-            else:
-                inherited.extend(
-                    load_opts_from_mrjob_conf(
-                        runner_alias, include, already_loaded))
+            inherited.extend(
+                load_opts_from_mrjob_conf(
+                    runner_alias, include, already_loaded))
     return inherited + [(conf_path, values)]
 
 
@@ -370,10 +371,10 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
         # don't include conf files that were loaded earlier in conf_paths
         already_loaded = []
 
-        return chain(*[
+        return list(chain(*[
             load_opts_from_mrjob_conf(
                 runner_alias, path, already_loaded=already_loaded)
-            for path in conf_paths])
+            for path in conf_paths]))
 
 
 ### writing mrjob.conf ###

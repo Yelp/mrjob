@@ -16,6 +16,7 @@
 
 """Test configuration parsing and option combining"""
 import os
+import os.path
 
 try:
     import unittest2 as unittest
@@ -44,6 +45,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
@@ -149,6 +151,17 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
                 load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
                 {})
 
+    def test_duplicate_conf_path(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(conf_path, 'w') as f:
+            f.write('{"runners": {"foo": {"qux": "quux"}}}')
+
+        self.assertEqual(
+            load_opts_from_mrjob_confs(
+                'foo', conf_paths=[conf_path, conf_path]),
+            [(conf_path, {'qux': 'quux'})])
+
     def _test_round_trip(self, conf):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
@@ -163,6 +176,8 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
     def test_round_trip_with_clear_tag(self):
         self._test_round_trip(
             {'runners': {'foo': {'qux': ClearedValue('quux')}}})
+
+
 
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):

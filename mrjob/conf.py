@@ -407,12 +407,24 @@ def combine_lists(*seqs):
 
     Generally this is used for a list of commands we want to run; the
     "default" commands get run before any commands specific to your job.
+
+    .. versionchanged:: 0.4.6
+       Strings and non-sequence objects (e.g. numbers) are treated as
+       single-item lists.
     """
     result = []
 
     for seq in seqs:
-        if seq:
-            result.extend(seq)
+        if seq is None:
+            continue
+
+        if isinstance(seq, basestring):
+            result.append(seq)
+        else:
+            try:
+                result.extend(seq)
+            except:
+                result.append(seq)
 
     return result
 
@@ -442,6 +454,8 @@ def combine_cmd_lists(*seqs_of_cmds):
 
     Returns a list of lists (each sublist contains the command plus arguments).
     """
+    log.warning(
+        'combine_cmd_lists() is deprecated and will be removed in v0.5.0')
     seq_of_cmds = combine_lists(*seqs_of_cmds)
     return [combine_cmds(cmd) for cmd in seq_of_cmds]
 
@@ -530,7 +544,11 @@ def combine_paths(*paths):
 def combine_path_lists(*path_seqs):
     """Concatenate the given sequences into a list. Ignore None values.
     Resolve ``~`` (home dir) and environment variables, and expand globs
-    that refer to the local filesystem."""
+    that refer to the local filesystem.
+
+    .. versionchanged:: 0.4.6
+       Can take single strings as well as lists.
+    """
     results = []
 
     for path in combine_lists(*path_seqs):

@@ -21,6 +21,7 @@ import glob
 from itertools import chain
 import logging
 import os
+import os.path
 
 from mrjob.util import expand_path
 
@@ -134,9 +135,9 @@ def real_mrjob_conf_path(conf_path=None):
     if conf_path is False:
         return None
     elif conf_path is None:
-        return find_mrjob_conf()
+        return os.path.realpath(find_mrjob_conf())
     else:
-        return expand_path(conf_path)
+        return os.path.realpath(expand_path(conf_path))
 
 
 ### !clear tag ###
@@ -323,6 +324,8 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
             includes = [includes]
 
         for include in includes:
+            include = os.path.realpath(include)
+
             if include in already_loaded:
                 log.warn('%s tries to recursively include %s! (Already'
                          ' included:  %s)' % (
@@ -351,8 +354,12 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
     if conf_paths is None:
         return load_opts_from_mrjob_conf(runner_alias, find_mrjob_conf())
     else:
+        # don't include conf files that were loaded earlier in conf_paths
+        already_loaded = []
+
         return chain(*[
-            load_opts_from_mrjob_conf(runner_alias, path)
+            load_opts_from_mrjob_conf(
+                runner_alias, path, already_loaded=already_loaded)
             for path in conf_paths])
 
 

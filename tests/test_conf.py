@@ -320,19 +320,24 @@ class CombineCmdsTestCase(unittest.TestCase):
 class CombineCmdsListsCase(unittest.TestCase):
 
     def test_empty(self):
-        self.assertEqual(combine_cmd_lists(), [])
+        with logger_disabled('mrjob.conf'):
+            self.assertEqual(combine_cmd_lists(), [])
 
     def test_concatenation(self):
-        self.assertEqual(
-            combine_cmd_lists(
-                [['echo', 'foo']], None, (['mkdir', 'bar'], ['rmdir', 'bar'])),
-            [['echo', 'foo'], ['mkdir', 'bar'], ['rmdir', 'bar']])
+        with logger_disabled('mrjob.conf'):
+            self.assertEqual(
+                combine_cmd_lists(
+                    [['echo', 'foo']],
+                    None,
+                    (['mkdir', 'bar'], ['rmdir', 'bar'])),
+                [['echo', 'foo'], ['mkdir', 'bar'], ['rmdir', 'bar']])
 
     def test_conversion(self):
-        self.assertEqual(
-            combine_cmd_lists(
-                ['echo "Hello World!"'], None, [('mkdir', '/tmp/baz')]),
-            [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
+        with logger_disabled('mrjob.conf'):
+            self.assertEqual(
+                combine_cmd_lists(
+                    ['echo "Hello World!"'], None, [('mkdir', '/tmp/baz')]),
+                [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
 
 
 class CombineEnvsTestCase(unittest.TestCase):

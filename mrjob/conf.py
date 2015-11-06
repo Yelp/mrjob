@@ -442,6 +442,8 @@ def combine_cmd_lists(*seqs_of_cmds):
 
     Returns a list of lists (each sublist contains the command plus arguments).
     """
+    log.warning(
+        'combine_cmd_lists() is deprecated and will be removed in v0.5.0')
     seq_of_cmds = combine_lists(*seqs_of_cmds)
     return [combine_cmds(cmd) for cmd in seq_of_cmds]
 

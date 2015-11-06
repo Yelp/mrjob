@@ -45,6 +45,7 @@ from mrjob.util import which
 
 from tests.py2 import TestCase
 from tests.py2 import patch
+from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
@@ -452,6 +453,7 @@ class ArchiveTestCase(TestCase):
             'tar.bz2',
             ['tar', 'cjhf', '%(archive_name)s', '%(files_to_archive)s'])
 
+    @skipIf(not which('jar'), 'no jar command')
     def test_unarchive_jar(self):
         # this test requires that jar is present
         self.archive_and_unarchive(

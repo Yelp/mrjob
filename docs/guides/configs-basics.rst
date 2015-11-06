@@ -163,6 +163,27 @@ once, the lists are concatenated together.
     List of :ref:`paths <data-type-path>`. Combined with
     :py:func:`~mrjob.conf.combine_path_lists`.
 
+.. versionchanged:: 0.4.6
+   strings and non-sequence data types (e.g. numbers) are treated as
+   single-item lists.
+
+For example,
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        setup: /run/some/command with args
+
+is equivalent to:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        setup:
+        - /run/some/command with args
+
 Dict data types
 ^^^^^^^^^^^^^^^
 

@@ -319,19 +319,24 @@ class CombineCmdsTestCase(TestCase):
 class CombineCmdsListsCase(TestCase):
 
     def test_empty(self):
-        self.assertEqual(combine_cmd_lists(), [])
+        with logger_disabled('mrjob.conf'):
+            self.assertEqual(combine_cmd_lists(), [])
 
     def test_concatenation(self):
-        self.assertEqual(
-            combine_cmd_lists(
-                [['echo', 'foo']], None, (['mkdir', 'bar'], ['rmdir', 'bar'])),
-            [['echo', 'foo'], ['mkdir', 'bar'], ['rmdir', 'bar']])
+        with logger_disabled('mrjob.conf'):
+            self.assertEqual(
+                combine_cmd_lists(
+                    [['echo', 'foo']],
+                    None,
+                    (['mkdir', 'bar'], ['rmdir', 'bar'])),
+                [['echo', 'foo'], ['mkdir', 'bar'], ['rmdir', 'bar']])
 
     def test_conversion(self):
-        self.assertEqual(
-            combine_cmd_lists(
-                ['echo "Hello World!"'], None, [('mkdir', '/tmp/baz')]),
-            [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
+        with logger_disabled('mrjob.conf'):
+            self.assertEqual(
+                combine_cmd_lists(
+                    ['echo "Hello World!"'], None, [('mkdir', '/tmp/baz')]),
+                [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
 
 
 class CombineEnvsTestCase(TestCase):
@@ -418,6 +423,18 @@ class CombineListsTestCase(TestCase):
     def test_concatenation(self):
         self.assertEqual(combine_lists([1, 2], None, (3, 4)), [1, 2, 3, 4])
 
+    def test_strings(self):
+        self.assertEqual(combine_lists('one', None, 'two', u'three'),
+                         ['one', 'two', u'three'])
+
+    def test_scalars(self):
+        self.assertEqual(combine_lists(None, False, b'\x00', 42, 3.14),
+                         [False, b'\x00', 42, 3.14])
+
+    def test_mix_lists_and_scalars(self):
+        self.assertEqual(combine_lists([1, 2], 3, (4, 5), 6),
+                        [1, 2, 3, 4, 5, 6])
+
 
 class CombineOptsTestCase(TestCase):
 
@@ -492,6 +509,11 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
     def test_combine_path_lists(self):
         self.assertEqual(
             combine_path_lists(['~/tmp'], [], ['/dev/null', '/tmp/$USER']),
+            ['/home/foo/tmp', '/dev/null', '/tmp/foo'])
+
+    def test_combine_path_lists_on_strings(self):
+        self.assertEqual(
+            combine_path_lists('~/tmp', [], ['/dev/null', '/tmp/$USER']),
             ['/home/foo/tmp', '/dev/null', '/tmp/foo'])
 
     def test_globbing(self):

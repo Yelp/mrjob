@@ -544,7 +544,11 @@ def combine_paths(*paths):
 def combine_path_lists(*path_seqs):
     """Concatenate the given sequences into a list. Ignore None values.
     Resolve ``~`` (home dir) and environment variables, and expand globs
-    that refer to the local filesystem."""
+    that refer to the local filesystem.
+
+    .. versionchanged:: 0.4.6
+       Can take single strings as well as lists.
+    """
     results = []
 
     for path in combine_lists(*path_seqs):

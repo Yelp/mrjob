@@ -512,6 +512,11 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
             combine_path_lists(['~/tmp'], [], ['/dev/null', '/tmp/$USER']),
             ['/home/foo/tmp', '/dev/null', '/tmp/foo'])
 
+    def test_combine_path_lists_on_strings(self):
+        self.assertEqual(
+            combine_path_lists('~/tmp', [], ['/dev/null', '/tmp/$USER']),
+            ['/home/foo/tmp', '/dev/null', '/tmp/foo'])
+
     def test_globbing(self):
         foo_path = os.path.join(self.tmp_dir, 'foo')
         bar_path = os.path.join(self.tmp_dir, 'bar')

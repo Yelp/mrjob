@@ -431,7 +431,7 @@ def combine_lists(*seqs):
         if seq is None:
             continue
 
-        if isinstance(seq, basestring):
+        if isinstance(seq, string_types):
             result.append(seq)
         else:
             try:

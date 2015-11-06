@@ -1,6 +1,8 @@
 v0.4.6, 2015-11-?? -- config files
  * PyYAML>=3.10 is required
  * !clear tag in conf files (#1162)
+ * combine_lists() and combine_path_lists() can handle scalars (#1172)
+ * mrjob.conf.combine_cmd_lists() is deprecated (#1168)
 
 v0.4.5, 2015-07-28 -- DescribeJobFlows begone
  * boto>=2.6.0 is required (used to be 2.2.0)

@@ -237,6 +237,34 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
             load_opts_from_mrjob_conf('foo', conf_path),
             [(conf_path_1, {}), (conf_path_2, {}), (conf_path, {})])
 
+    def test_nested_include(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+        conf_path_3 = os.path.join(self.tmp_dir, 'mrjob.3.conf')
+
+        # accidentally reversed the order of nested includes when
+        # trying to make precedence work; this test would catch that
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': conf_path_1}, f)
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({'include': [conf_path_2, conf_path_3]}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path_3, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(conf_path_2, {}),
+             (conf_path_3, {}),
+             (conf_path_1, {}),
+             (conf_path, {})])
+
     def test_relative_include(self):
         base_conf_path = os.path.join(self.tmp_dir, 'mrjob.base.conf')
         real_base_conf_path = os.path.realpath(base_conf_path)

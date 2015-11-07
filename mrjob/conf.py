@@ -345,8 +345,8 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
         # handle includes in reverse order so that include order takes
         # precedence over inheritance
         for include in reversed(includes):
-            # make include relative to conf_path (see #1166)
-            include = os.path.join(os.path.dirname(conf_path), include)
+            # make include relative to (real) conf_path (see #1166)
+            include = os.path.join(os.path.dirname(real_conf_path), include)
 
             inherited.extend(
                 load_opts_from_mrjob_conf(

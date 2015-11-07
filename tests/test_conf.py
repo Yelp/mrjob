@@ -208,7 +208,7 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
 
         with open(conf_path_1, 'w') as f:
-            dump_mrjob_conf({'include': conf_path_2}, f)
+            dump_mrjob_conf({}, f)
 
         with open(conf_path_2, 'w') as f:
             dump_mrjob_conf({}, f)
@@ -236,6 +236,49 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         self.assertEqual(
             load_opts_from_mrjob_conf('foo', conf_path),
             [(conf_path_1, {}), (conf_path_2, {}), (conf_path, {})])
+
+    def test_relative_include(self):
+        base_conf_path = os.path.join(self.tmp_dir, 'mrjob.base.conf')
+        real_base_conf_path = os.path.realpath(base_conf_path)
+
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(base_conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': 'mrjob.base.conf'}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(real_base_conf_path, {}), (conf_path, {})])
+
+    def test_include_relative_to_real_path(self):
+        os.mkdir(os.path.join(self.tmp_dir, 'conf'))
+
+        base_conf_path = os.path.join(self.tmp_dir, 'conf', 'mrjob.base.conf')
+        real_base_conf_path = os.path.realpath(base_conf_path)
+
+        conf_path = os.path.join(self.tmp_dir, 'conf', 'mrjob.conf')
+        conf_symlink_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(base_conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': 'mrjob.base.conf'}, f)
+
+        os.symlink(os.path.join('conf', 'mrjob.conf'), conf_symlink_path)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(real_base_conf_path, {}), (conf_path, {})])
+
+        # relative include should work from the symlink even though
+        # it's not in the same directory as mrjob.base.conf
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_symlink_path),
+            [(real_base_conf_path, {}), (conf_symlink_path, {})])
 
     def _test_round_trip(self, conf):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')

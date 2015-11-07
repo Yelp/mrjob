@@ -209,19 +209,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
 
 class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
 
-    def test_recurse(self):
-        path = os.path.join(self.tmp_dir, 'LOL.conf')
-        recurse_conf = dict(include=path)
-        with open(path, 'w') as f:
-            dump_mrjob_conf(recurse_conf, f)
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.conf', stderr)
-            RunnerOptionStore('inline', {}, [path])
-            self.assertIn('%s tries to recursively include %s!' % (path, path),
-                          stderr.getvalue())
-
     def test_empty_runner_error(self):
         conf = dict(runner=dict(local=dict(base_tmp_dir='/tmp')))
         path = self.save_conf('basic', conf)

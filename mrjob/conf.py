@@ -300,8 +300,8 @@ def conf_object_at_path(conf_path):
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
                               already_loaded=None):
     """Load a list of dictionaries representing the options in a given
-    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If
-    conf_path is not found, return [(None, {})].
+    mrjob.conf for a specific runner, resolving includes. Returns
+    ``[(path, values)]``. If *conf_path* is not found, return ``[(None, {})]``.
 
     :type runner_alias: str
     :param runner_alias: String identifier of the runner type, e.g. ``emr``,
@@ -310,8 +310,17 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     :param conf_path: location of the file to load
     :type already_loaded: list
     :param already_loaded: list of real (according to ``os.path.realpath()``)
-                           :file:`mrjob.conf` paths that have already
-                           been loaded
+                           conf paths that have already
+                           been loaded (used by
+                           :py:func:`load_opts_from_mrjob_confs`).
+
+    .. versionchanged:: 0.4.6
+        Relative ``include:`` paths are relative to the real (after resolving
+        symlinks) path of the including conf file
+
+    .. versionchanged:: 0.4.6
+        This will only load each config file once, even if it's referenced
+        from multiple paths due to symlinks.
     """
     conf_path = real_mrjob_conf_path(conf_path)
     conf = conf_object_at_path(conf_path)
@@ -358,15 +367,21 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
 def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
     """Load a list of dictionaries representing the options in a given
     list of mrjob config files for a specific runner. Returns
-    ``[(path, values)]``. If a path is not found, use (None, {}) as its value.
+    ``[(path, values), ...]``. If a path is not found, use ``(None, {})`` as
+    its value.
+
     If *conf_paths* is ``None``, look for a config file in the default
-    locations.
+    locations (see :py:func:`find_mrjob_conf`).
 
     :type runner_alias: str
     :param runner_alias: String identifier of the runner type, e.g. ``emr``,
                          ``local``, etc.
     :type conf_paths: list or ``None``
     :param conf_path: locations of the files to load
+
+    .. versionchanged:: 0.4.6
+        This will only load each config file once, even if it's referenced
+        from multiple paths due to symlinks.
     """
     if conf_paths is None:
         return load_opts_from_mrjob_conf(runner_alias, find_mrjob_conf())

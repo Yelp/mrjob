@@ -27,7 +27,7 @@ try:
         'install_requires': [
             'boto>=2.35.0',
             'filechunkio',
-            'PyYAML>=3.10',
+            'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',

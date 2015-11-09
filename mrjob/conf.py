@@ -206,7 +206,8 @@ def _load_yaml_with_clear_tag(stream):
     try:
         return loader.get_single_data()
     finally:
-        loader.dispose()
+        if hasattr(loader, 'dispose'):  # it doesn't in PyYAML 3.09
+            loader.dispose()
 
 
 def _cleared_value_representer(dumper, data):

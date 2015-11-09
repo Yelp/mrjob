@@ -163,6 +163,8 @@ once, the lists are concatenated together.
     List of :ref:`paths <data-type-path>`. Combined with
     :py:func:`~mrjob.conf.combine_path_lists`.
 
+.. _configs-list-example:
+
 .. versionchanged:: 0.4.6
    strings and non-sequence data types (e.g. numbers) are treated as
    single-item lists.
@@ -302,6 +304,11 @@ will be equivalent to this one:
 
 In this case, :file:`~/.mrjob.very-large.conf` has taken precedence over
 :file:`~/.mrjob.very-small.conf`.
+
+.. _configs-relative-includes:
+
+Relative includes
+^^^^^^^^^^^^^^^^^
 
 .. versionchanged:: 0.4.6
     Relative ``include:`` paths are relative to the real (after resolving

@@ -1,5 +1,5 @@
 v0.4.6, 2015-11-?? -- config files
- * PyYAML>=3.10 is required
+ * PyYAML>=3.08 is required
  * !clear tag in conf files (#1162)
  * combine_lists() and combine_path_lists() can handle scalars (#1172)
  * mrjob.conf.combine_cmd_lists() is deprecated (#1168)

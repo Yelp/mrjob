@@ -17,7 +17,8 @@ be totally overriden using the ``!clear`` tag. See :ref:`clearing-configs`.
 Options that take lists (e.g. :mrjob-opt:`setup`) now treat scalar values
 as single-item lists. See :ref:`this example <configs-list-example>`.
 
-Fixed a bug that kept the ``--pool-wait-minutes`` option from working.
+Fixed a bug that kept the ``pool_wait_minutes`` option from being loaded from
+config files.
 
 
 0.4.5

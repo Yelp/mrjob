@@ -345,8 +345,9 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
         conf = {'runners': {'foo': {'qux': ClearedValue('quux')}}}
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
-        self.assertRaises(TypeError,
-                          dump_mrjob_conf, conf, open(conf_path, 'w'))
+        with open(conf_path, 'w') as f:
+            self.assertRaises(TypeError,
+                              dump_mrjob_conf, conf, f)
 
     def test_json_error(self):
         conf = """

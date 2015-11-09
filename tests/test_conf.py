@@ -16,6 +16,7 @@
 
 """Test configuration parsing and option combining"""
 import os
+import os.path
 
 import mrjob.conf
 from mrjob.conf import ClearedValue
@@ -35,6 +36,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
@@ -144,6 +146,163 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
                 load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
                 {})
 
+    def test_duplicate_conf_path(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_confs(
+                'foo', [conf_path, conf_path]),
+            [(conf_path, {})])
+
+    def test_symlink_to_duplicate_conf_path(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        conf_symlink_path = os.path.join(self.tmp_dir, 'mrjob.conf.symlink')
+        os.symlink('mrjob.conf', conf_symlink_path)
+
+        self.assertEqual(
+            load_opts_from_mrjob_confs(
+                'foo', [conf_path, conf_symlink_path]),
+            [(conf_symlink_path, {})])
+
+        self.assertEqual(
+            load_opts_from_mrjob_confs(
+                'foo', [conf_symlink_path, conf_path]),
+            [(conf_path, {})])
+
+    def test_recursive_include(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': conf_path}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(conf_path, {})])
+
+    def test_doubly_recursive_include(self):
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({'include': conf_path_2}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({'include': conf_path_1}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path_1),
+            [(conf_path_2, {}), (conf_path_1, {})])
+
+    def test_conf_path_order_beats_include(self):
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        # shouldn't matter that conf_path_1 includes conf_path_2
+        self.assertEqual(
+            load_opts_from_mrjob_confs('foo', [conf_path_1, conf_path_2]),
+            [(conf_path_1, {}), (conf_path_2, {})])
+
+    def test_include_order_beats_include(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': [conf_path_1, conf_path_2]}, f)
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({'include': [conf_path_2]}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        # shouldn't matter that conf_path_1 includes conf_path_2
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(conf_path_1, {}), (conf_path_2, {}), (conf_path, {})])
+
+    def test_nested_include(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+        conf_path_3 = os.path.join(self.tmp_dir, 'mrjob.3.conf')
+
+        # accidentally reversed the order of nested includes when
+        # trying to make precedence work; this test would catch that
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': conf_path_1}, f)
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({'include': [conf_path_2, conf_path_3]}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path_3, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(conf_path_2, {}),
+             (conf_path_3, {}),
+             (conf_path_1, {}),
+             (conf_path, {})])
+
+    def test_relative_include(self):
+        base_conf_path = os.path.join(self.tmp_dir, 'mrjob.base.conf')
+        real_base_conf_path = os.path.realpath(base_conf_path)
+
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(base_conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': 'mrjob.base.conf'}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(real_base_conf_path, {}), (conf_path, {})])
+
+    def test_include_relative_to_real_path(self):
+        os.mkdir(os.path.join(self.tmp_dir, 'conf'))
+
+        base_conf_path = os.path.join(self.tmp_dir, 'conf', 'mrjob.base.conf')
+        real_base_conf_path = os.path.realpath(base_conf_path)
+
+        conf_path = os.path.join(self.tmp_dir, 'conf', 'mrjob.conf')
+        conf_symlink_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(base_conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': 'mrjob.base.conf'}, f)
+
+        os.symlink(os.path.join('conf', 'mrjob.conf'), conf_symlink_path)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(real_base_conf_path, {}), (conf_path, {})])
+
+        # relative include should work from the symlink even though
+        # it's not in the same directory as mrjob.base.conf
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_symlink_path),
+            [(real_base_conf_path, {}), (conf_symlink_path, {})])
+
     def _test_round_trip(self, conf):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
@@ -159,6 +318,8 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
     def test_round_trip_with_clear_tag(self):
         self._test_round_trip(
             {'runners': {'foo': {'qux': ClearedValue('quux')}}})
+
+
 
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):

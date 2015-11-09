@@ -21,6 +21,7 @@ import glob
 from itertools import chain
 import logging
 import os
+import os.path
 
 from mrjob.util import expand_path
 
@@ -130,7 +131,18 @@ def find_mrjob_conf():
         return None
 
 
+# TODO: rename and hide this function in v0.5.0
+
 def real_mrjob_conf_path(conf_path=None):
+    """Return the path of a single conf file. If *conf_path* is ``False``,
+    return ``None``, and if it's ``None``, return :py:func:`find_mrjob_conf`.
+    Otherwise, expand environment variables and ``~`` in *conf_path* and
+    return it.
+
+    Confusingly, this function doesn't actually return a "real" path according
+    to ``os.path.realpath()``; it just resolves environment variables and
+    ``~``.
+    """
     if conf_path is False:
         return None
     elif conf_path is None:
@@ -288,8 +300,8 @@ def conf_object_at_path(conf_path):
 def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
                               already_loaded=None):
     """Load a list of dictionaries representing the options in a given
-    mrjob.conf for a specific runner. Returns ``[(path, values)]``. If
-    conf_path is not found, return [(None, {})].
+    mrjob.conf for a specific runner, resolving includes. Returns
+    ``[(path, values)]``. If *conf_path* is not found, return ``[(None, {})]``.
 
     :type runner_alias: str
     :param runner_alias: String identifier of the runner type, e.g. ``emr``,
@@ -297,8 +309,18 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     :type conf_path: str
     :param conf_path: location of the file to load
     :type already_loaded: list
-    :param already_loaded: list of :file:`mrjob.conf` paths that have already
-                           been loaded
+    :param already_loaded: list of real (according to ``os.path.realpath()``)
+                           conf paths that have already
+                           been loaded (used by
+                           :py:func:`load_opts_from_mrjob_confs`).
+
+    .. versionchanged:: 0.4.6
+        Relative ``include:`` paths are relative to the real (after resolving
+        symlinks) path of the including conf file
+
+    .. versionchanged:: 0.4.6
+        This will only load each config file once, even if it's referenced
+        from multiple paths due to symlinks.
     """
     conf_path = real_mrjob_conf_path(conf_path)
     conf = conf_object_at_path(conf_path)
@@ -309,8 +331,15 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
     if already_loaded is None:
         already_loaded = []
 
-    already_loaded.append(conf_path)
+    # don't load same conf file twice
+    real_conf_path = os.path.realpath(conf_path)
 
+    if real_conf_path in already_loaded:
+        return []
+    else:
+        already_loaded.append(real_conf_path)
+
+    # get configs for our runner out of conf file
     try:
         values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
@@ -322,38 +351,52 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
         if isinstance(includes, basestring):
             includes = [includes]
 
-        for include in includes:
-            if include in already_loaded:
-                log.warn('%s tries to recursively include %s! (Already'
-                         ' included:  %s)' % (
-                             conf_path, conf['include'],
-                             ', '.join(already_loaded)))
-            else:
-                inherited.extend(
-                    load_opts_from_mrjob_conf(
-                        runner_alias, include, already_loaded))
+        # handle includes in reverse order so that include order takes
+        # precedence over inheritance
+        for include in reversed(includes):
+            # make include relative to (real) conf_path (see #1166)
+            include = os.path.join(os.path.dirname(real_conf_path), include)
+
+            inherited = load_opts_from_mrjob_conf(
+                runner_alias, include, already_loaded) + inherited
+
     return inherited + [(conf_path, values)]
 
 
 def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
     """Load a list of dictionaries representing the options in a given
     list of mrjob config files for a specific runner. Returns
-    ``[(path, values)]``. If a path is not found, use (None, {}) as its value.
+    ``[(path, values), ...]``. If a path is not found, use ``(None, {})`` as
+    its value.
+
     If *conf_paths* is ``None``, look for a config file in the default
-    locations.
+    locations (see :py:func:`find_mrjob_conf`).
 
     :type runner_alias: str
     :param runner_alias: String identifier of the runner type, e.g. ``emr``,
                          ``local``, etc.
     :type conf_paths: list or ``None``
     :param conf_path: locations of the files to load
+
+    .. versionchanged:: 0.4.6
+        This will only load each config file once, even if it's referenced
+        from multiple paths due to symlinks.
     """
     if conf_paths is None:
         return load_opts_from_mrjob_conf(runner_alias, find_mrjob_conf())
     else:
-        return chain(*[
-            load_opts_from_mrjob_conf(runner_alias, path)
-            for path in conf_paths])
+        # don't include conf files that were loaded earlier in conf_paths
+        already_loaded = []
+
+        # load configs in reversed order so that order of conf paths takes
+        # precedence over inheritance
+        results = []
+
+        for path in reversed(conf_paths):
+            results = load_opts_from_mrjob_conf(
+                runner_alias, path, already_loaded=already_loaded) + results
+
+        return results
 
 
 ### writing mrjob.conf ###

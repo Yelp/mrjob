@@ -303,6 +303,28 @@ will be equivalent to this one:
 In this case, :file:`~/.mrjob.very-large.conf` has taken precedence over
 :file:`~/.mrjob.very-small.conf`.
 
+.. versionchanged:: 0.4.6
+    Relative ``include:`` paths are relative to the real (after resolving
+    symlinks) path of the including conf file.
+
+For example, you could do this:
+
+:file:`~/.mrjob/base.conf`
+
+.. code-block:: yaml
+
+    runners:
+      ...
+
+:file:`~/.mrjob/default.conf`
+
+.. code-block:: yaml
+
+    include: base.conf
+
+You could then load your configs via a symlink :file:`~/.mrjob.conf` to
+:file:`~/.mrjob/default.conf` and file:`~/.mrjob/base.conf` would still be
+included (even though it's not in the same directory as the symlink).
 
 .. _clearing-configs:
 

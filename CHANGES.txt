@@ -5,6 +5,7 @@ v0.4.6, 2015-11-09 -- config files
  * include: paths in conf files are relative to real path of conf file (#1166)
  * mrjob.conf.combine_cmd_lists() is deprecated (#1168)
  * EMR runner: pool_wait_minutes can now be loaded from mrjob.conf (#1070)
+ * support for wheel packaging format (#1140)
 
 v0.4.5, 2015-07-28 -- DescribeJobFlows begone
  * boto>=2.6.0 is required (used to be 2.2.0)

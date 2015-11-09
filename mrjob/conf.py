@@ -18,7 +18,6 @@
 for :py:mod:`mrjob`.
 """
 import glob
-from itertools import chain
 import logging
 import os
 import os.path

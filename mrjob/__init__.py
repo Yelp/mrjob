@@ -46,6 +46,7 @@ __credits__ = [
     'Sudarshan Gaikaiwari <sudarshan@acm.org>',
     'Brett Gibson <brett@swiftserve.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',
+    'Thomas Grainger <tagrain@gmail.com>',
     'Peter Harrington <peter.b.harrington@gmail.com>',
     'Brandon Haynes <bhaynes@fas.harvard.edu>',
     'Tim Henderson <tim.tadh@gmail.com>',

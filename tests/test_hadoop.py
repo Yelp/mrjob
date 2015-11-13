@@ -88,8 +88,8 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
         def mock_ls(path):  # don't bother to support globs
             return (p for p in sorted(self.mock_paths) if p.startswith(path))
 
-        self.mock_ls = self.start(patch('mrjob.fs.local.LocalFilesystem.ls',
-                                        side_effect=mock_ls))
+        self.start(patch('mrjob.fs.local.LocalFilesystem.ls',
+                         side_effect=mock_ls))
 
         os.environ.clear()
 
@@ -228,10 +228,6 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
 
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
 
-    # relative priority of directories
-
-
-
     # alternate jar names and paths
 
     def test_subdirs(self):
@@ -287,6 +283,25 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
 
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/hadoop-streaming-a.jar')
+
+    # sanity-check that directory order overrides path sort order
+
+    def test_directory_order_overrides_path_sort_order(self):
+        os.environ['HADOOP_HOME'] = '/ha/do/op/a'
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op/b'
+
+        self.mock_paths.append('/ha/do/op/a/hadoop-streaming-a.jar')
+        self.mock_paths.append('/ha/do/op/b/hadoop-streaming-b.jar')
+
+        # $HADOOP_PREFIX takes precendence over $HADOOP_HOME, so sort
+        # order doesn't matter
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/b/hadoop-streaming-b.jar')
+
+        # now search in parent dir (/ha/do/op) to invoke sort order
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/a/hadoop-streaming-a.jar')
 
 
 class MockHadoopTestCase(SandboxedTestCase):

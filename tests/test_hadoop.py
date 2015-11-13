@@ -183,23 +183,31 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
 
         self.test_infer_from_hadoop_bin_parent_dir()
 
-    def test_dont_infer_from_bin_hadoop(self, path):
+    def test_dont_infer_from_bin_hadoop(self):
         self.runner = HadoopJobRunner(hadoop_bin=['/bin/hadoop'])
         self.mock_paths.append('/hadoop-streaming.jar')
 
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
 
-    def test_dont_infer_from_usr_bin_hadoop(self, path):
+    def test_dont_infer_from_usr_bin_hadoop(self):
         self.runner = HadoopJobRunner(hadoop_bin=['/usr/bin/hadoop'])
         self.mock_paths.append('/usr/hadoop-streaming.jar')
 
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
 
-    def test_dont_infer_from_usr_local_bin_hadoop(self, path):
+    def test_dont_infer_from_usr_local_bin_hadoop(self):
         self.runner = HadoopJobRunner(hadoop_bin=['/usr/local/bin/hadoop'])
         self.mock_paths.append('/usr/local/hadoop-streaming.jar')
 
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    def test_infer_from_hadoop_bin_realpath(self):
+        with patch('posixpath.realpath', return_value='/ha/do/op/bin'):
+            self.runner = HadoopJobRunner(hadoop_bin=['/usr/bin/hadoop'])
+            self.mock_paths.append('/ha/do/op/hadoop-streaming.jar')
+
+            self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                             '/ha/do/op/hadoop-streaming.jar')
 
     # tests of fallback environment variables ($HADOOP_*_HOME)
 

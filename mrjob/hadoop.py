@@ -113,7 +113,8 @@ def hadoop_prefix_from_bin(hadoop_bin):
 
     # use parent of hadoop_bin's directory
     hadoop_home = posixpath.abspath(
-        posixpath.join(posixpath.realpath(posixpath.dirname(hadoop_bin)), '..'))
+        posixpath.join(posixpath.realpath(posixpath.dirname(hadoop_bin)), '..')
+    )
 
     if hadoop_home in _BAD_HADOOP_HOMES:
         return None

@@ -275,7 +275,7 @@ class FindHadoopBinTestCase(SandboxedTestCase):
     def test_hadoop_mapred_home(self):
         self._test_environment_variable('HADOOP_MAPRED_HOME', 'bin')
 
-    def test_hadoop_anything_home(self):
+    def test_hadoop_star_home(self):
         self._test_environment_variable('HADOOP_ANYTHING_HOME', 'bin')
 
     def test_other_environment_variable(self):
@@ -317,5 +317,6 @@ class FindHadoopBinTestCase(SandboxedTestCase):
         self.test_path()
 
     def test_hadoop_anything_home_is_alphabetical(self):
+        # $HADOOP_ANYTHING_HOME comes before $HADOOP_MAPRED_HOME
         self._add_hadoop_bin_for_envvar('HADOOP_MAPRED_HOME', 'bin')
         self.test_hadoop_anything_home()

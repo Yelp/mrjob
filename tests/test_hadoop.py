@@ -88,8 +88,8 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
         def mock_ls(path):  # don't bother to support globs
             return (p for p in sorted(self.mock_paths) if p.startswith(path))
 
-        self.start(patch('mrjob.fs.local.LocalFilesystem.ls',
-                         side_effect=mock_ls))
+        self.mock_ls = self.start(patch('mrjob.fs.local.LocalFilesystem.ls',
+                                        side_effect=mock_ls))
 
         os.environ.clear()
 
@@ -105,26 +105,13 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/home-option/hadoop-streaming.jar')
 
-    def test_infer_from_hadoop_bin(self):
-        self.runner = HadoopJobRunner(hadoop_bin=['/ha/do/op/bin/hadoop'])
+    def test_deprecated_hadoop_home_option_beats_hadoop_prefix(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op/prefix'
+        self.mock_paths.append('/ha/do/op/prefix/hadoop-streaming.jar')
 
-        self.mock_paths.append('/ha/do/op/home-option/hadoop-streaming.jar')
-        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
-                         '/ha/do/op/home-option/hadoop-streaming.jar')
+        self.test_deprecated_hadoop_home_option()
 
-    def test_hard_coded_emr_paths(self):
-        self.runner = HadoopJobRunner()
-
-        self.mock_paths.append(
-            '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
-        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
-                         '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
-
-        self.mock_paths.append('/home/hadoop/contrib/hadoop-streaming.jar')
-        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
-                         '/home/hadoop/contrib/hadoop-streaming.jar')
-
-    # tests of environment variables
+    # tests of well-known environment variables
 
     def test_hadoop_prefix(self):
         os.environ['HADOOP_PREFIX'] = '/ha/do/op/prefix'
@@ -133,12 +120,24 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/prefix/hadoop-streaming.jar')
 
+    def test_hadoop_prefix_beats_hadoop_home(self):
+        os.environ['HADOOP_HOME'] = '/ha/do/op/home'
+        self.mock_paths.append('/ha/do/op/home/hadoop-streaming.jar')
+
+        self.test_hadoop_prefix()
+
     def test_hadoop_home(self):
         os.environ['HADOOP_HOME'] = '/ha/do/op/home'
         self.mock_paths.append('/ha/do/op/home/hadoop-streaming.jar')
 
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/home/hadoop-streaming.jar')
+
+    def test_hadoop_home_beats_hadoop_install(self):
+        os.environ['HADOOP_INSTALL'] = '/ha/do/op/install'
+        self.mock_paths.append('/ha/do/op/install/hadoop-streaming.jar')
+
+        self.test_hadoop_home()
 
     def test_hadoop_install(self):
         os.environ['HADOOP_INSTALL'] = '/ha/do/op/install'
@@ -147,6 +146,12 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/install/hadoop-streaming.jar')
 
+    def test_hadoop_install_beats_hadoop_mapred_home(self):
+        os.environ['HADOOP_MAPRED_HOME'] = '/ha/do/op/mapred-home'
+        self.mock_paths.append('/ha/do/op/mapred-home/hadoop-streaming.jar')
+
+        self.test_hadoop_install()
+
     def test_hadoop_mapred_home(self):
         os.environ['HADOOP_MAPRED_HOME'] = '/ha/do/op/mapred-home'
         self.mock_paths.append('/ha/do/op/mapred-home/hadoop-streaming.jar')
@@ -154,11 +159,80 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/mapred-home/hadoop-streaming.jar')
 
-    # TODO: test hadoop_anything_home
+    def test_hadoop_mapred_home_beats_infer_from_hadoop_bin(self):
+        self.runner = HadoopJobRunner(
+            hadoop_bin=['/ha/do/op/bin-parent/bin/hadoop'])
 
-    # TODO: test relative priority of environment variables
+        self.mock_paths.append('/ha/do/op/bin-parent/hadoop-streaming.jar')
 
-    # tests of alternate jar names and paths
+        self.test_hadoop_mapred_home()
+
+    # infer from hadoop_bin
+
+    def test_infer_from_hadoop_bin_parent_dir(self):
+        self.runner = HadoopJobRunner(
+            hadoop_bin=['/ha/do/op/bin-parent/bin/hadoop'])
+
+        self.mock_paths.append('/ha/do/op/bin-parent/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/bin-parent/hadoop-streaming.jar')
+
+    def test_hadoop_bin_beats_hadoop_anything_home(self):
+        os.environ['HADOOP_ANYTHING_HOME'] = '/ha/do/op/anything-home'
+        self.mock_paths.append('/ha/do/op/anything-home/hadoop-streaming.jar')
+
+        self.test_infer_from_hadoop_bin_parent_dir()
+
+    # tests of fallback environment variables ($HADOOP_*_HOME)
+
+    def test_hadoop_anything_home(self):
+        os.environ['HADOOP_WHATEVER_HOME'] = '/ha/do/op/whatever-home'
+        self.mock_paths.append('/ha/do/op/whatever-home/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/whatever-home/hadoop-streaming.jar')
+
+        # $HADOOP_ANYTHING_HOME comes before $HADOOP_WHATEVER_HOME
+        os.environ['HADOOP_ANYTHING_HOME'] = '/ha/do/op/anything-home'
+        self.mock_paths.append('/ha/do/op/anything-home/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/anything-home/hadoop-streaming.jar')
+
+    def test_hadoop_anything_home_beats_hard_coded_paths(self):
+        self.mock_paths.append('/home/hadoop/contrib/hadoop-streaming.jar')
+        self.mock_paths.append(
+            '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
+
+        self.test_hadoop_anything_home()
+
+    # hard-coded paths (for Hadoop inside EMR)
+
+    def test_hard_coded_emr_paths(self):
+        self.mock_paths.append(
+            '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
+
+        # /home/hadoop/contrib takes precedence
+        self.mock_paths.append('/home/hadoop/contrib/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/home/hadoop/contrib/hadoop-streaming.jar')
+
+    # invalid environment variables
+
+    def test_other_environment_variable(self):
+        os.environ['HADOOP_YARN_MRJOB_DIR'] = '/ha/do/op/yarn-mrjob-dir'
+        self.mock_paths.append(
+            '/ha/do/op/yarn-mrjob-dir/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    # relative priority of directories
+
+
+
+    # alternate jar names and paths
 
     def test_subdirs(self):
         os.environ['HADOOP_PREFIX'] = '/ha/do/op'
@@ -182,7 +256,7 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
             '/ha/do/op/hadoop-streaming-2.0.0-mr1-cdh4.3.1-sources.jar')
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
 
-    # tests of multiple matching jars in samed directory
+    # multiple matching jars in same directory
 
     def test_pick_shortest_name(self):
         os.environ['HADOOP_PREFIX'] = '/ha/do/op'
@@ -208,15 +282,11 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
     def test_fall_back_to_alphabetical_order(self):
         os.environ['HADOOP_PREFIX'] = '/ha/do/op'
 
-        # Googled it; it really is named *-sources.jar, not *-source.jar
         self.mock_paths.append('/ha/do/op/hadoop-streaming-a.jar')
         self.mock_paths.append('/ha/do/op/hadoop-streaming-b.jar')
 
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/hadoop-streaming-a.jar')
-
-
-
 
 
 class MockHadoopTestCase(SandboxedTestCase):

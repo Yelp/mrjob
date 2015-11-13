@@ -24,7 +24,6 @@ from subprocess import check_call
 
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
-from mrjob.hadoop import find_hadoop_streaming_jar
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
 from mrjob.util import bash_wrap
@@ -79,36 +78,256 @@ class TestFullyQualifyHDFSPath(TestCase):
                          'foo://bar/baz')
 
 
-class TestHadoopHomeRegression(SandboxedTestCase):
+class HadoopStreamingJarTestCase(SandboxedTestCase):
 
-    def test_hadoop_home_regression(self):
-        # kill $HADOOP_HOME if it exists
-        try:
-            del os.environ['HADOOP_HOME']
-        except KeyError:
-            pass
+    def setUp(self):
+        super(HadoopStreamingJarTestCase, self).setUp()
 
-        with patch('mrjob.hadoop.find_hadoop_streaming_jar',
-                   return_value='some.jar'):
-            HadoopJobRunner(hadoop_home=self.tmp_dir, conf_paths=[])
+        self.mock_paths = []
 
+        def mock_ls(path):  # don't bother to support globs
+            return (p for p in sorted(self.mock_paths) if p.startswith(path))
 
-class TestFindHadoopStreamingJar(SandboxedTestCase):
+        self.start(patch('mrjob.fs.local.LocalFilesystem.ls',
+                         side_effect=mock_ls))
 
-    def test_find_hadoop_streaming_jar(self):
-        # not just any jar will do
-        with patch.object(os, 'walk', return_value=[
-            ('/some_dir', None, 'mason.jar')]):
-            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
+        os.environ.clear()
 
-        # should match streaming jar
-        with patch.object(os, 'walk', return_value=[
-            ('/some_dir', None, 'hadoop-0.20.2-streaming.jar')]):
-            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
+        self.runner = HadoopJobRunner()
 
-        # shouldn't find anything in an empty dir
-        with patch.object(os, 'walk', return_value=[]):
-            self.assertEqual(find_hadoop_streaming_jar('/some_dir'), None)
+    def test_empty_fs(self):
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    def test_deprecated_hadoop_home_option(self):
+        self.runner = HadoopJobRunner(hadoop_home='/ha/do/op/home-option')
+
+        self.mock_paths.append('/ha/do/op/home-option/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/home-option/hadoop-streaming.jar')
+
+    def test_deprecated_hadoop_home_option_beats_hadoop_prefix(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op/prefix'
+        self.mock_paths.append('/ha/do/op/prefix/hadoop-streaming.jar')
+
+        self.test_deprecated_hadoop_home_option()
+
+    # tests of well-known environment variables
+
+    def test_hadoop_prefix(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op/prefix'
+        self.mock_paths.append('/ha/do/op/prefix/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/prefix/hadoop-streaming.jar')
+
+    def test_hadoop_prefix_beats_hadoop_home(self):
+        os.environ['HADOOP_HOME'] = '/ha/do/op/home'
+        self.mock_paths.append('/ha/do/op/home/hadoop-streaming.jar')
+
+        self.test_hadoop_prefix()
+
+    def test_hadoop_home(self):
+        os.environ['HADOOP_HOME'] = '/ha/do/op/home'
+        self.mock_paths.append('/ha/do/op/home/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/home/hadoop-streaming.jar')
+
+    def test_hadoop_home_beats_hadoop_install(self):
+        os.environ['HADOOP_INSTALL'] = '/ha/do/op/install'
+        self.mock_paths.append('/ha/do/op/install/hadoop-streaming.jar')
+
+        self.test_hadoop_home()
+
+    def test_hadoop_install(self):
+        os.environ['HADOOP_INSTALL'] = '/ha/do/op/install'
+        self.mock_paths.append('/ha/do/op/install/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/install/hadoop-streaming.jar')
+
+    def test_hadoop_install_beats_hadoop_mapred_home(self):
+        os.environ['HADOOP_MAPRED_HOME'] = '/ha/do/op/mapred-home'
+        self.mock_paths.append('/ha/do/op/mapred-home/hadoop-streaming.jar')
+
+        self.test_hadoop_install()
+
+    def test_hadoop_mapred_home(self):
+        os.environ['HADOOP_MAPRED_HOME'] = '/ha/do/op/mapred-home'
+        self.mock_paths.append('/ha/do/op/mapred-home/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/mapred-home/hadoop-streaming.jar')
+
+    def test_hadoop_mapred_home_beats_infer_from_hadoop_bin(self):
+        self.runner = HadoopJobRunner(
+            hadoop_bin=['/ha/do/op/bin-parent/bin/hadoop'])
+
+        self.mock_paths.append('/ha/do/op/bin-parent/hadoop-streaming.jar')
+
+        self.test_hadoop_mapred_home()
+
+    # infer from hadoop_bin
+
+    def test_infer_from_hadoop_bin_parent_dir(self):
+        self.runner = HadoopJobRunner(
+            hadoop_bin=['/ha/do/op/bin-parent/bin/hadoop'])
+
+        self.mock_paths.append('/ha/do/op/bin-parent/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/bin-parent/hadoop-streaming.jar')
+
+    def test_hadoop_bin_beats_hadoop_anything_home(self):
+        os.environ['HADOOP_ANYTHING_HOME'] = '/ha/do/op/anything-home'
+        self.mock_paths.append('/ha/do/op/anything-home/hadoop-streaming.jar')
+
+        self.test_infer_from_hadoop_bin_parent_dir()
+
+    def test_dont_infer_from_bin_hadoop(self):
+        self.runner = HadoopJobRunner(hadoop_bin=['/bin/hadoop'])
+        self.mock_paths.append('/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    def test_dont_infer_from_usr_bin_hadoop(self):
+        self.runner = HadoopJobRunner(hadoop_bin=['/usr/bin/hadoop'])
+        self.mock_paths.append('/usr/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    def test_dont_infer_from_usr_local_bin_hadoop(self):
+        self.runner = HadoopJobRunner(hadoop_bin=['/usr/local/bin/hadoop'])
+        self.mock_paths.append('/usr/local/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    def test_infer_from_hadoop_bin_realpath(self):
+        with patch('posixpath.realpath', return_value='/ha/do/op/bin'):
+            self.runner = HadoopJobRunner(hadoop_bin=['/usr/bin/hadoop'])
+            self.mock_paths.append('/ha/do/op/hadoop-streaming.jar')
+
+            self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                             '/ha/do/op/hadoop-streaming.jar')
+
+    # tests of fallback environment variables ($HADOOP_*_HOME)
+
+    def test_hadoop_anything_home(self):
+        os.environ['HADOOP_WHATEVER_HOME'] = '/ha/do/op/whatever-home'
+        self.mock_paths.append('/ha/do/op/whatever-home/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/whatever-home/hadoop-streaming.jar')
+
+        # $HADOOP_ANYTHING_HOME comes before $HADOOP_WHATEVER_HOME
+        os.environ['HADOOP_ANYTHING_HOME'] = '/ha/do/op/anything-home'
+        self.mock_paths.append('/ha/do/op/anything-home/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/anything-home/hadoop-streaming.jar')
+
+    def test_hadoop_anything_home_beats_hard_coded_paths(self):
+        self.mock_paths.append('/home/hadoop/contrib/hadoop-streaming.jar')
+        self.mock_paths.append(
+            '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
+
+        self.test_hadoop_anything_home()
+
+    # hard-coded paths (for Hadoop inside EMR)
+
+    def test_hard_coded_emr_paths(self):
+        self.mock_paths.append(
+            '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
+
+        # /home/hadoop/contrib takes precedence
+        self.mock_paths.append('/home/hadoop/contrib/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/home/hadoop/contrib/hadoop-streaming.jar')
+
+    # invalid environment variables
+
+    def test_other_environment_variable(self):
+        os.environ['HADOOP_YARN_MRJOB_DIR'] = '/ha/do/op/yarn-mrjob-dir'
+        self.mock_paths.append(
+            '/ha/do/op/yarn-mrjob-dir/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    # alternate jar names and paths
+
+    def test_subdirs(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+        self.mock_paths.append('/ha/do/op/contrib/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/contrib/hadoop-streaming.jar')
+
+    def test_hadoop_streaming_jar_name_with_version(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-2.6.0-amzn-0.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/hadoop-streaming-2.6.0-amzn-0.jar')
+
+    def test_skip_hadoop_streaming_source_jar(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        # Googled it; it really is named *-sources.jar, not *-source.jar
+        self.mock_paths.append(
+            '/ha/do/op/hadoop-streaming-2.0.0-mr1-cdh4.3.1-sources.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
+
+    # multiple matching jars in same directory
+
+    def test_pick_shortest_name(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-1.0.3.jar')
+        self.mock_paths.append('/ha/do/op/hadoop-streaming.jar')
+
+        # hadoop-streaming-1.0.3.jar comes first in alphabetical order
+        self.assertEqual(sorted(self.mock_paths), self.mock_paths)
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/hadoop-streaming.jar')
+
+    def test_pick_shallowest_subpath(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-1.0.3.jar')
+        self.mock_paths.append('/ha/do/op/old/hadoop-streaming.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/hadoop-streaming-1.0.3.jar')
+
+    def test_fall_back_to_alphabetical_order(self):
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-a.jar')
+        self.mock_paths.append('/ha/do/op/hadoop-streaming-b.jar')
+
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/hadoop-streaming-a.jar')
+
+    # sanity-check that directory order overrides path sort order
+
+    def test_directory_order_overrides_path_sort_order(self):
+        os.environ['HADOOP_HOME'] = '/ha/do/op/a'
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op/b'
+
+        self.mock_paths.append('/ha/do/op/a/hadoop-streaming-a.jar')
+        self.mock_paths.append('/ha/do/op/b/hadoop-streaming-b.jar')
+
+        # $HADOOP_PREFIX takes precendence over $HADOOP_HOME, so sort
+        # order doesn't matter
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/b/hadoop-streaming-b.jar')
+
+        # now search in parent dir (/ha/do/op) to invoke sort order
+        os.environ['HADOOP_PREFIX'] = '/ha/do/op'
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/a/hadoop-streaming-a.jar')
 
 
 class MockHadoopTestCase(SandboxedTestCase):

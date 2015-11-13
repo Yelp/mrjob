@@ -416,15 +416,10 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
         with no_handlers_for_logger('mrjob.conf'):
             log_to_stream('mrjob.conf', stderr)
 
-            # HadoopRunnerOptionStore really wants to find the streaming jar
-            with patch.object(mrjob.hadoop, 'find_hadoop_streaming_jar',
-                              return_value='found'):
-                opts = HadoopRunnerOptionStore(
-                    'hadoop',
-                    dict(base_tmp_dir='/scratch',
-                         hadoop_home='required',
-                         hdfs_scratch_dir='hdfs:///scratch'),
-                    [])
+            opts = HadoopRunnerOptionStore(
+                    'hadoop', dict(base_tmp_dir='/scratch',
+                         hdfs_scratch_dir='hdfs:///scratch',
+                    ), [])
 
             self.assertEqual(opts['local_tmp_dir'], '/scratch')
             self.assertNotIn('base_tmp_dir', opts)

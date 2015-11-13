@@ -17,6 +17,7 @@ import gzip
 import optparse
 import os
 import shutil
+import stat
 import sys
 import tarfile
 import tempfile
@@ -37,12 +38,16 @@ from mrjob.util import read_input
 from mrjob.util import safeeval
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import tar_and_gzip
-from mrjob.util import unarchive
 from mrjob.util import to_lines
+from mrjob.util import unarchive
+from mrjob.util import unique
+from mrjob.util import which
 
 from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import random_seed
 
 
@@ -608,3 +613,50 @@ class RandomIdentifierTestCase(TestCase):
         # heh
         with random_seed(0):
             self.assertNotEqual(random_identifier(), random_identifier())
+
+
+class UniqueTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(list(unique([])), [])
+
+    def test_de_duplication(self):
+        self.assertEqual(list(unique([1, 2, 1, 5, 1])),
+                         [1, 2, 5])
+
+    def test_preserves_order(self):
+        self.assertEqual(list(unique([6, 7, 2, 0, 7, 1])),
+                         [6, 7, 2, 0, 1])
+
+    def test_mixed_types_ok(self):
+        self.assertEqual(list(unique(['a', None, 33, 'a'])),
+                         ['a', None, 33])
+
+
+class WhichTestCase(SandboxedTestCase):
+
+    # which() is just a passthrough to shutil.which() and
+    # distutils.spawn.find_executable, so we're really just
+    # testing for consistent behavior across versions
+
+    def setUp(self):
+        super(WhichTestCase, self).setUp()
+
+        self.shekondar_path = self.makefile('shekondar', executable=True)
+
+    def test_explicit_path(self):
+        self.assertEqual(which('shekondar', path=self.tmp_dir),
+                         self.shekondar_path)
+
+    def test_path_from_environment(self):
+        with patch.dict(os.environ, PATH=self.tmp_dir):
+            self.assertEqual(which('shekondar'), self.shekondar_path)
+
+    def test_not_found(self):
+        self.assertEqual(which('shekondar-the-fearsome', self.tmp_dir), None)
+
+    def test_no_path(self):
+        with patch.dict(os.environ, clear=True):
+            # make sure we protect find_executable() from missing $PATH
+            # on Python 2.
+            self.assertEqual(which('shekondar'), None)

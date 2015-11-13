@@ -63,11 +63,30 @@ Options available to hadoop and emr runners
     :switch: --hadoop-streaming-jar
     :type: :ref:`string <data-type-string>`
     :set: all
-    :default: automatic
+    :default: (automatic)
 
-    Path to a custom hadoop streaming jar. This is optional for the ``hadoop``
-    runner, which will search for it in :envvar:`HADOOP_HOME`. The emr runner
-    can take a path either local to your machine or on S3.
+    Path to a custom hadoop streaming jar.
+
+    On EMR, this can be either a local path or a URI (``s3://...``). If you
+    want to use a jar at a path on the master node, use
+    :mrjob-opt:`hadoop_streaming_jar_on_emr`.
+
+    On Hadoop, mrjob tries its best to find your hadoop streaming jar,
+    searching these directories (recursively) for a ``.jar`` file with
+    ``hadoop`` followed by ``streaming`` in its name:
+
+    * :mrjob-opt:`hadoop_home` (the runner option)
+    * ``$HADOOP_PREFIX``
+    * ``$HADOOP_HOME``
+    * ``$HADOOP_INSTALL``
+    * ``$HADOOP_MAPRED_HOME``
+    * the parent of the directory containing the Hadoop binary (see :mrjob-opt:`hadoop_bin`), unless it's one of ``/``, ``/usr`` or ``/usr/local``
+    * ``$HADOOP_*_HOME`` (in alphabetical order by environment variable name)
+    * ``/home/hadoop/contrib``
+    * ``/usr/lib/hadoop-mapreduce``
+
+    (The last two paths allow the Hadoop runner to work out-of-the box
+    inside EMR.)
 
 .. mrjob-opt::
     :config: label
@@ -122,18 +141,35 @@ Options available to hadoop runner only
     :switch: --hadoop-bin
     :type: :ref:`command <data-type-command>`
     :set: hadoop
-    :default: :mrjob-opt:`hadoop_home` plus ``bin/hadoop``
+    :default: (automatic)
 
     Name/path of your hadoop program (may include arguments).
+
+    mrjob tries its best to find your hadoop binary, checking all of the
+    following places for an executable file named ``hadoop``:
+
+    * :mrjob-opt:`hadoop_home`/``bin``
+    * ``$HADOOP_PREFIX/bin``
+    * ``$HADOOP_HOME/bin``
+    * ``$HADOOP_INSTALL/bin``
+    * ``$HADOOP_INSTALL/hadoop/bin``
+    * ``$PATH``
+    * ``$HADOOP_*_HOME/bin`` (in alphabetical order by environment variable name)
+
+    If all else fails, we just use ``hadoop`` and hope for the best.
 
 .. mrjob-opt::
     :config: hadoop_home
     :switch: --hadoop-home
     :type: :ref:`path <data-type-path>`
     :set: hadoop
-    :default: :envvar:`HADOOP_HOME`
+    :default: ``None``
 
-    Alternative to setting the :envvar:`HADOOP_HOME` environment variable.
+    Hint about where to find the hadoop binary and streaming jar. Instead, just
+    set :mrjob-opt:`hadoop_bin` and/or :mrjob-opt:`hadoop_streaming_jar` as
+    needed.
+
+    .. deprecated: 0.5.0
 
 .. mrjob-opt::
     :config: hadoop_tmp_dir

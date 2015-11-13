@@ -105,9 +105,26 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/home-option/hadoop-streaming.jar')
 
-    # TODO: test infer from hadoop bin, hard-coded EMR paths
+    def test_infer_from_hadoop_bin(self):
+        self.runner = HadoopJobRunner(hadoop_bin=['/ha/do/op/bin/hadoop'])
 
-    # test environment variables
+        self.mock_paths.append('/ha/do/op/home-option/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/ha/do/op/home-option/hadoop-streaming.jar')
+
+    def test_hard_coded_emr_paths(self):
+        self.runner = HadoopJobRunner()
+
+        self.mock_paths.append(
+            '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
+
+        self.mock_paths.append('/home/hadoop/contrib/hadoop-streaming.jar')
+        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
+                         '/home/hadoop/contrib/hadoop-streaming.jar')
+
+    # tests of environment variables
 
     def test_hadoop_prefix(self):
         os.environ['HADOOP_PREFIX'] = '/ha/do/op/prefix'
@@ -165,7 +182,7 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
             '/ha/do/op/hadoop-streaming-2.0.0-mr1-cdh4.3.1-sources.jar')
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
 
-    # tests of multiple matching options
+    # tests of multiple matching jars in samed directory
 
     def test_pick_shortest_name(self):
         os.environ['HADOOP_PREFIX'] = '/ha/do/op'

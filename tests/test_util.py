@@ -654,3 +654,9 @@ class WhichTestCase(SandboxedTestCase):
 
     def test_not_found(self):
         self.assertEqual(which('shekondar-the-fearsome', self.tmp_dir), None)
+
+    def test_no_path(self):
+        with patch.dict(os.environ, clear=True):
+            # make sure we protect find_executable() from missing $PATH
+            # on Python 2.
+            self.assertEqual(which('shekondar'), None)

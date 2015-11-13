@@ -715,7 +715,8 @@ def unarchive(archive_path, dest):
 
 def which(cmd, path=None):
     """Like the UNIX which command: search in *path* for the executable named
-    *cmd*. *path* defaults to :envvar:`PATH`.
+    *cmd*. *path* defaults to :envvar:`PATH`. Returns ``None`` if no
+    such executable found.
 
     This is basically ``shutil.which()`` (which was introduced in Python 3.3)
     without the *mode* argument. Best practice is to always specify *path*
@@ -723,5 +724,8 @@ def which(cmd, path=None):
     """
     if hasattr(shutil, 'which'):
         return shutil.which(cmd, path=path)
+    elif path is None and os.environ.get('PATH') is None:
+        # find_executable() errors if neither path nor $PATH is set
+        return None
     else:
         return find_executable(cmd, path=path)

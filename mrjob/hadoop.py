@@ -239,7 +239,7 @@ class HadoopJobRunner(MRJobRunner):
             if streaming_jars:
                 # prefer shorter names and shallower paths
                 def sort_key(p):
-                    return (len('/'.split(p)),
+                    return (len(p.split('/')),
                             len(posixpath.basename(p)),
                             p)
 

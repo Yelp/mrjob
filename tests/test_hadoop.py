@@ -78,10 +78,10 @@ class TestFullyQualifyHDFSPath(TestCase):
                          'foo://bar/baz')
 
 
-class TestGetHadoopStreamingJar(SandboxedTestCase):
+class HadoopStreamingJarTestCase(SandboxedTestCase):
 
     def setUp(self):
-        super(TestGetHadoopStreamingJar, self).setUp()
+        super(HadoopStreamingJarTestCase, self).setUp()
 
         self.mock_paths = []
 

@@ -80,24 +80,6 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
 
 
-# TODO: redo log dir stuff
-def hadoop_log_dir(hadoop_home=None):
-    """Return the path where Hadoop stores logs.
-
-    :param hadoop_home: putative value of :envvar:`HADOOP_HOME`, or None to
-                        default to the actual value if used. This is only used
-                        if :envvar:`HADOOP_LOG_DIR` is not defined.
-    """
-    try:
-        return os.environ['HADOOP_LOG_DIR']
-    except KeyError:
-        # Defaults to $HADOOP_HOME/logs
-        # http://wiki.apache.org/hadoop/HowToConfigure
-        if hadoop_home is None:
-            hadoop_home = os.environ['HADOOP_HOME']
-        return posixpath.join(hadoop_home, 'logs')
-
-
 def hadoop_prefix_from_bin(hadoop_bin):
     """Given a path to the hadoop binary, return the path of the implied
     hadoop home, or None if we don't know.
@@ -569,15 +551,14 @@ class HadoopJobRunner(MRJobRunner):
         directory
         """
         return []
+        # in YARN, you can just ask the yarn bin:
+        # http://hortonworks.com/blog/simplifying-user-logs-management-and-access-in-yarn/  # noqa
+
         # TODO: redo this to look in
         # $HADOOP_LOG_DIR
         # dirname(hadoop_bin[0])/../logs
         # <output_dir>/_logs
         # ??? other places ???
-
-        return ls_logs(self.fs, log_type,
-                       log_dir=self._hadoop_log_dir,
-                       step_nums=step_nums)
 
     def _fetch_counters(self, step_nums, skip_s3_wait=False):
         """Read Hadoop counters from local logs.

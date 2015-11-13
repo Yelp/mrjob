@@ -1,5 +1,6 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,9 +16,12 @@
 
 """Test configuration parsing and option combining"""
 import os
+import os.path
 
 import mrjob.conf
-from mrjob.conf import combine_cmd_lists
+from mrjob.conf import ClearedValue
+from mrjob.conf import _fix_clear_tags
+from mrjob.conf import _load_yaml_with_clear_tag
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
@@ -32,6 +36,7 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
+from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
@@ -39,6 +44,7 @@ from tests.sandbox import SandboxedTestCase
 
 from tests.py2 import TestCase
 from tests.py2 import patch
+from tests.py2 import skipIf
 
 
 def load_mrjob_conf(conf_path=None):
@@ -65,9 +71,7 @@ class MRJobConfTestCase(SandboxedTestCase):
             else:
                 return path in self._existing_paths
 
-        p = patch('os.path.exists', side_effect=os_path_exists_stub)
-        p.start()
-        self.addCleanup(p.stop)
+        self.start(patch('os.path.exists', side_effect=os_path_exists_stub))
 
 
 class MRJobBasicConfTestCase(MRJobConfTestCase):
@@ -142,8 +146,164 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
                 load_opts_from_mrjob_conf('bar', conf_path=conf_path)[0][1],
                 {})
 
-    def test_round_trip(self):
-        conf = {'runners': {'foo': {'qux': 'quux'}}}
+    def test_duplicate_conf_path(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_confs(
+                'foo', [conf_path, conf_path]),
+            [(conf_path, {})])
+
+    def test_symlink_to_duplicate_conf_path(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        conf_symlink_path = os.path.join(self.tmp_dir, 'mrjob.conf.symlink')
+        os.symlink('mrjob.conf', conf_symlink_path)
+
+        self.assertEqual(
+            load_opts_from_mrjob_confs(
+                'foo', [conf_path, conf_symlink_path]),
+            [(conf_symlink_path, {})])
+
+        self.assertEqual(
+            load_opts_from_mrjob_confs(
+                'foo', [conf_symlink_path, conf_path]),
+            [(conf_path, {})])
+
+    def test_recursive_include(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': conf_path}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(conf_path, {})])
+
+    def test_doubly_recursive_include(self):
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({'include': conf_path_2}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({'include': conf_path_1}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path_1),
+            [(conf_path_2, {}), (conf_path_1, {})])
+
+    def test_conf_path_order_beats_include(self):
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        # shouldn't matter that conf_path_1 includes conf_path_2
+        self.assertEqual(
+            load_opts_from_mrjob_confs('foo', [conf_path_1, conf_path_2]),
+            [(conf_path_1, {}), (conf_path_2, {})])
+
+    def test_include_order_beats_include(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': [conf_path_1, conf_path_2]}, f)
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({'include': [conf_path_2]}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        # shouldn't matter that conf_path_1 includes conf_path_2
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(conf_path_1, {}), (conf_path_2, {}), (conf_path, {})])
+
+    def test_nested_include(self):
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+        conf_path_1 = os.path.join(self.tmp_dir, 'mrjob.1.conf')
+        conf_path_2 = os.path.join(self.tmp_dir, 'mrjob.2.conf')
+        conf_path_3 = os.path.join(self.tmp_dir, 'mrjob.3.conf')
+
+        # accidentally reversed the order of nested includes when
+        # trying to make precedence work; this test would catch that
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': conf_path_1}, f)
+
+        with open(conf_path_1, 'w') as f:
+            dump_mrjob_conf({'include': [conf_path_2, conf_path_3]}, f)
+
+        with open(conf_path_2, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path_3, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(conf_path_2, {}),
+             (conf_path_3, {}),
+             (conf_path_1, {}),
+             (conf_path, {})])
+
+    def test_relative_include(self):
+        base_conf_path = os.path.join(self.tmp_dir, 'mrjob.base.conf')
+        real_base_conf_path = os.path.realpath(base_conf_path)
+
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(base_conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': 'mrjob.base.conf'}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(real_base_conf_path, {}), (conf_path, {})])
+
+    def test_include_relative_to_real_path(self):
+        os.mkdir(os.path.join(self.tmp_dir, 'conf'))
+
+        base_conf_path = os.path.join(self.tmp_dir, 'conf', 'mrjob.base.conf')
+        real_base_conf_path = os.path.realpath(base_conf_path)
+
+        conf_path = os.path.join(self.tmp_dir, 'conf', 'mrjob.conf')
+        conf_symlink_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(base_conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': 'mrjob.base.conf'}, f)
+
+        os.symlink(os.path.join('conf', 'mrjob.conf'), conf_symlink_path)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(real_base_conf_path, {}), (conf_path, {})])
+
+        # relative include should work from the symlink even though
+        # it's not in the same directory as mrjob.base.conf
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_symlink_path),
+            [(real_base_conf_path, {}), (conf_symlink_path, {})])
+
+    def _test_round_trip(self, conf):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         with open(conf_path, 'w') as f:
@@ -151,25 +311,22 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         with no_handlers_for_logger('mrjob.conf'):
             self.assertEqual(conf, load_mrjob_conf(conf_path=conf_path))
 
+    def test_round_trip(self):
+        self._test_round_trip({'runners': {'foo': {'qux': 'quux'}}})
+
+    @skipIf(mrjob.conf.yaml is None, 'no yaml module')
+    def test_round_trip_with_clear_tag(self):
+        self._test_round_trip(
+            {'runners': {'foo': {'qux': ClearedValue('quux')}}})
+
+
+
 
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
     def setUp(self):
         super(MRJobConfNoYAMLTestCase, self).setUp()
-        self.blank_out_yaml()
-
-    def tearDown(self):
-        self.restore_yaml()
-        super(MRJobConfNoYAMLTestCase, self).tearDown()
-
-    def blank_out_yaml(self):
-        # This test doesn't care if you have YAML or not, but if you do, get
-        # rid of it temporarily
-        self._real_yaml = mrjob.conf.yaml
-        mrjob.conf.yaml = None
-
-    def restore_yaml(self):
-        mrjob.conf.yaml = self._real_yaml
+        self.start(patch('mrjob.conf.yaml', None))
 
     def test_using_json_and_not_yaml(self):
         conf = {'runners': {'foo': {'qux': 'quux'}}}
@@ -183,6 +340,14 @@ class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
         self.assertEqual(contents.replace(' ', '').replace('\n', ''),
                          '{"runners":{"foo":{"qux":"quux"}}}')
+
+    def test_no_support_for_clear_tags(self):
+        conf = {'runners': {'foo': {'qux': ClearedValue('quux')}}}
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(conf_path, 'w') as f:
+            self.assertRaises(TypeError,
+                              dump_mrjob_conf, conf, f)
 
     def test_json_error(self):
         conf = """
@@ -241,7 +406,7 @@ class CombineDictsTestCase(TestCase):
             {'TMPDIR': '/var/tmp', 'HOME': '/home/dave'})
 
     def test_skip_None(self):
-        self.assertEqual(combine_envs(None, {'USER': 'dave'}, None,
+        self.assertEqual(combine_dicts(None, {'USER': 'dave'}, None,
                                   {'TERM': 'xterm'}, None),
                      {'USER': 'dave', 'TERM': 'xterm'})
 
@@ -258,6 +423,27 @@ class CombineDictsTestCase(TestCase):
              'PYTHONPATH': '/home/dave/python',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
+
+    def test_None_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'}, {'USER': None}),
+            {'TERM': 'xterm', 'USER': None})
+
+    def test_cleared_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'},
+                          {'USER': ClearedValue('caleb')}),
+            {'TERM': 'xterm', 'USER': 'caleb'})
+
+    def test_deleted_value(self):
+        self.assertEqual(
+            combine_dicts({'USER': 'dave', 'TERM': 'xterm'},
+                          {'USER': ClearedValue(None)}),
+            {'TERM': 'xterm'})
+
+    def test_dont_accept_wrapped_dicts(self):
+        self.assertRaises(AttributeError,
+                          combine_dicts, ClearedValue({'USER': 'dave'}))
 
 
 class CombineCmdsTestCase(TestCase):
@@ -291,24 +477,6 @@ class CombineCmdsTestCase(TestCase):
         self.assertEqual(combine_cmds(u'wunderbar!'), ['wunderbar!'])
 
 
-class CombineCmdsListsCase(TestCase):
-
-    def test_empty(self):
-        self.assertEqual(combine_cmd_lists(), [])
-
-    def test_concatenation(self):
-        self.assertEqual(
-            combine_cmd_lists(
-                [['echo', 'foo']], None, (['mkdir', 'bar'], ['rmdir', 'bar'])),
-            [['echo', 'foo'], ['mkdir', 'bar'], ['rmdir', 'bar']])
-
-    def test_conversion(self):
-        self.assertEqual(
-            combine_cmd_lists(
-                ['echo "Hello World!"'], None, [('mkdir', '/tmp/baz')]),
-            [['echo', 'Hello World!'], ['mkdir', '/tmp/baz']])
-
-
 class CombineEnvsTestCase(TestCase):
 
     def test_empty(self):
@@ -326,16 +494,31 @@ class CombineEnvsTestCase(TestCase):
                      {'USER': 'dave', 'TERM': 'xterm'})
 
     def test_paths(self):
-        self.assertEqual(combine_envs(
-            {'PATH': '/bin:/usr/bin',
-             'PYTHONPATH': '/usr/lib/python/site-packages',
-             'PS1': '> '},
-            {'PATH': '/home/dave/bin',
-             'PYTHONPATH': '/home/dave/python',
-             'CLASSPATH': '/home/dave/java',
-             'PS1': '\w> '}),
+        self.assertEqual(
+            combine_envs(
+                {'PATH': '/bin:/usr/bin',
+                 'PYTHONPATH': '/usr/lib/python/site-packages',
+                 'PS1': '> '},
+                {'PATH': '/home/dave/bin',
+                 'PYTHONPATH': '/home/dave/python',
+                 'CLASSPATH': '/home/dave/java',
+                 'PS1': '\w> '}),
             {'PATH': '/home/dave/bin:/bin:/usr/bin',
              'PYTHONPATH': '/home/dave/python:/usr/lib/python/site-packages',
+             'CLASSPATH': '/home/dave/java',
+             'PS1': '\w> '})
+
+    def test_clear_paths(self):
+        self.assertEqual(
+            combine_envs(
+                {'PATH': '/bin:/usr/bin',
+                 'PYTHONPATH': '/usr/lib/python/site-packages',
+                 'PS1': '> '},
+                {'PATH': ClearedValue('/home/dave/bin'),
+                 'PYTHONPATH': ClearedValue(None),
+                 'CLASSPATH': '/home/dave/java',
+                 'PS1': '\w> '}),
+            {'PATH': '/home/dave/bin',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
 
@@ -378,6 +561,18 @@ class CombineListsTestCase(TestCase):
     def test_concatenation(self):
         self.assertEqual(combine_lists([1, 2], None, (3, 4)), [1, 2, 3, 4])
 
+    def test_strings(self):
+        self.assertEqual(combine_lists('one', None, 'two', u'three'),
+                         ['one', 'two', u'three'])
+
+    def test_scalars(self):
+        self.assertEqual(combine_lists(None, False, b'\x00', 42, 3.14),
+                         [False, b'\x00', 42, 3.14])
+
+    def test_mix_lists_and_scalars(self):
+        self.assertEqual(combine_lists([1, 2], 3, (4, 5), 6),
+                        [1, 2, 3, 4, 5, 6])
+
 
 class CombineOptsTestCase(TestCase):
 
@@ -385,17 +580,37 @@ class CombineOptsTestCase(TestCase):
         self.assertEqual(combine_opts(combiners={}), {})
 
     def test_combine_opts(self):
-        combiners = {
-            'foo': combine_lists,
-        }
         self.assertEqual(
-            combine_opts(combiners,
+            combine_opts(dict(foo=combine_lists),
                          {'foo': ['bar'], 'baz': ['qux']},
                          {'foo': ['baz'], 'baz': ['quux'], 'bar': 'garply'},
                          None,
                          {}),
             # "baz" doesn't use the list combiner, so ['qux'] is overwritten
             {'foo': ['bar', 'baz'], 'baz': ['quux'], 'bar': 'garply'})
+
+    def test_cleared_opt_values(self):
+        self.assertEqual(
+            combine_opts(dict(foo=combine_lists),
+                         {'foo': ['bar']},
+                         {'foo': ClearedValue(['baz'])}),
+            # ClearedValue(['baz']) overrides bar
+            {'foo': ['baz']})
+
+        self.assertEqual(
+            combine_opts(dict(foo=combine_lists),
+                         {'foo': ['bar']},
+                         {'foo': ClearedValue(None)}),
+            # not None!
+            {'foo': []})
+
+    def test_cant_clear_entire_opt_dicts(self):
+        self.assertRaises(
+            TypeError,
+            combine_opts,
+            dict(foo=combine_lists),
+            {'foo': ['bar']},
+            ClearedValue({'foo': ['baz']}))
 
 
 class CombineAndExpandPathsTestCase(SandboxedTestCase):
@@ -434,6 +649,11 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
             combine_path_lists(['~/tmp'], [], ['/dev/null', '/tmp/$USER']),
             ['/home/foo/tmp', '/dev/null', '/tmp/foo'])
 
+    def test_combine_path_lists_on_strings(self):
+        self.assertEqual(
+            combine_path_lists('~/tmp', [], ['/dev/null', '/tmp/$USER']),
+            ['/home/foo/tmp', '/dev/null', '/tmp/foo'])
+
     def test_globbing(self):
         foo_path = os.path.join(self.tmp_dir, 'foo')
         bar_path = os.path.join(self.tmp_dir, 'bar')
@@ -451,3 +671,187 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
             [bar_path, foo_path, foo_path,
              os.path.join(self.tmp_dir, 'q*'),
              's3://walrus/foo'])
+
+
+@skipIf(mrjob.conf.yaml is None, 'no yaml module')
+class LoadYAMLWithClearTag(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_load_yaml_with_clear_tag(''),
+                         None)
+        self.assertEqual(_load_yaml_with_clear_tag('!clear'),
+                         ClearedValue(None))
+
+    def test_null(self):
+        self.assertEqual(_load_yaml_with_clear_tag('null'),
+                         None)
+        self.assertEqual(_load_yaml_with_clear_tag('!clear null'),
+                         ClearedValue(None))
+
+    def test_string(self):
+        self.assertEqual(_load_yaml_with_clear_tag('foo'),
+                         'foo')
+        self.assertEqual(_load_yaml_with_clear_tag('!clear foo'),
+                         ClearedValue('foo'))
+
+    def test_int(self):
+        self.assertEqual(_load_yaml_with_clear_tag('18'),
+                         18)
+        self.assertEqual(_load_yaml_with_clear_tag('!clear 18'),
+                         ClearedValue(18))
+
+    def test_list(self):
+        self.assertEqual(_load_yaml_with_clear_tag('- foo\n- bar'),
+                         ['foo', 'bar'])
+        self.assertEqual(_load_yaml_with_clear_tag('!clear\n- foo\n- bar'),
+                         ClearedValue(['foo', 'bar']))
+        self.assertEqual(_load_yaml_with_clear_tag('- foo\n- !clear bar'),
+                         ['foo', ClearedValue('bar')])
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear\n- !clear foo\n- !clear bar'),
+            ClearedValue([ClearedValue('foo'), ClearedValue('bar')]))
+
+    def test_dict(self):
+        self.assertEqual(_load_yaml_with_clear_tag('foo: bar'),
+                         {'foo': 'bar'})
+        self.assertEqual(_load_yaml_with_clear_tag('!clear\nfoo: bar'),
+                         ClearedValue({'foo': 'bar'}))
+        self.assertEqual(_load_yaml_with_clear_tag('!clear foo: bar'),
+                         {ClearedValue('foo'): 'bar'})
+        self.assertEqual(_load_yaml_with_clear_tag('foo: !clear bar'),
+                         {'foo': ClearedValue('bar')})
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear\n!clear foo: !clear bar'),
+            ClearedValue({ClearedValue('foo'): ClearedValue('bar')}))
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear foo: bar\nfoo: baz'),
+            {ClearedValue('foo'): 'bar', 'foo': 'baz'})
+
+    def test_nesting(self):
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - baz: qux'),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag(
+                '!clear\n  foo:\n    - bar\n    - baz: qux'),
+            ClearedValue({'foo': ['bar', {'baz': 'qux'}]}))
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('!clear foo:\n  - bar\n  - baz: qux'),
+            {ClearedValue('foo'): ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo: !clear\n  - bar\n  - baz: qux'),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - !clear bar\n  - baz: qux'),
+            {'foo': [ClearedValue('bar'), {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag(
+                'foo:\n  - bar\n  - !clear\n    baz: qux'),
+            {'foo': ['bar', ClearedValue({'baz': 'qux'})]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - !clear baz: qux'),
+            {'foo': ['bar', {ClearedValue('baz'): 'qux'}]})
+
+        self.assertEqual(
+            _load_yaml_with_clear_tag('foo:\n  - bar\n  - baz: !clear qux'),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})
+
+
+class FixClearTag(TestCase):
+
+    def test_none(self):
+        self.assertEqual(_fix_clear_tags(None), None)
+        self.assertEqual(_fix_clear_tags(ClearedValue(None)),
+                         ClearedValue(None))
+
+    def test_string(self):
+        self.assertEqual(_fix_clear_tags('foo'), 'foo')
+        self.assertEqual(_fix_clear_tags(ClearedValue('foo')),
+                         ClearedValue('foo'))
+
+    def test_int(self):
+        self.assertEqual(_fix_clear_tags(18), 18)
+        self.assertEqual(_fix_clear_tags(ClearedValue(18)),
+                         ClearedValue(18))
+
+    def test_list(self):
+        self.assertEqual(_fix_clear_tags(['foo', 'bar']),
+                         ['foo', 'bar'])
+
+        self.assertEqual(_fix_clear_tags(ClearedValue(['foo', 'bar'])),
+                         ClearedValue(['foo', 'bar']))
+
+        self.assertEqual(_fix_clear_tags(['foo', ClearedValue('bar')]),
+                         ['foo', 'bar'])
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue([ClearedValue('foo'), ClearedValue('bar')])),
+            ClearedValue(['foo', 'bar']))
+
+    def test_dict(self):
+        self.assertEqual(_fix_clear_tags({'foo': 'bar'}), {'foo': 'bar'})
+
+        self.assertEqual(_fix_clear_tags(ClearedValue({'foo': 'bar'})),
+                         ClearedValue({'foo': 'bar'}))
+
+        self.assertEqual(_fix_clear_tags({ClearedValue('foo'): 'bar'}),
+                         {'foo': ClearedValue('bar')})
+
+        self.assertEqual(_fix_clear_tags({'foo': ClearedValue('bar')}),
+                         {'foo': ClearedValue('bar')})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue({ClearedValue('foo'): ClearedValue('bar')})),
+            ClearedValue({'foo': ClearedValue('bar')}))
+
+        # ClearedValue('foo') key overrides 'foo' key
+        self.assertEqual(
+            _fix_clear_tags({ClearedValue('foo'): 'bar', 'foo': 'baz'}),
+            {'foo': ClearedValue('bar')})
+
+    def test_nesting(self):
+        self.assertEqual(_fix_clear_tags({'foo': ['bar', {'baz': 'qux'}]}),
+                         {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                ClearedValue({'foo': ['bar', {'baz': 'qux'}]})),
+            ClearedValue({'foo': ['bar', {'baz': 'qux'}]}))
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {ClearedValue('foo'): ['bar', {'baz': 'qux'}]}),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ClearedValue(['bar', {'baz': 'qux'}])}),
+            {'foo': ClearedValue(['bar', {'baz': 'qux'}])})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': [ClearedValue('bar'), {'baz': 'qux'}]}),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', ClearedValue({'baz': 'qux'})]}),
+            {'foo': ['bar', {'baz': 'qux'}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', {ClearedValue('baz'): 'qux'}]}),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})
+
+        self.assertEqual(
+            _fix_clear_tags(
+                {'foo': ['bar', {'baz': ClearedValue('qux')}]}),
+            {'foo': ['bar', {'baz': ClearedValue('qux')}]})

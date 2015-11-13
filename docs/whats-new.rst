@@ -4,6 +4,23 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+
+0.4.6
+-----
+
+``include:`` in conf files can now use relative paths in a meaningful way.
+See :ref:`configs-relative-includes`.
+
+List and environment variable options loaded from included config files can
+be totally overriden using the ``!clear`` tag. See :ref:`clearing-configs`.
+
+Options that take lists (e.g. :mrjob-opt:`setup`) now treat scalar values
+as single-item lists. See :ref:`this example <configs-list-example>`.
+
+Fixed a bug that kept the ``pool_wait_minutes`` option from being loaded from
+config files.
+
+
 0.4.5
 -----
 

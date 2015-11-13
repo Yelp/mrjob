@@ -4,7 +4,6 @@ EMR Bootstrapping Cookbook
 Bootstrapping allows you to run commands to customize EMR machines, at the
 time the cluster is created.
 
-
 When to use bootstrap, and when to use setup
 --------------------------------------------
 

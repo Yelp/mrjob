@@ -201,6 +201,101 @@ def hadoop_fs_cat(stdout, stderr, environ, *args):
     else:
         return 0
 
+
+def hadoop_fs_du(stdout, stderr, environ, *args):
+    if mock_hadoop_uses_yarn(environ) and args and args[0] == '-s':
+        aggregate = True
+        path_args = args[1:]
+    else:
+        aggregate = False
+        path_args = args
+
+    return _hadoop_fs_du('du', stdout, stderr, environ,
+                         path_args=path_args, aggregate=aggregate)
+
+
+def hadoop_fs_dus(stdout, stderr, environ, *args):
+    """Implements hadoop fs -dus."""
+    yarn = mock_hadoop_uses_yarn(environ)
+
+    if yarn:
+        print("dus: DEPRECATED: Please use 'du -s' instead.", file=stderr)
+
+    return _hadoop_fs_du('dus', stdout, stderr, environ, path_args=args,
+                         aggregate=True, pre_yarn_dus_format=not yarn)
+
+
+def _hadoop_fs_du(cmd_name, stdout, stderr, environ, path_args,
+                  aggregate, pre_yarn_dus_format=False):
+    """Implements fs -du and fs -dus."""
+    hdfs_path_globs = path_args or ['']
+
+    failed = False
+
+    for hdfs_path_glob in hdfs_path_globs:
+        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
+        real_paths = glob.glob(real_path_glob)
+        if not real_paths:
+            if mock_hadoop_uses_yarn(environ):
+                msg = "%s: `%s': No such file or directory" % (
+                    cmd_name, hdfs_path_glob)
+            else:
+                msg = '%s: Cannot access %s: No such file or directory.' % (
+                    cmd_name, hdfs_path_glob)
+            print(msg, file=stderr)
+
+            failed = True
+            continue
+
+        for real_path in real_paths:
+            # if we're not in -s mode, it finds size of every item in dir
+            if os.path.isdir(real_path) and not aggregate:
+                paths = [os.path.join(real_path, name)
+                         for name in os.listdir(real_path)]
+            else:
+                paths = [real_path]
+
+            for path in paths:
+                hdfs_path = real_path_to_hdfs_path(path, environ)
+                size = _du(path)
+
+                # prior to YARN, the du commands put a variable number
+                # of spaces between path and size. Not emulating this
+                # because it doesn't matter.
+
+                if pre_yarn_dus_format:  # old fs -dus only, not fs -du
+                    print('%s  %d' % (hdfs_path, size), file=stdout)
+                else:
+                    print('%d  %s' % (size, hdfs_path), file=stdout)
+
+    if failed:
+        if mock_hadoop_uses_yarn(environ):
+            return 1  # -1 is only for arg-parsing errors
+        else:
+            return -1
+    else:
+        return 0
+
+
+def _du(real_path):
+    """Get total size of file or files in dir (recursive)."""
+    # Hadoop also seems to have some rule for size of directory
+    # that varies across versions and that I don't fully understand.
+    # Ignoring this for testing.
+    total_size = 0
+
+    if os.path.isdir(real_path):
+        for dirpath, dirnames, filenames in os.walk(real_path):
+            for filename in filenames:
+                total_size += os.path.getsize(
+                    os.path.join(dirpath, filename))
+    else:
+        total_size += os.path.getsize(real_path)
+
+    return total_size
+
+
+
 def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
     hdfs_path = real_path_to_hdfs_path(real_path, environ)
 
@@ -331,37 +426,6 @@ def hadoop_fs_mkdir(stdout, stderr, environ, *args):
             failed = True
         else:
             os.makedirs(real_path)
-
-    if failed:
-        return -1
-    else:
-        return 0
-
-
-def hadoop_fs_dus(stdout, stderr, environ, *args):
-    """Implements hadoop fs -dus."""
-    hdfs_path_globs = args or ['']
-
-    failed = False
-    for hdfs_path_glob in hdfs_path_globs:
-        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
-        real_paths = glob.glob(real_path_glob)
-        if not real_paths:
-            print((
-                'lsr: Cannot access %s: No such file or directory.' %
-                hdfs_path_glob), file=stderr)
-            failed = True
-        else:
-            for real_path in real_paths:
-                total_size = 0
-                if os.path.isdir(real_path):
-                    for dirpath, dirnames, filenames in os.walk(real_path):
-                        for filename in filenames:
-                            total_size += os.path.getsize(
-                                os.path.join(dirpath, filename))
-                else:
-                    total_size += os.path.getsize(real_path)
-                print("%s    %d" % (real_path, total_size), file=stdout)
 
     if failed:
         return -1

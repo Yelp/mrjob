@@ -132,6 +132,9 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.assertEqual(self.fs.du('hdfs:///more/data2'), 4)
         self.assertEqual(self.fs.du('hdfs:///more/data3'), 4)
 
+    def test_du_non_existent(self):
+        self.assertEqual(self.fs.du('hdfs:///does-not-exist'), 0)
+
     def test_mkdir(self):
         self.fs.mkdir('hdfs:///d/ave')
         local_path = os.path.join(self.tmp_dir, 'mock_hdfs_root', 'd', 'ave')

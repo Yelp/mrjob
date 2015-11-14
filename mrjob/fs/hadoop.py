@@ -188,13 +188,13 @@ class HadoopFilesystem(Filesystem):
         """Get the size of a file, or None if it's not a file or doesn't
         exist."""
         try:
-            stdout = self.invoke_hadoop(['fs', '-dus', path_glob],
+            stdout = self.invoke_hadoop(['fs', '-du', path_glob],
                                         return_stdout=True)
         except CalledProcessError:
             raise IOError(path_glob)
 
         try:
-            return sum(int(line.split()[1])
+            return sum(int(line.split()[0])
                        for line in stdout.split(b'\n')
                        if line.strip())
         except (ValueError, TypeError, IndexError):

@@ -185,13 +185,14 @@ class HadoopFilesystem(Filesystem):
             return proc.returncode
 
     def du(self, path_glob):
-        """Get the size of a file, or None if it's not a file or doesn't
-        exist."""
+        """Get the size of a file or directory (recursively), or 0
+        if it doesn't exist."""
         try:
             stdout = self.invoke_hadoop(['fs', '-du', path_glob],
-                                        return_stdout=True)
+                                        return_stdout=True,
+                                        ok_returncodes=[0, 1, 255])
         except CalledProcessError:
-            raise IOError(path_glob)
+            return 0
 
         try:
             return sum(int(line.split()[0])

@@ -74,8 +74,9 @@ class S3FSTestCase(MockBotoTestCase):
             's3://walrus/data/foo',
         ]
 
-        self.assertEqual(list(self.fs.ls('s3://walrus/')), paths)
-        self.assertEqual(list(self.fs.ls('s3://walrus/*')), paths)
+        self.assertEqual(list(self.fs.ls('s3://walrus/data/')), paths)
+        self.assertEqual(list(self.fs.ls('s3://walrus/data/*')), paths)
+        self.assertEqual(list(self.fs.ls('s3://walrus/data')), paths)
 
     def test_ls_glob(self):
         self.add_mock_s3_data(

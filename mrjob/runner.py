@@ -45,6 +45,7 @@ from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
+from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
@@ -425,7 +426,9 @@ class MRJobRunner(object):
         0.6.0, but **this behavior is deprecated.**
         """
         if self._fs is None:
-            self._fs = LocalFilesystem()
+            # wrap LocalFilesystem in CompositeFilesystem to get IOError
+            # on URIs (see #1185)
+            self._fs = CompositeFilesystem(LocalFilesystem())
         return self._fs
 
     def __getattr__(self, name):

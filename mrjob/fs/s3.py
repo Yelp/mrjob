@@ -234,6 +234,9 @@ class S3Filesystem(Filesystem):
         try:
             location = bucket.get_location()
         except boto.exception.S3ResponseError as e:
+            # it's possible to have access to a bucket but not access
+            # to its location metadata. This happens on the 'elasticmapreduce'
+            # bucket, for example (see #1170)
             if e.status == 403:
                 log.warning('Could not infer endpoint for bucket %s; '
                             'assuming %s', bucket_name, s3_conn.host)

@@ -231,7 +231,15 @@ class S3Filesystem(Filesystem):
         s3_conn = self.make_s3_conn()
 
         bucket = s3_conn.get_bucket(bucket_name)
-        location = bucket.get_location()
+        try:
+            location = bucket.get_location()
+        except boto.exception.S3ResponseError as e:
+            if e.status == 403:
+                log.warning("Could not infer aws region for bucket %s; "
+                            "assuming it's %s", bucket_name, s3_conn.host)
+                return bucket
+
+            raise
 
         # connect to bucket on proper endpoint
         if (not self._s3_endpoint and

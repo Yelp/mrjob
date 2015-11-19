@@ -50,7 +50,7 @@ class Filesystem(object):
     def du(self, path_glob):
         """Get the total size of files matching ``path_glob``
 
-        Corresponds roughly to: ``hadoop fs -dus path_glob``
+        Corresponds roughly to: ``hadoop fs -du path_glob``
         """
         raise NotImplementedError
 
@@ -60,7 +60,7 @@ class Filesystem(object):
         We don't return directories for compatibility with S3 (which
         has no concept of them)
 
-        Corresponds roughly to: ``hadoop fs -lsr path_glob``
+        Corresponds roughly to: ``hadoop fs -ls -R path_glob``
         """
         raise NotImplementedError
 
@@ -87,7 +87,7 @@ class Filesystem(object):
         """Create the given dir and its subdirs (if they don't already
         exist).
 
-        Corresponds roughly to: ``hadoop fs -mkdir path``
+        Corresponds roughly to: ``hadoop fs -mkdir -p path``
         """
         raise NotImplementedError
 
@@ -112,7 +112,7 @@ class Filesystem(object):
     def rm(self, path_glob):
         """Recursively delete the given file/directory, if it exists
 
-        Corresponds roughly to: ``hadoop fs -rmr path_glob``
+        Corresponds roughly to: ``hadoop fs -rm -R path_glob``
         """
         raise NotImplementedError
 

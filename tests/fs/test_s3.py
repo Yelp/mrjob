@@ -53,32 +53,35 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(list(self.fs._cat_file('s3://walrus/data/foo.gz')),
                          [b'foo\n'] * 10000)
 
-    def test_ls_basic(self):
+    def test_ls_key(self):
         self.add_mock_s3_data(
-            {'walrus': {'data/foo': b'foo\nfoo\n'}})
+            {'walrus': {'data/foo': b''}})
 
         self.assertEqual(list(self.fs.ls('s3://walrus/data/foo')),
                          ['s3://walrus/data/foo'])
-        self.assertEqual(list(self.fs.ls('s3://walrus/')),
-                         ['s3://walrus/data/foo'])
 
-    def test_ls_recurse(self):
+    def test_ls_recursively(self):
         self.add_mock_s3_data(
-            {'walrus': {'data/bar': b'bar\nbar\n',
-                        'data/bar/baz': b'baz\nbaz\n',
-                        'data/foo': b'foo\nfoo\n'}})
+            {'walrus': {'data/bar': b'',
+                        'data/bar/baz': b'',
+                        'data/foo': b'',
+                        'qux': b''}})
 
-        paths = [
+        uris = [
             's3://walrus/data/bar',
             's3://walrus/data/bar/baz',
             's3://walrus/data/foo',
+            's3://walrus/qux',
         ]
 
-        self.assertEqual(list(self.fs.ls('s3://walrus/data/')), paths)
-        self.assertEqual(list(self.fs.ls('s3://walrus/data/*')), paths)
-        self.assertEqual(list(self.fs.ls('s3://walrus/data')), paths)
+        self.assertEqual(list(self.fs.ls('s3://walrus/')), uris)
+        self.assertEqual(list(self.fs.ls('s3://walrus/*')), uris)
 
-    def test_ls_glob(self):
+        self.assertEqual(list(self.fs.ls('s3://walrus/data')), uris[:-1])
+        self.assertEqual(list(self.fs.ls('s3://walrus/data/')), uris[:-1])
+        self.assertEqual(list(self.fs.ls('s3://walrus/data/*')), uris[:-1])
+
+    def test_ls_globs(self):
         self.add_mock_s3_data(
             {'walrus': {'data/bar': b'bar\nbar\n',
                         'data/bar/baz': b'baz\nbaz\n',

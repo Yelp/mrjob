@@ -83,12 +83,26 @@ class S3FSTestCase(MockBotoTestCase):
 
     def test_ls_globs(self):
         self.add_mock_s3_data(
-            {'walrus': {'data/bar': b'bar\nbar\n',
-                        'data/bar/baz': b'baz\nbaz\n',
-                        'data/foo': b'foo\nfoo\n'}})
+            {'w': {'a': b'',
+                   'a/b': b'',
+                   'ab': b'',
+                   'b': b''}})
 
-        self.assertEqual(list(self.fs.ls('s3://walrus/*/baz')),
-                         ['s3://walrus/data/bar/baz'])
+        self.assertEqual(list(self.fs.ls('s3://w/')),
+                         ['s3://w/a', 's3://w/a/b', 's3://w/ab', 's3://w/b'])
+        self.assertEqual(list(self.fs.ls('s3://w/*')),
+                         ['s3://w/a', 's3://w/a/b', 's3://w/ab', 's3://w/b'])
+        self.assertEqual(list(self.fs.ls('s3://w/*/')),
+                         ['s3://w/a/b'])
+        self.assertEqual(list(self.fs.ls('s3://w/*/*')),
+                         ['s3://w/a/b'])
+        self.assertEqual(list(self.fs.ls('s3://w/a?')),
+                         ['s3://w/ab'])
+        # * can match /
+        self.assertEqual(list(self.fs.ls('s3://w/a*')),
+                         ['s3://w/a', 's3://w/a/b', 's3://w/ab'])
+        self.assertEqual(list(self.fs.ls('s3://w/*b')),
+                         ['s3://w/a/b', 's3://w/ab', 's3://w/b'])
 
     def test_ls_s3n(self):
         self.add_mock_s3_data(

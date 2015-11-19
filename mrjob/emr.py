@@ -1058,8 +1058,8 @@ class EMRJobRunner(MRJobRunner):
             # Nothing we can do.
             return
 
-        if (not self._opts['emr_job_flow_id'] and
-            not self._opts['pool_emr_job_flows']):
+        if not (self._opts['emr_job_flow_id'] or
+                self._opts['pool_emr_job_flows']):
             # we're taking down the job flow, don't bother
             return
 

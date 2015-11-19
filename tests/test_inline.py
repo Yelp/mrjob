@@ -19,6 +19,7 @@
 """Tests for InlineMRJobRunner"""
 import gzip
 import os
+import os.path
 from io import BytesIO
 
 from mrjob import conf
@@ -374,6 +375,22 @@ class InlineMRJobRunnerNoMapperTestCase(SandboxedTestCase):
             self.assertEqual(sorted(results),
                              [(1, ['blue', 'one', 'red', 'two']),
                               (4, ['fish'])])
+
+
+class InlineMRJobRunnerFSTestCase(SandboxedTestCase):
+
+    RUNNER_CLASS = InlineMRJobRunner
+
+    def setUp(self):
+        super(InlineMRJobRunnerFSTestCase, self).setUp()
+        self.runner = self.RUNNER_CLASS()
+
+    def test_can_handle_paths(self):
+        self.assertEqual(
+            self.runner.fs.exists(os.path.join(self.tmp_dir, 'foo')), False)
+
+    def test_cant_handle_uris(self):
+        self.assertRaises(IOError, self.runner.fs.ls, 's3://walrus/foo')
 
 
 class ErrorOnBadPathsTestCase(TestCase):

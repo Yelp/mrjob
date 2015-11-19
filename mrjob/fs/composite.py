@@ -57,7 +57,7 @@ class CompositeFilesystem(Filesystem):
                         first_exception = e
 
         if first_exception is None:
-            raise IOError('Could not %s: %s %s' % (action, path, args))
+            raise IOError("Can't handle path: %s" % path)
         else:
             raise first_exception
 

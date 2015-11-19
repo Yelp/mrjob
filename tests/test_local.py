@@ -46,6 +46,7 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+from tests.test_inline import InlineMRJobRunnerFSTestCase
 from tests.test_inline import InlineMRJobRunnerJobConfTestCase
 from tests.test_inline import InlineMRJobRunnerNoMapperTestCase
 
@@ -519,6 +520,11 @@ class LocalMRJobRunnerJobConfTestCase(InlineMRJobRunnerJobConfTestCase):
 class LocalMRJobRunnerNoMapperTestCase(InlineMRJobRunnerNoMapperTestCase):
 
     RUNNER = 'local'
+
+
+class LocalMRJobRunnerFSTestCase(InlineMRJobRunnerFSTestCase):
+
+    RUNNER_CLASS = LocalMRJobRunner
 
 
 class CompatTestCase(EmptyMrjobConfTestCase):

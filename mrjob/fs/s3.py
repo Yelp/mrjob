@@ -235,8 +235,8 @@ class S3Filesystem(Filesystem):
             location = bucket.get_location()
         except boto.exception.S3ResponseError as e:
             if e.status == 403:
-                log.warning("Could not infer aws region for bucket %s; "
-                            "assuming it's %s", bucket_name, s3_conn.host)
+                log.warning('Could not infer endpoint for bucket %s; '
+                            'assuming %s', bucket_name, s3_conn.host)
                 return bucket
 
             raise

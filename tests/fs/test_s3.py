@@ -24,6 +24,7 @@ from mrjob.fs.s3 import S3Filesystem
 
 from tests.compress import gzip_compress
 from tests.mockboto import MockBotoTestCase
+from tests.py2 import patch
 
 
 class S3FSTestCase(MockBotoTestCase):
@@ -170,6 +171,19 @@ class S3FSRegionTestCase(MockBotoTestCase):
         bucket = fs.get_bucket('walrus')
         self.assertEqual(bucket.connection.host,
                          's3-us-west-2.amazonaws.com')
+
+    def test_no_access_to_bucket_location(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+
+        fs = S3Filesystem()
+
+        with patch(
+                'tests.mockboto.MockBucket.get_location',
+                side_effect=boto.exception.S3ResponseError(403, 'Forbidden')):
+
+            bucket = fs.get_bucket('walrus')
+            self.assertEqual(bucket.connection.host,
+                             's3.amazonaws.com')
 
     def test_endpoint_for_bucket_in_us_east_1(self):
         # location constraint for us-east-1 is '', not 'us-east-1'

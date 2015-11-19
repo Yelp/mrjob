@@ -101,12 +101,15 @@ class S3Filesystem(Filesystem):
     def ls(self, path_glob):
         """Recursively list files on S3.
 
-        This doesn't list "directories" unless there's actually a
-        corresponding key ending with a '/' (which is weird and confusing;
-        don't make S3 keys ending in '/')
+        *path_glob* can include ``?`` to match single characters or
+        ``*`` to match 0 or more characters. Both ``?`` and ``*`` can match
+        ``/``.
 
-        To list a directory, path_glob must end with a trailing
-        slash (foo and foo/ are different on S3)
+        .. versionchanged:: 0.5.0
+
+            You no longer need a trailing slash to list "directories" on S3;
+            both ``ls('s3://b/dir')`` and `ls('s3://b/dir/')` will list
+            all keys starting with ``dir/``.
         """
 
         # clean up the  base uri to ensure we have an equal uri to boto (s3://)

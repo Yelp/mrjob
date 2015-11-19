@@ -123,14 +123,17 @@ class S3Filesystem(Filesystem):
         else:
             base_uri = path_glob
 
+        bucket_name, base_name = parse_s3_uri(base_uri)
+
         # allow subdirectories of the path/glob
         if path_glob and not path_glob.endswith('/'):
             dir_glob = path_glob + '/*'
         else:
             dir_glob = path_glob + '*'
 
-        for uri in self._s3_ls(base_uri):
-            uri = "%s://%s/%s" % ((scheme,) + parse_s3_uri(uri))
+        bucket = self.get_bucket(bucket_name)
+        for key in bucket.list(base_name):
+            uri = "%s://%s/%s" % (scheme, bucket_name, key.name)
 
             # enforce globbing
             if not (fnmatch.fnmatchcase(uri, path_glob) or
@@ -138,26 +141,6 @@ class S3Filesystem(Filesystem):
                 continue
 
             yield uri
-
-    def _s3_ls(self, uri):
-        """Helper for ls(); doesn't bother with globbing"""
-        bucket_name, key_name = parse_s3_uri(uri)
-
-        bucket = self.get_bucket(bucket_name)
-
-        # yield key if it exists
-        key = bucket.get_key(key_name)
-        if key:
-            yield uri
-
-        # recurse through directory if there is one
-        if key_name and not key_name.endswith('/'):
-            dir_name = key_name + '/'
-        else:
-            dir_name = key_name
-
-        for key in bucket.list(dir_name):
-            yield s3_key_to_uri(key)
 
     def md5sum(self, path):
         k = self.get_s3_key(path)

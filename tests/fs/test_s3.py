@@ -53,38 +53,56 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(list(self.fs._cat_file('s3://walrus/data/foo.gz')),
                          [b'foo\n'] * 10000)
 
-    def test_ls_basic(self):
+    def test_ls_key(self):
         self.add_mock_s3_data(
-            {'walrus': {'data/foo': b'foo\nfoo\n'}})
+            {'walrus': {'data/foo': b''}})
 
         self.assertEqual(list(self.fs.ls('s3://walrus/data/foo')),
                          ['s3://walrus/data/foo'])
-        self.assertEqual(list(self.fs.ls('s3://walrus/')),
-                         ['s3://walrus/data/foo'])
 
-    def test_ls_recurse(self):
+    def test_ls_recursively(self):
         self.add_mock_s3_data(
-            {'walrus': {'data/bar': b'bar\nbar\n',
-                        'data/bar/baz': b'baz\nbaz\n',
-                        'data/foo': b'foo\nfoo\n'}})
+            {'walrus': {'data/bar': b'',
+                        'data/bar/baz': b'',
+                        'data/foo': b'',
+                        'qux': b''}})
 
-        paths = [
+        uris = [
             's3://walrus/data/bar',
             's3://walrus/data/bar/baz',
             's3://walrus/data/foo',
+            's3://walrus/qux',
         ]
 
-        self.assertEqual(list(self.fs.ls('s3://walrus/')), paths)
-        self.assertEqual(list(self.fs.ls('s3://walrus/*')), paths)
+        self.assertEqual(list(self.fs.ls('s3://walrus/')), uris)
+        self.assertEqual(list(self.fs.ls('s3://walrus/*')), uris)
 
-    def test_ls_glob(self):
+        self.assertEqual(list(self.fs.ls('s3://walrus/data')), uris[:-1])
+        self.assertEqual(list(self.fs.ls('s3://walrus/data/')), uris[:-1])
+        self.assertEqual(list(self.fs.ls('s3://walrus/data/*')), uris[:-1])
+
+    def test_ls_globs(self):
         self.add_mock_s3_data(
-            {'walrus': {'data/bar': b'bar\nbar\n',
-                        'data/bar/baz': b'baz\nbaz\n',
-                        'data/foo': b'foo\nfoo\n'}})
+            {'w': {'a': b'',
+                   'a/b': b'',
+                   'ab': b'',
+                   'b': b''}})
 
-        self.assertEqual(list(self.fs.ls('s3://walrus/*/baz')),
-                         ['s3://walrus/data/bar/baz'])
+        self.assertEqual(list(self.fs.ls('s3://w/')),
+                         ['s3://w/a', 's3://w/a/b', 's3://w/ab', 's3://w/b'])
+        self.assertEqual(list(self.fs.ls('s3://w/*')),
+                         ['s3://w/a', 's3://w/a/b', 's3://w/ab', 's3://w/b'])
+        self.assertEqual(list(self.fs.ls('s3://w/*/')),
+                         ['s3://w/a/b'])
+        self.assertEqual(list(self.fs.ls('s3://w/*/*')),
+                         ['s3://w/a/b'])
+        self.assertEqual(list(self.fs.ls('s3://w/a?')),
+                         ['s3://w/ab'])
+        # * can match /
+        self.assertEqual(list(self.fs.ls('s3://w/a*')),
+                         ['s3://w/a', 's3://w/a/b', 's3://w/ab'])
+        self.assertEqual(list(self.fs.ls('s3://w/*b')),
+                         ['s3://w/a/b', 's3://w/ab', 's3://w/b'])
 
     def test_ls_s3n(self):
         self.add_mock_s3_data(
@@ -112,11 +130,22 @@ class S3FSTestCase(MockBotoTestCase):
 
     def test_rm(self):
         self.add_mock_s3_data({
-            'walrus': {'data/foo': b'abcd'}})
+            'walrus': {'foo': b''}})
+
+        self.assertEqual(self.fs.exists('s3://walrus/foo'), True)
+        self.fs.rm('s3://walrus/foo')
+        self.assertEqual(self.fs.exists('s3://walrus/foo'), False)
+
+    def test_rm_dir(self):
+        self.add_mock_s3_data({
+            'walrus': {'data/foo': b'',
+                       'data/bar/baz': b''}})
 
         self.assertEqual(self.fs.exists('s3://walrus/data/foo'), True)
-        self.fs.rm('s3://walrus/data/foo')
+        self.assertEqual(self.fs.exists('s3://walrus/data/bar/baz'), True)
+        self.fs.rm('s3://walrus/data')
         self.assertEqual(self.fs.exists('s3://walrus/data/foo'), False)
+        self.assertEqual(self.fs.exists('s3://walrus/data/bar/baz'), False)
 
 
 class S3FSRegionTestCase(MockBotoTestCase):
@@ -164,32 +193,3 @@ class S3FSRegionTestCase(MockBotoTestCase):
         # can't access this bucket from wrong endpoint!
         self.assertRaises(boto.exception.S3ResponseError,
                           fs.get_bucket, 'walrus-west')
-
-
-class TestS3Ls(MockBotoTestCase):
-
-    def test_s3_ls(self):
-        self.add_mock_s3_data(
-            {'walrus': {'one': b'', 'two': b'', 'three': b''}})
-
-        fs = S3Filesystem()
-
-        self.assertEqual(set(fs._s3_ls('s3://walrus/')),
-                         set(['s3://walrus/one',
-                              's3://walrus/two',
-                              's3://walrus/three',
-                              ]))
-
-        self.assertEqual(set(fs._s3_ls('s3://walrus/t')),
-                         set(['s3://walrus/two',
-                              's3://walrus/three',
-                              ]))
-
-        self.assertEqual(set(fs._s3_ls('s3://walrus/t/')),
-                         set([]))
-
-        # if we ask for a nonexistent bucket, we should get some sort
-        # of exception (in practice, buckets with random names will
-        # probably be owned by other people, and we'll get some sort
-        # of permissions error)
-        self.assertRaises(Exception, set, fs._s3_ls('s3://lolcat/'))

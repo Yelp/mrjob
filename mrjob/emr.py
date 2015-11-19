@@ -1054,8 +1054,11 @@ class EMRJobRunner(MRJobRunner):
 
     def _cleanup_job(self):
         # kill the job if we won't be taking down the whole job flow
-        if not (self._cluster_id or
-                self._opts['emr_job_flow_id'] or
+        if not self._cluster_id:
+            # Nothing we can do.
+            return
+
+        if not (self._opts['emr_job_flow_id'] or
                 self._opts['pool_emr_job_flows']):
             # we're taking down the job flow, don't bother
             return

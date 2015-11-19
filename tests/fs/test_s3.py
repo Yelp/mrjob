@@ -24,6 +24,7 @@ from mrjob.fs.s3 import S3Filesystem
 
 from tests.compress import gzip_compress
 from tests.mockboto import MockBotoTestCase
+from tests.py2 import patch
 
 
 class S3FSTestCase(MockBotoTestCase):
@@ -171,6 +172,32 @@ class S3FSRegionTestCase(MockBotoTestCase):
         self.assertEqual(bucket.connection.host,
                          's3-us-west-2.amazonaws.com')
 
+    def test_get_location_is_forbidden(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+
+        fs = S3Filesystem()
+
+        with patch(
+                'tests.mockboto.MockBucket.get_location',
+                side_effect=boto.exception.S3ResponseError(403, 'Forbidden')):
+
+            bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.connection.host, 's3.amazonaws.com')
+
+    def test_get_location_other_error(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+
+        fs = S3Filesystem()
+
+        with patch(
+                'tests.mockboto.MockBucket.get_location',
+                side_effect=boto.exception.S3ResponseError(404, 'Not Found')):
+
+            self.assertRaises(boto.exception.S3ResponseError,
+                              fs.get_bucket, 'walrus')
+
+
     def test_endpoint_for_bucket_in_us_east_1(self):
         # location constraint for us-east-1 is '', not 'us-east-1'
         self.add_mock_s3_data({'walrus': {}}, location='')
@@ -187,8 +214,12 @@ class S3FSRegionTestCase(MockBotoTestCase):
         fs = S3Filesystem(s3_endpoint='s3-us-east-2.amazonaws.com')
 
         bucket_east = fs.get_bucket('walrus-east')
-        self.assertEqual(bucket_east.connection.host,
-                         's3-us-east-2.amazonaws.com')
+
+        with patch('tests.mockboto.MockBucket.get_location') as mock_get_loc:
+            self.assertEqual(bucket_east.connection.host,
+                             's3-us-east-2.amazonaws.com')
+            # no reason to check bucket location if endpoint is forced
+            self.assertFalse(mock_get_loc.called)
 
         # can't access this bucket from wrong endpoint!
         self.assertRaises(boto.exception.S3ResponseError,

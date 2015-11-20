@@ -433,7 +433,7 @@ class HadoopJobRunner(MRJobRunner):
             if parsing_counters:
                 if counter_group is not None:
                     m = _HADOOP_COUNTER_RE.match(line)
-                    if len(m.group('indent')) > counter_group_indent:
+                    if m and len(m.group('indent')) > counter_group_indent:
                         counter = m.group('counter')
                         amount = int(m.group('amount'))
                         step_counters[counter_group][counter] = amount

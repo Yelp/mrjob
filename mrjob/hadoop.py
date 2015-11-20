@@ -362,6 +362,8 @@ class HadoopJobRunner(MRJobRunner):
                             master)
                         _, returncode = os.waitpid(pid, 0)
 
+            # TODO: looks like we are parsing counters
+            # but they don't get printed out.
             if step_counters:
                 self._counters.append(step_counters)
             else:

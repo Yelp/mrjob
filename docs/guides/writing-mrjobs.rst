@@ -207,7 +207,7 @@ more places than just the ends of tasks.
 Shell commands as steps
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-You can forego scripts entirely for a step by specifying it as shell a command.
+You can forego scripts entirely for a step by specifying it as a shell command.
 To do so, use ``mapper_cmd``, ``combiner_cmd``, or ``reducer_cmd`` as arguments
 to :py:class:`~mrjob.step.MRStep`, or override the methods of the same names on
 :py:class:`~mrjob.job.MRJob`. (See :py:meth:`~mrjob.job.MRJob.mapper_cmd`,
@@ -273,7 +273,7 @@ You can specify a command to filter a task's input before it reaches your task
 using the ``mapper_pre_filter`` and ``reducer_pre_filter`` arguments to
 :py:class:`~mrjob.step.MRStep`, or override the methods of the same names on
 :py:class:`~mrjob.job.MRJob`. Doing so will cause mrjob to pipe input through
-that comand before it reaches your mapper.
+that command before it reaches your mapper.
 
 .. warning::
 
@@ -612,7 +612,7 @@ Defining command line options
 -----------------------------
 
 Recall from :ref:`how-your-program-is-run` that your script is executed in
-several contexts: once for the initial invokation, and once for each task. If
+several contexts: once for the initial invocation, and once for each task. If
 you just add an option to your job's option parser, that option's value won't
 be propagated to other runs of your script. Instead, you can use mrjob's option
 API: :py:meth:`~mrjob.job.MRJob.add_passthrough_option` and

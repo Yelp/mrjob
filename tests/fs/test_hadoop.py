@@ -21,6 +21,7 @@ from mrjob.util import which
 
 from tests.compress import gzip_compress
 from tests.fs import MockSubprocessTestCase
+from tests.mockhadoop import get_mock_hdfs_root
 from tests.mockhadoop import main as mock_hadoop_main
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
@@ -50,15 +51,14 @@ class HadoopFSTestCase(MockSubprocessTestCase):
             'i are java bytecode',
         )
 
-        self.env['MOCK_HDFS_ROOT'] = self.makedirs('mock_hdfs_root')
-        self.env['MOCK_HADOOP_OUTPUT'] = self.makedirs('mock_hadoop_output')
-        self.env['USER'] = 'mrjob_tests'
-        # don't set MOCK_HADOOP_LOG, we get command history other ways]
-
+        self.env['MOCK_HADOOP_TMP'] = self.makedirs('mock_hadoop')
         self.env['MOCK_HADOOP_VERSION'] = '2.7.1'
 
+        self.env['USER'] = 'mrjob_tests'
+
     def make_mock_file(self, name, contents='contents'):
-        return self.makefile(os.path.join('mock_hdfs_root', name), contents)
+        return self.makefile(
+            os.path.join(get_mock_hdfs_root(self.env), name), contents)
 
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls('hdfs:///')), [])
@@ -137,7 +137,7 @@ class HadoopFSTestCase(MockSubprocessTestCase):
 
     def test_mkdir(self):
         self.fs.mkdir('hdfs:///d/ave')
-        local_path = os.path.join(self.tmp_dir, 'mock_hdfs_root', 'd', 'ave')
+        local_path = os.path.join(get_mock_hdfs_root(self.env), 'd', 'ave')
         self.assertEqual(os.path.isdir(local_path), True)
 
     def test_exists_no(self):

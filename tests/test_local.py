@@ -319,7 +319,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
             raise TimeoutException('Stalled on large amounts of stderr;'
                                    ' probably pipe buffer is full.')
         self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
-        signal.alarm(10)
+        signal.alarm(30)
 
     def restore_old_alarm_handler(self):
         signal.alarm(0)
@@ -340,7 +340,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
             # look for expected output from MRVerboseJob
             stderr = mr_job.stderr.getvalue()
             self.assertIn(
-                b"Counters from step 1:\n  Foo:\n    Bar: 10000", stderr)
+                b"Counters from step 1:\n\tFoo\n\t\tBar=10000", stderr)
             self.assertIn(b'status: 0\n', stderr)
             self.assertIn(b'status: 99\n', stderr)
             self.assertNotIn(b'status: 100\n', stderr)

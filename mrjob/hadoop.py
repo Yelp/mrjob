@@ -399,12 +399,13 @@ class HadoopJobRunner(MRJobRunner):
                 raise CalledProcessError(returncode, step_args)
 
     def _process_stderr_from_streaming(self, stderr):
+        """Process stderr from the Hadoop binary. Return a dict of counters
+        for the step.
 
-        # counter-parsing state
-        step_counters = {}
-        parsing_counters = False
-        counter_group = None
-        counter_group_indent = None
+        This also handles output from a PTY (which has a different EOF).
+        """
+        # This just handles fetching lines and EOF; deciding what to do with
+        # those lines happens in _process_streaming_stderr_lines()
 
         def treat_eio_as_eof(iter):
             # on Linux, the PTY gives us a specific IOError when the
@@ -418,7 +419,23 @@ class HadoopJobRunner(MRJobRunner):
                     else:
                         raise
 
-        for line in treat_eio_as_eof(stderr):
+        return self._process_streaming_stderr_lines(
+            line.rstrip('\r\n') for line in treat_eio_as_eof(stderr))
+
+
+    def _process_streaming_stderr_lines(self, lines):
+        """Process lines (with \r and \n stripped) from Hadoop binary's
+        stderr. Return a dict of counters for the step.
+
+        This handles counter parsing, debug printouts, and the job timestamp.
+        """
+        # counter-parsing state
+        step_counters = {}
+        parsing_counters = False
+        counter_group = None
+        counter_group_indent = None
+
+        for line in lines:
             line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
 
             # don't print HADOOP: <counter stuff>, since we print
@@ -441,13 +458,12 @@ class HadoopJobRunner(MRJobRunner):
                     m = _HADOOP_COUNTER_RE.match(line)
 
                     if m:
-                        log.debug(
-                            '  possible counter line: %s' % line.rstrip())
+                        log.debug('  possible counter line: %s' % line)
                         log.debug("  len(m.group('indent')) == %r" %
                                   len(m.group('indent')))
 
                     if m and len(m.group('indent')) > counter_group_indent:
-                        log.debug('  counter line: %s' % line.rstrip())
+                        log.debug('  counter line: %s' % line)
                         counter = m.group('counter')
                         amount = int(m.group('amount'))
                         step_counters[counter_group][counter] = amount
@@ -455,7 +471,7 @@ class HadoopJobRunner(MRJobRunner):
 
                 m = _HADOOP_COUNTER_GROUP_RE.match(line)
                 if m:
-                    log.debug('  counter group line: %s' % line.rstrip())
+                    log.debug('  counter group line: %s' % line)
                     counter_group_indent = len(m.group('indent'))
                     counter_group = m.group('group')
                     continue

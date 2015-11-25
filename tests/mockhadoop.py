@@ -1,5 +1,7 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 Tom Arnfeld and David Marin
+# Copyright 2014 Contributors
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,14 +17,16 @@
 """A mock version of the hadoop binary that actually manipulates the
 filesystem. This imitates only things that mrjob actually uses.
 
-Relies on these environment variables:
-MOCK_HDFS_ROOT -- root dir for our fake filesystem(s). Used regardless of
-URI scheme or host (so this is also the root of every S3 bucket).
-MOCK_HADOOP_OUTPUT -- a directory containing directories containing
-fake job output (to add output, use add_mock_output())
-MOCK_HADOOP_VERSION -- version of Hadoop to emulate (e.g. '2.7.1').
-MOCK_HADOOP_CMD_LOG -- optional: if this is set, append arguments passed
-to the fake hadoop binary to this file, one line per invocation
+Uses these environment variables:
+  MOCK_HADOOP_CMD_LOG (optional): if this is set, append arguments passed
+    to the fake hadoop binary to this file, one line per invocation
+  MOCK_HADOOP_OUTPUT: a directory containing directories containing
+    fake job output (to add output, use add_mock_output()). Each fake job
+    output directory will be deleted once it is output.
+  MOCK_HADOOP_VERSION: version of Hadoop to emulate (e.g. '2.7.1').
+  MOCK_HDFS_ROOT: root dir for our fake filesystem(s). Used
+    regardless of URI scheme or host (so this is also the root of every S3
+    bucket).
 
 This is designed to run as: python -m tests.mockhadoop <hadoop args>
 

@@ -21,16 +21,6 @@ Requires these environment variables:
   MOCK_HADOOP_TMP: temp directory used by mock hadoop
   MOCK_HADOOP_VERSION: version of Hadoop to emulate (e.g. '2.7.1').
 
-
-  MOCK_HADOOP_CMD_LOG (optional): if this is set, append arguments passed
-    to the fake hadoop binary to this file, one line per invocation
-  MOCK_HADOOP_OUTPUT (optional): a directory to queue up fake output for mock
-    hadoop streaming jobs (see add_mock_output()). Streaming jobs will
-    fail if you didn't set this or didn't add output.
-  MOCK_HDFS_ROOT: root dir for our fake filesystem(s). Used
-    regardless of URI scheme or host (so this is also the root of every S3
-    bucket).
-
 This is designed to run as: python -m tests.mockhadoop <hadoop args>
 
 mrjob requires a single binary (no args) to stand in for hadoop, so
@@ -91,12 +81,15 @@ def iso_now():
     return '%s.%06d' % (now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
 
 
-def makedirs(path):
-    """More robust/tolerant version of os.makedirs()."""
-    path = os.path.abspath(path)
+def get_mock_dir(*subdirs):
+    """Get a directory within $MOCK_HADOOP_TMP, creating it if it doesn't
+    already exist."""
+    path = os.path.join(os.environ['MOCK_HADOOP_TMP'], *subdirs)
 
     if not os.path.exists(path):
-        os.makedirs(path)
+        os.makedirs(os.path.abspath(path))
+
+    return path
 
 
 def add_mock_hadoop_output(parts):
@@ -107,10 +100,7 @@ def add_mock_hadoop_output(parts):
     parts -- a list of the contents of parts files, which should be iterables
         that return lines as bytes (e.g. lists, BytesIOs).
     """
-    output_subdir = os.path.join(
-        os.environ['MOCK_HADOOP_TMP'], 'output', iso_now())
-
-    makedirs(output_subdir)
+    output_subdir = get_mock_dir('output', iso_now())
 
     for i, part in enumerate(parts):
         part_path = os.path.join(output_subdir, 'part-%05d' % i)
@@ -121,7 +111,7 @@ def add_mock_hadoop_output(parts):
 def get_mock_hadoop_output():
     """Get a path to a directory containing part files to use as mock output.
     """
-    output_dir = os.path.join(os.environ['MOCK_HADOOP_TMP'], 'output')
+    output_dir = get_mock_dir('output')
 
     dirnames = sorted(os.listdir(output_dir))
     if dirnames:
@@ -130,15 +120,14 @@ def get_mock_hadoop_output():
         return None
 
 
+
 def get_mock_hdfs_root(environ=None):
     """Get the path of mock root of HDFS. Creates the directory if it
     doesn't already exist."""
     if environ is None:
         environ = os.environ
 
-    mock_hdfs_root = os.path.join(environ['MOCK_HADOOP_TMP'], 'hdfs')
-    makedirs(mock_hdfs_root)
-    return mock_hdfs_root
+    return get_mock_dir('hdfs')
 
 
 def mock_hadoop_uses_yarn(environ):
@@ -148,7 +137,7 @@ def mock_hadoop_uses_yarn(environ):
 def get_mock_hadoop_cmd_args():
     """Get a list for each invocation of hadoop, each containing a list of
     arguments (not including the hadoop binary's path)."""
-    cmd_log = os.path.join(os.environ['MOCK_HADOOP_TMP'], 'cmd.log')
+    cmd_log = os.path.join(get_mock_dir(), 'cmd.log')
 
     if not os.path.exists(cmd_log):
         return []
@@ -206,7 +195,7 @@ def main(stdin, stdout, stderr, argv, environ):
     """Implements hadoop <args>"""
 
     # log what commands we ran
-    cmd_log_path = os.path.join(os.environ['MOCK_HADOOP_TMP'], 'cmd.log')
+    cmd_log_path = os.path.join(get_mock_dir(), 'cmd.log')
     with open(cmd_log_path, 'a') as cmd_log:
         cmd_log.write(' '.join(pipes.quote(arg) for arg in argv[1:]))
         cmd_log.write('\n')

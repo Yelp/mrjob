@@ -28,6 +28,7 @@ from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
 from mrjob.util import bash_wrap
 
+from tests.mockhadoop import add_mock_hadoop_counters
 from tests.mockhadoop import add_mock_hadoop_output
 from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import get_mock_hadoop_cmd_args
@@ -385,6 +386,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         check_call([self.hadoop_bin,
                     'fs', '-put', input_to_upload, remote_input_path])
 
+        # add counters
+        add_mock_hadoop_counters({'foo': {'bar': 23}})
+        add_mock_hadoop_counters({'baz': {'qux': 42}})
+
         # doesn't matter what the intermediate output is; just has to exist.
         add_mock_hadoop_output([b''])
         add_mock_hadoop_output([b'1\t"qux"\n2\t"bar"\n',
@@ -440,6 +445,10 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                 self.assertTrue(any(
                     ('export PYTHONPATH' in line and mrjob_tar_gz_name in line)
                     for line in wrapper))
+
+        self.assertEqual(runner.counters(),
+                         [{'foo': {'bar': 23}},
+                          {'baz': {'qux': 42}}])
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])

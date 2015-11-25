@@ -36,6 +36,7 @@ from __future__ import print_function
 
 import datetime
 import glob
+import json
 import os
 import os.path
 import pipes
@@ -119,6 +120,33 @@ def get_mock_hadoop_output():
     else:
         return None
 
+
+def add_mock_hadoop_counters(counters):
+    """Add counters for a subsequent run of the hadoop jar command (streaming
+    or otherwise), as a map from group name to counter name to amount."""
+    counter_path = os.path.join(get_mock_dir('counters'), iso_now() + '.json')
+
+    with open(counter_path, 'w') as f:
+        json.dump(counters, f)
+
+
+def next_mock_hadoop_counters():
+    """Read the next set of counters from the filesystem, and delete it.
+
+    If no counters available, return {}
+    """
+    counters_dir = get_mock_dir('counters')
+    filenames = sorted(os.listdir(counters_dir))
+
+    if filenames:
+        counters_path = os.path.join(counters_dir, filenames[0])
+        try:
+            with open(counters_path) as f:
+                return json.load(f)
+        finally:
+            os.remove(counters_path)
+    else:
+        return {}
 
 
 def get_mock_hdfs_root(environ=None):
@@ -630,7 +658,25 @@ def hadoop_jar(stdout, stderr, environ, *args):
               ' job jar: %s' % jar_path, file=stderr)
         return -1
 
-    # only simulate for streaming steps
+    # use this to simulate log4j
+    def mock_log4j(message, level='INFO', logger='mapreduce.JOB', now=None):
+        now = now or datetime.datetime.now()
+        line = '%s %s %s: %s' % (now.strftime('%Y/%m/%d %H:%M:%S'),
+                                 level, logger, message)
+        print(line, file=stderr)
+
+    # simulate counters
+    counters = next_mock_hadoop_counters()
+    if counters:
+        num_counters = sum(len(g) for g in counters.values())
+        mock_log4j('Counters: %d' % num_counters)
+        # subsequent lines are actually part of same log record
+        for group, group_counters in sorted(counters.items()):
+            print(('\t%s' % group), file=stderr)
+            for counter, amount in sorted(group_counters.items()):
+                print(('\t\t%s=%d' % (counter, amount)), file=stderr)
+
+    # simulate output for streaming steps
     if HADOOP_STREAMING_JAR_RE.match(os.path.basename(jar_path)):
         streaming_args = args[1:]
         output_idx = list(streaming_args).index('-output')
@@ -640,7 +686,7 @@ def hadoop_jar(stdout, stderr, environ, *args):
 
         mock_output_dir = get_mock_hadoop_output()
         if mock_output_dir is None:
-            print('Job failed!', file=stderr)
+            mock_log4j('Job failed!')
             return -1
 
         if os.path.isdir(real_output_dir):
@@ -649,8 +695,8 @@ def hadoop_jar(stdout, stderr, environ, *args):
         shutil.move(mock_output_dir, real_output_dir)
 
     now = datetime.datetime.now()
-    print(now.strftime('Running job: job_%Y%m%d%H%M_0001'), file=stderr)
-    print('Job succeeded!', file=stderr)
+    mock_log4j(now.strftime('Running job: job_%Y%m%d%H%M_0001'))
+    mock_log4j('Job succeeded!')
     return 0
 
 

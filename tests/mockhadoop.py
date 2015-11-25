@@ -17,13 +17,16 @@
 """A mock version of the hadoop binary that actually manipulates the
 filesystem. This imitates only things that mrjob actually uses.
 
-Uses these environment variables:
+Requires these environment variables:
+  MOCK_HADOOP_TMP: temp directory used by mock hadoop
+  MOCK_HADOOP_VERSION: version of Hadoop to emulate (e.g. '2.7.1').
+
+
   MOCK_HADOOP_CMD_LOG (optional): if this is set, append arguments passed
     to the fake hadoop binary to this file, one line per invocation
-  MOCK_HADOOP_OUTPUT: a directory containing directories containing
-    fake job output (to add output, use add_mock_output()). Each fake job
-    output directory will be deleted once it is output.
-  MOCK_HADOOP_VERSION: version of Hadoop to emulate (e.g. '2.7.1').
+  MOCK_HADOOP_OUTPUT (optional): a directory to queue up fake output for mock
+    hadoop streaming jobs (see add_mock_output()). Streaming jobs will
+    fail if you didn't set this or didn't add output.
   MOCK_HDFS_ROOT: root dir for our fake filesystem(s). Used
     regardless of URI scheme or host (so this is also the root of every S3
     bucket).
@@ -33,6 +36,11 @@ This is designed to run as: python -m tests.mockhadoop <hadoop args>
 mrjob requires a single binary (no args) to stand in for hadoop, so
 use create_mock_hadoop_script() to write out a shell script that runs
 mockhadoop.
+
+To add mock output for streaming steps, use add_mock_output()
+To add mock counters for steps, use add_mock_counters()
+To see how the hadoop binary has been invoked, use get_mock_hadoop_cmd_args()
+To see what's in HDFS, use get_mock_hdfs_root()
 """
 from __future__ import print_function
 
@@ -48,7 +56,20 @@ import sys
 from mrjob.compat import uses_yarn
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
+from mrjob.util import shlex_split
 
+# layout of $MOCK_HADOOP_TMP:
+#   cmd.log: single file containing one line per invocation of mock hadoop
+#     binary, with lines containing space-separated args passed
+#   counters/YYmmdd.HH:MM:SS.uuuuuu.json: files containing JSON map from
+#     group to counter to amount. When we need to output counters, we read
+#     the first file alphabetically, and then delete it
+#   hdfs/: The root directory of all filesystems (HDFS and otherwise) accessed
+#     by mock hadoop binary (we ignore scheme and host)
+#   output/YYmmdd.HH:MM:SS.uuuuuu/part-nnnnn: sudirectories containing
+#     part files containing output to copy into HDFS to simulate job output.
+#     When we need output, we pick the first directory alphabetically, and then
+#     delete it
 
 def create_mock_hadoop_script(path):
     """Dump a wrapper script to the given file object that runs this
@@ -62,43 +83,83 @@ def create_mock_hadoop_script(path):
     os.chmod(path, stat.S_IREAD | stat.S_IEXEC)
 
 
+def iso_now():
+    """Return the current time as YYmmdd.HH:MM:SS.uuuuuu. Use this to ensure
+    that mock data added stays in alphabetical order.
+    """
+    now = datetime.datetime.now()
+    return '%s.%06d' % (now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
+
+
+def makedirs(path):
+    """More robust/tolerant version of os.makedirs()."""
+    path = os.path.abspath(path)
+
+    if not os.path.exists(path):
+        os.makedirs(path)
+
+
 def add_mock_hadoop_output(parts):
     """Add mock output which will be used by the next fake streaming
     job that mockhadoop will run.
 
     Args:
     parts -- a list of the contents of parts files, which should be iterables
-        that return lines (e.g. lists, BytesIOs).
-
-    The environment variable MOCK_HADOOP_OUTPUT must be set.
+        that return lines as bytes (e.g. lists, BytesIOs).
     """
-    now = datetime.datetime.now()
-    output_dir = os.path.join(
-        os.environ['MOCK_HADOOP_OUTPUT'],
-        '%s.%06d' % (now.strftime('%Y%m%d.%H%M%S'), now.microsecond))
-    os.mkdir(output_dir)
+    output_subdir = os.path.join(
+        os.environ['MOCK_HADOOP_TMP'], 'output', iso_now())
+
+    makedirs(output_subdir)
 
     for i, part in enumerate(parts):
-        part_path = os.path.join(output_dir, 'part-%05d' % i)
+        part_path = os.path.join(output_subdir, 'part-%05d' % i)
         with open(part_path, 'wb') as part_file:
                 part_file.write(part)
 
 
 def get_mock_hadoop_output():
-    """Get the first directory (alphabetically) from MOCK_HADOOP_OUTPUT"""
-    dirnames = sorted(os.listdir(os.environ['MOCK_HADOOP_OUTPUT']))
+    """Get a path to a directory containing part files to use as mock output.
+    """
+    output_dir = os.path.join(os.environ['MOCK_HADOOP_TMP'], 'output')
+
+    dirnames = sorted(os.listdir(output_dir))
     if dirnames:
-        return os.path.join(os.environ['MOCK_HADOOP_OUTPUT'], dirnames[0])
+        return os.path.join(output_dir, dirnames[0])
     else:
         return None
+
+
+def get_mock_hdfs_root(environ=None):
+    """Get the path of mock root of HDFS. Creates the directory if it
+    doesn't already exist."""
+    if environ is None:
+        environ = os.environ
+
+    mock_hdfs_root = os.path.join(environ['MOCK_HADOOP_TMP'], 'hdfs')
+    makedirs(mock_hdfs_root)
+    return mock_hdfs_root
 
 
 def mock_hadoop_uses_yarn(environ):
     return uses_yarn(environ['MOCK_HADOOP_VERSION'])
 
 
-def hdfs_path_to_real_path(hdfs_path, environ):
-    components = urlparse(hdfs_path)
+def get_mock_hadoop_cmd_args():
+    """Get a list for each invocation of hadoop, each containing a list of
+    arguments (not including the hadoop binary's path)."""
+    cmd_log = os.path.join(os.environ['MOCK_HADOOP_TMP'], 'cmd.log')
+
+    if not os.path.exists(cmd_log):
+        return []
+
+    with open(cmd_log) as f:
+        return [shlex_split(cmd) for cmd in f]
+
+
+def hdfs_uri_to_real_path(hdfs_uri, environ):
+    """Map an HDFS URI to a path on the filesystem."""
+    components = urlparse(hdfs_uri)
 
     scheme = components.scheme
     path = components.path
@@ -106,23 +167,22 @@ def hdfs_path_to_real_path(hdfs_path, environ):
     if not scheme and not path.startswith('/'):
         path = '/user/%s/%s' % (environ['USER'], path)
 
-    return os.path.join(environ['MOCK_HDFS_ROOT'], path.lstrip('/'))
+    return os.path.join(get_mock_hdfs_root(), path.lstrip('/'))
 
 
-def real_path_to_hdfs_path(real_path, environ):
-    if environ is None: # user may have passed empty dict
-        environ = os.environ
-    hdfs_root = environ['MOCK_HDFS_ROOT']
+def real_path_to_hdfs_uri(real_path, environ):
+    """Map a real path to an hdfs:/// URI."""
+    hdfs_root = get_mock_hdfs_root()
 
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
 
-    # janky version of os.path.relpath() (Python 2.6):
-    hdfs_path = real_path[len(hdfs_root):]
-    if not hdfs_path.startswith('/'):
-        hdfs_path = '/' + hdfs_path
+    # janky version of os.path.relpath(), for Python 2.6
+    hdfs_uri = real_path[len(hdfs_root):]
+    if not hdfs_uri.startswith('/'):
+        hdfs_uri = '/' + hdfs_uri
 
-    return hdfs_path
+    return hdfs_uri
 
 
 def invoke_cmd(stdout, stderr, environ, prefix, cmd, cmd_args, error_msg,
@@ -146,11 +206,11 @@ def main(stdin, stdout, stderr, argv, environ):
     """Implements hadoop <args>"""
 
     # log what commands we ran
-    if environ.get('MOCK_HADOOP_CMD_LOG'):
-        with open(environ['MOCK_HADOOP_CMD_LOG'], 'a') as cmd_log:
-            cmd_log.write(' '.join(pipes.quote(arg) for arg in argv[1:]))
-            cmd_log.write('\n')
-            cmd_log.flush()
+    cmd_log_path = os.path.join(os.environ['MOCK_HADOOP_TMP'], 'cmd.log')
+    with open(cmd_log_path, 'a') as cmd_log:
+        cmd_log.write(' '.join(pipes.quote(arg) for arg in argv[1:]))
+        cmd_log.write('\n')
+        cmd_log.flush()
 
     if len(argv) < 2:
         print('Usage: hadoop [--config confdir] COMMAND\n', file=stderr)
@@ -186,11 +246,11 @@ def hadoop_fs_cat(stdout, stderr, environ, *args):
         return -1
 
     failed = False
-    for hdfs_path_glob in args:
-        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
+    for hdfs_uri_glob in args:
+        real_path_glob = hdfs_uri_to_real_path(hdfs_uri_glob, environ)
         paths = glob.glob(real_path_glob)
         if not paths:
-            print('cat: File does not exist: %s' % hdfs_path_glob, file=stderr)
+            print('cat: File does not exist: %s' % hdfs_uri_glob, file=stderr)
             failed = True
         else:
             for path in paths:
@@ -232,20 +292,20 @@ def hadoop_fs_dus(stdout, stderr, environ, *args):
 def _hadoop_fs_du(cmd_name, stdout, stderr, environ, path_args,
                   aggregate, pre_yarn_dus_format=False):
     """Implements fs -du and fs -dus."""
-    hdfs_path_globs = path_args or ['']
+    hdfs_uri_globs = path_args or ['']
 
     failed = False
 
-    for hdfs_path_glob in hdfs_path_globs:
-        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
+    for hdfs_uri_glob in hdfs_uri_globs:
+        real_path_glob = hdfs_uri_to_real_path(hdfs_uri_glob, environ)
         real_paths = glob.glob(real_path_glob)
         if not real_paths:
             if mock_hadoop_uses_yarn(environ):
                 msg = "%s: `%s': No such file or directory" % (
-                    cmd_name, hdfs_path_glob)
+                    cmd_name, hdfs_uri_glob)
             else:
                 msg = '%s: Cannot access %s: No such file or directory.' % (
-                    cmd_name, hdfs_path_glob)
+                    cmd_name, hdfs_uri_glob)
             print(msg, file=stderr)
 
             failed = True
@@ -260,7 +320,7 @@ def _hadoop_fs_du(cmd_name, stdout, stderr, environ, path_args,
                 paths = [real_path]
 
             for path in paths:
-                hdfs_path = real_path_to_hdfs_path(path, environ)
+                hdfs_uri = real_path_to_hdfs_uri(path, environ)
                 size = _du(path)
 
                 # prior to YARN, the du commands put a variable number
@@ -268,9 +328,9 @@ def _hadoop_fs_du(cmd_name, stdout, stderr, environ, path_args,
                 # because it doesn't matter.
 
                 if pre_yarn_dus_format:  # old fs -dus only, not fs -du
-                    print('%s  %d' % (hdfs_path, size), file=stdout)
+                    print('%s  %d' % (hdfs_uri, size), file=stdout)
                 else:
-                    print('%d  %s' % (size, hdfs_path), file=stdout)
+                    print('%d  %s' % (size, hdfs_uri), file=stdout)
 
     if failed:
         if mock_hadoop_uses_yarn(environ):
@@ -301,7 +361,7 @@ def _du(real_path):
 
 
 def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
-    hdfs_path = real_path_to_hdfs_path(real_path, environ)
+    hdfs_uri = real_path_to_hdfs_uri(real_path, environ)
 
     # we could actually implement ls here, but mrjob only cares about
     # the path
@@ -318,14 +378,14 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
 
     # newer Hadoop returns fully qualified URIs (see Pull Request #577)
     if scheme and mock_hadoop_uses_yarn(environ):
-        hdfs_path = '%s://%s%s' % (scheme, netloc, hdfs_path)
+        hdfs_uri = '%s://%s%s' % (scheme, netloc, hdfs_uri)
 
     # figure out the padding
     size = str(size).rjust(len(str(max_size)))
 
     return (
         '%srwxrwxrwx - %s %s 2010-10-01 15:16 %s' %
-        (file_type, user_and_group, size, hdfs_path))
+        (file_type, user_and_group, size, hdfs_uri))
 
 
 
@@ -353,22 +413,22 @@ def hadoop_fs_lsr(stdout, stderr, environ, *args):
 
 def _hadoop_fs_ls(cmd_name, stdout, stderr, environ, path_args, recursive):
     """Helper for hadoop_fs_ls() and hadoop_fs_lsr()."""
-    hdfs_path_globs = path_args or ['']
+    hdfs_uri_globs = path_args or ['']
 
     failed = False
-    for hdfs_path_glob in hdfs_path_globs:
-        parsed = urlparse(hdfs_path_glob)
+    for hdfs_uri_glob in hdfs_uri_globs:
+        parsed = urlparse(hdfs_uri_glob)
         scheme = parsed.scheme
         netloc = parsed.netloc
 
-        real_path_glob = hdfs_path_to_real_path(hdfs_path_glob, environ)
+        real_path_glob = hdfs_uri_to_real_path(hdfs_uri_glob, environ)
         real_paths = glob.glob(real_path_glob)
 
         paths = []
 
         if not real_paths:
             print('%s: Cannot access %s: No such file or directory.' %
-                  (cmd_name, hdfs_path_glob), file=stderr)
+                  (cmd_name, hdfs_uri_glob), file=stderr)
             failed = True
         else:
             for real_path in real_paths:
@@ -422,7 +482,7 @@ def hadoop_fs_mkdir(stdout, stderr, environ, *args):
             failed = True
 
     for path in args:
-        real_path = hdfs_path_to_real_path(path, environ)
+        real_path = hdfs_uri_to_real_path(path, environ)
         if os.path.exists(real_path):
             print('mkdir: cannot create directory %s: File exists' % path,
                   file=stderr)
@@ -446,7 +506,7 @@ def hadoop_fs_put(stdout, stderr, environ, *args):
     srcs = args[:-1]
     dst = args[-1]
 
-    real_dst = hdfs_path_to_real_path(dst, environ)
+    real_dst = hdfs_uri_to_real_path(dst, environ)
     real_dir = os.path.dirname(real_dst)
     # dst could be a dir or a filename; we don't know
     if not (os.path.isdir(real_dst) or os.path.isdir(real_dir)):
@@ -541,7 +601,7 @@ def _hadoop_fs_rm(cmd_name, stdout, stderr, environ,
         failed.append(True)
 
     for path in path_args:
-        real_path = hdfs_path_to_real_path(path, environ)
+        real_path = hdfs_uri_to_real_path(path, environ)
         if os.path.isdir(real_path):
             if recursive:
                 shutil.rmtree(real_path)
@@ -564,7 +624,7 @@ def hadoop_fs_test(stdout, stderr, environ, *args):
     if len(args) < 1:
         print('Usage: java FsShell [-test -[ezd] <src>]', file=stderr)
 
-    if os.path.exists(hdfs_path_to_real_path(args[1], environ)):
+    if os.path.exists(hdfs_uri_to_real_path(args[1], environ)):
         return 0
     else:
         return 1
@@ -587,7 +647,7 @@ def hadoop_jar(stdout, stderr, environ, *args):
         output_idx = list(streaming_args).index('-output')
         assert output_idx != -1
         output_dir = streaming_args[output_idx + 1]
-        real_output_dir = hdfs_path_to_real_path(output_dir, environ)
+        real_output_dir = hdfs_uri_to_real_path(output_dir, environ)
 
         mock_output_dir = get_mock_hadoop_output()
         if mock_output_dir is None:

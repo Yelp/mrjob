@@ -27,10 +27,11 @@ from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
 from mrjob.util import bash_wrap
-from mrjob.util import shlex_split
 
-from tests.mockhadoop import create_mock_hadoop_script
 from tests.mockhadoop import add_mock_hadoop_output
+from tests.mockhadoop import create_mock_hadoop_script
+from tests.mockhadoop import get_mock_hadoop_cmd_args
+from tests.mockhadoop import get_mock_hdfs_root
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
@@ -338,6 +339,7 @@ class MockHadoopTestCase(SandboxedTestCase):
         hadoop_home = self.makedirs('mock_hadoop_home')
         os.environ['HADOOP_HOME'] = hadoop_home
         os.environ['MOCK_HADOOP_VERSION'] = "1.2.0"
+        os.environ['MOCK_HADOOP_TMP'] = self.makedirs('mock_hadoop_tmp')
 
         # make fake hadoop binary
         os.mkdir(os.path.join(hadoop_home, 'bin'))
@@ -349,18 +351,6 @@ class MockHadoopTestCase(SandboxedTestCase):
         streaming_jar_path = os.path.join(
             hadoop_home, 'contrib', 'streaming', 'hadoop-0.X.Y-streaming.jar')
         open(streaming_jar_path, 'w').close()
-
-        # set up fake HDFS
-        mock_hdfs_root = self.makedirs('mock_hdfs_root')
-        os.environ['MOCK_HDFS_ROOT'] = mock_hdfs_root
-
-        # make fake output dir
-        mock_output_dir = self.makedirs('mock_hadoop_output')
-        os.environ['MOCK_HADOOP_OUTPUT'] = mock_output_dir
-
-        # set up cmd log
-        mock_cmd_log_path = self.makefile('mock_hadoop_cmd_log', '')
-        os.environ['MOCK_HADOOP_CMD_LOG'] = mock_cmd_log_path
 
         # make sure the fake hadoop binaries can find mrjob
         self.add_mrjob_to_pythonpath()
@@ -425,7 +415,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             assert any(runner.fs.ls(runner.get_output_dir()))
 
             # make sure we're writing to the correct path in HDFS
-            hdfs_root = os.environ['MOCK_HDFS_ROOT']
+            hdfs_root = get_mock_hdfs_root()
             self.assertEqual(sorted(os.listdir(hdfs_root)), ['data', 'user'])
             home_dir = os.path.join(hdfs_root, 'user', getpass.getuser())
             self.assertEqual(os.listdir(home_dir), ['tmp'])
@@ -455,8 +445,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure we called hadoop the way we expected
-        with open(os.environ['MOCK_HADOOP_CMD_LOG']) as hadoop_cmd_log:
-            hadoop_cmd_args = [shlex_split(cmd) for cmd in hadoop_cmd_log]
+        hadoop_cmd_args = get_mock_hadoop_cmd_args()
 
         jar_cmd_args = [cmd_args for cmd_args in hadoop_cmd_args
                         if cmd_args[:1] == ['jar']]
@@ -684,15 +673,16 @@ class JarStepTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             runner.run()
 
-        with open(os.environ['MOCK_HADOOP_CMD_LOG']) as hadoop_cmd_log:
-            hadoop_jar_lines = [line for line in hadoop_cmd_log
-                                if line.startswith('jar ')]
-            self.assertEqual(len(hadoop_jar_lines), 1)
-            self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + fake_jar)
+        hadoop_cmd_args = get_mock_hadoop_cmd_args()
+
+        hadoop_jar_cmd_args = [args for args in hadoop_cmd_args if
+                           args and args[0] == 'jar']
+        self.assertEqual(len(hadoop_jar_cmd_args), 1)
+        self.assertEqual(hadoop_jar_cmd_args[0], ['jar', fake_jar])
 
     def test_hdfs_jar_uri(self):
         # this could change, but for now, we pass URIs straight through
-        mock_hdfs_jar = os.path.join(os.environ['MOCK_HDFS_ROOT'], 'fake.jar')
+        mock_hdfs_jar = os.path.join(get_mock_hdfs_root(), 'fake.jar')
         open(mock_hdfs_jar, 'w').close()
 
         jar_uri = 'hdfs:///fake.jar'
@@ -705,11 +695,13 @@ class JarStepTestCase(MockHadoopTestCase):
                 # `hadoop jar` doesn't actually accept URIs
                 self.assertRaises(CalledProcessError, runner.run)
 
-        with open(os.environ['MOCK_HADOOP_CMD_LOG']) as hadoop_cmd_log:
-            hadoop_jar_lines = [
-                line for line in hadoop_cmd_log if line.startswith('jar ')]
-            self.assertEqual(len(hadoop_jar_lines), 1)
-            self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + jar_uri)
+
+        hadoop_cmd_args = get_mock_hadoop_cmd_args()
+
+        hadoop_jar_cmd_args = [args for args in hadoop_cmd_args if
+                           args and args[0] == 'jar']
+        self.assertEqual(len(hadoop_jar_cmd_args), 1)
+        self.assertEqual(hadoop_jar_cmd_args[0], ['jar', jar_uri])
 
     def test_input_output_interpolation(self):
         fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
@@ -728,29 +720,29 @@ class JarStepTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            with open(os.environ['MOCK_HADOOP_CMD_LOG']) as hadoop_cmd_log:
-                hadoop_jar_lines = [
-                    line for line in hadoop_cmd_log if line.startswith('jar ')]
+            hadoop_cmd_args = get_mock_hadoop_cmd_args()
 
-                self.assertEqual(len(hadoop_jar_lines), 2)
-                jar_args = hadoop_jar_lines[0].rstrip().split()
-                streaming_args = hadoop_jar_lines[1].rstrip().split()
+            hadoop_jar_cmd_args = [args for args in hadoop_cmd_args if
+                               args and args[0] == 'jar']
 
-                self.assertEqual(len(jar_args), 5)
-                self.assertEqual(jar_args[0], 'jar')
-                self.assertEqual(jar_args[1], fake_jar)
-                self.assertEqual(jar_args[2], 'stuff')
+            self.assertEqual(len(hadoop_jar_cmd_args), 2)
+            jar_args, streaming_args = hadoop_jar_cmd_args
 
-                # check input is interpolated
-                input_arg = ','.join(
-                    runner._upload_mgr.uri(path) for path in (input1, input2))
-                self.assertEqual(jar_args[3], input_arg)
+            self.assertEqual(len(jar_args), 5)
+            self.assertEqual(jar_args[0], 'jar')
+            self.assertEqual(jar_args[1], fake_jar)
+            self.assertEqual(jar_args[2], 'stuff')
 
-                # check output of jar is input of next step
-                jar_output_arg = jar_args[4]
-                streaming_input_arg = streaming_args[
-                    streaming_args.index('-input') + 1]
-                self.assertEqual(jar_output_arg, streaming_input_arg)
+            # check input is interpolated
+            input_arg = ','.join(
+                runner._upload_mgr.uri(path) for path in (input1, input2))
+            self.assertEqual(jar_args[3], input_arg)
+
+            # check output of jar is input of next step
+            jar_output_arg = jar_args[4]
+            streaming_input_arg = streaming_args[
+                streaming_args.index('-input') + 1]
+            self.assertEqual(jar_output_arg, streaming_input_arg)
 
 
 class SetupLineEncodingTestCase(MockHadoopTestCase):

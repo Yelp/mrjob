@@ -420,7 +420,7 @@ class HadoopJobRunner(MRJobRunner):
                         raise
 
         return self._process_streaming_stderr_lines(
-            line.rstrip('\r\n') for line in treat_eio_as_eof(stderr))
+            line.rstrip(b'\r\n') for line in treat_eio_as_eof(stderr))
 
 
     def _process_streaming_stderr_lines(self, lines):

@@ -450,22 +450,14 @@ class HadoopJobRunner(MRJobRunner):
                     continue
 
             if parsing_counters:
-                log.debug('  counter_group == %r' % counter_group)
-                log.debug(
-                    '  counter_group_indent == %r' % counter_group_indent)
-
-                if counter_group is not None:
+                if not (counter_group is None or counter_group_indent is None):
                     m = _HADOOP_COUNTER_RE.match(line)
-
-                    if m:
-                        log.debug('  possible counter line: %s' % line)
-                        log.debug("  len(m.group('indent')) == %r" %
-                                  len(m.group('indent')))
-
                     if m and len(m.group('indent')) > counter_group_indent:
-                        log.debug('  counter line: %s' % line)
+
                         counter = m.group('counter')
                         amount = int(m.group('amount'))
+
+                        log.debug('  counter: %s=%d' % (counter, amount))
 
                         step_counters.setdefault(counter_group, {})
                         step_counters[counter_group][counter] = amount
@@ -474,9 +466,11 @@ class HadoopJobRunner(MRJobRunner):
 
                 m = _HADOOP_COUNTER_GROUP_RE.match(line)
                 if m:
-                    log.debug('  counter group line: %s' % line)
-                    counter_group_indent = len(m.group('indent'))
                     counter_group = m.group('group')
+                    counter_group_indent = len(m.group('indent'))
+
+                    log.debug('  counter group: %s' % counter_group)
+
                     continue
                 else:
                     parsing_counters = False

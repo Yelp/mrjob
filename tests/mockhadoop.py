@@ -185,12 +185,12 @@ def hdfs_uri_to_real_path(hdfs_uri, environ):
     if not scheme and not path.startswith('/'):
         path = '/user/%s/%s' % (environ['USER'], path)
 
-    return os.path.join(get_mock_hdfs_root(), path.lstrip('/'))
+    return os.path.join(get_mock_hdfs_root(environ=environ), path.lstrip('/'))
 
 
 def real_path_to_hdfs_uri(real_path, environ):
     """Map a real path to an hdfs:/// URI."""
-    hdfs_root = get_mock_hdfs_root()
+    hdfs_root = get_mock_hdfs_root(environ=environ)
 
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
@@ -222,7 +222,6 @@ def invoke_cmd(stdout, stderr, environ, prefix, cmd, cmd_args, error_msg,
 
 def main(stdin, stdout, stderr, argv, environ):
     """Implements hadoop <args>"""
-
     # log what commands we ran
     cmd_log_path = os.path.join(get_mock_dir(environ=environ), 'cmd.log')
     with open(cmd_log_path, 'a') as cmd_log:

@@ -142,8 +142,8 @@ def main(stdin, stdout, stderr, argv, environ):
     """Implements hadoop <args>"""
 
     # log what commands we ran
-    if environ.get('MOCK_HADOOP_LOG'):
-        with open(environ['MOCK_HADOOP_LOG'], 'a') as cmd_log:
+    if environ.get('MOCK_HADOOP_CMD_LOG'):
+        with open(environ['MOCK_HADOOP_CMD_LOG'], 'a') as cmd_log:
             cmd_log.write(' '.join(pipes.quote(arg) for arg in argv[1:]))
             cmd_log.write('\n')
             cmd_log.flush()

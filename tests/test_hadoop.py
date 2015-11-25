@@ -359,8 +359,8 @@ class MockHadoopTestCase(SandboxedTestCase):
         os.environ['MOCK_HADOOP_OUTPUT'] = mock_output_dir
 
         # set up cmd log
-        mock_log_path = self.makefile('mock_hadoop_logs', '')
-        os.environ['MOCK_HADOOP_LOG'] = mock_log_path
+        mock_cmd_log_path = self.makefile('mock_hadoop_cmd_log', '')
+        os.environ['MOCK_HADOOP_CMD_LOG'] = mock_cmd_log_path
 
         # make sure the fake hadoop binaries can find mrjob
         self.add_mrjob_to_pythonpath()
@@ -455,8 +455,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
         # make sure we called hadoop the way we expected
-        with open(os.environ['MOCK_HADOOP_LOG']) as mock_log:
-            hadoop_cmd_args = [shlex_split(cmd) for cmd in mock_log]
+        with open(os.environ['MOCK_HADOOP_CMD_LOG']) as hadoop_cmd_log:
+            hadoop_cmd_args = [shlex_split(cmd) for cmd in hadoop_cmd_log]
 
         jar_cmd_args = [cmd_args for cmd_args in hadoop_cmd_args
                         if cmd_args[:1] == ['jar']]
@@ -684,8 +684,8 @@ class JarStepTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             runner.run()
 
-        with open(os.environ['MOCK_HADOOP_LOG']) as hadoop_log:
-            hadoop_jar_lines = [line for line in hadoop_log
+        with open(os.environ['MOCK_HADOOP_CMD_LOG']) as hadoop_cmd_log:
+            hadoop_jar_lines = [line for line in hadoop_cmd_log
                                 if line.startswith('jar ')]
             self.assertEqual(len(hadoop_jar_lines), 1)
             self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + fake_jar)
@@ -705,9 +705,9 @@ class JarStepTestCase(MockHadoopTestCase):
                 # `hadoop jar` doesn't actually accept URIs
                 self.assertRaises(CalledProcessError, runner.run)
 
-        with open(os.environ['MOCK_HADOOP_LOG']) as hadoop_log:
+        with open(os.environ['MOCK_HADOOP_CMD_LOG']) as hadoop_cmd_log:
             hadoop_jar_lines = [
-                line for line in hadoop_log if line.startswith('jar ')]
+                line for line in hadoop_cmd_log if line.startswith('jar ')]
             self.assertEqual(len(hadoop_jar_lines), 1)
             self.assertEqual(hadoop_jar_lines[0].rstrip(), 'jar ' + jar_uri)
 
@@ -728,9 +728,9 @@ class JarStepTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            with open(os.environ['MOCK_HADOOP_LOG']) as hadoop_log:
+            with open(os.environ['MOCK_HADOOP_CMD_LOG']) as hadoop_cmd_log:
                 hadoop_jar_lines = [
-                    line for line in hadoop_log if line.startswith('jar ')]
+                    line for line in hadoop_cmd_log if line.startswith('jar ')]
 
                 self.assertEqual(len(hadoop_jar_lines), 2)
                 jar_args = hadoop_jar_lines[0].rstrip().split()

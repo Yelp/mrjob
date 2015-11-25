@@ -52,10 +52,10 @@ from mrjob.util import which
 log = logging.getLogger(__name__)
 
 # to filter out the log4j stuff that hadoop streaming prints out
-HADOOP_STREAMING_OUTPUT_RE = re.compile(br'^(\S+ \S+ \S+ \S+: )?(.*)$')
+_HADOOP_STREAMING_OUTPUT_RE = re.compile(br'^(\S+ \S+ \S+ \S+: )?(.*)$')
 
 # used to extract the job timestamp from stderr
-HADOOP_JOB_TIMESTAMP_RE = re.compile(
+_HADOOP_JOB_TIMESTAMP_RE = re.compile(
     br'(INFO: )?Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
 
 # don't look for the hadoop streaming jar here!
@@ -436,7 +436,7 @@ class HadoopJobRunner(MRJobRunner):
         counter_group_indent = None
 
         for line in lines:
-            line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
+            line = _HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
 
             # don't print HADOOP: <counter stuff>, since we print
             # counters later anyway
@@ -483,7 +483,7 @@ class HadoopJobRunner(MRJobRunner):
             # once because we know how many steps we have and just want to know
             # what Hadoop thinks the first step's number is.
             if self._job_timestamp is None:
-                m = HADOOP_JOB_TIMESTAMP_RE.match(line)
+                m = _HADOOP_JOB_TIMESTAMP_RE.match(line)
                 if m:
                     self._job_timestamp = m.group('timestamp')
                     self._start_step_num = int(m.group('step_num'))

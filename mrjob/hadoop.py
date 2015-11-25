@@ -433,8 +433,19 @@ class HadoopJobRunner(MRJobRunner):
                     continue
 
             if parsing_counters:
+                log.debug('  counter_group == %r' % counter_group)
+                log.debug(
+                    '  counter_group_indent == %r' % counter_group_indent)
+
                 if counter_group is not None:
                     m = _HADOOP_COUNTER_RE.match(line)
+
+                    if m:
+                        log.debug(
+                            '  possible counter line: %s' % line.rstrip())
+                        log.debug("  len(m.group('indent')) == %r" %
+                                  len(m.group('indent')))
+
                     if m and len(m.group('indent')) > counter_group_indent:
                         log.debug('  counter line: %s' % line.rstrip())
                         counter = m.group('counter')

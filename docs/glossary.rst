@@ -22,7 +22,7 @@ Glossary
         of the next.  See :ref:`job-protocols` for details.
 
     mapper
-        A function that convertsone key-value pair to zero or more key-value
+        A function that converts one key-value pair to zero or more key-value
         pairs based on some function. See :doc:`guides/concepts` for details.
 
     output protocol

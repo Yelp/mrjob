@@ -299,7 +299,7 @@ will be equivalent to this one:
         aws_access_key_id: HADOOPHADOOPBOBADOOP
         aws_region: us-west-1
         aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
-        ec2_core_instace_type: m1.xlarge
+        ec2_core_instance_type: m1.xlarge
         num_ec2_core_instances: 20
 
 In this case, :file:`~/.mrjob.very-large.conf` has taken precedence over

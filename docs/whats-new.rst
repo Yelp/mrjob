@@ -12,7 +12,7 @@ For a complete list of changes, see `CHANGES.txt
 See :ref:`configs-relative-includes`.
 
 List and environment variable options loaded from included config files can
-be totally overriden using the ``!clear`` tag. See :ref:`clearing-configs`.
+be totally overridden using the ``!clear`` tag. See :ref:`clearing-configs`.
 
 Options that take lists (e.g. :mrjob-opt:`setup`) now treat scalar values
 as single-item lists. See :ref:`this example <configs-list-example>`.

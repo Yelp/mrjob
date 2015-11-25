@@ -70,14 +70,14 @@ _EMR_HADOOP_STREAMING_JAR_DIRS = [
 ]
 
 # start of Counters printed by Hadoop
-_HADOOP_COUNTERS_START_RE = re.compile('^Counters: (?P<amount>\d+)\s*$')
+_HADOOP_COUNTERS_START_RE = re.compile(b'^Counters: (?P<amount>\d+)\s*$')
 
 # header for a group of counters
-_HADOOP_COUNTER_GROUP_RE = re.compile('^(?P<indent>\s+)(?P<group>.*)$')
+_HADOOP_COUNTER_GROUP_RE = re.compile(b'^(?P<indent>\s+)(?P<group>.*)$')
 
 # line for a counter
 _HADOOP_COUNTER_RE = re.compile(
-    '^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
+    b'^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
 
 
 def fully_qualify_hdfs_path(path):

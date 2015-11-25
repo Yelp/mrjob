@@ -77,7 +77,7 @@ _HADOOP_COUNTER_GROUP_RE = re.compile('^(?P<indent>\s+)(?P<group>.*)$')
 
 # line for a counter
 _HADOOP_COUNTER_RE = re.compile(
-    '^(?P<indent>\s+)(?P<group>.*)=(?P<amount>\d+)$')
+    '^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
 
 
 def fully_qualify_hdfs_path(path):

@@ -319,7 +319,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
             raise TimeoutException('Stalled on large amounts of stderr;'
                                    ' probably pipe buffer is full.')
         self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
-        signal.alarm(10)
+        signal.alarm(30)
 
     def restore_old_alarm_handler(self):
         signal.alarm(0)

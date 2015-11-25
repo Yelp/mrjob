@@ -82,10 +82,14 @@ def iso_now():
     return '%s.%06d' % (now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
 
 
-def get_mock_dir(*subdirs):
+def get_mock_dir(*subdirs, **kwargs):
     """Get a directory within $MOCK_HADOOP_TMP, creating it if it doesn't
-    already exist."""
-    path = os.path.join(os.environ['MOCK_HADOOP_TMP'], *subdirs)
+    already exist.
+
+    Takes optional *environ* keyword arg (defaults to ``os.environ``)."""
+    environ = kwargs.get('environ') or os.environ
+
+    path = os.path.join(environ['MOCK_HADOOP_TMP'], *subdirs)
 
     if not os.path.exists(path):
         os.makedirs(os.path.abspath(path))
@@ -152,10 +156,7 @@ def next_mock_hadoop_counters():
 def get_mock_hdfs_root(environ=None):
     """Get the path of mock root of HDFS. Creates the directory if it
     doesn't already exist."""
-    if environ is None:
-        environ = os.environ
-
-    return get_mock_dir('hdfs')
+    return get_mock_dir('hdfs', environ=environ)
 
 
 def mock_hadoop_uses_yarn(environ):
@@ -223,7 +224,7 @@ def main(stdin, stdout, stderr, argv, environ):
     """Implements hadoop <args>"""
 
     # log what commands we ran
-    cmd_log_path = os.path.join(get_mock_dir(), 'cmd.log')
+    cmd_log_path = os.path.join(get_mock_dir(environ=environ), 'cmd.log')
     with open(cmd_log_path, 'a') as cmd_log:
         cmd_log.write(' '.join(pipes.quote(arg) for arg in argv[1:]))
         cmd_log.write('\n')

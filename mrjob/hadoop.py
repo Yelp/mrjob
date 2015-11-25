@@ -466,7 +466,10 @@ class HadoopJobRunner(MRJobRunner):
                         log.debug('  counter line: %s' % line)
                         counter = m.group('counter')
                         amount = int(m.group('amount'))
+
+                        step_counters.setdefault(counter_group, {})
                         step_counters[counter_group][counter] = amount
+
                         continue
 
                 m = _HADOOP_COUNTER_GROUP_RE.match(line)

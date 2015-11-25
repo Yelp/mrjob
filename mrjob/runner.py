@@ -596,29 +596,23 @@ class MRJobRunner(object):
         """
         raise NotImplementedError
 
-    def print_counters(self, limit_to_steps=None):
-        """Display this run's counters in a user-friendly way.
+    def _print_counters(self, step_nums=None):
+        """Log this run's counters in a user-friendly way.
 
-        :type first_step_num: int
-        :param first_step_num: Display step number of the counters from the
-                               first step
-        :type limit_to_steps: list of int
-        :param limit_to_steps: List of step numbers *relative to this job* to
-                               print, indexed from 1
+        :type step_nums: list of int
+        :param step_nums: Optional list of indexes of steps in
+                          ``self.counters()`` to filter on.
         """
         for step_num, step_counters in enumerate(self.counters()):
-            step_num = step_num + 1
-            if limit_to_steps is None or step_num in limit_to_steps:
-                log.info('Counters from step %d:' % step_num)
-                if step_counters.keys():
-                    for group_name in sorted(step_counters.keys()):
-                        log.info('  %s:' % group_name)
-                        group_counters = step_counters[group_name]
-                        for counter_name in sorted(group_counters.keys()):
-                            log.info('    %s: %d' % (
-                                counter_name, group_counters[counter_name]))
+            if step_nums is None or step_num in step_nums:
+                log.info('Counters from step %d:' % (step_num + 1))
+                if step_counters:
+                    for group, group_counters in sorted(step_counters.items()):
+                        log.info('\t%s' % group)
+                        for counter, amount in sorted(group_counters.items()):
+                            log.info('\t\t%s=%d' % (counter, amount))
                 else:
-                    log.info('  (no counters found)')
+                    log.info('  (none found)')
 
     ### hooks for the with statement ###
 

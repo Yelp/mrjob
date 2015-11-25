@@ -370,7 +370,7 @@ class HadoopJobRunner(MRJobRunner):
                 self._fetch_counters([step_num + self._start_step_num])
 
             # just print counters for this one step
-            self.print_counters([step_num + 1])
+            self._print_counters(step_nums=[step_num])
 
             if returncode:
                 msg = ('Job failed with return code %d: %s' %

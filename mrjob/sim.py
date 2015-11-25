@@ -266,7 +266,7 @@ class SimMRJobRunner(MRJobRunner):
             self._prev_outfiles.append(output_path)
 
         self.per_step_runner_finish(step_num)
-        self.print_counters([step_num + 1])
+        self._print_counters(step_nums=[step_num])
 
     def _run_step(self, step_num, step_type, input_path, output_path,
                   working_dir, env):

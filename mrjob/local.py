@@ -249,7 +249,7 @@ class LocalMRJobRunner(SimMRJobRunner):
         returncode = proc.wait()
 
         if returncode != 0:
-            self.print_counters([step_num + 1])
+            self._print_counters(step_nums=[step_num])
             # try to throw a useful exception
             if tb_lines:
                 raise Exception(

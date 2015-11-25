@@ -112,7 +112,7 @@ def perform_actions(options, runner):
         steps = runner._list_steps_for_cluster()
         runner._fetch_counters(
             range(1, len(steps) + 1), skip_s3_wait=True)
-        runner.print_counters()
+        runner._print_counters()
 
     if options.find_failure:
         find_failure(runner, options.step_num)

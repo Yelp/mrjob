@@ -1619,7 +1619,7 @@ class EMRJobRunner(MRJobRunner):
             log.info('Running time was %.1fs (not counting time spent waiting'
                      ' for the EC2 instances)' % total_step_time)
             self._fetch_counters(step_nums, lg_step_num_mapping)
-            self.print_counters(range(1, len(step_nums) + 1))
+            self._print_counters()
         else:
             msg = 'Job on job flow %s failed with status %s: %s' % (
                 cluster.id, job_state, reason)

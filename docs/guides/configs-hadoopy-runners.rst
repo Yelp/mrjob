@@ -113,7 +113,7 @@ Options available to hadoop and emr runners
     :set: no_mrjob_conf
     :default: ``None``
 
-    Optional name of a Hadoop partitoner class, e.g.
+    Optional name of a Hadoop partitioner class, e.g.
     ``'org.apache.hadoop.mapred.lib.HashPartitioner'``. Hadoop Streaming will
     use this to determine how mapper output should be sorted and distributed
     to reducers. You can also set this option on your job class with the

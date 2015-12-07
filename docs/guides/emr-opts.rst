@@ -701,7 +701,7 @@ SSH access and tunneling
 
 .. mrjob-opt::
     :config: ssh_tunnel_to_job_tracker
-    :switch: --ssh-tunnel-to-job-tracker
+    :switch: --ssh-tunnel-to-job-tracker, --no-ssh-tunnel-to-job-tracker
     :type: boolean
     :set: emr
     :default: ``False``

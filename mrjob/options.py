@@ -341,9 +341,10 @@ def add_emr_run_opts(opt_group):
                   ' Rarely necessary.')),
 
         opt_group.add_option(
-            '--no-ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
+            '--no-ssh-tunnel', dest='ssh_tunnel',
             default=None, action='store_false',
-            help=("Don't open an SSH tunnel to the Hadoop job tracker")),
+            help=("Don't open an SSH tunnel to the Hadoop job"
+                  " tracker/resource manager")),
 
         opt_group.add_option(
             '--pool-wait-minutes', dest='pool_wait_minutes', default=None,

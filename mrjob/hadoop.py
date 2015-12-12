@@ -625,10 +625,13 @@ def _process_stderr_from_streaming(lines):
         message = record['message']
 
         level = getattr(logging, record['level'], None)
-        # don't show the counters themselves
+
         if _INDENTED_COUNTERS_START_RE.match(message):
-            message = message.split('\n')[0]
-        _log_line_from_hadoop(message, level=level)
+            # don't show the counters themselves
+            _log_line_from_hadoop(message.split('\n')[0], level=level)
+            log.info('(parsing counters)')
+        else:
+            _log_line_from_hadoop(message, level=level)
 
     return _parse_hadoop_streaming_log(stderr_to_log(lines),
                                        record_callback=callback)

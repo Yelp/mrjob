@@ -602,6 +602,9 @@ class MRJobRunner(object):
         :type step_nums: list of int
         :param step_nums: Optional list of indexes of steps in
                           ``self.counters()`` to filter on.
+
+        Prints step nums 1-indexed (e.g. "step 1"), but *step_nums* is
+        0-indexed (e.g. [0]).
         """
         for step_num, step_counters in enumerate(self.counters()):
             if step_nums is None or step_num in step_nums:

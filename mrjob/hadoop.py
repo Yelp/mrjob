@@ -37,6 +37,8 @@ from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.logs.ls import ls_logs
+from mrjob.logs.parse import _INDENTED_COUNTERS_START_RE
+from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logparsers import best_error_from_logs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
@@ -50,13 +52,6 @@ from mrjob.util import which
 
 
 log = logging.getLogger(__name__)
-
-# to filter out the log4j stuff that hadoop streaming prints out
-_HADOOP_STREAMING_OUTPUT_RE = re.compile(br'^(\S+ \S+ \S+ \S+: )?(.*)$')
-
-# used to extract the job timestamp from stderr
-_HADOOP_JOB_TIMESTAMP_RE = re.compile(
-    br'(INFO: )?Running job: job_(?P<timestamp>\d+)_(?P<step_num>\d+)')
 
 # don't look for the hadoop streaming jar here!
 _BAD_HADOOP_HOMES = ['/', '/usr', '/usr/local']
@@ -78,6 +73,13 @@ _HADOOP_COUNTER_GROUP_RE = re.compile(b'^(?P<indent>\s+)(?P<group>.*)$')
 # line for a counter
 _HADOOP_COUNTER_RE = re.compile(
     b'^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
+
+# if we see this from Hadoop, it actually came from stdout and shouldn't
+# be logged
+_HADOOP_STDOUT_RE = re.compile(br'^packageJobJar: ')
+
+# the one thing Hadoop streaming prints to stderr not in log format
+_HADOOP_NON_LOG_LINE_RE = re.compile(r'^Streaming Command Failed!')
 
 
 def fully_qualify_hdfs_path(path):
@@ -139,6 +141,8 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         })
 
 
+
+
 class HadoopJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
     Invoked when you run your job with ``-r hadoop``.
@@ -171,15 +175,19 @@ class HadoopJobRunner(MRJobRunner):
             self._output_dir or
             posixpath.join(self._hadoop_tmp_dir, 'output'))
 
-        # Running jobs via hadoop assigns a new timestamp to each job.
-        # Running jobs via mrjob only adds steps.
-        # Store both of these values to enable log parsing.
-        self._job_timestamp = None
-        self._start_step_num = 0
+        # Track job and (YARN) application ID to enable log parsing
+        self._application_id = None
+        self._job_id = None
 
         # Keep track of where the hadoop streaming jar is
         self._hadoop_streaming_jar = self._opts['hadoop_streaming_jar']
         self._searched_for_hadoop_streaming_jar = False
+
+        # Keep track of the status of each step that ran
+        #
+        # these are dictionaries with the same keys as
+        # mrjob.logs.parse._parse_hadoop_streaming_log()
+        self._steps_info = []
 
     @property
     def fs(self):
@@ -322,8 +330,6 @@ class HadoopJobRunner(MRJobRunner):
         return stdin_path
 
     def _run_job_in_hadoop(self):
-        self._counters = []
-
         for step_num in range(self._num_steps()):
             log.debug('running step %d of %d' %
                       (step_num + 1, self._num_steps()))
@@ -339,12 +345,12 @@ class HadoopJobRunner(MRJobRunner):
                 # no PTYs, just use Popen
                 step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)
 
-                step_counters = self._process_stderr_from_streaming(
+                step_info = _process_stderr_from_streaming(
                     step_proc.stderr)
 
                 # there shouldn't be much output to STDOUT
                 for line in step_proc.stdout:
-                    log.error('STDOUT: ' + to_string(line.strip(b'\n')))
+                    _log_line_from_hadoop(to_string(line).strip('\r\n'))
 
                 step_proc.stdout.close()
                 step_proc.stderr.close()
@@ -358,16 +364,14 @@ class HadoopJobRunner(MRJobRunner):
                     with os.fdopen(master_fd, 'rb') as master:
                         # reading from master gives us the subprocess's
                         # stderr and stdout (it's a fake terminal)
-                        step_counters = self._process_stderr_from_streaming(
-                            master)
+                        step_info = _process_stderr_from_streaming(
+                            _wrap_streaming_pty_output(master))
                         _, returncode = os.waitpid(pid, 0)
 
-            # TODO: looks like we are parsing counters
-            # but they don't get printed out.
-            if step_counters:
-                self._counters.append(step_counters)
-            else:
-                self._fetch_counters([step_num + self._start_step_num])
+            if not step_info['counters']:
+                pass  # TODO: fetch counters; see _fetch_counters()
+
+            self._steps_info.append(step_info)
 
             # just print counters for this one step
             self._print_counters(step_nums=[step_num])
@@ -376,9 +380,14 @@ class HadoopJobRunner(MRJobRunner):
                 msg = ('Job failed with return code %d: %s' %
                        (returncode, step_args))
                 log.error(msg)
+
+
                 # look for a Python traceback
-                cause = self._find_probable_cause_of_failure(
-                    [step_num + self._start_step_num])
+                #cause = self._find_probable_cause_of_failure(
+                #    [step_num + self._start_step_num])
+                # need to fix this
+                cause = None
+
                 if cause:
                     # log cause, and put it in exception
                     cause_msg = []  # lines to log and put in exception
@@ -396,99 +405,9 @@ class HadoopJobRunner(MRJobRunner):
                     # add cause_msg to exception message
                     msg += '\n' + '\n'.join(cause_msg) + '\n'
 
+                # TODO: could we be more clear than CalledProcessError?
+                # Maybe use something logged to ERROR by Hadoop?
                 raise CalledProcessError(returncode, step_args)
-
-    def _process_stderr_from_streaming(self, stderr):
-        """Process stderr from the Hadoop binary. Return a dict of counters
-        for the step.
-
-        This also handles output from a PTY (which has a different EOF).
-        """
-        # This just handles fetching lines and EOF; deciding what to do with
-        # those lines happens in _process_streaming_stderr_lines()
-
-        def treat_eio_as_eof(iter):
-            # on Linux, the PTY gives us a specific IOError when the
-            # when the child process exits, rather than EOF.
-            while True:
-                try:
-                    yield next(iter)  # okay for StopIteration to bubble up
-                except IOError as e:
-                    if e.errno == errno.EIO:
-                        return
-                    else:
-                        raise
-
-        return self._process_streaming_stderr_lines(
-            line.rstrip(b'\r\n') for line in treat_eio_as_eof(stderr))
-
-
-    def _process_streaming_stderr_lines(self, lines):
-        """Process lines (with \r and \n stripped) from Hadoop binary's
-        stderr. Return a dict of counters for the step.
-
-        This handles counter parsing, debug printouts, and the job timestamp.
-        """
-        # counter-parsing state
-        step_counters = {}
-        parsing_counters = False
-        counter_group = None
-        counter_group_indent = None
-
-        for line in lines:
-            line = _HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
-
-            # don't print HADOOP: <counter stuff>, since we print
-            # counters later anyway
-
-            # start of counters
-            if not (parsing_counters or step_counters):
-                m = _HADOOP_COUNTERS_START_RE.match(line)
-                if m:
-                    parsing_counters = True
-                    log.info('Parsing counters from hadoop output')
-                    continue
-
-            if parsing_counters:
-                if not (counter_group is None or counter_group_indent is None):
-                    m = _HADOOP_COUNTER_RE.match(line)
-                    if m and len(m.group('indent')) > counter_group_indent:
-
-                        counter = to_string(m.group('counter'))
-                        amount = int(m.group('amount'))
-
-                        log.debug('  counter: %s=%d' % (counter, amount))
-
-                        step_counters.setdefault(counter_group, {})
-                        step_counters[counter_group][counter] = amount
-
-                        continue
-
-                m = _HADOOP_COUNTER_GROUP_RE.match(line)
-                if m:
-                    counter_group = to_string(m.group('group'))
-                    counter_group_indent = len(m.group('indent'))
-
-                    log.debug('  counter group: %s' % counter_group)
-
-                    continue
-                else:
-                    parsing_counters = False
-
-            log.info('HADOOP: ' + to_string(line))
-            if b'Streaming Job Failed!' in line:
-                raise Exception(line)
-
-            # The job identifier is printed to stderr. We only want to parse it
-            # once because we know how many steps we have and just want to know
-            # what Hadoop thinks the first step's number is.
-            if self._job_timestamp is None:
-                m = _HADOOP_JOB_TIMESTAMP_RE.match(line)
-                if m:
-                    self._job_timestamp = m.group('timestamp')
-                    self._start_step_num = int(m.group('step_num'))
-
-        return step_counters
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)
@@ -611,21 +530,6 @@ class HadoopJobRunner(MRJobRunner):
 
     ### LOG FETCHING/PARSING ###
 
-    def _enforce_path_regexp(self, paths, regexp, step_nums):
-        """Helper for log fetching functions to filter out unwanted
-        logs. Keyword arguments are checked against their corresponding
-        regex groups.
-        """
-        for path in paths:
-            m = regexp.match(path)
-            if (m and
-                (step_nums is None or
-                 int(m.group('step_num')) in step_nums) and
-                (self._job_timestamp is None or
-                 m.group('timestamp') == self._job_timestamp)):
-
-                yield path
-
     def _ls_logs(self, log_type, step_nums=None):
         """List logs on the local filesystem by path relative to log root
         directory
@@ -656,7 +560,7 @@ class HadoopJobRunner(MRJobRunner):
             self._counters.append(new_counters.get(step_num, {}))
 
     def counters(self):
-        return self._counters
+        return [step_info['counters'] for step_info in self._steps_info]
 
     def _find_probable_cause_of_failure(self, step_nums):
         task_attempt_logs = self._ls_logs('task')
@@ -666,3 +570,65 @@ class HadoopJobRunner(MRJobRunner):
         log.info('Scanning logs for probable cause of failure')
         return best_error_from_logs(self, task_attempt_logs, step_logs,
                                     job_logs)
+
+
+# These don't require state from HadoopJobRunner, so making them functions.
+# Feel free to convert them back into methods as need be
+
+def _log_line_from_hadoop(line, level=None):
+    """Log ``'HADOOP: <line>'``. *line* should be a string.
+
+    Optionally specify a logging level (default is logging.INFO).
+    """
+    log.log(level or logging.INFO, 'HADOOP: %s' % line)
+
+
+def _wrap_streaming_pty_output(lines):
+    """Make output from PTY running hadoop streaming behave like stderr.
+
+    This screens out and logs lines that look like they came from stdout,
+    and treats the EIO error as EOF.
+    """
+    while True:
+        try:
+            line = next(lines)  # okay to get StopIteration
+            if _HADOOP_STDOUT_RE.match(line):
+                _log_line_from_hadoop(to_string(line).rstrip('\r\n'))
+            else:
+                yield line
+        except IOError as e:
+            if e.errno == errno.EIO:
+                return
+            else:
+                raise
+
+
+def _process_stderr_from_streaming(lines):
+    """Wrapper for _parse_hadoop_streaming_log().
+
+    This converts lines from bytes to str in Python 3, logs every line
+    (abbreviating the counters message, since we log counters next).
+
+    This also screens out and logs 'Streaming Command Failed!', which
+    isn't in log format.
+    """
+    def stderr_to_log(lines):
+        for line in lines:
+            line = to_string(line)
+            if _HADOOP_NON_LOG_LINE_RE.match(line):
+                # use error because this is usually "Streaming Command Failed!"
+                _log_line_from_hadoop(line, level=logging.ERROR)
+            else:
+                yield line
+
+    def callback(record):
+        message = record['message']
+
+        level = getattr(logging, record['level'], None)
+        # don't show the counters themselves
+        if _INDENTED_COUNTERS_START_RE.match(message):
+            message = message.split('\n')[0]
+        _log_line_from_hadoop(message, level=level)
+
+    return _parse_hadoop_streaming_log(stderr_to_log(lines),
+                                       record_callback=callback)

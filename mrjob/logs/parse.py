@@ -15,11 +15,20 @@ import re
 from logging import getLogger
 
 
+# log line format output by YARN hadoop jar command
 _HADOOP_LOG_LINE_RE = re.compile(
     r'^(?P<timestamp>.*?)'
     r'\s+(?P<level>[A-Z]+)'
     r'\s+(?P<logger>\S+)'
     r'(\s+\((?P<thread>.*?)\))?'
+    r': (?P<message>.*?)$')
+
+# log line format output to Hadoop syslog
+_HADOOP_LOG_LINE_ALTERNATE_RE = re.compile(
+    r'^(?P<timestamp>.*?)'
+    r'\s+(?P<level>[A-Z]+)'
+    r'(\s+\[(?P<thread>.*?)\])'
+    r'\s+(?P<logger>\S+)'
     r': (?P<message>.*?)$')
 
 _APPLICATION_ID_RE = re.compile(r'\bapplication_\d+_\d{4}\b')
@@ -30,16 +39,36 @@ _OUTPUT_DIR_LINE_RE = re.compile(
     r'^Output( directory)?:'
     r'\s+(?P<output_dir>\S+://\S+)')
 
-# marks start of counters
-_INDENTED_COUNTERS_START_RE = re.compile('^Counters: ')
+# marks start of counters message
+_INDENTED_COUNTERS_START_RE = re.compile(r'^Counters: ')
 
 # header for a group of counters
-_INDENTED_COUNTER_GROUP_RE = re.compile('^(?P<indent>\s+)(?P<group>.*)$')
+_INDENTED_COUNTER_GROUP_RE = re.compile(r'^(?P<indent>\s+)(?P<group>.*)$')
 
 # line for a counter
 _INDENTED_COUNTER_RE = re.compile(
-    '^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
+    r'^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
 
+# message telling us about a (input) split. Looks like this:
+#
+# Processing split: hdfs://ddf64167693a:9000/path/to/bootstrap.sh:0+335
+_YARN_INPUT_SPLIT_RE = re.compile(
+    r'^Processing split:\s+(?P<uri>.*)'
+    r':(?P<start_line>\d+)\+(?P<num_lines>\d+)$')
+
+
+# start of message telling us about a Java stacktrace
+# TODO: add pre-YARN version, other kinds of errors
+_JAVA_EXCEPTION_HEADER_RE = re.compile(
+    r'^Exception running child\s:\s+(?P<exception>.*)$')
+
+# start of line telling us about Python exception
+_PYTHON_EXCEPTION_HEADER_RE = re.compile(
+    r'^Traceback (most recent call last):$')
+
+# once we see the exception header, every line starting with whitespace
+# is part of the traceback
+_PYTHON_TRACEBACK_LINE_RE = re.compile(r'^\s+')
 
 # TODO: move to mrjob.hadoop
 _NON_HADOOP_LOG_LINE_RE = re.compile(
@@ -68,7 +97,8 @@ def _parse_hadoop_log_lines(lines):
     for line in lines:
         line = line.rstrip('\r\n')
 
-        m = _HADOOP_LOG_LINE_RE.match(line)
+        m = (_HADOOP_LOG_LINE_RE.match(line) or
+             _HADOOP_LOG_LINE_ALTERNATE_RE.match(line))
 
         if m:
             if last_record:
@@ -178,3 +208,71 @@ def _parse_indented_counters(lines):
             log.warning('unexpected counter line: %s' % line)
 
     return counters
+
+
+# TODO: handle "Output path already exists"
+def _parse_yarn_task_syslog(lines):
+    """Parse out last Java stacktrace (if any) and last split (if any)
+    from syslog file.
+
+    Returns a dictionary with the keys 'error' and 'split':
+
+    error: optional (may be None) dictionary with keys:
+        exception: string
+        stack_trace: [lines]
+    split: optional (may be None) dictionary with the keys:
+       uri: URI of input file
+       start_line: first line of split (0-indexed)
+       num_lines: number of lines in split
+    """
+    result = dict(java_stack_trace=None, split=None)
+
+    for record in _parse_hadoop_log_lines(lines):
+        message = record['message']
+
+        m = _YARN_INPUT_SPLIT_RE.match(message)
+        if m:
+            result['split'] = m.groupdict()
+            continue
+
+        m = _JAVA_EXCEPTION_HEADER_RE.match(message)
+        if m:
+            result['error'] = dict(
+                exception=m.group('exception'),
+                stack_trace= message.splitlines()[1:])
+            continue
+
+    return result
+
+
+def _parse_python_task_stderr(lines):
+    """Parse out the python stacktrace and exception, if any.
+
+    Returns a dictionary with the optional (may be None) key 'error':
+
+    error: dictionary with keys:
+        exception: string
+        traceback: [lines]
+    """
+    result=dict(error=None)
+
+    traceback = None
+
+    for line in lines:
+        line = line.rstrip('\r\n')
+
+        if traceback is None:
+            if _PYTHON_EXCEPTION_HEADER_RE.match(line):
+                traceback = [line]
+            # otherwise this line is uninteresting
+        else:
+            # parsing traceback
+            if _PYTHON_TRACEBACK_LINE_RE.match(line):
+                traceback.append(line)
+            else:
+                result['error'] = dict(
+                    exception=line,
+                    traceback=traceback)
+                traceback = None  # done parsing traceback
+
+    return result

@@ -47,6 +47,7 @@ v0.5.0, 2015-??-?? -- ???
  * removed mrjob.conf.combine_cmd_lists()
  * Python-version-specific mrjob commands (#1104)
  * mrjob.util:
+   * file_ext() takes filename, not path
    * random_identifier() moved here from mrjob.aws
    * renamed buffer_iterator_to_line_iterator() to to_lines()
      * to_lines() no longer appends a newline to data (#819)

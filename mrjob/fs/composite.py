@@ -77,8 +77,8 @@ class CompositeFilesystem(Filesystem):
     def exists(self, path_glob):
         return self._do_action('exists', path_glob)
 
-    def join(self, dirname, filename):
-        return self._do_action('join', dirname, filename)
+    def join(self, path, *paths):
+        return self._do_action('join', path, *paths)
 
     def rm(self, path_glob):
         return self._do_action('rm', path_glob)

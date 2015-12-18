@@ -16,6 +16,7 @@ import os.path
 import posixpath
 
 from mrjob.parse import is_uri
+from mrjob.parse import urlparse
 
 log = logging.getLogger(__name__)
 
@@ -74,14 +75,19 @@ class Filesystem(object):
         """
         raise NotImplementedError
 
-    def join(self, dirname, filename):
-        """Join *filename* onto *dirname* (which may be a URI)"""
-        if is_uri(filename):
-            return filename
-        elif is_uri(dirname):
-            return posixpath.join(dirname, filename)
+    def join(self, path, *paths):
+        """Join *paths* onto *path* (which may be a URI)"""
+        all_paths = (path,) + paths
+
+        # if there's a URI, we only care about it and what follows
+        for i in range(len(all_paths), 0, -1):
+            if is_uri(all_paths[i - 1]):
+                scheme, netloc, uri_path = urlparse(all_paths[i - 1])[:3]
+                return '%s://%s%s' % (
+                    scheme, netloc, posixpath.join(
+                        uri_path or '/', *all_paths[i:]))
         else:
-            return os.path.join(dirname, filename)
+            return os.path.join(*all_paths)
 
     def mkdir(self, path):
         """Create the given dir and its subdirs (if they don't already

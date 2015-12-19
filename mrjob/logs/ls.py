@@ -298,7 +298,7 @@ _YARN_TASK_SYSLOG_RE = re.compile(
 def _ls_logs(fs, log_dir):
     """ls() the given directory, but log a warning on IOError."""
     try:
-        for path in fs.ls(log_dir()):
+        for path in fs.ls(log_dir):
             yield path
     except IOError as e:
         log.warning("couldn't ls() %s: %r" % (log_dir, e))

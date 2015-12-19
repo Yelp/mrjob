@@ -404,7 +404,7 @@ class HadoopJobRunner(MRJobRunner):
 
             # make sure output_dir is filled
             if not step_info['output_dir']:
-                step_info = self._hdfs_step_output_dir(step_num)
+                step_info['output_dir'] = self._hdfs_step_output_dir(step_num)
 
             if not step_info['counters']:
                 pass  # TODO: fetch counters; see _fetch_counters()

@@ -302,7 +302,7 @@ class HadoopJobRunner(MRJobRunner):
 
         if output_dir:
             # Cloudera style of logging
-            yield posixpath.join(output_uri, '_logs')
+            yield posixpath.join(output_dir, '_logs')
 
         for hadoop_dir in self._hadoop_dirs():
             yield posixpath.join(hadoop_dir, 'logs')

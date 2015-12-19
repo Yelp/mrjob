@@ -287,7 +287,7 @@ class HadoopJobRunner(MRJobRunner):
         for path in _EMR_HADOOP_STREAMING_JAR_DIRS:
             yield path
 
-    def _hadoop_log_dirs(self, output_uri):
+    def _hadoop_log_dirs(self, output_dir=None):
         """Yield all possible places to look for hadoop logs."""
         # TODO: add hadoop_log_dir option
 
@@ -300,7 +300,7 @@ class HadoopJobRunner(MRJobRunner):
             if yarn_log_dir:
                 yield yarn_log_dir
 
-        if output_uri:
+        if output_dir:
             # Cloudera style of logging
             yield posixpath.join(output_uri, '_logs')
 
@@ -562,7 +562,8 @@ class HadoopJobRunner(MRJobRunner):
         # package up logs for _find_error_in_yarn_task_logs(),
         # and log where we're looking
         def stream_task_log_dirs():
-            for log_dir in unique(self._hadoop_log_dirs()):
+            for log_dir in unique(
+                    self._hadoop_log_dirs(output_dir=output_dir)):
                 path = self.fs.join(log_dir, application_id)
 
                 log.info('looking for logs in %s...' % path)

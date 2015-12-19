@@ -26,14 +26,14 @@ log = getLogger(__name__)
 
 
 
-def _cat_log(fs, uri):
+def _cat_log(fs, path):
     """fs.cat() the given log, converting lines to strings, and logging
     errors."""
     try:
-        for line in fs.cat(uri):
+        for line in fs.cat(path):
             yield to_string(line)
     except IOError as e:
-        log.warning("couldn't cat() %s: %r" % (uri, e))
+        log.warning("couldn't cat() %s: %r" % (path, e))
 
 
 def _find_error_in_yarn_task_logs(fs, log_dirs_stream, application_id=None):
@@ -44,32 +44,33 @@ def _find_error_in_yarn_task_logs(fs, log_dirs_stream, application_id=None):
     that something may be None):
 
     syslog: dict with keys:
-       uri: URI of syslog we found error in
+       path: path of syslog we found error in
        error: error details; dict with keys:
            exception: Java exception (as string)
            stack_trace: array of lines with Java stack trace
        split: optional input split we were reading; dict with keys:
-           uri: URI of input file
+           path: path of input file
            start_line: first line of split (0-indexed)
            num_lines: number of lines in split
     stderr: optional dict with keys:
-       uri: URI of stderr corresponding to syslog
+       path: path of stderr corresponding to syslog
        error: optional error details; dict with keys:
            exception: string  (Python exception)
            traceback: array of lines with Python stack trace
+    type: always set to 'task'
     """
-    syslog_uris = []
+    syslog_paths = []
 
-    # we assume that each set of log URIs contains the same copies
+    # we assume that each set of log paths contains the same copies
     # of syslogs, so stop once we find any non-empty set of log dirs
     for log_dirs in log_dirs_stream:
-        syslog_uris = _ls_yarn_task_syslogs(fs, log_dirs,
+        syslog_paths = _ls_yarn_task_syslogs(fs, log_dirs,
                                             application_id=application_id)
-        if syslog_uris:
+        if syslog_paths:
             break
 
-    for syslog_uri in syslog_uris:
-        syslog_info = _parse_yarn_task_syslog(_cat_log(fs, syslog_uri))
+    for syslog_path in syslog_paths:
+        syslog_info = _parse_yarn_task_syslog(_cat_log(fs, syslog_path))
 
         if not syslog_info['error']:
             continue
@@ -77,14 +78,59 @@ def _find_error_in_yarn_task_logs(fs, log_dirs_stream, application_id=None):
         # found error! see if we can explain it
 
         # TODO: don't bother if error wasn't due to child process
-        stderr_uri = _stderr_for_syslog(syslog_uri)
+        stderr_path = _stderr_for_syslog(syslog_path)
 
-        stderr_info = _parse_python_task_stderr(_cat_log(fs, stderr_uri))
+        stderr_info = _parse_python_task_stderr(_cat_log(fs, stderr_path))
 
         # output error info
-        syslog_info['uri'] = syslog_uri
-        stderr_info['uri'] = stderr_uri
+        syslog_info['path'] = syslog_path
+        stderr_info['path'] = stderr_path
 
-        return dict(syslog=syslog_info, stderr=stderr_info)
+        return dict(type='task', syslog=syslog_info, stderr=stderr_info)
 
     return None
+
+
+
+def _format_cause_of_failure(cause):
+    """Format error found by this module as lines, so we can easily
+    log it and put it into an exception."""
+    try:
+        if cause['type'] == 'task':
+            return _format_error_from_task_logs(cause)
+    except:
+        pass
+
+    # if it's an unknown error type or there's something wrong with
+    # the format function, just print a repr
+    return ['Probable cause of failure: %r' % (cause,)]
+
+
+def _format_error_from_task_logs(cause):
+    """Helper for _format_cause_of_failure()"""
+    lines = []
+
+    lines.append(
+        'Probable cause of failure (from %s):' % cause['syslog']['path'])
+    lines.append(cause['syslog']['error']['exception'])
+    lines.extend(cause['syslog']['error']['stack_trace'])
+
+    if cause['stderr']:
+        if cause['stderr']['error']:
+            lines.append('caused by exception (from %s):' %
+                         cause['stderr']['path'])
+            lines.append(cause['stderr']['error']['traceback'])
+            lines.append(cause['stderr']['error']['exception'])
+        else:
+            lines.append('(see %s for task stderr)' %
+                         cause['stderr']['path'])
+
+    if cause['syslog']['split']:
+        first_line = cause['syslog']['split']['start_line'] + 1
+        last_line = first_line + cause['syslog']['split']['num_lines']
+
+        lines.append('while reading input from lines %d-%d of %s' %
+                     (first_line, last_line,
+                      cause['syslog']['split']['path']))
+
+    return lines

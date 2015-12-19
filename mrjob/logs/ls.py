@@ -326,31 +326,31 @@ def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
     if isinstance(log_dirs, str):
         raise TypeError
 
-    uri_to_sort_key = {}
+    path_to_sort_key = {}
 
     for log_dir in log_dirs:
         try:
-            uris = fs.ls(log_dir)
+            paths = fs.ls(log_dir)
         except IOError as e:
             log.warning("couldn't ls() %s: %r" % (log_dir, e))
             continue
 
-        for uri in uris:
+        for path in paths:
             sort_key = _yarn_task_syslog_sort_key(
-                uri, application_id=application_id)
+                path, application_id=application_id)
 
             if sort_key:
-                uri_to_sort_key[uri] = sort_key
+                path_to_sort_key[path] = sort_key
 
-    return sorted(uri_to_sort_key, lambda k: uri_to_sort_key[k],
+    return sorted(path_to_sort_key, lambda k: path_to_sort_key[k],
                   reverse=True)
 
 
-def _stderr_for_syslog(uri):
-    """Get the URI of the stderr log corresponding to the given syslog.
+def _stderr_for_syslog(path):
+    """Get the path/uri of the stderr log corresponding to the given syslog.
 
     If the syslog is gzipped (/path/to/syslog.gz), we'll expect
     stderr to be gzipped too (/path/to/stderr.gz).
     """
-    stem, filename = posixpath.split(uri)
+    stem, filename = posixpath.split(path)
     return stem + '/syslog' + file_ext(filename)

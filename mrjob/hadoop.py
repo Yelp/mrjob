@@ -19,7 +19,6 @@ import posixpath
 import re
 from subprocess import Popen
 from subprocess import PIPE
-from subprocess import CalledProcessError
 
 try:
     import pty
@@ -30,17 +29,18 @@ except ImportError:
 import mrjob.step
 from mrjob.setup import UploadDirManager
 from mrjob.compat import supports_new_distributed_cache_options
+from mrjob.compat import uses_yarn
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_paths
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.composite import CompositeFilesystem
-from mrjob.logs.ls import ls_logs
+from mrjob.logs.interpret import _find_error_in_yarn_task_logs
+from mrjob.logs.interpret import _format_cause_of_failure
 from mrjob.logs.parse import _INDENTED_COUNTERS_START_RE
 from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logparsers import scan_for_counters_in_files
-from mrjob.logparsers import best_error_from_logs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.py2 import to_string
 from mrjob.parse import is_uri
@@ -57,12 +57,14 @@ log = logging.getLogger(__name__)
 _BAD_HADOOP_HOMES = ['/', '/usr', '/usr/local']
 
 # places to look for the Hadoop streaming jar if we're inside EMR
+# TODO: do this for logs as well
 _EMR_HADOOP_STREAMING_JAR_DIRS = [
     # for the 2.x and 3.x AMIs (the 2.x AMIs also set $HADOOP_HOME properly)
     '/home/hadoop/contrib',
     # for the 4.x AMIs
     '/usr/lib/hadoop-mapreduce',
 ]
+
 
 # start of Counters printed by Hadoop
 _HADOOP_COUNTERS_START_RE = re.compile(b'^Counters: (?P<amount>\d+)\s*$')
@@ -117,6 +119,8 @@ def hadoop_prefix_from_bin(hadoop_bin):
 
 
 class HadoopRunnerOptionStore(RunnerOptionStore):
+
+    # TODO: deprecate hadoop_home
 
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
@@ -250,8 +254,9 @@ class HadoopJobRunner(MRJobRunner):
 
         return None
 
-    def _hadoop_streaming_jar_dirs(self):
-        """Yield all possible places to look for the Hadoop streaming jar."""
+    def _hadoop_dirs(self):
+        """Yield all possible hadoop directories (used for streaming jar
+        and logs). May yield duplicates"""
         if self._opts['hadoop_home']:
             yield self._opts['hadoop_home']
 
@@ -271,9 +276,38 @@ class HadoopJobRunner(MRJobRunner):
             if name.startswith('HADOOP_') and name.endswith('_HOME'):
                 yield path
 
+    def _hadoop_streaming_jar_dirs(self):
+        """Yield all possible places to look for the Hadoop streaming jar.
+        May yield duplicates.
+        """
+        for hadoop_dir in self._hadoop_dirs():
+            yield hadoop_dir
+
         # use hard-coded paths to work out-of-the-box on EMR
         for path in _EMR_HADOOP_STREAMING_JAR_DIRS:
             yield path
+
+    def _hadoop_log_dirs(self, output_uri):
+        """Yield all possible places to look for hadoop logs."""
+        # TODO: add hadoop_log_dir option
+
+        hadoop_log_dir = os.environ.get('HADOOP_LOG_DIR')
+        if hadoop_log_dir:
+            yield hadoop_log_dir
+
+        if uses_yarn(self.hadoop_version()):
+            yarn_log_dir = os.environ.get('YARN_LOG_DIR')
+            if yarn_log_dir:
+                yield yarn_log_dir
+
+        if output_uri:
+            # Cloudera style of logging
+            yield posixpath.join(output_uri, '_logs')
+
+        for hadoop_dir in self._hadoop_dirs():
+            yield posixpath.join(hadoop_dir, 'logs')
+
+        # TODO: hard-coded log paths for EMR
 
     def _run(self):
         self._check_input_exists()
@@ -368,6 +402,10 @@ class HadoopJobRunner(MRJobRunner):
                             _wrap_streaming_pty_output(master))
                         _, returncode = os.waitpid(pid, 0)
 
+            # make sure output_dir is filled
+            if not step_info['output_dir']:
+                step_info = self._hdfs_step_output_dir(step_num)
+
             if not step_info['counters']:
                 pass  # TODO: fetch counters; see _fetch_counters()
 
@@ -377,37 +415,19 @@ class HadoopJobRunner(MRJobRunner):
             self._print_counters(step_nums=[step_num])
 
             if returncode:
-                msg = ('Job failed with return code %d: %s' %
-                       (returncode, step_args))
-                log.error(msg)
+                err_lines = [
+                    'Job failed with return code %d: %s' %
+                       (returncode, cmd_line(step_args))]
 
-
-                # look for a Python traceback
-                #cause = self._find_probable_cause_of_failure(
-                #    [step_num + self._start_step_num])
-                # need to fix this
-                cause = None
+                cause = self._find_probable_cause_of_failure(**step_info)
 
                 if cause:
-                    # log cause, and put it in exception
-                    cause_msg = []  # lines to log and put in exception
-                    cause_msg.append('Probable cause of failure (from %s):' %
-                                     cause['log_file_uri'])
-                    cause_msg.extend(line.strip('\n')
-                                     for line in cause['lines'])
-                    if cause['input_uri']:
-                        cause_msg.append('(while reading from %s)' %
-                                         cause['input_uri'])
+                    err_lines.append('')  # pad with empty line
+                    err_lines.extend(_format_cause_of_failure(cause))
 
-                    for line in cause_msg:
-                        log.error(line)
-
-                    # add cause_msg to exception message
-                    msg += '\n' + '\n'.join(cause_msg) + '\n'
-
-                # TODO: could we be more clear than CalledProcessError?
-                # Maybe use something logged to ERROR by Hadoop?
-                raise CalledProcessError(returncode, step_args)
+                for err_line in err_lines:
+                    log.error(err_line)
+                raise Exception('\n'.join(err_lines) + '\n')
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)
@@ -530,20 +550,32 @@ class HadoopJobRunner(MRJobRunner):
 
     ### LOG FETCHING/PARSING ###
 
-    def _ls_logs(self, log_type, step_nums=None):
-        """List logs on the local filesystem by path relative to log root
-        directory
-        """
-        return []
-        # in YARN, you can just ask the yarn bin:
-        # http://hortonworks.com/blog/simplifying-user-logs-management-and-access-in-yarn/  # noqa
+    def _find_probable_cause_of_failure(self, application_id=None, job_id=None,
+                                        output_dir=None, **ignored):
+        # TODO: handle non-YARN logs
+        if not uses_yarn(self.hadoop_version()):
+            return
 
-        # TODO: redo this to look in
-        # $HADOOP_LOG_DIR
-        # dirname(hadoop_bin[0])/../logs
-        # <output_dir>/_logs
-        # ??? other places ???
+        if not application_id:
+            return  # need application_id to find YARN logs
 
+        # package up logs for _find_error_in_yarn_task_logs(),
+        # and log where we're looking
+        def stream_task_log_dirs():
+            for log_dir in unique(self._hadoop_log_dirs()):
+                path = self.fs.join(log_dir, application_id)
+
+                log.info('looking for logs in %s...' % path)
+                yield [path]
+
+        cause = _find_error_in_yarn_task_logs(self.fs, stream_task_log_dirs(),
+                                              application_id=application_id)
+
+        # TODO: catch timeouts, etc.
+
+        return cause  # may be None
+
+    # TODO: redo this
     def _fetch_counters(self, step_nums, skip_s3_wait=False):
         """Read Hadoop counters from local logs.
 
@@ -562,14 +594,6 @@ class HadoopJobRunner(MRJobRunner):
     def counters(self):
         return [step_info['counters'] for step_info in self._steps_info]
 
-    def _find_probable_cause_of_failure(self, step_nums):
-        task_attempt_logs = self._ls_logs('task')
-        step_logs = self._ls_logs('step')
-        job_logs = self._ls_logs('job')
-
-        log.info('Scanning logs for probable cause of failure')
-        return best_error_from_logs(self, task_attempt_logs, step_logs,
-                                    job_logs)
 
 
 # These don't require state from HadoopJobRunner, so making them functions.
@@ -604,7 +628,7 @@ def _wrap_streaming_pty_output(lines):
 
 
 def _process_stderr_from_streaming(lines):
-    """Wrapper for _parse_hadoop_streaming_log().
+    """Wrapper for mrjob.logs._parse_hadoop_streaming_log().
 
     This converts lines from bytes to str in Python 3, logs every line
     (abbreviating the counters message, since we log counters next).

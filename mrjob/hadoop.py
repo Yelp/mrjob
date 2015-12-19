@@ -295,7 +295,7 @@ class HadoopJobRunner(MRJobRunner):
         if hadoop_log_dir:
             yield hadoop_log_dir
 
-        if uses_yarn(self.hadoop_version()):
+        if uses_yarn(self.get_hadoop_version()):
             yarn_log_dir = os.environ.get('YARN_LOG_DIR')
             if yarn_log_dir:
                 yield yarn_log_dir
@@ -553,7 +553,7 @@ class HadoopJobRunner(MRJobRunner):
     def _find_probable_cause_of_failure(self, application_id=None, job_id=None,
                                         output_dir=None, **ignored):
         # TODO: handle non-YARN logs
-        if not uses_yarn(self.hadoop_version()):
+        if not uses_yarn(self.get_hadoop_version()):
             return
 
         if not application_id:

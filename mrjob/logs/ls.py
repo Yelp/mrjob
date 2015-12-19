@@ -295,6 +295,15 @@ _YARN_TASK_SYSLOG_RE = re.compile(
     r'syslog(?P<suffix>\.\w+)?')
 
 
+def _ls_logs(fs, log_dir):
+    """ls() the given directory, but log a warning on IOError."""
+    try:
+        for path in fs.ls(log_dir()):
+            yield path
+    except IOError as e:
+        log.warning("couldn't ls() %s: %r" % (log_dir, e))
+
+
 def _yarn_task_syslog_sort_key(uri, application_id=None):
     """Given the uri of a log file, return the sort key
     (basically, chronological order) if it's
@@ -329,13 +338,7 @@ def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
     path_to_sort_key = {}
 
     for log_dir in log_dirs:
-        try:
-            paths = fs.ls(log_dir)
-        except IOError as e:
-            log.warning("couldn't ls() %s: %r" % (log_dir, e))
-            continue
-
-        for path in paths:
+        for path in _ls_logs(fs, log_dir):
             sort_key = _yarn_task_syslog_sort_key(
                 path, application_id=application_id)
 

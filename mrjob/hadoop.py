@@ -566,8 +566,9 @@ class HadoopJobRunner(MRJobRunner):
                     self._hadoop_log_dirs(output_dir=output_dir)):
                 path = self.fs.join(log_dir, application_id)
 
-                log.info('looking for logs in %s...' % path)
-                yield [path]
+                if self.fs.exists(path):
+                    log.info('looking for logs in %s' % path)
+                    yield [path]
 
         cause = _find_error_in_yarn_task_logs(self.fs, stream_task_log_dirs(),
                                               application_id=application_id)

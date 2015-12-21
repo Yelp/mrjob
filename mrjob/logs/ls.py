@@ -348,7 +348,7 @@ def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
             else:
                 log.debug('skipping non-syslog: %s' % path)
 
-    return sorted(path_to_sort_key, lambda k: path_to_sort_key[k],
+    return sorted(path_to_sort_key, key=lambda k: path_to_sort_key[k],
                   reverse=True)
 
 

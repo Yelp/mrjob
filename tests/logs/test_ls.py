@@ -17,6 +17,7 @@ from tests.py2 import TestCase
 from mrjob.logs.ls import _JOB_LOG_PATH_RE
 from mrjob.logs.ls import _TASK_LOG_PATH_RE
 from mrjob.logs.ls import _YARN_TASK_SYSLOG_RE
+from mrjob.logs.ls import _stderr_for_syslog
 
 
 class LogRegexTestCase(TestCase):
@@ -97,3 +98,21 @@ class LogRegexTestCase(TestCase):
         self.assertEqual(m.group('container_id'),
                          'container_1450486922681_0005_01_000003')
         self.assertEqual(m.group('suffix'), '.gz')
+
+
+class StderrForSyslogTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_stderr_for_syslog(''), 'stderr')
+
+    def test_no_stem(self):
+        self.assertEqual(_stderr_for_syslog('/path/to/syslog'),
+                         '/path/to/stderr')
+
+    def test_gz(self):
+        self.assertEqual(_stderr_for_syslog('/path/to/syslog.gz'),
+                        '/path/to/stderr.gz')
+
+    def test_doesnt_check_filename(self):
+        self.assertEqual(_stderr_for_syslog('/path/to/garden'),
+                         '/path/to/stderr')

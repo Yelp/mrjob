@@ -359,4 +359,4 @@ def _stderr_for_syslog(path):
     stderr to be gzipped too (/path/to/stderr.gz).
     """
     stem, filename = posixpath.split(path)
-    return stem + '/syslog' + file_ext(filename)
+    return posixpath.join(stem, 'stderr' + file_ext(filename))

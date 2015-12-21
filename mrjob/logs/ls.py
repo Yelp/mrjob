@@ -316,7 +316,7 @@ def _yarn_task_syslog_sort_key(uri, application_id=None):
         return None
 
     if not (application_id is None or
-            m.group('application_id') != application_id):
+            m.group('application_id') == application_id):
         return None
 
     return (m.group('application_id'), m.group('container_id'))

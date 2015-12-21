@@ -53,7 +53,7 @@ _INDENTED_COUNTER_RE = re.compile(
 #
 # Processing split: hdfs://ddf64167693a:9000/path/to/bootstrap.sh:0+335
 _YARN_INPUT_SPLIT_RE = re.compile(
-    r'^Processing split:\s+(?P<uri>.*)'
+    r'^Processing split:\s+(?P<path>.*)'
     r':(?P<start_line>\d+)\+(?P<num_lines>\d+)$')
 
 
@@ -221,7 +221,7 @@ def _parse_yarn_task_syslog(lines):
         exception: string
         stack_trace: [lines]
     split: optional (may be None) dictionary with the keys:
-       uri: URI of input file
+       path: URI of input file
        start_line: first line of split (0-indexed)
        num_lines: number of lines in split
     """
@@ -233,7 +233,7 @@ def _parse_yarn_task_syslog(lines):
         m = _YARN_INPUT_SPLIT_RE.match(message)
         if m:
             result['split'] = dict(
-                uri=m.group('uri'),
+                path=m.group('path'),
                 start_line=int(m.group('start_line')),
                 num_lines=int(m.group('num_lines')))
             continue

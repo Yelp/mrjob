@@ -294,7 +294,7 @@ class ParseYARNTaskSyslogTestCase(TestCase):
         self.assertEqual(
             _parse_yarn_task_syslog(lines),
             dict(error=None, split=dict(
-                uri=('hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
+                path=('hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
                      '/mr_boom.root.20151221.190511.059097/files'
                      '/bootstrap.sh'),
                 start_line=0,

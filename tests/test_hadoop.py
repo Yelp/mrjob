@@ -702,8 +702,7 @@ class JarStepTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             with logger_disabled('mrjob.hadoop'):
                 # `hadoop jar` doesn't actually accept URIs
-                self.assertRaises(CalledProcessError, runner.run)
-
+                self.assertRaises(Exception, runner.run)
 
         hadoop_cmd_args = get_mock_hadoop_cmd_args()
 

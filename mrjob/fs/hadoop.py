@@ -38,8 +38,7 @@ log = logging.getLogger(__name__)
 _HADOOP_FILE_EXISTS_RE = re.compile(br'.*File exists.*')
 
 # used by ls() and exists()
-_HADOOP_LS_NO_SUCH_FILE = re.compile(
-    br'^lsr?: Cannot access .*: No such file.*$')
+_HADOOP_LS_NO_SUCH_FILE = re.compile(br'^lsr?: .*No such file.*$')
 
 # used by rm() (see below)
 _HADOOP_RM_NO_SUCH_FILE = re.compile(br'^rmr?: .*No such file.*$')

@@ -14,6 +14,7 @@
 from mrjob.logs.parse import _parse_hadoop_log_lines
 from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logs.parse import _parse_indented_counters
+from mrjob.logs.parse import _parse_yarn_task_syslog
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
@@ -274,3 +275,10 @@ class ParseIndentedCountersTestCase(TestCase):
                 'Launched map tasks': 2,
             },
         })
+
+
+class ParseYARNTaskSyslogTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_yarn_task_syslog([]),
+                         dict(error=None, split=None))

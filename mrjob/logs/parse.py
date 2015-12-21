@@ -225,7 +225,7 @@ def _parse_yarn_task_syslog(lines):
        start_line: first line of split (0-indexed)
        num_lines: number of lines in split
     """
-    result = dict(java_stack_trace=None, split=None)
+    result = dict(error=None, split=None)
 
     for record in _parse_hadoop_log_lines(lines):
         message = record['message']

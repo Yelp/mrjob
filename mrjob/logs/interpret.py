@@ -65,7 +65,7 @@ def _find_error_in_yarn_task_logs(fs, log_dirs_stream, application_id=None):
     # of syslogs, so stop once we find any non-empty set of log dirs
     for log_dirs in log_dirs_stream:
         syslog_paths = _ls_yarn_task_syslogs(fs, log_dirs,
-                                            application_id=application_id)
+                                             application_id=application_id)
         if syslog_paths:
             break
 

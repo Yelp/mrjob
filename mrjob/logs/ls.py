@@ -343,7 +343,10 @@ def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
                 path, application_id=application_id)
 
             if sort_key:
+                log.debug('found syslog: %s' % path)
                 path_to_sort_key[path] = sort_key
+            else:
+                log.debug('skipping non-syslog: %s' % path)
 
     return sorted(path_to_sort_key, lambda k: path_to_sort_key[k],
                   reverse=True)

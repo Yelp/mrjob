@@ -70,6 +70,7 @@ def _find_error_in_yarn_task_logs(fs, log_dirs_stream, application_id=None):
             break
 
     for syslog_path in syslog_paths:
+        log.debug('Looking for error in %s' % syslog_path)
         syslog_info = _parse_yarn_task_syslog(_cat_log(fs, syslog_path))
 
         if not syslog_info['error']:

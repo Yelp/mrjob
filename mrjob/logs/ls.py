@@ -289,7 +289,7 @@ def _sorted_log_paths(log_paths, log_path_re, step_num_to_id=None):
 # Hadoop logging stuff; this is the new hotness
 
 _YARN_TASK_SYSLOG_RE = re.compile(
-    r'^(?P<prefix>.*?)/'
+    r'^(?P<prefix>.*?/)'
     r'(?P<application_id>application_\d+_\d{4})/'
     r'(?P<container_id>container(_\d+)+)/'
     r'syslog(?P<suffix>\.\w+)?')

@@ -16,6 +16,7 @@ from tests.py2 import TestCase
 
 from mrjob.logs.ls import _JOB_LOG_PATH_RE
 from mrjob.logs.ls import _TASK_LOG_PATH_RE
+from mrjob.logs.ls import _YARN_TASK_SYSLOG_RE
 
 
 class LogRegexTestCase(TestCase):
@@ -67,3 +68,32 @@ class LogRegexTestCase(TestCase):
         self.assertEqual(m.group('task_num'), '000004')
         self.assertEqual(m.group('attempt_num'), None)
         self.assertEqual(m.group('stream'), 'stderr')
+
+    def test_yarn_task_syslog_re(self):
+        uri = '/usr/local/hadoop-2.7.0/logs/userlogs/application_1450486922681_0005/container_1450486922681_0005_01_000003/syslog'  # noqa
+
+        m = _YARN_TASK_SYSLOG_RE.match(uri)
+
+        self.assertTrue(m)
+        self.assertEqual(m.group('prefix'),
+                         '/usr/local/hadoop-2.7.0/logs/userlogs/')
+        self.assertEqual(m.group('application_id'),
+                         'application_1450486922681_0005')
+        self.assertEqual(m.group('container_id'),
+                         'container_1450486922681_0005_01_000003')
+        self.assertEqual(m.group('suffix'),
+                         None)
+
+    def test_yarn_task_syslog_re_on_gz(self):
+        uri = '/usr/local/hadoop-2.7.0/logs/userlogs/application_1450486922681_0005/container_1450486922681_0005_01_000003/syslog.gz'  # noqa
+
+        m = _YARN_TASK_SYSLOG_RE.match(uri)
+
+        self.assertTrue(m)
+        self.assertEqual(m.group('prefix'),
+                         '/usr/local/hadoop-2.7.0/logs/userlogs/')
+        self.assertEqual(m.group('application_id'),
+                         'application_1450486922681_0005')
+        self.assertEqual(m.group('container_id'),
+                         'container_1450486922681_0005_01_000003')
+        self.assertEqual(m.group('suffix'), '.gz')

@@ -564,7 +564,7 @@ class HadoopJobRunner(MRJobRunner):
         def stream_task_log_dirs():
             for log_dir in unique(
                     self._hadoop_log_dirs(output_dir=output_dir)):
-                path = self.fs.join(log_dir, application_id)
+                path = self.fs.join(log_dir, 'userlogs', application_id)
 
                 if self.fs.exists(path):
                     log.info('looking for logs in %s' % path)

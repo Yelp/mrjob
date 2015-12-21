@@ -282,3 +282,45 @@ class ParseYARNTaskSyslogTestCase(TestCase):
     def test_empty(self):
         self.assertEqual(_parse_yarn_task_syslog([]),
                          dict(error=None, split=None))
+
+    def test_split(self):
+        lines = [
+            '2015-12-21 14:06:17,707 INFO [main]'
+            ' org.apache.hadoop.mapred.MapTask: Processing split:'
+            ' hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
+            '/mr_boom.root.20151221.190511.059097/files/bootstrap.sh:0+335',
+        ]
+
+        self.assertEqual(
+            _parse_yarn_task_syslog(lines),
+            dict(error=None, split=dict(
+                uri=('hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
+                     '/mr_boom.root.20151221.190511.059097/files'
+                     '/bootstrap.sh'),
+                start_line=0,
+                num_lines=335)))
+
+    def test_error(self):
+        lines = [
+            '2015-12-21 14:06:18,538 WARN [main]'
+            ' org.apache.hadoop.mapred.YarnChild: Exception running child'
+            ' : java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+            ' subprocess failed with code 1',
+            '        at org.apache.hadoop.streaming.PipeMapRed'
+            '.waitOutputThreads(PipeMapRed.java:322)',
+            '        at org.apache.hadoop.streaming.PipeMapRed'
+            '.mapRedFinished(PipeMapRed.java:535)',
+        ]
+
+        self.assertEqual(
+            _parse_yarn_task_syslog(lines),
+            dict(split=None, error=dict(
+                exception=('java.lang.RuntimeException:'
+                           ' PipeMapRed.waitOutputThreads():'
+                           ' subprocess failed with code 1'),
+                stack_trace=[
+                    '        at org.apache.hadoop.streaming.PipeMapRed'
+                    '.waitOutputThreads(PipeMapRed.java:322)',
+                    '        at org.apache.hadoop.streaming.PipeMapRed'
+                    '.mapRedFinished(PipeMapRed.java:535)',
+                ])))

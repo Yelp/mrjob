@@ -60,7 +60,7 @@ _YARN_INPUT_SPLIT_RE = re.compile(
 # start of message telling us about a Java stacktrace
 # TODO: add pre-YARN version, other kinds of errors
 _JAVA_EXCEPTION_HEADER_RE = re.compile(
-    r'^Exception running child\s:\s+(?P<exception>.*)$')
+    r'^Exception running child\s?:\s+(?P<exception>.*)$')
 
 # start of line telling us about Python exception
 _PYTHON_EXCEPTION_HEADER_RE = re.compile(
@@ -232,14 +232,21 @@ def _parse_yarn_task_syslog(lines):
 
         m = _YARN_INPUT_SPLIT_RE.match(message)
         if m:
-            result['split'] = m.groupdict()
+            result['split'] = dict(
+                uri=m.group('uri'),
+                start_line=int(m.group('start_line')),
+                num_lines=int(m.group('num_lines')))
             continue
 
-        m = _JAVA_EXCEPTION_HEADER_RE.match(message)
+        message_lines = message.splitlines()
+        if not message_lines:
+            continue
+
+        m = _JAVA_EXCEPTION_HEADER_RE.match(message_lines[0])
         if m:
             result['error'] = dict(
                 exception=m.group('exception'),
-                stack_trace= message.splitlines()[1:])
+                stack_trace=message_lines[1:])
             continue
 
     return result

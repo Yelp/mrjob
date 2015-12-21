@@ -116,15 +116,11 @@ def _format_error_from_task_logs(cause):
     lines.append(cause['syslog']['error']['exception'])
     lines.extend(cause['syslog']['error']['stack_trace'])
 
-    if cause['stderr']:
-        if cause['stderr']['error']:
-            lines.append('caused by exception (from %s):' %
-                         cause['stderr']['path'])
-            lines.append(cause['stderr']['error']['traceback'])
-            lines.append(cause['stderr']['error']['exception'])
-        else:
-            lines.append('(see %s for task stderr)' %
-                         cause['stderr']['path'])
+    if cause['stderr'] and cause['stderr']['error']:
+        lines.append('caused by exception (from %s):' %
+                     cause['stderr']['path'])
+        lines.append(cause['stderr']['error']['traceback'])
+        lines.append(cause['stderr']['error']['exception'])
 
     if cause['syslog']['split']:
         first_line = cause['syslog']['split']['start_line'] + 1
@@ -133,5 +129,10 @@ def _format_error_from_task_logs(cause):
         lines.append('while reading input from lines %d-%d of %s' %
                      (first_line, last_line,
                       cause['syslog']['split']['path']))
+
+    # if we didn't mention stderr above, mention it now
+    if cause['stderr'] and not cause['stderr']['error']:
+        lines.append('(see %s for task stderr)' % cause['stderr']['path'])
+
 
     return lines

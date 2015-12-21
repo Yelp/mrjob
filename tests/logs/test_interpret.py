@@ -18,6 +18,25 @@ from tests.py2 import TestCase
 
 class FormatCauseOfFailureTestCase(TestCase):
 
+    # data from actual failures
+    TASK_LOG_PREFIX = (
+        '/usr/local/hadoop/logs/userlogs/application_1450723037222_0007'
+        '/container_1450723037222_0007_01_000010/')
+    SYSLOG_PATH = TASK_LOG_PREFIX + 'syslog'
+    STDERR_PATH = TASK_LOG_PREFIX + 'stderr'
+
+    JAVA_EXCEPTION = (
+        'java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+        ' subprocess failed with code 1')
+
+    JAVA_STACK_TRACE = [
+        '\tat org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+        '(PipeMapRed.java:322)']
+
+    INPUT_URI = (
+        'hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
+        '/mr_boom.root.20151221.192347.898037/files/bootstrap.sh')
+
     def test_empty(self):
         # should fall back
         self.assertEqual(
@@ -25,49 +44,30 @@ class FormatCauseOfFailureTestCase(TestCase):
             ['Probable cause of failure: None'])
 
     def test_task_log_error_no_traceback(self):
-        task_log_prefix = (
-            '/usr/local/hadoop/logs/userlogs/application_1450723037222_0007'
-            '/container_1450723037222_0007_01_000010/')
-
-        syslog_path = task_log_prefix + 'syslog'
-        stderr_path = task_log_prefix + 'stderr'
-
-        java_exception = (
-            'java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
-            ' subprocess failed with code 1')
-
-        java_stack_trace = [
-            '\tat org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
-            '(PipeMapRed.java:322)']
-
-        input_uri = (
-            'hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
-            '/mr_boom.root.20151221.192347.898037/files/bootstrap.sh')
-
         cause = dict(
             type='task',
             syslog=dict(
-                path=syslog_path,
+                path=self.SYSLOG_PATH,
                 split=dict(
                     start_line=0,
                     num_lines=335,
-                    path=input_uri,
+                    path=self.INPUT_URI,
                 ),
                 error=dict(
-                    stack_trace=java_stack_trace,
-                    exception=java_exception,
+                    stack_trace=self.JAVA_STACK_TRACE,
+                    exception=self.JAVA_EXCEPTION,
                 ),
             ),
             stderr=dict(
-                path=stderr_path,
+                path=self.STDERR_PATH,
                 error=None,
             ),
         )
 
         self.assertEqual(
             _format_cause_of_failure(cause),
-            ['Probable cause of failure (from ' + syslog_path + '):',
-             java_exception] +
-            java_stack_trace +
-            ['(see ' + stderr_path + ' for task stderr)',
-             'while reading input from lines 1-336 of ' + input_uri])
+            ['Probable cause of failure (from ' + self.SYSLOG_PATH + '):',
+             self.JAVA_EXCEPTION] +
+            self.JAVA_STACK_TRACE +
+            ['while reading input from lines 1-336 of ' + self.INPUT_URI,
+             '(see ' + self.STDERR_PATH + ' for task stderr)'])

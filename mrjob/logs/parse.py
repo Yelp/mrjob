@@ -64,7 +64,7 @@ _JAVA_EXCEPTION_HEADER_RE = re.compile(
 
 # start of line telling us about Python exception
 _PYTHON_EXCEPTION_HEADER_RE = re.compile(
-    r'^Traceback (most recent call last):$')
+    r'^Traceback \(most recent call last\):$')
 
 # once we see the exception header, every line starting with whitespace
 # is part of the traceback
@@ -261,7 +261,7 @@ def _parse_python_task_stderr(lines):
         exception: string
         traceback: [lines]
     """
-    result=dict(error=None)
+    result = dict(error=None)
 
     traceback = None
 

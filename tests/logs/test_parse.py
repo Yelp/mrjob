@@ -14,6 +14,7 @@
 from mrjob.logs.parse import _parse_hadoop_log_lines
 from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logs.parse import _parse_indented_counters
+from mrjob.logs.parse import _parse_python_task_stderr
 from mrjob.logs.parse import _parse_yarn_task_syslog
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
@@ -288,7 +289,7 @@ class ParseYARNTaskSyslogTestCase(TestCase):
             '2015-12-21 14:06:17,707 INFO [main]'
             ' org.apache.hadoop.mapred.MapTask: Processing split:'
             ' hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
-            '/mr_boom.root.20151221.190511.059097/files/bootstrap.sh:0+335',
+            '/mr_boom.root.20151221.190511.059097/files/bootstrap.sh:0+335\n',
         ]
 
         self.assertEqual(
@@ -305,11 +306,11 @@ class ParseYARNTaskSyslogTestCase(TestCase):
             '2015-12-21 14:06:18,538 WARN [main]'
             ' org.apache.hadoop.mapred.YarnChild: Exception running child'
             ' : java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
-            ' subprocess failed with code 1',
+            ' subprocess failed with code 1\n',
             '        at org.apache.hadoop.streaming.PipeMapRed'
-            '.waitOutputThreads(PipeMapRed.java:322)',
+            '.waitOutputThreads(PipeMapRed.java:322)\n',
             '        at org.apache.hadoop.streaming.PipeMapRed'
-            '.mapRedFinished(PipeMapRed.java:535)',
+            '.mapRedFinished(PipeMapRed.java:535)\n',
         ]
 
         self.assertEqual(
@@ -323,4 +324,30 @@ class ParseYARNTaskSyslogTestCase(TestCase):
                     '.waitOutputThreads(PipeMapRed.java:322)',
                     '        at org.apache.hadoop.streaming.PipeMapRed'
                     '.mapRedFinished(PipeMapRed.java:535)',
+                ])))
+
+
+class ParsePythonTaskStderr(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_python_task_stderr([]),
+                         dict(error=None))
+
+    def test_exception(self):
+        lines = [
+            '+ python mr_boom.py --step-num=0 --mapper\n',
+            'Traceback (most recent call last):\n',
+            '  File "mr_boom.py", line 10, in <module>\n',
+            '    MRBoom.run()\n',
+            'Exception: BOOM\n',
+        ]
+
+        self.assertEqual(
+            _parse_python_task_stderr(lines),
+            dict(error=dict(
+                exception='Exception: BOOM',
+                traceback=[
+                    'Traceback (most recent call last):',
+                    '  File "mr_boom.py", line 10, in <module>',
+                    '    MRBoom.run()',
                 ])))

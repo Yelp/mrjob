@@ -17,6 +17,7 @@
 """Test the hadoop job runner."""
 import getpass
 import os
+import os.path
 import pty
 from io import BytesIO
 from subprocess import CalledProcessError
@@ -830,3 +831,65 @@ class SetupLineEncodingTestCase(MockHadoopTestCase):
                     self.assertIn(
                         call(runner._setup_wrapper_script_path, 'wb'),
                         m_open.mock_calls)
+
+
+class FindProbableCauseOfFailureTestCase(MockHadoopTestCase):
+
+    # integration tests for _find_probable_cause_of_failure()
+
+    def setUp(self):
+        super(FindProbableCauseOfFailureTestCase, self).setUp()
+
+        os.environ['MOCK_HADOOP_VERSION'] = '2.7.0'
+
+        self.runner = HadoopJobRunner()
+
+    def test_empty(self):
+        self.assertEqual(self.runner._find_probable_cause_of_failure(), None)
+
+    def test_yarn_python_exception(self):
+        APPLICATION_ID = 'application_1450486922681_0004'
+        CONTAINER_ID = 'container_1450486922681_0005_01_000003'
+
+        log_subdir = os.path.join(
+            os.environ['HADOOP_HOME'], 'logs',
+            'userlogs', APPLICATION_ID, CONTAINER_ID)
+
+        os.makedirs(log_subdir)
+
+        syslog_path = os.path.join(log_subdir, 'syslog')
+        with open(syslog_path, 'w') as syslog:
+            syslog.write(
+                '2015-12-21 14:06:17,707 INFO [main]'
+                ' org.apache.hadoop.mapred.MapTask: Processing split:'
+                ' hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
+                '/mr_boom.root.20151221.190511.059097/files'
+                '/bootstrap.sh:0+335\n')
+            syslog.write(
+                '2015-12-21 14:06:18,538 WARN [main]'
+                ' org.apache.hadoop.mapred.YarnChild: Exception running child'
+                ' : java.lang.RuntimeException:'
+                ' PipeMapRed.waitOutputThreads(): subprocess failed with'
+                ' code 1\n')
+            syslog.write(
+                '        at org.apache.hadoop.streaming.PipeMapRed'
+                '.waitOutputThreads(PipeMapRed.java:322)\n')
+
+        stderr_path = os.path.join(log_subdir, 'stderr')
+        with open(stderr_path, 'w') as stderr:
+            stderr.write('Traceback (most recent call last):\n')
+            stderr.write('  File "mr_boom.py", line 10, in <module>\n')
+            stderr.write('    MRBoom.run()\n')
+            stderr.write('Exception: BOOM\n')
+
+        # need application_id
+        self.assertIsNone(self.runner._find_probable_cause_of_failure())
+
+        cause = self.runner._find_probable_cause_of_failure(
+            application_id=APPLICATION_ID)
+
+        self.assertTrue(cause)
+        self.assertEqual(cause['syslog']['path'], syslog_path)
+        self.assertTrue(cause['syslog']['error'])
+        self.assertEqual(cause['stderr']['path'], stderr_path)
+        self.assertTrue(cause['stderr']['error'])

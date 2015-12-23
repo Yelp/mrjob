@@ -36,6 +36,9 @@ v0.5.0, 2015-??-?? -- ???
      * don't try to clean up job when there's no cluster ID (#1170)
    * Hadoop
      * counters are parsed from Hadoop binary stderr in YARN (#1153)
+     * can find logs and probable cause of failure in YARN (#1195)
+       * will search in <output dir>/_logs, to support Cloudera (#565)
+     * added hadoop_log_dirs option
      * hdfs_scratch_dir option is now hadoop_tmp_dir (#318)
      * use fs -ls -R and fs -rm -R in YARN (#1152)
      * fs.du() now works on YARN (#1155)

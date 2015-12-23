@@ -17,6 +17,7 @@
 """Test the hadoop job runner."""
 import getpass
 import os
+import os.path
 import pty
 from io import BytesIO
 from subprocess import CalledProcessError
@@ -330,6 +331,74 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
         os.environ['HADOOP_PREFIX'] = '/ha/do/op'
         self.assertEqual(self.runner._find_hadoop_streaming_jar(),
                          '/ha/do/op/a/hadoop-streaming-a.jar')
+
+
+class HadoopLogDirsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(HadoopLogDirsTestCase, self).setUp()
+
+        os.environ.clear()
+
+        self.mock_hadoop_version = '2.7.0'
+        # the result of _hadoop_dir(). This handles non-log-specific
+        # environment variables, such as $HADOOP_PREFIX, and also guesses
+        # based on the path of the Hadoop binary
+        self.mock_hadoop_dirs = []
+
+        def mock_get_hadoop_version():
+            return self.mock_hadoop_version
+
+        def mock_hadoop_dirs_method():
+            return (d for d in self.mock_hadoop_dirs)
+
+        self.start(patch('mrjob.hadoop.HadoopJobRunner.get_hadoop_version',
+                         side_effect=mock_get_hadoop_version))
+        self.start(patch('mrjob.hadoop.HadoopJobRunner._hadoop_dirs',
+                         side_effect=mock_hadoop_dirs_method))
+
+        self.runner = HadoopJobRunner()
+
+    def test_empty(self):
+        self.assertEqual(list(self.runner._hadoop_log_dirs()), [])
+
+    def test_precedence(self):
+        os.environ['HADOOP_LOG_DIR'] = '/path/to/hadoop-log-dir'
+        os.environ['YARN_LOG_DIR'] = '/path/to/yarn-log-dir'
+        self.mock_hadoop_dirs = ['/path/to/hadoop-prefix',
+                                 '/path/to/hadoop-home']
+
+        self.assertEqual(
+            list(self.runner._hadoop_log_dirs(output_dir='hdfs:///output/')),
+            ['/path/to/hadoop-log-dir',
+             '/path/to/yarn-log-dir',
+             'hdfs:///output/_logs',
+             '/path/to/hadoop-prefix/logs',
+             '/path/to/hadoop-home/logs'])
+
+    def test_hadoop_log_dirs_opt(self):
+        self.runner = HadoopJobRunner(hadoop_log_dirs=['/logs1', '/logs2'])
+
+        os.environ['HADOOP_LOG_DIR'] = '/path/to/hadoop-log-dir'
+
+        # setting hadoop_log_dirs short-circuits automatic discovery of logs
+        self.assertEqual(
+            list(self.runner._hadoop_log_dirs()),
+            ['/logs1', '/logs2'])
+
+
+    def test_need_yarn_for_yarn_log_dir(self):
+        os.environ['YARN_LOG_DIR'] = '/path/to/yarn-log-dir'
+
+        self.mock_hadoop_version = '2.0.0'
+        self.assertEqual(list(self.runner._hadoop_log_dirs()),
+                         ['/path/to/yarn-log-dir'])
+
+        self.mock_hadoop_version = '1.0.3'
+        self.assertEqual(list(self.runner._hadoop_log_dirs()), [])
+
+
+
 
 
 class MockHadoopTestCase(SandboxedTestCase):
@@ -702,8 +771,7 @@ class JarStepTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             with logger_disabled('mrjob.hadoop'):
                 # `hadoop jar` doesn't actually accept URIs
-                self.assertRaises(CalledProcessError, runner.run)
-
+                self.assertRaises(Exception, runner.run)
 
         hadoop_cmd_args = get_mock_hadoop_cmd_args()
 
@@ -774,3 +842,65 @@ class SetupLineEncodingTestCase(MockHadoopTestCase):
                     self.assertIn(
                         call(runner._setup_wrapper_script_path, 'wb'),
                         m_open.mock_calls)
+
+
+class FindProbableCauseOfFailureTestCase(MockHadoopTestCase):
+
+    # integration tests for _find_probable_cause_of_failure()
+
+    def setUp(self):
+        super(FindProbableCauseOfFailureTestCase, self).setUp()
+
+        os.environ['MOCK_HADOOP_VERSION'] = '2.7.0'
+
+        self.runner = HadoopJobRunner()
+
+    def test_empty(self):
+        self.assertEqual(self.runner._find_probable_cause_of_failure(), None)
+
+    def test_yarn_python_exception(self):
+        APPLICATION_ID = 'application_1450486922681_0004'
+        CONTAINER_ID = 'container_1450486922681_0005_01_000003'
+
+        log_subdir = os.path.join(
+            os.environ['HADOOP_HOME'], 'logs',
+            'userlogs', APPLICATION_ID, CONTAINER_ID)
+
+        os.makedirs(log_subdir)
+
+        syslog_path = os.path.join(log_subdir, 'syslog')
+        with open(syslog_path, 'w') as syslog:
+            syslog.write(
+                '2015-12-21 14:06:17,707 INFO [main]'
+                ' org.apache.hadoop.mapred.MapTask: Processing split:'
+                ' hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
+                '/mr_boom.root.20151221.190511.059097/files'
+                '/bootstrap.sh:0+335\n')
+            syslog.write(
+                '2015-12-21 14:06:18,538 WARN [main]'
+                ' org.apache.hadoop.mapred.YarnChild: Exception running child'
+                ' : java.lang.RuntimeException:'
+                ' PipeMapRed.waitOutputThreads(): subprocess failed with'
+                ' code 1\n')
+            syslog.write(
+                '        at org.apache.hadoop.streaming.PipeMapRed'
+                '.waitOutputThreads(PipeMapRed.java:322)\n')
+
+        stderr_path = os.path.join(log_subdir, 'stderr')
+        with open(stderr_path, 'w') as stderr:
+            stderr.write('Traceback (most recent call last):\n')
+            stderr.write('  File "mr_boom.py", line 10, in <module>\n')
+            stderr.write('    MRBoom.run()\n')
+            stderr.write('Exception: BOOM\n')
+
+        # need application_id
+        self.assertIsNone(self.runner._find_probable_cause_of_failure())
+
+        cause = self.runner._find_probable_cause_of_failure(
+            application_id=APPLICATION_ID)
+
+        self.assertTrue(cause)
+        self.assertEqual(cause['syslog']['path'], syslog_path)
+        self.assertTrue(cause['syslog']['error'])
+        self.assertEqual(cause['stderr']['path'], stderr_path)
+        self.assertTrue(cause['stderr']['error'])

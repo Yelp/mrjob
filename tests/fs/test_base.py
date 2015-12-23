@@ -27,11 +27,6 @@ class JoinTestCase(SandboxedTestCase):
     def setUp(self):
         super(JoinTestCase, self).setUp()
 
-        # os.path.join() and posixpath.join() do the same thing in
-        # UNIX and OS X, so track which one we called
-        self.start(patch('os.path.join', wraps=os.path.join))
-        self.start(patch('posixpath.join', wraps=posixpath.join))
-
         self.fs = Filesystem()
 
     def test_local_paths(self):
@@ -39,23 +34,20 @@ class JoinTestCase(SandboxedTestCase):
                          'foo%sbar' % os.path.sep)
         self.assertEqual(self.fs.join('foo', '%sbar' % os.path.sep),
                          '%sbar' % os.path.sep)
-
-        self.assertTrue(os.path.join.called)
+        self.assertEqual(self.fs.join('foo', 'bar', 'baz'),
+                         'foo%sbar%sbaz' % (os.path.sep, os.path.sep))
 
     def test_path_onto_uri(self):
         self.assertEqual(self.fs.join('hdfs://host', 'path'),
                          'hdfs://host/path')
-
-        self.assertTrue(posixpath.join.called)
 
     def test_uri_onto_anything(self):
         self.assertEqual(self.fs.join('hdfs://host', 'hdfs://host2/path'),
                          'hdfs://host2/path')
         self.assertEqual(self.fs.join('/', 'hdfs://host2/path'),
                          'hdfs://host2/path')
-
-        self.assertFalse(os.path.join.called)
-        self.assertFalse(posixpath.join.called)
+        self.assertEqual(self.fs.join('/', 'hdfs://host2/path', 'subdir'),
+                         'hdfs://host2/path/subdir')
 
 
 class DeprecatedAliasesTestCase(TestCase):

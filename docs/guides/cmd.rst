@@ -23,13 +23,6 @@ EMR tools
 
     Alias for :py:mod:`mrjob.tools.emr.create_job_flow`.
 
-``mrjob fetch-logs (job flow ID) [options]``
-    List, display, and parse Hadoop logs associated with EMR job flows. Useful
-    for debugging failed jobs for which mrjob did not display a useful error
-    message or for inspecting jobs whose output has been lost.
-
-    Alias for :py:mod:`mrjob.tools.emr.fetch_logs`.
-
 ``mrjob report-long-jobs [options]``
     Report jobs running for more than a certain number of hours (by default,
     24.0). This can help catch buggy jobs and Hadoop/EMR operational issues.

@@ -172,6 +172,28 @@ Options available to hadoop runner only
     .. deprecated: 0.5.0
 
 .. mrjob-opt::
+   :config: hadoop_log_dirs
+   :switch: --hadoop-log-dir
+   :type: :ref:`path list <data-type-path-list>`
+   :set: hadoop
+   :default: (automatic)
+
+   Where to look for Hadoop logs (to find counters and probable cause of
+   job failure). These can be (local) paths or URIs (``hdfs:///...``).
+
+   If this is *not* set, mrjob will try its best to find the logs, searching in:
+
+   * ``$HADOOP_LOG_DIR``
+   * ``$YARN_LOG_DIR`` (on YARN only)
+   * ``<job output dir>/_logs``
+   * ``$HADOOP_PREFIX/logs``
+   * ``$HADOOP_HOME/logs``
+   * ``$HADOOP_INSTALL/logs``
+   * ``$HADOOP_MAPRED_HOME/logs``
+   * ``<dir containing hadoop bin>/logs`` (see :mrjob-opt:`hadoop_bin`), unless the hadoop binary is in ``/bin``, ``/usr/bin``, or ``/usr/local/bin``
+   * ``$HADOOP_*_HOME/logs`` (in alphabetical order by environment variable name)
+
+.. mrjob-opt::
     :config: hadoop_tmp_dir
     :switch: --hadoop-tmp-dir
     :type: :ref:`path <data-type-path>`

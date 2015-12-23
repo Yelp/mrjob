@@ -1388,7 +1388,8 @@ class CounterFetchingTestCase(MockBotoTestCase):
             stderr = StringIO()
             log_to_stream('mrjob.emr', stderr)
             self.runner._fetch_counters([1], skip_s3_wait=True)
-            self.assertIn('5 minutes', stderr.getvalue())
+            self.assertIn('Counters may not have been uploaded',
+                          stderr.getvalue())
 
     def test_present_counters_running_job(self):
         self.add_mock_s3_data({'walrus': {

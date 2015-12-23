@@ -76,7 +76,19 @@ def random_seed(seed):
         random.setstate(state)
 
 
-class EmptyMrjobConfTestCase(TestCase):
+class PatcherTestCase(TestCase):
+
+    def start(self, patcher):
+        """Add the given patcher to this test case's cleanup actions,
+        then start it, and return the mock it returns. Example:
+
+        mock_turtle = self.start(patch('foo.bar.turtle'))
+        """
+        self.addCleanup(patcher.stop)
+        return patcher.start()
+
+
+class EmptyMrjobConfTestCase(PatcherTestCase):
 
     # set to None if you don't want load_opts_from_mrjob_confs patched
     MRJOB_CONF_CONTENTS = EMPTY_MRJOB_CONF
@@ -90,15 +102,6 @@ class EmptyMrjobConfTestCase(TestCase):
             patcher = mrjob_conf_patcher(self.MRJOB_CONF_CONTENTS)
             patcher.start()
             self.addCleanup(patcher.stop)
-
-    def start(self, patcher):
-        """Add the given patcher to this test case's cleanup actions,
-        then start it, and return the mock it returns. Example:
-
-        mock_turtle = self.start(patch('foo.bar.turtle'))
-        """
-        self.addCleanup(patcher.stop)
-        return patcher.start()
 
 
 class SandboxedTestCase(EmptyMrjobConfTestCase):

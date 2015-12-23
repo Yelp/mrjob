@@ -16,6 +16,17 @@ from tests.py2 import TestCase
 
 from mrjob.logs.ls import _JOB_LOG_PATH_RE
 from mrjob.logs.ls import _TASK_LOG_PATH_RE
+from mrjob.logs.ls import _YARN_TASK_SYSLOG_RE
+from mrjob.logs.ls import _stderr_for_syslog
+from mrjob.logs.ls import _ls_logs
+from mrjob.logs.ls import _ls_yarn_task_syslogs
+from mrjob.py2 import StringIO
+from mrjob.util import log_to_stream
+
+from tests.py2 import Mock
+from tests.py2 import patch
+from tests.quiet import no_handlers_for_logger
+from tests.sandbox import PatcherTestCase
 
 
 class LogRegexTestCase(TestCase):
@@ -67,3 +78,184 @@ class LogRegexTestCase(TestCase):
         self.assertEqual(m.group('task_num'), '000004')
         self.assertEqual(m.group('attempt_num'), None)
         self.assertEqual(m.group('stream'), 'stderr')
+
+    def test_yarn_task_syslog_re(self):
+        uri = '/usr/local/hadoop-2.7.0/logs/userlogs/application_1450486922681_0005/container_1450486922681_0005_01_000003/syslog'  # noqa
+
+        m = _YARN_TASK_SYSLOG_RE.match(uri)
+
+        self.assertTrue(m)
+        self.assertEqual(m.group('prefix'),
+                         '/usr/local/hadoop-2.7.0/logs/userlogs/')
+        self.assertEqual(m.group('application_id'),
+                         'application_1450486922681_0005')
+        self.assertEqual(m.group('container_id'),
+                         'container_1450486922681_0005_01_000003')
+        self.assertEqual(m.group('suffix'),
+                         None)
+
+    def test_yarn_task_syslog_re_on_gz(self):
+        uri = '/usr/local/hadoop-2.7.0/logs/userlogs/application_1450486922681_0005/container_1450486922681_0005_01_000003/syslog.gz'  # noqa
+
+        m = _YARN_TASK_SYSLOG_RE.match(uri)
+
+        self.assertTrue(m)
+        self.assertEqual(m.group('prefix'),
+                         '/usr/local/hadoop-2.7.0/logs/userlogs/')
+        self.assertEqual(m.group('application_id'),
+                         'application_1450486922681_0005')
+        self.assertEqual(m.group('container_id'),
+                         'container_1450486922681_0005_01_000003')
+        self.assertEqual(m.group('suffix'), '.gz')
+
+
+class StderrForSyslogTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_stderr_for_syslog(''), 'stderr')
+
+    def test_no_stem(self):
+        self.assertEqual(_stderr_for_syslog('/path/to/syslog'),
+                         '/path/to/stderr')
+
+    def test_gz(self):
+        self.assertEqual(_stderr_for_syslog('/path/to/syslog.gz'),
+                        '/path/to/stderr.gz')
+
+    def test_doesnt_check_filename(self):
+        self.assertEqual(_stderr_for_syslog('/path/to/garden'),
+                         '/path/to/stderr')
+
+
+class LsLogsTestCase(TestCase):
+
+    def setUp(self):
+        super(LsLogsTestCase, self).setUp()
+
+        self.mock_fs = Mock()
+        self.mock_paths = []
+
+        def mock_fs_ls(path):
+            # we just ignore path, keeping it simple
+            for p in self.mock_paths:
+                if isinstance(p, Exception):
+                    raise p
+                else:
+                    yield p
+
+        self.mock_fs.ls = Mock(side_effect=mock_fs_ls)
+
+    def test_empty(self):
+        self.assertEqual(list(_ls_logs(self.mock_fs, '/path/to/logs')),
+                         [])
+        self.mock_fs.ls.assert_called_once_with('/path/to/logs')
+
+    def test_paths(self):
+        self.mock_paths = [
+            '/path/to/logs/oak',
+            '/path/to/logs/pine',
+            '/path/to/logs/redwood',
+        ]
+        self.assertEqual(list(_ls_logs(self.mock_fs, '/path/to/logs')),
+                         self.mock_paths)
+
+        self.mock_fs.ls.assert_called_once_with('/path/to/logs')
+
+    def test_io_error(self):
+        self.mock_paths = [
+            IOError(),
+        ]
+
+        with no_handlers_for_logger('mrjob.logs.ls'):
+            stderr = StringIO()
+            log_to_stream('mrjob.logs.ls', stderr)
+
+            self.assertEqual(list(_ls_logs(self.mock_fs, '/path/to/logs')), [])
+
+            self.mock_fs.ls.assert_called_once_with('/path/to/logs')
+
+            self.assertIn("couldn't ls() /path/to/logs", stderr.getvalue())
+
+
+class LsYarnTaskSyslogsTestCase(PatcherTestCase):
+
+    def setUp(self):
+        super(LsYarnTaskSyslogsTestCase, self).setUp()
+
+        self.mock_fs = 'MOCK_FS'
+        self.mock_paths = []
+
+        def mock_ls_logs(fs, log_dir):
+            log_dir = log_dir.rstrip('/') + '/'
+            for path in self.mock_paths:
+                if path.startswith(log_dir):
+                    yield path
+
+        self.start(patch('mrjob.logs.ls._ls_logs', mock_ls_logs))
+
+    def test_no_log_dirs(self):
+        self.assertEqual(_ls_yarn_task_syslogs(self.mock_fs, []), [])
+
+    def test_filter_and_sort(self):
+        self.mock_paths = [
+            '/log/dir/userlogs/application_1450486922681_0004'
+            '/container_1450486922681_0005_01_000003/syslog',
+            '/log/dir/userlogs/application_1450486922681_0005'
+            '/container_1450486922681_0005_01_000004/syslog',
+            '/log/dir/userlogs/application_1450486922681_0005'
+            '/container_1450486922681_0005_01_000003/syslog',
+            '/log/dir/userlogs/application_1450486922681_0005'
+            '/container_1450486922681_0005_01_000003/stderr',
+            '/log/dir/random-crud',
+        ]
+
+        # should be sorted in reverse order by app and container ID
+        self.assertEqual(
+            _ls_yarn_task_syslogs(
+                self.mock_fs, ['/log/dir']),
+            ['/log/dir/userlogs/application_1450486922681_0005'
+             '/container_1450486922681_0005_01_000004/syslog',
+             '/log/dir/userlogs/application_1450486922681_0005'
+             '/container_1450486922681_0005_01_000003/syslog',
+             '/log/dir/userlogs/application_1450486922681_0004'
+             '/container_1450486922681_0005_01_000003/syslog'])
+
+        # test filter by application ID
+        self.assertEqual(
+            _ls_yarn_task_syslogs(
+                self.mock_fs, ['/log/dir'],
+                application_id='application_1450486922681_0004'),
+            ['/log/dir/userlogs/application_1450486922681_0004'
+             '/container_1450486922681_0005_01_000003/syslog'])
+
+        # test subdir
+        self.assertEqual(
+            _ls_yarn_task_syslogs(
+                self.mock_fs,
+                ['/log/dir/userlogs/application_1450486922681_0005']),
+            ['/log/dir/userlogs/application_1450486922681_0005'
+             '/container_1450486922681_0005_01_000004/syslog',
+             '/log/dir/userlogs/application_1450486922681_0005'
+             '/container_1450486922681_0005_01_000003/syslog'])
+
+    def test_read_logs_from_at_most_one_dir(self):
+        self.mock_paths = [
+            '/log/dir/userlogs/application_1450486922681_0004'
+            '/container_1450486922681_0005_01_000003/syslog',
+        ]
+
+        self.assertEqual(
+            _ls_yarn_task_syslogs(
+                self.mock_fs, ['hdfs:///output/_logs', '/log/dir']),
+            ['/log/dir/userlogs/application_1450486922681_0004'
+             '/container_1450486922681_0005_01_000003/syslog'])
+
+        self.mock_paths.append(
+            'hdfs:///output/_logs/userlogs/application_1450486922681_0004'
+            '/container_1450486922681_0005_01_000003/syslog')
+
+        self.assertEqual(
+            _ls_yarn_task_syslogs(
+                self.mock_fs, ['hdfs:///output/_logs', '/log/dir']),
+            ['hdfs:///output/_logs/userlogs/application_1450486922681_0004'
+             '/container_1450486922681_0005_01_000003/syslog'])

@@ -95,46 +95,15 @@ job flow to bootstrap.
 
 Note that SSH must be set up for logs to be scanned from persistent jobs.
 
-Finding failures after the fact
--------------------------------
-
-If you are trying to look at a failure after the original process has exited,
-you can use the :py:mod:`mrjob.tools.emr.fetch_logs` tool to scan the logs::
-
-    > python -m mrjob.tools.emr.fetch_logs --find-failure j-1NXMMBNEQHAFT
-    using configs in /etc/mrjob.conf
-    Scanning SSH logs for probable cause of failure
-    Probable cause of failure (from ssh://ec2-50-18-136-229.us-west-1.compute.amazonaws.com/mnt/var/log/hadoop/userlogs/attempt_201108111855_0001_m_000001_3/stderr):
-    Traceback (most recent call last):
-      File "buggy_job.py", line 36, in <module>
-        MRWordFreqCount.run()
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 448, in run
-        mr_job.execute()
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 455, in execute
-        self.run_mapper(self.options.step_num)
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 548, in run_mapper
-        for out_key, out_value in mapper(key, value) or ():
-      File "buggy_job.py", line 24, in mapper
-        raise IndexError
-    IndexError
-    Traceback (most recent call last):
-      File "wrapper.py", line 16, in <module>
-        check_call(sys.argv[1:])
-      File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
-        raise CalledProcessError(retcode, cmd)
-    subprocess.CalledProcessError: Command '['python', 'buggy_job.py', '--step-num=0', '--mapper']' returned non-zero exit status 1
-    (while reading from s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/input/00000-README.rst)
-    Removing all files in s3://scratch-bucket/tmp/no_script.username.20110811.190217.810442/
-
 Determining cause of failure when mrjob can't
 ---------------------------------------------
 
 In some cases, :py:mod:`mrjob` will be unable to find the reason your job
 failed, or it will report an error that was merely a symptom of a larger
-problem. You can look at the logs yourself by using Amazon's `elastic-mapreduce
-<http://aws.amazon.com/developertools/2264>`_ tool to SSH to the master node::
+problem. You can look at the logs yourself by using the `AWS Command Line
+Interface <https://aws.amazon.com/cli/>`_ to SSH to the master node::
 
-    > elastic-mapreduce --ssh j-1NXMMBNEQHAFT
+    > aws emr ssh --cluster-id j-1NXMMBNEQHAFT --key-pair-file /nail/etc/EMR.pem.dev
     ssh -i /nail/etc/EMR.pem.dev hadoop@ec2-50-18-136-229.us-west-1.compute.amazonaws.com
     ...
     hadoop@ip-10-172-51-151:~$ grep --recursive 'Traceback' /mnt/var/log/hadoop

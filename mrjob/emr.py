@@ -1711,10 +1711,7 @@ class EMRJobRunner(MRJobRunner):
         else:
             cluster = self._describe_cluster()
             if not self._cluster_is_done(cluster):
-                log.info("Counters may not have been uploaded to S3 yet."
-                         " Try again in 5 minutes with:"
-                         " mrjob fetch-logs --counters %s" %
-                         cluster.id)
+                log.info("Counters may not have been uploaded to S3 yet.")
 
         # step_nums is relative to the start of the job flow
         # we only want them relative to the job

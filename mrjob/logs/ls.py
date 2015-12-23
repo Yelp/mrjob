@@ -12,11 +12,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import posixpath
 import re
 from logging import getLogger
-from os.path import join
 
 from mrjob.parse import is_s3_uri
+from mrjob.util import file_ext
 
 # relative path to look for logs in
 _LOG_TYPE_TO_RELATIVE_PATH = dict(
@@ -168,9 +169,9 @@ def ls_logs(fs, log_type,
 
                     # it matches!
                     log_paths.append(log_path)
-            except IOError:
+            except IOError as e:
                 # problem with this log path, try another one
-                log.warning("couldn't ls %s" % log_subdir)
+                log.warning("couldn't ls() %s: %r" % (log_subdir, e))
 
         if log_paths:
             return _sorted_log_paths(log_paths, log_path_re,
@@ -199,7 +200,7 @@ def _candidate_log_subdirs(fs, log_type, log_dir, node_log_path, ssh_host):
             relative_path = _LOG_TYPE_TO_RELATIVE_PATH.get(log_type)
 
         if relative_path is not None:
-            yield [join(log_dir, relative_path, '')]
+            yield [posixpath.join(log_dir, relative_path, '')]
 
 
 def _ssh_log_subdirs(fs, log_type, ssh_host, node_log_path):
@@ -224,7 +225,7 @@ def _ssh_log_subdirs(fs, log_type, ssh_host, node_log_path):
         return []
 
     # join node (root) log path and relative path, with trailing slash
-    log_path = join(node_log_path, relative_log_path, '')
+    log_path = posixpath.join(node_log_path, relative_log_path, '')
 
     hosts = []
 
@@ -282,3 +283,83 @@ def _sorted_log_paths(log_paths, log_path_re, step_num_to_id=None):
                  'timestamp')] + [log_path]
 
     return sorted(log_paths, key=sort_key, reverse=True)
+
+
+
+# Hadoop logging stuff; this is the new hotness
+
+_YARN_TASK_SYSLOG_RE = re.compile(
+    r'^(?P<prefix>.*?/)'
+    r'(?P<application_id>application_\d+_\d{4})/'
+    r'(?P<container_id>container(_\d+)+)/'
+    r'syslog(?P<suffix>\.\w+)?')
+
+
+def _ls_logs(fs, log_dir):
+    """ls() the given directory, but log a warning on IOError."""
+    try:
+        for path in fs.ls(log_dir):
+            yield path
+    except IOError as e:
+        log.warning("couldn't ls() %s: %r" % (log_dir, e))
+
+
+def _yarn_task_syslog_sort_key(uri, application_id=None):
+    """Given the uri of a log file, return the sort key
+    (basically, chronological order) if it's
+    a syslog that we want, and otherwise return None.
+
+    Optionally, specify a single application ID to filter on.
+    """
+    m = _YARN_TASK_SYSLOG_RE.match(uri)
+    if not m:
+        return None
+
+    if not (application_id is None or
+            m.group('application_id') == application_id):
+        return None
+
+    return (m.group('application_id'), m.group('container_id'))
+
+
+def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
+    """List all task syslogs in the given directories, in reverse order, so
+    we can find where the job failed. If we find any logs in a directory,
+    we won't search subsequent ones (since we'll probably just find copies
+    of the same logs).
+
+    We sort the logs in reverse order so we can find the *last* failure
+    so we don't report errors that Hadoop later recovered from.
+
+    This function isn't sensitive about how far up the directory tree
+    your log dir is: you can search in *log_dir*, or *log_dir*/userlogs/,
+    or *log_dir*/userlogs/*application_id* (or /, but don't do that).
+    """
+    if isinstance(log_dirs, str):
+        raise TypeError
+
+    for log_dir in log_dirs:
+        path_to_sort_key = {}
+
+        for path in _ls_logs(fs, log_dir):
+            sort_key = _yarn_task_syslog_sort_key(
+                path, application_id=application_id)
+
+            if sort_key:
+                path_to_sort_key[path] = sort_key
+
+        if path_to_sort_key:
+            return sorted(path_to_sort_key, key=lambda k: path_to_sort_key[k],
+                          reverse=True)
+
+    return []
+
+
+def _stderr_for_syslog(path):
+    """Get the path/uri of the stderr log corresponding to the given syslog.
+
+    If the syslog is gzipped (/path/to/syslog.gz), we'll expect
+    stderr to be gzipped too (/path/to/stderr.gz).
+    """
+    stem, filename = posixpath.split(path)
+    return posixpath.join(stem, 'stderr' + file_ext(filename))

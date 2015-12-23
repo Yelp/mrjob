@@ -201,13 +201,12 @@ def expand_path(path):
         return os.path.expanduser(os.path.expandvars(path))
 
 
-def file_ext(path):
+def file_ext(filename):
     """return the file extension, including the ``.``
 
     >>> file_ext('foo.tar.gz')
     '.tar.gz'
     """
-    filename = os.path.basename(path)
     dot_index = filename.find('.')
     if dot_index == -1:
         return ''

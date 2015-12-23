@@ -365,7 +365,7 @@ class HadoopJobRunner(MRJobRunner):
 
     def _run_job_in_hadoop(self):
         for step_num in range(self._num_steps()):
-            log.debug('running step %d of %d' %
+            log.info('Running step %d of %d' %
                       (step_num + 1, self._num_steps()))
 
             step_args = self._args_for_step(step_num)
@@ -380,7 +380,6 @@ class HadoopJobRunner(MRJobRunner):
 
                 # user won't get much feedback for a while, so tell them
                 # Hadoop is running
-                log.info('Launching Hadoop job')
                 log.debug('No PTY available, using Popen() to invoke Hadoop')
 
                 step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)

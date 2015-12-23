@@ -100,10 +100,10 @@ Determining cause of failure when mrjob can't
 
 In some cases, :py:mod:`mrjob` will be unable to find the reason your job
 failed, or it will report an error that was merely a symptom of a larger
-problem. You can look at the logs yourself by using Amazon's `elastic-mapreduce
-<http://aws.amazon.com/developertools/2264>`_ tool to SSH to the master node::
+problem. You can look at the logs yourself by using the `AWS Command Line
+Interface <https://aws.amazon.com/cli/>`_ to SSH to the master node::
 
-    > elastic-mapreduce --ssh j-1NXMMBNEQHAFT
+    > aws emr ssh --cluster-id j-1NXMMBNEQHAFT --key-pair-file /nail/etc/EMR.pem.dev
     ssh -i /nail/etc/EMR.pem.dev hadoop@ec2-50-18-136-229.us-west-1.compute.amazonaws.com
     ...
     hadoop@ip-10-172-51-151:~$ grep --recursive 'Traceback' /mnt/var/log/hadoop

@@ -18,6 +18,13 @@ from mrjob.logs.ls import _JOB_LOG_PATH_RE
 from mrjob.logs.ls import _TASK_LOG_PATH_RE
 from mrjob.logs.ls import _YARN_TASK_SYSLOG_RE
 from mrjob.logs.ls import _stderr_for_syslog
+from mrjob.logs.ls import _ls_logs
+from mrjob.logs.ls import _ls_yarn_task_syslogs
+from mrjob.py2 import StringIO
+from mrjob.util import log_to_stream
+
+from tests.py2 import Mock
+from tests.quiet import no_handlers_for_logger
 
 
 class LogRegexTestCase(TestCase):
@@ -116,3 +123,54 @@ class StderrForSyslogTestCase(TestCase):
     def test_doesnt_check_filename(self):
         self.assertEqual(_stderr_for_syslog('/path/to/garden'),
                          '/path/to/stderr')
+
+
+class LsLogsTestCase(TestCase):
+
+    def setUp(self):
+        super(LsLogsTestCase, self).setUp()
+
+        self.mock_fs = Mock()
+        self.mock_paths = []
+
+        def mock_fs_ls(path):
+            # we just ignore path, keeping it simple
+            for p in self.mock_paths:
+                if isinstance(p, Exception):
+                    raise p
+                else:
+                    yield p
+
+        self.mock_fs.ls = Mock(side_effect=mock_fs_ls)
+
+    def test_empty(self):
+        self.assertEqual(list(_ls_logs(self.mock_fs, '/path/to/logs')),
+                         [])
+        self.mock_fs.ls.assert_called_once_with('/path/to/logs')
+
+    def test_paths(self):
+        self.mock_paths = [
+            '/path/to/logs/oak',
+            '/path/to/logs/pine',
+            '/path/to/logs/redwood',
+        ]
+        self.assertEqual(list(_ls_logs(self.mock_fs, '/path/to/logs')),
+                         self.mock_paths)
+
+        self.mock_fs.ls.assert_called_once_with('/path/to/logs')
+
+    def test_io_error(self):
+        self.mock_paths = [
+            IOError(),
+        ]
+
+        with no_handlers_for_logger('mrjob.logs.ls'):
+            stderr = StringIO()
+            log_to_stream('mrjob.logs.ls', stderr)
+
+            self.assertEqual(list(_ls_logs(self.mock_fs, '/path/to/logs')), [])
+
+            self.mock_fs.ls.assert_called_once_with('/path/to/logs')
+
+            self.assertIn("couldn't ls() /path/to/logs: IOError",
+                          stderr.getvalue())

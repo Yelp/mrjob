@@ -338,18 +338,55 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
         super(HadoopLogDirsTestCase, self).setUp()
 
         os.environ.clear()
+
         self.mock_hadoop_version = '2.7.0'
+        # the result of _hadoop_dir(). This handles non-log-specific
+        # environment variables, such as $HADOOP_PREFIX, and also guesses
+        # based on the path of the Hadoop binary
+        self.mock_hadoop_dirs = []
 
         def mock_get_hadoop_version():
             return self.mock_hadoop_version
 
+        def mock_hadoop_dirs_method():
+            return (d for d in self.mock_hadoop_dirs)
+
         self.start(patch('mrjob.hadoop.HadoopJobRunner.get_hadoop_version',
                          side_effect=mock_get_hadoop_version))
+        self.start(patch('mrjob.hadoop.HadoopJobRunner._hadoop_dirs',
+                         side_effect=mock_hadoop_dirs_method))
 
         self.runner = HadoopJobRunner()
 
     def test_empty(self):
         self.assertEqual(list(self.runner._hadoop_log_dirs()), [])
+
+    def test_precedence(self):
+        os.environ['HADOOP_LOG_DIR'] = '/path/to/hadoop-log-dir'
+        os.environ['YARN_LOG_DIR'] = '/path/to/yarn-log-dir'
+        self.mock_hadoop_dirs = ['/path/to/hadoop-prefix',
+                                 '/path/to/hadoop-home']
+
+        self.assertEqual(
+            list(self.runner._hadoop_log_dirs(output_dir='hdfs:///output/')),
+            ['/path/to/hadoop-log-dir',
+             '/path/to/yarn-log-dir',
+             'hdfs:///output/_logs',
+             '/path/to/hadoop-prefix/logs',
+             '/path/to/hadoop-home/logs'])
+
+    def test_need_yarn_for_yarn_log_dir(self):
+        os.environ['YARN_LOG_DIR'] = '/path/to/yarn-log-dir'
+
+        self.mock_hadoop_version = '2.0.0'
+        self.assertEqual(list(self.runner._hadoop_log_dirs()),
+                         ['/path/to/yarn-log-dir'])
+
+        self.mock_hadoop_version = '1.0.3'
+        self.assertEqual(list(self.runner._hadoop_log_dirs()), [])
+
+
+
 
 
 class MockHadoopTestCase(SandboxedTestCase):

@@ -117,9 +117,9 @@ def _format_error_from_task_logs(cause):
     lines.extend(cause['syslog']['error']['stack_trace'])
 
     if cause['stderr'] and cause['stderr']['error']:
-        lines.append('caused by exception (from %s):' %
+        lines.append('caused by Python exception (from %s):' %
                      cause['stderr']['path'])
-        lines.append(cause['stderr']['error']['traceback'])
+        lines.extend(cause['stderr']['error']['traceback'])
         lines.append(cause['stderr']['error']['exception'])
 
     if cause['syslog']['split']:

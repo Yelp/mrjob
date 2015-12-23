@@ -324,32 +324,35 @@ def _yarn_task_syslog_sort_key(uri, application_id=None):
 
 def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
     """List all task syslogs in the given directories, in reverse order, so
-    we can find where the job failed.
-
-    In Hadoop, we want to look in <log dir>/userlogs, but on s3, we
-    want to look in <log dir>/task-attempts.
+    we can find where the job failed. If we find any logs in a directory,
+    we won't search subsequent ones (since we'll probably just find copies
+    of the same logs).
 
     We sort the logs in reverse order so we can find the *last* failure
-    so we don't report errors that Hadoop later recovered from
+    so we don't report errors that Hadoop later recovered from.
+
+    This function isn't sensitive about how far up the directory tree
+    your log dir is: you can search in *log_dir*, or *log_dir*/userlogs/,
+    or *log_dir*/userlogs/*application_id* (or /, but don't do that).
     """
     if isinstance(log_dirs, str):
         raise TypeError
 
-    path_to_sort_key = {}
-
     for log_dir in log_dirs:
+        path_to_sort_key = {}
+
         for path in _ls_logs(fs, log_dir):
             sort_key = _yarn_task_syslog_sort_key(
                 path, application_id=application_id)
 
             if sort_key:
-                log.debug('found syslog: %s' % path)
                 path_to_sort_key[path] = sort_key
-            else:
-                log.debug('skipping non-syslog: %s' % path)
 
-    return sorted(path_to_sort_key, key=lambda k: path_to_sort_key[k],
-                  reverse=True)
+        if path_to_sort_key:
+            return sorted(path_to_sort_key, key=lambda k: path_to_sort_key[k],
+                          reverse=True)
+
+    return []
 
 
 def _stderr_for_syslog(path):

@@ -294,6 +294,13 @@ _YARN_TASK_SYSLOG_RE = re.compile(
     r'(?P<container_id>container(_\d+)+)/'
     r'syslog(?P<suffix>\.\w+)?')
 
+_PRE_YARN_TASK_SYSLOG_RE = re.compile(
+    r'^(?P<prefix>.*?/)'
+    r'attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_'
+    r'(?P<task_type>[mr])_(?P<task_num>\d+)_'
+    r'(?P<attempt_num>\d+)/'
+    r'syslog(?P<suffix>\.\w+)?')
+
 
 def _ls_logs(fs, log_dir):
     """ls() the given directory, but log a warning on IOError."""
@@ -304,14 +311,42 @@ def _ls_logs(fs, log_dir):
         log.warning("couldn't ls() %s: %r" % (log_dir, e))
 
 
-def _yarn_task_syslog_sort_key(uri, application_id=None):
-    """Given the uri of a log file, return the sort key
+
+def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
+    """List all task syslogs in the given directories, in reverse order, so
+    we can find where the job failed. Optionally filter by
+    *application_id*.
+
+    Once we find a log dir with *any* syslogs in it, we won't search
+    subsequent directories (since these will probably have copies of
+    the same logs).
+
+    This function isn't sensitive about how far up the directory tree
+    your log dir is: you can search in *log_dir*, or *log_dir*/userlogs/,
+    or *log_dir*/userlogs/*application_id* (or /, but don't do that).
+    """
+    key_func = lambda path: _yarn_task_syslog_sort_key(
+        path, application_id=application_id)
+
+    return _ls_syslogs_helper(fs, log_dirs, key_func)
+
+
+def _ls_pre_yarn_task_syslogs(fs, log_dirs, job_id=None):
+    """Like _ls_yarn_task_syslogs(), but for pre-YARN logs"""
+    key_func = lambda path: _pre_yarn_task_syslog_sort_key(
+        path, job_id=job_id)
+
+    return _ls_syslogs_helper(fs, log_dirs, key_func)
+
+
+def _yarn_task_syslog_sort_key(path, application_id=None):
+    """Given the path of a log file, return the sort key
     (basically, chronological order) if it's
     a syslog that we want, and otherwise return None.
 
     Optionally, specify a single application ID to filter on.
     """
-    m = _YARN_TASK_SYSLOG_RE.match(uri)
+    m = _YARN_TASK_SYSLOG_RE.match(path)
     if not m:
         return None
 
@@ -322,19 +357,33 @@ def _yarn_task_syslog_sort_key(uri, application_id=None):
     return (m.group('application_id'), m.group('container_id'))
 
 
-def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
-    """List all task syslogs in the given directories, in reverse order, so
-    we can find where the job failed. If we find any logs in a directory,
-    we won't search subsequent ones (since we'll probably just find copies
-    of the same logs).
+def _pre_yarn_task_syslog_sort_key(path, job_id=None):
+    """Given the path of a log file, return the sort key
+    (basically, chronological order) if it's
+    a syslog that we want, and otherwise return None.
 
-    We sort the logs in reverse order so we can find the *last* failure
-    so we don't report errors that Hadoop later recovered from.
-
-    This function isn't sensitive about how far up the directory tree
-    your log dir is: you can search in *log_dir*, or *log_dir*/userlogs/,
-    or *log_dir*/userlogs/*application_id* (or /, but don't do that).
+    Optionally, specify a single job ID to filter on.
     """
+    m = _PRE_YARN_TASK_SYSLOG_RE.match(path)
+    if not m:
+        return None
+
+    if job_id is not None:
+        log_job_id = 'job_%s_%s' % (m.group('timestamp'), m.group('step_num'))
+        if log_job_id != job_id:
+            return None
+
+    # we'd rather match later attempts than later tasks (failed steps
+    # are re-attempted a fixed number of times)
+    return (m.group('timestamp'),
+            int(m.group('step_num')),
+            m.group('task_type'),
+            int(m.group('attempt_num')),
+            int(m.group('task_num')))
+
+
+# helper for _ls_yarn_task_syslogs and _ls_pre_yarn_task_syslogs
+def _ls_syslogs_helper(fs, log_dirs, key_func):
     if isinstance(log_dirs, str):
         raise TypeError
 
@@ -342,8 +391,7 @@ def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
         path_to_sort_key = {}
 
         for path in _ls_logs(fs, log_dir):
-            sort_key = _yarn_task_syslog_sort_key(
-                path, application_id=application_id)
+            sort_key = key_func(path)
 
             if sort_key:
                 path_to_sort_key[path] = sort_key

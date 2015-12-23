@@ -15,10 +15,12 @@
 from tests.py2 import TestCase
 
 from mrjob.logs.ls import _JOB_LOG_PATH_RE
+from mrjob.logs.ls import _PRE_YARN_TASK_SYSLOG_RE
 from mrjob.logs.ls import _TASK_LOG_PATH_RE
 from mrjob.logs.ls import _YARN_TASK_SYSLOG_RE
 from mrjob.logs.ls import _stderr_for_syslog
 from mrjob.logs.ls import _ls_logs
+from mrjob.logs.ls import _ls_pre_yarn_task_syslogs
 from mrjob.logs.ls import _ls_yarn_task_syslogs
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
@@ -108,6 +110,36 @@ class LogRegexTestCase(TestCase):
                          'container_1450486922681_0005_01_000003')
         self.assertEqual(m.group('suffix'), '.gz')
 
+    def test_pre_yarn_task_syslog_re(self):
+        uri = '/mnt/var/log/hadoop/userlogs/job_201512232143_0006/attempt_201512232143_0006_m_000000_0/syslog'  # noqa
+
+        m = _PRE_YARN_TASK_SYSLOG_RE.match(uri)
+
+        self.assertTrue(m)
+        self.assertEqual(m.group('prefix'),
+                         '/mnt/var/log/hadoop/userlogs/job_201512232143_0006/')
+        self.assertEqual(m.group('timestamp'), '201512232143')
+        self.assertEqual(m.group('step_num'), '0006')
+        self.assertEqual(m.group('task_type'), 'm')
+        self.assertEqual(m.group('task_num'), '000000')
+        self.assertEqual(m.group('attempt_num'), '0')
+        self.assertEqual(m.group('suffix'), None)
+
+    def test_pre_yarn_task_syslog_re_on_gz(self):
+        uri = '/mnt/var/log/hadoop/userlogs/job_201512232143_0006/attempt_201512232143_0006_m_000000_0/syslog.gz'  # noqa
+
+        m = _PRE_YARN_TASK_SYSLOG_RE.match(uri)
+
+        self.assertTrue(m)
+        self.assertEqual(m.group('prefix'),
+                         '/mnt/var/log/hadoop/userlogs/job_201512232143_0006/')
+        self.assertEqual(m.group('timestamp'), '201512232143')
+        self.assertEqual(m.group('step_num'), '0006')
+        self.assertEqual(m.group('task_type'), 'm')
+        self.assertEqual(m.group('task_num'), '000000')
+        self.assertEqual(m.group('attempt_num'), '0')
+        self.assertEqual(m.group('suffix'), '.gz')
+
 
 class StderrForSyslogTestCase(TestCase):
 
@@ -177,10 +209,10 @@ class LsLogsTestCase(TestCase):
             self.assertIn("couldn't ls() /path/to/logs", stderr.getvalue())
 
 
-class LsYarnTaskSyslogsTestCase(PatcherTestCase):
+class LsTaskSyslogsTestCase(PatcherTestCase):
 
     def setUp(self):
-        super(LsYarnTaskSyslogsTestCase, self).setUp()
+        super(LsTaskSyslogsTestCase, self).setUp()
 
         self.mock_fs = 'MOCK_FS'
         self.mock_paths = []
@@ -192,6 +224,9 @@ class LsYarnTaskSyslogsTestCase(PatcherTestCase):
                     yield path
 
         self.start(patch('mrjob.logs.ls._ls_logs', mock_ls_logs))
+
+
+class LsYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
 
     def test_no_log_dirs(self):
         self.assertEqual(_ls_yarn_task_syslogs(self.mock_fs, []), [])
@@ -259,3 +294,41 @@ class LsYarnTaskSyslogsTestCase(PatcherTestCase):
                 self.mock_fs, ['hdfs:///output/_logs', '/log/dir']),
             ['hdfs:///output/_logs/userlogs/application_1450486922681_0004'
              '/container_1450486922681_0005_01_000003/syslog'])
+
+
+class LsPreYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
+
+    def test_no_log_dirs(self):
+        self.assertEqual(_ls_pre_yarn_task_syslogs(self.mock_fs, []), [])
+
+    def test_filter_and_sort(self):
+        # on EMR, looks like attempts are grouped in subdirectories
+
+        self.mock_paths = [
+            '/userlogs/attempt_201512232143_0008_m_000001_3/syslog',
+            '/userlogs/attempt_201512232143_0008_r_000000_0/syslog',
+            '/userlogs/attempt_201512232143_0008_m_000003_1/syslog',
+            '/userlogs/attempt_201512232143_0006_m_000000_0/syslog',
+            '/userlogs/attempt_201512232143_0006_m_000000_0/stderr',
+            '/userlogs/random-crud',
+        ]
+
+        # should be sorted in reverse order by app and container ID
+        self.assertEqual(
+            _ls_pre_yarn_task_syslogs(
+                self.mock_fs, ['/userlogs']), [
+                    '/userlogs/attempt_201512232143_0008_r_000000_0/syslog',
+                    '/userlogs/attempt_201512232143_0008_m_000001_3/syslog',
+                    '/userlogs/attempt_201512232143_0008_m_000003_1/syslog',
+                    '/userlogs/attempt_201512232143_0006_m_000000_0/syslog',
+                ])
+
+        # test filter by job ID
+        self.assertEqual(
+            _ls_pre_yarn_task_syslogs(
+                self.mock_fs, ['/userlogs'],
+                job_id='job_201512232143_0006'),
+            ['/userlogs/attempt_201512232143_0006_m_000000_0/syslog'])
+
+    # subdirs and reading from at most one subdir are handled by code
+    # shared with _ls_yarn_task_syslogs(), and thus are tested above

@@ -365,11 +365,12 @@ class HadoopJobRunner(MRJobRunner):
 
     def _run_job_in_hadoop(self):
         for step_num in range(self._num_steps()):
-            log.info('Running step %d of %d' %
-                      (step_num + 1, self._num_steps()))
-
             step_args = self._args_for_step(step_num)
 
+            # log this *after* _args_for_step(), which can start a search
+            # for the Hadoop streaming jar
+            log.info('Running step %d of %d' %
+                      (step_num + 1, self._num_steps()))
             log.debug('> %s' % cmd_line(step_args))
 
             # try to use a PTY if it's available

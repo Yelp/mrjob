@@ -332,6 +332,26 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
                          '/ha/do/op/a/hadoop-streaming-a.jar')
 
 
+class HadoopLogDirsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(HadoopLogDirsTestCase, self).setUp()
+
+        os.environ.clear()
+        self.mock_hadoop_version = '2.7.0'
+
+        def mock_get_hadoop_version():
+            return self.mock_hadoop_version
+
+        self.start(patch('mrjob.hadoop.HadoopJobRunner.get_hadoop_version',
+                         side_effect=mock_get_hadoop_version))
+
+        self.runner = HadoopJobRunner()
+
+    def test_empty(self):
+        self.assertEqual(list(self.runner._hadoop_log_dirs()), [])
+
+
 class MockHadoopTestCase(SandboxedTestCase):
 
     def setUp(self):

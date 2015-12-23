@@ -84,12 +84,6 @@ def create_jf(args):
     main(args)
 
 
-@command('fetch-logs', 'Fetch and parse EMR logs for errors and counters')
-def fetch_logs(args):
-    from mrjob.tools.emr.fetch_logs import main
-    main(args)
-
-
 @command('report-long-jobs', 'Report EMR jobs which have been running for a'
          ' long time')
 def report_long_jobs(args):

@@ -16,7 +16,6 @@ from mrjob import cmd
 from mrjob import launch
 from mrjob.tools.emr import audit_usage
 from mrjob.tools.emr import create_job_flow
-from mrjob.tools.emr import fetch_logs
 from mrjob.tools.emr import report_long_jobs
 from mrjob.tools.emr import s3_tmpwatch
 from mrjob.tools.emr import terminate_idle_job_flows
@@ -55,9 +54,6 @@ class CommandTestCase(TestCase):
 
     def test_create_job_flow(self):
         self._test_main_call(create_job_flow, 'create-job-flow')
-
-    def test_fetch_logs(self):
-        self._test_main_call(fetch_logs, 'fetch-logs')
 
     def test_report_long_jobs(self):
         self._test_main_call(report_long_jobs, 'report-long-jobs')

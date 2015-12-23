@@ -174,8 +174,7 @@ class LsLogsTestCase(TestCase):
 
             self.mock_fs.ls.assert_called_once_with('/path/to/logs')
 
-            self.assertIn("couldn't ls() /path/to/logs: IOError",
-                          stderr.getvalue())
+            self.assertIn("couldn't ls() /path/to/logs", stderr.getvalue())
 
 
 class LsYarnTaskSyslogsTestCase(PatcherTestCase):

@@ -51,8 +51,6 @@ class FormatCauseOfFailureTestCase(TestCase):
             _format_cause_of_failure(None),
             ['Probable cause of failure: None'])
 
-    maxDiff = None
-
     def test_task_log_error(self):
         cause = dict(
             type='task',
@@ -80,11 +78,15 @@ class FormatCauseOfFailureTestCase(TestCase):
         self.assertEqual(
             _format_cause_of_failure(cause),
             ['Probable cause of failure (from ' + self.SYSLOG_PATH + '):',
+             '',
              self.JAVA_EXCEPTION] +
             self.JAVA_STACK_TRACE +
-            ['caused by Python exception (from ' + self.STDERR_PATH + '):'] +
+            ['',
+             'caused by Python exception (from ' + self.STDERR_PATH + '):',
+             ''] +
             self.PYTHON_TRACEBACK +
             [self.PYTHON_EXCEPTION,
+             '',
              'while reading input from lines 1-336 of ' + self.INPUT_URI])
 
     def test_task_log_error_no_traceback(self):
@@ -111,7 +113,10 @@ class FormatCauseOfFailureTestCase(TestCase):
         self.assertEqual(
             _format_cause_of_failure(cause),
             ['Probable cause of failure (from ' + self.SYSLOG_PATH + '):',
+             '',
              self.JAVA_EXCEPTION] +
             self.JAVA_STACK_TRACE +
-            ['while reading input from lines 1-336 of ' + self.INPUT_URI,
+            ['',
+             'while reading input from lines 1-336 of ' + self.INPUT_URI,
+             '',
              '(see ' + self.STDERR_PATH + ' for task stderr)'])

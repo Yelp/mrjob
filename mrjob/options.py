@@ -225,6 +225,11 @@ def add_hadoop_emr_opts(opt_group):
             'streaming. You can use --hadoop-arg multiple times.'),
 
         opt_group.add_option(
+            '--hadoop-log-dir', dest='hadoop_log_dir', default=[],
+            action='append', help='Hard-coded directory to search for'
+            ' hadoop logs in. You can use --hadoop-log-dir multiple times.'),
+
+        opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
             default=None,
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)'),

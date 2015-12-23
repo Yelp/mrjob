@@ -27,25 +27,26 @@ except ImportError:
     pty = None
 
 import mrjob.step
-from mrjob.setup import UploadDirManager
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
+from mrjob.conf import combine_path_lists
 from mrjob.conf import combine_paths
+from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.fs.composite import CompositeFilesystem
+from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logs.interpret import _find_error_in_yarn_task_logs
 from mrjob.logs.interpret import _format_cause_of_failure
 from mrjob.logs.parse import _INDENTED_COUNTERS_START_RE
 from mrjob.logs.parse import _parse_hadoop_streaming_log
-from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
-from mrjob.py2 import to_string
 from mrjob.parse import is_uri
+from mrjob.py2 import to_string
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
+from mrjob.setup import UploadDirManager
 from mrjob.util import cmd_line
 from mrjob.util import unique
 from mrjob.util import which
@@ -125,13 +126,15 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
         'hadoop_home',
+        'hadoop_log_dirs',
         'hadoop_tmp_dir',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'hadoop_bin': combine_cmds,
         'hadoop_home': combine_paths,
-        'hadoop_tmp_dir': combine_paths,
+        'hadoop_log_dirs': combine_path_lists,
+        'Hadoop_tmp_dir': combine_paths,
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
@@ -143,8 +146,6 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'hadoop_tmp_dir': 'tmp/mrjob',
         })
-
-
 
 
 class HadoopJobRunner(MRJobRunner):
@@ -289,7 +290,11 @@ class HadoopJobRunner(MRJobRunner):
 
     def _hadoop_log_dirs(self, output_dir=None):
         """Yield all possible places to look for hadoop logs."""
-        # TODO: add hadoop_log_dir option
+        # hadoop_log_dirs opt overrides all this
+        if self._opts['hadoop_log_dirs']:
+            for path in self._opts['hadoop_log_dirs']:
+                yield path
+            return
 
         hadoop_log_dir = os.environ.get('HADOOP_LOG_DIR')
         if hadoop_log_dir:

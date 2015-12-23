@@ -376,6 +376,17 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
              '/path/to/hadoop-prefix/logs',
              '/path/to/hadoop-home/logs'])
 
+    def test_hadoop_log_dirs_opt(self):
+        self.runner = HadoopJobRunner(hadoop_log_dirs=['/logs1', '/logs2'])
+
+        os.environ['HADOOP_LOG_DIR'] = '/path/to/hadoop-log-dir'
+
+        # setting hadoop_log_dirs short-circuits automatic discovery of logs
+        self.assertEqual(
+            list(self.runner._hadoop_log_dirs()),
+            ['/logs1', '/logs2'])
+
+
     def test_need_yarn_for_yarn_log_dir(self):
         os.environ['YARN_LOG_DIR'] = '/path/to/yarn-log-dir'
 

@@ -583,8 +583,21 @@ class HadoopJobRunner(MRJobRunner):
                     log.info('looking for logs in %s' % path)
                     yield [path]
 
-        cause = _find_error_in_yarn_task_logs(self.fs, stream_task_log_dirs(),
-                                              application_id=application_id)
+        cause = None
+
+        if uses_yarn(self.get_hadoop_version()):
+            if application_id:
+                cause = _find_error_in_yarn_task_logs(
+                    self.fs, stream_task_log_dirs(),
+                    application_id=application_id)
+        else:
+            # this is unlikely to be super-helpful on "real" (multi-node)
+            # Hadoop because task logs aren't generally shipped to a local
+            # directory. It's a start, anyways. See #1201.
+            if job_id:
+                cause = _find_error_in_pre_yarn_task_logs(
+                    self.fs, stream_task_log_dirs(),
+                    job_id=job_id)
 
         # TODO: catch timeouts, etc.
 

@@ -210,7 +210,9 @@ def _parse_indented_counters(lines):
     return counters
 
 
-# TODO: handle "Output path already exists"
+# TODO: make this just _parse_task_syslog(), and handle other sorts
+# of exceptions and ways to read input URI (note this will make start_lines
+# and num_lines optional).
 def _parse_yarn_task_syslog(lines):
     """Parse out last Java stacktrace (if any) and last split (if any)
     from syslog file.

@@ -36,6 +36,11 @@ def _cat_log(fs, path):
         log.warning("couldn't cat() %s: %r" % (path, e))
 
 
+def _find_error_in_pre_yarn_task_logs(fs, log_dirs_stream, job_id=None):
+    # TODO: merge this with _find_error_in_yarn_task_logs()
+    raise NotImplementedError
+
+
 def _find_error_in_yarn_task_logs(fs, log_dirs_stream, application_id=None):
     """Given a filesystem and a stream of lists of log dirs to search in,
     find the last error and return details about it.

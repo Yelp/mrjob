@@ -50,7 +50,7 @@ def _find_error_in_task_logs(fs, log_dirs_stream, hadoop_version,
     is required, as task logs have very different paths in YARN.
 
     In YARN, you must set *application_id*, and pre-YARN, you must set
-    *job_id*, or we'll bail out with a warning.
+    *job_id*, or we'll bail out and return None.
 
     Returns a dictionary with the following keys ("optional" means
     that something may be None):
@@ -75,14 +75,8 @@ def _find_error_in_task_logs(fs, log_dirs_stream, hadoop_version,
 
     yarn = uses_yarn(hadoop_version)
 
-    if yarn:
-        if application_id is None:
-            log.warning("Need application ID to find error in task logs")
-            return None
-    else:
-        if job_id is None:
-            log.warning("Need job ID to find error in task logs")
-            return None
+    if ((yarn and application_id is None) or (not yarn and job_id is None)):
+        return None
 
     # we assume that each set of log paths contains the same copies
     # of syslogs, so stop once we find any non-empty set of log dirs

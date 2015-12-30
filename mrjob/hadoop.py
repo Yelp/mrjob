@@ -581,8 +581,15 @@ class HadoopJobRunner(MRJobRunner):
         # package up logs for _find_error_intask_logs(),
         # and log where we're looking.
         hadoop_version = self.get_hadoop_version()
-
         yarn = uses_yarn(hadoop_version)
+
+        if yarn and application_id is None:
+            log.warning("No application ID!")
+            return None
+
+        if not yarn and job_id is None:
+            log.warning("No job ID!")
+            return None
 
         # Note: this is unlikely to be super-helpful on "real" (multi-node)
         # pre-YARN Hadoop because task logs aren't generally shipped to a local

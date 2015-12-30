@@ -56,11 +56,18 @@ _YARN_INPUT_SPLIT_RE = re.compile(
     r'^Processing split:\s+(?P<path>.*)'
     r':(?P<start_line>\d+)\+(?P<num_lines>\d+)$')
 
+# this seems to only happen for S3. Not sure if this happens in YARN
+_OPENING_FOR_READING_RE = re.compile(
+    r"^Opening '(?P<path>.*?)' for reading$")
 
-# start of message telling us about a Java stacktrace
-# TODO: add pre-YARN version, other kinds of errors
-_JAVA_EXCEPTION_HEADER_RE = re.compile(
+
+# start of message telling us about a Java stacktrace on YARN
+_YARN_JAVA_EXCEPTION_HEADER_RE = re.compile(
     r'^Exception running child\s?:\s+(?P<exception>.*)$')
+
+# start of message telling us about a Java stacktrace pre-YARN
+# (the exception is on the next line)
+_PRE_YARN_JAVA_ERROR_HEADER_RE = re.compile(r'^Error running child$')
 
 # start of line telling us about Python exception
 _PYTHON_EXCEPTION_HEADER_RE = re.compile(
@@ -210,10 +217,7 @@ def _parse_indented_counters(lines):
     return counters
 
 
-# TODO: make this just _parse_task_syslog(), and handle other sorts
-# of exceptions and ways to read input URI (note this will make start_lines
-# and num_lines optional).
-def _parse_yarn_task_syslog(lines):
+def _parse_task_syslog(lines):
     """Parse out last Java stacktrace (if any) and last split (if any)
     from syslog file.
 
@@ -224,14 +228,23 @@ def _parse_yarn_task_syslog(lines):
         stack_trace: [lines]
     split: optional (may be None) dictionary with the keys:
        path: URI of input file
-       start_line: first line of split (0-indexed)
-       num_lines: number of lines in split
+       start_line: optional first line of split (0-indexed)
+       num_lines: optional number of lines in split
     """
     result = dict(error=None, split=None)
 
     for record in _parse_hadoop_log_lines(lines):
         message = record['message']
 
+        m = _OPENING_FOR_READING_RE.match(message)
+        if m:
+            result['split'] = dict(
+                path = m.group('path'),
+                start_line=None,
+                num_lines=None)
+            continue
+
+        # doesn't really hurt to try this on non-YARN logs
         m = _YARN_INPUT_SPLIT_RE.match(message)
         if m:
             result['split'] = dict(
@@ -244,12 +257,22 @@ def _parse_yarn_task_syslog(lines):
         if not message_lines:
             continue
 
-        m = _JAVA_EXCEPTION_HEADER_RE.match(message_lines[0])
+        # TODO: could also generalize this by looking for exception lines
+        # ("    at ...(...:###)") rather than a Hadoop-version-specific header
+        m = _YARN_JAVA_EXCEPTION_HEADER_RE.match(message_lines[0])
         if m:
             result['error'] = dict(
                 exception=m.group('exception'),
                 stack_trace=message_lines[1:])
             continue
+
+        if (_PRE_YARN_JAVA_ERROR_HEADER_RE.match(message_lines[0])
+            and len(message_lines) > 1):
+            result['error'] = dict(
+                exception=message_lines[1],
+                stack_trace=message_lines[2:])
+            continue
+
 
     return result
 
@@ -263,6 +286,12 @@ def _parse_python_task_stderr(lines):
         exception: string
         traceback: [lines]
     """
+    # stderr can also contain the java Exception (or a warning that no
+    # appenders can be found for the logger), but there's not much point
+    # in parsing this as we already get it from syslog
+
+    # TODO: handle errors from the setup script (see #1203)
+
     result = dict(error=None)
 
     traceback = None

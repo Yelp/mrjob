@@ -37,7 +37,7 @@ from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logparsers import scan_for_counters_in_files
-from mrjob.logs.interpret import _find_error_in_yarn_task_logs
+from mrjob.logs.interpret import _find_error_in_task_logs
 from mrjob.logs.interpret import _format_cause_of_failure
 from mrjob.logs.parse import _INDENTED_COUNTERS_START_RE
 from mrjob.logs.parse import _parse_hadoop_streaming_log
@@ -58,7 +58,6 @@ log = logging.getLogger(__name__)
 _BAD_HADOOP_HOMES = ['/', '/usr', '/usr/local']
 
 # places to look for the Hadoop streaming jar if we're inside EMR
-# TODO: do this for logs as well
 _EMR_HADOOP_STREAMING_JAR_DIRS = [
     # for the 2.x and 3.x AMIs (the 2.x AMIs also set $HADOOP_HOME properly)
     '/home/hadoop/contrib',
@@ -66,6 +65,13 @@ _EMR_HADOOP_STREAMING_JAR_DIRS = [
     '/usr/lib/hadoop-mapreduce',
 ]
 
+
+# places to look for logs if we're inside EMR.
+_EMR_HADOOP_LOG_DIRS = [
+    # for the 2.x and 3.x AMIs
+    '/mnt/var/log/hadoop',
+
+]
 
 # start of Counters printed by Hadoop
 _HADOOP_COUNTERS_START_RE = re.compile(b'^Counters: (?P<amount>\d+)\s*$')
@@ -312,7 +318,9 @@ class HadoopJobRunner(MRJobRunner):
         for hadoop_dir in self._hadoop_dirs():
             yield posixpath.join(hadoop_dir, 'logs')
 
-        # TODO: hard-coded log paths for EMR
+        # hard-coded log paths for EMR, so this can work out-of-the-box
+        for path in _EMR_HADOOP_LOG_DIRS:
+            yield path
 
     def _run(self):
         self._check_input_exists()
@@ -565,15 +573,17 @@ class HadoopJobRunner(MRJobRunner):
 
     def _find_probable_cause_of_failure(self, application_id=None, job_id=None,
                                         output_dir=None, **ignored):
-        # TODO: handle non-YARN logs
-        if not uses_yarn(self.get_hadoop_version()):
-            return
+        """Find probable cause of failure. Currently we just scan task logs.
 
-        if not application_id:
-            return  # need application_id to find YARN logs
+        On YARN, you must set application_id, and pre-YARN, you must set
+        job_id.
+        """
+        # package up logs for _find_error_intask_logs(),
+        # and log where we're looking.
 
-        # package up logs for _find_error_in_yarn_task_logs(),
-        # and log where we're looking
+        # Note: this is unlikely to be super-helpful on "real" (multi-node)
+        # pre-YARN Hadoop because task logs aren't generally shipped to a local
+        # directory. It's a start, anyways. See #1201.
         def stream_task_log_dirs():
             for log_dir in unique(
                     self._hadoop_log_dirs(output_dir=output_dir)):
@@ -583,25 +593,13 @@ class HadoopJobRunner(MRJobRunner):
                     log.info('looking for logs in %s' % path)
                     yield [path]
 
-        cause = None
+        hadoop_version = self.get_hadoop_version()
 
-        if uses_yarn(self.get_hadoop_version()):
-            if application_id:
-                cause = _find_error_in_yarn_task_logs(
-                    self.fs, stream_task_log_dirs(),
-                    application_id=application_id)
-        else:
-            # this is unlikely to be super-helpful on "real" (multi-node)
-            # Hadoop because task logs aren't generally shipped to a local
-            # directory. It's a start, anyways. See #1201.
-            if job_id:
-                cause = _find_error_in_pre_yarn_task_logs(
-                    self.fs, stream_task_log_dirs(),
-                    job_id=job_id)
+        return _find_error_in_task_logs(
+            self.fs, stream_task_log_dirs(), hadoop_version,
+            application_id=application_id, job_id=job_id)
 
         # TODO: catch timeouts, etc.
-
-        return cause  # may be None
 
     # TODO: redo this
     def _fetch_counters(self, step_nums, skip_s3_wait=False):

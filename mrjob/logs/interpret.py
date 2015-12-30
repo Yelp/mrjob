@@ -18,7 +18,7 @@ from logging import getLogger
 from mrjob.py2 import to_string
 from mrjob.logs.ls import _ls_yarn_task_syslogs
 from mrjob.logs.ls import _stderr_for_syslog
-from mrjob.logs.parse import _parse_yarn_task_syslog
+from mrjob.logs.parse import _parse_task_syslog
 from mrjob.logs.parse import _parse_python_task_stderr
 
 
@@ -41,9 +41,14 @@ def _find_error_in_pre_yarn_task_logs(fs, log_dirs_stream, job_id=None):
     raise NotImplementedError
 
 
-def _find_error_in_yarn_task_logs(fs, log_dirs_stream, application_id=None):
+def _find_error_in_task_logs(fs, log_dirs_stream, hadoop_version,
+                             application_id=None, job_id=None):
     """Given a filesystem and a stream of lists of log dirs to search in,
-    find the last error and return details about it.
+    find the last error and return details about it. *hadoop_version*
+    is required, as task logs have very different paths in YARN.
+
+    In YARN, you must set *application_id*, and pre-YARN, you must set
+    *job_id*, or we'll bail out with a warning.
 
     Returns a dictionary with the following keys ("optional" means
     that something may be None):
@@ -66,17 +71,33 @@ def _find_error_in_yarn_task_logs(fs, log_dirs_stream, application_id=None):
     """
     syslog_paths = []
 
+    yarn = uses_yarn(hadoop_version)
+
+    if yarn:
+        if application_id is None:
+            log.warning("Need application ID to find error in task logs")
+            return None
+    else:
+        if job_id is None:
+            log.warning("Need job ID to find error in task logs")
+            return None
+
     # we assume that each set of log paths contains the same copies
     # of syslogs, so stop once we find any non-empty set of log dirs
     for log_dirs in log_dirs_stream:
-        syslog_paths = _ls_yarn_task_syslogs(fs, log_dirs,
-                                             application_id=application_id)
+        if yarn:
+            syslog_paths = _ls_yarn_task_syslogs(fs, log_dirs,
+                                                 application_id=application_id)
+        else:
+            syslog_paths = _ls_pre_yarn_task_syslogs(fs, log_dirs,
+                                                     job_id=job_id)
+
         if syslog_paths:
             break
 
     for syslog_path in syslog_paths:
         log.debug('Looking for error in %s' % syslog_path)
-        syslog_info = _parse_yarn_task_syslog(_cat_log(fs, syslog_path))
+        syslog_info = _parse_task_syslog(_cat_log(fs, syslog_path))
 
         if not syslog_info['error']:
             continue
@@ -131,13 +152,18 @@ def _format_error_from_task_logs(cause):
         lines.append(cause['stderr']['error']['exception'])
 
     if cause['syslog']['split']:
-        first_line = cause['syslog']['split']['start_line'] + 1
-        last_line = first_line + cause['syslog']['split']['num_lines']
+        split = cause['syslog']['split']
 
         lines.append('')
-        lines.append('while reading input from lines %d-%d of %s' %
-                     (first_line, last_line,
-                      cause['syslog']['split']['path']))
+
+        line_nums_desc = ''
+        if not (split['start_line'] is None or split['num_lines'] is None):
+            first_line = split['start_line'] + 1
+            last_line = first_line + split['num_lines']
+            line_nums_desc = 'lines %d-%d of ' % (first_line, last_line)
+
+        lines.append('while reading input from %s%s' %
+                     (line_nums_desc, split['path']))
 
     # if we didn't mention stderr above, mention it now
     if cause['stderr'] and not cause['stderr']['error']:

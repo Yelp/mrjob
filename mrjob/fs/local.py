@@ -35,7 +35,7 @@ class LocalFilesystem(Filesystem):
     def ls(self, path_glob):
         for path in glob.glob(path_glob):
             if os.path.isdir(path):
-                for dirname, _, filenames in os.walk(path):
+                for dirname, _, filenames in os.walk(path, followlinks=True):
                     for filename in filenames:
                         yield os.path.join(dirname, filename)
             else:

@@ -50,6 +50,7 @@ v0.5.0, 2015-??-?? -- ???
  * removed mrjob.conf.combine_cmd_lists()
  * removed fetch-logs tool (#1127)
  * Python-version-specific mrjob commands (#1104)
+ * use followlinks=True with os.walk()
  * mrjob.util:
    * file_ext() takes filename, not path
    * random_identifier() moved here from mrjob.aws

@@ -86,7 +86,7 @@ log = getLogger(__name__)
 
 
 def _parse_hadoop_log_lines(lines):
-    """Parse lines from a hadoop log into log4j (I think?) records.
+    """Parse lines from a hadoop log into log4j records.
 
     Yield dictionaries with the following keys:
     timestamp -- unparsed timestamp, e.g. '15/12/07 20:49:28',

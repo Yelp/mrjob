@@ -360,7 +360,8 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
         self.runner = HadoopJobRunner()
 
     def test_empty(self):
-        self.assertEqual(list(self.runner._hadoop_log_dirs()), [])
+        self.assertEqual(list(self.runner._hadoop_log_dirs()),
+                         ['/mnt/var/log/hadoop'])
 
     def test_precedence(self):
         os.environ['HADOOP_LOG_DIR'] = '/path/to/hadoop-log-dir'
@@ -374,7 +375,8 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
              '/path/to/yarn-log-dir',
              'hdfs:///output/_logs',
              '/path/to/hadoop-prefix/logs',
-             '/path/to/hadoop-home/logs'])
+             '/path/to/hadoop-home/logs',
+             '/mnt/var/log/hadoop'])
 
     def test_hadoop_log_dirs_opt(self):
         self.runner = HadoopJobRunner(hadoop_log_dirs=['/logs1', '/logs2'])
@@ -392,10 +394,12 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
 
         self.mock_hadoop_version = '2.0.0'
         self.assertEqual(list(self.runner._hadoop_log_dirs()),
-                         ['/path/to/yarn-log-dir'])
+                         ['/path/to/yarn-log-dir',
+                          '/mnt/var/log/hadoop'])
 
         self.mock_hadoop_version = '1.0.3'
-        self.assertEqual(list(self.runner._hadoop_log_dirs()), [])
+        self.assertEqual(list(self.runner._hadoop_log_dirs()),
+                         ['/mnt/var/log/hadoop'])
 
 
 

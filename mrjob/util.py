@@ -451,7 +451,7 @@ def read_input(path, stdin=None):
 
     # recurse through directories
     if os.path.isdir(path):
-        for dirname, _, filenames in os.walk(path):
+        for dirname, _, filenames in os.walk(path, followlinks=True):
             for filename in filenames:
                 for line in read_input(os.path.join(dirname, filename),
                                        stdin=stdin):
@@ -613,7 +613,7 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
 
     tar_gz = tarfile.open(out_path, mode='w:gz')
 
-    for dirpath, dirnames, filenames in os.walk(dir):
+    for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
         for filename in filenames:
             path = os.path.join(dirpath, filename)
             # janky version of os.path.relpath() (Python 2.6):

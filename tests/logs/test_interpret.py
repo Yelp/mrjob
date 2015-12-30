@@ -89,6 +89,44 @@ class FormatCauseOfFailureTestCase(TestCase):
              '',
              'while reading input from lines 1-336 of ' + self.INPUT_URI])
 
+    def test_task_log_error_no_line_nums(self):
+        cause = dict(
+            type='task',
+            syslog=dict(
+                path=self.SYSLOG_PATH,
+                split=dict(
+                    start_line=None,
+                    num_lines=None,
+                    path=self.INPUT_URI,
+                ),
+                error=dict(
+                    stack_trace=self.JAVA_STACK_TRACE,
+                    exception=self.JAVA_EXCEPTION,
+                ),
+            ),
+            stderr=dict(
+                path=self.STDERR_PATH,
+                error=dict(
+                    exception=self.PYTHON_EXCEPTION,
+                    traceback=self.PYTHON_TRACEBACK,
+                ),
+            ),
+        )
+
+        self.assertEqual(
+            _format_cause_of_failure(cause),
+            ['Probable cause of failure (from ' + self.SYSLOG_PATH + '):',
+             '',
+             self.JAVA_EXCEPTION] +
+            self.JAVA_STACK_TRACE +
+            ['',
+             'caused by Python exception (from ' + self.STDERR_PATH + '):',
+             ''] +
+            self.PYTHON_TRACEBACK +
+            [self.PYTHON_EXCEPTION,
+             '',
+             'while reading input from ' + self.INPUT_URI])
+
     def test_task_log_error_no_traceback(self):
         cause = dict(
             type='task',

@@ -15,7 +15,7 @@ from mrjob.logs.parse import _parse_hadoop_log_lines
 from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logs.parse import _parse_indented_counters
 from mrjob.logs.parse import _parse_python_task_stderr
-from mrjob.logs.parse import _parse_yarn_task_syslog
+from mrjob.logs.parse import _parse_task_syslog
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
@@ -278,10 +278,10 @@ class ParseIndentedCountersTestCase(TestCase):
         })
 
 
-class ParseYARNTaskSyslogTestCase(TestCase):
+class ParseTaskSyslogTestCase(TestCase):
 
     def test_empty(self):
-        self.assertEqual(_parse_yarn_task_syslog([]),
+        self.assertEqual(_parse_task_syslog([]),
                          dict(error=None, split=None))
 
     def test_split(self):
@@ -293,7 +293,7 @@ class ParseYARNTaskSyslogTestCase(TestCase):
         ]
 
         self.assertEqual(
-            _parse_yarn_task_syslog(lines),
+            _parse_task_syslog(lines),
             dict(error=None, split=dict(
                 path=('hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
                      '/mr_boom.root.20151221.190511.059097/files'
@@ -301,7 +301,22 @@ class ParseYARNTaskSyslogTestCase(TestCase):
                 start_line=0,
                 num_lines=335)))
 
-    def test_error(self):
+    def test_opening_file(self):
+        lines = [
+            '2010-07-27 17:54:54,344 INFO'
+            ' org.apache.hadoop.fs.s3native.NativeS3FileSystem (main):'
+            " Opening 's3://yourbucket/logs/2010/07/23/log2-00077.gz'"
+            ' for reading\n'
+        ]
+
+        self.assertEqual(
+            _parse_task_syslog(lines),
+            dict(error=None, split=dict(
+                path='s3://yourbucket/logs/2010/07/23/log2-00077.gz',
+                start_line=None,
+                num_lines=None)))
+
+    def test_yarn_error(self):
         lines = [
             '2015-12-21 14:06:18,538 WARN [main]'
             ' org.apache.hadoop.mapred.YarnChild: Exception running child'
@@ -314,7 +329,7 @@ class ParseYARNTaskSyslogTestCase(TestCase):
         ]
 
         self.assertEqual(
-            _parse_yarn_task_syslog(lines),
+            _parse_task_syslog(lines),
             dict(split=None, error=dict(
                 exception=('java.lang.RuntimeException:'
                            ' PipeMapRed.waitOutputThreads():'
@@ -325,6 +340,28 @@ class ParseYARNTaskSyslogTestCase(TestCase):
                     '        at org.apache.hadoop.streaming.PipeMapRed'
                     '.mapRedFinished(PipeMapRed.java:535)',
                 ])))
+
+    def test_pre_yarn_error(self):
+        lines = [
+            '2015-12-30 19:21:39,980 WARN'
+            ' org.apache.hadoop.mapred.Child (main): Error running child\n',
+            'java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+            ' subprocess failed with code 1\n',
+            '        at org.apache.hadoop.streaming.PipeMapRed'
+            '.waitOutputThreads(PipeMapRed.java:372)\n',
+        ]
+
+        self.assertEqual(
+            _parse_task_syslog(lines),
+            dict(split=None, error=dict(
+                exception=('java.lang.RuntimeException:'
+                           ' PipeMapRed.waitOutputThreads():'
+                           ' subprocess failed with code 1'),
+                stack_trace=[
+                    '        at org.apache.hadoop.streaming.PipeMapRed'
+                    '.waitOutputThreads(PipeMapRed.java:372)',
+                ])))
+
 
 
 class ParsePythonTaskStderr(TestCase):

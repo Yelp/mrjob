@@ -580,6 +580,9 @@ class HadoopJobRunner(MRJobRunner):
         """
         # package up logs for _find_error_intask_logs(),
         # and log where we're looking.
+        hadoop_version = self.get_hadoop_version()
+
+        yarn = uses_yarn(hadoop_version)
 
         # Note: this is unlikely to be super-helpful on "real" (multi-node)
         # pre-YARN Hadoop because task logs aren't generally shipped to a local
@@ -587,13 +590,17 @@ class HadoopJobRunner(MRJobRunner):
         def stream_task_log_dirs():
             for log_dir in unique(
                     self._hadoop_log_dirs(output_dir=output_dir)):
-                path = self.fs.join(log_dir, 'userlogs', application_id)
+
+                if yarn:
+                    path = self.fs.join(log_dir, 'userlogs', application_id)
+                else:
+                    # sometimes pre-YARN attempt logs are organized by job_id,
+                    # sometimes not. Play it safe
+                    path = self.fs.join(log_dir, 'userlogs')
 
                 if self.fs.exists(path):
                     log.info('looking for logs in %s' % path)
                     yield [path]
-
-        hadoop_version = self.get_hadoop_version()
 
         return _find_error_in_task_logs(
             self.fs, stream_task_log_dirs(), hadoop_version,

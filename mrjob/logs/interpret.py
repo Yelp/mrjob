@@ -15,11 +15,13 @@
 """Scan logs for cause of failure and counters."""
 from logging import getLogger
 
-from mrjob.py2 import to_string
+from mrjob.compat import uses_yarn
+from mrjob.logs.ls import _ls_pre_yarn_task_syslogs
 from mrjob.logs.ls import _ls_yarn_task_syslogs
 from mrjob.logs.ls import _stderr_for_syslog
 from mrjob.logs.parse import _parse_task_syslog
 from mrjob.logs.parse import _parse_python_task_stderr
+from mrjob.py2 import to_string
 
 
 log = getLogger(__name__)

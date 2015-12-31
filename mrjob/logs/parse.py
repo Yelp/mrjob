@@ -77,11 +77,6 @@ _PYTHON_EXCEPTION_HEADER_RE = re.compile(
 # is part of the traceback
 _PYTHON_TRACEBACK_LINE_RE = re.compile(r'^\s+')
 
-# TODO: move to mrjob.hadoop
-_NON_HADOOP_LOG_LINE_RE = re.compile(
-    r'^(packageJobJar: |Streaming Command Failed!)')
-
-
 log = getLogger(__name__)
 
 

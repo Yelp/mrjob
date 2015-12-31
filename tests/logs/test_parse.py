@@ -14,6 +14,7 @@
 from mrjob.logs.parse import _parse_hadoop_log_lines
 from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logs.parse import _parse_indented_counters
+from mrjob.logs.parse import _parse_pre_yarn_history_line
 from mrjob.logs.parse import _parse_python_task_stderr
 from mrjob.logs.parse import _parse_task_syslog
 from mrjob.py2 import StringIO
@@ -364,7 +365,7 @@ class ParseTaskSyslogTestCase(TestCase):
 
 
 
-class ParsePythonTaskStderr(TestCase):
+class ParsePythonTaskStderrTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_python_task_stderr([]),
@@ -388,3 +389,31 @@ class ParsePythonTaskStderr(TestCase):
                     '  File "mr_boom.py", line 10, in <module>',
                     '    MRBoom.run()',
                 ])))
+
+
+class ParsePreYARNHistoryLineTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_pre_yarn_history_line(''), None)
+
+    def test_basic(self):
+        self.assertEqual(
+            _parse_pre_yarn_history_line('Meta VERSION="1" .\n'),
+            ('Meta', dict(VERSION='1')))
+
+    def test_carriage_return(self):
+        self.assertEqual(
+            _parse_pre_yarn_history_line('Meta VERSION="1" .\r\n'),
+            ('Meta', dict(VERSION='1')))
+
+    def test_unescape(self):
+        line = ('Task TASKID="task_201512311928_0001_m_000003" TASK_TYPE="MAP"'
+                ' START_TIME="1451590341378"'
+                ' SPLITS="/default-rack/172\\.31\\.22\\.226" .\n')
+
+        self.assertEqual(
+            _parse_pre_yarn_history_line(line),
+            ('Task', dict(TASKID='task_201512311928_0001_m_000003',
+                          TASK_TYPE='MAP',
+                          START_TIME='1451590341378',
+                          SPLITS='/default-rack/172.31.22.226')))

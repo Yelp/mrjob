@@ -77,6 +77,19 @@ _PYTHON_EXCEPTION_HEADER_RE = re.compile(
 # is part of the traceback
 _PYTHON_TRACEBACK_LINE_RE = re.compile(r'^\s+')
 
+# escape sequence in pre-YARN history file
+_PRE_YARN_HISTORY_ESCAPE_RE = re.compile(r'\\(.)')
+
+# capture key-value pairs like JOBNAME="streamjob8025762403845318969\.jar"
+_PRE_YARN_HISTORY_KEY_PAIR = re.compile(
+    r'(?P<key>\w+)="(?P<escaped_value>(\\.|[^"\\])*)"')
+
+# an entire line in a pre-YARN history file
+_PRE_YARN_HISTORY_LINE = re.compile(
+    r'^(?P<type>\w+)'
+    r'(?P<key_pairs>( ' + _PRE_YARN_HISTORY_KEY_PAIR.pattern + ')*)'
+    r' \.$')
+
 log = getLogger(__name__)
 
 
@@ -309,3 +322,43 @@ def _parse_python_task_stderr(lines):
                 traceback = None  # done parsing traceback
 
     return result
+
+
+def _parse_pre_yarn_history_line(line):
+    """Turn a line like:
+
+    Task TASKID="task_201512311928_0001_m_000003" \
+    TASK_TYPE="MAP" START_TIME="1451590341378" \
+    SPLITS="/default-rack/172\.31\.22\.226" .
+
+    into a record like:
+
+    ('Task', {'TASKID': 'task_201512311928_0001_m_00000',
+              'TASK_TYPE': 'MAP',
+              'START_TIME': '1451590341378',
+              'SPLITS': '/default-rack/172.31.22.226'})
+
+    This handles unescaping values, but doesn't do the further
+    unescaping needed to process counters.
+
+    Returns None if it's not a pre-YARN history line.
+    """
+    line = line.rstrip('\r\n')
+
+    line_match = _PRE_YARN_HISTORY_LINE.match(line)
+    if not line_match:
+        return None
+
+    record_type = line_match.group('type')
+    key_pairs_str = line_match.group('key_pairs')
+
+    key_pairs = {}
+
+    for m in _PRE_YARN_HISTORY_KEY_PAIR.finditer(key_pairs_str):
+        key = m.group('key')
+        value = _PRE_YARN_HISTORY_ESCAPE_RE.sub(
+            r'\1', m.group('escaped_value'))
+
+        key_pairs[key] = value
+
+    return record_type, key_pairs

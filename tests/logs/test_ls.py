@@ -19,6 +19,7 @@ from mrjob.logs.ls import _PRE_YARN_TASK_SYSLOG_RE
 from mrjob.logs.ls import _TASK_LOG_PATH_RE
 from mrjob.logs.ls import _YARN_TASK_SYSLOG_RE
 from mrjob.logs.ls import _stderr_for_syslog
+from mrjob.logs.ls import _ls_job_history_logs
 from mrjob.logs.ls import _ls_logs
 from mrjob.logs.ls import _ls_pre_yarn_task_syslogs
 from mrjob.logs.ls import _ls_yarn_task_syslogs
@@ -209,10 +210,10 @@ class LsLogsTestCase(TestCase):
             self.assertIn("couldn't ls() /path/to/logs", stderr.getvalue())
 
 
-class LsTaskSyslogsTestCase(PatcherTestCase):
+class MockLsLogsTestCase(PatcherTestCase):
 
     def setUp(self):
-        super(LsTaskSyslogsTestCase, self).setUp()
+        super(MockLsLogsTestCase, self).setUp()
 
         self.mock_fs = 'MOCK_FS'
         self.mock_paths = []
@@ -226,7 +227,7 @@ class LsTaskSyslogsTestCase(PatcherTestCase):
         self.start(patch('mrjob.logs.ls._ls_logs', mock_ls_logs))
 
 
-class LsYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
+class LsYarnTaskSyslogsTestCase(MockLsLogsTestCase):
 
     def test_no_log_dirs(self):
         self.assertEqual(_ls_yarn_task_syslogs(self.mock_fs, []), [])
@@ -277,7 +278,7 @@ class LsYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
     # _ls_pre_yarn_task_syslogs(), and thus is tested below
 
 
-class LsPreYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
+class LsPreYarnTaskSyslogsTestCase(MockLsLogsTestCase):
 
     def test_no_log_dirs(self):
         self.assertEqual(_ls_pre_yarn_task_syslogs(self.mock_fs, []), [])
@@ -328,3 +329,11 @@ class LsPreYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
 
     # subdirs are handled by code shared with _ls_yarn_task_syslogs(), and
     # thus are tested above
+
+
+class LsJobHistoryLogs(MockLsLogsTestCase):
+
+    def test_no_log_dirs(self):
+        self.assertEqual(list(_ls_job_history_logs(self.mock_fs, [])), [])
+
+    # TODO: non-empty tests

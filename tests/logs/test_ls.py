@@ -141,6 +141,8 @@ class LogRegexTestCase(TestCase):
         self.assertEqual(m.group('attempt_num'), '0')
         self.assertEqual(m.group('suffix'), '.gz')
 
+    # _JOB_HISTORY_RE only captures job_id, which is tested below
+
 
 class StderrForSyslogTestCase(TestCase):
 
@@ -336,4 +338,49 @@ class LsJobHistoryLogs(MockLsLogsTestCase):
     def test_no_log_dirs(self):
         self.assertEqual(list(_ls_job_history_logs(self.mock_fs, [])), [])
 
-    # TODO: non-empty tests
+    def test_pre_yarn(self):
+        self.mock_paths = [
+            '/logs/history/done/version-1/host_1451590133273_/2015/12/31'
+            '/000000/job_201512311928_0001_1451590317008_hadoop'
+            '_streamjob8025762403845318969.jar',
+            '/logs/history/done/version-1/host_1451590133273_/2015/12/31'
+            '/000000/job_201512311928_0001_conf.xml',
+            '/logs/history/done/version-1/host_1451590133273_/2015/12/31'
+            '/000000/job_201512311928_0002_1451590930047_hadoop'
+            '_streamjob8971190398668159070.jar',
+        ]
+
+        self.assertEqual(
+            list(_ls_job_history_logs(self.mock_fs, ['/logs/history'])),
+            [self.mock_paths[0], self.mock_paths[2]])
+
+        # filter by job_id
+        self.assertEqual(
+            list(_ls_job_history_logs(self.mock_fs, ['/logs/history'],
+                                      job_id='job_201512311928_0001')),
+            [self.mock_paths[0]])
+
+    def test_yarn(self):
+        self.mock_paths = [
+            'hdfs:///tmp/hadoop-yarn/staging/history/done/2015/12/31/000000/'
+            'job_1451592123989_0001-1451592605470-hadoop-QuasiMonteCarlo'
+            '-1451592786882-10-1-SUCCEEDED-default-1451592631082.jhist',
+            'hdfs:///tmp/hadoop-yarn/staging/history/done/2015/12/31/000000/'
+            'job_1451592123989_0001_conf.xml',
+            'hdfs:///tmp/hadoop-yarn/staging/history/done/2015/12/31/000000/'
+            'job_1451592123989_0002-1451593615731-hadoop'
+            '-streamjob1167072285631954001.jar-1451593662474-2-0-SUCCEEDED'
+            '-default-1451593630518.jhist',
+        ]
+
+        self.assertEqual(
+            list(_ls_job_history_logs(
+                self.mock_fs, ['hdfs:///tmp/hadoop-yarn/staging/history'])),
+            [self.mock_paths[0], self.mock_paths[2]])
+
+        # filter by job_id
+        self.assertEqual(
+            list(_ls_job_history_logs(
+                self.mock_fs, ['hdfs:///tmp/hadoop-yarn/staging/history'],
+                job_id='job_1451592123989_0002')),
+            [self.mock_paths[2]])

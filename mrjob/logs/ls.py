@@ -306,11 +306,12 @@ _PRE_YARN_TASK_SYSLOG_RE = re.compile(
     r'syslog(?P<suffix>\.\w+)?')
 
 # what job history (e.g. counters) look like on either YARN or pre-YARN.
-# YARN uses - instead of _ to separate fields, and has a bunch of stuff
-# after .jar
+# YARN uses - instead of _ to separate fields. This should work for
+# non-streaming jars as well.
 _JOB_HISTORY_RE = re.compile(
-    r'^(?P<job_id>job_\d+_\d{4})'
-    r'[_-]\d+[_-]hadoop[_-]streamjob\d+\.jar\S*')
+    r'^(?P<prefix>.*?/)'
+    r'(?P<job_id>job_\d+_\d{4})'
+    r'[_-]\d+[_-]hadoop[_-]\S*$')
 
 def _ls_logs(fs, log_dir):
     """ls() the given directory, but log a warning on IOError."""

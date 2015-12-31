@@ -387,8 +387,9 @@ def _ls_syslogs_helper(fs, log_dirs, key_func):
     if isinstance(log_dirs, str):
         raise TypeError
 
+    path_to_sort_key = {}
+
     for log_dir in log_dirs:
-        path_to_sort_key = {}
 
         for path in _ls_logs(fs, log_dir):
             sort_key = key_func(path)
@@ -396,11 +397,8 @@ def _ls_syslogs_helper(fs, log_dirs, key_func):
             if sort_key:
                 path_to_sort_key[path] = sort_key
 
-        if path_to_sort_key:
-            return sorted(path_to_sort_key, key=lambda k: path_to_sort_key[k],
-                          reverse=True)
-
-    return []
+    return sorted(path_to_sort_key, key=lambda k: path_to_sort_key[k],
+                  reverse=True)
 
 
 def _stderr_for_syslog(path):

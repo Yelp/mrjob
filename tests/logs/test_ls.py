@@ -273,27 +273,8 @@ class LsYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
              '/log/dir/userlogs/application_1450486922681_0005'
              '/container_1450486922681_0005_01_000003/syslog'])
 
-    def test_read_logs_from_at_most_one_dir(self):
-        self.mock_paths = [
-            '/log/dir/userlogs/application_1450486922681_0004'
-            '/container_1450486922681_0005_01_000003/syslog',
-        ]
-
-        self.assertEqual(
-            _ls_yarn_task_syslogs(
-                self.mock_fs, ['hdfs:///output/_logs', '/log/dir']),
-            ['/log/dir/userlogs/application_1450486922681_0004'
-             '/container_1450486922681_0005_01_000003/syslog'])
-
-        self.mock_paths.append(
-            'hdfs:///output/_logs/userlogs/application_1450486922681_0004'
-            '/container_1450486922681_0005_01_000003/syslog')
-
-        self.assertEqual(
-            _ls_yarn_task_syslogs(
-                self.mock_fs, ['hdfs:///output/_logs', '/log/dir']),
-            ['hdfs:///output/_logs/userlogs/application_1450486922681_0004'
-             '/container_1450486922681_0005_01_000003/syslog'])
+    # reading from multiple dirs is handled by code shared with
+    # _ls_pre_yarn_task_syslogs(), and thus is tested below
 
 
 class LsPreYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
@@ -330,5 +311,20 @@ class LsPreYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
                 job_id='job_201512232143_0006'),
             ['/userlogs/attempt_201512232143_0006_m_000000_0/syslog'])
 
-    # subdirs and reading from at most one subdir are handled by code
-    # shared with _ls_yarn_task_syslogs(), and thus are tested above
+    def test_read_logs_from_multiple_dirs(self):
+        self.mock_paths = [
+            'ssh://node1/logs/attempt_201512232143_0008_m_000000_0/syslog',
+            'ssh://node2/logs/attempt_201512232143_0008_r_000000_0/syslog',
+            'ssh://node1/etc/sys-stuff',
+        ]
+
+        self.assertEqual(
+            _ls_pre_yarn_task_syslogs(
+                self.mock_fs,
+                ['ssh://node1/logs', 'ssh://node2/logs']),
+            ['ssh://node2/logs/attempt_201512232143_0008_r_000000_0/syslog',
+             'ssh://node1/logs/attempt_201512232143_0008_m_000000_0/syslog',])
+
+
+    # subdirs are handled by code shared with _ls_yarn_task_syslogs(), and
+    # thus are tested above

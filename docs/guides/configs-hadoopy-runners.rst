@@ -185,7 +185,8 @@ Options available to hadoop runner only
 
    * ``$HADOOP_LOG_DIR``
    * ``$YARN_LOG_DIR`` (on YARN only)
-   * ``<job output dir>/_logs``
+   * ``hdfs:///tmp/hadoop-yarn/staging`` (on YARN only)
+   * ``<job output dir>/_logs`` (usually this is on HDFS)
    * ``$HADOOP_PREFIX/logs``
    * ``$HADOOP_HOME/logs``
    * ``$HADOOP_INSTALL/logs``

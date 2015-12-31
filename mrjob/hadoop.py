@@ -90,6 +90,10 @@ _HADOOP_STDOUT_RE = re.compile(br'^packageJobJar: ')
 # the one thing Hadoop streaming prints to stderr not in log format
 _HADOOP_NON_LOG_LINE_RE = re.compile(r'^Streaming Command Failed!')
 
+# where YARN stores history logs, etc. on HDFS by default
+_DEFAULT_YARN_HDFS_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging'
+
+
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
@@ -310,6 +314,8 @@ class HadoopJobRunner(MRJobRunner):
             yarn_log_dir = os.environ.get('YARN_LOG_DIR')
             if yarn_log_dir:
                 yield yarn_log_dir
+
+            yield _DEFAULT_YARN_HDFS_LOG_DIR
 
         if output_dir:
             # Cloudera style of logging

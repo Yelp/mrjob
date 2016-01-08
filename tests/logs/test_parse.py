@@ -14,6 +14,8 @@
 from mrjob.logs.parse import _parse_hadoop_log_lines
 from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logs.parse import _parse_indented_counters
+from mrjob.logs.parse import _parse_pre_yarn_counters
+from mrjob.logs.parse import _parse_pre_yarn_history_file
 from mrjob.logs.parse import _parse_pre_yarn_history_line
 from mrjob.logs.parse import _parse_python_task_stderr
 from mrjob.logs.parse import _parse_task_syslog
@@ -394,7 +396,7 @@ class ParsePythonTaskStderrTestCase(TestCase):
 class ParsePreYARNHistoryLineTestCase(TestCase):
 
     def test_empty(self):
-        self.assertEqual(_parse_pre_yarn_history_line(''), None)
+        self.assertEqual(_parse_pre_yarn_history_line(''), (None, None))
 
     def test_basic(self):
         self.assertEqual(
@@ -417,3 +419,98 @@ class ParsePreYARNHistoryLineTestCase(TestCase):
                           TASK_TYPE='MAP',
                           START_TIME='1451590341378',
                           SPLITS='/default-rack/172.31.22.226')))
+
+
+class ParsePreYARNCountersTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_pre_yarn_counters(''), {})
+
+    def test_basic(self):
+        counter_str = (
+            '{(org.apache.hadoop.mapred.JobInProgress$Counter)'
+            '(Job Counters )'
+            '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]'
+            '[(TOTAL_LAUNCHED_MAPS)(Launched map tasks)(2)]}'
+            '{(FileSystemCounters)(FileSystemCounters)'
+            '[(FILE_BYTES_READ)(FILE_BYTES_READ)(10547174)]}')
+
+        self.assertEqual(
+            _parse_pre_yarn_counters(counter_str), {
+                'Job Counters ': {
+                    'Launched reduce tasks': 1,
+                    'Launched map tasks': 2,
+                },
+                'FileSystemCounters': {
+                    'FILE_BYTES_READ': 10547174,
+                },
+            })
+
+    def test_escape_sequences(self):
+        counter_str = (
+            r'{(\)\(\)\(\)\})(\)\(\)\(\)\})'
+            r'[(\\)(\\)(1)]'
+            r'[(\[\])(\[\])(2)]'
+            r'[(\{\})(\{\})(3)]'
+            r'[(\(\))(\(\))(4)]}')
+
+        self.assertEqual(
+            _parse_pre_yarn_counters(counter_str), {
+                ')()()}': {
+                    '\\': 1,
+                    '[]': 2,
+                    '{}': 3,
+                    '()': 4,
+                },
+            })
+
+
+class ParsePreYARNHistoryFileTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_pre_yarn_history_file([]), dict(counters={}))
+
+    def test_job_counters(self):
+        lines = [
+            'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
+            ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
+            ' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="'
+            '{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)'
+            '(Job Counters )'
+            '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]}" .\n'
+        ]
+
+        self.assertEqual(
+            _parse_pre_yarn_history_file(lines),
+            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}}))
+
+    maxDiff = None
+
+    def test_task_counters(self):
+        lines = [
+            'Task TASKID="task_201601081945_0005_m_000005" TASK_TYPE="SETUP"'
+            ' TASK_STATUS="SUCCESS" FINISH_TIME="1452283612363"'
+            ' COUNTERS="{(FileSystemCounters)(FileSystemCounters)'
+            '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(27785)]}" .\n',
+            'Task TASKID="task_201601081945_0005_m_000000" TASK_TYPE="MAP"'
+            ' TASK_STATUS="SUCCESS" FINISH_TIME="1452283651437"'
+            ' COUNTERS="{'
+            '(org\.apache\.hadoop\.mapred\.FileOutputFormat$Counter)'
+            '(File Output Format Counters )'
+            '[(BYTES_WRITTEN)(Bytes Written)(0)]}'
+            '{(FileSystemCounters)(FileSystemCounters)'
+            '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(27785)]'
+            '[(HDFS_BYTES_READ)(HDFS_BYTES_READ)(248)]}" .\n',
+        ]
+
+        self.assertEqual(
+            _parse_pre_yarn_history_file(lines),
+            dict(counters={
+                'FileSystemCounters': {
+                    'FILE_BYTES_WRITTEN': 55570,
+                    'HDFS_BYTES_READ': 248,
+                },
+                'File Output Format Counters ': {
+                    'Bytes Written': 0,
+                },
+            }))

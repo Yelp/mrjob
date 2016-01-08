@@ -77,7 +77,8 @@ _PYTHON_EXCEPTION_HEADER_RE = re.compile(
 # is part of the traceback
 _PYTHON_TRACEBACK_LINE_RE = re.compile(r'^\s+')
 
-# escape sequence in pre-YARN history file
+# escape sequence in pre-YARN history file. Characters inside COUNTERS
+# fields are double escaped
 _PRE_YARN_HISTORY_ESCAPE_RE = re.compile(r'\\(.)')
 
 # capture key-value pairs like JOBNAME="streamjob8025762403845318969\.jar"
@@ -89,6 +90,29 @@ _PRE_YARN_HISTORY_LINE = re.compile(
     r'^(?P<type>\w+)'
     r'(?P<key_pairs>( ' + _PRE_YARN_HISTORY_KEY_PAIR.pattern + ')*)'
     r' \.$')
+
+# capture one group of counters
+# this looks like: {(group_id)(group_name)[counter][counter]...}
+_PRE_YARN_COUNTER_GROUP_RE = re.compile(
+    r'{\('
+    r'(?P<group_id>(\\.|[^)}\\])*)'
+    r'\)\('
+    r'(?P<group_name>(\\.|[^)}\\])*)'
+    r'\)'
+    r'(?P<counter_list_str>\[(\\.|[^}\\])*\])'
+    r'}')
+
+# parse a single counter from a counter group (counter_list_str above)
+# this looks like: [(counter_id)(counter_name)(amount)]
+_PRE_YARN_COUNTER_RE = re.compile(
+    r'\[\('
+    r'(?P<counter_id>(\\.|[^)\\])*)'
+    r'\)\('
+    r'(?P<counter_name>(\\.|[^)\\])*)'
+    r'\)\('
+    r'(?P<amount>\d+)'
+    r'\)\]')
+
 
 log = getLogger(__name__)
 
@@ -324,6 +348,13 @@ def _parse_python_task_stderr(lines):
     return result
 
 
+def _pre_yarn_history_unescape(s):
+    """Un-escape string from a pre-YARN history file."""
+    return _PRE_YARN_HISTORY_ESCAPE_RE.sub(r'\1', s)
+
+
+# TODO: this doesn't handle multi-line records, for example ones
+# with timeout errors. Really, we want to yield records
 def _parse_pre_yarn_history_line(line):
     """Turn a line like:
 
@@ -341,24 +372,104 @@ def _parse_pre_yarn_history_line(line):
     This handles unescaping values, but doesn't do the further
     unescaping needed to process counters.
 
-    Returns None if it's not a pre-YARN history line.
+    Returns (None, None) if it's not a pre-YARN history line.
     """
     line = line.rstrip('\r\n')
 
     line_match = _PRE_YARN_HISTORY_LINE.match(line)
     if not line_match:
-        return None
+        return None, None
 
     record_type = line_match.group('type')
-    key_pairs_str = line_match.group('key_pairs')
+    key_pairs = line_match.group('key_pairs')
 
-    key_pairs = {}
+    record = {}
 
-    for m in _PRE_YARN_HISTORY_KEY_PAIR.finditer(key_pairs_str):
+    for m in _PRE_YARN_HISTORY_KEY_PAIR.finditer(key_pairs):
         key = m.group('key')
-        value = _PRE_YARN_HISTORY_ESCAPE_RE.sub(
-            r'\1', m.group('escaped_value'))
+        value = _pre_yarn_history_unescape(m.group('escaped_value'))
 
-        key_pairs[key] = value
+        record[key] = value
 
-    return record_type, key_pairs
+    return record_type, record
+
+
+def _parse_pre_yarn_history_file(lines):
+    """Parse useful stuff out of a pre-YARN history file.
+
+    Currently this returns a dictionary with one key, 'counters',
+    which maps from counter group to counter to amount.
+    """
+    # tantalizingly, STATE_STRING contains the split (URI and line numbers)
+    # read... but only for successful tasks
+
+    task_id_to_counters = {}  # used for successful tasks in failed jobs
+    job_counters = None
+
+    for line in lines:
+        record_type, record = _parse_pre_yarn_history_line(line)
+        if record is None:
+            continue
+
+        # if job is successful, we get counters for the entire job at the end
+        if record_type == 'Job' and 'COUNTERS' in record:
+            job_counters = _parse_pre_yarn_counters(record['COUNTERS'])
+
+        # otherwise, compile counters for each successful task
+        #
+        # Note: this apparently records a higher total than the task tracker
+        # (possibly some tasks are duplicates?). Couldn't figure out the logic
+        # behind this while looking at the history file
+        elif (record_type == 'Task' and
+              'COUNTERS' in record and 'TASKID' in record):
+            task_id = record['TASKID']
+            counters = _parse_pre_yarn_counters(record['COUNTERS'])
+
+            task_id_to_counters[task_id] = counters
+
+    # if job failed, patch together counters from successful tasks
+    if job_counters is None:
+        job_counters = _sum_counters(*task_id_to_counters.values())
+
+    return dict(counters=job_counters)
+
+
+def _parse_pre_yarn_counters(counters_str):
+    """Parse a COUNTERS field from a pre-YARN history file.
+
+    Returns a map from group to counter to amount.
+    """
+    counters = {}
+
+    for group_match in _PRE_YARN_COUNTER_GROUP_RE.finditer(counters_str):
+        group_name = _pre_yarn_history_unescape(
+            group_match.group('group_name'))
+
+        group_counters = {}
+
+        for counter_match in _PRE_YARN_COUNTER_RE.finditer(
+                group_match.group('counter_list_str')):
+
+            counter_name = _pre_yarn_history_unescape(
+                counter_match.group('counter_name'))
+            amount = int(counter_match.group('amount'))
+
+            group_counters[counter_name] = amount
+
+        counters[group_name] = group_counters
+
+    return counters
+
+
+def _sum_counters(*counters_list):
+    """Combine many maps from group to counter to amount."""
+    result = {}
+
+    for counters in counters_list:
+        for group, counter_to_amount in counters.items():
+            for counter, amount in counter_to_amount.items():
+                result.setdefault(group, {})
+                result[group].setdefault(counter, 0)
+                result[group][counter] += amount
+
+    return result

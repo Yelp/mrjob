@@ -48,7 +48,7 @@ _ls_*_logs(ls, log_dir, ...): Implementation of _find_*_logs().
     Use mrjob.logs.wrap _find_logs() to use this.
 
 
-_interpret_*_logs(fs, log_paths, ...):
+_interpret_*_logs(fs, matches, ...):
 
     Once we know where our logs are, search them for counters and/or errors.
 
@@ -68,9 +68,9 @@ _interpret_*_logs(fs, log_paths, ...):
             start_line: (see above)
             num_lines: (see above)
         application_id: (YARN application ID)
+        attempt_id: (ID of task attempt)
         container_id: (YARN container ID)
         job_id: (ID of job)
-        task_attempt_id: (ID of task attempt)
         task_id: (ID of task)
     ]
 

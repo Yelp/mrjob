@@ -15,7 +15,20 @@
 """Utilities for ls()ing and cat()ing logs without raising exceptions."""
 from logging import getLogger
 
+from mrjob.py2 import to_string
+
+
 log = getLogger(__name__)
+
+
+def _cat_log(fs, path):
+    """fs.cat() the given log, converting lines to strings, and logging
+    errors."""
+    try:
+        for line in fs.cat(path):
+            yield to_string(line)
+    except IOError as e:
+        log.warning("couldn't cat() %s: %r" % (path, e))
 
 
 def _ls_logs(fs, log_dir_stream, matcher, **kwargs):

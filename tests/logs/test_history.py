@@ -31,7 +31,7 @@ class MatchHistoryLogTestCase(TestCase):
 
         self.assertEqual(
             _match_history_log(history_path),
-            dict(job_id='job_201512311928_0001'))
+            dict(job_id='job_201512311928_0001', yarn=False))
 
         conf_path = (
             '/logs/history/done/version-1/host_1451590133273_/2015/12/31'
@@ -49,7 +49,7 @@ class MatchHistoryLogTestCase(TestCase):
 
         self.assertEqual(
             _match_history_log(history_path, job_id='job_201512311928_0001'),
-            dict(job_id='job_201512311928_0001'))
+            dict(job_id='job_201512311928_0001', yarn=False))
 
         self.assertEqual(
             _match_history_log(history_path, job_id='job_201512311928_0002'),
@@ -63,7 +63,7 @@ class MatchHistoryLogTestCase(TestCase):
 
         self.assertEqual(
             _match_history_log(history_path),
-            dict(job_id='job_1451592123989_0001'))
+            dict(job_id='job_1451592123989_0001', yarn=True))
 
         conf_path = (
             'hdfs:///tmp/hadoop-yarn/staging/history/done/2015/12/31/000000/'
@@ -81,7 +81,7 @@ class MatchHistoryLogTestCase(TestCase):
 
         self.assertEqual(
             _match_history_log(history_path, job_id='job_1451592123989_0001'),
-            dict(job_id='job_1451592123989_0001'))
+            dict(job_id='job_1451592123989_0001', yarn=True))
 
         self.assertEqual(
             _match_history_log(history_path, job_id='job_1451592123989_0002'),

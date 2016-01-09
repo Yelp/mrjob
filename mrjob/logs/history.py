@@ -32,8 +32,7 @@ log = getLogger(__name__)
 _HISTORY_LOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<job_id>job_\d+_\d{4})'
-    r'[_-]\d+[_-]hadoop[_-]\S*?'
-    r'(?P<yarn_ext>\.jhist)?\S*$')
+    r'[_-]\d+[_-]hadoop[_-](?P<suffix>\S*)$')
 
 # escape sequence in pre-YARN history file. Characters inside COUNTERS
 # fields are double escaped
@@ -102,7 +101,9 @@ def _match_history_log(path, job_id=None):
     if not (job_id is None or m.group('job_id') == job_id):
         return None
 
-    return dict(job_id=m.group('job_id'), yarn=bool(m.group('yarn_ext')))
+    # TODO: couldn't manage to include .jhist in regex; an optional
+    # group has less priority than a non-greedy match, apparently
+    return dict(job_id=m.group('job_id'), yarn='.jhist' in m.group('suffix'))
 
 
 def _interpret_history_log(fs, matches):

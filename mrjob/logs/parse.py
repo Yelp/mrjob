@@ -83,13 +83,13 @@ _PRE_YARN_HISTORY_ESCAPE_RE = re.compile(r'\\(.)')
 
 # capture key-value pairs like JOBNAME="streamjob8025762403845318969\.jar"
 _PRE_YARN_HISTORY_KEY_PAIR = re.compile(
-    r'(?P<key>\w+)="(?P<escaped_value>(\\.|[^"\\])*)"')
+    r'(?P<key>\w+)="(?P<escaped_value>(\\.|[^"\\])*)"', re.MULTILINE)
 
 # an entire line in a pre-YARN history file
-_PRE_YARN_HISTORY_LINE = re.compile(
+_PRE_YARN_HISTORY_RECORD = re.compile(
     r'^(?P<type>\w+)'
     r'(?P<key_pairs>( ' + _PRE_YARN_HISTORY_KEY_PAIR.pattern + ')*)'
-    r' \.$')
+    r' \.$', re.MULTILINE)
 
 # capture one group of counters
 # this looks like: {(group_id)(group_name)[counter][counter]...}
@@ -263,6 +263,7 @@ def _parse_task_syslog(lines):
        start_line: optional first line of split (0-indexed)
        num_lines: optional number of lines in split
     """
+    # TODO: just make error a string
     result = dict(error=None, split=None)
 
     for record in _parse_hadoop_log_lines(lines):
@@ -324,6 +325,7 @@ def _parse_python_task_stderr(lines):
 
     # TODO: handle errors from the setup script (see #1203)
 
+    # TODO: just make error a string, try to find command as well
     result = dict(error=None)
 
     traceback = None
@@ -353,10 +355,10 @@ def _pre_yarn_history_unescape(s):
     return _PRE_YARN_HISTORY_ESCAPE_RE.sub(r'\1', s)
 
 
-# TODO: this doesn't handle multi-line records, for example ones
-# with timeout errors. Really, we want to yield records
-def _parse_pre_yarn_history_line(line):
-    """Turn a line like:
+
+def _parse_pre_yarn_history_file(lines):
+    """Yield records from the given sequence of lines. For example,
+    a line like this:
 
     Task TASKID="task_201512311928_0001_m_000003" \
     TASK_TYPE="MAP" START_TIME="1451590341378" \
@@ -364,74 +366,119 @@ def _parse_pre_yarn_history_line(line):
 
     into a record like:
 
-    ('Task', {'TASKID': 'task_201512311928_0001_m_00000',
-              'TASK_TYPE': 'MAP',
-              'START_TIME': '1451590341378',
-              'SPLITS': '/default-rack/172.31.22.226'})
+    {
+        'fields': {'TASKID': 'task_201512311928_0001_m_00000',
+                   'TASK_TYPE': 'MAP',
+                   'START_TIME': '1451590341378',
+                   'SPLITS': '/default-rack/172.31.22.226'},
+        'type': 'Task',
+        'line_num': 0,
+        'num_lines': 1,
+    }
 
     This handles unescaping values, but doesn't do the further
-    unescaping needed to process counters.
-
-    Returns (None, None) if it's not a pre-YARN history line.
+    unescaping needed to process counters. It can also handle multi-line
+    records (e.g. for Java stack traces).
     """
-    line = line.rstrip('\r\n')
+    def yield_record_strings(lines):
+        record_lines = []
+        start_line = 0
 
-    line_match = _PRE_YARN_HISTORY_LINE.match(line)
-    if not line_match:
-        return None, None
+        for line_num, line in enumerate(lines):
+            record_lines.append(line)
+            if line.endswith(' .\n'):
+                yield start_line, len(record_lines), ''.join(record_lines)
+                record_lines = []
+                start_line = line_num + 1
 
-    record_type = line_match.group('type')
-    key_pairs = line_match.group('key_pairs')
+    for start_line, num_lines, record_str in yield_record_strings(lines):
+        record_match = _PRE_YARN_HISTORY_RECORD.match(record_str)
 
-    record = {}
+        if not record_match:
+            continue
 
-    for m in _PRE_YARN_HISTORY_KEY_PAIR.finditer(key_pairs):
-        key = m.group('key')
-        value = _pre_yarn_history_unescape(m.group('escaped_value'))
+        record_type = record_match.group('type')
+        key_pairs = record_match.group('key_pairs')
 
-        record[key] = value
+        fields = {}
+        for m in _PRE_YARN_HISTORY_KEY_PAIR.finditer(key_pairs):
+            key = m.group('key')
+            value = _pre_yarn_history_unescape(m.group('escaped_value'))
 
-    return record_type, record
+            fields[key] = value
+
+        yield dict(
+            fields=fields,
+            num_lines=num_lines,
+            start_line=start_line,
+            type=record_type,
+        )
 
 
-def _parse_pre_yarn_history_file(lines):
-    """Parse useful stuff out of a pre-YARN history file.
 
-    Currently this returns a dictionary with one key, 'counters',
-    which maps from counter group to counter to amount.
+# TODO: this properly belongs in mrjob.logs.interpret
+def _summarize_pre_yarn_history(records, path=None):
+    """Collect useful info from a pre-YARN history file. Expects a
+    sequence of ``(record_type, {record})`` (see
+    :py:func:`_parse_pre_yarn_history_records`).
+
+    This returns a dictionary with the following keys:
+
+    counters: map from group to counter to amount. If job failed, we sum
+        counters for succesful tasks
+    errors: a list of dictionaries with the keys:
+        java_error:
+            error: lines of error, as as string
+            path: *path*
+            start_line: first line of log containing the error (0-indexed)
+            num_lines: # of lines of log containing the error
+        task_attempt_id: ID of task attempt with this error
+
+    You can optionally pass in *path*, the path of the file, so that it can
+    be included in errors.
     """
     # tantalizingly, STATE_STRING contains the split (URI and line numbers)
-    # read... but only for successful tasks
+    # read, but only for successful tasks, which doesn't help with debugging
 
     task_id_to_counters = {}  # used for successful tasks in failed jobs
     job_counters = None
+    errors = []
 
-    for line in lines:
-        record_type, record = _parse_pre_yarn_history_line(line)
-        if record is None:
-            continue
+    for record in records:
+        fields = record['fields']
 
         # if job is successful, we get counters for the entire job at the end
-        if record_type == 'Job' and 'COUNTERS' in record:
-            job_counters = _parse_pre_yarn_counters(record['COUNTERS'])
+        if record['type'] == 'Job' and 'COUNTERS' in fields:
+            job_counters = _parse_pre_yarn_counters(fields['COUNTERS'])
 
         # otherwise, compile counters for each successful task
         #
         # Note: this apparently records a higher total than the task tracker
         # (possibly some tasks are duplicates?). Couldn't figure out the logic
         # behind this while looking at the history file
-        elif (record_type == 'Task' and
-              'COUNTERS' in record and 'TASKID' in record):
-            task_id = record['TASKID']
-            counters = _parse_pre_yarn_counters(record['COUNTERS'])
+        elif (record['type'] == 'Task' and
+              'COUNTERS' in fields and 'TASKID' in fields):
+            task_id = fields['TASKID']
+            counters = _parse_pre_yarn_counters(fields['COUNTERS'])
 
             task_id_to_counters[task_id] = counters
+
+        elif (record['type'] in ('MapAttempt', 'ReduceAttempt') and
+              'TASK_ATTEMPT_ID' in fields and 'ERROR' in fields):
+            errors.append(dict(
+                java_error=dict(
+                    error=fields['ERROR'],
+                    path=path,
+                    start_line=record['start_line'],
+                    num_lines=record['num_lines']),
+                task_attempt_id=fields['TASK_ATTEMPT_ID']))
 
     # if job failed, patch together counters from successful tasks
     if job_counters is None:
         job_counters = _sum_counters(*task_id_to_counters.values())
 
-    return dict(counters=job_counters)
+    return dict(counters=job_counters,
+                errors=errors)
 
 
 def _parse_pre_yarn_counters(counters_str):

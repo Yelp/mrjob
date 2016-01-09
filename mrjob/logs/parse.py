@@ -14,6 +14,8 @@
 import re
 from logging import getLogger
 
+from mrjob.logs.util import _sum_counters
+
 
 # log line format output by YARN hadoop jar command
 _HADOOP_LOG_LINE_RE = re.compile(
@@ -506,17 +508,3 @@ def _parse_pre_yarn_counters(counters_str):
         counters[group_name] = group_counters
 
     return counters
-
-
-def _sum_counters(*counters_list):
-    """Combine many maps from group to counter to amount."""
-    result = {}
-
-    for counters in counters_list:
-        for group, counter_to_amount in counters.items():
-            for counter, amount in counter_to_amount.items():
-                result.setdefault(group, {})
-                result[group].setdefault(counter, 0)
-                result[group][counter] += amount
-
-    return result

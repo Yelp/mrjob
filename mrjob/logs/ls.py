@@ -425,8 +425,6 @@ def _ls_job_history_logs(fs, log_dirs, job_id=None):
     """Yield paths/uris of all job history files in the given directories,
     optionally filtering by *job_id*.
     """
-    # usually, there should only be one, so sorting doesn't really matter
-
     if isinstance(log_dirs, str):
         raise TypeError
 

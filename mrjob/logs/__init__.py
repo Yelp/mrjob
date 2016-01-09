@@ -25,7 +25,8 @@ task: stderr and syslog of individual tasks (found in <log dir>/userlogs/)
 Each of these should have methods like this:
 
 
-_ls_*_logs(fs, log_dir_stream, ...): Find paths of all logs of the given
+
+_find_*_logs(fs, log_dir_stream, ...): Find paths of all logs of the given
      type.
 
      log_dir_stream is a list of lists of log dirs. We assume that you might
@@ -40,6 +41,11 @@ _ls_*_logs(fs, log_dir_stream, ...): Find paths of all logs of the given
      job_id: (ID of job)
      task_attempt_id: (ID of task attempt)
      task_id: (ID of task)
+
+
+_ls_*_logs(ls, log_dir, ...): Implementation of _find_*_logs().
+
+    Use mrjob.logs.wrap _find_logs() to use this.
 
 
 _interpret_*_logs(fs, log_paths, ...):
@@ -76,6 +82,8 @@ _parse_*_log(lines):
     Pull important information from a log file. This generally follows the same
     format as _interpret_<type>_logs(), above.
 
+    Log lines are always strings (see mrjob.logs.wrap._cat_log()).
+
 
 _parse_*_records(lines):
 
@@ -93,3 +101,4 @@ Finally:
     log4j: handles log4j record parsing (used by step and task syslog)
     wrap: module for listing and catting logs in an error-free
         way (since log parsing shouldn't kill a job).
+"""

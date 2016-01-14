@@ -118,17 +118,19 @@ def _interpret_history_log(fs, matches):
     Returns a dictionary with the keys *counters* and *errors*.
     """
     for match in matches:
-        if match['yarn']:
-            return  # not yet implemented
-
         path = match['path']
-        result = _parse_pre_yarn_history_log(_cat_log(fs, path))
 
+        if match['yarn']:
+            # not yet implemented
+            continue
+        else:
+            result = _parse_pre_yarn_history_log(_cat_log(fs, path))
+
+        # patch path, task_id, etc. into errors
         for error in result['errors']:
-            # patch in path
             if 'hadoop_error' in error:
                 error['hadoop_error']['path'] = path
-            # patch in task_id, job_id
+
             _add_implied_ids(error)
 
         return result

@@ -13,12 +13,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _match_history_log
 from mrjob.logs.history import _parse_pre_yarn_history_log
 from mrjob.logs.history import _parse_pre_yarn_history_records
 from mrjob.logs.history import _parse_pre_yarn_counters
 
+from tests.sandbox import PatcherTestCase
+from tests.py2 import Mock
 from tests.py2 import TestCase
+from tests.py2 import patch
 
 
 # path matching
@@ -93,6 +97,90 @@ class MatchHistoryLogTestCase(TestCase):
 
 
 # TODO: test _interpret_history_log()
+class InterpretHistoryLogTestCase(PatcherTestCase):
+
+    def setUp(self):
+        super(InterpretHistoryLogTestCase, self).setUp()
+
+        self.mock_fs = Mock()
+
+        # don't include errors in return value, as they get patched
+        mock_return_value = dict(
+            counters={'foo': {'bar': 42}},
+            errors=[])
+
+        self.mock_parse_yarn_history_log = self.start(
+            patch('mrjob.logs.history._parse_yarn_history_log',
+                  return_value=mock_return_value))
+
+        self.mock_parse_pre_yarn_history_log = self.start(
+            patch('mrjob.logs.history._parse_pre_yarn_history_log',
+                  return_value=mock_return_value))
+
+        self.mock_cat_log = self.start(patch('mrjob.logs.history._cat_log'))
+
+    def interpret_history_log(self, matches):
+        """Wrap _interpret_history_log(), since fs doesn't matter."""
+        return _interpret_history_log(self.mock_fs, matches)
+
+    def test_empty(self):
+        self.assertEqual(self.interpret_history_log([]),
+                         dict(counters={}, errors=[]))
+
+    def test_pre_yarn(self):
+        self.assertEqual(
+            self.interpret_history_log(
+                [dict(path='/path/to/pre-yarn-history.jar', yarn=False)]),
+            self.mock_parse_pre_yarn_history_log.return_value)
+
+        self.mock_cat_log.called_once_with(
+            self.mock_fs, '/path/to/pre-yarn-history.jar')
+
+        self.assertEqual(self.mock_parse_pre_yarn_history_log.call_count, 1)
+
+    def test_yarn(self):
+        self.assertEqual(
+            self.interpret_history_log(
+                [dict(path='/path/to/yarn-history.jhist', yarn=True)]),
+            self.mock_parse_yarn_history_log.return_value)
+
+        self.mock_cat_log.called_once_with(
+            self.mock_fs, '/path/to/yarn-history.jhist')
+
+        self.assertEqual(self.mock_parse_yarn_history_log.call_count, 1)
+
+    # code works the same way for YARN and pre-YARN, so testing on YARN
+    # from here on out
+
+    def test_ignore_multiple_matches(self):
+        self.assertEqual(
+            self.interpret_history_log(
+                [dict(path='/path/to/yarn-history-1.jhist', yarn=True),
+                 dict(path='/path/to/yarn-history-2.jhist', yarn=True)]),
+            self.mock_parse_yarn_history_log.return_value)
+
+        self.mock_cat_log.called_once_with(
+            self.mock_fs, '/path/to/yarn-history-1.jhist')
+
+        self.assertEqual(self.mock_parse_yarn_history_log.call_count, 1)
+
+    def test_patch_errors(self):
+        self.mock_parse_yarn_history_log.return_value = dict(
+            counters={},
+            errors=[
+                dict(),
+                dict(hadoop_error=dict()),
+            ])
+
+        self.assertEqual(
+            self.interpret_history_log(
+                [dict(path='/path/to/yarn-history.jhist', yarn=True)]),
+                dict(counters={},
+                     errors=[
+                         dict(),
+                         dict(hadoop_error=dict(
+                             path='/path/to/yarn-history.jhist')),
+                    ]))
 
 
 

@@ -117,12 +117,13 @@ def _interpret_history_log(fs, matches):
 
     Returns a dictionary with the keys *counters* and *errors*.
     """
+    # we expect to go through this for loop 0 or 1 times
     for match in matches:
         path = match['path']
 
         if match['yarn']:
             # not yet implemented
-            continue
+            result = _parse_yarn_history_log(_cat_log(fs, path))
         else:
             result = _parse_pre_yarn_history_log(_cat_log(fs, path))
 
@@ -138,10 +139,13 @@ def _interpret_history_log(fs, matches):
     return dict(counters={}, errors=[])
 
 
+def _parse_yarn_history_log(lines):
+    """Collect useful info from a YARN history file."""
+    raise NotImplementedError
+
+
 def _parse_pre_yarn_history_log(lines):
-    """Collect useful info from a pre-YARN history file. Expects a
-    sequence of ``(record_type, {record})`` (see
-    :py:func:`_parse_pre_yarn_history_records`).
+    """Collect useful info from a pre-YARN history file.
 
     This returns a dictionary with the following keys:
 

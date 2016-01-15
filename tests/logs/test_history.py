@@ -244,7 +244,7 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
             'MapAttempt TASK_TYPE="MAP"'
             ' TASKID="task_201601081945_0005_m_000001"'
             ' TASK_ATTEMPT_ID='
-            '"task_201601081945_0005_m_00000_2"'
+            '"attempt_201601081945_0005_m_00000_2"'
             ' TASK_STATUS="FAILED"'
             ' ERROR="java\.lang\.RuntimeException:'
             ' PipeMapRed\.waitOutputThreads():'
@@ -278,7 +278,7 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
                             num_lines=4,
                             start_line=0,
                         ),
-                        task_attempt_id='task_201601081945_0005_m_00000_2',
+                        attempt_id='attempt_201601081945_0005_m_00000_2',
                     ),
                 ]))
 

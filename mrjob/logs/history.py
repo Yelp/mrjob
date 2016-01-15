@@ -153,7 +153,7 @@ def _parse_yarn_history_log(lines):
             start_line: first line of log containing the error (0-indexed)
             num_lines: # of lines of log containing the error
         task_id: ID of task with this error
-        task_attempt_id: ID of task attempt with this error
+        attempt_id: ID of task attempt with this error
     """
     task_to_counters = {}  # used for successful tasks in failed jobs
     job_counters = None
@@ -283,8 +283,7 @@ def _parse_pre_yarn_history_log(lines):
                     error=fields['ERROR'],
                     start_line=record['start_line'],
                     num_lines=record['num_lines']),
-                # TODO: this should be just attempt_id
-                task_attempt_id=fields['TASK_ATTEMPT_ID']))
+                attempt_id=fields['TASK_ATTEMPT_ID']))
 
     # if job failed, patch together counters from successful tasks
     if job_counters is None:

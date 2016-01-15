@@ -35,11 +35,11 @@ _find_*_logs(fs, log_dir_stream, ...): Find paths of all logs of the given
 
      This yields dictionaries with the following format:
 
-     path: path/URI of log
      application_id: (YARN application ID)
+     attempt_id: (ID of task attempt)
      container_id: (YARN container ID)
      job_id: (ID of job)
-     task_attempt_id: (ID of task attempt)
+     path: path/URI of log
      task_id: (ID of task)
 
 

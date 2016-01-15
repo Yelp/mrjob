@@ -18,6 +18,8 @@ import json
 import re
 from logging import getLogger
 
+from mrjob.py2 import integer_types
+from mrjob.py2 import string_types
 from .counters import _sum_counters
 from .ids import _add_implied_ids
 from .wrap import _ls_logs
@@ -141,7 +143,8 @@ def _interpret_history_log(fs, matches):
 
 
 def _parse_yarn_history_log(lines):
-    """Collect useful info from a YARN history file.
+    """Collect useful info from a YARN history file, dealing gracefully
+    with unexpected data structures.
 
     This returns a dictionary with the following keys:
 
@@ -169,12 +172,21 @@ def _parse_yarn_history_log(lines):
         except:
             continue
 
-        record_type = record.get('type') or ''
+        record_type = record.get('type')
+        if not isinstance(record_type, string_types):
+            continue
+
+        # extract events. Looks like there's just one per record
+        event_record = record.get('event')
+        if not isinstance(event_record, dict):
+            continue
+        events = [e for e in record['event'].values()
+                  if isinstance(e, dict)]
 
         if record_type.endswith('_ATTEMPT_FAILED'):
-            for event in record.get('event', {}).values():
+            for event in events:
                 error_str = event.get('error')
-                if not error_str:
+                if not isinstance(error_str, string_types):
                     continue
 
                 error = dict(
@@ -183,32 +195,29 @@ def _parse_yarn_history_log(lines):
                         start_line=line_num,
                         num_lines=1))
 
-                if 'taskid' in event:
+                if isinstance(event.get('taskid'), string_types):
                     error['task_id'] = event['taskid']
 
-                if 'attemptId' in event:
-                    error['attempt_id'] = event['attempt_id']
+                if isinstance(event.get('attemptId'), string_types):
+                    error['attempt_id'] = event['attemptId']
 
                 errors.append(error)
 
-        elif record_type in ('TASK_FINISHED', 'JOB_FINISHED'):
-            for event in record.get('event', {}).values():
-                counters_record = event.get('counters')
-                if not counters_record:
+        elif record_type == 'TASK_FINISHED':
+            for event in events:
+                task_id = event.get('taskid')
+                if not isinstance(task_id, string_types):
                     continue
 
-                try:
-                    counters = _munge_yarn_counters(counters_record)
-                except (AttributeError, TypeError):
-                    log.warning('counters in unexpected format, skipping...')
+                counters = _extract_yarn_counters(event.get('counters'))
 
-                if record_type == 'TASK_FINISHED':
-                    task_id = event.get('taskid')
-                    if task_id:
-                        task_to_counters[task_id] = counters
-                else:
-                    # record_type is JOB_FINISHED
-                    job_counters = counters
+                task_to_counters[task_id] = counters
+
+        elif record_type == 'JOB_FINISHED':
+            for event in events:
+                # mapCounters and reduceCounters are also available
+                job_counters = _extract_yarn_counters(
+                    event.get('totalCounters'))
 
     # if job failed, patch together counters from successful tasks
     if job_counters is None:
@@ -218,29 +227,47 @@ def _parse_yarn_history_log(lines):
                 errors=errors)
 
 
-def _munge_yarn_counters(counters_record):
+def _extract_yarn_counters(counters_record):
     """Convert Avro-Json counter data structure to our
     group -> counter -> amount format.
 
-    In theory, this could raise TypeError or AttributeError if
-    it encounters an unexpected data structure.
+    This deals gracefully with unexpected data structures.
     """
+    if not isinstance(counters_record, dict):
+        return {}
+
+    group_records = counters_record.get('groups')
+    if not isinstance(group_records, list):
+        return {}
+
     counters = {}
 
-    for group_record in counters_record.get('groups', []):
-        group = group_record.get('displayName')
-        if not group:
+    for group_record in group_records:
+        if not isinstance(group_record, dict):
             continue
 
-        for counter_record in group_record.get('counts', []):
-            counter = counter_record.get('displayName')
-            amount = counter_record.get('value')
+        group = group_record.get('displayName')
+        if not isinstance(group, string_types):
+            continue
 
-            # there are records where amount is 0, but that doesn't seem useful
-            if not (counter and amount):
-                counters.setdefault(group, {})
-                counters[group].setdefault(counter, 0)
-                counters[group][counter] += amount
+        counter_records = group_record.get('counts')
+        if not isinstance(counter_records, list):
+            continue
+
+        for counter_record in counter_records:
+            counter = counter_record.get('displayName')
+            if not isinstance(counter, string_types):
+                continue
+
+            # in YARN, counters can have an amount of 0. The Hadoop command
+            # prints them out, so we'll parse them
+            amount = counter_record.get('value')
+            if not (isinstance(amount, integer_types)):
+                continue
+
+            counters.setdefault(group, {})
+            counters[group].setdefault(counter, 0)
+            counters[group][counter] += amount
 
     return counters
 

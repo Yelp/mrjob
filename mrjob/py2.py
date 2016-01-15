@@ -65,11 +65,9 @@ Use the ``StringIO`` from this module to deal with strings (it's
 Please use ``%`` for format strings and not ``format()``, which is much more
 picky about mixing unicode and bytes.
 
-This module provides a ``string_types`` tuple (name from the ``six`` library)
-so you can check if something is a string.
+We don't provide a ``unicode`` type:
 
-We don't provide a ``unicode`` constant:
-
+- Use ``isinstance(..., string_types)`` to check if something is a string
 - Use ``not isinstance(..., bytes)`` to check if a string is Unicode
 - To convert ``bytes`` to ``unicode``, use ``.decode('utf_8')`.
 - Python 3.3+ has ``u''`` literals; please use sparingly

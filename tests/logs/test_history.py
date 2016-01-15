@@ -18,6 +18,7 @@ from mrjob.logs.history import _match_history_log
 from mrjob.logs.history import _parse_pre_yarn_history_log
 from mrjob.logs.history import _parse_pre_yarn_history_records
 from mrjob.logs.history import _parse_pre_yarn_counters
+from mrjob.logs.history import _parse_yarn_history_log
 
 from tests.sandbox import PatcherTestCase
 from tests.py2 import Mock
@@ -186,7 +187,178 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
 
 
 # log parsing
+class ParseYARNHistoryLogTestCase(TestCase):
+
+    JOB_COUNTER_LINES = [
+        '{"type":"JOB_FINISHED","event":{'
+        '"org.apache.hadoop.mapreduce.jobhistory.JobFinished":{'
+        '"jobid":"job_1452815622929_0001","totalCounters":{'
+        '"name":"TOTAL_COUNTERS","groups":[{'
+        '"name":"org.apache.hadoop.mapreduce.FileSystemCounter",'
+        '"displayName":"File System Counters","counts":[{'
+        '"name":"FILE_BYTES_READ","displayName":'
+        '"FILE: Number of bytes read","value":0},{"name":'
+        '"HDFS_BYTES_READ","displayName":"HDFS: Number of bytes read",'
+        '"value":588}]}]}}}}\n',
+    ]
+
+    TASK_COUNTER_LINES = [
+        '{"type":"TASK_FINISHED","event":{'
+        '"org.apache.hadoop.mapreduce.jobhistory.TaskFinished":{'
+        '"taskid":"task_1452815622929_0001_m_000001","taskType":"MAP",'
+        '"status":"SUCCEEDED","counters":{"name":"COUNTERS","groups":[{'
+        '"name":"org.apache.hadoop.mapreduce.FileSystemCounter",'
+        '"displayName":"File System Counters","counts":[{"name":'
+        '"FILE_BYTES_READ","displayName":"FILE: Number of bytes read",'
+        '"value":0},{"name":"FILE_BYTES_WRITTEN","displayName":'
+        '"FILE: Number of bytes written","value":102090}]}]}}}}\n',
+        '{"type":"TASK_FINISHED","event":{'
+        '"org.apache.hadoop.mapreduce.jobhistory.TaskFinished":{'
+        '"taskid":"task_1452815622929_0001_m_000002","taskType":"MAP",'
+        '"status":"SUCCEEDED","counters":{"name":"COUNTERS","groups":[{'
+        '"name":"org.apache.hadoop.mapreduce.FileSystemCounter",'
+        '"displayName":"File System Counters","counts":[{"name":'
+        '"FILE_BYTES_WRITTEN","displayName":'
+        '"FILE: Number of bytes written","value":1}]}]}}}}\n',
+    ]
+
+    def test_empty(self):
+        self.assertEqual(
+            _parse_yarn_history_log([]),
+            dict(counters={}, errors=[]))
+
+    def handle_non_json(self):
+        lines = [
+            'Avro-Json\n',
+            '\n',
+            'BLARG\n',
+            '{not JSON\n',
+        ]
+
+        self.assertEqual(
+            _parse_yarn_history_log([]),
+            dict(counters={}, errors=[]))
+
+    def test_job_counters(self):
+        self.assertEqual(
+            _parse_yarn_history_log(self.JOB_COUNTER_LINES),
+            dict(
+                counters={
+                    'File System Counters': {
+                        'FILE: Number of bytes read': 0,
+                        'HDFS: Number of bytes read': 588,
+                    }
+                },
+                errors=[],
+            ))
+
+    def test_task_counters(self):
+        self.assertEqual(
+            _parse_yarn_history_log(self.TASK_COUNTER_LINES),
+            dict(
+                counters={
+                    'File System Counters': {
+                        'FILE: Number of bytes read': 0,
+                        'FILE: Number of bytes written': 102091,
+                    }
+                },
+                errors=[],
+            ))
+
+    def test_job_counters_beat_task_counters(self):
+        self.assertEqual(
+            _parse_yarn_history_log(self.JOB_COUNTER_LINES +
+                                    self.TASK_COUNTER_LINES),
+            dict(
+                counters={
+                    'File System Counters': {
+                        'FILE: Number of bytes read': 0,
+                        'HDFS: Number of bytes read': 588,
+                    }
+                },
+                errors=[],
+            ))
+
+    def test_errors(self):
+        lines = [
+            '{"type":"MAP_ATTEMPT_FAILED","event":{'
+            '"org.apache.hadoop.mapreduce.jobhistory'
+            '.TaskAttemptUnsuccessfulCompletion":{"taskid":'
+            '"task_1449525218032_0005_m_000000","taskType":"MAP",'
+            '"attemptId":"attempt_1449525218032_0005_m_000000_0",'
+            '"status":"FAILED","error":'
+            '"Error: java.lang.RuntimeException: PipeMapRed'
+            '.waitOutputThreads(): subprocess failed with code 1\\n'
+            '\\tat org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads('
+            'PipeMapRed.java:322)\\n"}}}\n',
+            '{"type":"MAP_ATTEMPT_FAILED","event":{'
+            '"org.apache.hadoop.mapreduce.jobhistory'
+            '.TaskAttemptUnsuccessfulCompletion":{"error":'
+            '"Error: java.lang.RuntimeException: PipeMapRed'
+            '.waitOutputThreads(): subprocess failed with code 1\\n"}}}\n',
+        ]
+
+        self.assertEqual(
+            _parse_yarn_history_log(lines),
+            dict(
+                counters={},
+                errors=[
+                    dict(
+                        hadoop_error=dict(
+                            error=(
+                                'Error: java.lang.RuntimeException: PipeMapRed'
+                                '.waitOutputThreads(): subprocess failed with'
+                                ' code 1\n\tat org.apache.hadoop.streaming'
+                                '.PipeMapRed.waitOutputThreads('
+                                'PipeMapRed.java:322)\n'),
+                            start_line=0,
+                            num_lines=1,
+                        ),
+                        task_id='task_1449525218032_0005_m_000000',
+                        attempt_id='attempt_1449525218032_0005_m_000000_0',
+                    ),
+                    dict(
+                        hadoop_error=dict(
+                            error=(
+                                'Error: java.lang.RuntimeException: PipeMapRed'
+                                '.waitOutputThreads(): subprocess failed with'
+                                ' code 1\n'),
+                            start_line=1,
+                            num_lines=1,
+                        )
+                    ),
+                ]))
+
+    maxDiff = None
+
+
+
+
 class ParsePreYARNHistoryLogTestCase(TestCase):
+    JOB_COUNTER_LINES = [
+        'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
+        ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
+        ' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="'
+        '{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)'
+        '(Job Counters )'
+        '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]}" .\n',
+    ]
+
+    TASK_COUNTER_LINES = [
+        'Task TASKID="task_201601081945_0005_m_000005" TASK_TYPE="SETUP"'
+        ' TASK_STATUS="SUCCESS" FINISH_TIME="1452283612363"'
+        ' COUNTERS="{(FileSystemCounters)(FileSystemCounters)'
+        '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(27785)]}" .\n',
+        'Task TASKID="task_201601081945_0005_m_000000" TASK_TYPE="MAP"'
+        ' TASK_STATUS="SUCCESS" FINISH_TIME="1452283651437"'
+        ' COUNTERS="{'
+        '(org\.apache\.hadoop\.mapred\.FileOutputFormat$Counter)'
+        '(File Output Format Counters )'
+        '[(BYTES_WRITTEN)(Bytes Written)(0)]}'
+        '{(FileSystemCounters)(FileSystemCounters)'
+        '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(27785)]'
+        '[(HDFS_BYTES_READ)(HDFS_BYTES_READ)(248)]}" .\n',
+    ]
 
     def test_empty(self):
         self.assertEqual(
@@ -194,39 +366,14 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
             dict(counters={}, errors=[]))
 
     def test_job_counters(self):
-        lines = [
-            'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
-            ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
-            ' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="'
-            '{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)'
-            '(Job Counters )'
-            '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]}" .\n'
-        ]
-
         self.assertEqual(
-            _parse_pre_yarn_history_log(lines),
+            _parse_pre_yarn_history_log(self.JOB_COUNTER_LINES),
             dict(counters={'Job Counters ': {'Launched reduce tasks': 1}},
                  errors=[]))
 
     def test_task_counters(self):
-        lines = [
-            'Task TASKID="task_201601081945_0005_m_000005" TASK_TYPE="SETUP"'
-            ' TASK_STATUS="SUCCESS" FINISH_TIME="1452283612363"'
-            ' COUNTERS="{(FileSystemCounters)(FileSystemCounters)'
-            '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(27785)]}" .\n',
-            'Task TASKID="task_201601081945_0005_m_000000" TASK_TYPE="MAP"'
-            ' TASK_STATUS="SUCCESS" FINISH_TIME="1452283651437"'
-            ' COUNTERS="{'
-            '(org\.apache\.hadoop\.mapred\.FileOutputFormat$Counter)'
-            '(File Output Format Counters )'
-            '[(BYTES_WRITTEN)(Bytes Written)(0)]}'
-            '{(FileSystemCounters)(FileSystemCounters)'
-            '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(27785)]'
-            '[(HDFS_BYTES_READ)(HDFS_BYTES_READ)(248)]}" .\n',
-        ]
-
         self.assertEqual(
-            _parse_pre_yarn_history_log(lines),
+            _parse_pre_yarn_history_log(self.TASK_COUNTER_LINES),
             dict(
                 counters={
                     'FileSystemCounters': {
@@ -238,6 +385,13 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
                         },
                 },
                 errors=[]))
+
+    def test_job_counters_beat_task_counters(self):
+        self.assertEqual(
+            _parse_pre_yarn_history_log(self.JOB_COUNTER_LINES +
+                                        self.TASK_COUNTER_LINES),
+            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}},
+                 errors=[]))
 
     def test_errors(self):
         lines = [

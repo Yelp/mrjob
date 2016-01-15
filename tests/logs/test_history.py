@@ -97,7 +97,6 @@ class MatchHistoryLogTestCase(TestCase):
             None)
 
 
-# TODO: test _interpret_history_log()
 class InterpretHistoryLogTestCase(PatcherTestCase):
 
     def setUp(self):
@@ -166,12 +165,11 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         self.assertEqual(self.mock_parse_yarn_history_log.call_count, 1)
 
     def test_patch_errors(self):
-        # TODO: test inferring IDs
 
         self.mock_parse_yarn_history_log.return_value = dict(
             counters={},
             errors=[
-                dict(),
+                dict(attempt_id='attempt_1449525218032_0005_m_000000_0'),
                 dict(hadoop_error=dict()),
             ])
 
@@ -180,9 +178,14 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
                 [dict(path='/path/to/yarn-history.jhist', yarn=True)]),
                 dict(counters={},
                      errors=[
-                         dict(),
-                         dict(hadoop_error=dict(
-                             path='/path/to/yarn-history.jhist')),
+                         dict(
+                             attempt_id=(
+                                 'attempt_1449525218032_0005_m_000000_0'),
+                             job_id='job_1449525218032_0005',
+                             task_id='task_1449525218032_0005_m_000000'),
+                         dict(
+                             hadoop_error=dict(
+                                 path='/path/to/yarn-history.jhist')),
                     ]))
 
 

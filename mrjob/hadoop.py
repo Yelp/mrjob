@@ -437,7 +437,7 @@ class HadoopJobRunner(MRJobRunner):
             if not step_info['counters']:
                 log.info('Attempting to read counters from history log')
                 history = self._interpret_history_log(step_info)
-                if history is None:
+                if history:
                     step_info['counters'] = history['counters']
 
             self._steps_info.append(step_info)

@@ -435,8 +435,9 @@ class HadoopJobRunner(MRJobRunner):
                 step_info['output_dir'] = self._hdfs_step_output_dir(step_num)
 
             if not step_info['counters']:
+                log.info('Attempting to read counters from history log')
                 history = self._interpret_history_log(step_info)
-                if history is not None:
+                if history is None:
                     step_info['counters'] = history['counters']
 
             self._steps_info.append(step_info)
@@ -594,7 +595,7 @@ class HadoopJobRunner(MRJobRunner):
                             output_dir=step_info.get('output_dir'))):
 
                     if self.fs.exists(log_dir):
-                         log.info('looking for logs in %s' % log_dir)
+                         log.info('Looking for history log in %s' % log_dir)
                          yield [log_dir]
 
             # wrap _ls_history_logs() to add logging
@@ -602,11 +603,11 @@ class HadoopJobRunner(MRJobRunner):
                 # there should be at most one history log
                 for match in _ls_history_logs(
                         self.fs, stream_history_log_dirs(), job_id=job_id):
-                    log.info(
-                        'reading counters/errors from %s' % match['path'])
+                    log.info('Found history log: %s' % match['path'])
                     yield match
 
-            step_info['history'] = _interpret_history_log(ls_history_logs())
+            step_info['history'] = _interpret_history_log(
+                self.fs, ls_history_logs())
 
         return step_info['history']
 

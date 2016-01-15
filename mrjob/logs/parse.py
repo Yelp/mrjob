@@ -14,22 +14,8 @@
 import re
 from logging import getLogger
 
+from .log4j import _parse_hadoop_log4j_records
 
-# log line format output by YARN hadoop jar command
-_HADOOP_LOG_LINE_RE = re.compile(
-    r'^(?P<timestamp>.*?)'
-    r'\s+(?P<level>[A-Z]+)'
-    r'\s+(?P<logger>\S+)'
-    r'(\s+\((?P<thread>.*?)\))?'
-    r': (?P<message>.*?)$')
-
-# log line format output to Hadoop syslog
-_HADOOP_LOG_LINE_ALTERNATE_RE = re.compile(
-    r'^(?P<timestamp>.*?)'
-    r'\s+(?P<level>[A-Z]+)'
-    r'(\s+\[(?P<thread>.*?)\])'
-    r'\s+(?P<logger>\S+)'
-    r': (?P<message>.*?)$')
 
 _APPLICATION_ID_RE = re.compile(r'\bapplication_\d+_\d{4}\b')
 
@@ -117,41 +103,6 @@ _PRE_YARN_COUNTER_RE = re.compile(
 log = getLogger(__name__)
 
 
-def _parse_hadoop_log_lines(lines):
-    """Parse lines from a hadoop log into log4j records.
-
-    Yield dictionaries with the following keys:
-    timestamp -- unparsed timestamp, e.g. '15/12/07 20:49:28',
-        '2015-08-22 00:46:18,411'
-    level -- e.g. 'INFO'
-    logger -- e.g. 'amazon.emr.metrics.MetricsSaver'
-    thread -- e.g. 'main'. May be None
-    message -- the actual message. If this is a multi-line message (e.g.
-        for counters), the lines will be joined by '\n'
-
-    Trailing \r and \n will be stripped from lines.
-    """
-    last_record = None
-
-    for line in lines:
-        line = line.rstrip('\r\n')
-
-        m = (_HADOOP_LOG_LINE_RE.match(line) or
-             _HADOOP_LOG_LINE_ALTERNATE_RE.match(line))
-
-        if m:
-            if last_record:
-                yield last_record
-            last_record = m.groupdict()
-        else:
-            # add on to previous record
-            if last_record:
-                last_record['message'] += '\n' + line
-            else:
-                log.warning('unexpected log line: %s' % line)
-
-    if last_record:
-        yield last_record
 
 
 def _parse_hadoop_streaming_log(lines, record_callback=None):
@@ -180,7 +131,7 @@ def _parse_hadoop_streaming_log(lines, record_callback=None):
     job_id = None
     output_dir = None
 
-    for record in _parse_hadoop_log_lines(lines):
+    for record in _parse_hadoop_log4j_records(lines):
         if record_callback:
             record_callback(record)
 
@@ -266,7 +217,7 @@ def _parse_task_syslog(lines):
     # TODO: just make error a string
     result = dict(error=None, split=None)
 
-    for record in _parse_hadoop_log_lines(lines):
+    for record in _parse_hadoop_log4j_records(lines):
         message = record['message']
 
         m = _OPENING_FOR_READING_RE.match(message)

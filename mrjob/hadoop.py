@@ -600,10 +600,11 @@ class HadoopJobRunner(MRJobRunner):
             # wrap _ls_history_logs() to add logging
             def ls_history_logs():
                 # there should be at most one history log
-                for path in _ls_history_logs(
+                for match in _ls_history_logs(
                         self.fs, stream_history_log_dirs(), job_id=job_id):
-                    log.info('reading counters/errors from %s' % path)
-                    yield path
+                    log.info(
+                        'reading counters/errors from %s' % match['path'])
+                    yield match
 
             step_info['history'] = _interpret_history_log(ls_history_logs())
 

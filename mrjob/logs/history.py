@@ -14,6 +14,7 @@
 # limitations under the License.
 """Code for parsing the history file, which contains counters and error
 messages for each task."""
+import json
 import re
 from logging import getLogger
 
@@ -140,12 +141,7 @@ def _interpret_history_log(fs, matches):
 
 
 def _parse_yarn_history_log(lines):
-    """Collect useful info from a YARN history file."""
-    raise NotImplementedError
-
-
-def _parse_pre_yarn_history_log(lines):
-    """Collect useful info from a pre-YARN history file.
+    """Collect useful info from a YARN history file.
 
     This returns a dictionary with the following keys:
 
@@ -156,12 +152,108 @@ def _parse_pre_yarn_history_log(lines):
             error: lines of error, as as string
             start_line: first line of log containing the error (0-indexed)
             num_lines: # of lines of log containing the error
+        task_id: ID of task with this error
         task_attempt_id: ID of task attempt with this error
+    """
+    task_to_counters = {}  # used for successful tasks in failed jobs
+    job_counters = None
+    errors = []
+
+    for line_num, line in enumerate(lines):
+        # empty space or "Avro-Json" header
+        if not line.startswith('{'):
+            continue
+
+        try:
+            record = json.loads(line)
+        except:
+            continue
+
+        record_type = record.get('type') or ''
+
+        if record_type.endswith('_ATTEMPT_FAILED'):
+            for event in record.get('event', {}).values():
+                error_str = event.get('error')
+                if not error_str:
+                    continue
+
+                error = dict(
+                    hadoop_error=dict(
+                        error=error_str,
+                        start_line=line_num,
+                        num_lines=1))
+
+                if 'taskid' in event:
+                    error['task_id'] = event['taskid']
+
+                if 'attemptId' in event:
+                    error['attempt_id'] = event['attempt_id']
+
+                errors.append(error)
+
+        elif record_type in ('TASK_FINISHED', 'JOB_FINISHED'):
+            for event in record.get('event', {}).values():
+                counters_record = event.get('counters')
+                if not counters_record:
+                    continue
+
+                try:
+                    counters = _munge_yarn_counters(counters_record)
+                except (AttributeError, TypeError):
+                    log.warning('counters in unexpected format, skipping...')
+
+                if record_type == 'TASK_FINISHED':
+                    task_id = event.get('taskid')
+                    if task_id:
+                        task_to_counters[task_id] = counters
+                else:
+                    # record_type is JOB_FINISHED
+                    job_counters = counters
+
+    # if job failed, patch together counters from successful tasks
+    if job_counters is None:
+        job_counters = _sum_counters(*task_to_counters.values())
+
+    return dict(counters=job_counters,
+                errors=errors)
+
+
+def _munge_yarn_counters(counters_record):
+    """Convert Avro-Json counter data structure to our
+    group -> counter -> amount format.
+
+    In theory, this could raise TypeError or AttributeError if
+    it encounters an unexpected data structure.
+    """
+    counters = {}
+
+    for group_record in counters_record.get('groups', []):
+        group = group_record.get('displayName')
+        if not group:
+            continue
+
+        for counter_record in group_record.get('counts', []):
+            counter = counter_record.get('displayName')
+            amount = counter_record.get('value')
+
+            # there are records where amount is 0, but that doesn't seem useful
+            if not (counter and amount):
+                counters.setdefault(group, {})
+                counters[group].setdefault(counter, 0)
+                counters[group][counter] += amount
+
+    return counters
+
+
+def _parse_pre_yarn_history_log(lines):
+    """Collect useful info from a pre-YARN history file.
+
+    See :py:func:`_parse_yarn_history_log` for return format.
     """
     # tantalizingly, STATE_STRING contains the split (URI and line numbers)
     # read, but only for successful tasks, which doesn't help with debugging
 
-    task_id_to_counters = {}  # used for successful tasks in failed jobs
+    task_to_counters = {}  # used for successful tasks in failed jobs
     job_counters = None
     errors = []
 
@@ -182,7 +274,7 @@ def _parse_pre_yarn_history_log(lines):
             task_id = fields['TASKID']
             counters = _parse_pre_yarn_counters(fields['COUNTERS'])
 
-            task_id_to_counters[task_id] = counters
+            task_to_counters[task_id] = counters
 
         elif (record['type'] in ('MapAttempt', 'ReduceAttempt') and
               'TASK_ATTEMPT_ID' in fields and 'ERROR' in fields):
@@ -191,11 +283,12 @@ def _parse_pre_yarn_history_log(lines):
                     error=fields['ERROR'],
                     start_line=record['start_line'],
                     num_lines=record['num_lines']),
+                # TODO: this should be just attempt_id
                 task_attempt_id=fields['TASK_ATTEMPT_ID']))
 
     # if job failed, patch together counters from successful tasks
     if job_counters is None:
-        job_counters = _sum_counters(*task_id_to_counters.values())
+        job_counters = _sum_counters(*task_to_counters.values())
 
     return dict(counters=job_counters,
                 errors=errors)

@@ -165,6 +165,8 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         self.assertEqual(self.mock_parse_yarn_history_log.call_count, 1)
 
     def test_patch_errors(self):
+        # TODO: test inferring IDs
+
         self.mock_parse_yarn_history_log.return_value = dict(
             counters={},
             errors=[
@@ -181,8 +183,6 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
                          dict(hadoop_error=dict(
                              path='/path/to/yarn-history.jhist')),
                     ]))
-
-
 
 
 # log parsing

@@ -19,6 +19,8 @@ from logging import getLogger
 from mrjob.parse import is_s3_uri
 from mrjob.util import file_ext
 
+# old code, currently used by EMR log parsing
+
 # relative path to look for logs in
 _LOG_TYPE_TO_RELATIVE_PATH = dict(
     all='',
@@ -288,12 +290,14 @@ def _sorted_log_paths(log_paths, log_path_re, step_num_to_id=None):
 
 # Hadoop logging stuff; this is the new hotness
 
+# what syslog paths look like on YARN
 _YARN_TASK_SYSLOG_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<application_id>application_\d+_\d{4})/'
     r'(?P<container_id>container(_\d+)+)/'
     r'syslog(?P<suffix>\.\w+)?')
 
+# what syslog paths look like pre-YARN
 _PRE_YARN_TASK_SYSLOG_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_'
@@ -301,6 +305,13 @@ _PRE_YARN_TASK_SYSLOG_RE = re.compile(
     r'(?P<attempt_num>\d+)/'
     r'syslog(?P<suffix>\.\w+)?')
 
+# what job history (e.g. counters) look like on either YARN or pre-YARN.
+# YARN uses - instead of _ to separate fields. This should work for
+# non-streaming jars as well.
+_JOB_HISTORY_RE = re.compile(
+    r'^(?P<prefix>.*?/)'
+    r'(?P<job_id>job_\d+_\d{4})'
+    r'[_-]\d+[_-]hadoop[_-]\S*$')
 
 def _ls_logs(fs, log_dir):
     """ls() the given directory, but log a warning on IOError."""
@@ -309,7 +320,6 @@ def _ls_logs(fs, log_dir):
             yield path
     except IOError as e:
         log.warning("couldn't ls() %s: %r" % (log_dir, e))
-
 
 
 def _ls_yarn_task_syslogs(fs, log_dirs, application_id=None):
@@ -387,8 +397,9 @@ def _ls_syslogs_helper(fs, log_dirs, key_func):
     if isinstance(log_dirs, str):
         raise TypeError
 
+    path_to_sort_key = {}
+
     for log_dir in log_dirs:
-        path_to_sort_key = {}
 
         for path in _ls_logs(fs, log_dir):
             sort_key = key_func(path)
@@ -396,11 +407,8 @@ def _ls_syslogs_helper(fs, log_dirs, key_func):
             if sort_key:
                 path_to_sort_key[path] = sort_key
 
-        if path_to_sort_key:
-            return sorted(path_to_sort_key, key=lambda k: path_to_sort_key[k],
-                          reverse=True)
-
-    return []
+    return sorted(path_to_sort_key, key=lambda k: path_to_sort_key[k],
+                  reverse=True)
 
 
 def _stderr_for_syslog(path):
@@ -411,3 +419,22 @@ def _stderr_for_syslog(path):
     """
     stem, filename = posixpath.split(path)
     return posixpath.join(stem, 'stderr' + file_ext(filename))
+
+
+def _ls_job_history_logs(fs, log_dirs, job_id=None):
+    """Yield paths/uris of all job history files in the given directories,
+    optionally filtering by *job_id*.
+    """
+    if isinstance(log_dirs, str):
+        raise TypeError
+
+    for log_dir in log_dirs:
+        for path in _ls_logs(fs, log_dir):
+            m = _JOB_HISTORY_RE.match(path)
+            if not m:
+                continue
+
+            if not (job_id is None or m.group('job_id') == job_id):
+                continue
+
+            yield path

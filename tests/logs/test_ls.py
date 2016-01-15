@@ -19,6 +19,7 @@ from mrjob.logs.ls import _PRE_YARN_TASK_SYSLOG_RE
 from mrjob.logs.ls import _TASK_LOG_PATH_RE
 from mrjob.logs.ls import _YARN_TASK_SYSLOG_RE
 from mrjob.logs.ls import _stderr_for_syslog
+from mrjob.logs.ls import _ls_job_history_logs
 from mrjob.logs.ls import _ls_logs
 from mrjob.logs.ls import _ls_pre_yarn_task_syslogs
 from mrjob.logs.ls import _ls_yarn_task_syslogs
@@ -140,6 +141,8 @@ class LogRegexTestCase(TestCase):
         self.assertEqual(m.group('attempt_num'), '0')
         self.assertEqual(m.group('suffix'), '.gz')
 
+    # _JOB_HISTORY_RE only captures job_id, which is tested below
+
 
 class StderrForSyslogTestCase(TestCase):
 
@@ -209,10 +212,10 @@ class LsLogsTestCase(TestCase):
             self.assertIn("couldn't ls() /path/to/logs", stderr.getvalue())
 
 
-class LsTaskSyslogsTestCase(PatcherTestCase):
+class MockLsLogsTestCase(PatcherTestCase):
 
     def setUp(self):
-        super(LsTaskSyslogsTestCase, self).setUp()
+        super(MockLsLogsTestCase, self).setUp()
 
         self.mock_fs = 'MOCK_FS'
         self.mock_paths = []
@@ -226,7 +229,7 @@ class LsTaskSyslogsTestCase(PatcherTestCase):
         self.start(patch('mrjob.logs.ls._ls_logs', mock_ls_logs))
 
 
-class LsYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
+class LsYarnTaskSyslogsTestCase(MockLsLogsTestCase):
 
     def test_no_log_dirs(self):
         self.assertEqual(_ls_yarn_task_syslogs(self.mock_fs, []), [])
@@ -273,30 +276,11 @@ class LsYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
              '/log/dir/userlogs/application_1450486922681_0005'
              '/container_1450486922681_0005_01_000003/syslog'])
 
-    def test_read_logs_from_at_most_one_dir(self):
-        self.mock_paths = [
-            '/log/dir/userlogs/application_1450486922681_0004'
-            '/container_1450486922681_0005_01_000003/syslog',
-        ]
-
-        self.assertEqual(
-            _ls_yarn_task_syslogs(
-                self.mock_fs, ['hdfs:///output/_logs', '/log/dir']),
-            ['/log/dir/userlogs/application_1450486922681_0004'
-             '/container_1450486922681_0005_01_000003/syslog'])
-
-        self.mock_paths.append(
-            'hdfs:///output/_logs/userlogs/application_1450486922681_0004'
-            '/container_1450486922681_0005_01_000003/syslog')
-
-        self.assertEqual(
-            _ls_yarn_task_syslogs(
-                self.mock_fs, ['hdfs:///output/_logs', '/log/dir']),
-            ['hdfs:///output/_logs/userlogs/application_1450486922681_0004'
-             '/container_1450486922681_0005_01_000003/syslog'])
+    # reading from multiple dirs is handled by code shared with
+    # _ls_pre_yarn_task_syslogs(), and thus is tested below
 
 
-class LsPreYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
+class LsPreYarnTaskSyslogsTestCase(MockLsLogsTestCase):
 
     def test_no_log_dirs(self):
         self.assertEqual(_ls_pre_yarn_task_syslogs(self.mock_fs, []), [])
@@ -330,5 +314,73 @@ class LsPreYarnTaskSyslogsTestCase(LsTaskSyslogsTestCase):
                 job_id='job_201512232143_0006'),
             ['/userlogs/attempt_201512232143_0006_m_000000_0/syslog'])
 
-    # subdirs and reading from at most one subdir are handled by code
-    # shared with _ls_yarn_task_syslogs(), and thus are tested above
+    def test_read_logs_from_multiple_dirs(self):
+        self.mock_paths = [
+            'ssh://node1/logs/attempt_201512232143_0008_m_000000_0/syslog',
+            'ssh://node2/logs/attempt_201512232143_0008_r_000000_0/syslog',
+            'ssh://node1/etc/sys-stuff',
+        ]
+
+        self.assertEqual(
+            _ls_pre_yarn_task_syslogs(
+                self.mock_fs,
+                ['ssh://node1/logs', 'ssh://node2/logs']),
+            ['ssh://node2/logs/attempt_201512232143_0008_r_000000_0/syslog',
+             'ssh://node1/logs/attempt_201512232143_0008_m_000000_0/syslog',])
+
+
+    # subdirs are handled by code shared with _ls_yarn_task_syslogs(), and
+    # thus are tested above
+
+
+class LsJobHistoryLogs(MockLsLogsTestCase):
+
+    def test_no_log_dirs(self):
+        self.assertEqual(list(_ls_job_history_logs(self.mock_fs, [])), [])
+
+    def test_pre_yarn(self):
+        self.mock_paths = [
+            '/logs/history/done/version-1/host_1451590133273_/2015/12/31'
+            '/000000/job_201512311928_0001_1451590317008_hadoop'
+            '_streamjob8025762403845318969.jar',
+            '/logs/history/done/version-1/host_1451590133273_/2015/12/31'
+            '/000000/job_201512311928_0001_conf.xml',
+            '/logs/history/done/version-1/host_1451590133273_/2015/12/31'
+            '/000000/job_201512311928_0002_1451590930047_hadoop'
+            '_streamjob8971190398668159070.jar',
+        ]
+
+        self.assertEqual(
+            list(_ls_job_history_logs(self.mock_fs, ['/logs/history'])),
+            [self.mock_paths[0], self.mock_paths[2]])
+
+        # filter by job_id
+        self.assertEqual(
+            list(_ls_job_history_logs(self.mock_fs, ['/logs/history'],
+                                      job_id='job_201512311928_0001')),
+            [self.mock_paths[0]])
+
+    def test_yarn(self):
+        self.mock_paths = [
+            'hdfs:///tmp/hadoop-yarn/staging/history/done/2015/12/31/000000/'
+            'job_1451592123989_0001-1451592605470-hadoop-QuasiMonteCarlo'
+            '-1451592786882-10-1-SUCCEEDED-default-1451592631082.jhist',
+            'hdfs:///tmp/hadoop-yarn/staging/history/done/2015/12/31/000000/'
+            'job_1451592123989_0001_conf.xml',
+            'hdfs:///tmp/hadoop-yarn/staging/history/done/2015/12/31/000000/'
+            'job_1451592123989_0002-1451593615731-hadoop'
+            '-streamjob1167072285631954001.jar-1451593662474-2-0-SUCCEEDED'
+            '-default-1451593630518.jhist',
+        ]
+
+        self.assertEqual(
+            list(_ls_job_history_logs(
+                self.mock_fs, ['hdfs:///tmp/hadoop-yarn/staging/history'])),
+            [self.mock_paths[0], self.mock_paths[2]])
+
+        # filter by job_id
+        self.assertEqual(
+            list(_ls_job_history_logs(
+                self.mock_fs, ['hdfs:///tmp/hadoop-yarn/staging/history'],
+                job_id='job_1451592123989_0002')),
+            [self.mock_paths[2]])

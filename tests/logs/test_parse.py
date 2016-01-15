@@ -14,8 +14,11 @@
 from mrjob.logs.parse import _parse_hadoop_log_lines
 from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logs.parse import _parse_indented_counters
+from mrjob.logs.parse import _parse_pre_yarn_counters
+from mrjob.logs.parse import _parse_pre_yarn_history_file
 from mrjob.logs.parse import _parse_python_task_stderr
 from mrjob.logs.parse import _parse_task_syslog
+from mrjob.logs.parse import _summarize_pre_yarn_history
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
@@ -364,7 +367,7 @@ class ParseTaskSyslogTestCase(TestCase):
 
 
 
-class ParsePythonTaskStderr(TestCase):
+class ParsePythonTaskStderrTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_python_task_stderr([]),
@@ -388,3 +391,265 @@ class ParsePythonTaskStderr(TestCase):
                     '  File "mr_boom.py", line 10, in <module>',
                     '    MRBoom.run()',
                 ])))
+
+
+class ParsePreYARNHistoryFileTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(list(_parse_pre_yarn_history_file([])), [])
+
+    def test_basic(self):
+        lines = [
+            'Meta VERSION="1" .\n',
+            'Job JOBID="job_201601081945_0005" JOB_PRIORITY="NORMAL" .\n',
+        ]
+        self.assertEqual(
+            list(_parse_pre_yarn_history_file(lines)),
+            [
+                dict(
+                    fields=dict(
+                        VERSION='1'
+                    ),
+                    start_line=0,
+                    num_lines=1,
+                    type='Meta',
+                ),
+                dict(
+                    fields=dict(
+                        JOBID='job_201601081945_0005',
+                        JOB_PRIORITY='NORMAL'
+                    ),
+                    num_lines=1,
+                    start_line=1,
+                    type='Job',
+                )
+            ])
+
+    def test_unescape(self):
+        lines = [
+            'Task TASKID="task_201512311928_0001_m_000003" TASK_TYPE="MAP"'
+            ' START_TIME="1451590341378"'
+            ' SPLITS="/default-rack/172\\.31\\.22\\.226" .\n',
+        ]
+
+        self.assertEqual(
+            list(_parse_pre_yarn_history_file(lines)),
+            [
+                dict(
+                    fields=dict(
+                        TASKID='task_201512311928_0001_m_000003',
+                        TASK_TYPE='MAP',
+                        START_TIME='1451590341378',
+                        SPLITS='/default-rack/172.31.22.226',
+                    ),
+                    num_lines=1,
+                    start_line=0,
+                    type='Task',
+                ),
+            ])
+
+    def test_multiline(self):
+        lines = [
+            'MapAttempt TASK_TYPE="MAP"'
+            ' TASKID="task_201601081945_0005_m_000001"'
+            ' TASK_STATUS="FAILED"'
+            ' ERROR="java\.lang\.RuntimeException:'
+            ' PipeMapRed\.waitOutputThreads():'
+            ' subprocess failed with code 1\n',
+            '        at org\\.apache\\.hadoop\\.streaming\\.PipeMapRed'
+            '\\.waitOutputThreads(PipeMapRed\\.java:372)\n',
+            '        at org\\.apache\\.hadoop\\.streaming\\.PipeMapRed'
+            '\\.mapRedFinished(PipeMapRed\\.java:586)\n',
+            '" .\n',
+        ]
+
+        self.assertEqual(
+            list(_parse_pre_yarn_history_file(lines)),
+            [
+                dict(
+                    fields=dict(
+                        ERROR=(
+                            'java.lang.RuntimeException: PipeMapRed'
+                            '.waitOutputThreads():'
+                            ' subprocess failed with code 1\n'
+                            '        at org.apache.hadoop.streaming.PipeMapRed'
+                            '.waitOutputThreads(PipeMapRed.java:372)\n'
+                            '        at org.apache.hadoop.streaming.PipeMapRed'
+                            '.mapRedFinished(PipeMapRed.java:586)\n'),
+                        TASK_TYPE='MAP',
+                        TASKID='task_201601081945_0005_m_000001',
+                        TASK_STATUS='FAILED',
+                    ),
+                    num_lines=4,
+                    start_line=0,
+                    type='MapAttempt',
+                ),
+            ])
+
+    def test_bad_records(self):
+        # should just silently ignore bad records and yield good ones
+        lines = [
+            '\n',
+            'Foo BAZ .\n',
+            'Job JOBID="job_201601081945_0005" JOB_PRIORITY="NORMAL" .\n',
+            'Job JOBID="\n',
+        ]
+
+        self.assertEqual(
+            list(_parse_pre_yarn_history_file(lines)),
+            [
+                dict(
+                    fields=dict(
+                        JOBID='job_201601081945_0005',
+                        JOB_PRIORITY='NORMAL'
+                    ),
+                    num_lines=1,
+                    start_line=2,
+                    type='Job',
+                )
+            ])
+
+
+class ParsePreYARNCountersTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_pre_yarn_counters(''), {})
+
+    def test_basic(self):
+        counter_str = (
+            '{(org.apache.hadoop.mapred.JobInProgress$Counter)'
+            '(Job Counters )'
+            '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]'
+            '[(TOTAL_LAUNCHED_MAPS)(Launched map tasks)(2)]}'
+            '{(FileSystemCounters)(FileSystemCounters)'
+            '[(FILE_BYTES_READ)(FILE_BYTES_READ)(10547174)]}')
+
+        self.assertEqual(
+            _parse_pre_yarn_counters(counter_str), {
+                'Job Counters ': {
+                    'Launched reduce tasks': 1,
+                    'Launched map tasks': 2,
+                },
+                'FileSystemCounters': {
+                    'FILE_BYTES_READ': 10547174,
+                },
+            })
+
+    def test_escape_sequences(self):
+        counter_str = (
+            r'{(\)\(\)\(\)\})(\)\(\)\(\)\})'
+            r'[(\\)(\\)(1)]'
+            r'[(\[\])(\[\])(2)]'
+            r'[(\{\})(\{\})(3)]'
+            r'[(\(\))(\(\))(4)]}')
+
+        self.assertEqual(
+            _parse_pre_yarn_counters(counter_str), {
+                ')()()}': {
+                    '\\': 1,
+                    '[]': 2,
+                    '{}': 3,
+                    '()': 4,
+                },
+            })
+
+
+class SummarizePreYARNHistoryFileTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(
+            _summarize_pre_yarn_history([]),
+            dict(counters={}, errors=[]))
+
+    def test_job_counters(self):
+        lines = [
+            'Job JOBID="job_201106092314_0003" FINISH_TIME="1307662284564"'
+            ' JOB_STATUS="SUCCESS" FINISHED_MAPS="2" FINISHED_REDUCES="1"'
+            ' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="'
+            '{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)'
+            '(Job Counters )'
+            '[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]}" .\n'
+        ]
+
+        self.assertEqual(
+            _summarize_pre_yarn_history(_parse_pre_yarn_history_file(lines)),
+            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}},
+                 errors=[]))
+
+    maxDiff = None
+
+    def test_task_counters(self):
+        lines = [
+            'Task TASKID="task_201601081945_0005_m_000005" TASK_TYPE="SETUP"'
+            ' TASK_STATUS="SUCCESS" FINISH_TIME="1452283612363"'
+            ' COUNTERS="{(FileSystemCounters)(FileSystemCounters)'
+            '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(27785)]}" .\n',
+            'Task TASKID="task_201601081945_0005_m_000000" TASK_TYPE="MAP"'
+            ' TASK_STATUS="SUCCESS" FINISH_TIME="1452283651437"'
+            ' COUNTERS="{'
+            '(org\.apache\.hadoop\.mapred\.FileOutputFormat$Counter)'
+            '(File Output Format Counters )'
+            '[(BYTES_WRITTEN)(Bytes Written)(0)]}'
+            '{(FileSystemCounters)(FileSystemCounters)'
+            '[(FILE_BYTES_WRITTEN)(FILE_BYTES_WRITTEN)(27785)]'
+            '[(HDFS_BYTES_READ)(HDFS_BYTES_READ)(248)]}" .\n',
+        ]
+
+        self.assertEqual(
+            _summarize_pre_yarn_history(_parse_pre_yarn_history_file(lines)),
+            dict(
+                counters={
+                    'FileSystemCounters': {
+                        'FILE_BYTES_WRITTEN': 55570,
+                        'HDFS_BYTES_READ': 248,
+                    },
+                    'File Output Format Counters ': {
+                        'Bytes Written': 0,
+                        },
+                },
+                errors=[]))
+
+    def test_errors(self):
+        lines = [
+            'MapAttempt TASK_TYPE="MAP"'
+            ' TASKID="task_201601081945_0005_m_000001"'
+            ' TASK_ATTEMPT_ID='
+            '"task_201601081945_0005_m_00000_2"'
+            ' TASK_STATUS="FAILED"'
+            ' ERROR="java\.lang\.RuntimeException:'
+            ' PipeMapRed\.waitOutputThreads():'
+            ' subprocess failed with code 1\n',
+            '        at org\\.apache\\.hadoop\\.streaming\\.PipeMapRed'
+            '\\.waitOutputThreads(PipeMapRed\\.java:372)\n',
+            '        at org\\.apache\\.hadoop\\.streaming\\.PipeMapRed'
+            '\\.mapRedFinished(PipeMapRed\\.java:586)\n',
+            '" .\n',
+        ]
+
+        path = '/history/history.jar'
+
+        self.assertEqual(
+            _summarize_pre_yarn_history(_parse_pre_yarn_history_file(lines),
+                                        path=path),
+            dict(
+                counters={},
+                errors=[
+                    dict(
+                        java_error=dict(
+                            error=(
+                                'java.lang.RuntimeException: PipeMapRed'
+                                '.waitOutputThreads():'
+                                ' subprocess failed with code 1\n'
+                                '        at org.apache.hadoop.streaming'
+                                '.PipeMapRed.waitOutputThreads'
+                                '(PipeMapRed.java:372)\n'
+                                '        at org.apache.hadoop.streaming'
+                                '.PipeMapRed.mapRedFinished'
+                                '(PipeMapRed.java:586)\n'),
+                            num_lines=4,
+                            path=path,
+                            start_line=0,
+                        ),
+                        task_attempt_id='task_201601081945_0005_m_00000_2',
+                    ),
+                ]))

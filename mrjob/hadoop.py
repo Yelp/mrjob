@@ -36,11 +36,12 @@ from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.logparsers import scan_for_counters_in_files
 from mrjob.logs.interpret import _find_error_in_task_logs
 from mrjob.logs.interpret import _format_cause_of_failure
 from mrjob.logs.parse import _INDENTED_COUNTERS_START_RE
 from mrjob.logs.parse import _parse_hadoop_streaming_log
+from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.history import _interpret_history_log
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
@@ -434,7 +435,9 @@ class HadoopJobRunner(MRJobRunner):
                 step_info['output_dir'] = self._hdfs_step_output_dir(step_num)
 
             if not step_info['counters']:
-                pass  # TODO: fetch counters; see _fetch_counters()
+                history = self._interpret_history_log(step_info)
+                if history is not None:
+                    step_info['counters'] = history['counters']
 
             self._steps_info.append(step_info)
 
@@ -577,6 +580,35 @@ class HadoopJobRunner(MRJobRunner):
 
     ### LOG FETCHING/PARSING ###
 
+    def _interpret_history_log(self, step_info):
+        if 'history' not in step_info:
+            job_id = step_info.get('job_id')
+
+            if not job_id:
+                log.warning("Can't fetch history without job ID")
+                return None
+
+            def stream_history_log_dirs():
+                for log_dir in unique(
+                        self._hadoop_log_dirs(
+                            output_dir=step_info.get('output_dir'))):
+
+                    if self.fs.exists(log_dir):
+                         log.info('looking for logs in %s' % log_dir)
+                         yield [log_dir]
+
+            # wrap _ls_history_logs() to add logging
+            def ls_history_logs():
+                # there should be at most one history log
+                for path in _ls_history_logs(
+                        self.fs, stream_history_log_dirs(), job_id=job_id):
+                    log.info('reading counters/errors from %s' % path)
+                    yield path
+
+            step_info['history'] = _interpret_history_log(ls_history_logs())
+
+        return step_info['history']
+
     def _find_probable_cause_of_failure(self, application_id=None, job_id=None,
                                         output_dir=None, **ignored):
         """Find probable cause of failure. Currently we just scan task logs.
@@ -620,22 +652,6 @@ class HadoopJobRunner(MRJobRunner):
             application_id=application_id, job_id=job_id)
 
         # TODO: catch timeouts, etc.
-
-    # TODO: redo this
-    def _fetch_counters(self, step_nums, skip_s3_wait=False):
-        """Read Hadoop counters from local logs.
-
-        Args:
-        step_nums -- the steps belonging to us, so that we can ignore errors
-                     from other jobs run with the same timestamp
-        """
-        uris = self._ls_logs('job', step_nums)
-        new_counters = scan_for_counters_in_files(uris, self,
-                                                  self.get_hadoop_version())
-
-        # only include steps relevant to the current job
-        for step_num in step_nums:
-            self._counters.append(new_counters.get(step_num, {}))
 
     def counters(self):
         return [step_info['counters'] for step_info in self._steps_info]

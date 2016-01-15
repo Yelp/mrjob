@@ -80,7 +80,7 @@ def _ls_history_logs(fs, log_dir_stream, job_id=None):
     """Yield matching files, optionally filtering by *job_id*. Yields dicts
     with the keys:
 
-    job_id: job_id in path (must match *job_id* if set
+    job_id: job_id in path (must match *job_id* if set)
     path: path/URI of log file
     yarn: true if this is a YARN log file
 

@@ -131,7 +131,7 @@ def _interpret_history_log(fs, matches):
             result = _parse_pre_yarn_history_log(_cat_log(fs, path))
 
         # patch path, task_id, etc. into errors
-        for error in result['errors']:
+        for error in result.get('errors') or ():
             if 'hadoop_error' in error:
                 error['hadoop_error']['path'] = path
 
@@ -139,14 +139,14 @@ def _interpret_history_log(fs, matches):
 
         return result
 
-    return dict(counters={}, errors=[])
+    return {}
 
 
 def _parse_yarn_history_log(lines):
     """Collect useful info from a YARN history file, dealing gracefully
     with unexpected data structures.
 
-    This returns a dictionary with the following keys:
+    This returns a dictionary which may contain the following keys:
 
     counters: map from group to counter to amount. If job failed, we sum
         counters for succesful tasks
@@ -158,9 +158,8 @@ def _parse_yarn_history_log(lines):
         task_id: ID of task with this error
         attempt_id: ID of task attempt with this error
     """
+    result = {}
     task_to_counters = {}  # used for successful tasks in failed jobs
-    job_counters = None
-    errors = []
 
     for line_num, line in enumerate(lines):
         # empty space or "Avro-Json" header
@@ -201,7 +200,8 @@ def _parse_yarn_history_log(lines):
                 if isinstance(event.get('attemptId'), string_types):
                     error['attempt_id'] = event['attemptId']
 
-                errors.append(error)
+                result.setdefault('errors', [])
+                result['errors'].append(error)
 
         elif record_type == 'TASK_FINISHED':
             for event in events:
@@ -209,22 +209,27 @@ def _parse_yarn_history_log(lines):
                 if not isinstance(task_id, string_types):
                     continue
 
-                counters = _extract_yarn_counters(event.get('counters'))
+                counters_record = event.get('counters')
+                if not isinstance(counters_record, dict):
+                    continue
 
-                task_to_counters[task_id] = counters
+                task_to_counters[task_id] = _extract_yarn_counters(
+                    counters_record)
 
         elif record_type == 'JOB_FINISHED':
             for event in events:
                 # mapCounters and reduceCounters are also available
-                job_counters = _extract_yarn_counters(
-                    event.get('totalCounters'))
+                counters_record = event.get('totalCounters')
+                if not isinstance(counters_record, dict):
+                    continue
+
+                result['counters'] = _extract_yarn_counters(counters_record)
 
     # if job failed, patch together counters from successful tasks
-    if job_counters is None:
-        job_counters = _sum_counters(*task_to_counters.values())
+    if 'counters' not in result and task_to_counters:
+        result['counters'] = _sum_counters(*task_to_counters.values())
 
-    return dict(counters=job_counters,
-                errors=errors)
+    return result
 
 
 def _extract_yarn_counters(counters_record):
@@ -279,17 +284,15 @@ def _parse_pre_yarn_history_log(lines):
     """
     # tantalizingly, STATE_STRING contains the split (URI and line numbers)
     # read, but only for successful tasks, which doesn't help with debugging
-
+    result = {}
     task_to_counters = {}  # used for successful tasks in failed jobs
-    job_counters = None
-    errors = []
 
     for record in _parse_pre_yarn_history_records(lines):
         fields = record['fields']
 
         # if job is successful, we get counters for the entire job at the end
         if record['type'] == 'Job' and 'COUNTERS' in fields:
-            job_counters = _parse_pre_yarn_counters(fields['COUNTERS'])
+            result['counters'] = _parse_pre_yarn_counters(fields['COUNTERS'])
 
         # otherwise, compile counters for each successful task
         #
@@ -305,7 +308,8 @@ def _parse_pre_yarn_history_log(lines):
 
         elif (record['type'] in ('MapAttempt', 'ReduceAttempt') and
               'TASK_ATTEMPT_ID' in fields and 'ERROR' in fields):
-            errors.append(dict(
+            result.setdefault('errors', [])
+            result['errors'].append(dict(
                 java_error=dict(
                     error=fields['ERROR'],
                     start_line=record['start_line'],
@@ -313,11 +317,10 @@ def _parse_pre_yarn_history_log(lines):
                 attempt_id=fields['TASK_ATTEMPT_ID']))
 
     # if job failed, patch together counters from successful tasks
-    if job_counters is None:
-        job_counters = _sum_counters(*task_to_counters.values())
+    if 'counters' not in result and task_to_counters:
+        result['counters'] = _sum_counters(*task_to_counters.values())
 
-    return dict(counters=job_counters,
-                errors=errors)
+    return result
 
 
 def _parse_pre_yarn_history_records(lines):

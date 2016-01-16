@@ -124,8 +124,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         return _interpret_history_log(self.mock_fs, matches)
 
     def test_empty(self):
-        self.assertEqual(self.interpret_history_log([]),
-                         dict(counters={}, errors=[]))
+        self.assertEqual(self.interpret_history_log([]), {})
 
     def test_pre_yarn(self):
         self.assertEqual(
@@ -165,9 +164,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         self.assertEqual(self.mock_parse_yarn_history_log.call_count, 1)
 
     def test_patch_errors(self):
-
         self.mock_parse_yarn_history_log.return_value = dict(
-            counters={},
             errors=[
                 dict(attempt_id='attempt_1449525218032_0005_m_000000_0'),
                 dict(hadoop_error=dict()),
@@ -176,8 +173,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         self.assertEqual(
             self.interpret_history_log(
                 [dict(path='/path/to/yarn-history.jhist', yarn=True)]),
-                dict(counters={},
-                     errors=[
+                dict(errors=[
                          dict(
                              attempt_id=(
                                  'attempt_1449525218032_0005_m_000000_0'),
@@ -226,9 +222,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
     ]
 
     def test_empty(self):
-        self.assertEqual(
-            _parse_yarn_history_log([]),
-            dict(counters={}, errors=[]))
+        self.assertEqual(_parse_yarn_history_log([]), {})
 
     def handle_non_json(self):
         lines = [
@@ -238,9 +232,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
             '{not JSON\n',
         ]
 
-        self.assertEqual(
-            _parse_yarn_history_log([]),
-            dict(counters={}, errors=[]))
+        self.assertEqual(_parse_yarn_history_log(lines), {})
 
     def test_job_counters(self):
         self.assertEqual(
@@ -252,7 +244,6 @@ class ParseYARNHistoryLogTestCase(TestCase):
                         'HDFS: Number of bytes read': 588,
                     }
                 },
-                errors=[],
             ))
 
     def test_task_counters(self):
@@ -264,8 +255,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
                         'FILE: Number of bytes read': 0,
                         'FILE: Number of bytes written': 102091,
                     }
-                },
-                errors=[],
+                }
             ))
 
     def test_job_counters_beat_task_counters(self):
@@ -279,7 +269,6 @@ class ParseYARNHistoryLogTestCase(TestCase):
                         'HDFS: Number of bytes read': 588,
                     }
                 },
-                errors=[],
             ))
 
     def test_errors(self):
@@ -304,7 +293,6 @@ class ParseYARNHistoryLogTestCase(TestCase):
         self.assertEqual(
             _parse_yarn_history_log(lines),
             dict(
-                counters={},
                 errors=[
                     dict(
                         hadoop_error=dict(
@@ -332,7 +320,6 @@ class ParseYARNHistoryLogTestCase(TestCase):
                     ),
                 ]))
 
-    maxDiff = None
 
 
 
@@ -364,15 +351,12 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
     ]
 
     def test_empty(self):
-        self.assertEqual(
-            _parse_pre_yarn_history_log([]),
-            dict(counters={}, errors=[]))
+        self.assertEqual(_parse_pre_yarn_history_log([]), {})
 
     def test_job_counters(self):
         self.assertEqual(
             _parse_pre_yarn_history_log(self.JOB_COUNTER_LINES),
-            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}},
-                 errors=[]))
+            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}}))
 
     def test_task_counters(self):
         self.assertEqual(
@@ -386,15 +370,13 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
                     'File Output Format Counters ': {
                         'Bytes Written': 0,
                         },
-                },
-                errors=[]))
+                }))
 
     def test_job_counters_beat_task_counters(self):
         self.assertEqual(
             _parse_pre_yarn_history_log(self.JOB_COUNTER_LINES +
                                         self.TASK_COUNTER_LINES),
-            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}},
-                 errors=[]))
+            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}}))
 
     def test_errors(self):
         lines = [
@@ -418,7 +400,6 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
         self.assertEqual(
             _parse_pre_yarn_history_log(lines),
             dict(
-                counters={},
                 errors=[
                     dict(
                         java_error=dict(

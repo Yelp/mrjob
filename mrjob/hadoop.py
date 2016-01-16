@@ -11,7 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import errno
 import getpass
 import logging
 import os
@@ -38,10 +37,10 @@ from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.interpret import _find_error_in_task_logs
 from mrjob.logs.interpret import _format_cause_of_failure
-from mrjob.logs.parse import _INDENTED_COUNTERS_START_RE
-from mrjob.logs.parse import _parse_hadoop_streaming_log
 from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.history import _interpret_history_log
+from mrjog.logs.step import _is_counter_log4j_record
+from mrjob.logs.step import _parse_hadoop_jar_command_stderr
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
@@ -405,8 +404,9 @@ class HadoopJobRunner(MRJobRunner):
 
                 step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)
 
-                step_info = _process_stderr_from_streaming(
-                    step_proc.stderr)
+                step_info = _parse_hadoop_jar_command_stderr(
+                    step_proc.stderr,
+                    record_callback=_log_record_from_hadoop)
 
                 # there shouldn't be much output to STDOUT
                 for line in step_proc.stdout:
@@ -426,8 +426,9 @@ class HadoopJobRunner(MRJobRunner):
                     with os.fdopen(master_fd, 'rb') as master:
                         # reading from master gives us the subprocess's
                         # stderr and stdout (it's a fake terminal)
-                        step_info = _process_stderr_from_streaming(
-                            _wrap_streaming_pty_output(master))
+                        step_info = _parse_hadoop_jar_command_stderr(
+                            master,
+                            record_callback=_log_record_from_hadoop)
                         _, returncode = os.waitpid(pid, 0)
 
             # make sure output_dir is filled
@@ -671,55 +672,9 @@ def _log_line_from_hadoop(line, level=None):
     log.log(level or logging.INFO, 'HADOOP: %s' % line)
 
 
-def _wrap_streaming_pty_output(lines):
-    """Make output from PTY running hadoop streaming behave like stderr.
-
-    This screens out and logs lines that look like they came from stdout,
-    and treats the EIO error as EOF.
-    """
-    while True:
-        try:
-            line = next(lines)  # okay to get StopIteration
-            if _HADOOP_STDOUT_RE.match(line):
-                _log_line_from_hadoop(to_string(line).rstrip('\r\n'))
-            else:
-                yield line
-        except IOError as e:
-            if e.errno == errno.EIO:
-                return
-            else:
-                raise
-
-
-def _process_stderr_from_streaming(lines):
-    """Wrapper for mrjob.logs._parse_hadoop_streaming_log().
-
-    This converts lines from bytes to str in Python 3, logs every line
-    (abbreviating the counters message, since we log counters next).
-
-    This also screens out and logs 'Streaming Command Failed!', which
-    isn't in log format.
-    """
-    def stderr_to_log(lines):
-        for line in lines:
-            line = to_string(line)
-            if _HADOOP_NON_LOG_LINE_RE.match(line):
-                # use error because this is usually "Streaming Command Failed!"
-                _log_line_from_hadoop(line, level=logging.ERROR)
-            else:
-                yield line
-
-    def callback(record):
-        message = record['message']
-
-        level = getattr(logging, record['level'], None)
-
-        if _INDENTED_COUNTERS_START_RE.match(message):
-            # don't show the counters themselves
-            _log_line_from_hadoop(message.split('\n')[0], level=level)
-            log.info('(parsing counters)')
-        else:
-            _log_line_from_hadoop(message, level=level)
-
-    return _parse_hadoop_streaming_log(stderr_to_log(lines),
-                                       record_callback=callback)
+def _log_record_from_hadoop(record):
+    """Log log4j record parsed from hadoop stderr."""
+    if _is_counter_log4j_record(record):
+        log.info('(parsing counters)')
+    else:
+        _log_record_from_hadoop(record['message'], level=record.get('level'))

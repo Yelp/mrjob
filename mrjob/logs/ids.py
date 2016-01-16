@@ -15,6 +15,8 @@
 """Utility for handling IDs, especially sorting by recency."""
 
 
+# TODO: test these!
+
 def _sort_by_recency(ds):
     """Sort the given list/sequence of dicts containing IDs so that the
     most recent ones come first (e.g. to find the best error, or the best
@@ -32,10 +34,11 @@ def _time_sort_key(d):
     attempt of a task.
     """
     # break ID like
-    # {attempt,task,job}_201601081945_0005[_m[_000005[_0]]] into
+    # {application,attempt,task,job}_201601081945_0005[_m[_000005[_0]]] into
     # its component parts
     attempt_parts = (d.get('attempt_id') or d.get('task_id')
-                     or d.get('job_id') or '').split('_')
+                     or d.get('job_id') or d.get('application_id')
+                     or '').split('_')
 
     timestamp_and_step = '_'.join(attempt_parts[1:3])
     task_type = '_'.join(attempt_parts[3:4])
@@ -57,7 +60,11 @@ def _time_sort_key(d):
 def _add_implied_ids(d):
     """If *d* (a dictionary) has *attempt_id* but not *task_id* add it.
 
-    Similarly, if *d* has *task_id* but not *job_id*, add it.
+    Similarly, if *d* has *task_id* or *application_id* but not *job_id*,
+    add it.
+
+    (We don't infer application_id from job_id because application_id
+    only exists on YARN)
     """
     if d.get('attempt_id') and not d.get('task_id'):
         d['task_id'] = _attempt_id_to_task_id(
@@ -66,7 +73,12 @@ def _add_implied_ids(d):
     if d.get('task_id') and not d.get('job_id'):
         d['job_id'] = _task_id_to_job_id(d['task_id'])
 
-    # TODO: can we do anything with application_id or container_id?
+    if d.get('application_id') and not d.get('job_id'):
+        d['job_id'] = _task_id_to_job_id(d['application_id'])
+
+    # TODO: looks like application_id and job_id are the same, except
+    # they start with 'application' and 'job', respectively. Of course,
+    # application_id only exists on YARN
 
 
 def _attempt_id_to_task_id(attempt_id):
@@ -79,3 +91,9 @@ def _task_id_to_job_id(task_id):
     """Convert e.g. ``'task_201601081945_0005_m_000005'``
     to ``'job_201601081945_0005'``."""
     return 'job_' + '_'.join(task_id.split('_')[1:3])
+
+
+def _application_id_to_job_id(application_id):
+    """Convert .e.g ``'application_1452893364657_0008'``
+    to ``'job_1452893364657_0008'``"""
+    return 'job_' + '_'.join(application_id.split('_')[1:])

@@ -677,4 +677,4 @@ def _log_record_from_hadoop(record):
     if _is_counter_log4j_record(record):
         log.info('(parsing counters)')
     else:
-        _log_record_from_hadoop(record['message'], level=record.get('level'))
+        _log_line_from_hadoop(record['message'], level=record.get('level'))

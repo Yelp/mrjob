@@ -432,10 +432,10 @@ class HadoopJobRunner(MRJobRunner):
                         _, returncode = os.waitpid(pid, 0)
 
             # make sure output_dir is filled
-            if not step_info['output_dir']:
+            if 'output_dir' not in step_info:
                 step_info['output_dir'] = self._hdfs_step_output_dir(step_num)
 
-            if not step_info['counters']:
+            if 'counters' not in step_info:
                 log.info('Attempting to read counters from history log')
                 history = self._interpret_history_log(step_info)
                 if 'counters' in history:
@@ -657,7 +657,8 @@ class HadoopJobRunner(MRJobRunner):
         # TODO: catch timeouts, etc.
 
     def counters(self):
-        return [step_info['counters'] for step_info in self._steps_info]
+        return [step_info.get('counters') or {}
+                for step_info in self._steps_info]
 
 
 
@@ -677,4 +678,5 @@ def _log_record_from_hadoop(record):
     if _is_counter_log4j_record(record):
         log.info('(parsing counters)')
     else:
-        _log_line_from_hadoop(record['message'], level=record.get('level'))
+        level = getattr(logging, record.get('level') or '', None)
+        _log_line_from_hadoop(record['message'], level=level)

@@ -39,7 +39,7 @@ from mrjob.logs.interpret import _find_error_in_task_logs
 from mrjob.logs.interpret import _format_cause_of_failure
 from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.history import _interpret_history_log
-from mrjog.logs.step import _is_counter_log4j_record
+from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.step import _parse_hadoop_jar_command_stderr
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri

@@ -50,7 +50,7 @@ _JOB_LOG_PATH_RE = re.compile(
     r'job_(?P<timestamp>\d+)_(?P<step_num>\d+)'  # oh look, meaningful data!
     r'([_-]\d+)?'  # sometimes there is a number here.
     r'[_-](?P<user>.*?)[_-]streamjob(\d+).jar'
-    r'(-[A-Za-z0-9-]+\.jhist)?'  # this happens on YARN
+    r'(-[A-Za-z0-9-]+\.jhist)?(\.gz)?'  # this happens on YARN
     r'$')
 
 # match a node log path

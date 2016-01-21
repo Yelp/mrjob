@@ -962,7 +962,6 @@ class EMRJobRunner(MRJobRunner):
             else:
                 ssh_proc.stdin.close()
                 ssh_proc.stdout.close()
-                print('ssh stderr: ' + to_string(ssh_proc.stderr.read()))
                 ssh_proc.stderr.close()
 
         if not self._ssh_proc:

@@ -21,7 +21,7 @@ from logging import getLogger
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
 from .counters import _sum_counters
-from .ids import _add_implied_ids
+from .ids import _add_implied_task_id
 from .wrap import _ls_logs
 from .wrap import _cat_log
 
@@ -134,8 +134,7 @@ def _interpret_history_log(fs, matches):
         for error in result.get('errors') or ():
             if 'hadoop_error' in error:
                 error['hadoop_error']['path'] = path
-
-            _add_implied_ids(error)
+            _add_implied_task_id(error)
 
         return result
 

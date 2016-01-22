@@ -26,7 +26,7 @@ Each of these should have methods like this:
 
 
 
-_find_*_logs(fs, log_dir_stream, ...): Find paths of all logs of the given
+_ls_*_logs(fs, log_dir_stream, ...): Find paths of all logs of the given
      type.
 
      log_dir_stream is a list of lists of log dirs. We assume that you might
@@ -42,9 +42,6 @@ _find_*_logs(fs, log_dir_stream, ...): Find paths of all logs of the given
      path: path/URI of log
      task_id: (ID of task)
 
-
-_ls_*_logs(ls, log_dir, ...): Implementation of _find_*_logs().
-
     Use mrjob.logs.wrap _find_logs() to use this.
 
 
@@ -52,8 +49,10 @@ _interpret_*_logs(fs, matches, ...):
 
     Once we know where our logs are, search them for counters and/or errors.
 
-    In most cases, we want to stop when we find the first error.
+    This returns a dictionary with counters, errors, and (for step logs),
+    application and job ID for the step
 
+    application_id: YARN application ID for the step
     counters: group -> counter -> amount
     errors: [
         hadoop_error:  (for errors internal to Hadoop)
@@ -67,15 +66,14 @@ _interpret_*_logs(fs, matches, ...):
             path: (see above)
             start_line: (see above)
             num_lines: (see above)
-        application_id: (YARN application ID)
-        attempt_id: (ID of task attempt)
-        container_id: (YARN container ID)
-        job_id: (ID of job)
-        task_id: (ID of task)
+        attempt_id: task attempt that this error originated from
+        task_id: task that this error originated from
     ]
+    job_id: job ID for the step
 
-    This assumes there might be several sets of logs dirs to look in (e.g.
-    the log dir on S3, directories on master and slave nodes, etc.).
+    Errors' task_id should always be set if attempt_id is set (use
+    mrjob.logs.id._add_implied_task_id())
+
 
 _parse_*_log(lines):
 

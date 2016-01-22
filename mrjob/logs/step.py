@@ -20,7 +20,8 @@ import re
 from logging import getLogger
 
 from mrjob.py2 import to_string
-from .ids import _add_implied_ids
+from .ids import _add_implied_job_id
+from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
 
 # hadoop streaming always prints "packageJobJar..." to stdout,
@@ -123,9 +124,9 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
 
     result = _parse_step_log_from_log4j_records(yield_records())
 
-    _add_implied_ids(result)
+    _add_implied_job_id(result)
     for error in result.get('errors') or ():
-        _add_implied_ids(error)
+        _add_implied_task_id(error)
 
     return result
 

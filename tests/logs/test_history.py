@@ -177,7 +177,6 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
                          dict(
                              attempt_id=(
                                  'attempt_1449525218032_0005_m_000000_0'),
-                             job_id='job_1449525218032_0005',
                              task_id='task_1449525218032_0005_m_000000'),
                          dict(
                              hadoop_error=dict(

@@ -122,6 +122,17 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
             _interpret_hadoop_jar_command_stderr(PRE_YARN_STEP_LOG_LINES),
             PARSED_PRE_YARN_STEP_LOG_LINES)
 
+    def test_infer_job_id_from_application_id(self):
+        lines = [
+            '15/12/11 13:32:45 INFO impl.YarnClientImpl:'
+            ' Submitted application application_1449857544442_0002\n',
+        ]
+
+        self.assertEqual(
+            _interpret_hadoop_jar_command_stderr(lines),
+            dict(application_id='application_1449857544442_0002',
+                 job_id='job_1449857544442_0002'))
+
     def test_yarn_error(self):
         lines = [
             '16/01/22 19:14:16 INFO mapreduce.Job: Task Id :'
@@ -154,8 +165,7 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
                             num_lines=5,
                             start_line=0,
                         ),
-                        # job and task ID are implied by attempt ID
-                        job_id='job_1453488173054_0001',
+                        # task ID is implied by attempt ID
                         task_id='task_1453488173054_0001_m_000000',
                     )
                 ]

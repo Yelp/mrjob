@@ -57,28 +57,29 @@ def _time_sort_key(d):
         task_num)
 
 
-def _add_implied_ids(d):
-    """If *d* (a dictionary) has *attempt_id* but not *task_id* add it.
+def _add_implied_task_id(d):
+    """If *d* (a dictionary) has *attempt_id* but not *task_id*, add it.
 
-    Similarly, if *d* has *task_id* or *application_id* but not *job_id*,
-    add it.
-
-    (We don't infer application_id from job_id because application_id
-    only exists on YARN)
+    Use this on errors.
     """
     if d.get('attempt_id') and not d.get('task_id'):
         d['task_id'] = _attempt_id_to_task_id(
             d['attempt_id'])
 
-    if d.get('task_id') and not d.get('job_id'):
-        d['job_id'] = _task_id_to_job_id(d['task_id'])
 
-    if d.get('application_id') and not d.get('job_id'):
-        d['job_id'] = _task_id_to_job_id(d['application_id'])
+def _add_implied_job_id(d):
+    """If *d* has *task_id* or *application_id* but not *job_id*,
+    add it.
 
-    # TODO: looks like application_id and job_id are the same, except
-    # they start with 'application' and 'job', respectively. Of course,
-    # application_id only exists on YARN
+    (We don't infer application_id from job_id because application_id
+    only exists on YARN)
+    """
+    if not d.get('job_id'):
+        if d.get('task_id'):
+            d['job_id'] = _task_id_to_job_id(d['task_id'])
+        elif d.get('application_id'):
+            d['job_id'] = _task_id_to_job_id(d['application_id'])
+
 
 
 def _attempt_id_to_task_id(attempt_id):

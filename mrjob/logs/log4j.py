@@ -45,7 +45,7 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
         for counters), the lines will be joined by '\n'
     num_lines -- how many lines made up the message
     start_line -- which line the message started on (0-indexed)
-    thread -- e.g. 'main'. Defaults to None
+    thread -- e.g. 'main'. Defaults to ''
     timestamp -- unparsed timestamp, e.g. '15/12/07 20:49:28',
         '2015-08-22 00:46:18,411'
 
@@ -53,8 +53,10 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
 
     If set, *pre_filter* will be applied to stripped lines. If it
     returns true, we'll return a fake record with message set to the line,
-    num_lines and start_line set as normal, thread set to None, and everything
-    else set to ''. We'll also yield fake records for leading non-log4j lines.
+    num_lines and start_line set as normal, and everything else set to ''.
+
+    Also yields fake records for leading non-log4j lines (trailing non-log4j
+    lines are assumed to be part of a multiline message if not pre-filtered).
     """
     last_record = None
 
@@ -68,7 +70,7 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
                 message=line,
                 num_lines=1,
                 start_line=line_num,
-                thread=None,
+                thread='',
                 timestamp='')
 
         # had to patch this in here to get _parse_hadoop_jar_command_stderr()'s
@@ -97,6 +99,7 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
                 yield last_record
 
             last_record = m.groupdict()
+            last_record['thread'] = last_record['thread'] or ''
             last_record['start_line'] = line_num
         else:
             # add on to previous record

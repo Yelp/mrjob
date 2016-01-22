@@ -162,7 +162,7 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
                              ' tmpDir=null'),
                     num_lines=1,
                     start_line=0,
-                    thread=None,
+                    thread='',
                     timestamp='',
                 ),
                 dict(
@@ -171,7 +171,7 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
                     message='Running job: job_1449857544442_0002',
                     num_lines=1,
                     start_line=1,
-                    thread=None,
+                    thread='',
                     timestamp='15/12/11 13:33:11',
                 ),
                 dict(
@@ -180,7 +180,7 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
                     message='Streaming Command Failed!',
                     num_lines=1,
                     start_line=2,
-                    thread=None,
+                    thread='',
                     timestamp='',
                 ),
             ])

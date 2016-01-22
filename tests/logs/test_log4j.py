@@ -38,7 +38,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                     message='Connecting to ResourceManager at /0.0.0.0:8032',
                     num_lines=1,
                     start_line=0,
-                    thread=None,
+                    thread='',
                     timestamp='15/12/11 13:26:07',
                 ),
                 dict(
@@ -48,7 +48,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                              ' Output directory already exists'),
                     num_lines=1,
                     start_line=1,
-                    thread=None,
+                    thread='',
                     timestamp='15/12/11 13:26:08',
                 ),
             ])
@@ -64,7 +64,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                     message='Connecting to ResourceManager at /0.0.0.0:8032',
                     num_lines=1,
                     start_line=0,
-                    thread=None,
+                    thread='',
                     timestamp='15/12/11 13:26:07',
                 )
             ])
@@ -126,7 +126,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                     message='foo',
                     num_lines=1,
                     start_line=0,
-                    thread=None,
+                    thread='',
                     timestamp='',
                 ),
                 dict(
@@ -135,7 +135,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                     message='bar',
                     num_lines=1,
                     start_line=1,
-                    thread=None,
+                    thread='',
                     timestamp='',
                 ),
                 dict(
@@ -148,7 +148,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                              'Streaming Command Failed!'),
                     num_lines=2,
                     start_line=2,
-                    thread=None,
+                    thread='',
                     timestamp='15/12/11 13:26:08',
                 ),
             ])

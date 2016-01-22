@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from mrjob.logs.history import _interpret_history_log
-from mrjob.logs.history import _match_history_log
+from mrjob.logs.history import _match_history_log_path
 from mrjob.logs.history import _parse_pre_yarn_history_log
 from mrjob.logs.history import _parse_pre_yarn_history_records
 from mrjob.logs.history import _parse_pre_yarn_counters
@@ -30,7 +30,7 @@ from tests.py2 import patch
 class MatchHistoryLogTestCase(TestCase):
 
     def test_empty(self):
-        self.assertEqual(_match_history_log(''), None)
+        self.assertEqual(_match_history_log_path(''), None)
 
     def test_pre_yarn(self):
         history_path = (
@@ -39,7 +39,7 @@ class MatchHistoryLogTestCase(TestCase):
             '_streamjob8025762403845318969.jar')
 
         self.assertEqual(
-            _match_history_log(history_path),
+            _match_history_log_path(history_path),
             dict(job_id='job_201512311928_0001', yarn=False))
 
         conf_path = (
@@ -47,7 +47,7 @@ class MatchHistoryLogTestCase(TestCase):
             '/000000/job_201512311928_0001_conf.xml')
 
         self.assertEqual(
-            _match_history_log(conf_path),
+            _match_history_log_path(conf_path),
             None)
 
     def test_pre_yarn_filter_by_job_id(self):
@@ -57,11 +57,13 @@ class MatchHistoryLogTestCase(TestCase):
             '_streamjob8025762403845318969.jar')
 
         self.assertEqual(
-            _match_history_log(history_path, job_id='job_201512311928_0001'),
+            _match_history_log_path(
+                history_path, job_id='job_201512311928_0001'),
             dict(job_id='job_201512311928_0001', yarn=False))
 
         self.assertEqual(
-            _match_history_log(history_path, job_id='job_201512311928_0002'),
+            _match_history_log_path(
+                history_path, job_id='job_201512311928_0002'),
             None)
 
     def test_yarn(self):
@@ -71,7 +73,7 @@ class MatchHistoryLogTestCase(TestCase):
             '-1451592786882-10-1-SUCCEEDED-default-1451592631082.jhist')
 
         self.assertEqual(
-            _match_history_log(history_path),
+            _match_history_log_path(history_path),
             dict(job_id='job_1451592123989_0001', yarn=True))
 
         conf_path = (
@@ -79,7 +81,7 @@ class MatchHistoryLogTestCase(TestCase):
             'job_1451592123989_0001_conf.xml')
 
         self.assertEqual(
-            _match_history_log(conf_path),
+            _match_history_log_path(conf_path),
             None)
 
     def test_yarn_filter_by_job_id(self):
@@ -89,11 +91,13 @@ class MatchHistoryLogTestCase(TestCase):
             '-1451592786882-10-1-SUCCEEDED-default-1451592631082.jhist')
 
         self.assertEqual(
-            _match_history_log(history_path, job_id='job_1451592123989_0001'),
+            _match_history_log_path(
+                history_path, job_id='job_1451592123989_0001'),
             dict(job_id='job_1451592123989_0001', yarn=True))
 
         self.assertEqual(
-            _match_history_log(history_path, job_id='job_1451592123989_0002'),
+            _match_history_log_path(
+                history_path, job_id='job_1451592123989_0002'),
             None)
 
 

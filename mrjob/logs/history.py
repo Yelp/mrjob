@@ -74,8 +74,6 @@ _PRE_YARN_COUNTER_RE = re.compile(
     r'\)\]')
 
 
-
-
 def _ls_history_logs(fs, log_dir_stream, job_id=None):
     """Yield matching files, optionally filtering by *job_id*. Yields dicts
     with the keys:
@@ -89,11 +87,11 @@ def _ls_history_logs(fs, log_dir_stream, job_id=None):
     assumption is that subsequent lists of log dirs would have copies
     of the same logs, just in a different location.
     """
-    return _ls_logs(fs, log_dir_stream, _match_history_log,
+    return _ls_logs(fs, log_dir_stream, _match_history_log_path,
                     job_id=job_id)
 
 
-def _match_history_log(path, job_id=None):
+def _match_history_log_path(path, job_id=None):
     """Yield paths/uris of all job history files in the given directories,
     optionally filtering by *job_id*.
     """

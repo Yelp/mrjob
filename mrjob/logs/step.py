@@ -20,6 +20,7 @@ import re
 from logging import getLogger
 
 from mrjob.py2 import to_string
+from .ids import _add_implied_ids
 from .log4j import _parse_hadoop_log4j_records
 
 # hadoop streaming always prints "packageJobJar..." to stdout,
@@ -86,7 +87,7 @@ def _parse_step_log(lines):
 
 
 # TODO: possibly allow custom filters for non-log4j crud from other jars?
-def _parse_hadoop_jar_command_stderr(stderr, record_callback=None):
+def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     """Parse stderr from the ``hadoop jar`` command. Works like
     :py:func:`_parse_step_log` (same return format)  with a few extra features
     to handle the output of the ``hadoop jar`` command on the fly:
@@ -120,7 +121,13 @@ def _parse_hadoop_jar_command_stderr(stderr, record_callback=None):
                 record_callback(record)
             yield record
 
-    return _parse_step_log_from_log4j_records(yield_records())
+    result = _parse_step_log_from_log4j_records(yield_records())
+
+    _add_implied_ids(result)
+    for error in result.get('errors') or ():
+        _add_implied_ids(error)
+
+    return result
 
 
 def _parse_step_log_from_log4j_records(records):
@@ -128,7 +135,7 @@ def _parse_step_log_from_log4j_records(records):
     emitted by Hadoop.
 
     This powers :py:func:`_parse_step_log` and
-    :py:func:`_parse_hadoop_jar_command_stderr`.
+    :py:func:`_interpret_hadoop_jar_command_stderr`.
     """
     result = {}
 

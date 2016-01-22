@@ -14,7 +14,7 @@
 import errno
 
 from mrjob.logs.step import _parse_hadoop_log4j_records
-from mrjob.logs.step import _parse_hadoop_jar_command_stderr
+from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _parse_indented_counters
 from mrjob.logs.step import _parse_step_log
 from mrjob.py2 import StringIO
@@ -107,19 +107,19 @@ class ParseStepLogTestCase(TestCase):
             PARSED_PRE_YARN_STEP_LOG_LINES)
 
 
-class ParseHadoopJarCommandStderrTestCase(TestCase):
+class InterpretHadoopJarCommandStderrTestCase(TestCase):
 
     def test_empty(self):
-        self.assertEqual(_parse_hadoop_jar_command_stderr([]), {})
+        self.assertEqual(_interpret_hadoop_jar_command_stderr([]), {})
 
     def test_yarn(self):
         self.assertEqual(
-            _parse_hadoop_jar_command_stderr(YARN_STEP_LOG_LINES),
+            _interpret_hadoop_jar_command_stderr(YARN_STEP_LOG_LINES),
             PARSED_YARN_STEP_LOG_LINES)
 
     def test_pre_yarn(self):
         self.assertEqual(
-            _parse_hadoop_jar_command_stderr(PRE_YARN_STEP_LOG_LINES),
+            _interpret_hadoop_jar_command_stderr(PRE_YARN_STEP_LOG_LINES),
             PARSED_PRE_YARN_STEP_LOG_LINES)
 
     def test_yarn_error(self):
@@ -136,7 +136,7 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
         ]
 
         self.assertEqual(
-            _parse_hadoop_jar_command_stderr(lines),
+            _interpret_hadoop_jar_command_stderr(lines),
             dict(
                 errors=[
                     dict(
@@ -153,14 +153,17 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
                             ),
                             num_lines=5,
                             start_line=0,
-                        )
+                        ),
+                        # job and task ID are implied by attempt ID
+                        job_id='job_1453488173054_0001',
+                        task_id='task_1453488173054_0001_m_000000',
                     )
                 ]
             ))
 
     def test_lines_can_be_bytes(self):
         self.assertEqual(
-            _parse_hadoop_jar_command_stderr([
+            _interpret_hadoop_jar_command_stderr([
                 b'15/12/11 13:33:11 INFO mapreduce.Job:'
                 b' Running job: job_1449857544442_0002\n']),
             dict(job_id='job_1449857544442_0002'))
@@ -182,7 +185,7 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
         ]
 
         self.assertEqual(
-            _parse_hadoop_jar_command_stderr(
+            _interpret_hadoop_jar_command_stderr(
                 lines, record_callback=record_callback),
             dict(job_id='job_1449857544442_0002'))
 
@@ -230,7 +233,7 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
             raise e
 
         self.assertEqual(
-            _parse_hadoop_jar_command_stderr(yield_lines()),
+            _interpret_hadoop_jar_command_stderr(yield_lines()),
             dict(job_id='job_1449857544442_0002'))
 
     def test_raise_other_io_errors(self):
@@ -241,7 +244,7 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
 
         self.assertRaises(
             IOError,
-            _parse_hadoop_jar_command_stderr, yield_lines())
+            _interpret_hadoop_jar_command_stderr, yield_lines())
 
 
 class ParseIndentedCountersTestCase(TestCase):

@@ -40,7 +40,7 @@ from mrjob.logs.interpret import _format_cause_of_failure
 from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.step import _is_counter_log4j_record
-from mrjob.logs.step import _parse_hadoop_jar_command_stderr
+from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
@@ -404,7 +404,7 @@ class HadoopJobRunner(MRJobRunner):
 
                 step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)
 
-                step_info = _parse_hadoop_jar_command_stderr(
+                step_info = _interpret_hadoop_jar_command_stderr(
                     step_proc.stderr,
                     record_callback=_log_record_from_hadoop)
 
@@ -426,7 +426,7 @@ class HadoopJobRunner(MRJobRunner):
                     with os.fdopen(master_fd, 'rb') as master:
                         # reading from master gives us the subprocess's
                         # stderr and stdout (it's a fake terminal)
-                        step_info = _parse_hadoop_jar_command_stderr(
+                        step_info = _interpret_hadoop_jar_command_stderr(
                             master,
                             record_callback=_log_record_from_hadoop)
                         _, returncode = os.waitpid(pid, 0)

@@ -84,9 +84,7 @@ def _parse_hadoop_jar_command_stderr(stderr, record_callback=None):
     - Handles "stderr" from a PTY (including treating EIO as EOF and
       pre-filtering stdout lines from Hadoop Streaming)
     - Optionally calls *record_callback* for each log4j record (see
-      :py:func:`~mrjob.logs.log4j._parse_hadoop_log4j_records`). For
-      non-log4j lines, the "record" is a dict with "message" set to
-      the line.
+      :py:func:`~mrjob.logs.log4j._parse_hadoop_log4j_records`).
     """
     def yield_lines():
         try:
@@ -100,8 +98,7 @@ def _parse_hadoop_jar_command_stderr(stderr, record_callback=None):
                 raise
 
     def pre_filter(line):
-        if _HADOOP_STREAMING_NON_LOG4J_LINE_RE.match(line):
-            return dict(message=line)
+        return bool(_HADOOP_STREAMING_NON_LOG4J_LINE_RE.match(line))
 
     def yield_records():
         for record in _parse_hadoop_log4j_records(yield_lines(),

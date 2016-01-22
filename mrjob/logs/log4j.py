@@ -35,7 +35,6 @@ _HADOOP_LOG4J_LINE_ALTERNATE_RE = re.compile(
 log = getLogger(__name__)
 
 
-# TODO: add line numbers
 def _parse_hadoop_log4j_records(lines, pre_filter=None):
     """Parse lines from a hadoop log into log4j records.
 
@@ -44,30 +43,47 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
     logger -- e.g. 'amazon.emr.metrics.MetricsSaver'
     message -- the actual message. If this is a multi-line message (e.g.
         for counters), the lines will be joined by '\n'
-    thread -- e.g. 'main'. May be None
+    num_lines -- how many lines made up the message
+    start_line -- which line the message started on (0-indexed)
+    thread -- e.g. 'main'. Defaults to None
     timestamp -- unparsed timestamp, e.g. '15/12/07 20:49:28',
         '2015-08-22 00:46:18,411'
 
     Trailing \r and \n will be stripped from lines.
 
     If set, *pre_filter* will be applied to stripped lines. If it
-    returns a true-ish value, that value will be yielded.
+    returns true, we'll return a fake record with message set to the line,
+    num_lines and start_line set as normal, thread set to None, and everything
+    else set to ''. We'll also yield fake records for leading non-log4j lines.
     """
     last_record = None
 
-    for line in lines:
+    for line_num, line in enumerate(lines):
         line = line.rstrip('\r\n')
+
+        def fake_record():
+            return dict(
+                level='',
+                logger='',
+                message=line,
+                num_lines=1,
+                start_line=line_num,
+                thread=None,
+                timestamp='')
 
         # had to patch this in here to get _parse_hadoop_jar_command_stderr()'s
         # record_callback to fire on the correct line. The problem is that
         # we don't emit records until we see the next line (to handle
-        # multiline records)
+        # multiline records), so the callback would fire in the wrong order
         if pre_filter:
-            fake_record = pre_filter(line)
-            if fake_record:
+            if pre_filter(line):
                 if last_record:
+                    last_record['num_lines'] = (
+                        line_num - last_record['start_line'])
                     yield last_record
-                yield fake_record
+
+                yield fake_record()
+
                 last_record = None
                 continue
 
@@ -76,14 +92,20 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
 
         if m:
             if last_record:
+                last_record['num_lines'] = (
+                    line_num - last_record['start_line'])
                 yield last_record
+
             last_record = m.groupdict()
+            last_record['start_line'] = line_num
         else:
             # add on to previous record
             if last_record:
                 last_record['message'] += '\n' + line
             else:
-                log.warning('unexpected log line: %s' % line)
+                yield fake_record()
 
     if last_record:
+        last_record['num_lines'] = (
+            line_num + 1 - last_record['start_line'])
         yield last_record

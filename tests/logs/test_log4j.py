@@ -33,18 +33,24 @@ class ParseHadoopLog4JRecordsCase(TestCase):
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
                 dict(
-                    timestamp='15/12/11 13:26:07',
                     level='INFO',
                     logger='client.RMProxy',
+                    message='Connecting to ResourceManager at /0.0.0.0:8032',
+                    num_lines=1,
+                    start_line=0,
                     thread=None,
-                    message='Connecting to ResourceManager at /0.0.0.0:8032'),
+                    timestamp='15/12/11 13:26:07',
+                ),
                 dict(
-                    timestamp='15/12/11 13:26:08',
                     level='ERROR',
                     logger='streaming.StreamJob',
-                    thread=None,
                     message=('Error Launching job :'
-                             ' Output directory already exists'))
+                             ' Output directory already exists'),
+                    num_lines=1,
+                    start_line=1,
+                    thread=None,
+                    timestamp='15/12/11 13:26:08',
+                ),
             ])
 
     def test_trailing_carriage_return(self):
@@ -53,11 +59,14 @@ class ParseHadoopLog4JRecordsCase(TestCase):
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
                 dict(
-                    timestamp='15/12/11 13:26:07',
                     level='INFO',
                     logger='client.RMProxy',
+                    message='Connecting to ResourceManager at /0.0.0.0:8032',
+                    num_lines=1,
+                    start_line=0,
                     thread=None,
-                    message='Connecting to ResourceManager at /0.0.0.0:8032')
+                    timestamp='15/12/11 13:26:07',
+                )
             ])
 
     def test_thread(self):
@@ -71,8 +80,11 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                     timestamp='2015-08-22 00:46:18,411',
                     level='INFO',
                     logger='amazon.emr.metrics.MetricsSaver',
+                    num_lines=1,
+                    start_line=0,
                     thread='main',
-                    message='Thread 1 created MetricsLockFreeSaver 1')
+                    message='Thread 1 created MetricsLockFreeSaver 1',
+                )
             ])
 
     def test_multiline_message(self):
@@ -85,14 +97,17 @@ class ParseHadoopLog4JRecordsCase(TestCase):
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
                 dict(
-                    timestamp='2015-08-22 00:47:35,323',
                     level='INFO',
                     logger='org.apache.hadoop.mapreduce.Job',
-                    thread='main',
                     # strip \r's, no trailing \n
                     message=('Counters: 54\n'
                              '        File System Counters\n'
-                             '                FILE: Number of bytes read=83'))
+                             '                FILE: Number of bytes read=83'),
+                    num_lines=3,
+                    start_line=0,
+                    thread='main',
+                    timestamp='2015-08-22 00:47:35,323',
+                )
             ])
 
     def test_non_log_lines(self):
@@ -103,25 +118,37 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                          ' Output directory already exists\n'
                          'Streaming Command Failed!')
 
-        with no_handlers_for_logger('mrjob.logs.log4j'):
-            stderr = StringIO()
-            log_to_stream('mrjob.logs.log4j', stderr)
-
-            self.assertEqual(
+        self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
-                # ignore leading non-log lines
                 dict(
-                    timestamp='15/12/11 13:26:08',
+                    level='',
+                    logger='',
+                    message='foo',
+                    num_lines=1,
+                    start_line=0,
+                    thread=None,
+                    timestamp='',
+                ),
+                dict(
+                    level='',
+                    logger='',
+                    message='bar',
+                    num_lines=1,
+                    start_line=1,
+                    thread=None,
+                    timestamp='',
+                ),
+                dict(
                     level='ERROR',
                     logger='streaming.StreamJob',
-                    thread=None,
                     # no way to know that Streaming Command Failed! wasn't part
                     # of a multi-line message
                     message=('Error Launching job :'
                              ' Output directory already exists\n'
-                             'Streaming Command Failed!'))
+                             'Streaming Command Failed!'),
+                    num_lines=2,
+                    start_line=2,
+                    thread=None,
+                    timestamp='15/12/11 13:26:08',
+                ),
             ])
-
-            # should be one warning for each leading non-log line
-            log_lines = stderr.getvalue().splitlines()
-            self.assertEqual(len(log_lines), 2)

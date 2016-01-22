@@ -154,19 +154,35 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
             records,
             [
                 dict(
+                    level='',
+                    logger='',
                     message=('packageJobJar: [/mnt/var/lib/hadoop/tmp/hadoop'
                              '-unjar7873615084086492115/] []'
                              ' /tmp/streamjob737002412080260811.jar'
                              ' tmpDir=null'),
+                    num_lines=1,
+                    start_line=0,
+                    thread=None,
+                    timestamp='',
                 ),
                 dict(
                     level='INFO',
                     logger='mapreduce.Job',
                     message='Running job: job_1449857544442_0002',
+                    num_lines=1,
+                    start_line=1,
                     thread=None,
                     timestamp='15/12/11 13:33:11',
                 ),
-                dict(message='Streaming Command Failed!'),
+                dict(
+                    level='',
+                    logger='',
+                    message='Streaming Command Failed!',
+                    num_lines=1,
+                    start_line=2,
+                    thread=None,
+                    timestamp='',
+                ),
             ])
 
     def test_treat_eio_as_eof(self):

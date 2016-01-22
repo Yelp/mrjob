@@ -60,6 +60,8 @@ _interpret_*_logs(fs, matches, ...):
             path: URI of log file containing error
             start_line: first line of <path> with error (0-indexed)
             num_lines: # of lines containing error
+        split:  (input split processed when error happened)
+
         task_error:   (for errors caused by one task)
             message: string representation of error (e.g. Python command line
                 followed by Python exception)
@@ -81,6 +83,9 @@ _parse_*_log(lines):
     format as _interpret_<type>_logs(), above.
 
     Log lines are always strings (see mrjob.logs.wrap._cat_log()).
+
+    _parse_*_log() methods generally return a part of the _interpret_*_logs()
+    format, but are *not* responsible for including implied job/task IDs.
 
 
 _parse_*_records(lines):

@@ -14,7 +14,101 @@
 # limitations under the License.
 from tests.py2 import TestCase
 
+from mrjob.logs.task import _parse_task_syslog
 from mrjob.logs.task import _parse_task_stderr
+
+
+
+class ParseTaskSyslogTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_parse_task_syslog([]), {})
+
+    def test_split(self):
+        lines = [
+            '2015-12-21 14:06:17,707 INFO [main]'
+            ' org.apache.hadoop.mapred.MapTask: Processing split:'
+            ' hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
+            '/mr_boom.root.20151221.190511.059097/files/bootstrap.sh:0+335\n',
+        ]
+
+        self.assertEqual(
+            _parse_task_syslog(lines),
+            dict(
+                split=dict(
+                    path=('hdfs://e4270474c8ee:9000/user/root/tmp/mrjob'
+                          '/mr_boom.root.20151221.190511.059097/files'
+                          '/bootstrap.sh'),
+                    start_line=0,
+                    num_lines=335)))
+
+    def test_opening_file(self):
+        lines = [
+            '2010-07-27 17:54:54,344 INFO'
+            ' org.apache.hadoop.fs.s3native.NativeS3FileSystem (main):'
+            " Opening 's3://yourbucket/logs/2010/07/23/log2-00077.gz'"
+            ' for reading\n'
+        ]
+
+        self.assertEqual(
+            _parse_task_syslog(lines),
+            dict(
+                split=dict(
+                    path='s3://yourbucket/logs/2010/07/23/log2-00077.gz')))
+
+    def test_yarn_error(self):
+        lines = [
+            '2015-12-21 14:06:18,538 WARN [main]'
+            ' org.apache.hadoop.mapred.YarnChild: Exception running child'
+            ' : java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+            ' subprocess failed with code 1\n',
+            '        at org.apache.hadoop.streaming.PipeMapRed'
+            '.waitOutputThreads(PipeMapRed.java:322)\n',
+            '        at org.apache.hadoop.streaming.PipeMapRed'
+            '.mapRedFinished(PipeMapRed.java:535)\n',
+        ]
+
+        self.assertEqual(
+            _parse_task_syslog(lines),
+            dict(
+                hadoop_error=dict(
+                    message=(
+                        'Exception running child : java.lang.RuntimeException:'
+                        ' PipeMapRed.waitOutputThreads():'
+                        ' subprocess failed with code 1\n'
+                        '        at org.apache.hadoop.streaming.PipeMapRed'
+                        '.waitOutputThreads(PipeMapRed.java:322)\n'
+                        '        at org.apache.hadoop.streaming.PipeMapRed'
+                        '.mapRedFinished(PipeMapRed.java:535)'),
+                    num_lines=3,
+                    start_line=0,
+                )
+            ))
+
+    def test_pre_yarn_error(self):
+        lines = [
+            '2015-12-30 19:21:39,980 WARN'
+            ' org.apache.hadoop.mapred.Child (main): Error running child\n',
+            'java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+            ' subprocess failed with code 1\n',
+            '        at org.apache.hadoop.streaming.PipeMapRed'
+            '.waitOutputThreads(PipeMapRed.java:372)\n',
+        ]
+
+        self.assertEqual(
+            _parse_task_syslog(lines),
+            dict(
+                hadoop_error=dict(
+                    message=(
+                        'Error running child\n'
+                        'java.lang.RuntimeException:'
+                        ' PipeMapRed.waitOutputThreads():'
+                        ' subprocess failed with code 1\n'
+                        '        at org.apache.hadoop.streaming.PipeMapRed'
+                        '.waitOutputThreads(PipeMapRed.java:372)'),
+                    num_lines=3,
+                    start_line=0,
+                )))
 
 
 class ParseTaskStderrTestCase(TestCase):

@@ -122,6 +122,42 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
             _parse_hadoop_jar_command_stderr(PRE_YARN_STEP_LOG_LINES),
             PARSED_PRE_YARN_STEP_LOG_LINES)
 
+    def test_yarn_error(self):
+        lines = [
+            '16/01/22 19:14:16 INFO mapreduce.Job: Task Id :'
+            ' attempt_1453488173054_0001_m_000000_0, Status : FAILED\n',
+            'Error: java.lang.RuntimeException: PipeMapRed'
+            '.waitOutputThreads(): subprocess failed with code 1\n',
+            '\tat org.apache.hadoop.streaming.PipeMapRed'
+            '.waitOutputThreads(PipeMapRed.java:330)\n',
+            '\tat org.apache.hadoop.streaming.PipeMapRed.mapRedFinished'
+            '(PipeMapRed.java:543)\n',
+            '\n',
+        ]
+
+        self.assertEqual(
+            _parse_hadoop_jar_command_stderr(lines),
+            dict(
+                errors=[
+                    dict(
+                        attempt_id='attempt_1453488173054_0001_m_000000_0',
+                        hadoop_error=dict(
+                            error=(
+                                'Error: java.lang.RuntimeException: PipeMapRed'
+                                '.waitOutputThreads(): subprocess failed with'
+                                ' code 1\n\tat org.apache.hadoop.streaming'
+                                '.PipeMapRed.waitOutputThreads(PipeMapRed.java'
+                                ':330)\n\tat org.apache.hadoop.streaming'
+                                '.PipeMapRed.mapRedFinished(PipeMapRed.java'
+                                ':543)'
+                            ),
+                            num_lines=5,
+                            start_line=0,
+                        )
+                    )
+                ]
+            ))
+
     def test_lines_can_be_bytes(self):
         self.assertEqual(
             _parse_hadoop_jar_command_stderr([

@@ -51,6 +51,13 @@ _SUBMITTED_APPLICATION_RE = re.compile(
 _RUNNING_JOB_RE = re.compile(
     r'^Running job: (?P<job_id>job_\d+_\d{4})\s*$')
 
+# YARN prints this (followed by a Java exception) when tasks fail
+_TASK_ATTEMPT_FAILED_RE = re.compile(
+    r'^Task Id *:'
+    r' (?P<attempt_id>attempt_\d+_\d{4}_[mr]_\d+_\d+),'
+    r' Status *: FAILED$',
+    re.MULTILINE)
+
 log = getLogger(__name__)
 
 
@@ -64,6 +71,12 @@ def _parse_step_log(lines):
         set on YARN
     counters: a map from counter group -> counter -> amount, or None if
         no counters found (only YARN prints counters)
+    errors: a list of errors, with the following keys:
+        hadoop_error:
+            error: lines of error, as as string
+            start_line: first line of log containing the error (0-indexed)
+            num_lines: # of lines of log containing the error
+        attempt_id: ID of task attempt with this error
     job_id: a string like 'job_201512112247_0003'. Should always be set
     output_dir: a URI like 'hdfs:///user/hadoop/tmp/my-output-dir'. Should
         always be set on success.
@@ -144,6 +157,24 @@ def _parse_step_log_from_log4j_records(records):
         m = _RUNNING_JOB_RE.match(message)
         if m:
             result['job_id'] = m.group('job_id')
+            continue
+
+        # task failure
+        m = _TASK_ATTEMPT_FAILED_RE.match(message)
+        if m:
+            error_str = '\n'.join(message.splitlines()[1:])
+
+            error = dict(
+                attempt_id=m.group('attempt_id'),
+                hadoop_error=dict(
+                    error=error_str,
+                    num_lines=record['num_lines'],
+                    start_line=record['start_line'],
+                )
+            )
+
+            result.setdefault('errors', [])
+            result['errors'].append(error)
 
     return result
 

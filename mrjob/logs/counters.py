@@ -14,6 +14,16 @@
 # limitations under the License.
 """Utility methods for dealing with counters (not including parsers)."""
 
+def _pick_counters(log_interpretation):
+    """Pick counters from a dictionary possibly containing
+    step and history interpretations."""
+    for log_type in 'step', 'history':
+        counters = log_interpretation.get(log_type, {}).get('counters')
+        if counters:
+            return counters
+    else:
+        return {}
+
 
 def _sum_counters(*counters_list):
     """Combine many maps from group to counter to amount."""

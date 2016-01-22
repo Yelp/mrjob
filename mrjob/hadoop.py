@@ -35,6 +35,7 @@ from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
+from mrjob.logs.counters import _pick_counters
 from mrjob.logs.interpret import _find_error_in_task_logs
 from mrjob.logs.interpret import _format_cause_of_failure
 from mrjob.logs.history import _ls_history_logs
@@ -198,11 +199,11 @@ class HadoopJobRunner(MRJobRunner):
         self._hadoop_streaming_jar = self._opts['hadoop_streaming_jar']
         self._searched_for_hadoop_streaming_jar = False
 
-        # Keep track of the status of each step that ran
-        #
-        # these are dictionaries with the same keys as
-        # mrjob.logs.parse._parse_hadoop_streaming_log()
-        self._steps_info = []
+        # List of dicts (one for each step) potentially containing
+        # the keys 'history', 'step', and 'task' ('step' will always
+        # be filled because it comes from the hadoop jar command output,
+        # others will be filled as needed)
+        self._log_interpretations = []
 
     @property
     def fs(self):
@@ -392,6 +393,9 @@ class HadoopJobRunner(MRJobRunner):
                       (step_num + 1, self._num_steps()))
             log.debug('> %s' % cmd_line(step_args))
 
+            log_interpretation = {}
+            self._log_interpretations.append(log_interpretation)
+
             # try to use a PTY if it's available
             try:
                 pid, master_fd = pty.fork()
@@ -404,7 +408,7 @@ class HadoopJobRunner(MRJobRunner):
 
                 step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)
 
-                step_info = _interpret_hadoop_jar_command_stderr(
+                step_interpretation = _interpret_hadoop_jar_command_stderr(
                     step_proc.stderr,
                     record_callback=_log_record_from_hadoop)
 
@@ -426,22 +430,22 @@ class HadoopJobRunner(MRJobRunner):
                     with os.fdopen(master_fd, 'rb') as master:
                         # reading from master gives us the subprocess's
                         # stderr and stdout (it's a fake terminal)
-                        step_info = _interpret_hadoop_jar_command_stderr(
-                            master,
-                            record_callback=_log_record_from_hadoop)
+                        step_interpretation = (
+                            _interpret_hadoop_jar_command_stderr(
+                                master,
+                                record_callback=_log_record_from_hadoop))
                         _, returncode = os.waitpid(pid, 0)
 
             # make sure output_dir is filled
-            if 'output_dir' not in step_info:
-                step_info['output_dir'] = self._hdfs_step_output_dir(step_num)
+            if 'output_dir' not in step_interpretation:
+                step_interpretation['output_dir'] = (
+                    self._hdfs_step_output_dir(step_num))
 
-            if 'counters' not in step_info:
+            log_interpretation['step'] = step_interpretation
+
+            if 'counters' not in step_interpretation:
                 log.info('Attempting to read counters from history log')
-                history = self._interpret_history_log(step_info)
-                if 'counters' in history:
-                    step_info['counters'] = history['counters']
-
-            self._steps_info.append(step_info)
+                self._interpret_history_log(log_interpretation)
 
             # just print counters for this one step
             self._print_counters(step_nums=[step_num])
@@ -582,9 +586,11 @@ class HadoopJobRunner(MRJobRunner):
 
     ### LOG FETCHING/PARSING ###
 
-    def _interpret_history_log(self, step_info):
-        if 'history' not in step_info:
-            job_id = step_info.get('job_id')
+    def _interpret_history_log(self, log_interpretation):
+        if 'history' not in log_interpretation:
+            # get job ID from output of hadoop command
+            step_interpretation = log_interpretation.get('step') or {}
+            job_id = step_interpretation.get('job_id')
 
             if not job_id:
                 log.warning("Can't fetch history without job ID")
@@ -593,7 +599,7 @@ class HadoopJobRunner(MRJobRunner):
             def stream_history_log_dirs():
                 for log_dir in unique(
                         self._hadoop_log_dirs(
-                            output_dir=step_info.get('output_dir'))):
+                            output_dir=step_interpretation.get('output_dir'))):
 
                     if self.fs.exists(log_dir):
                          log.info('Looking for history log in %s' % log_dir)
@@ -607,10 +613,10 @@ class HadoopJobRunner(MRJobRunner):
                     log.info('Found history log: %s' % match['path'])
                     yield match
 
-            step_info['history'] = _interpret_history_log(
+            log_interpretation['history'] = _interpret_history_log(
                 self.fs, ls_history_logs())
 
-        return step_info['history']
+        return log_interpretation['history']
 
     def _find_probable_cause_of_failure(self, application_id=None, job_id=None,
                                         output_dir=None, **ignored):
@@ -657,9 +663,8 @@ class HadoopJobRunner(MRJobRunner):
         # TODO: catch timeouts, etc.
 
     def counters(self):
-        return [step_info.get('counters') or {}
-                for step_info in self._steps_info]
-
+        return [_pick_counters(log_interpretation)
+                for log_interpretation in self._log_interpretations]
 
 
 # These don't require state from HadoopJobRunner, so making them functions.

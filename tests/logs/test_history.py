@@ -296,7 +296,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
                 errors=[
                     dict(
                         hadoop_error=dict(
-                            error=(
+                            message=(
                                 'Error: java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads(): subprocess failed with'
                                 ' code 1\n\tat org.apache.hadoop.streaming'
@@ -310,7 +310,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
                     ),
                     dict(
                         hadoop_error=dict(
-                            error=(
+                            message=(
                                 'Error: java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads(): subprocess failed with'
                                 ' code 1\n'),
@@ -403,7 +403,7 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
                 errors=[
                     dict(
                         java_error=dict(
-                            error=(
+                            message=(
                                 'java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads():'
                                 ' subprocess failed with code 1\n'

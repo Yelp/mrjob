@@ -152,7 +152,7 @@ def _parse_yarn_history_log(lines):
         counters for succesful tasks
     errors: a list of dictionaries with the keys:
         hadoop_error:
-            error: lines of error, as as string
+            message: lines of error, as as string
             start_line: first line of log containing the error (0-indexed)
             num_lines: # of lines of log containing the error
         task_id: ID of task with this error
@@ -184,13 +184,13 @@ def _parse_yarn_history_log(lines):
 
         if record_type.endswith('_ATTEMPT_FAILED'):
             for event in events:
-                error_str = event.get('error')
-                if not isinstance(error_str, string_types):
+                err_msg = event.get('error')
+                if not isinstance(err_msg, string_types):
                     continue
 
                 error = dict(
                     hadoop_error=dict(
-                        error=error_str,
+                        message=err_msg,
                         start_line=line_num,
                         num_lines=1))
 
@@ -311,7 +311,7 @@ def _parse_pre_yarn_history_log(lines):
             result.setdefault('errors', [])
             result['errors'].append(dict(
                 java_error=dict(
-                    error=fields['ERROR'],
+                    message=fields['ERROR'],
                     start_line=record['start_line'],
                     num_lines=record['num_lines']),
                 attempt_id=fields['TASK_ATTEMPT_ID']))

@@ -142,7 +142,7 @@ class ParseHadoopJarCommandStderrTestCase(TestCase):
                     dict(
                         attempt_id='attempt_1453488173054_0001_m_000000_0',
                         hadoop_error=dict(
-                            error=(
+                            message=(
                                 'Error: java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads(): subprocess failed with'
                                 ' code 1\n\tat org.apache.hadoop.streaming'

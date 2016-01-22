@@ -57,13 +57,13 @@ _interpret_*_logs(fs, matches, ...):
     counters: group -> counter -> amount
     errors: [
         hadoop_error:  (for errors internal to Hadoop)
-            error: string representation of Java stack trace
+            message: string representation of Java stack trace
             path: URI of log file containing error
             start_line: first line of <path> with error (0-indexed)
             num_lines: # of lines containing error
         task_error:   (for errors caused by one task)
-            error: stderr explaining error (e.g. Python traceback)
-            command: command that was run to cause this error
+            message: string representation of error (e.g. Python command line
+                followed by Python exception)
             path: (see above)
             start_line: (see above)
             num_lines: (see above)

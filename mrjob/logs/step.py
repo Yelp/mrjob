@@ -73,7 +73,7 @@ def _parse_step_log(lines):
         no counters found (only YARN prints counters)
     errors: a list of errors, with the following keys:
         hadoop_error:
-            error: lines of error, as as string
+            message: lines of error, as as string
             start_line: first line of log containing the error (0-indexed)
             num_lines: # of lines of log containing the error
         attempt_id: ID of task attempt with this error
@@ -167,7 +167,7 @@ def _parse_step_log_from_log4j_records(records):
             error = dict(
                 attempt_id=m.group('attempt_id'),
                 hadoop_error=dict(
-                    error=error_str,
+                    message=error_str,
                     num_lines=record['num_lines'],
                     start_line=record['start_line'],
                 )

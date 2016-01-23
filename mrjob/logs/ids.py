@@ -50,8 +50,8 @@ def _time_sort_key(d):
     # what we want
     return (
         d.get('application_id') or '',
-        d.get('container_id') or '',
         timestamp_and_step,
+        d.get('container_id') or '',
         task_type,
         attempt_num,
         task_num)

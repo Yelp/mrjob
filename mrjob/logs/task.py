@@ -14,8 +14,10 @@
 # limitations under the License.
 """Parse "task" logs, which are the syslog and stderr for each individual
 task and typically appear in the userlogs/ directory."""
+import posixpath
 import re
 
+from mrjob.util import file_ext
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
 
@@ -53,6 +55,14 @@ _YARN_TASK_SYSLOG_PATH_RE = re.compile(
     r'syslog(?P<suffix>\.\w+)?')
 
 
+def _ls_task_syslogs(fs, log_dir_stream, application_id=None, job_id=None):
+    """Yield matching syslogs, optionally filtering by application_id
+    or job_id."""
+    return _ls_logs(fs, log_dir_stream, _match_task_syslog_path,
+                    application_id=application_id,
+                    job_id=job_id)
+
+
 # TODO: will need to filter by step_num on EMR
 def _match_task_syslog_path(path, application_id=None, job_id=None):
     """Is this the path/URI of a task syslog?
@@ -78,6 +88,17 @@ def _match_task_syslog_path(path, application_id=None, job_id=None):
             container_id=m.group('container_id'))
 
     return None
+
+
+def _syslog_to_stderr_path(path):
+    """Get the path/uri of the stderr log corresponding to the given syslog.
+
+    If the syslog is gzipped (/path/to/syslog.gz), we'll expect
+    stderr to be gzipped too (/path/to/stderr.gz).
+    """
+    stem, filename = posixpath.split(path)
+    return posixpath.join(stem, 'stderr' + file_ext(filename))
+
 
 
 def _parse_task_syslog(lines):

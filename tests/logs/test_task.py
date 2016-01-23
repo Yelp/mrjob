@@ -14,9 +14,10 @@
 # limitations under the License.
 from tests.py2 import TestCase
 
-from mrjob.logs.task import _parse_task_syslog
-from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _match_task_syslog_path
+from mrjob.logs.task import _parse_task_stderr
+from mrjob.logs.task import _parse_task_syslog
+from mrjob.logs.task import _syslog_to_stderr_path
 
 
 class MatchTaskSyslogPathTestCase(TestCase):
@@ -263,3 +264,21 @@ class ParseTaskStderrTestCase(TestCase):
 
         self.assertEqual(
             _parse_task_stderr(lines), None)
+
+
+class SyslogToStderrPathTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_syslog_to_stderr_path(''), 'stderr')
+
+    def test_no_stem(self):
+        self.assertEqual(_syslog_to_stderr_path('/path/to/syslog'),
+                         '/path/to/stderr')
+
+    def test_gz(self):
+        self.assertEqual(_syslog_to_stderr_path('/path/to/syslog.gz'),
+                        '/path/to/stderr.gz')
+
+    def test_doesnt_check_filename(self):
+        self.assertEqual(_syslog_to_stderr_path('/path/to/garden'),
+                         '/path/to/stderr')

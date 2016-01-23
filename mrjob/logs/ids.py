@@ -62,11 +62,16 @@ def _add_implied_task_id(d):
 
     Use this on errors.
     """
+    # NOTE: container IDs look similar to task IDs, but they're actually
+    # different. Each container contains one task attempt, so there are
+    # actually more container IDs than task IDs.
     if d.get('attempt_id') and not d.get('task_id'):
         d['task_id'] = _attempt_id_to_task_id(
             d['attempt_id'])
 
 
+# TODO: pretty sure that application and job IDs match, but if not,
+# our code could probably live with that
 def _add_implied_job_id(d):
     """If *d* has *task_id* or *application_id* but not *job_id*,
     add it.
@@ -76,9 +81,9 @@ def _add_implied_job_id(d):
     """
     if not d.get('job_id'):
         if d.get('task_id'):
-            d['job_id'] = _task_id_to_job_id(d['task_id'])
+            d['job_id'] = _to_job_id(d['task_id'])
         elif d.get('application_id'):
-            d['job_id'] = _task_id_to_job_id(d['application_id'])
+            d['job_id'] = _to_job_id(d['application_id'])
 
 
 
@@ -88,13 +93,8 @@ def _attempt_id_to_task_id(attempt_id):
     return 'task_' + '_'.join(attempt_id.split('_')[1:5])
 
 
-def _task_id_to_job_id(task_id):
+def _to_job_id(task_id):
     """Convert e.g. ``'task_201601081945_0005_m_000005'``
+    or ``'application_201601081945_0005'`` to
     to ``'job_201601081945_0005'``."""
     return 'job_' + '_'.join(task_id.split('_')[1:3])
-
-
-def _application_id_to_job_id(application_id):
-    """Convert .e.g ``'application_1452893364657_0008'``
-    to ``'job_1452893364657_0008'``"""
-    return 'job_' + '_'.join(application_id.split('_')[1:])

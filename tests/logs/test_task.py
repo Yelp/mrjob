@@ -16,6 +16,77 @@ from tests.py2 import TestCase
 
 from mrjob.logs.task import _parse_task_syslog
 from mrjob.logs.task import _parse_task_stderr
+from mrjob.logs.task import _match_task_syslog_path
+
+
+class MatchTaskSyslogPathTestCase(TestCase):
+
+    PRE_YARN_PATH = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+
+    YARN_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
+                 'container_1450486922681_0005_01_000003/syslog')
+
+    def test_empty(self):
+        self.assertEqual(_match_task_syslog_path(''), None)
+
+    def test_pre_yarn(self):
+        self.assertEqual(
+            _match_task_syslog_path(self.PRE_YARN_PATH),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
+
+    def test_pre_yarn_gz(self):
+        self.assertEqual(
+            _match_task_syslog_path(self.PRE_YARN_PATH + '.gz'),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
+
+    def test_dont_match_pre_yarn_stderr(self):
+        self.assertEqual(
+            _match_task_syslog_path(self.PRE_YARN_PATH[:-6] + 'stderr'),
+            None)
+
+    def test_pre_yarn_job_id_filter(self):
+        self.assertEqual(
+            _match_task_syslog_path(
+                self.PRE_YARN_PATH,
+                job_id='job_201512232143_0008'),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
+
+        self.assertEqual(
+            _match_task_syslog_path(
+                self.PRE_YARN_PATH,
+                job_id='job_201512232143_0009'),
+            None)
+
+    def test_yarn(self):
+        self.assertEqual(
+            _match_task_syslog_path(self.YARN_PATH),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003'))
+
+    def test_yarn_gz(self):
+        self.assertEqual(
+            _match_task_syslog_path(self.YARN_PATH + '.gz'),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003'))
+
+    def test_dont_match_yarn_stderr(self):
+        self.assertEqual(
+            _match_task_syslog_path(self.YARN_PATH[:-6] + 'stderr'),
+            None)
+
+    def test_yarn_application_id_filter(self):
+        self.assertEqual(
+            _match_task_syslog_path(
+                self.YARN_PATH,
+                application_id='application_1450486922681_0004'),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003'))
+
+        self.assertEqual(
+            _match_task_syslog_path(
+                self.YARN_PATH,
+                application_id='application_1450486922681_0005'),
+            None)
 
 
 

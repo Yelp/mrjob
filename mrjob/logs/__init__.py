@@ -58,10 +58,15 @@ _match_*_log_path(path, **filter_kwargs):
 
 _interpret_*_log(fs, matches):
 _interpret_*_logs(fs, matches, partial=True):
-_interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
 
     Search one or more logs (or command stderr) for relevant information
     (counters, errors, and IDs).
+
+    Rather than taking paths, takes a stream of matches returned by
+    _ls_*_logs() (see above).
+
+    If partial is set to True, just scan for the first error, starting
+    with the last log.
 
     This returns a dictionary with the following format (all fields optional):
 
@@ -93,6 +98,12 @@ _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     Errors' task_id should always be set if attempt_id is set (use
     mrjob.logs.id._add_implied_task_id()) and job_id should always be set
     if application_id is set (use mrjob.logs.id._add_implied_job_id)
+
+
+_interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
+
+    Reads hadoop jar command output on the fly, but otherwise works like
+    other _interpret_*() functions (same return format).
 
 
 _parse_*_log(lines):

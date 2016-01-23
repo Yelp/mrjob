@@ -48,10 +48,12 @@ _match_*_log_path(path, **filter_kwargs):
 
     Is this the path of a log of this type?
 
-    If there is a match, returns a match dictionary, which may contain
-    *_id fields parsed from the path (application_id, attempt_id,
-    container_id, job_id, task_id), but can also be empty. If no match,
-    returns None.
+    If there is a match, returns a dictionary. If not, returns None
+
+    The match dictionary may be empty, but it can also include
+    *_ids fields parsed from the path (*application_id*, *attempt_id*,
+    *container_id*, *job_id*, *task_id*), or information about which
+    version of Hadoop this file comes from (*yarn*).
 
     filter_kwargs allows us to filter by job ID, etc.
 

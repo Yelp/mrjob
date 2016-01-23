@@ -18,6 +18,7 @@ import posixpath
 import re
 
 from mrjob.util import file_ext
+from .ids import _sort_by_recency
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
 
@@ -90,6 +91,65 @@ def _match_task_syslog_path(path, application_id=None, job_id=None):
     return None
 
 
+def _interpret_task_logs(fs, matches, partial=True):
+    """Look for errors in task syslog/stderr.
+
+    If *partial* is true (the default), work backwards from the most
+    recent log file and stop when we find the first error.
+
+    Returns a dictionary possibly containing the key 'errors', which
+    is a dict containing:
+
+    hadoop_error:
+        message: string containing error message and Java exception
+        num_lines: number of lines in syslog this takes up
+        path: syslog we read this error from
+        start_line: where in syslog exception starts (0-indexed)
+    split: (optional)
+        path: URI of input file task was processing
+        num_lines: (optional) number of lines in split
+        start_line: (optional) first line of split (0-indexed)
+    task_error:
+        message: command and error message from task, as a string
+        num_lines: number of lines in stderr this takes up
+        path: stderr we read this from
+        start_line: where in stderr error message starts (0-indexed)
+
+    In addition, if *partial* is set to true (and we found an error),
+    this dictionary will contain the key *partial*, set to True.
+    """
+    result = {}
+
+    if partial:
+        matches = _sort_by_recency(matches)
+
+    for match in matches:
+        syslog_path = match['path']
+
+        # get hadoop_error and possibly split from syslog
+        error = _parse_task_syslog(_cat_log(fs, syslog_path))
+        if not error.get('hadoop_error'):
+            continue
+        error['hadoop_error']['path'] = syslog_path
+
+        # look for task_error in stderr
+        stderr_path = _syslog_to_stderr_path(syslog_path)
+        task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
+
+        if task_error:
+            task_error['path'] = stderr_path
+            error['task_error'] = task_error
+
+        result.setdefault('errors', [])
+        result['errors'].append(error)
+
+        if partial:
+            result['partial'] = True
+            break
+
+    return result
+
+
 def _syslog_to_stderr_path(path):
     """Get the path/uri of the stderr log corresponding to the given syslog.
 
@@ -100,14 +160,13 @@ def _syslog_to_stderr_path(path):
     return posixpath.join(stem, 'stderr' + file_ext(filename))
 
 
-
 def _parse_task_syslog(lines):
     """Parse an error out of a syslog file.
 
     Returns a dict, possibly containing the following keys:
 
     hadoop_error:
-        message: Java exception, as a string
+        message: string containing error message and Java exception
         num_lines: number of lines in syslog this takes up
         start_line: where in syslog exception starts (0-indexed)
     split: (optional)

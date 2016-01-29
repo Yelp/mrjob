@@ -46,7 +46,7 @@ def _time_sort_key(d):
     attempt_num = '_'.join(attempt_parts[5:6])
 
     # numbers are 0-padded, so no need to convert anything to int
-    # also, 'm' (task_type in attempt_id) sorts before 'r', which is
+    # also, 'm' (task type in attempt ID) sorts before 'r', which is
     # what we want
     return (
         timestamp_and_step,

@@ -183,10 +183,12 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000001_3',
                     hadoop_error=dict(
                         message='BOOM',
                         path=syslog_path,
                     ),
+                    task_id='task_201512232143_0008_m_000001',
                 ),
             ],
             partial=True,
@@ -205,11 +207,13 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000001_3',
                     hadoop_error=dict(
                         message='BOOM',
                         path=syslog_path,
                     ),
                     split=dict(path='best_input_file_ever'),
+                    task_id='task_201512232143_0008_m_000001',
                 ),
             ],
             partial=True,
@@ -229,6 +233,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000001_3',
                     hadoop_error=dict(
                         message='BOOM',
                         path=syslog_path,
@@ -236,6 +241,32 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_error=dict(
                         message='because, exploding code',
                         path=stderr_path,
+                    ),
+                    task_id='task_201512232143_0008_m_000001',
+                ),
+            ],
+            partial=True,
+        ))
+
+    def test_yarn_syslog_with_error(self):
+        # this works the same way as the other tests, except we get
+        # container_id rather than attempt_id and task_id
+        syslog_path = (
+            '/log/dir/userlogs/application_1450486922681_0004'
+            '/container_1450486922681_0005_01_000003/syslog')
+        self.mock_paths = [syslog_path]
+
+        self.path_to_mock_result = {
+            syslog_path: dict(hadoop_error=dict(message='BOOM')),
+        }
+
+        self.assertEqual(self.interpret_task_logs(), dict(
+            errors=[
+                dict(
+                    container_id='container_1450486922681_0005_01_000003',
+                    hadoop_error=dict(
+                        message='BOOM',
+                        path=syslog_path,
                     ),
                 ),
             ],
@@ -274,10 +305,12 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
                         message='BOOM2',
                         path=syslog2_path,
                     ),
+                    task_id='task_201512232143_0008_m_000002',
                 ),
             ],
             partial=True,
@@ -293,16 +326,20 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.assertEqual(self.interpret_task_logs(partial=False), dict(
             errors=[
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000001_3',
                     hadoop_error=dict(
                         message='BOOM1',
                         path=syslog1_path,
                     ),
+                    task_id='task_201512232143_0008_m_000001',
                 ),
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
                         message='BOOM2',
                         path=syslog2_path,
                     ),
+                    task_id='task_201512232143_0008_m_000002',
                 ),
             ],
         ))
@@ -310,6 +347,10 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.assertEqual(self.mock_paths_catted, self.mock_paths)
 
     def test_pre_yarn_sorting(self):
+        # NOTE: we currently don't have to handle errors from multiple
+        # jobs at once; this is a latent feature that might become
+        # useful later
+
         self.mock_paths = [
             '/userlogs/attempt_201512232143_0008_m_000001_3/syslog',
             '/userlogs/attempt_201512232143_0008_r_000000_0/syslog',
@@ -331,6 +372,10 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         )
 
     def test_yarn_sorting(self):
+        # NOTE: we currently don't have to handle errors from multiple
+        # jobs/applications at once; this is a latent feature that might
+        # become useful later
+
         self.mock_paths = [
             '/log/dir/userlogs/application_1450486922681_0004'
             '/container_1450486922681_0005_01_000003/syslog',

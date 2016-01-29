@@ -18,6 +18,7 @@ import posixpath
 import re
 
 from mrjob.util import file_ext
+from .ids import _add_implied_task_id
 from .ids import _sort_by_recency
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
@@ -133,6 +134,13 @@ def _interpret_task_logs(fs, matches, partial=True):
         if not error.get('hadoop_error'):
             continue
         error['hadoop_error']['path'] = syslog_path
+
+        # path in IDs we learned from path
+        for id_key in 'attempt_id', 'container_id', 'type_id':
+            if id_key in match:
+                error[id_key] = match[id_key]
+
+        _add_implied_task_id(error)
 
         # look for task_error in stderr, if it exists
         stderr_path = _syslog_to_stderr_path(syslog_path)

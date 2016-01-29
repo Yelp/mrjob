@@ -49,7 +49,6 @@ def _time_sort_key(d):
     # also, 'm' (task_type in attempt_id) sorts before 'r', which is
     # what we want
     return (
-        d.get('application_id') or '',
         timestamp_and_step,
         d.get('container_id') or '',
         task_type,

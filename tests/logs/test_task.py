@@ -12,12 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from tests.py2 import TestCase
-
+from mrjob.logs.task import _interpret_task_logs
+from mrjob.logs.task import _ls_task_syslogs
 from mrjob.logs.task import _match_task_syslog_path
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog
 from mrjob.logs.task import _syslog_to_stderr_path
+
+from tests.py2 import Mock
+from tests.py2 import TestCase
+from tests.py2 import call
+from tests.py2 import patch
+from tests.sandbox import PatcherTestCase
 
 
 class MatchTaskSyslogPathTestCase(TestCase):
@@ -88,6 +94,220 @@ class MatchTaskSyslogPathTestCase(TestCase):
                 self.YARN_PATH,
                 application_id='application_1450486922681_0005'),
             None)
+
+
+# this also tests _ls_task_syslogs()
+class InterpretTaskLogsTestCase(PatcherTestCase):
+
+    def setUp(self):
+        super(InterpretTaskLogsTestCase, self).setUp()
+
+        # instead of mocking out contents of files, just mock out
+        # what _parse_task_{syslog,stderr}() should return, and have
+        # _cat_log() just pass through the path
+        self.mock_paths = []
+        self.path_to_mock_result = {}
+
+        self.mock_paths_catted = []
+
+        def mock_cat_log(fs, path):
+            if path in self.mock_paths:
+                self.mock_paths_catted.append(path)
+            return path
+
+        # (the actual log-parsing functions take lines from the log)
+        def mock_parse_task_syslog(path_from_mock_cat_log):
+            # default is {}
+            return self.path_to_mock_result.get(path_from_mock_cat_log, {})
+
+        def mock_parse_task_stderr(path_from_mock_cat_log):
+            # default is None
+            return self.path_to_mock_result.get(path_from_mock_cat_log)
+
+        # need to mock ls so that _ls_task_syslogs() can work
+        def mock_exists(path):
+            return path in self.mock_paths
+
+        def mock_ls(log_dir):
+            return self.mock_paths
+
+        self.mock_fs = Mock()
+        self.mock_fs.ls = Mock(side_effect=mock_ls)
+
+        self.mock_cat_log = self.start(
+            patch('mrjob.logs.task._cat_log', side_effect=mock_cat_log))
+
+        self.start(patch('mrjob.logs.task._parse_task_syslog',
+                         side_effect=mock_parse_task_syslog))
+        self.start(patch('mrjob.logs.task._parse_task_stderr',
+                         side_effect=mock_parse_task_stderr))
+
+    def interpret_task_logs(self, **kwargs):
+        # create matches from mock paths
+        mock_log_dir_stream = [['']]  # needed to make _ls_logs() work
+        matches = _ls_task_syslogs(self.mock_fs, mock_log_dir_stream)
+        return _interpret_task_logs(self.mock_fs, matches, **kwargs)
+
+    def test_empty(self):
+        self.assertEqual(self.interpret_task_logs(), {})
+
+    def test_syslog_with_no_error(self):
+        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+
+        self.mock_paths = [syslog_path]
+
+        self.assertEqual(self.interpret_task_logs(), {})
+
+    def test_syslog_with_split_only(self):
+        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+
+        self.mock_paths = [syslog_path]
+
+        self.path_to_mock_result = {
+            syslog_path: dict(split=dict(path='best_input_file_ever'))
+        }
+
+        self.assertEqual(self.interpret_task_logs(), {})
+
+    def test_syslog_with_error(self):
+        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+
+        self.mock_paths = [syslog_path]
+
+        self.path_to_mock_result = {
+            syslog_path: dict(hadoop_error=dict(message='BOOM')),
+        }
+
+        self.assertEqual(self.interpret_task_logs(), dict(
+            errors=[
+                dict(
+                    hadoop_error=dict(
+                        message='BOOM',
+                        path=syslog_path,
+                    ),
+                ),
+            ],
+            partial=True,
+        ))
+
+    def test_syslog_with_error_and_split(self):
+        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+
+        self.mock_paths = [syslog_path]
+
+        self.path_to_mock_result = {
+            syslog_path: dict(hadoop_error=dict(message='BOOM'),
+                              split=dict(path='best_input_file_ever')),
+        }
+
+        self.assertEqual(self.interpret_task_logs(), dict(
+            errors=[
+                dict(
+                    hadoop_error=dict(
+                        message='BOOM',
+                        path=syslog_path,
+                    ),
+                    split=dict(path='best_input_file_ever'),
+                ),
+            ],
+            partial=True,
+        ))
+
+    def test_syslog_with_corresponding_stderr(self):
+        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+        stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
+
+        self.mock_paths = [syslog_path, stderr_path]
+
+        self.path_to_mock_result = {
+            syslog_path: dict(hadoop_error=dict(message='BOOM')),
+            stderr_path: dict(message='because, exploding code')
+        }
+
+        self.assertEqual(self.interpret_task_logs(), dict(
+            errors=[
+                dict(
+                    hadoop_error=dict(
+                        message='BOOM',
+                        path=syslog_path,
+                    ),
+                    task_error=dict(
+                        message='because, exploding code',
+                        path=stderr_path,
+                    ),
+                ),
+            ],
+            partial=True,
+        ))
+
+    def test_error_in_stderr_only(self):
+        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+        stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
+
+        self.mock_paths = [syslog_path, stderr_path]
+
+        self.path_to_mock_result = {
+            stderr_path: dict(message='because, exploding code')
+        }
+
+        self.assertEqual(self.interpret_task_logs(), {})
+
+        # never even looked at stderr, because no error in syslog
+        self.assertEqual(self.mock_paths_catted, [syslog_path])
+
+    def test_ordering(self):
+        syslog1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+        syslog2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/syslog'
+        syslog3_path = '/userlogs/attempt_201512232143_0008_m_000003_3/syslog'
+
+        self.mock_paths = [syslog1_path, syslog2_path, syslog3_path]
+
+        self.path_to_mock_result = {
+            syslog1_path: dict(hadoop_error=dict(message='BOOM1')),
+            syslog2_path: dict(hadoop_error=dict(message='BOOM2')),
+            # no error for syslog3_path
+        }
+
+        # we should read from syslog2_path first (later task number)
+        self.assertEqual(self.interpret_task_logs(), dict(
+            errors=[
+                dict(
+                    hadoop_error=dict(
+                        message='BOOM2',
+                        path=syslog2_path,
+                    ),
+                ),
+            ],
+            partial=True,
+        ))
+
+        # shouldn't even bother with syslog1_path
+        self.assertEqual(self.mock_paths_catted, [syslog3_path, syslog2_path])
+
+        # try again, with partial=False
+        self.mock_paths_catted = []
+
+        # no need to sort paths if scanning them all
+        self.assertEqual(self.interpret_task_logs(partial=False), dict(
+            errors=[
+                dict(
+                    hadoop_error=dict(
+                        message='BOOM1',
+                        path=syslog1_path,
+                    ),
+                ),
+                dict(
+                    hadoop_error=dict(
+                        message='BOOM2',
+                        path=syslog2_path,
+                    ),
+                ),
+            ],
+        ))
+
+        self.assertEqual(self.mock_paths_catted, self.mock_paths)
+
+
 
 
 

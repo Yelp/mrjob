@@ -22,7 +22,7 @@ def _sort_by_recency(ds):
     most recent ones come first (e.g. to find the best error, or the best
     log file to look for an error in).
     """
-    return _sort_by_recency(ds, key=_time_sort_key, reverse=True)
+    return sorted(ds, key=_time_sort_key, reverse=True)
 
 
 def _time_sort_key(d):

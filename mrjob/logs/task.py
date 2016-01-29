@@ -21,6 +21,8 @@ from mrjob.util import file_ext
 from .ids import _sort_by_recency
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
+from .wrap import _cat_log
+from .wrap import _ls_logs
 
 
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
@@ -132,7 +134,7 @@ def _interpret_task_logs(fs, matches, partial=True):
             continue
         error['hadoop_error']['path'] = syslog_path
 
-        # look for task_error in stderr
+        # look for task_error in stderr, if it exists
         stderr_path = _syslog_to_stderr_path(syslog_path)
         task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
 
@@ -206,11 +208,6 @@ def _parse_task_syslog(lines):
             break  # nothing to do once we've found the error
 
     return result
-
-
-
-
-
 
 
 def _parse_task_stderr(lines):

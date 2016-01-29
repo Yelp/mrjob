@@ -25,6 +25,8 @@ def _cat_log(fs, path):
     """fs.cat() the given log, converting lines to strings, and logging
     errors."""
     try:
+        if not fs.exists(path):
+            return
         for line in fs.cat(path):
             yield to_string(line)
     except IOError as e:

@@ -318,7 +318,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         ]
 
         # just want to see order that logs are catted
-        self.assertEqual(self.interpret_task_logs(), [])
+        self.assertEqual(self.interpret_task_logs(), {})
 
         self.assertEqual(
             self.mock_paths_catted,
@@ -341,7 +341,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         ]
 
         # just want to see order that logs are catted
-        self.assertEqual(self.interpret_task_logs(), [])
+        self.assertEqual(self.interpret_task_logs(), {})
 
         self.assertEqual(
             self.mock_paths_catted,

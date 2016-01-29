@@ -96,7 +96,7 @@ class MatchTaskSyslogPathTestCase(TestCase):
             None)
 
 
-# this also tests _ls_task_syslogs()
+# this indirectly tests _ls_task_syslogs() and .ids._sort_by_recency()
 class InterpretTaskLogsTestCase(PatcherTestCase):
 
     def setUp(self):
@@ -142,11 +142,13 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.start(patch('mrjob.logs.task._parse_task_stderr',
                          side_effect=mock_parse_task_stderr))
 
-    def interpret_task_logs(self, **kwargs):
-        # create matches from mock paths
+    def mock_path_matches(self):
         mock_log_dir_stream = [['']]  # needed to make _ls_logs() work
-        matches = _ls_task_syslogs(self.mock_fs, mock_log_dir_stream)
-        return _interpret_task_logs(self.mock_fs, matches, **kwargs)
+        return _ls_task_syslogs(self.mock_fs, mock_log_dir_stream)
+
+    def interpret_task_logs(self, **kwargs):
+        return _interpret_task_logs(
+            self.mock_fs, self.mock_path_matches(), **kwargs)
 
     def test_empty(self):
         self.assertEqual(self.interpret_task_logs(), {})
@@ -255,7 +257,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         # never even looked at stderr, because no error in syslog
         self.assertEqual(self.mock_paths_catted, [syslog_path])
 
-    def test_ordering(self):
+    def test_multiple_logs(self):
         syslog1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         syslog2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/syslog'
         syslog3_path = '/userlogs/attempt_201512232143_0008_m_000003_3/syslog'
@@ -307,8 +309,51 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
 
         self.assertEqual(self.mock_paths_catted, self.mock_paths)
 
+    def test_pre_yarn_sorting(self):
+        self.mock_paths = [
+            '/userlogs/attempt_201512232143_0008_m_000001_3/syslog',
+            '/userlogs/attempt_201512232143_0008_r_000000_0/syslog',
+            '/userlogs/attempt_201512232143_0008_m_000003_1/syslog',
+            '/userlogs/attempt_201512232143_0006_m_000000_0/syslog',
+        ]
 
+        # just want to see order that logs are catted
+        self.assertEqual(self.interpret_task_logs(), [])
 
+        self.assertEqual(
+            self.mock_paths_catted,
+            [
+                '/userlogs/attempt_201512232143_0008_r_000000_0/syslog',
+                '/userlogs/attempt_201512232143_0008_m_000001_3/syslog',
+                '/userlogs/attempt_201512232143_0008_m_000003_1/syslog',
+                '/userlogs/attempt_201512232143_0006_m_000000_0/syslog',
+            ]
+        )
+
+    def test_yarn_sorting(self):
+        self.mock_paths = [
+            '/log/dir/userlogs/application_1450486922681_0004'
+            '/container_1450486922681_0005_01_000003/syslog',
+            '/log/dir/userlogs/application_1450486922681_0005'
+            '/container_1450486922681_0005_01_000004/syslog',
+            '/log/dir/userlogs/application_1450486922681_0005'
+            '/container_1450486922681_0005_01_000003/syslog',
+        ]
+
+        # just want to see order that logs are catted
+        self.assertEqual(self.interpret_task_logs(), [])
+
+        self.assertEqual(
+            self.mock_paths_catted,
+            [
+                '/log/dir/userlogs/application_1450486922681_0005'
+                '/container_1450486922681_0005_01_000004/syslog',
+                '/log/dir/userlogs/application_1450486922681_0005'
+                '/container_1450486922681_0005_01_000003/syslog',
+                '/log/dir/userlogs/application_1450486922681_0004'
+                '/container_1450486922681_0005_01_000003/syslog',
+            ]
+        )
 
 
 class ParseTaskSyslogTestCase(TestCase):

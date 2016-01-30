@@ -455,9 +455,8 @@ class HadoopJobRunner(MRJobRunner):
 
             if returncode:
                 error = self._pick_error(log_interpretation)
-
                 if error:
-                    log.error('Probable cause of failure:\n\n' +
+                    log.error('Probable cause of failure:\n\n%s\n' %
                               _format_error(error))
 
                 raise CalledProcessError(returncode, step_args)

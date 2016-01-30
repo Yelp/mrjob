@@ -316,7 +316,7 @@ def _parse_pre_yarn_history_log(lines):
               'TASK_ATTEMPT_ID' in fields and 'ERROR' in fields):
             result.setdefault('errors', [])
             result['errors'].append(dict(
-                java_error=dict(
+                hadoop_error=dict(
                     message=fields['ERROR'],
                     start_line=record['start_line'],
                     num_lines=record['num_lines']),

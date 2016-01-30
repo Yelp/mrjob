@@ -434,7 +434,7 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
             dict(
                 errors=[
                     dict(
-                        java_error=dict(
+                        hadoop_error=dict(
                             message=(
                                 'java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads():'

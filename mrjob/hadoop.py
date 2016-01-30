@@ -16,6 +16,7 @@ import logging
 import os
 import posixpath
 import re
+from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -36,12 +37,14 @@ from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
-from mrjob.logs.interpret import _find_error_in_task_logs
-from mrjob.logs.interpret import _format_cause_of_failure
-from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _pick_error
 from mrjob.logs.history import _interpret_history_log
-from mrjob.logs.step import _is_counter_log4j_record
+from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
+from mrjob.logs.step import _is_counter_log4j_record
+from mrjob.logs.task import _interpret_task_logs
+from mrjob.logs.task import _ls_task_syslogs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
@@ -451,19 +454,13 @@ class HadoopJobRunner(MRJobRunner):
             self._print_counters(step_nums=[step_num])
 
             if returncode:
-                err_lines = [
-                    'Job failed with return code %d: %s' %
-                       (returncode, cmd_line(step_args))]
+                error = self._pick_error
 
-                cause = self._find_probable_cause_of_failure(**step_info)
+                if error:
+                    log.error('Probable cause of failure:\n\n' +
+                              _format_error(error))
 
-                if cause:
-                    err_lines.append('')  # pad with empty line
-                    err_lines.extend(_format_cause_of_failure(cause))
-
-                for err_line in err_lines:
-                    log.error(err_line)
-                raise Exception('\n'.join(err_lines) + '\n')
+                raise CalledProcessError(returncode, step_args)
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)
@@ -587,6 +584,8 @@ class HadoopJobRunner(MRJobRunner):
     ### LOG FETCHING/PARSING ###
 
     def _interpret_history_log(self, log_interpretation):
+        """Find and interpret the history log, storing the
+        interpretation in ``log_interpretation['history']``."""
         if 'history' not in log_interpretation:
             # get job ID from output of hadoop command
             step_interpretation = log_interpretation.get('step') or {}
@@ -618,49 +617,65 @@ class HadoopJobRunner(MRJobRunner):
 
         return log_interpretation['history']
 
-    def _find_probable_cause_of_failure(self, application_id=None, job_id=None,
-                                        output_dir=None, **ignored):
-        """Find probable cause of failure. Currently we just scan task logs.
+    def _interpret_task_logs(self, log_interpretation):
+        """Find and interpret the task logs, storing the
+        interpretation in ``log_interpretation['task']``."""
+        if 'task' not in log_interpretation:
+            # get job/application ID from output of hadoop command
+            step_interpretation = log_interpretation.get('step') or {}
+            application_id = step_interpretation.get('application_id')
+            job_id = step_interpretation.get('job_id')
 
-        On YARN, you must set application_id, and pre-YARN, you must set
-        job_id.
-        """
-        # package up logs for _find_error_intask_logs(),
-        # and log where we're looking.
-        hadoop_version = self.get_hadoop_version()
-        yarn = uses_yarn(hadoop_version)
+            yarn = uses_yarn(self.get_hadoop_version())
 
-        if yarn and application_id is None:
-            log.warning("No application ID!")
-            return None
+            if yarn and application_id is None:
+                log.warning("Can't fetch task logs without application ID")
+                return {}
+            elif not yarn and job_id is None:
+                log.warning("Can't fetch task logs without job ID")
+                return {}
 
-        if not yarn and job_id is None:
-            log.warning("No job ID!")
-            return None
+            # Note: this is unlikely to be super-helpful on "real" (multi-node)
+            # pre-YARN Hadoop because task logs aren't generally shipped to a
+            # local directory. It's a start, anyways. See #1201.
+            def stream_task_log_dirs():
+                for log_dir in unique(
+                    self._hadoop_log_dirs(
+                        output_dir=step_interpretation.get('output_dir'))):
 
-        # Note: this is unlikely to be super-helpful on "real" (multi-node)
-        # pre-YARN Hadoop because task logs aren't generally shipped to a local
-        # directory. It's a start, anyways. See #1201.
-        def stream_task_log_dirs():
-            for log_dir in unique(
-                    self._hadoop_log_dirs(output_dir=output_dir)):
+                    if yarn:
+                        path = self.fs.join(
+                            log_dir, 'userlogs', application_id)
+                    else:
+                        # sometimes pre-YARN attempt logs are organized by
+                        # job_id,
+                        # sometimes not. Play it safe
+                        path = self.fs.join(log_dir, 'userlogs')
 
-                if yarn:
-                    path = self.fs.join(log_dir, 'userlogs', application_id)
-                else:
-                    # sometimes pre-YARN attempt logs are organized by job_id,
-                    # sometimes not. Play it safe
-                    path = self.fs.join(log_dir, 'userlogs')
+                    if self.fs.exists(path):
+                        log.info('Scanning task syslogs in %s' % path)
+                        yield [path]
 
-                if self.fs.exists(path):
-                    log.info('looking for logs in %s' % path)
-                    yield [path]
+            # wrap _ls_task_syslogs() to add logging
+            def ls_task_syslogs():
+                # there should be at most one history log
+                for match in _ls_task_syslogs(
+                        self.fs, stream_task_log_dirs(),
+                        application_id=application_id, job_id=job_id):
+                    log.info('  Scanning for errors: %s' % match['path'])
+                    yield match
 
-        return _find_error_in_task_logs(
-            self.fs, stream_task_log_dirs(), hadoop_version,
-            application_id=application_id, job_id=job_id)
+            log_interpretation['task'] = _interpret_task_logs(
+                self.fs, ls_task_syslogs())
 
-        # TODO: catch timeouts, etc.
+        return log_interpretation['task']
+
+    def _pick_error(self, log_interpretation):
+        """Find probable cause of failure, and return it."""
+        self._interpret_history_log(log_interpretation)
+        self._interpret_task_logs(log_interpretation)
+
+        return _pick_error(log_interpretation)
 
     def counters(self):
         return [_pick_counters(log_interpretation)

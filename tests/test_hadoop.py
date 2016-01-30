@@ -851,23 +851,24 @@ class SetupLineEncodingTestCase(MockHadoopTestCase):
                         m_open.mock_calls)
 
 
-class FindProbableCauseOfFailureTestCase(MockHadoopTestCase):
+class PickErrorTestCase(MockHadoopTestCase):
 
-    # integration tests for _find_probable_cause_of_failure()
+    # integration tests for _pick_error()
 
     def setUp(self):
-        super(FindProbableCauseOfFailureTestCase, self).setUp()
+        super(PickErrorTestCase, self).setUp()
 
         os.environ['MOCK_HADOOP_VERSION'] = '2.7.0'
 
         self.runner = HadoopJobRunner()
 
     def test_empty(self):
-        self.assertEqual(self.runner._find_probable_cause_of_failure(), None)
+        self.assertEqual(self.runner._pick_error({}), None)
 
     def test_yarn_python_exception(self):
         APPLICATION_ID = 'application_1450486922681_0004'
         CONTAINER_ID = 'container_1450486922681_0005_01_000003'
+        JOB_ID = 'job_1450486922681_0004'
 
         log_subdir = os.path.join(
             os.environ['HADOOP_HOME'], 'logs',
@@ -895,19 +896,16 @@ class FindProbableCauseOfFailureTestCase(MockHadoopTestCase):
 
         stderr_path = os.path.join(log_subdir, 'stderr')
         with open(stderr_path, 'w') as stderr:
+            stderr.write('+ python mr_boom.py --mapper')
             stderr.write('Traceback (most recent call last):\n')
             stderr.write('  File "mr_boom.py", line 10, in <module>\n')
             stderr.write('    MRBoom.run()\n')
             stderr.write('Exception: BOOM\n')
 
-        # need application_id
-        self.assertIsNone(self.runner._find_probable_cause_of_failure())
+        error = self.runner._pick_error(dict(
+            step=dict(application_id=APPLICATION_ID, job_id=JOB_ID)))
 
-        cause = self.runner._find_probable_cause_of_failure(
-            application_id=APPLICATION_ID)
+        self.assertIsNotNone(error)
 
-        self.assertTrue(cause)
-        self.assertEqual(cause['syslog']['path'], syslog_path)
-        self.assertTrue(cause['syslog']['error'])
-        self.assertEqual(cause['stderr']['path'], stderr_path)
-        self.assertTrue(cause['stderr']['error'])
+        self.assertEqual(error['hadoop_error']['path'], syslog_path)
+        self.assertEqual(error['task_error']['path'], stderr_path)

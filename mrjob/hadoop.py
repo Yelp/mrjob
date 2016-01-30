@@ -454,7 +454,7 @@ class HadoopJobRunner(MRJobRunner):
             self._print_counters(step_nums=[step_num])
 
             if returncode:
-                error = self._pick_error()
+                error = self._pick_error(log_interpretation)
 
                 if error:
                     log.error('Probable cause of failure:\n\n' +

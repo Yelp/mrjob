@@ -14,7 +14,7 @@
 # limitations under the License.
 
 from mrjob.logs.history import _interpret_history_log
-from mrjob.logs.history import _match_history_log
+from mrjob.logs.history import _match_history_log_path
 from mrjob.logs.history import _parse_pre_yarn_history_log
 from mrjob.logs.history import _parse_pre_yarn_history_records
 from mrjob.logs.history import _parse_pre_yarn_counters
@@ -30,7 +30,7 @@ from tests.py2 import patch
 class MatchHistoryLogTestCase(TestCase):
 
     def test_empty(self):
-        self.assertEqual(_match_history_log(''), None)
+        self.assertEqual(_match_history_log_path(''), None)
 
     def test_pre_yarn(self):
         history_path = (
@@ -39,7 +39,7 @@ class MatchHistoryLogTestCase(TestCase):
             '_streamjob8025762403845318969.jar')
 
         self.assertEqual(
-            _match_history_log(history_path),
+            _match_history_log_path(history_path),
             dict(job_id='job_201512311928_0001', yarn=False))
 
         conf_path = (
@@ -47,7 +47,7 @@ class MatchHistoryLogTestCase(TestCase):
             '/000000/job_201512311928_0001_conf.xml')
 
         self.assertEqual(
-            _match_history_log(conf_path),
+            _match_history_log_path(conf_path),
             None)
 
     def test_pre_yarn_filter_by_job_id(self):
@@ -57,11 +57,13 @@ class MatchHistoryLogTestCase(TestCase):
             '_streamjob8025762403845318969.jar')
 
         self.assertEqual(
-            _match_history_log(history_path, job_id='job_201512311928_0001'),
+            _match_history_log_path(
+                history_path, job_id='job_201512311928_0001'),
             dict(job_id='job_201512311928_0001', yarn=False))
 
         self.assertEqual(
-            _match_history_log(history_path, job_id='job_201512311928_0002'),
+            _match_history_log_path(
+                history_path, job_id='job_201512311928_0002'),
             None)
 
     def test_yarn(self):
@@ -71,7 +73,7 @@ class MatchHistoryLogTestCase(TestCase):
             '-1451592786882-10-1-SUCCEEDED-default-1451592631082.jhist')
 
         self.assertEqual(
-            _match_history_log(history_path),
+            _match_history_log_path(history_path),
             dict(job_id='job_1451592123989_0001', yarn=True))
 
         conf_path = (
@@ -79,7 +81,7 @@ class MatchHistoryLogTestCase(TestCase):
             'job_1451592123989_0001_conf.xml')
 
         self.assertEqual(
-            _match_history_log(conf_path),
+            _match_history_log_path(conf_path),
             None)
 
     def test_yarn_filter_by_job_id(self):
@@ -89,11 +91,13 @@ class MatchHistoryLogTestCase(TestCase):
             '-1451592786882-10-1-SUCCEEDED-default-1451592631082.jhist')
 
         self.assertEqual(
-            _match_history_log(history_path, job_id='job_1451592123989_0001'),
+            _match_history_log_path(
+                history_path, job_id='job_1451592123989_0001'),
             dict(job_id='job_1451592123989_0001', yarn=True))
 
         self.assertEqual(
-            _match_history_log(history_path, job_id='job_1451592123989_0002'),
+            _match_history_log_path(
+                history_path, job_id='job_1451592123989_0002'),
             None)
 
 
@@ -124,8 +128,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         return _interpret_history_log(self.mock_fs, matches)
 
     def test_empty(self):
-        self.assertEqual(self.interpret_history_log([]),
-                         dict(counters={}, errors=[]))
+        self.assertEqual(self.interpret_history_log([]), {})
 
     def test_pre_yarn(self):
         self.assertEqual(
@@ -165,9 +168,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         self.assertEqual(self.mock_parse_yarn_history_log.call_count, 1)
 
     def test_patch_errors(self):
-
         self.mock_parse_yarn_history_log.return_value = dict(
-            counters={},
             errors=[
                 dict(attempt_id='attempt_1449525218032_0005_m_000000_0'),
                 dict(hadoop_error=dict()),
@@ -176,12 +177,10 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         self.assertEqual(
             self.interpret_history_log(
                 [dict(path='/path/to/yarn-history.jhist', yarn=True)]),
-                dict(counters={},
-                     errors=[
+                dict(errors=[
                          dict(
                              attempt_id=(
                                  'attempt_1449525218032_0005_m_000000_0'),
-                             job_id='job_1449525218032_0005',
                              task_id='task_1449525218032_0005_m_000000'),
                          dict(
                              hadoop_error=dict(
@@ -226,9 +225,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
     ]
 
     def test_empty(self):
-        self.assertEqual(
-            _parse_yarn_history_log([]),
-            dict(counters={}, errors=[]))
+        self.assertEqual(_parse_yarn_history_log([]), {})
 
     def handle_non_json(self):
         lines = [
@@ -238,9 +235,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
             '{not JSON\n',
         ]
 
-        self.assertEqual(
-            _parse_yarn_history_log([]),
-            dict(counters={}, errors=[]))
+        self.assertEqual(_parse_yarn_history_log(lines), {})
 
     def test_job_counters(self):
         self.assertEqual(
@@ -252,7 +247,6 @@ class ParseYARNHistoryLogTestCase(TestCase):
                         'HDFS: Number of bytes read': 588,
                     }
                 },
-                errors=[],
             ))
 
     def test_task_counters(self):
@@ -264,8 +258,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
                         'FILE: Number of bytes read': 0,
                         'FILE: Number of bytes written': 102091,
                     }
-                },
-                errors=[],
+                }
             ))
 
     def test_job_counters_beat_task_counters(self):
@@ -279,7 +272,6 @@ class ParseYARNHistoryLogTestCase(TestCase):
                         'HDFS: Number of bytes read': 588,
                     }
                 },
-                errors=[],
             ))
 
     def test_errors(self):
@@ -304,11 +296,10 @@ class ParseYARNHistoryLogTestCase(TestCase):
         self.assertEqual(
             _parse_yarn_history_log(lines),
             dict(
-                counters={},
                 errors=[
                     dict(
                         hadoop_error=dict(
-                            error=(
+                            message=(
                                 'Error: java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads(): subprocess failed with'
                                 ' code 1\n\tat org.apache.hadoop.streaming'
@@ -322,7 +313,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
                     ),
                     dict(
                         hadoop_error=dict(
-                            error=(
+                            message=(
                                 'Error: java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads(): subprocess failed with'
                                 ' code 1\n'),
@@ -332,9 +323,37 @@ class ParseYARNHistoryLogTestCase(TestCase):
                     ),
                 ]))
 
-    maxDiff = None
+    def test_container_to_attempt_mapping(self):
+        lines = [
+            '{"type":"MAP_ATTEMPT_STARTED","event":{'
+            '"org.apache.hadoop.mapreduce.jobhistory.TaskAttemptStarted":{'
+            '"taskid":"task_1449525218032_0005_m_000000","taskType":"MAP",'
+            '"attemptId":"attempt_1449525218032_0005_m_000000_3","startTime":'
+            '1449532586958,"trackerName":"0a7802e19139","httpPort":8042,'
+            '"shufflePort":13562,"containerId":'
+            '"container_1449525218032_0005_01_000010","locality":{"string":'
+            '"NODE_LOCAL"},"avataar":{"string":"VIRGIN"}}}}\n',
+            '{"type":"MAP_ATTEMPT_STARTED","event":{'
+            '"org.apache.hadoop.mapreduce.jobhistory.TaskAttemptStarted":{'
+            '"taskid":"task_1449525218032_0005_m_000001","taskType":"MAP",'
+            '"attemptId":"attempt_1449525218032_0005_m_000001_3","startTime":'
+            '1449532587976,"trackerName":"0a7802e19139","httpPort":8042,'
+            '"shufflePort":13562,"containerId":'
+            '"container_1449525218032_0005_01_000011","locality":{"string":'
+            '"NODE_LOCAL"},"avataar":{"string":"VIRGIN"}}}}\n',
+        ]
 
-
+        self.assertEqual(
+            _parse_yarn_history_log(lines),
+            dict(
+                container_to_attempt_id={
+                    'container_1449525218032_0005_01_000010':
+                        'attempt_1449525218032_0005_m_000000_3',
+                    'container_1449525218032_0005_01_000011':
+                        'attempt_1449525218032_0005_m_000001_3',
+                }
+            )
+        )
 
 
 class ParsePreYARNHistoryLogTestCase(TestCase):
@@ -364,15 +383,12 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
     ]
 
     def test_empty(self):
-        self.assertEqual(
-            _parse_pre_yarn_history_log([]),
-            dict(counters={}, errors=[]))
+        self.assertEqual(_parse_pre_yarn_history_log([]), {})
 
     def test_job_counters(self):
         self.assertEqual(
             _parse_pre_yarn_history_log(self.JOB_COUNTER_LINES),
-            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}},
-                 errors=[]))
+            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}}))
 
     def test_task_counters(self):
         self.assertEqual(
@@ -386,15 +402,13 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
                     'File Output Format Counters ': {
                         'Bytes Written': 0,
                         },
-                },
-                errors=[]))
+                }))
 
     def test_job_counters_beat_task_counters(self):
         self.assertEqual(
             _parse_pre_yarn_history_log(self.JOB_COUNTER_LINES +
                                         self.TASK_COUNTER_LINES),
-            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}},
-                 errors=[]))
+            dict(counters={'Job Counters ': {'Launched reduce tasks': 1}}))
 
     def test_errors(self):
         lines = [
@@ -418,11 +432,10 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
         self.assertEqual(
             _parse_pre_yarn_history_log(lines),
             dict(
-                counters={},
                 errors=[
                     dict(
-                        java_error=dict(
-                            error=(
+                        hadoop_error=dict(
+                            message=(
                                 'java.lang.RuntimeException: PipeMapRed'
                                 '.waitOutputThreads():'
                                 ' subprocess failed with code 1\n'

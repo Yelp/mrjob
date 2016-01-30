@@ -12,13 +12,91 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from io import BytesIO
+
+from mrjob.logs.wrap import _cat_log
 from mrjob.logs.wrap import _ls_logs
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
+from tests.py2 import patch
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import PatcherTestCase
+
+
+class CatLogsTestCase(PatcherTestCase):
+
+    def setUp(self):
+        super(CatLogsTestCase, self)
+
+        self.mock_data = None
+
+        self.mock_fs = Mock()
+        self.mock_fs.cat = Mock(return_value=())
+        self.mock_fs.exists = Mock(return_value=True)
+
+        self.mock_log = self.start(patch('mrjob.logs.wrap.log'))
+
+    # wrapper for cat_log() that uses self.mock_fs and turns result into list
+    def cat_log(self, path):
+        return list(_cat_log(self.mock_fs, path))
+
+    def test_basic(self):
+        self.mock_fs.cat.return_value = BytesIO(b'bar\nbaz')
+
+        self.assertEqual(self.cat_log('foo'), ['bar\n', 'baz'])
+
+        self.mock_fs.exists.assert_called_once_with('foo')
+        self.mock_fs.cat.assert_called_once_with('foo')
+        self.assertFalse(self.mock_log.warning.called)
+
+    def test_nonexistent_path(self):
+        self.mock_fs.exists.return_value = False
+
+        self.assertEqual(self.cat_log('foo'), [])
+
+        self.mock_fs.exists.assert_called_once_with('foo')
+        self.assertFalse(self.mock_fs.cat.called)
+        self.assertFalse(self.mock_log.warning.called)
+
+    def test_cat_ioerror(self):
+        self.mock_fs.cat.side_effect = IOError
+
+        self.assertEqual(self.cat_log('foo'), [])
+
+        self.mock_fs.exists.assert_called_once_with('foo')
+        self.mock_fs.cat.assert_called_once_with('foo')
+        self.assertTrue(self.mock_log.warning.called)
+
+    def test_cat_other_error(self):
+        self.mock_fs.cat.side_effect = ValueError
+
+        self.assertRaises(ValueError, self.cat_log, 'foo')
+
+        self.mock_fs.exists.assert_called_once_with('foo')
+        self.mock_fs.cat.assert_called_once_with('foo')
+        self.assertFalse(self.mock_log.warning.called)
+
+    def test_exists_ioerror(self):
+        self.mock_fs.exists.side_effect = IOError
+
+        self.assertEqual(self.cat_log('foo'), [])
+
+        self.mock_fs.exists.assert_called_once_with('foo')
+        self.assertFalse(self.mock_fs.cat.called)
+        self.assertTrue(self.mock_log.warning.called)
+
+    def test_exists_other_error(self):
+        self.mock_fs.exists.side_effect = ValueError
+
+        self.assertRaises(ValueError, self.cat_log, 'foo')
+
+        self.mock_fs.exists.assert_called_once_with('foo')
+        self.assertFalse(self.mock_fs.cat.called)
+        self.assertFalse(self.mock_log.warning.called)
+
 
 
 class LsLogsTestCase(TestCase):

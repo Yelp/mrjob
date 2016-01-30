@@ -26,56 +26,87 @@ Each of these should have methods like this:
 
 
 
-_find_*_logs(fs, log_dir_stream, ...): Find paths of all logs of the given
-     type.
+_ls_*_logs(fs, log_dir_stream, **filter_kwargs):
+
+     Find paths of all logs of this type.
 
      log_dir_stream is a list of lists of log dirs. We assume that you might
      have multiple ways to fetch the same logs (e.g. from S3, or by SSHing to
      nodes), so once we find a list of log dirs that works, we stop searching.
 
-     This yields dictionaries with the following format:
+     This yields dictionaries with at least the key 'path' (path/URI
+     of log) and possibly *_id fields as well (application_id, attempt_id,
+     container_id, job_id, task_id)
 
-     application_id: (YARN application ID)
-     attempt_id: (ID of task attempt)
-     container_id: (YARN container ID)
-     job_id: (ID of job)
-     path: path/URI of log
-     task_id: (ID of task)
+     filter_kwargs allows us to filter by job ID, etc.
 
-
-_ls_*_logs(ls, log_dir, ...): Implementation of _find_*_logs().
-
-    Use mrjob.logs.wrap _find_logs() to use this.
+     Usually this is implemented with mrjob.logs.wrap_._ls_logs() and
+     the _match_*_log_path() method (see below)
 
 
-_interpret_*_logs(fs, matches, ...):
+_match_*_log_path(path, **filter_kwargs):
 
-    Once we know where our logs are, search them for counters and/or errors.
+    Is this the path of a log of this type?
 
-    In most cases, we want to stop when we find the first error.
+    If there is a match, returns a dictionary. If not, returns None
 
+    The match dictionary may be empty, but it can also include
+    *_ids fields parsed from the path (*application_id*, *attempt_id*,
+    *container_id*, *job_id*, *task_id*), or information about which
+    version of Hadoop this file comes from (*yarn*).
+
+    filter_kwargs allows us to filter by job ID, etc.
+
+
+_interpret_*_log(fs, matches):
+_interpret_*_logs(fs, matches, partial=True):
+
+    Search one or more logs (or command stderr) for relevant information
+    (counters, errors, and IDs).
+
+    Rather than taking paths, takes a stream of matches returned by
+    _ls_*_logs() (see above).
+
+    If partial is set to True, just scan for the first error, starting
+    with the last log.
+
+    This returns a dictionary with the following format (all fields optional):
+
+    application_id: YARN application ID for the step
     counters: group -> counter -> amount
     errors: [
         hadoop_error:  (for errors internal to Hadoop)
-            error: string representation of Java stack trace
+            message: string representation of Java stack trace
             path: URI of log file containing error
             start_line: first line of <path> with error (0-indexed)
             num_lines: # of lines containing error
+        split:  (input split processed when error happened)
+            path: URI of input
+            start_line: first line read by this attempt
+            num_lines: # of lines read by this attempt
         task_error:   (for errors caused by one task)
-            error: stderr explaining error (e.g. Python traceback)
-            command: command that was run to cause this error
+            message: string representation of error (e.g. Python command line
+                followed by Python exception)
             path: (see above)
             start_line: (see above)
             num_lines: (see above)
-        application_id: (YARN application ID)
-        attempt_id: (ID of task attempt)
-        container_id: (YARN container ID)
-        job_id: (ID of job)
-        task_id: (ID of task)
+        attempt_id: task attempt that this error originated from
+        container_id: YARN container where error originated from
+        task_id: task that this error originated from
     ]
+    job_id: job ID for the step
+    partial: set to true if we stopped parsing
 
-    This assumes there might be several sets of logs dirs to look in (e.g.
-    the log dir on S3, directories on master and slave nodes, etc.).
+    Errors' task_id should always be set if attempt_id is set (use
+    mrjob.logs.id._add_implied_task_id()) and job_id should always be set
+    if application_id is set (use mrjob.logs.id._add_implied_job_id)
+
+
+_interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
+
+    Reads hadoop jar command output on the fly, but otherwise works like
+    other _interpret_*() functions (same return format).
+
 
 _parse_*_log(lines):
 
@@ -83,6 +114,9 @@ _parse_*_log(lines):
     format as _interpret_<type>_logs(), above.
 
     Log lines are always strings (see mrjob.logs.wrap._cat_log()).
+
+    _parse_*_log() methods generally return a part of the _interpret_*_logs()
+    format, but are *not* responsible for including implied job/task IDs.
 
 
 _parse_*_records(lines):

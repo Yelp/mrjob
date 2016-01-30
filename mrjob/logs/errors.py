@@ -23,19 +23,20 @@ def _pick_error(log_interpretation):
     step, history, and task interpretations. Returns None if there
     are no errors.
     """
-    error_lists = [
-        log_interpretation.get(log_type, {}).get('errors')
-        for log_type in 'step', 'history', 'task'
-    ]
+    def yield_errors():
+        for log_type in ('step', 'history', 'task'):
+            errors = log_interpretation.get(log_type, {}).get('errors')
+            for error in errors or ():
+                yield error
 
-    errors = _merge_and_sort_errors(error_lists)
+    errors = _merge_and_sort_errors(yield_errors())
     if errors:
         return errors[0]
     else:
         return None
 
 
-def _merge_and_sort_errors(error_lists):
+def _merge_and_sort_errors(errors):
     """Merge errors from one or more lists of errors and then return
     them, sorted by recency.
 
@@ -43,17 +44,10 @@ def _merge_and_sort_errors(error_lists):
     """
     key_to_error = {}
 
-    for errors in error_lists:
-        if errors is None:
-            continue
+    for error in errors:
+        key = _time_sort_key(error)
+        key_to_error.setdefault(key, {})
+        key_to_error[key].update(error)
 
-        # catch common interface errors
-        if isinstance(errors, (dict, string_types)):
-            raise TypeError
-
-        for error in errors:
-            key = _time_sort_key(error)
-            key_to_error.setdefault(key, {})
-            key_to_error[key].update(error)
-
-    return [error for key, error in sorted(errors.items(), reverse=True)]
+    return [error for key, error in
+            sorted(key_to_error.items(), reverse=True)]

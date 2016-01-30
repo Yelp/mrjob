@@ -661,6 +661,11 @@ class HadoopJobRunner(MRJobRunner):
                 for match in _ls_task_syslogs(
                         self.fs, stream_task_log_dirs(),
                         application_id=application_id, job_id=job_id):
+
+                    # TODO: this isn't really correct because
+                    # _interpret_task_logs() sorts the logs paths and
+                    # scans starting at the most recent one. Probably
+                    # should have _ls_task_syslogs() do the sorting.
                     log.info('  Scanning for errors: %s' % match['path'])
                     yield match
 

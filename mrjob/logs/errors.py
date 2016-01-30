@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Merging errors, picking the best one, and displaying it."""
+import json
 
 from .ids import _make_time_sort_key
 from mrjob.py2 import string_types
@@ -59,3 +60,55 @@ def _merge_and_sort_errors(errors, container_to_attempt_id=None):
 
     return [error for key, error in
             sorted(key_to_error.items(), reverse=True)]
+
+
+def _format_error(error):
+    """Return string to log/print explaining the given error."""
+    # it's just sad if we error while trying to explain an error
+    try:
+        return _format_error_helper(error)
+    except:
+        return json.dumps(error, indent=2, sort_keys=True)
+
+
+def _format_error_helper(error):
+    """Return string to log/print explaining the given error."""
+    result = ''
+
+    hadoop_error = error.get('hadoop_error')
+    if hadoop_error:
+        result += hadoop_error.get('message', '')
+
+        if hadoop_error.get('path'):
+            result += '\n\n(from %s)' % _describe_source(hadoop_error)
+
+    # for practical purposes, there's always a hadoop error with a message,
+    # so don't worry too much about spacing.
+
+    task_error = error.get('task_error')
+    if task_error:
+        result += '\n\ncaused by:\n\n%s' % (task_error.get('message', ''))
+
+        if task_error.get('path'):
+            result += '\n\n(from %s)' % _describe_source(task_error)
+
+    split = error.get('split')
+    if split and split.get('path'):
+        result += '\n\nwhile reading input from %s' % _describe_source(split)
+
+    return result
+
+
+def _describe_source(d):
+    """return either '<path>' or 'line N of <path>' or 'lines M-N of <path>'.
+    """
+    path = d.get('path') or ''
+
+    if 'num_lines' in d and 'start_line' in d:
+        if d['num_lines'] == 1:
+            return 'line %d of %s' % (d['start_line'] + 1, path)
+        else:
+            return 'lines %d-%d of %s' % (
+                d['start_line'] + 1, d['start_line'] + d['num_lines'], path)
+    else:
+        return path

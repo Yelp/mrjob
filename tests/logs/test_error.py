@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _merge_and_sort_errors
 from mrjob.logs.errors import _pick_error
 from mrjob.logs.ids import _attempt_id_to_task_id
@@ -148,9 +149,6 @@ class PickErrorTestCase(TestCase):
             ))
 
 
-
-
-
 class MergeAndSortErrorsTestCase(TestCase):
 
     def test_empty(self):
@@ -244,3 +242,72 @@ class MergeAndSortErrorsTestCase(TestCase):
                 ),
             ]
         )
+
+
+class FormatErrorTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_format_error({}), '')
+
+    def test_fall_back_to_json(self):
+        self.assertEqual(_format_error([]), '[]')
+
+    def test_hadoop_error(self):
+        self.assertEqual(
+            _format_error(dict(hadoop_error=dict(
+                message='DevastatingJavaException')
+            )),
+            'DevastatingJavaException')
+
+        self.assertEqual(
+            _format_error(dict(hadoop_error=dict(
+                message='DevastatingJavaException',
+                path='history.jhist'
+            ))),
+            'DevastatingJavaException\n\n(from history.jhist)')
+
+        self.assertEqual(
+            _format_error(dict(hadoop_error=dict(
+                message='DevastatingJavaException',
+                path='history.jhist',
+                start_line=23,
+                num_lines=1
+            ))),
+            'DevastatingJavaException\n\n(from line 24 of history.jhist)')
+
+        self.assertEqual(
+            _format_error(dict(hadoop_error=dict(
+                message='DevastatingJavaException',
+                path='history.jhist',
+                start_line=23,
+                num_lines=3
+            ))),
+            'DevastatingJavaException\n\n(from lines 24-26 of history.jhist)')
+
+    def test_task_error(self):
+        self.assertEqual(
+            _format_error(dict(task_error=dict(
+                message='system will self-destruct in 5s'
+            ))),
+            '\n\ncaused by:\n\n'
+            'system will self-destruct in 5s')
+
+        # everything uses the same code to format path + line range, so
+        # don't worry about testing all the options each time
+        self.assertEqual(
+            _format_error(dict(task_error=dict(
+                message='system will self-destruct in 5s',
+                path='/path/to/stderr',
+                start_line=0,
+                num_lines=1))),
+            '\n\ncaused by:\n\n'
+            'system will self-destruct in 5s'
+            '\n\n(from line 1 of /path/to/stderr)')
+
+    def test_split(self):
+        self.assertEqual(
+            _format_error(dict(split=dict(
+                path='very_troubling.log',
+                start_line=665,
+                num_lines=334))),
+            '\n\nwhile reading input from lines 666-999 of very_troubling.log')

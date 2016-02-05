@@ -49,14 +49,27 @@ def patched_list_steps(emr_conn, *args, **kwargs):
     # and StepStatus should have its own StepTimeline class. But that doesn't
     # make a difference for mrjob.
 
-    # monkey-patch boto.emr.connection, because that's what
-    # list_steps() references. Not using patch here because it's
+    # monkey-patch boto.emr.emrobject, because that's what
+    # StepSummaryList references. Not using patch here because it's
     # an external dependency in Python 2
     try:
-        boto.emr.connection.ClusterTimeline = PatchedClusterTimeline
+        boto.emr.emrobject.ClusterTimeline = PatchedClusterTimeline
         return emr_conn.list_steps(*args, **kwargs)
     finally:
-        boto.emr.connection.ClusterTimeline = ClusterTimeline
+        boto.emr.emrobject.ClusterTimeline = ClusterTimeline
+
+
+def patched_describe_step(emr_conn, *args, **kwargs):
+    """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
+    that works around around `boto's startdatetime bug
+    <https://github.com/boto/boto/issues/3268>`__."""
+    # see comment in patched_list_steps() for details
+    try:
+        boto.emr.emrobject.ClusterTimeline = PatchedClusterTimeline
+        return emr_conn.describe_step(*args, **kwargs)
+    finally:
+        boto.emr.emrobject.ClusterTimeline = ClusterTimeline
+
 
 
 class Configuration(EmrObject):

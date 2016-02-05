@@ -75,6 +75,9 @@ from mrjob.iam import FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
+from mrjob.logs.counters import _pick_counters
+from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _pick_error
 from mrjob.logs.ls import ls_logs
 from mrjob.logparsers import best_error_from_logs
 from mrjob.logparsers import scan_for_counters_in_files
@@ -86,12 +89,12 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.patched_boto import patched_describe_cluster
+from mrjob.patched_boto import patched_describe_step
 from mrjob.patched_boto import patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
-from mrjob.py2 import to_string
 from mrjob.py2 import urlopen
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
@@ -200,6 +203,20 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
                         *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
+
+
+def _step_ids_for_job(steps, job_key):
+    """Return a list of the (EMR) step IDs for the job with the given key.
+
+    *steps* is the result of _yield_all_steps().
+    """
+    step_ids = []
+
+    for step in steps:
+        if step.name.startswith(job_key):
+            step_ids.append(step.id)
+
+    return step_ids
 
 
 def make_lock_uri(s3_tmp_dir, emr_job_flow_id, step_num):
@@ -609,6 +626,13 @@ class EMRJobRunner(MRJobRunner):
         self._ami_version = None
         self._hadoop_version = None
 
+        # List of dicts (one for each step) potentially containing
+        # the keys 'history', 'step', and 'task'. These will also always
+        # contain 'step_id' (the s-XXXXXXXX step ID on EMR).
+        #
+        # This will be filled by _wait_for_steps_to_complete()
+        self._log_interpretations = []
+
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
         aren't already set.
@@ -723,7 +747,8 @@ class EMRJobRunner(MRJobRunner):
 
     def _run(self):
         self._launch()
-        self._wait_for_job_to_complete()
+        self._wait_for_steps_to_complete()
+        #self._wait_for_job_to_complete()
 
     def _launch(self):
         self._prepare_for_launch()
@@ -1481,6 +1506,117 @@ class EMRJobRunner(MRJobRunner):
                               for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
+    def _wait_for_steps_to_complete(self):
+        """Wait for every step of the job to complete, one by one."""
+        steps = self._list_steps_for_cluster()
+
+        step_ids = _step_ids_for_job(steps, self._job_key)
+        num_steps = len(step_ids)
+
+        if num_steps != len(self._get_steps()):
+            raise AssertionError("Can't find our steps in the job flow!")
+
+        # clear out _log_interpretations if for some reason it was
+        # already filled
+        self._log_interpretations = []
+
+        for step_num, step_id in enumerate(step_ids):
+            # this will raise an exception if a step fails
+            log.info('Waiting for step %d of %d to complete...' % (
+                step_num + 1, num_steps))
+            self._wait_for_step_to_complete(step_id)
+
+
+    def _wait_for_step_to_complete(self, step_id):
+        """Helper for _wait_for_step_to_complete(). Wait for
+        step with the given ID to complete, and fetch counters.
+        If it fails, attempt to diagnose the error, and raise an
+        exception.
+
+        :param step_id: the s-XXXXXXX step ID on EMR
+        :param step_num: which step this is out of the steps
+                         belonging to our job (0-indexed)
+        :param num_steps: number of steps in our job
+
+        This also adds an item to self._log_interpretations
+        """
+        # just using step_num for _print_counters(). This is messy
+        step_num = len(self._log_interpretations)
+
+        log_interpretation = dict(step_id=step_id)
+        self._log_interpretations.append(log_interpretation)
+
+        emr_conn = self.make_emr_conn()
+
+        while True:
+            # don't antagonize EMR's throttling
+            log.debug('Waiting %.1f seconds...' %
+                      self._opts['check_emr_status_every'])
+            time.sleep(self._opts['check_emr_status_every'])
+
+            step = patched_describe_step(emr_conn, self._cluster_id, step_id)
+            cluster = self._describe_cluster()
+
+            cluster_desc = cluster.status.state
+            change_reason = getattr(
+                getattr(cluster.status, 'statechangereason', ''),
+                'message', '')
+            if change_reason:
+                cluster_desc += ': ' + change_reason
+
+            if step.status.state == 'PENDING':
+                log.info('  PENDING (cluster is %s)' % cluster_desc)
+                continue
+
+            if step.status.state == 'RUNNING':
+                time_running_desc = ''
+
+                startdatetime = getattr(
+                    getattr(step.status, 'timeline', ''), 'startdatetime' ,'')
+                if startdatetime:
+                    start = iso8601_to_timestamp(startdatetime)
+                    time_running_desc = ' for %.1fs' % (time.time() - start)
+
+                log.info('  RUNNING%s' % time_running_desc)
+                continue
+
+
+            # we're done, will return at the end of this
+            if step.status.state == 'COMPLETED':
+                log.info('  COMPLETED')
+            else:
+                log.info('  %s (cluster is %s)' % (
+                   step.status.state, cluster_desc))
+
+            # TODO: check for bad IAM roles
+
+            # step is done (either COMPLETED, FAILED, INTERRUPTED). so
+            # try to fetch counters
+            if step.status.state != 'CANCELLED':
+                log.info('Attempting to fetch counters from logs...')
+                # TODO: wait for cluster to complete if that makes sense
+                self._interpret_step_log(log_interpretation)
+                if not _pick_counters(log_interpretation):
+                    self._interpret_history_log(log_interpretation)
+
+                self._print_counters(step_nums=[step_num])
+
+            if step.status.state == 'COMPLETED':
+                return
+
+            if step.status.state == 'FAILED':
+                log.info('Scanning logs for probable cause of failure')
+                self._interpret_step_log(log_interpretation)
+                self._interpret_history_log(log_interpretation)
+                self._interpret_task_logs(log_interpretation)
+
+                error = _pick_error(log_interpretation)
+                if error:
+                    log.error('Probable cause of failure:\n\n%s\n\n' %
+                              _format_error(error))
+
+            raise Exception
+
     # TODO: break this method up; it's too big to write tests for
     def _wait_for_job_to_complete(self):
         """Wait for the job to complete, and raise an exception if
@@ -1679,6 +1815,15 @@ class EMRJobRunner(MRJobRunner):
 
     ## LOG PARSING ##
 
+    def _interpret_step_log(self, log_interpretation):
+        pass
+
+    def _interpret_task_logs(self, log_interpretation):
+        pass
+
+    def _interpret_history_log(self, log_interpretation):
+        pass
+
     def _fetch_counters(self, step_nums, lg_step_num_mapping=None,
                         skip_s3_wait=False):
         """Read Hadoop counters from S3.
@@ -1722,7 +1867,8 @@ class EMRJobRunner(MRJobRunner):
                 self._counters.append({})
 
     def counters(self):
-        return self._counters
+        return [_pick_counters(log_interpretation)
+                for log_interpretation in self._log_interpretations]
 
     def _find_probable_cause_of_failure(self, step_nums, lg_step_nums=None):
         """Scan logs for Python exception tracebacks.

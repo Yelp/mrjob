@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
+import calendar
 import json
 import logging
 import re
@@ -687,12 +688,13 @@ SUBSECOND_RE = re.compile('\.[0-9]+')
 RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
 
 
+# TODO: test this, now that it uses UTC time
 def iso8601_to_timestamp(iso8601_time):
     iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
     try:
-        return time.mktime(time.strptime(iso8601_time, boto.utils.ISO8601))
+        return calendar.timegm(time.strptime(iso8601_time, boto.utils.ISO8601))
     except ValueError:
-        return time.mktime(time.strptime(iso8601_time, RFC1123))
+        return calendar.timegm(time.strptime(iso8601_time, RFC1123))
 
 
 def iso8601_to_datetime(iso8601_time):

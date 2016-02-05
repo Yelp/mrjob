@@ -1522,8 +1522,8 @@ class EMRJobRunner(MRJobRunner):
 
         for step_num, step_id in enumerate(step_ids):
             # this will raise an exception if a step fails
-            log.info('Waiting for step %d of %d to complete...' % (
-                step_num + 1, num_steps))
+            log.info('Waiting for step %d of %d (%s) to complete...' % (
+                step_num + 1, num_steps, step_id))
             self._wait_for_step_to_complete(step_id)
 
 
@@ -1555,17 +1555,19 @@ class EMRJobRunner(MRJobRunner):
             time.sleep(self._opts['check_emr_status_every'])
 
             step = patched_describe_step(emr_conn, self._cluster_id, step_id)
-            cluster = self._describe_cluster()
-
-            cluster_desc = cluster.status.state
-            change_reason = getattr(
-                getattr(cluster.status, 'statechangereason', ''),
-                'message', '')
-            if change_reason:
-                cluster_desc += ': ' + change_reason
 
             if step.status.state == 'PENDING':
-                log.info('  PENDING (cluster is %s)' % cluster_desc)
+                cluster = self._describe_cluster()
+
+                reason_desc = ''
+                reason = getattr(
+                    getattr(cluster.status, 'statechangereason', ''),
+                    'message', '')
+                if reason:
+                    reason_desc = ': ' + reason
+
+                log.info('  PENDING (cluster is %s%s)' %
+                         cluster.status.state, reason_desc)
                 continue
 
             if step.status.state == 'RUNNING':
@@ -1578,15 +1580,27 @@ class EMRJobRunner(MRJobRunner):
                     time_running_desc = ' for %.1fs' % (time.time() - start)
 
                 log.info('  RUNNING%s' % time_running_desc)
-                continue
 
+                # TODO: check for progress %
+                continue
 
             # we're done, will return at the end of this
             if step.status.state == 'COMPLETED':
                 log.info('  COMPLETED')
+                # will fetch counters, below
             else:
-                log.info('  %s (cluster is %s)' % (
-                   step.status.state, cluster_desc))
+                # these fields definitely exist, but currently, message doesn't
+                # seem to be filled (at least, the AWS CLI can't see it
+                # either)
+                reason_desc = ''
+                reason = getattr(
+                    getattr(step.status, 'statechangereason' ,''),
+                    'message', '')
+                if reason:
+                    reason_desc = ' (%s)' % reason_desc
+
+                log.info('  %s%s' % (
+                   step.status.state, reason_desc))
 
             # TODO: check for bad IAM roles
 

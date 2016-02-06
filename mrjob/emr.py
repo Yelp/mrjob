@@ -18,6 +18,7 @@ import logging
 import os
 import os.path
 import pipes
+import posixpath
 import random
 import signal
 import socket
@@ -119,6 +120,10 @@ _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '3': dict(name='resource manager', path='/cluster', port=9026),
     '4': dict(name='resource manager', path='/cluster', port=8088),
 }
+
+# if we SSH into a node, default place to look for Hadoop logs
+_EMR_HADOOP_LOG_DIR = '/mnt/var/log/hadoop'
+
 
 MAX_SSH_RETRIES = 20
 
@@ -682,7 +687,7 @@ class EMRJobRunner(MRJobRunner):
         log.info("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
 
-    def _log_dir(self):
+    def _s3_log_dir(self):
         """Get the URI of the log directory for this job's cluster."""
         if not self._s3_job_log_uri:
             cluster = self._describe_cluster()
@@ -1063,11 +1068,11 @@ class EMRJobRunner(MRJobRunner):
 
         # delete the log files, if it's a job flow we created (the logs
         # belong to the job flow)
-        if self._log_dir() and not self._opts['emr_job_flow_id'] \
+        if self._s3_log_dir() and not self._opts['emr_job_flow_id'] \
                 and not self._opts['pool_emr_job_flows']:
             try:
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
-                self.fs.rm(self._log_dir())
+                self.fs.rm(self._s3_log_dir())
             except Exception as e:
                 log.exception(e)
 
@@ -1706,9 +1711,63 @@ class EMRJobRunner(MRJobRunner):
 
     ## LOG PARSING ##
 
+    def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name=None,
+                         ssh_to_slaves=False):
+        """Stream log dirs for the given kind of log.
+
+        Our general strategy is first, if SSH is enabled, to SSH into the
+        master node (and possibly slaves, if *ssh_to_slaves* is set).
+
+        If this doesn't work, we have to look on S3. If the cluster is
+        TERMINATING, we first wait for it to terminate (since that
+        will trigger copying logs over).
+        """
+        if self._ssh_fs:
+            ssh_host = self._address_of_master()
+            if ssh_host:
+                hosts = [ssh_host]
+                host_desc = ssh_host
+                if ssh_to_slaves:
+                    try:
+                        hosts.extend(self.fs.ssh_slave_hosts(ssh_host))
+                        host_desc += ' and task/core nodes'
+                    except IOError:
+                        log.warning('Could not get slave addresses for %s' %
+                                    ssh_host)
+
+                path = posixpath.join(_EMR_HADOOP_LOG_DIR, dir_name)
+                log.info('Looking for %s in %s on %s...' % (
+                    log_desc, path, host_desc))
+                yield ['ssh://%s%s%s' % (
+                    ssh_host, '!' + host if host != ssh_host else '',
+                    path) for host in hosts]
+
+            # wait for logs to be on S3
+            self._wait_for_terminating_cluster_to_terminate()
+
+            s3_log_uri = posixpath.join(
+                self._s3_log_dir(), (s3_dir_name or dir_name))
+            log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
+            yield s3_log_uri
+
+    # TODO: stream step, history, task dirs, then interpret them
+
+
+    def _wait_for_terminating_cluster_to_terminate(self):
+        """If the cluster is already terminating, wait for it to terminate,
+        so that logs will be transferred to S3.
+
+        Don't print anything unless cluster is in the TERMINATING state.
+        """
+        pass  # TODO: implement this
+
+
+
+
+
     def _interpret_step_log(self, log_interpretation):
         """Fetch step logs and add 'step' to log_interpretation."""
-        if 'step' not in log_interpretation.get('step')
+        if 'step' not in log_interpretation:
             step_id = log_interpretation.get('step_id')
             if not step_id:
                 log.warning("Can't fetch step logs without step ID")
@@ -1816,7 +1875,7 @@ class EMRJobRunner(MRJobRunner):
             step_num_to_id = self._step_num_to_id()
 
         return ls_logs(self.fs, log_type,
-                       log_dir=self._log_dir(),
+                       log_dir=self._s3_log_dir(),
                        ssh_host=self._address_of_master(),
                        step_nums=step_nums,
                        step_num_to_id=step_num_to_id)
@@ -2483,6 +2542,7 @@ class EMRJobRunner(MRJobRunner):
         if cluster.status.state in ('RUNNING', 'WAITING'):
             self._address = cluster.masterpublicdnsname
 
+    # TODO: this is only used by mrboss; otherwise we do this through fs
     def _addresses_of_slaves(self):
         if not self._ssh_slave_addrs:
             self._ssh_slave_addrs = ssh_slave_addresses(

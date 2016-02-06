@@ -748,7 +748,6 @@ class EMRJobRunner(MRJobRunner):
     def _run(self):
         self._launch()
         self._wait_for_steps_to_complete()
-        #self._wait_for_job_to_complete()
 
     def _launch(self):
         self._prepare_for_launch()
@@ -1593,8 +1592,10 @@ class EMRJobRunner(MRJobRunner):
             # we're done, will return at the end of this
             if step.status.state == 'COMPLETED':
                 log.info('  COMPLETED')
-                # will fetch counters, below
+                # will fetch counters, below, and then return
             else:
+                # step has failed somehow
+
                 # these fields definitely exist, but currently, message doesn't
                 # seem to be filled (at least, the AWS CLI can't see it
                 # either)
@@ -1608,7 +1609,9 @@ class EMRJobRunner(MRJobRunner):
                 log.info('  %s%s' % (
                    step.status.state, reason_desc))
 
-            # TODO: check for bad IAM roles
+                # maybe it failed due to an IAM issue? if so, tell the user
+                # what to do to fix it
+                self._check_for_missing_default_iam_roles()
 
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters
@@ -1673,184 +1676,23 @@ class EMRJobRunner(MRJobRunner):
             if tunnel_handle is not None:
                 tunnel_handle.close()
 
+    def _check_for_missing_default_iam_roles(self):
+        """If cluster couldn't start due to missing IAM roles, tell
+        user what to do."""
+        cluster = self._describe_cluster()
 
-    # TODO: break this method up; it's too big to write tests for
-    def _wait_for_job_to_complete(self):
-        """Wait for the job to complete, and raise an exception if
-        the job failed.
-
-        Also grab log URI from the job status (since we may not know it)
-        """
-        success = False
-
-        while True:
-            # don't antagonize EMR's throttling
-            log.debug('Waiting %.1f seconds...' %
-                      self._opts['check_emr_status_every'])
-            time.sleep(self._opts['check_emr_status_every'])
-
-            cluster = self._describe_cluster()
-
-            self._set_s3_job_log_uri(cluster)
-
-            job_state = cluster.status.state
-            reason = getattr(
-                getattr(cluster.status, 'statechangereason', None),
-                'message', '')
-
-            # find all steps belonging to us, and get their state
-            step_states = []
-            running_step_name = ''
-            total_step_time = 0.0
-            step_nums = []  # step numbers belonging to us. 1-indexed
-            # "lg_step" stands for "log generating step"
-
-            # TODO: this lg stuff confuses me and is about to be refactored
-            # once I do some hand-testing on which steps actually generate
-            # logs
-            lg_step_num_mapping = {}
-
-            steps = self._list_steps_for_cluster()
-            latest_lg_step_num = 0
-
-            def is_lg_step(step):
-                return any(arg.value == '-mapper' for arg in step.config.args)
-
-            for i, step in enumerate(steps):
-                if is_lg_step(step):
-                    latest_lg_step_num += 1
-
-                # ignore steps belonging to other jobs
-                if not step.name.startswith(self._job_key):
-                    continue
-
-                step_nums.append(i + 1)
-                if is_lg_step(step):
-                    lg_step_num_mapping[i + 1] = latest_lg_step_num
-
-                step_states.append(step.status.state)
-                if step.status.state == 'RUNNING':
-                    running_step_name = step.name
-
-                if (hasattr(step.status, 'timeline') and
-                        hasattr(step.status.timeline, 'startdatetime') and
-                        hasattr(step.status.timeline, 'enddatetime')):
-
-                    start_time = iso8601_to_timestamp(
-                        step.status.timeline.startdatetime)
-                    end_time = iso8601_to_timestamp(
-                        step.status.timeline.enddatetime)
-                    total_step_time += end_time - start_time
-
-            if not step_states:
-                raise AssertionError("Can't find our steps in the job flow!")
-
-            # if all our steps have completed, we're done!
-            if all(state == 'COMPLETED' for state in step_states):
-                success = True
-                break
-
-            # if any step fails, give up
-            if any(state in ('CANCELLED', 'FAILED', 'INTERRUPTED')
-                   for state in step_states):
-                break
-
-            # (the other step states are PENDING and RUNNING)
-
-            # keep track of how long we've been waiting
-            running_time = time.time() - self._emr_job_start
-
-            # if a step is still running, we can print a status message
-            if running_step_name:
-                log.info('Job launched %.1fs ago, status %s: %s (%s)' %
-                         (running_time, job_state, reason, running_step_name))
-
-                if self._show_tracker_progress:
-                    tunnel_config = self._ssh_tunnel_config()
-
-                    tunnel_handle = None
-                    try:
-                        tunnel_handle = urlopen(self._tunnel_url)
-                        tunnel_html = tunnel_handle.read()
-                    except:
-                        log.error('Unable to connect to %s' %
-                                  tunnel_config['name'])
-                        self._show_tracker_progress = False
-                    else:
-                        if tunnel_config['name'] == 'job tracker':
-                            map_progress, reduce_progress = (
-                                _parse_progress_from_job_tracker(tunnel_html))
-                            if map_progress is not None:
-                                log.info(' map %3d%% reduce %3d%%' % (
-                                    map_progress, reduce_progress))
-                        else:
-                            progress = _parse_progress_from_resource_manager(
-                                tunnel_html)
-                            if progress is not None:
-                                log.info(' %5.1f%% complete' % progress)
-                    finally:
-                        if tunnel_handle is not None:
-                            tunnel_handle.close()
-
-                # once a step is running, it's safe to set up the ssh tunnel to
-                # the job tracker
-                job_host = getattr(cluster, 'masterpublicdnsname', None)
-                if job_host and self._opts['ssh_tunnel']:
-                    self._set_up_ssh_tunnel(job_host)
-
-            # other states include STARTING and SHUTTING_DOWN
-            elif reason:
-                log.info('Job launched %.1fs ago, status %s: %s' %
-                         (running_time, job_state, reason))
-            else:
-                log.info('Job launched %.1fs ago, status %s' %
-                         (running_time, job_state,))
-
-        if success:
-            log.info('Job completed.')
-            log.info('Running time was %.1fs (not counting time spent waiting'
-                     ' for the EC2 instances)' % total_step_time)
-            self._fetch_counters(step_nums, lg_step_num_mapping)
-            self._print_counters()
-        else:
-            msg = 'Job on job flow %s failed with status %s: %s' % (
-                cluster.id, job_state, reason)
-            log.error(msg)
-            # check for invalid fallback IAM roles
-            if any(reason.rstrip().endswith('/%s is invalid' % role)
-                   for role in (FALLBACK_INSTANCE_PROFILE,
-                                FALLBACK_SERVICE_ROLE)):
-                msg += (
-                    '\n\n'
-                    'Ask your admin to create the default EMR roles'
-                    ' by following:\n\n'
-                    '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
-                    '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
-            else:
-                if self._s3_job_log_uri:
-                    log.info('Logs are in %s' % self._s3_job_log_uri)
-                # look for a Python traceback
-                cause = self._find_probable_cause_of_failure(
-                    step_nums, sorted(lg_step_num_mapping.values()))
-                if cause:
-                    # log cause, and put it in exception
-                    cause_msg = []  # lines to log and put in exception
-                    cause_msg.append('Probable cause of failure (from %s):' %
-                                     cause['log_file_uri'])
-                    cause_msg.extend(
-                        line.strip('\n') for line in cause['lines'])
-
-                    if cause['input_uri']:
-                        cause_msg.append('(while reading from %s)' %
-                                         cause['input_uri'])
-
-                    for line in cause_msg:
-                        log.error(line)
-
-                    # add cause_msg to exception message
-                    msg += '\n' + '\n'.join(cause_msg) + '\n'
-
-            raise Exception(msg)
+        reason = getattr(
+            getattr(cluster.status, 'statechangereason' ,''),
+            'message', '')
+        if any(reason.rstrip().endswith('/%s is invalid' % role)
+               for role in (FALLBACK_INSTANCE_PROFILE,
+                            FALLBACK_SERVICE_ROLE)):
+            log.warning(
+                '\n\n'
+                'Ask your admin to create the default EMR roles'
+                ' by following:\n\n'
+                '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
+                '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
 
     def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""

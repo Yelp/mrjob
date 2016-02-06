@@ -917,20 +917,24 @@ class EMRJobRunner(MRJobRunner):
         return map_version(self.get_ami_version(),
                            _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
 
-    def _set_up_ssh_tunnel(self, host):
+    def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
-
-        Args:
-        host -- hostname of the EMR master node.
         """
+        if not self._opts['ssh_tunnel']:
+            return
+
+        host = self._address_of_master()
+        if not host:
+            return
+
         REQUIRED_OPTS = ['ec2_key_pair', 'ec2_key_pair_file', 'ssh_bind_ports']
         for opt_name in REQUIRED_OPTS:
             if not self._opts[opt_name]:
                 if not self._gave_cant_ssh_warning:
                     log.warning(
-                        "You must set %s in order to set up the SSH tunnel!" %
-                        opt_name)
+                        "  You must set %s in order to set up the SSH tunnel!"
+                        % opt_name)
                     self._gave_cant_ssh_warning = True
                 return
 
@@ -940,14 +944,14 @@ class EMRJobRunner(MRJobRunner):
             if self._ssh_proc.returncode is None:
                 return
             else:
-                log.warning('Oops, ssh subprocess exited with return code %d,'
-                            ' restarting...' % self._ssh_proc.returncode)
+                log.warning('  Oops, ssh subprocess exited with return code'
+                            ' %d, restarting...' % self._ssh_proc.returncode)
                 self._ssh_proc = None
 
         # look up what we're supposed to do on this AMI version
         tunnel_config = self._ssh_tunnel_config()
 
-        log.info('Opening ssh tunnel to %s' % tunnel_config['name'])
+        log.info('  Opening ssh tunnel to %s...' % tunnel_config['name'])
 
         # if ssh detects that a host key has changed, it will silently not
         # open the tunnel, so make a fake empty known_hosts file and use that.
@@ -991,7 +995,7 @@ class EMRJobRunner(MRJobRunner):
 
         if not self._ssh_proc:
             log.warning(
-                'Failed to open ssh tunnel to %s' % tunnel_config['name'])
+                '  Failed to open ssh tunnel to %s' % tunnel_config['name'])
         else:
             if self._opts['ssh_tunnel_is_open']:
                 bind_host = socket.getfqdn()
@@ -1000,7 +1004,7 @@ class EMRJobRunner(MRJobRunner):
             self._tunnel_url = 'http://%s:%d%s' % (
                 bind_host, bind_port, tunnel_config['path'])
             self._show_tracker_progress = True
-            log.info('Connect to %s at: %s' % (
+            log.info('  Connect to %s at: %s' % (
                 tunnel_config['name'], self._tunnel_url))
 
     def _pick_ssh_bind_ports(self):
@@ -1566,8 +1570,8 @@ class EMRJobRunner(MRJobRunner):
                 if reason:
                     reason_desc = ': ' + reason
 
-                log.info('  PENDING (cluster is %s%s)' %
-                         cluster.status.state, reason_desc)
+                log.info('  PENDING (cluster is %s%s)' % (
+                    cluster.status.state, reason_desc))
                 continue
 
             if step.status.state == 'RUNNING':
@@ -1579,9 +1583,11 @@ class EMRJobRunner(MRJobRunner):
                     start = iso8601_to_timestamp(startdatetime)
                     time_running_desc = ' for %.1fs' % (time.time() - start)
 
+                # now is the time to tunnel if, if we haven't already
+                self._set_up_ssh_tunnel()
                 log.info('  RUNNING%s' % time_running_desc)
+                self._log_step_progress()
 
-                # TODO: check for progress %
                 continue
 
             # we're done, will return at the end of this
@@ -1630,6 +1636,43 @@ class EMRJobRunner(MRJobRunner):
                               _format_error(error))
 
             raise Exception
+
+    def _log_step_progress(self):
+        """Tunnel to the job tracker/resource manager and log the
+        progress of the current step.
+
+        (This takes no arguments; we just assume the most recent running
+        job is ours, which should be correct for EMR.)
+        """
+        if not self._show_tracker_progress:
+            return
+
+        tunnel_config = self._ssh_tunnel_config()
+
+        tunnel_handle = None
+        try:
+            tunnel_handle = urlopen(self._tunnel_url)
+            tunnel_html = tunnel_handle.read()
+        except:
+            log.error('Unable to connect to %s' %
+                      tunnel_config['name'])
+            self._show_tracker_progress = False
+        else:
+            if tunnel_config['name'] == 'job tracker':
+                map_progress, reduce_progress = (
+                    _parse_progress_from_job_tracker(tunnel_html))
+                if map_progress is not None:
+                    log.info('   map %3d%% reduce %3d%%' % (
+                        map_progress, reduce_progress))
+            else:
+                progress = _parse_progress_from_resource_manager(
+                    tunnel_html)
+                if progress is not None:
+                    log.info('   %5.1f%% complete' % progress)
+        finally:
+            if tunnel_handle is not None:
+                tunnel_handle.close()
+
 
     # TODO: break this method up; it's too big to write tests for
     def _wait_for_job_to_complete(self):

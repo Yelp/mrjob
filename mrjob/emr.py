@@ -2451,6 +2451,13 @@ class EMRJobRunner(MRJobRunner):
             self._store_cluster_info()
         return self._ami_version
 
+    def _address_of_master(self):
+        """Get the address of the master node so we can SSH to it"""
+        if not self._address:
+            self._store_cluster_info()
+
+        return self._address
+
     def _store_cluster_info(self):
         """Set self._ami_version and self._hadoop_version."""
         if not self._cluster_id:
@@ -2470,24 +2477,8 @@ class EMRJobRunner(MRJobRunner):
             if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs
                 self._hadoop_version = a.version
 
-        # TODO: could get masterpublicdnsname too
-
-    def _address_of_master(self, emr_conn=None):
-        """Get the address of the master node so we can SSH to it"""
-        # cache address of master to avoid redundant calls to describe_jobflow
-        # also convenient for testing (pretend we can SSH when we really can't
-        # by setting this to something not False)
-        if not self._address:
-            try:
-                cluster = self._describe_cluster()
-                if cluster.status.state not in ('RUNNING', 'WAITING'):
-                    return None
-                self._address = cluster.masterpublicdnsname
-            except boto.exception.S3ResponseError:
-                # Raised when cluster doesn't exist
-                pass
-
-        return self._address
+        if cluster.status.state in ('RUNNING', 'WAITING'):
+            self._address = cluster.masterpublicdnsname
 
     def _addresses_of_slaves(self):
         if not self._ssh_slave_addrs:

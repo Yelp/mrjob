@@ -682,23 +682,16 @@ class EMRJobRunner(MRJobRunner):
         log.info("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
 
-    # TODO: stop fetching/accessing s3_job_log_uri directly
     def _log_dir(self):
         """Get the URI of the log directory for this job's cluster."""
         if not self._s3_job_log_uri:
             cluster = self._describe_cluster()
-            self._set_s3_job_log_uri(cluster)
+            log_uri = getattr(cluster, 'loguri', '')
+            if log_uri:
+                self._s3_job_log_uri = '%s%s/' % (
+                    log_uri.replace('s3n://', 's3://'), self._cluster_id)
 
         return self._s3_job_log_uri
-
-    def _set_s3_job_log_uri(self, cluster):
-        """Given a job flow description, set self._s3_job_log_uri. This allows
-        us to call self.fs.ls(), etc. without running the job.
-        """
-        log_uri = getattr(cluster, 'loguri', '')
-        if log_uri:
-            self._s3_job_log_uri = '%s%s/' % (
-                log_uri.replace('s3n://', 's3://'), self._cluster_id)
 
     def _create_s3_tmp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
@@ -1070,12 +1063,11 @@ class EMRJobRunner(MRJobRunner):
 
         # delete the log files, if it's a job flow we created (the logs
         # belong to the job flow)
-        if self._s3_job_log_uri and not self._opts['emr_job_flow_id'] \
+        if self._log_dir() and not self._opts['emr_job_flow_id'] \
                 and not self._opts['pool_emr_job_flows']:
             try:
                 log.info('Removing all files in %s' % self._s3_job_log_uri)
-                self.fs.rm(self._s3_job_log_uri)
-                self._s3_job_log_uri = None
+                self.fs.rm(self._log_dir())
             except Exception as e:
                 log.exception(e)
 
@@ -1715,6 +1707,17 @@ class EMRJobRunner(MRJobRunner):
     ## LOG PARSING ##
 
     def _interpret_step_log(self, log_interpretation):
+        """Fetch step logs and add 'step' to log_interpretation."""
+        if 'step' not in log_interpretation.get('step')
+            step_id = log_interpretation.get('step_id')
+            if not step_id:
+                log.warning("Can't fetch step logs without step ID")
+                return {}
+
+
+
+
+
         pass
 
     def _interpret_task_logs(self, log_interpretation):

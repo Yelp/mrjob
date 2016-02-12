@@ -186,10 +186,6 @@ def _parse_task_syslog(lines):
     """
     result = {}
 
-
-    split = None
-    hadoop_error = None
-
     for record in _parse_hadoop_log4j_records(lines):
         message = record['message']
 

@@ -23,13 +23,15 @@ from mrjob.py2 import to_string
 from .ids import _add_implied_job_id
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
+from .wrap import _cat_log
+from .wrap import _ls_logs
 
 
 # path of step log (these only exist on EMR)
 _EMR_STEP_LOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
-    r'(?P<step_id>s-[A-Z0-9]+)'
-    r'stderr(?P<suffix>\.\w+)?')
+    r'(?P<step_id>s-[A-Z0-9]+)/'
+    r'syslog(?P<suffix>\.\w+)?')
 
 # hadoop streaming always prints "packageJobJar..." to stdout,
 # and prints Streaming Command Failed! to stderr on failure

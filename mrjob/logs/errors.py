@@ -16,7 +16,6 @@
 import json
 
 from .ids import _make_time_sort_key
-from mrjob.py2 import string_types
 
 
 def _pick_error(log_interpretation):

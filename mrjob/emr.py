@@ -61,6 +61,7 @@ from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import map_version
+from mrjob.compat import uses_yarn
 from mrjob.compat import version_gte
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -79,9 +80,12 @@ from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _pick_error
-from mrjob.logs.ls import ls_logs
-from mrjob.logparsers import best_error_from_logs
-from mrjob.logparsers import scan_for_counters_in_files
+from mrjob.logs.history import _interpret_history_log
+from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.step import _interpret_emr_step_log
+from mrjob.logs.step import _ls_emr_step_logs
+from mrjob.logs.task import _interpret_task_logs
+from mrjob.logs.task import _ls_task_syslogs
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -1748,10 +1752,36 @@ class EMRJobRunner(MRJobRunner):
             s3_log_uri = posixpath.join(
                 self._s3_log_dir(), (s3_dir_name or dir_name))
             log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
-            yield s3_log_uri
 
-    # TODO: stream step, history, task dirs, then interpret them
+    def _stream_history_log_dirs(self):
+        """Get lists of directories to look for the history log in."""
+        # in YARN, the history log lives on HDFS, which we currently
+        # don't have a way to access (see #990 for a possible solution), and
+        # isn't copied to S3
+        #
+        # Fortunately, in YARN, everything we want is in the step
+        # log anyway.
+        if uses_yarn(self.get_hadoop_version()):
+            return []
 
+        return self._stream_log_dirs(
+            'history log', dir_name='history', s3_dir_name='jobs')
+
+    def _stream_step_log_dirs(self, step_id):
+        """Get lists of directories to look for the step log in."""
+        dir_name = posixpath.join('steps', step_id)
+        return self._stream_log_dirs('step log', dir_name)
+
+    def _stream_task_log_dirs(self, application_id=None):
+        if application_id:
+            dir_name = posixpath.join('userlogs', application_id)
+            s3_dir_name = posixpath.join('task-attempts', application_id)
+        else:
+            dir_name = 'userlogs'
+            s3_dir_name = 'task-attempts'
+
+        return self._stream_log_dirs(
+            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
 
     def _wait_for_terminating_cluster_to_terminate(self):
         """If the cluster is already terminating, wait for it to terminate,
@@ -1761,124 +1791,68 @@ class EMRJobRunner(MRJobRunner):
         """
         pass  # TODO: implement this
 
+    # TODO: merge this with similar code in hadoop.py
+    def _interpret_history_log(self, log_interpretation):
+        """Fetch history log and add 'history' to log_interpretation."""
+        if 'history' not in log_interpretation:
+            job_id = log_interpretation.get('step', {}).get('job_id')
+            if not job_id:
+                log.warning("Can't fetch history log without job ID")
+                return {}
 
+            matches = _ls_history_logs(
+                self.fs, self._stream_history_log_dirs(), job_id=job_id)
 
+            log_interpretation['history'] = _interpret_history_log(
+                self.fs, matches)
 
+        return log_interpretation['history']
 
     def _interpret_step_log(self, log_interpretation):
-        """Fetch step logs and add 'step' to log_interpretation."""
+        """Fetch step log and add 'step' to log_interpretation."""
         if 'step' not in log_interpretation:
             step_id = log_interpretation.get('step_id')
             if not step_id:
-                log.warning("Can't fetch step logs without step ID")
+                log.warning("Can't fetch step log without step ID")
                 return {}
 
+            matches = _ls_emr_step_logs(
+                self.fs, self._stream_step_log_dirs(step_id),
+                step_id=step_id)
 
+            log_interpretation['step'] = _interpret_emr_step_log(
+                self.fs, matches)
 
+        return log_interpretation['step']
 
-
-        pass
-
+    # TODO: merge this with similar code in hadoop.py
     def _interpret_task_logs(self, log_interpretation):
-        pass
+        if 'task' not in log_interpretation:
+            step_interpretation = log_interpretation.get('step') or {}
+            application_id = step_interpretation.get('application_id')
+            job_id = step_interpretation.get('job_id')
 
-    def _interpret_history_log(self, log_interpretation):
-        pass
+            yarn = uses_yarn(self.get_hadoop_version())
 
-    def _fetch_counters(self, step_nums, lg_step_num_mapping=None,
-                        skip_s3_wait=False):
-        """Read Hadoop counters from S3.
+            if yarn and application_id is None:
+                log.warning("Can't fetch task logs without application ID")
+                return {}
+            elif not yarn and job_id is None:
+                log.warning("Can't fetch task logs without job ID")
+                return {}
 
-        Args:
-        step_nums -- the steps belonging to us, so that we can ignore counters
-                     from other jobs when sharing a job flow
-        """
-        # empty list is a valid value for lg_step_nums, but it is an optional
-        # parameter
-        if lg_step_num_mapping is None:
-            lg_step_num_mapping = dict((n, n) for n in step_nums)
-        lg_step_nums = sorted(
-            lg_step_num_mapping[k] for k in step_nums
-            if k in lg_step_num_mapping)
+            matches = _ls_task_syslogs(
+                self.fs, self._stream_task_log_dirs(
+                    application_id=application_id),
+                application_id=application_id, job_id=job_id)
 
-        self._counters = []
-        new_counters = {}
+            log_interpretation['task'] = _interpret_task_logs(self.fs, matches)
 
-        # TODO: do we need this?
-        if not skip_s3_wait:
-            self._wait_for_s3_eventual_consistency()
-
-        uris = self._ls_logs('job', lg_step_nums)
-
-        if uris:
-            new_counters = scan_for_counters_in_files(
-                uris, self.fs, self.get_hadoop_version())
-        else:
-            cluster = self._describe_cluster()
-            if not self._cluster_is_done(cluster):
-                log.info("Counters may not have been uploaded to S3 yet.")
-
-        # step_nums is relative to the start of the job flow
-        # we only want them relative to the job
-        for step_num in step_nums:
-            if step_num in lg_step_num_mapping:
-                self._counters.append(
-                    new_counters.get(lg_step_num_mapping[step_num], {}))
-            else:
-                self._counters.append({})
+        return log_interpretation['task']
 
     def counters(self):
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
-
-    def _find_probable_cause_of_failure(self, step_nums, lg_step_nums=None):
-        """Scan logs for Python exception tracebacks.
-
-        :param step_nums: the numbers of steps belonging to us, so that we
-                          can ignore errors from other jobs when sharing a job
-                          flow
-        :param lg_step_nums: "Log generating step numbers" - list of
-                             (job flow step num, hadoop job num) mapping a job
-                             flow step number to the number hadoop sees.
-                             Necessary because not all steps generate task
-                             attempt logs, and when there are steps that don't,
-                             the number in the log path differs from the job
-                             flow step number.
-
-        Returns:
-        None (nothing found) or a dictionary containing:
-        lines -- lines in the log file containing the error message
-        log_file_uri -- the log file containing the error message
-        input_uri -- if the error happened in a mapper in the first
-            step, the URI of the input file that caused the error
-            (otherwise None)
-        """
-        if lg_step_nums is None:
-            lg_step_nums = step_nums
-
-        step_num_to_id = self._step_num_to_id()
-
-        task_attempt_logs = self._ls_logs('task', step_nums,
-                                          step_num_to_id=step_num_to_id)
-        step_logs = self._ls_logs('step', step_nums,
-                                  step_num_to_id=step_num_to_id)
-        job_logs = self._ls_logs('job', step_nums,
-                                 step_num_to_id=step_num_to_id)
-
-        return best_error_from_logs(
-            self.fs, task_attempt_logs, step_logs, job_logs)
-
-    def _ls_logs(self, log_type, step_nums=None, step_num_to_id=None):
-        # TODO: cache this as we go. We only need to know it if
-        # step_nums is set
-        if step_num_to_id is None:
-            step_num_to_id = self._step_num_to_id()
-
-        return ls_logs(self.fs, log_type,
-                       log_dir=self._s3_log_dir(),
-                       ssh_host=self._address_of_master(),
-                       step_nums=step_nums,
-                       step_num_to_id=step_num_to_id)
 
     ### Bootstrapping ###
 

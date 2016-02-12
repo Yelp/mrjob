@@ -1068,7 +1068,7 @@ class MockEmrConnection(object):
 
         # make sure that we only call list_steps() when we've patched
         # around https://github.com/boto/boto/issues/3268
-        if 'StartDateTime' not in boto.emr.connection.ClusterTimeline.Fields:
+        if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
             raise Exception('called un-patched version of list_steps()!')
 
         if marker is not None:

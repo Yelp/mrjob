@@ -19,7 +19,6 @@ import re
 
 from mrjob.util import file_ext
 from .ids import _add_implied_task_id
-from .ids import _sort_by_recency
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
 from .wrap import _cat_log
@@ -97,8 +96,7 @@ def _match_task_syslog_path(path, application_id=None, job_id=None):
 def _interpret_task_logs(fs, matches, partial=True):
     """Look for errors in task syslog/stderr.
 
-    If *partial* is true (the default), work backwards from the most
-    recent log file and stop when we find the first error.
+    If *partial* is true (the default), stop when we find the first error.
 
     Returns a dictionary possibly containing the key 'errors', which
     is a dict containing:
@@ -122,9 +120,6 @@ def _interpret_task_logs(fs, matches, partial=True):
     this dictionary will contain the key *partial*, set to True.
     """
     result = {}
-
-    if partial:
-        matches = _sort_by_recency(matches)
 
     for match in matches:
         syslog_path = match['path']

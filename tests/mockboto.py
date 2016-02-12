@@ -1084,6 +1084,24 @@ class MockEmrConnection(object):
 
         return MockEmrObject(steps=steps_listed)
 
+    def describe_step(self, cluster_id, step_id):
+        self._enforce_strict_ssl()
+
+        # make sure that we only call list_steps() when we've patched
+        # around https://github.com/boto/boto/issues/3268
+        if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
+            raise Exception('called un-patched version of describe_step()!')
+
+        cluster = self._get_mock_cluster(cluster_id)
+
+        for step in cluster._steps:
+            if step.id == step_id:
+                return step
+
+        raise boto.exception.EmrResponseError(
+            400, 'Bad Request', body=err_xml(
+                "Step id '%s' is not valid." % step_id))
+
     def add_jobflow_steps(self, jobflow_id, steps, now=None):
         self._enforce_strict_ssl()
 

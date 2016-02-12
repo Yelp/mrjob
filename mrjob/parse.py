@@ -655,10 +655,9 @@ def _parse_progress_from_job_tracker(html_bytes):
     else:
         return None, None
 
-
-# TODO: actual data is in an out-of-order JS data structure. Need to
-# parse pairs of (job_id, percent) and return percent from largest
-# (most recent) job ID.
+# TODO: this has two issues:
+# - reports progress of previous steps
+# - reports 100% progress for failed steps
 def _parse_progress_from_resource_manager(html_bytes):
     """Pull progress_precent from job tracker HTML, as a float, or return
     None."""

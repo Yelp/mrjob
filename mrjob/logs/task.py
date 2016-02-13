@@ -219,27 +219,31 @@ def _parse_task_stderr(lines):
     """Attempt to explain any error in task stderr, be it a Python
     exception or a problem with a setup command (see #1203).
 
-    Currently this only works with tasks run with the setup wrapper script;
-    it looks for '+ ' followed by a command line, and then the command's
-    stderr.
+    Looks for '+ ' followed by a command line, and then the command's
+    stderr. If there are no such lines (because we're not using a setup
+    script), assumes the entire file contents are the cause of error.
 
-    Either returns None or a task error dictionary with the following keys:
+    Returns a task error dictionary with the following keys, or None
+    if the file is empty.
 
     message: a string (e.g. Python command line followed by Python traceback)
     start_line: where in lines message appears (0-indexed)
     num_lines: how may lines the message takes up
     """
+    # TODO: screen out crud like:
+    # log4j:WARN No appenders could be found for logger (amazon.emr.metrics.MetricsSaver).  # noqa
+    # log4j:WARN Please initialize the log4j system properly.  # noqa
+    # log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.  # noqa
     task_error = None
 
     for line_num, line in enumerate(lines):
         line = line.rstrip('\r\n')
 
-        if line.startswith('+ '):
+        if not task_error or line.startswith('+ '):
             task_error = dict(
                 message=line,
                 start_line=line_num)
-        elif task_error:
-            # explain what wrong!
+        else:
             task_error['message'] += '\n' + line
 
     if task_error:

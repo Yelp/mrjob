@@ -93,10 +93,13 @@ def _match_task_syslog_path(path, application_id=None, job_id=None):
     return None
 
 
-def _interpret_task_logs(fs, matches, partial=True):
+def _interpret_task_logs(fs, matches, partial=True, stderr_callback=None):
     """Look for errors in task syslog/stderr.
 
     If *partial* is true (the default), stop when we find the first error.
+
+    If *stderr_callback* is set, every time we're about to parse a stderr
+        file, call it with a single argument, the path of that file
 
     Returns a dictionary possibly containing the key 'errors', which
     is a dict containing:
@@ -139,11 +142,14 @@ def _interpret_task_logs(fs, matches, partial=True):
 
         # look for task_error in stderr, if it exists
         stderr_path = _syslog_to_stderr_path(syslog_path)
-        task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
+        if fs.exists(stderr_path):
+            stderr_callback(stderr_path)
 
-        if task_error:
-            task_error['path'] = stderr_path
-            error['task_error'] = task_error
+            task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
+
+            if task_error:
+                task_error['path'] = stderr_path
+                error['task_error'] = task_error
 
         result.setdefault('errors', [])
         result['errors'].append(error)

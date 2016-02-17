@@ -1609,6 +1609,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             self.assertEqual(jf_hash, runner._pool_hash())
             self.assertEqual(jf_name, runner._opts['emr_job_flow_pool_name'])
 
+            emr_conn.simulate_progress(runner.get_cluster_id())
             cluster = runner._describe_cluster()
             self.assertEqual(cluster.status.state, 'WAITING')
 

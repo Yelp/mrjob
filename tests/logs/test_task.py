@@ -590,6 +590,37 @@ class ParseTaskStderrTestCase(TestCase):
             )
         )
 
+    def test_log4j_init_warnings(self):
+        lines = [
+            'log4j:WARN No appenders could be found for logger'
+            ' (amazon.emr.metrics.MetricsSaver).\n',
+            'log4j:WARN Please initialize the log4j system properly.\n',
+            'log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html'
+            '#noconfig for more info.\n',
+        ]
+
+        self.assertEqual(_parse_task_stderr(lines), None)
+
+    def test_error_with_log4j_init_warnings(self):
+        lines = [
+            'ERROR: something is terribly, terribly wrong\n',
+            'OH THE HORROR\n',
+            'log4j:WARN No appenders could be found for logger'
+            ' (amazon.emr.metrics.MetricsSaver).\n',
+            'log4j:WARN Please initialize the log4j system properly.\n',
+            'log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html'
+            '#noconfig for more info.\n',
+        ]
+
+        self.assertEqual(
+            _parse_task_stderr(lines),
+            dict(
+                message=('ERROR: something is terribly, terribly wrong\n'
+                         'OH THE HORROR'),
+                start_line=0,
+                num_lines=2,
+            )
+        )
 
 
 class SyslogToStderrPathTestCase(TestCase):

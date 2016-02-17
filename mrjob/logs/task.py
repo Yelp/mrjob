@@ -43,6 +43,9 @@ _PRE_YARN_TASK_SYSLOG_PATH_RE = re.compile(
     r'(?P<attempt_num>\d+))/'
     r'syslog(?P<suffix>\.\w+)?')
 
+# ignore warnings about initializing log4j in task stderr
+_TASK_STDERR_IGNORE_RE = re.compile(r'^log4j:WARN .*$')
+
 # message telling us about a (input) split. Looks like this:
 #
 # Processing split: hdfs://ddf64167693a:9000/path/to/bootstrap.sh:0+335
@@ -231,16 +234,18 @@ def _parse_task_stderr(lines):
     start_line: where in lines message appears (0-indexed)
     num_lines: how may lines the message takes up
     """
-    # TODO: screen out crud like:
-    # log4j:WARN No appenders could be found for logger (amazon.emr.metrics.MetricsSaver).  # noqa
-    # log4j:WARN Please initialize the log4j system properly.  # noqa
-    # log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.  # noqa
     task_error = None
 
     for line_num, line in enumerate(lines):
         line = line.rstrip('\r\n')
 
-        if not task_error or line.startswith('+ '):
+        # ignore warnings about initializing log4j
+        if _TASK_STDERR_IGNORE_RE.match(line):
+            # ignored lines shouldn't count as part of the line range
+            if task_error and 'num_lines' not in task_error:
+                task_error['num_lines'] = line_num - task_error['start_line']
+            continue
+        elif not task_error or line.startswith('+ '):
             task_error = dict(
                 message=line,
                 start_line=line_num)
@@ -248,7 +253,8 @@ def _parse_task_stderr(lines):
             task_error['message'] += '\n' + line
 
     if task_error:
-        task_error['num_lines'] = line_num + 1 - task_error['start_line']
+        if 'num_lines' not in task_error:
+            task_error['num_lines'] = line_num + 1 - task_error['start_line']
         return task_error
     else:
         return None

@@ -149,7 +149,6 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             self.assertTrue(any(runner.fs.ls(runner.get_output_dir())))
 
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster.status.state, 'TERMINATED')
             name_match = JOB_KEY_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())

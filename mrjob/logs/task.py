@@ -143,7 +143,8 @@ def _interpret_task_logs(fs, matches, partial=True, stderr_callback=None):
         # look for task_error in stderr, if it exists
         stderr_path = _syslog_to_stderr_path(syslog_path)
         if fs.exists(stderr_path):
-            stderr_callback(stderr_path)
+            if stderr_callback:
+                stderr_callback(stderr_path)
 
             task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
 

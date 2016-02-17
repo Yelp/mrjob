@@ -221,6 +221,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
     def test_syslog_with_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
+        mock_stderr_callback = Mock()
 
         self.mock_paths = [syslog_path, stderr_path]
 
@@ -229,23 +230,28 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             stderr_path: dict(message='because, exploding code')
         }
 
-        self.assertEqual(self.interpret_task_logs(), dict(
-            errors=[
-                dict(
-                    attempt_id='attempt_201512232143_0008_m_000001_3',
-                    hadoop_error=dict(
-                        message='BOOM',
-                        path=syslog_path,
+        self.assertEqual(
+            self.interpret_task_logs(stderr_callback=mock_stderr_callback),
+            dict(
+                errors=[
+                    dict(
+                        attempt_id='attempt_201512232143_0008_m_000001_3',
+                        hadoop_error=dict(
+                            message='BOOM',
+                            path=syslog_path,
+                        ),
+                        task_error=dict(
+                            message='because, exploding code',
+                            path=stderr_path,
+                        ),
+                        task_id='task_201512232143_0008_m_000001',
                     ),
-                    task_error=dict(
-                        message='because, exploding code',
-                        path=stderr_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000001',
-                ),
-            ],
-            partial=True,
-        ))
+                ],
+                partial=True,
+            )
+        )
+
+        mock_stderr_callback.assert_called_once_with(stderr_path)
 
     def test_yarn_syslog_with_error(self):
         # this works the same way as the other tests, except we get
@@ -571,10 +577,19 @@ class ParseTaskStderrTestCase(TestCase):
     def test_error_without_leading_plus(self):
         lines = [
             'ERROR: something is terribly, terribly wrong\n',
+            'OH THE HORROR\n',
         ]
 
         self.assertEqual(
-            _parse_task_stderr(lines), None)
+            _parse_task_stderr(lines),
+            dict(
+                message=('ERROR: something is terribly, terribly wrong\n'
+                         'OH THE HORROR'),
+                start_line=0,
+                num_lines=2,
+            )
+        )
+
 
 
 class SyslogToStderrPathTestCase(TestCase):

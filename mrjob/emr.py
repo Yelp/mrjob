@@ -604,7 +604,7 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['additional_emr_info'])
 
         # where our own logs ended up (we'll find this out once we run the job)
-        self._s3_job_log_uri = None
+        self._s3_log_dir_uri = None
 
         # we'll create the script later
         self._master_bootstrap_script_path = None
@@ -693,14 +693,14 @@ class EMRJobRunner(MRJobRunner):
 
     def _s3_log_dir(self):
         """Get the URI of the log directory for this job's cluster."""
-        if not self._s3_job_log_uri:
+        if not self._s3_log_dir_uri:
             cluster = self._describe_cluster()
             log_uri = getattr(cluster, 'loguri', '')
             if log_uri:
-                self._s3_job_log_uri = '%s%s/' % (
+                self._s3_log_dir_uri = '%s%s/' % (
                     log_uri.replace('s3n://', 's3://'), self._cluster_id)
 
-        return self._s3_job_log_uri
+        return self._s3_log_dir_uri
 
     def _create_s3_tmp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
@@ -1075,7 +1075,7 @@ class EMRJobRunner(MRJobRunner):
         if self._s3_log_dir() and not self._opts['emr_job_flow_id'] \
                 and not self._opts['pool_emr_job_flows']:
             try:
-                log.info('Removing all files in %s' % self._s3_job_log_uri)
+                log.info('Removing all files in %s' % self._s3_log_dir())
                 self.fs.rm(self._s3_log_dir())
             except Exception as e:
                 log.exception(e)

@@ -250,7 +250,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             runner.run()
 
             # this is set and unset before we can get at it unless we do this
-            log_bucket, _ = parse_s3_uri(runner._s3_job_log_uri)
+            log_bucket, _ = parse_s3_uri(runner._s3_log_dir())
 
             list(runner.stream_output())
 

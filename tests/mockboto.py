@@ -991,7 +991,7 @@ class MockEmrConnection(object):
             cluster._steps.append(MockEmrObject(
                 actiononfailure=step.action_on_failure,
                 config=step_config,
-                id='s-FAKE',
+                id=('s-MOCKSTEP%d' % len(cluster._steps)),
                 name=step.name,
                 status=step_status,
             ))

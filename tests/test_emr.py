@@ -213,8 +213,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
                 self.assertIsInstance(runner, EMRJobRunner)
 
                 self.assertRaises(Exception, runner.run)
-                # make sure job flow ID printed in error string
-                self.assertIn('Job on job flow j-MOCKCLUSTER0 failed',
+                self.assertIn('\n  FAILED\n',
                               stderr.getvalue())
 
                 emr_conn = runner.make_emr_conn()

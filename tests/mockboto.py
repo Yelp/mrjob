@@ -967,6 +967,35 @@ class MockEmrConnection(object):
 
         return self.mock_emr_clusters[cluster_id]
 
+    def add_jobflow_steps(self, jobflow_id, steps, now=None):
+        self._enforce_strict_ssl()
+
+        if now is None:
+            now = datetime.utcnow()
+
+        cluster = self._get_mock_cluster(jobflow_id)
+
+        for step in steps:
+            step_config = MockEmrObject(
+                args=[MockEmrObject(value=a) for a in step.args()],
+                jar=step.jar(),
+                mainclass=step.main_class())
+            # there's also a "properties" field, but boto doesn't handle it
+
+            step_status = MockEmrObject(
+                state='PENDING',
+                timeline=MockEmrObject(
+                    creationdatetime=to_iso8601(now)),
+            )
+
+            cluster._steps.append(MockEmrObject(
+                actiononfailure=step.action_on_failure,
+                config=step_config,
+                id='s-FAKE',
+                name=step.name,
+                status=step_status,
+            ))
+
     def add_tags(self, resource_id, tags):
         """Simulate successful creation of new metadata tags for the specified
         resource id.
@@ -997,9 +1026,26 @@ class MockEmrConnection(object):
     def describe_cluster(self, cluster_id):
         self._enforce_strict_ssl()
 
+        return self._get_mock_cluster(cluster_id)
+
+    def describe_step(self, cluster_id, step_id):
+        self._enforce_strict_ssl()
         self.simulate_progress(cluster_id)
 
-        return self._get_mock_cluster(cluster_id)
+        # make sure that we only call list_steps() when we've patched
+        # around https://github.com/boto/boto/issues/3268
+        if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
+            raise Exception('called un-patched version of describe_step()!')
+
+        cluster = self._get_mock_cluster(cluster_id)
+
+        for step in cluster._steps:
+            if step.id == step_id:
+                return step
+
+        raise boto.exception.EmrResponseError(
+            400, 'Bad Request', body=err_xml(
+                "Step id '%s' is not valid." % step_id))
 
     def list_bootstrap_actions(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
@@ -1083,53 +1129,6 @@ class MockEmrConnection(object):
                 steps_listed.append(step)
 
         return MockEmrObject(steps=steps_listed)
-
-    def describe_step(self, cluster_id, step_id):
-        self._enforce_strict_ssl()
-
-        # make sure that we only call list_steps() when we've patched
-        # around https://github.com/boto/boto/issues/3268
-        if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
-            raise Exception('called un-patched version of describe_step()!')
-
-        cluster = self._get_mock_cluster(cluster_id)
-
-        for step in cluster._steps:
-            if step.id == step_id:
-                return step
-
-        raise boto.exception.EmrResponseError(
-            400, 'Bad Request', body=err_xml(
-                "Step id '%s' is not valid." % step_id))
-
-    def add_jobflow_steps(self, jobflow_id, steps, now=None):
-        self._enforce_strict_ssl()
-
-        if now is None:
-            now = datetime.utcnow()
-
-        cluster = self._get_mock_cluster(jobflow_id)
-
-        for step in steps:
-            step_config = MockEmrObject(
-                args=[MockEmrObject(value=a) for a in step.args()],
-                jar=step.jar(),
-                mainclass=step.main_class())
-            # there's also a "properties" field, but boto doesn't handle it
-
-            step_status = MockEmrObject(
-                state='PENDING',
-                timeline=MockEmrObject(
-                    creationdatetime=to_iso8601(now)),
-            )
-
-            cluster._steps.append(MockEmrObject(
-                actiononfailure=step.action_on_failure,
-                config=step_config,
-                id='s-FAKE',
-                name=step.name,
-                status=step_status,
-            ))
 
     def terminate_jobflow(self, jobflow_id):
         self._enforce_strict_ssl()

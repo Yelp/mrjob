@@ -1618,7 +1618,6 @@ class EMRJobRunner(MRJobRunner):
             # try to fetch counters
             if step.status.state != 'CANCELLED':
                 log.info('Attempting to fetch counters from logs...')
-                # TODO: wait for cluster to complete if that makes sense
                 self._interpret_step_log(log_interpretation)
                 if not _pick_counters(log_interpretation):
                     self._interpret_history_log(log_interpretation)
@@ -1759,7 +1758,34 @@ class EMRJobRunner(MRJobRunner):
 
         Don't print anything unless cluster is in the TERMINATING state.
         """
-        pass  # TODO: implement this
+        cluster = self._describe_cluster()
+
+        if cluster.status.state in (
+                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+            return  # already terminated
+
+        if cluster.status.state != 'TERMINATING':
+            return  # not going to terminate anytime soon
+
+        log.info('Waiting for cluster (%s) to terminate...' %
+                 cluster.id)
+
+        while True:
+            reason_desc = ''
+            reason = getattr(
+                getattr(cluster.status, 'statechangereason', ''),
+                'message', '')
+            if reason:
+                reason_desc = ': ' + reason
+
+            log.info('  %s%s' % (cluster.status.state, reason_desc))
+
+            if cluster.status.state in (
+                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                return
+
+            time.sleep(self._opts['check_emr_status_every'])
+            cluster = self._describe_cluster()
 
     # TODO: merge interpret/ls code with similar code in hadoop.py
 

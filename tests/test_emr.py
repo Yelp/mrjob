@@ -286,20 +286,6 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
                           'GARBAGE', 0, 0)
 
-    def test_wait_for_cluster_to_terminate(self):
-        # Test regression from #338 where _wait_for_cluster_to_terminate()
-        # (called _wait_for_job_flow_termination() at the time)
-        # would raise an IndexError whenever the job flow wasn't already
-        # finished
-        mr_job = MRTwoStepJob(['-r', 'emr'])
-        mr_job.sandbox()
-        with mr_job.make_runner() as runner:
-            runner._add_job_files_for_upload()
-            runner._launch_emr_job()
-            runner._wait_for_cluster_to_terminate()
-
-
-
 
 class ExistingClusterTestCase(MockBotoTestCase):
 
@@ -3241,3 +3227,8 @@ class SetupLineEncodingTestCase(MockBotoTestCase):
                     self.assertIn(
                         call(runner._setup_wrapper_script_path, 'wb'),
                         m_open.mock_calls)
+
+
+class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
+
+    pass  # TODO: complete this

@@ -156,13 +156,6 @@ class MockBotoTestCase(SandboxedTestCase):
             EMRJobRunner, '_create_mrjob_tar_gz',
             fake_create_mrjob_tar_gz))
 
-        # TODO: why patch these, if sleep() is mocked out anyway?
-        self.start(patch.object(
-            EMRJobRunner, '_wait_for_s3_eventual_consistency'))
-
-        self.start(patch.object(
-            EMRJobRunner, '_wait_for_cluster_to_terminate'))
-
         self.start(patch.object(time, 'sleep'))
 
     def add_mock_s3_data(self, data, time_modified=None, location=None):
@@ -1282,7 +1275,9 @@ class MockEmrConnection(object):
                     (cluster_id, step_num))
 
             # done!
-            return
+            # if this is the last step, continue to autotermination code, below
+            if step_num < len(cluster._steps) - 1:
+                return
 
         # no pending steps. should we wait, or shut down?
         if cluster.autoterminate == 'true':

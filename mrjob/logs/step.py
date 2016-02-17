@@ -62,7 +62,7 @@ _SUBMITTED_APPLICATION_RE = re.compile(
 _RUNNING_JOB_RE = re.compile(
     r'^Running job: (?P<job_id>job_\d+_\d{4})\s*$')
 
-# YARN prints this (followed by a Java exception) when tasks fail
+# YARN prints this (sometimes followed by a Java exception) when tasks fail
 _TASK_ATTEMPT_FAILED_RE = re.compile(
     r'^Task Id *:'
     r' (?P<attempt_id>attempt_\d+_\d{4}_[mr]_\d+_\d+),'
@@ -224,6 +224,8 @@ def _parse_step_log_from_log4j_records(records):
         m = _TASK_ATTEMPT_FAILED_RE.match(message)
         if m:
             error_str = '\n'.join(message.splitlines()[1:])
+            if not error_str:  # if no exception, print something
+                error_str = message
 
             error = dict(
                 attempt_id=m.group('attempt_id'),

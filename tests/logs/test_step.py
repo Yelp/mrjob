@@ -171,6 +171,34 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
                 ]
             ))
 
+    def test_yarn_error_without_exception(self):
+        # when there's no exception, just use the whole line as the message
+        lines = [
+            '16/01/22 19:14:16 INFO mapreduce.Job: Task Id :'
+            ' attempt_1453488173054_0001_m_000000_0, Status : FAILED\n',
+        ]
+
+        self.assertEqual(
+            _interpret_hadoop_jar_command_stderr(lines),
+            dict(
+                errors=[
+                    dict(
+                        attempt_id='attempt_1453488173054_0001_m_000000_0',
+                        hadoop_error=dict(
+                            message=(
+                                'Task Id :'
+                                ' attempt_1453488173054_0001_m_000000_0,'
+                                ' Status : FAILED'
+                            ),
+                            num_lines=1,
+                            start_line=0,
+                        ),
+                        # task ID is implied by attempt ID
+                        task_id='task_1453488173054_0001_m_000000',
+                    )
+                ]
+            ))
+
     def test_lines_can_be_bytes(self):
         self.assertEqual(
             _interpret_hadoop_jar_command_stderr([

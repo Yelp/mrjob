@@ -1021,7 +1021,12 @@ class MockEmrConnection(object):
     def describe_cluster(self, cluster_id):
         self._enforce_strict_ssl()
 
-        return self._get_mock_cluster(cluster_id)
+        cluster = self._get_mock_cluster(cluster_id)
+
+        if cluster.status.state == 'TERMINATING':
+            self.simulate_progress(cluster_id)
+
+        return cluster
 
     def describe_step(self, cluster_id, step_id):
         self._enforce_strict_ssl()

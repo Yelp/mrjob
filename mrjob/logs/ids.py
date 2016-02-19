@@ -43,16 +43,33 @@ def _make_time_sort_key(container_to_attempt_id=None):
     def sort_key(d):
         container_id = d.get('container_id') or ''
 
+        # when parsing task syslogs on YARN, we may end up with
+        # container_id and nothing else. container IDs match with job ID
+        # but aren't directly comparable to task and attempt IDs
+
+        # if we've parsed the history file, we should be able to
+        # map every container_id to an attempt ID
         inferred_attempt_id = container_to_attempt_id.get(container_id) or ''
         if inferred_attempt_id:
             container_id = ''
 
+        # But if we couldn't parse the history file (for example because
+        # we're using YARN on EMR and the only way to get it is SSHing in and
+        # finding it on HDFS), we can use the container ID to infer the
+        # job ID. After that, we just assume that errors with a container
+        # ID must be better (they usually include the task error, after all),
+        # so we treat them as more recent.
+
         # break ID like
         # {application,attempt,task,job}_201601081945_0005[_m[_000005[_0]]]
         # into its component parts
+        #
+        # in practice, errors don't have job or application ID attached to
+        # them (and we're only sorting errors from the same job/application)
         attempt_parts = (d.get('attempt_id') or inferred_attempt_id or
                          d.get('task_id') or d.get('job_id') or
-                         d.get('application_id') or '').split('_')
+                         d.get('application_id') or
+                         _to_job_id(container_id) or '').split('_')
 
         timestamp_and_step = '_'.join(attempt_parts[1:3])
         task_type = '_'.join(attempt_parts[3:4])

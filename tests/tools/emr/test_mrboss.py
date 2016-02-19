@@ -42,7 +42,7 @@ class MRBossTestCase(MockBotoTestCase):
         self.runner = EMRJobRunner(s3_sync_wait_time=0,
                                    s3_tmp_dir='s3://walrus/tmp',
                                    conf_paths=[])
-        self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
+        self.runner._s3_log_dir_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)
         self.output_dir = tempfile.mkdtemp(prefix='mrboss_wd')
 

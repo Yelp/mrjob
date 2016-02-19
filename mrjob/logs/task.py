@@ -19,7 +19,6 @@ import re
 
 from mrjob.util import file_ext
 from .ids import _add_implied_task_id
-from .ids import _sort_by_recency
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
 from .wrap import _cat_log
@@ -43,6 +42,9 @@ _PRE_YARN_TASK_SYSLOG_PATH_RE = re.compile(
     r'(?P<task_type>[mr])_(?P<task_num>\d+)_'
     r'(?P<attempt_num>\d+))/'
     r'syslog(?P<suffix>\.\w+)?')
+
+# ignore warnings about initializing log4j in task stderr
+_TASK_STDERR_IGNORE_RE = re.compile(r'^log4j:WARN .*$')
 
 # message telling us about a (input) split. Looks like this:
 #
@@ -94,11 +96,13 @@ def _match_task_syslog_path(path, application_id=None, job_id=None):
     return None
 
 
-def _interpret_task_logs(fs, matches, partial=True):
+def _interpret_task_logs(fs, matches, partial=True, stderr_callback=None):
     """Look for errors in task syslog/stderr.
 
-    If *partial* is true (the default), work backwards from the most
-    recent log file and stop when we find the first error.
+    If *partial* is true (the default), stop when we find the first error.
+
+    If *stderr_callback* is set, every time we're about to parse a stderr
+        file, call it with a single argument, the path of that file
 
     Returns a dictionary possibly containing the key 'errors', which
     is a dict containing:
@@ -123,9 +127,6 @@ def _interpret_task_logs(fs, matches, partial=True):
     """
     result = {}
 
-    if partial:
-        matches = _sort_by_recency(matches)
-
     for match in matches:
         syslog_path = match['path']
 
@@ -144,11 +145,15 @@ def _interpret_task_logs(fs, matches, partial=True):
 
         # look for task_error in stderr, if it exists
         stderr_path = _syslog_to_stderr_path(syslog_path)
-        task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
+        if fs.exists(stderr_path):
+            if stderr_callback:
+                stderr_callback(stderr_path)
 
-        if task_error:
-            task_error['path'] = stderr_path
-            error['task_error'] = task_error
+            task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
+
+            if task_error:
+                task_error['path'] = stderr_path
+                error['task_error'] = task_error
 
         result.setdefault('errors', [])
         result['errors'].append(error)
@@ -186,10 +191,6 @@ def _parse_task_syslog(lines):
     """
     result = {}
 
-
-    split = None
-    hadoop_error = None
-
     for record in _parse_hadoop_log4j_records(lines):
         message = record['message']
 
@@ -222,11 +223,12 @@ def _parse_task_stderr(lines):
     """Attempt to explain any error in task stderr, be it a Python
     exception or a problem with a setup command (see #1203).
 
-    Currently this only works with tasks run with the setup wrapper script;
-    it looks for '+ ' followed by a command line, and then the command's
-    stderr.
+    Looks for '+ ' followed by a command line, and then the command's
+    stderr. If there are no such lines (because we're not using a setup
+    script), assumes the entire file contents are the cause of error.
 
-    Either returns None or a task error dictionary with the following keys:
+    Returns a task error dictionary with the following keys, or None
+    if the file is empty.
 
     message: a string (e.g. Python command line followed by Python traceback)
     start_line: where in lines message appears (0-indexed)
@@ -237,16 +239,22 @@ def _parse_task_stderr(lines):
     for line_num, line in enumerate(lines):
         line = line.rstrip('\r\n')
 
-        if line.startswith('+ '):
+        # ignore warnings about initializing log4j
+        if _TASK_STDERR_IGNORE_RE.match(line):
+            # ignored lines shouldn't count as part of the line range
+            if task_error and 'num_lines' not in task_error:
+                task_error['num_lines'] = line_num - task_error['start_line']
+            continue
+        elif not task_error or line.startswith('+ '):
             task_error = dict(
                 message=line,
                 start_line=line_num)
-        elif task_error:
-            # explain what wrong!
+        else:
             task_error['message'] += '\n' + line
 
     if task_error:
-        task_error['num_lines'] = line_num + 1 - task_error['start_line']
+        if 'num_lines' not in task_error:
+            task_error['num_lines'] = line_num + 1 - task_error['start_line']
         return task_error
     else:
         return None

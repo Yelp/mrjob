@@ -17,6 +17,7 @@ from logging import getLogger
 
 from mrjob.py2 import to_string
 
+from .ids import _sort_by_recency
 
 log = getLogger(__name__)
 
@@ -34,7 +35,8 @@ def _cat_log(fs, path):
 
 
 def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
-    """Yield logs matching *matcher*. Used to implement _ls_*_logs() functions.
+    """Return a list matches against log files. Used to implement
+    ``_ls_*_logs()`` functions.
 
     This yields dictionaries with ``path`` set to matching log path, and
     other information (e.g. corresponding job_id) returned by *matcher*
@@ -52,7 +54,7 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
     about the path (e.g. the corresponding job_id). It's okay to return
     an empty dict.
     """
-    # wrapper for _fs_ls() that turns IOErrors into warnings
+    # wrapper for fs.ls() that turns IOErrors into warnings
     def _fs_ls(path):
         try:
             for path in fs.ls(log_dir):
@@ -64,15 +66,16 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
         if isinstance(log_dirs, str):
             raise TypeError
 
-        matched = False
+        matches = []
 
         for log_dir in log_dirs:
             for path in _fs_ls(log_dir):
                 m = matcher(path, **kwargs)
                 if m is not None:
-                    matched = True
                     m['path'] = path
-                    yield m
+                    matches.append(m)
 
-        if matched:
-            return
+        if matches:
+            return _sort_by_recency(matches)
+
+    return []

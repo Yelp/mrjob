@@ -18,6 +18,7 @@ import logging
 import os
 import os.path
 import pipes
+import posixpath
 import random
 import signal
 import socket
@@ -60,6 +61,7 @@ from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import map_version
+from mrjob.compat import uses_yarn
 from mrjob.compat import version_gte
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -75,9 +77,15 @@ from mrjob.iam import FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
-from mrjob.logs.ls import ls_logs
-from mrjob.logparsers import best_error_from_logs
-from mrjob.logparsers import scan_for_counters_in_files
+from mrjob.logs.counters import _pick_counters
+from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _pick_error
+from mrjob.logs.history import _interpret_history_log
+from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.step import _interpret_emr_step_log
+from mrjob.logs.step import _ls_emr_step_logs
+from mrjob.logs.task import _interpret_task_logs
+from mrjob.logs.task import _ls_task_syslogs
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -86,12 +94,12 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.patched_boto import patched_describe_cluster
+from mrjob.patched_boto import patched_describe_step
 from mrjob.patched_boto import patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
-from mrjob.py2 import to_string
 from mrjob.py2 import urlopen
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
@@ -116,6 +124,10 @@ _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '3': dict(name='resource manager', path='/cluster', port=9026),
     '4': dict(name='resource manager', path='/cluster', port=8088),
 }
+
+# if we SSH into a node, default place to look for Hadoop logs
+_EMR_HADOOP_LOG_DIR = '/mnt/var/log/hadoop'
+
 
 MAX_SSH_RETRIES = 20
 
@@ -200,6 +212,20 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
                         *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
+
+
+def _step_ids_for_job(steps, job_key):
+    """Return a list of the (EMR) step IDs for the job with the given key.
+
+    *steps* is the result of _yield_all_steps().
+    """
+    step_ids = []
+
+    for step in steps:
+        if step.name.startswith(job_key):
+            step_ids.append(step.id)
+
+    return step_ids
 
 
 def make_lock_uri(s3_tmp_dir, emr_job_flow_id, step_num):
@@ -578,7 +604,7 @@ class EMRJobRunner(MRJobRunner):
                 self._opts['additional_emr_info'])
 
         # where our own logs ended up (we'll find this out once we run the job)
-        self._s3_job_log_uri = None
+        self._s3_log_dir_uri = None
 
         # we'll create the script later
         self._master_bootstrap_script_path = None
@@ -608,6 +634,13 @@ class EMRJobRunner(MRJobRunner):
         # init hadoop, ami version caches
         self._ami_version = None
         self._hadoop_version = None
+
+        # List of dicts (one for each step) potentially containing
+        # the keys 'history', 'step', and 'task'. These will also always
+        # contain 'step_id' (the s-XXXXXXXX step ID on EMR).
+        #
+        # This will be filled by _wait_for_steps_to_complete()
+        self._log_interpretations = []
 
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
@@ -658,23 +691,16 @@ class EMRJobRunner(MRJobRunner):
         log.info("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
 
-    # TODO: stop fetching/accessing s3_job_log_uri directly
-    def _log_dir(self):
+    def _s3_log_dir(self):
         """Get the URI of the log directory for this job's cluster."""
-        if not self._s3_job_log_uri:
+        if not self._s3_log_dir_uri:
             cluster = self._describe_cluster()
-            self._set_s3_job_log_uri(cluster)
+            log_uri = getattr(cluster, 'loguri', '')
+            if log_uri:
+                self._s3_log_dir_uri = '%s%s/' % (
+                    log_uri.replace('s3n://', 's3://'), self._cluster_id)
 
-        return self._s3_job_log_uri
-
-    def _set_s3_job_log_uri(self, cluster):
-        """Given a job flow description, set self._s3_job_log_uri. This allows
-        us to call self.fs.ls(), etc. without running the job.
-        """
-        log_uri = getattr(cluster, 'loguri', '')
-        if log_uri:
-            self._s3_job_log_uri = '%s%s/' % (
-                log_uri.replace('s3n://', 's3://'), self._cluster_id)
+        return self._s3_log_dir_uri
 
     def _create_s3_tmp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
@@ -723,7 +749,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _run(self):
         self._launch()
-        self._wait_for_job_to_complete()
+        self._wait_for_steps_to_complete()
 
     def _launch(self):
         self._prepare_for_launch()
@@ -892,20 +918,24 @@ class EMRJobRunner(MRJobRunner):
         return map_version(self.get_ami_version(),
                            _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
 
-    def _set_up_ssh_tunnel(self, host):
+    def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
-
-        Args:
-        host -- hostname of the EMR master node.
         """
+        if not self._opts['ssh_tunnel']:
+            return
+
+        host = self._address_of_master()
+        if not host:
+            return
+
         REQUIRED_OPTS = ['ec2_key_pair', 'ec2_key_pair_file', 'ssh_bind_ports']
         for opt_name in REQUIRED_OPTS:
             if not self._opts[opt_name]:
                 if not self._gave_cant_ssh_warning:
                     log.warning(
-                        "You must set %s in order to set up the SSH tunnel!" %
-                        opt_name)
+                        "  You must set %s in order to set up the SSH tunnel!"
+                        % opt_name)
                     self._gave_cant_ssh_warning = True
                 return
 
@@ -915,14 +945,14 @@ class EMRJobRunner(MRJobRunner):
             if self._ssh_proc.returncode is None:
                 return
             else:
-                log.warning('Oops, ssh subprocess exited with return code %d,'
-                            ' restarting...' % self._ssh_proc.returncode)
+                log.warning('  Oops, ssh subprocess exited with return code'
+                            ' %d, restarting...' % self._ssh_proc.returncode)
                 self._ssh_proc = None
 
         # look up what we're supposed to do on this AMI version
         tunnel_config = self._ssh_tunnel_config()
 
-        log.info('Opening ssh tunnel to %s' % tunnel_config['name'])
+        log.info('  Opening ssh tunnel to %s...' % tunnel_config['name'])
 
         # if ssh detects that a host key has changed, it will silently not
         # open the tunnel, so make a fake empty known_hosts file and use that.
@@ -966,7 +996,7 @@ class EMRJobRunner(MRJobRunner):
 
         if not self._ssh_proc:
             log.warning(
-                'Failed to open ssh tunnel to %s' % tunnel_config['name'])
+                '  Failed to open ssh tunnel to %s' % tunnel_config['name'])
         else:
             if self._opts['ssh_tunnel_is_open']:
                 bind_host = socket.getfqdn()
@@ -975,7 +1005,7 @@ class EMRJobRunner(MRJobRunner):
             self._tunnel_url = 'http://%s:%d%s' % (
                 bind_host, bind_port, tunnel_config['path'])
             self._show_tracker_progress = True
-            log.info('Connect to %s at: %s' % (
+            log.info('  Connect to %s at: %s' % (
                 tunnel_config['name'], self._tunnel_url))
 
     def _pick_ssh_bind_ports(self):
@@ -1042,12 +1072,11 @@ class EMRJobRunner(MRJobRunner):
 
         # delete the log files, if it's a job flow we created (the logs
         # belong to the job flow)
-        if self._s3_job_log_uri and not self._opts['emr_job_flow_id'] \
+        if self._s3_log_dir() and not self._opts['emr_job_flow_id'] \
                 and not self._opts['pool_emr_job_flows']:
             try:
-                log.info('Removing all files in %s' % self._s3_job_log_uri)
-                self.fs.rm(self._s3_job_log_uri)
-                self._s3_job_log_uri = None
+                log.info('Removing all files in %s' % self._s3_log_dir())
+                self.fs.rm(self._s3_log_dir())
             except Exception as e:
                 log.exception(e)
 
@@ -1481,14 +1510,47 @@ class EMRJobRunner(MRJobRunner):
                               for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
-    # TODO: break this method up; it's too big to write tests for
-    def _wait_for_job_to_complete(self):
-        """Wait for the job to complete, and raise an exception if
-        the job failed.
+    def _wait_for_steps_to_complete(self):
+        """Wait for every step of the job to complete, one by one."""
+        steps = self._list_steps_for_cluster()
 
-        Also grab log URI from the job status (since we may not know it)
+        step_ids = _step_ids_for_job(steps, self._job_key)
+        num_steps = len(step_ids)
+
+        if num_steps != len(self._get_steps()):
+            raise AssertionError("Can't find our steps in the job flow!")
+
+        # clear out _log_interpretations if for some reason it was
+        # already filled
+        self._log_interpretations = []
+
+        for step_num, step_id in enumerate(step_ids):
+            # this will raise an exception if a step fails
+            log.info('Waiting for step %d of %d (%s) to complete...' % (
+                step_num + 1, num_steps, step_id))
+            self._wait_for_step_to_complete(step_id)
+
+
+    def _wait_for_step_to_complete(self, step_id):
+        """Helper for _wait_for_step_to_complete(). Wait for
+        step with the given ID to complete, and fetch counters.
+        If it fails, attempt to diagnose the error, and raise an
+        exception.
+
+        :param step_id: the s-XXXXXXX step ID on EMR
+        :param step_num: which step this is out of the steps
+                         belonging to our job (0-indexed)
+        :param num_steps: number of steps in our job
+
+        This also adds an item to self._log_interpretations
         """
-        success = False
+        # just using step_num for _print_counters(). This is messy
+        step_num = len(self._log_interpretations)
+
+        log_interpretation = dict(step_id=step_id)
+        self._log_interpretations.append(log_interpretation)
+
+        emr_conn = self.make_emr_conn()
 
         while True:
             # don't antagonize EMR's throttling
@@ -1496,168 +1558,141 @@ class EMRJobRunner(MRJobRunner):
                       self._opts['check_emr_status_every'])
             time.sleep(self._opts['check_emr_status_every'])
 
-            cluster = self._describe_cluster()
+            step = patched_describe_step(emr_conn, self._cluster_id, step_id)
 
-            self._set_s3_job_log_uri(cluster)
+            if step.status.state == 'PENDING':
+                cluster = self._describe_cluster()
 
-            job_state = cluster.status.state
-            reason = getattr(
-                getattr(cluster.status, 'statechangereason', None),
-                'message', '')
+                reason_desc = ''
+                reason = getattr(
+                    getattr(cluster.status, 'statechangereason', ''),
+                    'message', '')
+                if reason:
+                    reason_desc = ': ' + reason
 
-            # find all steps belonging to us, and get their state
-            step_states = []
-            running_step_name = ''
-            total_step_time = 0.0
-            step_nums = []  # step numbers belonging to us. 1-indexed
-            # "lg_step" stands for "log generating step"
+                log.info('  PENDING (cluster is %s%s)' % (
+                    cluster.status.state, reason_desc))
+                continue
 
-            # TODO: this lg stuff confuses me and is about to be refactored
-            # once I do some hand-testing on which steps actually generate
-            # logs
-            lg_step_num_mapping = {}
+            if step.status.state == 'RUNNING':
+                time_running_desc = ''
 
-            steps = self._list_steps_for_cluster()
-            latest_lg_step_num = 0
+                startdatetime = getattr(
+                    getattr(step.status, 'timeline', ''), 'startdatetime' ,'')
+                if startdatetime:
+                    start = iso8601_to_timestamp(startdatetime)
+                    time_running_desc = ' for %.1fs' % (time.time() - start)
 
-            def is_lg_step(step):
-                return any(arg.value == '-mapper' for arg in step.config.args)
+                # now is the time to tunnel if, if we haven't already
+                self._set_up_ssh_tunnel()
+                log.info('  RUNNING%s' % time_running_desc)
+                self._log_step_progress()
 
-            for i, step in enumerate(steps):
-                if is_lg_step(step):
-                    latest_lg_step_num += 1
+                continue
 
-                # ignore steps belonging to other jobs
-                if not step.name.startswith(self._job_key):
-                    continue
-
-                step_nums.append(i + 1)
-                if is_lg_step(step):
-                    lg_step_num_mapping[i + 1] = latest_lg_step_num
-
-                step_states.append(step.status.state)
-                if step.status.state == 'RUNNING':
-                    running_step_name = step.name
-
-                if (hasattr(step.status, 'timeline') and
-                        hasattr(step.status.timeline, 'startdatetime') and
-                        hasattr(step.status.timeline, 'enddatetime')):
-
-                    start_time = iso8601_to_timestamp(
-                        step.status.timeline.startdatetime)
-                    end_time = iso8601_to_timestamp(
-                        step.status.timeline.enddatetime)
-                    total_step_time += end_time - start_time
-
-            if not step_states:
-                raise AssertionError("Can't find our steps in the job flow!")
-
-            # if all our steps have completed, we're done!
-            if all(state == 'COMPLETED' for state in step_states):
-                success = True
-                break
-
-            # if any step fails, give up
-            if any(state in ('CANCELLED', 'FAILED', 'INTERRUPTED')
-                   for state in step_states):
-                break
-
-            # (the other step states are PENDING and RUNNING)
-
-            # keep track of how long we've been waiting
-            running_time = time.time() - self._emr_job_start
-
-            # if a step is still running, we can print a status message
-            if running_step_name:
-                log.info('Job launched %.1fs ago, status %s: %s (%s)' %
-                         (running_time, job_state, reason, running_step_name))
-
-                if self._show_tracker_progress:
-                    tunnel_config = self._ssh_tunnel_config()
-
-                    tunnel_handle = None
-                    try:
-                        tunnel_handle = urlopen(self._tunnel_url)
-                        tunnel_html = tunnel_handle.read()
-                    except:
-                        log.error('Unable to connect to %s' %
-                                  tunnel_config['name'])
-                        self._show_tracker_progress = False
-                    else:
-                        if tunnel_config['name'] == 'job tracker':
-                            map_progress, reduce_progress = (
-                                _parse_progress_from_job_tracker(tunnel_html))
-                            if map_progress is not None:
-                                log.info(' map %3d%% reduce %3d%%' % (
-                                    map_progress, reduce_progress))
-                        else:
-                            progress = _parse_progress_from_resource_manager(
-                                tunnel_html)
-                            if progress is not None:
-                                log.info(' %5.1f%% complete' % progress)
-                    finally:
-                        if tunnel_handle is not None:
-                            tunnel_handle.close()
-
-                # once a step is running, it's safe to set up the ssh tunnel to
-                # the job tracker
-                job_host = getattr(cluster, 'masterpublicdnsname', None)
-                if job_host and self._opts['ssh_tunnel']:
-                    self._set_up_ssh_tunnel(job_host)
-
-            # other states include STARTING and SHUTTING_DOWN
-            elif reason:
-                log.info('Job launched %.1fs ago, status %s: %s' %
-                         (running_time, job_state, reason))
+            # we're done, will return at the end of this
+            if step.status.state == 'COMPLETED':
+                log.info('  COMPLETED')
+                # will fetch counters, below, and then return
             else:
-                log.info('Job launched %.1fs ago, status %s' %
-                         (running_time, job_state,))
+                # step has failed somehow
 
-        if success:
-            log.info('Job completed.')
-            log.info('Running time was %.1fs (not counting time spent waiting'
-                     ' for the EC2 instances)' % total_step_time)
-            self._fetch_counters(step_nums, lg_step_num_mapping)
-            self._print_counters()
+                # these fields definitely exist, but currently, message doesn't
+                # seem to be filled (at least, the AWS CLI can't see it
+                # either)
+                reason_desc = ''
+                reason = getattr(
+                    getattr(step.status, 'statechangereason' ,''),
+                    'message', '')
+                if reason:
+                    reason_desc = ' (%s)' % reason_desc
+
+                log.info('  %s%s' % (
+                   step.status.state, reason_desc))
+
+                # maybe it failed due to an IAM issue? if so, tell the user
+                # what to do to fix it
+                self._check_for_missing_default_iam_roles()
+
+            # step is done (either COMPLETED, FAILED, INTERRUPTED). so
+            # try to fetch counters
+            if step.status.state != 'CANCELLED':
+                log.info('Attempting to fetch counters from logs...')
+                self._interpret_step_log(log_interpretation)
+                if not _pick_counters(log_interpretation):
+                    self._interpret_history_log(log_interpretation)
+
+                self._print_counters(step_nums=[step_num])
+
+            if step.status.state == 'COMPLETED':
+                return
+
+            if step.status.state == 'FAILED':
+                log.info('Scanning logs for probable cause of failure...')
+                self._interpret_step_log(log_interpretation)
+                self._interpret_history_log(log_interpretation)
+                self._interpret_task_logs(log_interpretation)
+
+                error = _pick_error(log_interpretation)
+                if error:
+                    log.error('Probable cause of failure:\n\n%s\n\n' %
+                              _format_error(error))
+
+            raise Exception
+
+    def _log_step_progress(self):
+        """Tunnel to the job tracker/resource manager and log the
+        progress of the current step.
+
+        (This takes no arguments; we just assume the most recent running
+        job is ours, which should be correct for EMR.)
+        """
+        if not self._show_tracker_progress:
+            return
+
+        tunnel_config = self._ssh_tunnel_config()
+
+        tunnel_handle = None
+        try:
+            tunnel_handle = urlopen(self._tunnel_url)
+            tunnel_html = tunnel_handle.read()
+        except:
+            log.error('Unable to connect to %s' %
+                      tunnel_config['name'])
+            self._show_tracker_progress = False
         else:
-            msg = 'Job on job flow %s failed with status %s: %s' % (
-                cluster.id, job_state, reason)
-            log.error(msg)
-            # check for invalid fallback IAM roles
-            if any(reason.rstrip().endswith('/%s is invalid' % role)
-                   for role in (FALLBACK_INSTANCE_PROFILE,
-                                FALLBACK_SERVICE_ROLE)):
-                msg += (
-                    '\n\n'
-                    'Ask your admin to create the default EMR roles'
-                    ' by following:\n\n'
-                    '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
-                    '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
+            if tunnel_config['name'] == 'job tracker':
+                map_progress, reduce_progress = (
+                    _parse_progress_from_job_tracker(tunnel_html))
+                if map_progress is not None:
+                    log.info('   map %3d%% reduce %3d%%' % (
+                        map_progress, reduce_progress))
             else:
-                if self._s3_job_log_uri:
-                    log.info('Logs are in %s' % self._s3_job_log_uri)
-                # look for a Python traceback
-                cause = self._find_probable_cause_of_failure(
-                    step_nums, sorted(lg_step_num_mapping.values()))
-                if cause:
-                    # log cause, and put it in exception
-                    cause_msg = []  # lines to log and put in exception
-                    cause_msg.append('Probable cause of failure (from %s):' %
-                                     cause['log_file_uri'])
-                    cause_msg.extend(
-                        line.strip('\n') for line in cause['lines'])
+                progress = _parse_progress_from_resource_manager(
+                    tunnel_html)
+                if progress is not None:
+                    log.info('   %5.1f%% complete' % progress)
+        finally:
+            if tunnel_handle is not None:
+                tunnel_handle.close()
 
-                    if cause['input_uri']:
-                        cause_msg.append('(while reading from %s)' %
-                                         cause['input_uri'])
+    def _check_for_missing_default_iam_roles(self):
+        """If cluster couldn't start due to missing IAM roles, tell
+        user what to do."""
+        cluster = self._describe_cluster()
 
-                    for line in cause_msg:
-                        log.error(line)
-
-                    # add cause_msg to exception message
-                    msg += '\n' + '\n'.join(cause_msg) + '\n'
-
-            raise Exception(msg)
+        reason = getattr(
+            getattr(cluster.status, 'statechangereason' ,''),
+            'message', '')
+        if any(reason.rstrip().endswith('/%s is invalid' % role)
+               for role in (FALLBACK_INSTANCE_PROFILE,
+                            FALLBACK_SERVICE_ROLE)):
+            log.warning(
+                '\n\n'
+                'Ask your admin to create the default EMR roles'
+                ' by following:\n\n'
+                '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
+                '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
 
     def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
@@ -1679,99 +1714,196 @@ class EMRJobRunner(MRJobRunner):
 
     ## LOG PARSING ##
 
-    def _fetch_counters(self, step_nums, lg_step_num_mapping=None,
-                        skip_s3_wait=False):
-        """Read Hadoop counters from S3.
+    def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name=None,
+                         ssh_to_slaves=False):
+        """Stream log dirs for the given kind of log.
 
-        Args:
-        step_nums -- the steps belonging to us, so that we can ignore counters
-                     from other jobs when sharing a job flow
+        Our general strategy is first, if SSH is enabled, to SSH into the
+        master node (and possibly slaves, if *ssh_to_slaves* is set).
+
+        If this doesn't work, we have to look on S3. If the cluster is
+        TERMINATING, we first wait for it to terminate (since that
+        will trigger copying logs over).
         """
-        # empty list is a valid value for lg_step_nums, but it is an optional
-        # parameter
-        if lg_step_num_mapping is None:
-            lg_step_num_mapping = dict((n, n) for n in step_nums)
-        lg_step_nums = sorted(
-            lg_step_num_mapping[k] for k in step_nums
-            if k in lg_step_num_mapping)
+        if self._ssh_fs:
+            ssh_host = self._address_of_master()
+            if ssh_host:
+                hosts = [ssh_host]
+                host_desc = ssh_host
+                if ssh_to_slaves:
+                    try:
+                        hosts.extend(self.fs.ssh_slave_hosts(ssh_host))
+                        host_desc += ' and task/core nodes'
+                    except IOError:
+                        log.warning('Could not get slave addresses for %s' %
+                                    ssh_host)
 
-        self._counters = []
-        new_counters = {}
+                path = posixpath.join(_EMR_HADOOP_LOG_DIR, dir_name)
+                log.info('Looking for %s in %s on %s...' % (
+                    log_desc, path, host_desc))
+                yield ['ssh://%s%s%s' % (
+                    ssh_host, '!' + host if host != ssh_host else '',
+                    path) for host in hosts]
 
-        # TODO: do we need this?
-        if not skip_s3_wait:
-            self._wait_for_s3_eventual_consistency()
+            # wait for logs to be on S3
+            self._wait_for_terminating_cluster_to_terminate()
 
-        uris = self._ls_logs('job', lg_step_nums)
+            s3_log_uri = posixpath.join(
+                self._s3_log_dir(), (s3_dir_name or dir_name))
+            log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
 
-        if uris:
-            new_counters = scan_for_counters_in_files(
-                uris, self.fs, self.get_hadoop_version())
-        else:
+    def _wait_for_terminating_cluster_to_terminate(self):
+        """If the cluster is already terminating, wait for it to terminate,
+        so that logs will be transferred to S3.
+
+        Don't print anything unless cluster is in the TERMINATING state.
+        """
+        cluster = self._describe_cluster()
+
+        if cluster.status.state in (
+                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+            return  # already terminated
+
+        if cluster.status.state != 'TERMINATING':
+            return  # not going to terminate anytime soon
+
+        log.info('Waiting for cluster (%s) to terminate...' %
+                 cluster.id)
+
+        while True:
+            reason_desc = ''
+            reason = getattr(
+                getattr(cluster.status, 'statechangereason', ''),
+                'message', '')
+            if reason:
+                reason_desc = ': ' + reason
+
+            log.info('  %s%s' % (cluster.status.state, reason_desc))
+
+            if cluster.status.state in (
+                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                return
+
+            time.sleep(self._opts['check_emr_status_every'])
             cluster = self._describe_cluster()
-            if not self._cluster_is_done(cluster):
-                log.info("Counters may not have been uploaded to S3 yet.")
 
-        # step_nums is relative to the start of the job flow
-        # we only want them relative to the job
-        for step_num in step_nums:
-            if step_num in lg_step_num_mapping:
-                self._counters.append(
-                    new_counters.get(lg_step_num_mapping[step_num], {}))
-            else:
-                self._counters.append({})
+    # TODO: merge interpret/ls code with similar code in hadoop.py
+
+    ### history log ###
+
+    def _interpret_history_log(self, log_interpretation):
+        """Fetch history log and add 'history' to log_interpretation."""
+        if 'history' not in log_interpretation:
+            job_id = log_interpretation.get('step', {}).get('job_id')
+            if not job_id:
+                log.warning("Can't fetch history log without job ID")
+                return {}
+
+            log_interpretation['history'] = _interpret_history_log(
+                self.fs, self._ls_history_logs(job_id=job_id))
+
+        return log_interpretation['history']
+
+    def _ls_history_logs(self, job_id=None):
+        """Yield history log matches, logging a message for each one."""
+        for match in _ls_history_logs(
+                self.fs, self._stream_history_log_dirs(), job_id=job_id):
+            log.info('  Parsing history log: %s' % match['path'])
+            yield match
+
+    def _stream_history_log_dirs(self):
+        """Get lists of directories to look for the history log in."""
+        # in YARN, the history log lives on HDFS, which we currently
+        # don't have a way to access (see #990 for a possible solution), and
+        # isn't copied to S3
+        #
+        # Fortunately, in YARN, everything we want is in the step
+        # log anyway.
+        if uses_yarn(self.get_hadoop_version()):
+            return []
+
+        return self._stream_log_dirs(
+            'history log', dir_name='history', s3_dir_name='jobs')
+
+    ### step log ###
+
+    def _interpret_step_log(self, log_interpretation):
+        """Fetch step log and add 'step' to log_interpretation."""
+        if 'step' not in log_interpretation:
+            step_id = log_interpretation.get('step_id')
+            if not step_id:
+                log.warning("Can't fetch step log without step ID")
+                return {}
+
+            log_interpretation['step'] = _interpret_emr_step_log(
+                self.fs, self._ls_step_logs(step_id=step_id))
+
+        return log_interpretation['step']
+
+    def _ls_step_logs(self, step_id):
+        """Yield step log matches, logging a message for each one."""
+        for match in _ls_emr_step_logs(
+                self.fs, self._stream_step_log_dirs(step_id),
+                step_id=step_id):
+            log.info('  Parsing step log: %s' % match['path'])
+            yield match
+
+    def _stream_step_log_dirs(self, step_id):
+        """Get lists of directories to look for the step log in."""
+        dir_name = posixpath.join('steps', step_id)
+        return self._stream_log_dirs('step log', dir_name)
+
+    ### task logs ###
+
+    def _interpret_task_logs(self, log_interpretation):
+
+        def stderr_callback(stderr_path):
+            log.info('  Parsing task stderr: %s' % stderr_path)
+
+        if 'task' not in log_interpretation:
+            step_interpretation = log_interpretation.get('step') or {}
+            application_id = step_interpretation.get('application_id')
+            job_id = step_interpretation.get('job_id')
+
+            yarn = uses_yarn(self.get_hadoop_version())
+
+            if yarn and application_id is None:
+                log.warning("Can't fetch task logs without application ID")
+                return {}
+            elif not yarn and job_id is None:
+                log.warning("Can't fetch task logs without job ID")
+                return {}
+
+            log_interpretation['task'] = _interpret_task_logs(
+                self.fs, self._ls_task_syslogs(
+                    application_id=application_id, job_id=job_id),
+                stderr_callback=stderr_callback)
+
+        return log_interpretation['task']
+
+    def _ls_task_syslogs(self, application_id=None, job_id=None):
+        """Yield task log matches, logging a message for each one."""
+        for match in _ls_task_syslogs(
+                self.fs, self._stream_task_log_dirs(
+                    application_id=application_id),
+                application_id=application_id, job_id=job_id):
+            log.info('  Parsing task syslog: %s' % match['path'])
+            yield match
+
+    def _stream_task_log_dirs(self, application_id=None):
+        if application_id:
+            dir_name = posixpath.join('userlogs', application_id)
+            s3_dir_name = posixpath.join('task-attempts', application_id)
+        else:
+            dir_name = 'userlogs'
+            s3_dir_name = 'task-attempts'
+
+        return self._stream_log_dirs(
+            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
 
     def counters(self):
-        return self._counters
-
-    def _find_probable_cause_of_failure(self, step_nums, lg_step_nums=None):
-        """Scan logs for Python exception tracebacks.
-
-        :param step_nums: the numbers of steps belonging to us, so that we
-                          can ignore errors from other jobs when sharing a job
-                          flow
-        :param lg_step_nums: "Log generating step numbers" - list of
-                             (job flow step num, hadoop job num) mapping a job
-                             flow step number to the number hadoop sees.
-                             Necessary because not all steps generate task
-                             attempt logs, and when there are steps that don't,
-                             the number in the log path differs from the job
-                             flow step number.
-
-        Returns:
-        None (nothing found) or a dictionary containing:
-        lines -- lines in the log file containing the error message
-        log_file_uri -- the log file containing the error message
-        input_uri -- if the error happened in a mapper in the first
-            step, the URI of the input file that caused the error
-            (otherwise None)
-        """
-        if lg_step_nums is None:
-            lg_step_nums = step_nums
-
-        step_num_to_id = self._step_num_to_id()
-
-        task_attempt_logs = self._ls_logs('task', step_nums,
-                                          step_num_to_id=step_num_to_id)
-        step_logs = self._ls_logs('step', step_nums,
-                                  step_num_to_id=step_num_to_id)
-        job_logs = self._ls_logs('job', step_nums,
-                                 step_num_to_id=step_num_to_id)
-
-        return best_error_from_logs(
-            self.fs, task_attempt_logs, step_logs, job_logs)
-
-    def _ls_logs(self, log_type, step_nums=None, step_num_to_id=None):
-        # TODO: cache this as we go. We only need to know it if
-        # step_nums is set
-        if step_num_to_id is None:
-            step_num_to_id = self._step_num_to_id()
-
-        return ls_logs(self.fs, log_type,
-                       log_dir=self._log_dir(),
-                       ssh_host=self._address_of_master(),
-                       step_nums=step_nums,
-                       step_num_to_id=step_num_to_id)
+        return [_pick_counters(log_interpretation)
+                for log_interpretation in self._log_interpretations]
 
     ### Bootstrapping ###
 
@@ -2406,6 +2538,13 @@ class EMRJobRunner(MRJobRunner):
             self._store_cluster_info()
         return self._ami_version
 
+    def _address_of_master(self):
+        """Get the address of the master node so we can SSH to it"""
+        if not self._address:
+            self._store_cluster_info()
+
+        return self._address
+
     def _store_cluster_info(self):
         """Set self._ami_version and self._hadoop_version."""
         if not self._cluster_id:
@@ -2425,25 +2564,10 @@ class EMRJobRunner(MRJobRunner):
             if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs
                 self._hadoop_version = a.version
 
-        # TODO: could get masterpublicdnsname too
+        if cluster.status.state in ('RUNNING', 'WAITING'):
+            self._address = cluster.masterpublicdnsname
 
-    def _address_of_master(self, emr_conn=None):
-        """Get the address of the master node so we can SSH to it"""
-        # cache address of master to avoid redundant calls to describe_jobflow
-        # also convenient for testing (pretend we can SSH when we really can't
-        # by setting this to something not False)
-        if not self._address:
-            try:
-                cluster = self._describe_cluster()
-                if cluster.status.state not in ('RUNNING', 'WAITING'):
-                    return None
-                self._address = cluster.masterpublicdnsname
-            except boto.exception.S3ResponseError:
-                # Raised when cluster doesn't exist
-                pass
-
-        return self._address
-
+    # TODO: this is only used by mrboss; otherwise we do this through fs
     def _addresses_of_slaves(self):
         if not self._ssh_slave_addrs:
             self._ssh_slave_addrs = ssh_slave_addresses(

@@ -214,7 +214,7 @@ class LsLogsTestCase(TestCase):
             IOError(),
         ]
 
-        with no_handlers_for_logger('mrjob.logs.ls'):
+        with no_handlers_for_logger('mrjob.logs.wrap'):
             stderr = StringIO()
             log_to_stream('mrjob.logs.wrap', stderr)
 

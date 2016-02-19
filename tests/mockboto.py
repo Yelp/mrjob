@@ -113,7 +113,9 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 class MockBotoTestCase(SandboxedTestCase):
 
-    MAX_SIMULATION_STEPS = 100
+    # if a test needs to create an EMR connection more than this many
+    # times, there's probably a problem with simulating progress
+    MAX_EMR_CONNECTIONS = 100
 
     @classmethod
     def setUpClass(cls):
@@ -137,8 +139,8 @@ class MockBotoTestCase(SandboxedTestCase):
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
 
-        self.simulation_iterator = itertools.repeat(
-            None, self.MAX_SIMULATION_STEPS)
+        self.emr_conn_iterator = itertools.repeat(
+            None, self.MAX_EMR_CONNECTIONS)
 
         self.start(patch.object(boto, 'connect_s3', self.connect_s3))
         self.start(patch.object(boto, 'connect_iam', self.connect_iam))
@@ -155,13 +157,6 @@ class MockBotoTestCase(SandboxedTestCase):
         self.start(patch.object(
             EMRJobRunner, '_create_mrjob_tar_gz',
             fake_create_mrjob_tar_gz))
-
-        # TODO: why patch these, if sleep() is mocked out anyway?
-        self.start(patch.object(
-            EMRJobRunner, '_wait_for_s3_eventual_consistency'))
-
-        self.start(patch.object(
-            EMRJobRunner, '_wait_for_cluster_to_terminate'))
 
         self.start(patch.object(time, 'sleep'))
 
@@ -278,11 +273,16 @@ class MockBotoTestCase(SandboxedTestCase):
         return MockS3Connection(*args, **kwargs)
 
     def connect_emr(self, *args, **kwargs):
+        try:
+            next(self.emr_conn_iterator)
+        except StopIteration:
+            raise AssertionError(
+                'Too many connections to mock EMR, may be stalled')
+
         kwargs['mock_s3_fs'] = self.mock_s3_fs
         kwargs['mock_emr_clusters'] = self.mock_emr_clusters
         kwargs['mock_emr_failures'] = self.mock_emr_failures
         kwargs['mock_emr_output'] = self.mock_emr_output
-        kwargs['simulation_iterator'] = self.simulation_iterator
         return MockEmrConnection(*args, **kwargs)
 
     def connect_iam(self, *args, **kwargs):
@@ -600,8 +600,7 @@ class MockEmrConnection(object):
                  security_token=None,
                  mock_s3_fs=None, mock_emr_clusters=None,
                  mock_emr_failures=None, mock_emr_output=None,
-                 max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED,
-                 simulation_iterator=None):
+                 max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED):
         """Create a mock version of EmrConnection. Most of these args are
         the same as for the real EmrConnection, and are ignored.
 
@@ -634,9 +633,6 @@ class MockEmrConnection(object):
         :type max_days_ago: int
         :param max_days_ago: the maximum amount of days that EMR will go back
                              in time
-        :param simulation_iterator: we call ``next()`` on this each time
-                                    we simulate progress. If there is
-                                    no next element, we bail out.
         """
         # check this now; strs will cause problems later in Python 3
         if mock_emr_output and any(
@@ -649,7 +645,6 @@ class MockEmrConnection(object):
         self.mock_emr_failures = combine_values({}, mock_emr_failures)
         self.mock_emr_output = combine_values({}, mock_emr_output)
         self.max_clusters_returned = max_clusters_returned
-        self.simulation_iterator = simulation_iterator
 
         if region is not None:
             self.host = region.endpoint
@@ -967,6 +962,35 @@ class MockEmrConnection(object):
 
         return self.mock_emr_clusters[cluster_id]
 
+    def add_jobflow_steps(self, jobflow_id, steps, now=None):
+        self._enforce_strict_ssl()
+
+        if now is None:
+            now = datetime.utcnow()
+
+        cluster = self._get_mock_cluster(jobflow_id)
+
+        for step in steps:
+            step_config = MockEmrObject(
+                args=[MockEmrObject(value=a) for a in step.args()],
+                jar=step.jar(),
+                mainclass=step.main_class())
+            # there's also a "properties" field, but boto doesn't handle it
+
+            step_status = MockEmrObject(
+                state='PENDING',
+                timeline=MockEmrObject(
+                    creationdatetime=to_iso8601(now)),
+            )
+
+            cluster._steps.append(MockEmrObject(
+                actiononfailure=step.action_on_failure,
+                config=step_config,
+                id=('s-MOCKSTEP%d' % len(cluster._steps)),
+                name=step.name,
+                status=step_status,
+            ))
+
     def add_tags(self, resource_id, tags):
         """Simulate successful creation of new metadata tags for the specified
         resource id.
@@ -997,9 +1021,35 @@ class MockEmrConnection(object):
     def describe_cluster(self, cluster_id):
         self._enforce_strict_ssl()
 
+        cluster = self._get_mock_cluster(cluster_id)
+
+        if cluster.status.state == 'TERMINATING':
+            # simulate progress, to support
+            # _wait_for_terminating_cluster_to_terminate()
+            self.simulate_progress(cluster_id)
+
+        return cluster
+
+    def describe_step(self, cluster_id, step_id):
+        self._enforce_strict_ssl()
+
+        # simulate progress, to support _wait_for_steps_to_complete()
         self.simulate_progress(cluster_id)
 
-        return self._get_mock_cluster(cluster_id)
+        # make sure that we only call list_steps() when we've patched
+        # around https://github.com/boto/boto/issues/3268
+        if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
+            raise Exception('called un-patched version of describe_step()!')
+
+        cluster = self._get_mock_cluster(cluster_id)
+
+        for step in cluster._steps:
+            if step.id == step_id:
+                return step
+
+        raise boto.exception.EmrResponseError(
+            400, 'Bad Request', body=err_xml(
+                "Step id '%s' is not valid." % step_id))
 
     def list_bootstrap_actions(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
@@ -1068,7 +1118,7 @@ class MockEmrConnection(object):
 
         # make sure that we only call list_steps() when we've patched
         # around https://github.com/boto/boto/issues/3268
-        if 'StartDateTime' not in boto.emr.connection.ClusterTimeline.Fields:
+        if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
             raise Exception('called un-patched version of list_steps()!')
 
         if marker is not None:
@@ -1083,35 +1133,6 @@ class MockEmrConnection(object):
                 steps_listed.append(step)
 
         return MockEmrObject(steps=steps_listed)
-
-    def add_jobflow_steps(self, jobflow_id, steps, now=None):
-        self._enforce_strict_ssl()
-
-        if now is None:
-            now = datetime.utcnow()
-
-        cluster = self._get_mock_cluster(jobflow_id)
-
-        for step in steps:
-            step_config = MockEmrObject(
-                args=[MockEmrObject(value=a) for a in step.args()],
-                jar=step.jar(),
-                mainclass=step.main_class())
-            # there's also a "properties" field, but boto doesn't handle it
-
-            step_status = MockEmrObject(
-                state='PENDING',
-                timeline=MockEmrObject(
-                    creationdatetime=to_iso8601(now)),
-            )
-
-            cluster._steps.append(MockEmrObject(
-                actiononfailure=step.action_on_failure,
-                config=step_config,
-                id='s-FAKE',
-                name=step.name,
-                status=step_status,
-            ))
 
     def terminate_jobflow(self, jobflow_id):
         self._enforce_strict_ssl()
@@ -1159,15 +1180,12 @@ class MockEmrConnection(object):
         if now is None:
             now = datetime.utcnow()
 
-        # don't allow simulating forever
-        if self.simulation_iterator:
-            try:
-                next(self.simulation_iterator)
-            except StopIteration:
-                raise AssertionError(
-                    'Simulated progress too many times; bailing out')
-
         cluster = self._get_mock_cluster(cluster_id)
+
+        # allow clusters to get stuck
+        if getattr(cluster, 'delay_progress_simulation', 0) > 0:
+            cluster.delay_progress_simulation -= 1
+            return
 
         # this code is pretty loose about updating statechangereason
         # (for the cluster, instance groups, and steps). Add this as needed.
@@ -1192,7 +1210,10 @@ class MockEmrConnection(object):
 
         # if job is TERMINATING, move along to terminated
         if cluster.status.state == 'TERMINATING':
-            if cluster.status.statechangereason.code == 'STEP_FAILURE':
+            code = getattr(getattr(cluster.status, 'statechangereason', None),
+                'code', None)
+
+            if code == 'STEP_FAILURE':
                 cluster.status.state = 'TERMINATED_WITH_ERRORS'
             else:
                 cluster.status.state = 'TERMINATED'
@@ -1213,10 +1234,6 @@ class MockEmrConnection(object):
             if step.status.state in (
                     'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED'):
                 continue
-
-            # allow steps to get stuck
-            if getattr(step, 'mock_no_progress', None):
-                return
 
             # found currently running step! handle it, then exit
 
@@ -1265,7 +1282,9 @@ class MockEmrConnection(object):
                     (cluster_id, step_num))
 
             # done!
-            return
+            # if this is the last step, continue to autotermination code, below
+            if step_num < len(cluster._steps) - 1:
+                return
 
         # no pending steps. should we wait, or shut down?
         if cluster.autoterminate == 'true':

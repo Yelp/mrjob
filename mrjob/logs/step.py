@@ -23,6 +23,15 @@ from mrjob.py2 import to_string
 from .ids import _add_implied_job_id
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
+from .wrap import _cat_log
+from .wrap import _ls_logs
+
+
+# path of step log (these only exist on EMR)
+_EMR_STEP_LOG_PATH_RE = re.compile(
+    r'^(?P<prefix>.*?/)'
+    r'(?P<step_id>s-[A-Z0-9]+)/'
+    r'syslog(?P<suffix>\.\w+)?')
 
 # hadoop streaming always prints "packageJobJar..." to stdout,
 # and prints Streaming Command Failed! to stderr on failure
@@ -53,7 +62,7 @@ _SUBMITTED_APPLICATION_RE = re.compile(
 _RUNNING_JOB_RE = re.compile(
     r'^Running job: (?P<job_id>job_\d+_\d{4})\s*$')
 
-# YARN prints this (followed by a Java exception) when tasks fail
+# YARN prints this (sometimes followed by a Java exception) when tasks fail
 _TASK_ATTEMPT_FAILED_RE = re.compile(
     r'^Task Id *:'
     r' (?P<attempt_id>attempt_\d+_\d{4}_[mr]_\d+_\d+),'
@@ -63,28 +72,49 @@ _TASK_ATTEMPT_FAILED_RE = re.compile(
 log = getLogger(__name__)
 
 
-# TODO: add error parsing
-def _parse_step_log(lines):
-    """Parse the syslog from the ``hadoop jar`` command.
+def _ls_emr_step_logs(fs, log_dir_stream, step_id=None):
+    """Yield matching step logs, optionally filtering by *step_id*.
+    Yields dicts with the keys:
 
-    Returns a dictionary which potentially contains the following keys:
-
-    application_id: a string like 'application_1449857544442_0002'. Only
-        set on YARN
-    counters: a map from counter group -> counter -> amount, or None if
-        no counters found (only YARN prints counters)
-    errors: a list of errors, with the following keys:
-        hadoop_error:
-            message: lines of error, as as string
-            start_line: first line of log containing the error (0-indexed)
-            num_lines: # of lines of log containing the error
-        attempt_id: ID of task attempt with this error
-    job_id: a string like 'job_201512112247_0003'. Should always be set
-    output_dir: a URI like 'hdfs:///user/hadoop/tmp/my-output-dir'. Should
-        always be set on success.
+    path: path/URI of step file
+    step_id: step_id in *path* (must match *step_id* if set)
     """
-    return _parse_step_log_from_log4j_records(
-        _parse_hadoop_log4j_records(lines))
+    return _ls_logs(fs, log_dir_stream, _match_emr_step_log_path,
+                    step_id=step_id)
+
+
+def _match_emr_step_log_path(path, step_id=None):
+    """Yields paths/URIs of all job history files in the given directories,
+    optionally filtering by *step_id*.
+    """
+    m = _EMR_STEP_LOG_PATH_RE.match(path)
+    if not m:
+        return None
+
+    if not (step_id is None or m.group('step_id') == step_id):
+        return None
+
+    return dict(step_id=m.group('step_id'))
+
+
+def _interpret_emr_step_log(fs, matches):
+    """Extract information from step log (see :py:func:`_parse_step_log()`)"""
+    # we expect to go through this loop 0 or 1 times
+    for match in matches:
+        path = match['path']
+
+        result = _parse_step_log(_cat_log(fs, path))
+
+        # add missing IDs and patch path into hadoop errors
+        _add_implied_job_id(result)
+        for error in result.get('errors') or ():
+            if 'hadoop_error' in error:
+                error['hadoop_error']['path'] = path
+            _add_implied_task_id(error)
+
+        return result
+
+    return {}  # whoops, no logs
 
 
 # TODO: possibly allow custom filters for non-log4j crud from other jars?
@@ -131,6 +161,29 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     return result
 
 
+def _parse_step_log(lines):
+    """Parse the syslog from the ``hadoop jar`` command.
+
+    Returns a dictionary which potentially contains the following keys:
+
+    application_id: a string like 'application_1449857544442_0002'. Only
+        set on YARN
+    counters: a map from counter group -> counter -> amount, or None if
+        no counters found (only YARN prints counters)
+    errors: a list of errors, with the following keys:
+        hadoop_error:
+            message: lines of error, as as string
+            start_line: first line of log containing the error (0-indexed)
+            num_lines: # of lines of log containing the error
+        attempt_id: ID of task attempt with this error
+    job_id: a string like 'job_201512112247_0003'. Should always be set
+    output_dir: a URI like 'hdfs:///user/hadoop/tmp/my-output-dir'. Should
+        always be set on success.
+    """
+    return _parse_step_log_from_log4j_records(
+        _parse_hadoop_log4j_records(lines))
+
+
 def _parse_step_log_from_log4j_records(records):
     """Pulls errors, counters, IDs, etc. from log4j records
     emitted by Hadoop.
@@ -171,6 +224,8 @@ def _parse_step_log_from_log4j_records(records):
         m = _TASK_ATTEMPT_FAILED_RE.match(message)
         if m:
             error_str = '\n'.join(message.splitlines()[1:])
+            if not error_str:  # if no exception, print something
+                error_str = message
 
             error = dict(
                 attempt_id=m.group('attempt_id'),

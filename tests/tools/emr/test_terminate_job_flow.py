@@ -35,4 +35,5 @@ class TerminateToolTestCase(ToolTestCase):
 
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
         cluster = patched_describe_cluster(emr_conn, cluster_id)
+        emr_conn.simulate_progress(cluster_id)
         self.assertEqual(cluster.status.state, 'TERMINATED')

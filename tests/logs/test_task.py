@@ -96,7 +96,6 @@ class MatchTaskSyslogPathTestCase(TestCase):
             None)
 
 
-# this indirectly tests _ls_task_syslogs() and .ids._sort_by_recency()
 class InterpretTaskLogsTestCase(PatcherTestCase):
 
     def setUp(self):
@@ -222,6 +221,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
     def test_syslog_with_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
+        mock_stderr_callback = Mock()
 
         self.mock_paths = [syslog_path, stderr_path]
 
@@ -230,23 +230,28 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             stderr_path: dict(message='because, exploding code')
         }
 
-        self.assertEqual(self.interpret_task_logs(), dict(
-            errors=[
-                dict(
-                    attempt_id='attempt_201512232143_0008_m_000001_3',
-                    hadoop_error=dict(
-                        message='BOOM',
-                        path=syslog_path,
+        self.assertEqual(
+            self.interpret_task_logs(stderr_callback=mock_stderr_callback),
+            dict(
+                errors=[
+                    dict(
+                        attempt_id='attempt_201512232143_0008_m_000001_3',
+                        hadoop_error=dict(
+                            message='BOOM',
+                            path=syslog_path,
+                        ),
+                        task_error=dict(
+                            message='because, exploding code',
+                            path=stderr_path,
+                        ),
+                        task_id='task_201512232143_0008_m_000001',
                     ),
-                    task_error=dict(
-                        message='because, exploding code',
-                        path=stderr_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000001',
-                ),
-            ],
-            partial=True,
-        ))
+                ],
+                partial=True,
+            )
+        )
+
+        mock_stderr_callback.assert_called_once_with(stderr_path)
 
     def test_yarn_syslog_with_error(self):
         # this works the same way as the other tests, except we get
@@ -288,6 +293,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         # never even looked at stderr, because no error in syslog
         self.assertEqual(self.mock_paths_catted, [syslog_path])
 
+    # indirectly tests _ls_task_syslogs() and its ability to sort by recency
     def test_multiple_logs(self):
         syslog1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         syslog2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/syslog'
@@ -322,17 +328,9 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         # try again, with partial=False
         self.mock_paths_catted = []
 
-        # no need to sort paths if scanning them all
+        # paths still get sorted by _ls_logs()
         self.assertEqual(self.interpret_task_logs(partial=False), dict(
             errors=[
-                dict(
-                    attempt_id='attempt_201512232143_0008_m_000001_3',
-                    hadoop_error=dict(
-                        message='BOOM1',
-                        path=syslog1_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000001',
-                ),
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
@@ -341,10 +339,19 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     ),
                     task_id='task_201512232143_0008_m_000002',
                 ),
+                dict(
+                    attempt_id='attempt_201512232143_0008_m_000001_3',
+                    hadoop_error=dict(
+                        message='BOOM1',
+                        path=syslog1_path,
+                    ),
+                    task_id='task_201512232143_0008_m_000001',
+                ),
             ],
         ))
 
-        self.assertEqual(self.mock_paths_catted, self.mock_paths)
+        self.assertEqual(self.mock_paths_catted,
+                         [syslog3_path, syslog2_path, syslog1_path])
 
     def test_pre_yarn_sorting(self):
         # NOTE: we currently don't have to handle errors from multiple
@@ -570,10 +577,50 @@ class ParseTaskStderrTestCase(TestCase):
     def test_error_without_leading_plus(self):
         lines = [
             'ERROR: something is terribly, terribly wrong\n',
+            'OH THE HORROR\n',
         ]
 
         self.assertEqual(
-            _parse_task_stderr(lines), None)
+            _parse_task_stderr(lines),
+            dict(
+                message=('ERROR: something is terribly, terribly wrong\n'
+                         'OH THE HORROR'),
+                start_line=0,
+                num_lines=2,
+            )
+        )
+
+    def test_log4j_init_warnings(self):
+        lines = [
+            'log4j:WARN No appenders could be found for logger'
+            ' (amazon.emr.metrics.MetricsSaver).\n',
+            'log4j:WARN Please initialize the log4j system properly.\n',
+            'log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html'
+            '#noconfig for more info.\n',
+        ]
+
+        self.assertEqual(_parse_task_stderr(lines), None)
+
+    def test_error_with_log4j_init_warnings(self):
+        lines = [
+            'ERROR: something is terribly, terribly wrong\n',
+            'OH THE HORROR\n',
+            'log4j:WARN No appenders could be found for logger'
+            ' (amazon.emr.metrics.MetricsSaver).\n',
+            'log4j:WARN Please initialize the log4j system properly.\n',
+            'log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html'
+            '#noconfig for more info.\n',
+        ]
+
+        self.assertEqual(
+            _parse_task_stderr(lines),
+            dict(
+                message=('ERROR: something is terribly, terribly wrong\n'
+                         'OH THE HORROR'),
+                start_line=0,
+                num_lines=2,
+            )
+        )
 
 
 class SyslogToStderrPathTestCase(TestCase):

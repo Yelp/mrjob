@@ -596,6 +596,7 @@ class MRJobRunner(object):
         """
         raise NotImplementedError
 
+    # TODO: move this to mrjob.logs.counters
     def _print_counters(self, step_nums=None):
         """Log this run's counters in a user-friendly way.
 

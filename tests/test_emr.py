@@ -149,7 +149,6 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             self.assertTrue(any(runner.fs.ls(runner.get_output_dir())))
 
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster.status.state, 'TERMINATED')
             name_match = JOB_KEY_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
@@ -213,8 +212,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
                 self.assertIsInstance(runner, EMRJobRunner)
 
                 self.assertRaises(Exception, runner.run)
-                # make sure job flow ID printed in error string
-                self.assertIn('Job on job flow j-MOCKCLUSTER0 failed',
+                self.assertIn('\n  FAILED\n',
                               stderr.getvalue())
 
                 emr_conn = runner.make_emr_conn()
@@ -250,7 +248,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             runner.run()
 
             # this is set and unset before we can get at it unless we do this
-            log_bucket, _ = parse_s3_uri(runner._s3_job_log_uri)
+            log_bucket, _ = parse_s3_uri(runner._s3_log_dir())
 
             list(runner.stream_output())
 
@@ -287,20 +285,6 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
                           'NONE,LOGS,REMOTE_TMP', 0, 0)
         self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
                           'GARBAGE', 0, 0)
-
-    def test_wait_for_cluster_to_terminate(self):
-        # Test regression from #338 where _wait_for_cluster_to_terminate()
-        # (called _wait_for_job_flow_termination() at the time)
-        # would raise an IndexError whenever the job flow wasn't already
-        # finished
-        mr_job = MRTwoStepJob(['-r', 'emr'])
-        mr_job.sandbox()
-        with mr_job.make_runner() as runner:
-            runner._add_job_files_for_upload()
-            runner._launch_emr_job()
-            runner._wait_for_cluster_to_terminate()
-
-
 
 
 class ExistingClusterTestCase(MockBotoTestCase):
@@ -1145,405 +1129,6 @@ def make_input_uri_line(input_uri):
             " Opening '%s' for reading\n" % input_uri).encode('utf_8')
 
 
-class FindProbableCauseOfFailureTestCase(MockBotoTestCase):
-
-    def setUp(self):
-        super(FindProbableCauseOfFailureTestCase, self).setUp()
-        self.make_runner()
-
-    def tearDown(self):
-        self.cleanup_runner()
-        super(FindProbableCauseOfFailureTestCase, self).tearDown()
-
-    # We're mostly concerned here that the right log files are read in the
-    # right order. parsing of the logs is handled by tests.parse_test
-    def make_runner(self):
-        self.add_mock_s3_data({'walrus': {}})
-        self.runner = EMRJobRunner(s3_sync_wait_time=0,
-                                   s3_tmp_dir='s3://walrus/tmp',
-                                   conf_paths=[])
-        self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
-
-        # need this to make step mapping work
-        self.runner._step_num_to_id = Mock(
-            return_value={1: 's-ONE', 2: 's-TWO', 3: 's-THREE', 4: 's-FOUR'})
-
-    def cleanup_runner(self):
-        self.runner.cleanup()
-
-    def test_empty(self):
-        self.add_mock_s3_data({'walrus': {}})
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
-                         None)
-
-    def test_python_exception(self):
-        self.add_mock_s3_data({'walrus': {
-            ATTEMPT_0_DIR + 'stderr':
-                GARBAGE + TRACEBACK_START + PY_EXCEPTION + GARBAGE,
-            ATTEMPT_0_DIR + 'syslog':
-                make_input_uri_line(BUCKET_URI + 'input.gz'),
-        }})
-        self.assertEqual(
-            self.runner._find_probable_cause_of_failure([1]),
-            {'lines': (TRACEBACK_START + PY_EXCEPTION).decode(
-                'ascii').splitlines(True),
-             'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
-             'input_uri': BUCKET_URI + 'input.gz'})
-
-    def test_python_exception_without_input_uri(self):
-        self.add_mock_s3_data({'walrus': {
-            ATTEMPT_0_DIR + 'stderr': (
-                GARBAGE + TRACEBACK_START + PY_EXCEPTION + GARBAGE),
-        }})
-        self.assertEqual(
-            self.runner._find_probable_cause_of_failure([1]),
-            {'lines': (TRACEBACK_START + PY_EXCEPTION).decode(
-                'ascii').splitlines(True),
-             'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'stderr',
-             'input_uri': None})
-
-    def test_java_exception(self):
-        self.add_mock_s3_data({'walrus': {
-            ATTEMPT_0_DIR + 'stderr': GARBAGE + GARBAGE,
-            ATTEMPT_0_DIR + 'syslog':
-                make_input_uri_line(BUCKET_URI + 'input.gz') +
-                GARBAGE +
-                CHILD_ERR_LINE +
-                JAVA_STACK_TRACE +
-                GARBAGE,
-        }})
-        self.assertEqual(
-            self.runner._find_probable_cause_of_failure([1]),
-            {'lines': JAVA_STACK_TRACE.decode('ascii').splitlines(True),
-             'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
-             'input_uri': BUCKET_URI + 'input.gz'})
-
-    def test_java_exception_without_input_uri(self):
-        self.add_mock_s3_data({'walrus': {
-            ATTEMPT_0_DIR + 'syslog':
-                CHILD_ERR_LINE +
-                JAVA_STACK_TRACE +
-                GARBAGE,
-        }})
-        self.assertEqual(
-            self.runner._find_probable_cause_of_failure([1]),
-            {'lines': JAVA_STACK_TRACE.decode('ascii').splitlines(True),
-             'log_file_uri': BUCKET_URI + ATTEMPT_0_DIR + 'syslog',
-             'input_uri': None})
-
-    def test_hadoop_streaming_error(self):
-        # we should look only at step 2 since the errors in the other
-        # steps are boring
-        #
-        # we include input.gz just to test that we DON'T check for it
-        self.add_mock_s3_data({'walrus': {
-            LOG_DIR + 'steps/s-ONE/syslog':
-                GARBAGE +
-                HADOOP_ERR_LINE_PREFIX + BORING_HADOOP_ERROR + b'\n',
-            LOG_DIR + 'steps/s-TWO/syslog':
-                GARBAGE +
-                make_input_uri_line(BUCKET_URI + 'input.gz') +
-                HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
-            LOG_DIR + 'steps/s-THREE/syslog':
-                HADOOP_ERR_LINE_PREFIX + BORING_HADOOP_ERROR + b'\n',
-        }})
-
-        self.assertEqual(
-            self.runner._find_probable_cause_of_failure([1, 2, 3]),
-            {'lines': [(USEFUL_HADOOP_ERROR + b'\n').decode('ascii')],
-             'log_file_uri': BUCKET_URI + LOG_DIR + 'steps/s-TWO/syslog',
-             'input_uri': None})
-
-    def test_later_task_attempt_steps_win(self):
-        # should look at later steps first
-        self.add_mock_s3_data({'walrus': {
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0001_r_000126_3/stderr':
-                TRACEBACK_START + PY_EXCEPTION,
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000004_0/syslog':
-                CHILD_ERR_LINE + JAVA_STACK_TRACE,
-        }})
-        failure = self.runner._find_probable_cause_of_failure([1, 2])
-        self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + TASK_ATTEMPTS_DIR +
-                         'attempt_201007271720_0002_m_000004_0/syslog')
-
-    def test_later_step_logs_win(self):
-        self.add_mock_s3_data({'walrus': {
-            LOG_DIR + 'steps/s-THREE/syslog':
-                HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
-            LOG_DIR + 'steps/s-FOUR/syslog':
-                HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
-        }})
-        failure = self.runner._find_probable_cause_of_failure([3, 4])
-        self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + LOG_DIR + 'steps/s-FOUR/syslog')
-
-    def test_reducer_beats_mapper(self):
-        # should look at reducers over mappers
-        self.add_mock_s3_data({'walrus': {
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0001_m_000126_3/stderr':
-                TRACEBACK_START + PY_EXCEPTION,
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0001_r_000126_3/syslog':
-                CHILD_ERR_LINE + JAVA_STACK_TRACE,
-        }})
-        failure = self.runner._find_probable_cause_of_failure([1])
-        self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + TASK_ATTEMPTS_DIR +
-                         'attempt_201007271720_0001_r_000126_3/syslog')
-
-    def test_more_attempts_win(self):
-        # look at fourth attempt before looking at first attempt
-        self.add_mock_s3_data({'walrus': {
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0001_m_000126_0/stderr':
-                TRACEBACK_START + PY_EXCEPTION,
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0001_m_000004_3/syslog':
-                CHILD_ERR_LINE + JAVA_STACK_TRACE,
-        }})
-        failure = self.runner._find_probable_cause_of_failure([1])
-        self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + TASK_ATTEMPTS_DIR +
-                         'attempt_201007271720_0001_m_000004_3/syslog')
-
-    def test_py_exception_beats_java_stack_trace(self):
-        self.add_mock_s3_data({'walrus': {
-            ATTEMPT_0_DIR + 'stderr': TRACEBACK_START + PY_EXCEPTION,
-            ATTEMPT_0_DIR + 'syslog': CHILD_ERR_LINE + JAVA_STACK_TRACE,
-        }})
-        failure = self.runner._find_probable_cause_of_failure([1])
-        self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + ATTEMPT_0_DIR + 'stderr')
-
-    def test_exception_beats_hadoop_error(self):
-        self.add_mock_s3_data({'walrus': {
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
-                TRACEBACK_START + PY_EXCEPTION,
-            LOG_DIR + 'steps/1/syslog':
-                HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
-        }})
-        failure = self.runner._find_probable_cause_of_failure([1, 2])
-        self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + TASK_ATTEMPTS_DIR +
-                         'attempt_201007271720_0002_m_000126_0/stderr')
-
-    def test_step_filtering(self):
-        # same as previous test, but step 2 is filtered out
-        self.add_mock_s3_data({'walrus': {
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
-                TRACEBACK_START + PY_EXCEPTION,
-            LOG_DIR + 'steps/s-ONE/syslog':
-                HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n',
-        }})
-        failure = self.runner._find_probable_cause_of_failure([1])
-        self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + LOG_DIR + 'steps/s-ONE/syslog')
-
-    def test_ignore_errors_from_steps_that_later_succeeded(self):
-        # This tests the fix for Issue #31
-        self.add_mock_s3_data({'walrus': {
-            ATTEMPT_0_DIR + 'stderr':
-                GARBAGE + TRACEBACK_START + PY_EXCEPTION + GARBAGE,
-            ATTEMPT_0_DIR + 'syslog':
-                make_input_uri_line(BUCKET_URI + 'input.gz'),
-            ATTEMPT_1_DIR + 'stderr': b'',
-            ATTEMPT_1_DIR + 'syslog':
-                make_input_uri_line(BUCKET_URI + 'input.gz'),
-        }})
-        self.assertEqual(self.runner._find_probable_cause_of_failure([1]),
-                         None)
-
-
-class CounterFetchingTestCase(MockBotoTestCase):
-
-    COUNTER_LINE = (
-        b'Job JOBID="job_201106092314_0001" FINISH_TIME="1307662284564"'
-        b' JOB_STATUS="SUCCESS" FINISHED_MAPS="0" FINISHED_REDUCES="0"'
-        b' FAILED_MAPS="0" FAILED_REDUCES="0" COUNTERS="'
-        b'{(org\.apache\.hadoop\.mapred\.JobInProgress$Counter)'
-        b'(Job Counters )'
-        b'[(TOTAL_LAUNCHED_REDUCES)(Launched reduce tasks)(1)]}'
-        b'" .')
-
-    def setUp(self):
-        super(CounterFetchingTestCase, self).setUp()
-        self.add_mock_s3_data({'walrus': {}})
-        kwargs = {
-            'ami_version': '2.4.9',  # counters have different format in 3.x
-            'conf_paths': [],
-            's3_tmp_dir': 's3://walrus/',
-            's3_sync_wait_time': 0}
-        with EMRJobRunner(**kwargs) as runner:
-            cluster_id = runner.make_persistent_cluster()
-
-        self.runner = EMRJobRunner(emr_job_flow_id=cluster_id, **kwargs)
-        self.mock_cluster = self.mock_emr_clusters[cluster_id]
-
-    def tearDown(self):
-        super(CounterFetchingTestCase, self).tearDown()
-        self.runner.cleanup()
-
-    def test_empty_counters_running_job(self):
-        self.mock_cluster.status.state = 'RUNNING'
-
-        with no_handlers_for_logger():
-            stderr = StringIO()
-            log_to_stream('mrjob.emr', stderr)
-            self.runner._fetch_counters([1], skip_s3_wait=True)
-            self.assertIn('Counters may not have been uploaded',
-                          stderr.getvalue())
-
-    def test_present_counters_running_job(self):
-        self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
-            self.COUNTER_LINE}})
-        self.mock_cluster.status.state = 'RUNNING'
-
-        self.runner._fetch_counters([1], skip_s3_wait=True)
-        self.assertEqual(self.runner.counters(),
-                         [{'Job Counters ': {'Launched reduce tasks': 1}}])
-
-    def test_present_counters_terminated_job(self):
-        self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
-            self.COUNTER_LINE}})
-        self.mock_cluster.status.state = 'TERMINATED'
-
-        self.runner._fetch_counters([1], skip_s3_wait=True)
-        self.assertEqual(self.runner.counters(),
-                         [{'Job Counters ': {'Launched reduce tasks': 1}}])
-
-    def test_present_counters_step_mismatch(self):
-        self.add_mock_s3_data({'walrus': {
-            'logs/j-MOCKCLUSTER0/jobs/job_0_1_hadoop_streamjob1.jar':
-            self.COUNTER_LINE}})
-        self.mock_cluster.status.state = 'RUNNING'
-
-        self.runner._fetch_counters([2], {2: 1}, skip_s3_wait=True)
-        self.assertEqual(self.runner.counters(),
-                         [{'Job Counters ': {'Launched reduce tasks': 1}}])
-
-    def _mock_step(self, jar, args=()):
-        return MockEmrObject(
-            config=MockEmrObject(jar=jar,
-                                 args=[MockEmrObject(value=a) for a in args]),
-            id='s-FAKE',
-            name=self.runner._job_key,
-            status=MockEmrObject(state='COMPLETED'))
-
-    def test_no_log_generating_steps(self):
-        self.mock_cluster.status.state = 'TERMINATED'
-        self.mock_cluster._steps = [
-            self._mock_step(jar='x.jar'),
-            self._mock_step(jar='x.jar'),
-        ]
-
-        self.runner._ls_logs = Mock(return_value={})
-
-        self.runner._wait_for_job_to_complete()
-        self.runner._ls_logs.assert_called_with('job', [])
-
-    def test_interleaved_log_generating_steps(self):
-        self.mock_cluster.status.state = 'TERMINATED'
-        self.mock_cluster._steps = [
-            self._mock_step(jar='x.jar'),
-            self._mock_step(jar='hadoop.streaming.jar', args=['-mapper']),
-            self._mock_step(jar='x.jar'),
-            # jar for 4.x steps don't have "streaming" in the name;
-            # look for -mapper in the args
-            self._mock_step(jar='command-runner.jar',
-                            args=['hadoop-streaming', '-mapper']),
-        ]
-
-        self.runner._ls_logs = Mock(return_value=[])
-
-        self.runner._wait_for_job_to_complete()
-
-        self.runner._ls_logs.assert_called_with('job', [1, 2])
-
-
-class LogFetchingFallbackTestCase(MockBotoTestCase):
-
-    def setUp(self):
-        super(LogFetchingFallbackTestCase, self).setUp()
-        # Make sure that SSH and S3 are accessed when we expect them to be
-        self.add_mock_s3_data({'walrus': {}})
-
-        self.runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp')
-        self.runner._s3_job_log_uri = BUCKET_URI + LOG_DIR
-        # need this to make step mapping work
-        self.runner._step_ids_for_cluster = Mock(
-            return_value=['s-ONE', 's-TWO', 's-THREE', 's-FOUR'])
-
-        self.prepare_runner_for_ssh(self.runner)
-
-    def tearDown(self):
-        super(LogFetchingFallbackTestCase, self).tearDown()
-        """This method assumes ``prepare_runner_for_ssh()`` was called. That
-        method isn't a "proper" setup method because it requires different
-        arguments for different tests.
-        """
-        self.runner.cleanup()
-
-    def test_exception_in_s3_logs_beats_ssh(self):
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/s-ONE')
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/userlogs')
-
-        # Put a log file and error into SSH
-        ssh_lone_log_path = posixpath.join(
-            SSH_LOG_ROOT, 'steps', 's-ONE', 'syslog')
-        mock_ssh_file('testmaster', ssh_lone_log_path,
-                      HADOOP_ERR_LINE_PREFIX + USEFUL_HADOOP_ERROR + b'\n')
-
-        # Put a 'more interesting' error in S3
-        self.add_mock_s3_data({'walrus': {
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
-                TRACEBACK_START + PY_EXCEPTION,
-        }})
-        failure = self.runner._find_probable_cause_of_failure([1, 2])
-        self.assertEqual(failure['log_file_uri'],
-                         's3://walrus/' + TASK_ATTEMPTS_DIR +
-                         'attempt_201007271720_0002_m_000126_0/stderr')
-
-    def test_ssh_works_with_slaves(self):
-        self.add_slave()
-
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/steps/s-ONE')
-        mock_ssh_dir('testmaster', SSH_LOG_ROOT + '/history')
-        mock_ssh_dir(
-            'testmaster!testslave0',
-            SSH_LOG_ROOT + '/userlogs/attempt_201007271720_0002_m_000126_0')
-
-        # Put a log file and error into SSH
-        ssh_log_path = posixpath.join(SSH_LOG_ROOT, 'userlogs',
-                                      'attempt_201007271720_0002_m_000126_0',
-                                      'stderr')
-        ssh_log_path_2 = posixpath.join(SSH_LOG_ROOT, 'userlogs',
-                                        'attempt_201007271720_0002_m_000126_0',
-                                        'syslog')
-        mock_ssh_file('testmaster!testslave0', ssh_log_path,
-                      TRACEBACK_START + PY_EXCEPTION)
-        mock_ssh_file('testmaster!testslave0', ssh_log_path_2,
-                      b'')
-        failure = self.runner._find_probable_cause_of_failure([1, 2])
-        self.assertEqual(failure['log_file_uri'],
-                         SSH_PREFIX + 'testmaster!testslave0' + ssh_log_path)
-
-    def test_ssh_fails_to_s3(self):
-        # the runner will try to use SSH and find itself unable to do so,
-        # triggering S3 fetching.
-        self.runner._address = None
-
-        # Put a different error into S3
-        self.add_mock_s3_data({'walrus': {
-            TASK_ATTEMPTS_DIR + 'attempt_201007271720_0002_m_000126_0/stderr':
-                TRACEBACK_START + PY_EXCEPTION,
-        }})
-        failure = self.runner._find_probable_cause_of_failure([1, 2])
-        self.assertEqual(failure['log_file_uri'],
-                         BUCKET_URI + TASK_ATTEMPTS_DIR +
-                         'attempt_201007271720_0002_m_000126_0/stderr')
-
-
 class TestEMREndpoints(MockBotoTestCase):
 
     def test_default_region(self):
@@ -2010,6 +1595,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             self.assertEqual(jf_hash, runner._pool_hash())
             self.assertEqual(jf_name, runner._opts['emr_job_flow_pool_name'])
 
+            emr_conn.simulate_progress(runner.get_cluster_id())
             cluster = runner._describe_cluster()
             self.assertEqual(cluster.status.state, 'WAITING')
 
@@ -2340,13 +1926,15 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_dont_join_idle_with_pending_steps(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 
-        self.mock_emr_clusters[cluster_id]._steps = [
+        cluster = self.mock_emr_clusters[cluster_id]
+
+        cluster._steps = [
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
                 config=MockEmrObject(args=[]),
-                mock_no_progress=True,
                 name='dummy',
                 status=MockEmrObject(state='PENDING'))]
+        cluster.delay_progress_simulation = 100  # keep step PENDING
 
         self.assertDoesNotJoin(cluster_id,
                                ['-r', 'emr', '--pool-emr-job-flows'])
@@ -3641,3 +3229,55 @@ class SetupLineEncodingTestCase(MockBotoTestCase):
                     self.assertIn(
                         call(runner._setup_wrapper_script_path, 'wb'),
                         m_open.mock_calls)
+
+
+class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(WaitForTerminatingClusterToTerminateTestCase, self).setUp()
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        self.runner = job.make_runner()
+        self.runner._launch()
+
+        self.cluster = self.mock_emr_clusters[self.runner._cluster_id]
+
+        self.mock_log = self.start(patch('mrjob.emr.log'))
+
+    def _test_silently_exits_on_state(self, state):
+        self.cluster.status.state = state
+
+        self.runner._wait_for_terminating_cluster_to_terminate()
+
+        self.assertEqual(self.runner._describe_cluster().status.state, state)
+        self.assertFalse(self.mock_log.info.called)
+
+    def test_starting(self):
+        self._test_silently_exits_on_state('STARTING')
+
+    def test_bootstrapping(self):
+        self._test_silently_exits_on_state('BOOTSTRAPPING')
+
+    def test_running(self):
+        self._test_silently_exits_on_state('RUNNING')
+
+    def test_waiting(self):
+        self._test_silently_exits_on_state('WAITING')
+
+    def test_terminating(self):
+        self.cluster.status.state = 'TERMINATING'
+        self.cluster.delay_progress_simulation = 1
+
+        self.runner._wait_for_terminating_cluster_to_terminate()
+
+        self.assertEqual(self.runner._describe_cluster().status.state,
+                         'TERMINATED')
+        self.assertTrue(self.mock_log.info.called)
+
+    def test_terminated(self):
+        self._test_silently_exits_on_state('TERMINATED')
+
+    def test_terminated_with_errors(self):
+        self._test_silently_exits_on_state('TERMINATED_WITH_ERRORS')

@@ -33,7 +33,6 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 
-from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import translate_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -867,17 +866,6 @@ class MRJobRunner(object):
 
         reducer, bash_wrap_reducer = self._render_substep(
             step_num, 'reducer')
-
-        if (combiner is not None and
-            not supports_combiners_in_hadoop_streaming(version)):
-
-            # krazy hack to support combiners on hadoop <0.20
-            bash_wrap_mapper = True
-            mapper = "%s | sort | %s" % (mapper, combiner)
-
-            # take the combiner away, hadoop will just be confused
-            combiner = None
-            bash_wrap_combiner = False
 
         if bash_wrap_mapper:
             mapper = bash_wrap(mapper)

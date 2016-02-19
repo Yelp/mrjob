@@ -715,18 +715,6 @@ def translate_jobconf_dict(jobconf, hadoop_version=None):
     return translated_jobconf
 
 
-def supports_combiners_in_hadoop_streaming(version):
-    """Return ``True`` if this version of Hadoop Streaming supports combiners
-    (i.e. >= 0.20.203), otherwise ``False``.
-
-    If version is empty, returns ``True``
-    """
-    if not version:
-        return True
-    else:
-        return version_gte(version, '0.20')
-
-
 def uses_yarn(version):
     """Basically, is this Hadoop 2? This also handles versions in the
     zero series (0.23+) where YARN originated."""

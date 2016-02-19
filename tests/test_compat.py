@@ -20,7 +20,6 @@ from distutils.version import LooseVersion
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env
 from mrjob.compat import map_version
-from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_yarn
@@ -124,19 +123,7 @@ class TranslateJobConfTestCase(TestCase):
                          ['foo.bar'])
 
 
-class MiscCompatTestCase(TestCase):
-
-    def test_supports_combiners(self):
-        self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),
-                         False)
-        self.assertEqual(supports_combiners_in_hadoop_streaming('0.19.2'),
-                         False)
-        self.assertEqual(supports_combiners_in_hadoop_streaming('0.20'),
-                         True)
-        self.assertEqual(supports_combiners_in_hadoop_streaming('0.20.203'),
-                         True)
-        # default to True
-        self.assertEqual(supports_combiners_in_hadoop_streaming(None), True)
+class UsesYarnTestCase(TestCase):
 
     def test_uses_yarn(self):
         self.assertEqual(uses_yarn('0.22'), False)

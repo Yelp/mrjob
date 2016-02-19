@@ -17,8 +17,8 @@
 
 Usage::
 
-    mrjob terminate-job-flow [options] j-JOBFLOWID
-    python -m mrjob.tools.emr.terminate_job_flow [options] j-JOBFLOWID
+    mrjob terminate-job-flow [options] j-CLUSTERID
+    python -m mrjob.tools.emr.terminate_job_flow [options] j-CLUSTERID
 
 Terminate an existing EMR job flow.
 
@@ -74,7 +74,7 @@ def main(cl_args=None):
 
 
 def make_option_parser():
-    usage = '%prog [options] jobflowid'
+    usage = '%prog [options] cluster-id'
     description = 'Terminate an existing EMR job flow.'
 
     option_parser = OptionParser(usage=usage, description=description)

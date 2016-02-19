@@ -16,16 +16,16 @@ instances (1 master and 11 slaves), taking all other options from
 
     > python mrjob/tools/emr/create_job_flow.py --num-ec2-instances=12
     ...
-    Job flow created with ID: j-JOBFLOWID
+    Job flow created with ID: j-CLUSTERID
 
 
 You can then add jobs to the job flow with the :option:`--emr-job-flow-id`
 switch or the `emr_job_flow_id` variable in `mrjob.conf` (see
 :py:meth:`EMRJobRunner.__init__`)::
 
-    > python mr_my_job.py -r emr --emr-job-flow-id=j-JOBFLOWID input_file.txt > out
+    > python mr_my_job.py -r emr --emr-job-flow-id=j-CLUSTERID input_file.txt > out
     ...
-    Adding our job to job flow j-JOBFLOWID
+    Adding our job to job flow j-CLUSTERID
     ...
 
 Debugging will be difficult unless you complete SSH setup (see
@@ -222,7 +222,7 @@ install it and use it as ``python_bin``::
 Run your job in a persistent job flow. When it fails, you can SSH to your nodes
 to inspect the core dump files::
 
-    you@local: emr --ssh j-MYJOBFLOWID
+    you@local: emr --ssh j-MYCLUSTERID
 
     hadoop@ip-10-160-75-214:~$ gdb `which python` /tmp/cores/core.python.blah
 

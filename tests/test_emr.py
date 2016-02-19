@@ -1086,7 +1086,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 BUCKET = 'walrus'
 BUCKET_URI = 's3://' + BUCKET + '/'
 
-LOG_DIR = 'j-JOBFLOWID/'
+LOG_DIR = 'j-CLUSTERID/'
 
 GARBAGE = \
 b"""GarbageGarbageGarbage
@@ -1527,7 +1527,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
     def make_pooled_cluster(self, name=None, minutes_ago=0, **kwargs):
         """Returns ``(runner, cluster_id)``. Set minutes_ago to set
-        ``jobflow.startdatetime`` to seconds before
+        ``cluster.startdatetime`` to seconds before
         ``datetime.datetime.now()``."""
         runner = EMRJobRunner(pool_emr_job_flows=True,
                               emr_job_flow_pool_name=name,
@@ -2892,7 +2892,7 @@ class ActionOnFailureTestCase(MockBotoTestCase):
                          'TERMINATE_CLUSTER')
 
     def test_default_with_job_flow_id(self):
-        runner = EMRJobRunner(emr_job_flow_id='j-JOBFLOW')
+        runner = EMRJobRunner(emr_job_flow_id='j-CLUSTER')
         self.assertEqual(runner._action_on_failure,
                          'CANCEL_AND_WAIT')
 

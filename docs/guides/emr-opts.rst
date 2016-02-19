@@ -703,8 +703,7 @@ MRJob uses boto to manipulate/access S3.
 
     Where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for
     your job flow will go into a subdirectory, e.g.
-    ``s3://yourbucket/logs/j-JOBFLOWID/``. in this example
-    s3://yourbucket/logs/j-YOURJOBID/).
+    ``s3://yourbucket/logs/j-CLUSTERID/``.
 
 .. mrjob-opt::
     :config: s3_tmp_dir

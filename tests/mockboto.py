@@ -1170,10 +1170,11 @@ class MockEmrConnection(object):
 
     def simulate_progress(self, cluster_id, now=None):
         """Simulate progress on the given job flow. This is automatically
-        run when we call describe_jobflow().
+        run when we call :py:meth:`describe_step`, and, when the cluster is
+        ``TERMINATING``, :py:meth:`describe_cluster`.
 
-        :type jobflow_id: str
-        :param jobflow_id: fake job flow ID
+        :type cluster_id: str
+        :param cluster_id: fake cluster ID
         :type now: py:class:`datetime.datetime`
         :param now: alternate time to use as the current time (should be UTC)
         """

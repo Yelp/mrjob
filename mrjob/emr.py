@@ -1162,7 +1162,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _create_instance_group(self, role, instance_type, count, bid_price):
         """Helper method for creating instance groups. For use when
-        creating a jobflow using a list of InstanceGroups, instead
+        creating a cluster using a list of InstanceGroups, instead
         of the typical triumverate of
         num_instances/master_instance_type/slave_instance_type.
 
@@ -1471,8 +1471,8 @@ class EMRJobRunner(MRJobRunner):
             return _PRE_4_X_STREAMING_JAR, []
 
     def _launch_emr_job(self):
-        """Create an empty jobflow on EMR, and set self._cluster_id to
-        the ID for that job."""
+        """Create an empty cluster on EMR, and set self._cluster_id to
+        its ID."""
         self._create_s3_tmp_bucket_if_needed()
         emr_conn = self.make_emr_conn()
 

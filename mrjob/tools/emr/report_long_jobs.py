@@ -117,7 +117,7 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
     For each job that is running or pending longer than *min_time*, yields
     a dictionary with the following keys:
 
-    * *job_flow_id*: the job flow's unique ID (e.g. ``j-SOMEJOBFLOW``)
+    * *job_flow_id*: the job flow's unique ID (e.g. ``j-SOMECLUSTER``)
     * *name*: name of the step, or the job flow when bootstrapping
     * *state*: state of the step (``'RUNNING'`` or ``'PENDING'``) or, if there
                is no step, the cluster (``'STARTING'`` or ``'BOOTSTRAPPING'``)

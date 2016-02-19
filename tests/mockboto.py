@@ -113,7 +113,9 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 class MockBotoTestCase(SandboxedTestCase):
 
-    MAX_SIMULATION_STEPS = 100
+    # if a test needs to create an EMR connection more than this many
+    # times, there's probably a problem with simulating progress
+    MAX_EMR_CONNECTIONS = 100
 
     @classmethod
     def setUpClass(cls):
@@ -137,8 +139,8 @@ class MockBotoTestCase(SandboxedTestCase):
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
 
-        self.simulation_iterator = itertools.repeat(
-            None, self.MAX_SIMULATION_STEPS)
+        self.emr_conn_iterator = itertools.repeat(
+            None, self.MAX_EMR_CONNECTIONS)
 
         self.start(patch.object(boto, 'connect_s3', self.connect_s3))
         self.start(patch.object(boto, 'connect_iam', self.connect_iam))
@@ -271,11 +273,16 @@ class MockBotoTestCase(SandboxedTestCase):
         return MockS3Connection(*args, **kwargs)
 
     def connect_emr(self, *args, **kwargs):
+        try:
+            next(self.emr_conn_iterator)
+        except StopIteration:
+            raise AssertionError(
+                'Too many connections to mock EMR, may be stalled')
+
         kwargs['mock_s3_fs'] = self.mock_s3_fs
         kwargs['mock_emr_clusters'] = self.mock_emr_clusters
         kwargs['mock_emr_failures'] = self.mock_emr_failures
         kwargs['mock_emr_output'] = self.mock_emr_output
-        kwargs['simulation_iterator'] = self.simulation_iterator
         return MockEmrConnection(*args, **kwargs)
 
     def connect_iam(self, *args, **kwargs):
@@ -593,8 +600,7 @@ class MockEmrConnection(object):
                  security_token=None,
                  mock_s3_fs=None, mock_emr_clusters=None,
                  mock_emr_failures=None, mock_emr_output=None,
-                 max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED,
-                 simulation_iterator=None):
+                 max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED):
         """Create a mock version of EmrConnection. Most of these args are
         the same as for the real EmrConnection, and are ignored.
 
@@ -627,9 +633,6 @@ class MockEmrConnection(object):
         :type max_days_ago: int
         :param max_days_ago: the maximum amount of days that EMR will go back
                              in time
-        :param simulation_iterator: we call ``next()`` on this each time
-                                    we simulate progress. If there is
-                                    no next element, we bail out.
         """
         # check this now; strs will cause problems later in Python 3
         if mock_emr_output and any(
@@ -642,7 +645,6 @@ class MockEmrConnection(object):
         self.mock_emr_failures = combine_values({}, mock_emr_failures)
         self.mock_emr_output = combine_values({}, mock_emr_output)
         self.max_clusters_returned = max_clusters_returned
-        self.simulation_iterator = simulation_iterator
 
         if region is not None:
             self.host = region.endpoint
@@ -1168,14 +1170,6 @@ class MockEmrConnection(object):
         """
         if now is None:
             now = datetime.utcnow()
-
-        # don't allow simulating forever
-        if self.simulation_iterator:
-            try:
-                next(self.simulation_iterator)
-            except StopIteration:
-                raise AssertionError(
-                    'Simulated progress too many times; bailing out')
 
         cluster = self._get_mock_cluster(cluster_id)
 

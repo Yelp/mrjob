@@ -593,9 +593,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         self.runner._add_job_files_for_upload()
 
         self.start(patch.object(self.runner, '_upload_args',
-                                return_value=['new_upload_args']))
-        self.start(patch.object(self.runner, '_pre_0_20_upload_args',
-                                return_value=['old_upload_args']))
+                                return_value=['upload_args']))
         self.start(patch.object(self.runner, '_hadoop_args_for_step',
                                 return_value=['hadoop_args_for_step']))
         self.start(patch.object(self.runner, '_hdfs_step_input_files',
@@ -608,29 +606,15 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
         self._new_basic_args = [
             'hadoop', 'jar', 'streaming.jar',
-             'new_upload_args', 'hadoop_args_for_step',
+             'upload_args', 'hadoop_args_for_step',
              '-input', 'hdfs_step_input_files',
              '-output', 'hdfs_step_output_dir']
-
-        self._old_basic_args = [
-            'hadoop', 'jar', 'streaming.jar',
-             'hadoop_args_for_step',
-             '-input', 'hdfs_step_input_files',
-             '-output', 'hdfs_step_output_dir',
-             'old_upload_args']
 
     def _assert_streaming_step(self, step, args):
         self.runner._steps = [step]
         self.assertEqual(
             self.runner._args_for_streaming_step(0),
             self._new_basic_args + args)
-
-    def _assert_streaming_step_old(self, step, args):
-        HadoopFilesystem.get_hadoop_version.return_value = '0.18'
-        self.runner._steps = [step]
-        self.assertEqual(
-            self.runner._args_for_streaming_step(0),
-            self._old_basic_args + args)
 
     def test_basic_mapper(self):
         self._assert_streaming_step(

@@ -27,7 +27,6 @@ except ImportError:
     pty = None
 
 import mrjob.step
-from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -480,11 +479,9 @@ class HadoopJobRunner(MRJobRunner):
 
         args = self.get_hadoop_bin() + ['jar', hadoop_streaming_jar]
 
-        # -files/-archives (generic options, new-style)
-        if supports_new_distributed_cache_options(version):
-            # set up uploading from HDFS to the working dir
-            args.extend(
-                self._upload_args(self._upload_mgr))
+        # set up uploading from HDFS to the working dir
+        args.extend(
+            self._upload_args(self._upload_mgr))
 
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
@@ -498,12 +495,6 @@ class HadoopJobRunner(MRJobRunner):
         # set up output
         args.append('-output')
         args.append(self._hdfs_step_output_dir(step_num))
-
-        # -cacheFile/-cacheArchive (streaming options, old-style)
-        if not supports_new_distributed_cache_options(version):
-            # set up uploading from HDFS to the working dir
-            args.extend(
-                self._pre_0_20_upload_args(self._upload_mgr))
 
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step_num))

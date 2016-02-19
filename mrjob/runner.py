@@ -1275,20 +1275,6 @@ class MRJobRunner(object):
 
         return args
 
-    def _pre_0_20_upload_args(self, upload_mgr):
-        """-files/-archive args for Hadoop prior to 0.20.203"""
-        args = []
-
-        for file_hash in self._arg_hash_paths('file', upload_mgr):
-            args.append('-cacheFile')
-            args.append(file_hash)
-
-        for archive_hash in self._arg_hash_paths('archive', upload_mgr):
-            args.append('-cacheArchive')
-            args.append(archive_hash)
-
-        return args
-
     def _invoke_sort(self, input_paths, output_path):
         """Use the local sort command to sort one or more input files. Raise
         an exception if there is a problem.

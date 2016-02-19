@@ -727,21 +727,6 @@ def supports_combiners_in_hadoop_streaming(version):
         return version_gte(version, '0.20')
 
 
-def supports_new_distributed_cache_options(version):
-    """Use ``-files`` and ``-archives`` instead of ``-cacheFile`` and
-    ``-cacheArchive``. If version is empty, returns ``True``
-    """
-    if not version:
-        return True
-    else:
-        # Although Hadoop 0.20 supports these options, that support is buggy:
-        # https://issues.apache.org/jira/browse/MAPREDUCE-2361
-        # https://issues.apache.org/jira/browse/HADOOP-6334
-        # The bug was fixed in Hadoop 0.20.203.0:
-        # http://hadoop.apache.org/common/docs/r0.20.203.0/releasenotes.html
-        return version_gte(version, '0.20.203')
-
-
 def uses_yarn(version):
     """Basically, is this Hadoop 2? This also handles versions in the
     zero series (0.23+) where YARN originated."""

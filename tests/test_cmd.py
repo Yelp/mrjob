@@ -15,6 +15,7 @@
 from mrjob import cmd
 from mrjob import launch
 from mrjob.tools.emr import audit_usage
+from mrjob.tools.emr import create_cluster
 from mrjob.tools.emr import create_job_flow
 from mrjob.tools.emr import report_long_jobs
 from mrjob.tools.emr import s3_tmpwatch
@@ -51,6 +52,9 @@ class CommandTestCase(TestCase):
 
     def test_audit_usage(self):
         self._test_main_call(audit_usage, 'audit-emr-usage')
+
+    def test_create_cluster(self):
+        self._test_main_call(create_cluster, 'create-cluster')
 
     def test_create_job_flow(self):
         self._test_main_call(create_job_flow, 'create-job-flow')

@@ -15,8 +15,8 @@
 """Test the create-job-flow script"""
 import sys
 
-from mrjob.tools.emr.create_job_flow import main as create_job_flow_main
-from mrjob.tools.emr.create_job_flow import runner_kwargs
+from mrjob.tools.emr.create_cluster import main as create_cluster_main
+from mrjob.tools.emr.create_cluster import runner_kwargs
 
 from tests.mockboto import MockEmrObject
 from tests.tools.emr import ToolTestCase
@@ -78,14 +78,14 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'visible_to_all_users': None,
              })
 
-    def test_create_job_flow(self):
+    def test_create_cluster(self):
         self.add_mock_s3_data({'walrus': {}})
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '--s3-sync-wait-time', '0',
             '--s3-tmp-dir', 's3://walrus/tmp')
         self.monkey_patch_stdout()
-        create_job_flow_main()
+        create_cluster_main()
         self.assertEqual(list(self.mock_emr_clusters.keys()),
                          ['j-MOCKCLUSTER0'])
         self.assertEqual(sys.stdout.getvalue(), b'j-MOCKCLUSTER0\n')
@@ -102,7 +102,7 @@ class JobFlowInspectionTestCase(ToolTestCase):
             '--emr-tag', 'tag_two=bar',
         )
         self.monkey_patch_stdout()
-        create_job_flow_main()
+        create_cluster_main()
         self.assertEqual(list(self.mock_emr_clusters.keys()),
                          ['j-MOCKCLUSTER0'])
 

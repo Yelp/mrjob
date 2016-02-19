@@ -549,7 +549,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertIn('-mapper', args)
             self.assertLess(args.index('-libjar'), args.index('-mapper'))
 
-        # make sure -jobconf made it through
+        # make sure -D (jobconf) made it through
         self.assertIn('-D', step_0_args)
         self.assertIn('x=y', step_0_args)
         self.assertIn('-D', step_1_args)
@@ -626,7 +626,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             },
             ['-mapper',
              PYTHON_BIN + ' my_job.py --step-num=0 --mapper',
-             '-jobconf',
+             '-D',
              'mapred.reduce.tasks=0'])
 
     def test_basic_reducer(self):
@@ -669,49 +669,6 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
              "bash -c 'grep something | " + PYTHON_BIN +
              " my_job.py --step-num=0 --reducer'"])
 
-    def test_combiner_018(self):
-        self._assert_streaming_step_old(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'command',
-                    'command': 'cat',
-                },
-                'combiner': {
-                    'type': 'script',
-                },
-            },
-            ["-mapper",
-             "bash -c 'cat | sort | " + PYTHON_BIN +
-             " my_job.py --step-num=0 --combiner'",
-             '-jobconf', 'mapred.reduce.tasks=0'])
-
-    def test_pre_filters_018(self):
-        self._assert_streaming_step_old(
-            {
-                'type': 'streaming',
-                'mapper': {
-                    'type': 'script',
-                    'pre_filter': 'grep anything',
-                },
-                'combiner': {
-                    'type': 'script',
-                    'pre_filter': 'grep nothing',
-                },
-                'reducer': {
-                    'type': 'script',
-                    'pre_filter': 'grep something',
-                },
-            },
-            ['-mapper',
-             "bash -c 'grep anything | " + PYTHON_BIN +
-             " my_job.py --step-num=0"
-             " --mapper | sort | grep nothing | " + PYTHON_BIN +
-             " my_job.py --step-num=0 --combiner'",
-             '-reducer',
-             "bash -c 'grep something | " + PYTHON_BIN +
-             " my_job.py --step-num=0 --reducer'"])
-
     def test_pre_filter_escaping(self):
         # ESCAPE ALL THE THINGS!!!
         self._assert_streaming_step(
@@ -727,7 +684,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
              " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
              PYTHON_BIN +
              " my_job.py --step-num=0 --mapper'",
-             '-jobconf', 'mapred.reduce.tasks=0'])
+             '-D', 'mapred.reduce.tasks=0'])
 
 
 class JarStepTestCase(MockHadoopTestCase):

@@ -1011,7 +1011,7 @@ class MRJob(MRJobLauncher):
     JOBCONF = {}
 
     def jobconf(self):
-        """``-jobconf`` args to pass to hadoop streaming. This should be a map
+        """``-D`` args to pass to hadoop streaming. This should be a map
         from property name to value.
 
         By default, this combines :option:`jobconf` options from the command

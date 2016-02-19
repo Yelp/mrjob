@@ -510,7 +510,7 @@ class HadoopJobRunner(MRJobRunner):
             args.append('-reducer')
             args.append(reducer)
         else:
-            args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
+            args.extend(['-D', 'mapred.reduce.tasks=0'])
 
         return args
 

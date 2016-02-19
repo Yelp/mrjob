@@ -489,14 +489,6 @@ class HadoopArgsTestCase(EmptyMrjobConfTestCase):
                               '-D', 'FOO=bar',
                               ])
 
-        job_0_18 = MRWordCount(jobconf_args + ['--hadoop-version', '0.18'])
-        with job_0_18.make_runner() as runner_0_18:
-            self.assertEqual(runner_0_18._hadoop_args_for_step(0),
-                             ['-jobconf', 'BAX=Arnold',
-                              '-jobconf', 'BAZ=qux',
-                              '-jobconf', 'FOO=bar',
-                              ])
-
     def test_empty_jobconf_values(self):
         # value of None means to omit that jobconf
         job = MRWordCount()

@@ -3244,7 +3244,7 @@ class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
 
         self.cluster = self.mock_emr_clusters[self.runner._cluster_id]
 
-        self.mock_log_info = self.start(patch('mrjob.emr.log.info'))
+        self.mock_log = self.start(patch('mrjob.emr.log'))
 
     def _test_silently_exits_on_state(self, state):
         self.cluster.status.state = state
@@ -3252,7 +3252,7 @@ class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
         self.runner._wait_for_terminating_cluster_to_terminate()
 
         self.assertEqual(self.runner._describe_cluster().status.state, state)
-        self.assertFalse(self.mock_log_info.called)
+        self.assertFalse(self.mock_log.info.called)
 
     def test_starting(self):
         self._test_silently_exits_on_state('STARTING')
@@ -3274,7 +3274,7 @@ class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
 
         self.assertEqual(self.runner._describe_cluster().status.state,
                          'TERMINATED')
-        self.assertTrue(self.mock_log_info.called)
+        self.assertTrue(self.mock_log.info.called)
 
     def test_terminated(self):
         self._test_silently_exits_on_state('TERMINATED')

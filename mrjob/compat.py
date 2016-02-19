@@ -749,14 +749,6 @@ def uses_020_counters(version):
     return version_gte(version, '0.20')
 
 
-def uses_generic_jobconf(version):
-    """Use ``-D`` instead of ``-jobconf``. Defaults to ``True`` if
-    *version* is empty."""
-    if not version:
-        return True
-    return version_gte(version, '0.20')
-
-
 def uses_yarn(version):
     """Basically, is this Hadoop 2? This also handles versions in the
     zero series (0.23+) where YARN originated."""

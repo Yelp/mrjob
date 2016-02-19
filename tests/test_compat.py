@@ -24,7 +24,6 @@ from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
-from mrjob.compat import uses_generic_jobconf
 from mrjob.compat import uses_yarn
 
 from tests.py2 import TestCase
@@ -139,15 +138,6 @@ class MiscCompatTestCase(TestCase):
                          True)
         # default to True
         self.assertEqual(supports_combiners_in_hadoop_streaming(None), True)
-
-
-    def test_uses_generic_jobconf(self):
-        self.assertEqual(uses_generic_jobconf('0.18'), False)
-        self.assertEqual(uses_generic_jobconf('0.20'), True)
-        self.assertEqual(uses_generic_jobconf('0.21'), True)
-
-        # default to True
-        self.assertEqual(uses_generic_jobconf(None), True)
 
     def test_cache_opts(self):
         self.assertEqual(supports_new_distributed_cache_options('0.18'), False)

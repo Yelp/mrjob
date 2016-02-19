@@ -35,7 +35,6 @@ from subprocess import check_call
 
 from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import translate_jobconf
-from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
@@ -1229,15 +1228,9 @@ class MRJobRunner(object):
         # the hadoop version
         jobconf = self._jobconf_for_step(step_num)
 
-        if uses_generic_jobconf(version):
-            for key, value in sorted(jobconf.items()):
-                if value is not None:
-                    args.extend(['-D', '%s=%s' % (key, value)])
-        # old-style jobconf
-        else:
-            for key, value in sorted(jobconf.items()):
-                if value is not None:
-                    args.extend(['-jobconf', '%s=%s' % (key, value)])
+        for key, value in sorted(jobconf.items()):
+            if value is not None:
+                args.extend(['-D', '%s=%s' % (key, value)])
 
         # partitioner
         if self._partitioner:

@@ -38,10 +38,10 @@ and ``inline`` runners to some degree.
     :set: all
     :default: ``{}``
 
-    ``-jobconf`` args to pass to hadoop streaming. This should be a map from
-    property name to value.  Equivalent to passing ``['-jobconf',
-    'KEY1=VALUE1', '-jobconf', 'KEY2=VALUE2', ...]`` to
-    :mrjob-opt:`hadoop_extra_args`.
+    ``-D`` args to pass to hadoop streaming. This should be a map from
+    property name to value.  Equivalent to passing ``['-D',
+    'KEY1=VALUE1', '-D', 'KEY2=VALUE2', ...]`` to
+    :mrjob-opt:`hadoop_extra_args`
 
 
 Options available to hadoop and emr runners

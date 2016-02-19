@@ -168,7 +168,8 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
     return ret
 
 
-# recognize hadoop streaming output
+### parsing job output/stderr ###
+
 _COUNTER_RE = re.compile(br'^reporter:counter:([^,]*),([^,]*),(-?\d+)$')
 _STATUS_RE = re.compile(br'^reporter:status:(.*)$')
 
@@ -218,6 +219,60 @@ def parse_mr_job_stderr(stderr, counters=None):
         other.append(to_string(line))
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
+
+
+def find_python_traceback(lines):
+    """Scan subprocess stderr for Python traceback."""
+    # Essentially, we detect the start of the traceback, and continue
+    # until we find a non-indented line, with some special rules for exceptions
+    # from subprocesses.
+
+    # Lines to pass back representing entire error found
+    all_tb_lines = []
+
+    # This is used to store a working list of lines in a single traceback
+    tb_lines = []
+
+    # This is used to store a working list of non-traceback lines between the
+    # current traceback and the previous one
+    non_tb_lines = []
+
+    # Track whether or not we are in a traceback rather than consuming the
+    # iterator
+    in_traceback = False
+
+    for line in lines:
+        # don't return bytes in Python 3
+        line = to_string(line)
+
+        if in_traceback:
+            tb_lines.append(line)
+
+            # If no indentation, this is the last line of the traceback
+            if line.lstrip() == line:
+                in_traceback = False
+
+                if line.startswith('subprocess.CalledProcessError'):
+                    # CalledProcessError may mean that the subprocess printed
+                    # errors to stderr which we can show the user
+                    all_tb_lines += non_tb_lines
+
+                all_tb_lines += tb_lines
+
+                # Reset all working lists
+                tb_lines = []
+                non_tb_lines = []
+        else:
+            if line.startswith('Traceback (most recent call last):'):
+                tb_lines.append(line)
+                in_traceback = True
+            else:
+                non_tb_lines.append(line)
+    if all_tb_lines:
+        return all_tb_lines
+    else:
+        return None
+
 
 
 ### job tracker/resource manager ###

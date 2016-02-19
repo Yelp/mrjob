@@ -742,13 +742,6 @@ def supports_new_distributed_cache_options(version):
         return version_gte(version, '0.20.203')
 
 
-def uses_020_counters(version):
-    """Does this version of Hadoop log counters the same way as Hadoop 0.20?"""
-    # TODO: YARN has a different counter style anyway; this probably belongs
-    # in log parsing code.
-    return version_gte(version, '0.20')
-
-
 def uses_yarn(version):
     """Basically, is this Hadoop 2? This also handles versions in the
     zero series (0.23+) where YARN originated."""

@@ -23,7 +23,6 @@ from datetime import datetime
 from functools import wraps
 from io import BytesIO
 
-from mrjob.compat import uses_020_counters
 from mrjob.compat import version_gte
 from mrjob.py2 import PY2
 from mrjob.py2 import ParseResult

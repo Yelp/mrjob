@@ -30,8 +30,9 @@ simulates several features of Hadoop, including:
 * ``mapreduce.task.output.dir``
 * ``mapreduce.task.partition``
 
-If you specify *hadoop_version* <= 0.18, the simulated environment variables
-will change to use the names corresponding with the older Hadoop version.
+If you specify *hadoop_version* of 0.20 or 1.x, the simulated environment
+variables will change to use the names corresponding with the older Hadoop
+version.
 
 See :py:class:`~mrjob.local.LocalMRJobRunner` for reference about its behavior.
 

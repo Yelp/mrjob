@@ -92,14 +92,12 @@ class JobConfFromDictTestCase(TestCase):
 class TranslateJobConfTestCase(TestCase):
 
     def test_translate_jobconf(self):
-        self.assertEqual(translate_jobconf('user.name', '0.18'),
+        self.assertEqual(translate_jobconf('user.name', '0.20'),
                          'user.name')
-        self.assertEqual(translate_jobconf('mapreduce.job.user.name', '0.18'),
-                         'user.name')
-        self.assertEqual(translate_jobconf('user.name', '0.19'),
+        self.assertEqual(translate_jobconf('mapreduce.job.user.name', '0.20'),
                          'user.name')
         self.assertEqual(
-            translate_jobconf('mapreduce.job.user.name', '0.19.2'),
+            translate_jobconf('mapreduce.job.user.name', '0.20.2'),
             'user.name')
         self.assertEqual(translate_jobconf('user.name', '0.21'),
                          'mapreduce.job.user.name')

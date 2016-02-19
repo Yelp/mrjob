@@ -581,9 +581,6 @@ class JobConfTestCase(TestCase):
         JOBCONF = {'hadoop_version': 1.0}
 
     class MRHadoopVersionJobConfJob2(MRJob):
-        JOBCONF = {'hadoop_version': 0.18}
-
-    class MRHadoopVersionJobConfJob3(MRJob):
         JOBCONF = {'hadoop_version': 0.20}
 
     def test_empty(self):
@@ -620,10 +617,7 @@ class JobConfTestCase(TestCase):
         self.assert_hadoop_version(self.MRHadoopVersionJobConfJob1, '1.0')
 
     def test_float_options_2(self):
-        self.assert_hadoop_version(self.MRHadoopVersionJobConfJob2, '0.18')
-
-    def test_float_options_3(self):
-        self.assert_hadoop_version(self.MRHadoopVersionJobConfJob3, '0.20')
+        self.assert_hadoop_version(self.MRHadoopVersionJobConfJob2, '0.20')
 
     def test_jobconf_method(self):
         mr_job = self.MRJobConfJob()

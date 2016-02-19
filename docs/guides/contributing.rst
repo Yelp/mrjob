@@ -104,10 +104,7 @@ mrjob's modules can be put in four categories:
   * :py:mod:`mrjob.compat`: Transparently handle differences between Hadoop
     versions
 
-  * :py:mod:`mrjob.logparsers`: Find interesting information (errors,
-    counters) in Hadoop logs (used by ``hadoop`` and ``emr`` runners)
-
-  * :py:mod:`mrjob.parse`: Parsing utilities for URIs, logs, command line
+  * :py:mod:`mrjob.parse`: Parsing utilities for URIs, command line
     options, etc.
 
   * :py:mod:`mrjob.util`: Utilities for dealing with files, command line

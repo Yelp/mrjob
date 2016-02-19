@@ -128,7 +128,7 @@ def add_runner_opts(opt_group, default_runner='local'):
         # http://hadoop.apache.org/mapreduce/docs/current/mapred-default.html
         opt_group.add_option(
             '--jobconf', dest='jobconf', default=[], action='append',
-            help=('-jobconf arg to pass through to hadoop streaming; should'
+            help=('-D arg to pass through to hadoop streaming; should'
                   ' take the form KEY=VALUE. You can use --jobconf multiple'
                   ' times.')),
 

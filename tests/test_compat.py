@@ -20,11 +20,8 @@ from distutils.version import LooseVersion
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env
 from mrjob.compat import map_version
-from mrjob.compat import supports_combiners_in_hadoop_streaming
-from mrjob.compat import supports_new_distributed_cache_options
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
-from mrjob.compat import uses_generic_jobconf
 from mrjob.compat import uses_yarn
 
 from tests.py2 import TestCase
@@ -95,14 +92,12 @@ class JobConfFromDictTestCase(TestCase):
 class TranslateJobConfTestCase(TestCase):
 
     def test_translate_jobconf(self):
-        self.assertEqual(translate_jobconf('user.name', '0.18'),
+        self.assertEqual(translate_jobconf('user.name', '0.20'),
                          'user.name')
-        self.assertEqual(translate_jobconf('mapreduce.job.user.name', '0.18'),
-                         'user.name')
-        self.assertEqual(translate_jobconf('user.name', '0.19'),
+        self.assertEqual(translate_jobconf('mapreduce.job.user.name', '0.20'),
                          'user.name')
         self.assertEqual(
-            translate_jobconf('mapreduce.job.user.name', '0.19.2'),
+            translate_jobconf('mapreduce.job.user.name', '0.20.2'),
             'user.name')
         self.assertEqual(translate_jobconf('user.name', '0.21'),
                          'mapreduce.job.user.name')
@@ -126,38 +121,7 @@ class TranslateJobConfTestCase(TestCase):
                          ['foo.bar'])
 
 
-class MiscCompatTestCase(TestCase):
-
-    def test_supports_combiners(self):
-        self.assertEqual(supports_combiners_in_hadoop_streaming('0.19'),
-                         False)
-        self.assertEqual(supports_combiners_in_hadoop_streaming('0.19.2'),
-                         False)
-        self.assertEqual(supports_combiners_in_hadoop_streaming('0.20'),
-                         True)
-        self.assertEqual(supports_combiners_in_hadoop_streaming('0.20.203'),
-                         True)
-        # default to True
-        self.assertEqual(supports_combiners_in_hadoop_streaming(None), True)
-
-
-    def test_uses_generic_jobconf(self):
-        self.assertEqual(uses_generic_jobconf('0.18'), False)
-        self.assertEqual(uses_generic_jobconf('0.20'), True)
-        self.assertEqual(uses_generic_jobconf('0.21'), True)
-
-        # default to True
-        self.assertEqual(uses_generic_jobconf(None), True)
-
-    def test_cache_opts(self):
-        self.assertEqual(supports_new_distributed_cache_options('0.18'), False)
-        self.assertEqual(supports_new_distributed_cache_options('0.20'), False)
-        self.assertEqual(
-            supports_new_distributed_cache_options('0.20.203'), True)
-
-        # default to True
-        self.assertEqual(
-            supports_new_distributed_cache_options(None), True)
+class UsesYarnTestCase(TestCase):
 
     def test_uses_yarn(self):
         self.assertEqual(uses_yarn('0.22'), False)

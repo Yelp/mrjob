@@ -33,9 +33,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 
-from mrjob.compat import supports_combiners_in_hadoop_streaming
 from mrjob.compat import translate_jobconf
-from mrjob.compat import uses_generic_jobconf
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
@@ -869,17 +867,6 @@ class MRJobRunner(object):
         reducer, bash_wrap_reducer = self._render_substep(
             step_num, 'reducer')
 
-        if (combiner is not None and
-            not supports_combiners_in_hadoop_streaming(version)):
-
-            # krazy hack to support combiners on hadoop <0.20
-            bash_wrap_mapper = True
-            mapper = "%s | sort | %s" % (mapper, combiner)
-
-            # take the combiner away, hadoop will just be confused
-            combiner = None
-            bash_wrap_combiner = False
-
         if bash_wrap_mapper:
             mapper = bash_wrap(mapper)
 
@@ -1229,15 +1216,9 @@ class MRJobRunner(object):
         # the hadoop version
         jobconf = self._jobconf_for_step(step_num)
 
-        if uses_generic_jobconf(version):
-            for key, value in sorted(jobconf.items()):
-                if value is not None:
-                    args.extend(['-D', '%s=%s' % (key, value)])
-        # old-style jobconf
-        else:
-            for key, value in sorted(jobconf.items()):
-                if value is not None:
-                    args.extend(['-jobconf', '%s=%s' % (key, value)])
+        for key, value in sorted(jobconf.items()):
+            if value is not None:
+                args.extend(['-D', '%s=%s' % (key, value)])
 
         # partitioner
         if self._partitioner:
@@ -1279,20 +1260,6 @@ class MRJobRunner(object):
         if archive_hash_paths:
             args.append('-archives')
             args.append(','.join(archive_hash_paths))
-
-        return args
-
-    def _pre_0_20_upload_args(self, upload_mgr):
-        """-files/-archive args for Hadoop prior to 0.20.203"""
-        args = []
-
-        for file_hash in self._arg_hash_paths('file', upload_mgr):
-            args.append('-cacheFile')
-            args.append(file_hash)
-
-        for archive_hash in self._arg_hash_paths('archive', upload_mgr):
-            args.append('-cacheArchive')
-            args.append(archive_hash)
 
         return args
 

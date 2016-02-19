@@ -112,13 +112,27 @@ def s3_tmpwatch(args):
     main(args)
 
 
-@command('terminate-idle-job-flows', 'Terminate idle EMR job flows')
+@command('terminate-idle-clusters', 'Terminate idle EMR clusters')
+def terminate_idle_clusters(args):
+    from mrjob.tools.emr.terminate_idle_clusters import main
+    main(args)
+
+
+# deprecated alias for terminate-idle-clusters, delete in v0.6.0
+@command('terminate-idle-job-flows')
 def terminate_idle_jfs(args):
     from mrjob.tools.emr.terminate_idle_job_flows import main
     main(args)
 
 
-@command('terminate-job-flow', 'Terminate a single EMR job flow')
+@command('terminate-cluster', 'Terminate a single EMR cluster')
+def terminate_cluster(args):
+    from mrjob.tools.emr.terminate_cluster import main
+    main(args)
+
+
+# deprecated alias for terminate-cluster, delete in v0.6.0
+@command('terminate-job-flow')
 def terminate_jf(args):
     from mrjob.tools.emr.terminate_job_flow import main
     main(args)

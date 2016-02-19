@@ -1926,13 +1926,15 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_dont_join_idle_with_pending_steps(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 
-        self.mock_emr_clusters[cluster_id]._steps = [
+        cluster = self.mock_emr_clusters[cluster_id]
+
+        cluster._steps = [
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
                 config=MockEmrObject(args=[]),
-                mock_no_progress=True,
                 name='dummy',
                 status=MockEmrObject(state='PENDING'))]
+        cluster.delay_progress_simulation = 100  # keep step PENDING
 
         self.assertDoesNotJoin(cluster_id,
                                ['-r', 'emr', '--pool-emr-job-flows'])
@@ -3231,4 +3233,51 @@ class SetupLineEncodingTestCase(MockBotoTestCase):
 
 class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
 
-    pass  # TODO: complete this
+    def setUp(self):
+        super(WaitForTerminatingClusterToTerminateTestCase, self).setUp()
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        self.runner = job.make_runner()
+        self.runner._launch()
+
+        self.cluster = self.mock_emr_clusters[self.runner._cluster_id]
+
+        self.mock_log_info = self.start(patch('mrjob.emr.log.info'))
+
+    def _test_silently_exits_on_state(self, state):
+        self.cluster.status.state = state
+
+        self.runner._wait_for_terminating_cluster_to_terminate()
+
+        self.assertEqual(self.runner._describe_cluster().status.state, state)
+        self.assertFalse(self.mock_log_info.called)
+
+    def test_starting(self):
+        self._test_silently_exits_on_state('STARTING')
+
+    def test_bootstrapping(self):
+        self._test_silently_exits_on_state('BOOTSTRAPPING')
+
+    def test_running(self):
+        self._test_silently_exits_on_state('RUNNING')
+
+    def test_waiting(self):
+        self._test_silently_exits_on_state('WAITING')
+
+    def test_terminating(self):
+        self.cluster.status.state = 'TERMINATING'
+        self.cluster.delay_progress_simulation = 1
+
+        self.runner._wait_for_terminating_cluster_to_terminate()
+
+        self.assertEqual(self.runner._describe_cluster().status.state,
+                         'TERMINATED')
+        self.assertTrue(self.mock_log_info.called)
+
+    def test_terminated(self):
+        self._test_silently_exits_on_state('TERMINATED')
+
+    def test_terminated_with_errors(self):
+        self._test_silently_exits_on_state('TERMINATED_WITH_ERRORS')

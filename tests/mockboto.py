@@ -1024,12 +1024,16 @@ class MockEmrConnection(object):
         cluster = self._get_mock_cluster(cluster_id)
 
         if cluster.status.state == 'TERMINATING':
+            # simulate progress, to support
+            # _wait_for_terminating_cluster_to_terminate()
             self.simulate_progress(cluster_id)
 
         return cluster
 
     def describe_step(self, cluster_id, step_id):
         self._enforce_strict_ssl()
+
+        # simulate progress, to support _wait_for_steps_to_complete()
         self.simulate_progress(cluster_id)
 
         # make sure that we only call list_steps() when we've patched
@@ -1178,6 +1182,11 @@ class MockEmrConnection(object):
 
         cluster = self._get_mock_cluster(cluster_id)
 
+        # allow clusters to get stuck
+        if getattr(cluster, 'delay_progress_simulation', 0) > 0:
+            cluster.delay_progress_simulation -= 1
+            return
+
         # this code is pretty loose about updating statechangereason
         # (for the cluster, instance groups, and steps). Add this as needed.
 
@@ -1201,7 +1210,10 @@ class MockEmrConnection(object):
 
         # if job is TERMINATING, move along to terminated
         if cluster.status.state == 'TERMINATING':
-            if cluster.status.statechangereason.code == 'STEP_FAILURE':
+            code = getattr(getattr(cluster.status, 'statechangereason', None),
+                'code', None)
+
+            if code == 'STEP_FAILURE':
                 cluster.status.state = 'TERMINATED_WITH_ERRORS'
             else:
                 cluster.status.state = 'TERMINATED'
@@ -1222,10 +1234,6 @@ class MockEmrConnection(object):
             if step.status.state in (
                     'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED'):
                 continue
-
-            # allow steps to get stuck
-            if getattr(step, 'mock_no_progress', None):
-                return
 
             # found currently running step! handle it, then exit
 

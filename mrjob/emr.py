@@ -135,7 +135,7 @@ MAX_SSH_RETRIES = 20
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
 # amount of time to wait between checks for available pooled clusters
-JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
+_POOLING_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 
 # bootstrap action which automatically terminates idle clusters
 _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
@@ -2385,7 +2385,7 @@ class EMRJobRunner(MRJobRunner):
         max_wait_time = self._opts['pool_wait_minutes']
         now = datetime.now()
         end_time = now + timedelta(minutes=max_wait_time)
-        time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)
+        time_sleep = timedelta(seconds=_POOLING_SLEEP_INTERVAL)
 
         log.info("Attempting to find an available cluster...")
         while now <= end_time:
@@ -2411,8 +2411,8 @@ class EMRJobRunner(MRJobRunner):
                 log.info("No clusters available in pool '%s'. Checking again"
                          " in %d seconds." % (
                              self._opts['emr_job_flow_pool_name'],
-                             int(JOB_FLOW_SLEEP_INTERVAL)))
-                time.sleep(JOB_FLOW_SLEEP_INTERVAL)
+                             int(_POOLING_SLEEP_INTERVAL)))
+                time.sleep(_POOLING_SLEEP_INTERVAL)
                 now += time_sleep
         return None
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2015 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -56,7 +56,7 @@ import mrjob
 import mrjob.step
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
-from mrjob.aws import MAX_STEPS_PER_JOB_FLOW
+from mrjob.aws import _MAX_STEPS_PER_CLUSTER
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
@@ -2278,7 +2278,7 @@ class EMRJobRunner(MRJobRunner):
             steps = list(_yield_all_steps(emr_conn, cluster.id))
 
             # there is a hard limit of 256 steps per job flow
-            if len(steps) + num_steps > MAX_STEPS_PER_JOB_FLOW:
+            if len(steps) + num_steps > _MAX_STEPS_PER_CLUSTER:
                 return
 
             # in rare cases, job flow can be WAITING *and* have incomplete

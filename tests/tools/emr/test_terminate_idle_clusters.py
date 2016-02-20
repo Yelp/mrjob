@@ -1,7 +1,7 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 Lyft
 # Copyright 2014 Marc Abramowitz
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,14 +22,14 @@ from datetime import timedelta
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
-from mrjob.tools.emr.terminate_idle_job_flows import maybe_terminate_clusters
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_bootstrapping
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_done
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_running
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_starting
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_non_streaming
-from mrjob.tools.emr.terminate_idle_job_flows import cluster_has_pending_steps
-from mrjob.tools.emr.terminate_idle_job_flows import time_last_active
+from mrjob.tools.emr.terminate_idle_clusters import maybe_terminate_clusters
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_bootstrapping
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_done
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_running
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_starting
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_non_streaming
+from mrjob.tools.emr.terminate_idle_clusters import cluster_has_pending_steps
+from mrjob.tools.emr.terminate_idle_clusters import time_last_active
 
 from tests.mockboto import MockBotoTestCase
 from tests.mockboto import MockEmrObject
@@ -436,7 +436,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
         self.assertIsNone(
             self._lock_contents(mock_cluster, steps_ahead=steps_ahead))
 
-    def assert_terminated_job_flows_locked_by_terminate(self):
+    def assert_terminated_clusters_locked_by_terminate(self):
         for cluster_id in self.ids_of_terminated_clusters():
             self.assert_locked_by_terminate(self.mock_emr_clusters[cluster_id])
 
@@ -483,14 +483,14 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             idle_for=timedelta(hours=2),
         )
 
-    def test_hive_job_flow(self):
+    def test_hive_cluster(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-HIVE'],
             idle_for=timedelta(hours=4),
             non_streaming=True,
         )
 
-    def test_hadoop_debugging_job_flow(self):
+    def test_hadoop_debugging_cluster(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-HADOOP_DEBUGGING'],
             idle_for=timedelta(hours=2),
@@ -576,7 +576,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(max_hours_idle=1)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
@@ -588,7 +588,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly()
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
@@ -600,7 +600,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(max_hours_idle=0)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
@@ -621,7 +621,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(mins_to_end_of_hour=6)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         # j-PENDING_BUT_IDLE is also 5 mins from end of hour, but
         # is skipped because it has pending jobs.
@@ -633,7 +633,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
         self.maybe_terminate_quietly(mins_to_end_of_hour=61,
                                                  max_hours_idle=0.01)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
@@ -646,7 +646,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(pooled_only=True)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         # pooled job was not idle for an hour (the default)
         self.assertEqual(self.ids_of_terminated_clusters(), [])
@@ -661,7 +661,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(unpooled_only=True)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
@@ -691,7 +691,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
         self.maybe_terminate_quietly(
             pool_name='reflecting', max_hours_idle=0.01)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(), ['j-POOLED'])
 

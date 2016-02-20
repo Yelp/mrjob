@@ -12,7 +12,7 @@ You can use :mrjob-opt:`bootstrap` and :mrjob-opt:`setup` together.
 Generally, you want to use :mrjob-opt:`bootstrap` for things that are
 part of your general production environment, and :mrjob-opt:`setup`
 for things that are specific to your particular job. This makes things
-work as expected if you are :ref:`pooling-job-flows`.
+work as expected if you are :ref:`pooling-clusters`.
 
 All these examples use :mrjob-opt:`bootstrap`. Not saying it's a good idea, but
 all these examples will work with :mrjob-opt:`setup` as well (yes, Hadoop

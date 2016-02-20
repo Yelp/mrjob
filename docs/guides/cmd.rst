@@ -13,37 +13,37 @@ EMR tools
 ---------
 
 ``mrjob audit-emr-usage [options]``
-    Audit EMR usage over the past 2 weeks, sorted by job flow name and user.
+    Audit EMR usage over the past 2 weeks, sorted by cluster name and user.
 
-    Alias for :py:mod:`mrjob.tools.emr.audit_usage`.
+    Runs :py:mod:`mrjob.tools.emr.audit_usage`.
 
-``mrjob create-job-flow [options]``
-    Create a persistent EMR job flow, using bootstrap scripts and other
-    configs from :py:mod:`mrjob.conf`, and print the job flow ID to stdout.
+``mrjob create-cluster [options]``
+    Create a persistent EMR cluster, using bootstrap scripts and other
+    configs from :py:mod:`mrjob.conf`, and print the cluster ID to stdout.
 
-    Alias for :py:mod:`mrjob.tools.emr.create_job_flow`.
+    Runs :py:mod:`mrjob.tools.emr.create_cluster`.
 
 ``mrjob report-long-jobs [options]``
     Report jobs running for more than a certain number of hours (by default,
     24.0). This can help catch buggy jobs and Hadoop/EMR operational issues.
 
-    Alias for :py:mod:`mrjob.tools.emr.report_long_jobs`.
+    Runs :py:mod:`mrjob.tools.emr.report_long_jobs`.
 
 ``mrjob s3-tmpwatch [options]``
     Delete all files in a given URI that are older than a specified time.
 
-    Alias for :py:mod:`mrjob.tools.emr.s3_tmpwatch`.
+    Runs :py:mod:`mrjob.tools.emr.s3_tmpwatch`.
 
-``mrjob terminate-idle-job-flows [options]``
-    Terminate idle EMR job flows that meet the criteria passed in on the
-    command line (or, by default, job flows that have been idle for one hour).
+``mrjob terminate-idle-clusters [options]``
+    Terminate idle EMR clusters that meet the criteria passed in on the
+    command line (or, by default, clusters that have been idle for one hour).
 
-    Alias for :py:mod:`mrjob.tools.emr.terminate_idle_job_flows`.
+    Runs :py:mod:`mrjob.tools.emr.terminate_idle_clusters`.
 
-``mrjob terminate-job-flow (job flow ID)``
-    Terminate an existing EMR job flow.
+``mrjob terminate-cluster (cluster ID)``
+    Terminate an existing EMR cluster.
 
-    Alias for :py:mod:`mrjob.tools.emr.terminate_job_flow`.
+    Runs :py:mod:`mrjob.tools.emr.terminate_cluster`.
 
 Running jobs
 ------------

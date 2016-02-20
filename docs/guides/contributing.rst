@@ -77,7 +77,7 @@ mrjob's modules can be put in four categories:
 
     * :py:mod:`mrjob.emr`: Submit jobs to EMR
 
-    * :py:mod:`mrjob.pool`: Utilities for job flow pooling functionality
+    * :py:mod:`mrjob.pool`: Utilities for cluster pooling functionality
 
     * :py:mod:`mrjob.retry`: Wrapper for S3 and EMR connections to handle
       recoverable errors

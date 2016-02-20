@@ -91,12 +91,12 @@ There are many other ins and outs of effectively using mrjob with EMR. See
 :doc:`emr-advanced` for some of the ins, but the outs are left as an exercise
 for the reader. This is a strictly no-outs body of documentation!
 
-.. _picking-job-flow-config:
+.. _picking-cluster-config:
 
 Choosing Type and Number of EC2 Instances
 -----------------------------------------
 
-When you create a job flow on EMR, you'll have the option of specifying a number
+When you create a cluster on EMR, you'll have the option of specifying a number
 and type of EC2 instances, which are basically virtual machines. Each instance
 type has different memory, CPU, I/O and network characteristics, and costs
 a different amount of money. See
@@ -110,16 +110,16 @@ Instances perform one of three roles:
 * **Core**: You may have one or more core instances. These run tasks and host
   HDFS.
 * **Task**: You may have zero or more of these. These run tasks, but do *not*
-  host HDFS. This is mostly useful because your job flow can lose task instances
+  host HDFS. This is mostly useful because your cluster can lose task instances
   without killing your job (see :ref:`spot-instances`).
 
-There's a special case where your job flow *only* has a single master instance, in which case the master instance schedules tasks, runs them, and hosts HDFS.
+There's a special case where your cluster *only* has a single master instance, in which case the master instance schedules tasks, runs them, and hosts HDFS.
 
 By default, :py:mod:`mrjob` runs a single ``m1.medium``, which is a cheap but not very powerful instance type. This can be quite adequate for testing your code on a small subset of your data, but otherwise give little advantage over running a job locally. To get more performance out of your job, you can either add more instances, use more powerful instances, or both.
 
 Here are some things to consider when tuning your instance settings:
 
-* Amazon bills you for the full hour even if your job flow only lasts for a few
+* Amazon bills you for the full hour even if your cluster only lasts for a few
   minutes (this is an artifact of the EC2 billing structure), so for many
   jobs that you run repeatedly, it is a good strategy to pick instance settings
   that make your job consistently run in a little less than an hour.

@@ -134,10 +134,10 @@ MAX_SSH_RETRIES = 20
 # ssh should fail right away if it can't bind a port
 WAIT_FOR_SSH_TO_FAIL = 1.0
 
-# amount of time to wait between checks for available pooled job flows
+# amount of time to wait between checks for available pooled clusters
 JOB_FLOW_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 
-# bootstrap action which automatically terminates idle job flows
+# bootstrap action which automatically terminates idle clusters
 _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     os.path.dirname(mrjob.__file__),
     'bootstrap',
@@ -229,7 +229,7 @@ def _step_ids_for_job(steps, job_key):
 
 
 def make_lock_uri(s3_tmp_dir, emr_job_flow_id, step_num):
-    """Generate the URI to lock the job flow ``emr_job_flow_id``"""
+    """Generate the URI to lock the cluster ``emr_job_flow_id``"""
     return s3_tmp_dir + 'locks/' + emr_job_flow_id + '/' + str(step_num)
 
 
@@ -238,9 +238,9 @@ def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
     bucket = s3_fs.get_bucket(bucket_name)
     key = bucket.get_key(key_prefix)
 
-    # EMRJobRunner should start using a job flow within about a second of
+    # EMRJobRunner should start using a cluster within about a second of
     # locking it, so if it's been a while, then it probably crashed and we
-    # can just use this job flow.
+    # can just use this cluster.
     key_expired = False
     if key and mins_to_expiration is not None:
         last_modified = iso8601_to_datetime(key.last_modified)
@@ -499,11 +499,11 @@ class EMRJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
     Invoked when you run your job with ``-r emr``.
 
-    :py:class:`EMRJobRunner` runs your job in an EMR job flow, which is
-    basically a temporary Hadoop cluster. Normally, it creates a job flow
+    :py:class:`EMRJobRunner` runs your job in an EMR cluster, which is
+    basically a temporary Hadoop cluster. Normally, it creates a cluster
     just for your job; it's also possible to run your job in a specific
-    job flow by setting *emr_job_flow_id* or to automatically choose a
-    waiting job flow, creating one if none exists, by setting
+    cluster by setting *emr_job_flow_id* or to automatically choose a
+    waiting cluster, creating one if none exists, by setting
     *pool_emr_job_flows*.
 
     Input, support, and jar files can be either local or on S3; use
@@ -1011,12 +1011,12 @@ class EMRJobRunner(MRJobRunner):
     def _pick_ssh_bind_ports(self):
         """Pick a list of ports to try binding our SSH tunnel to.
 
-        We will try to bind the same port for any given job flow (Issue #67)
+        We will try to bind the same port for any given cluster (Issue #67)
         """
         # don't perturb the random number generator
         random_state = random.getstate()
         try:
-            # seed random port selection on job flow ID
+            # seed random port selection on cluster ID
             random.seed(self._cluster_id)
             num_picks = min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
@@ -1045,13 +1045,13 @@ class EMRJobRunner(MRJobRunner):
                 except Exception as e:
                     log.exception(e)
 
-        # stop the job flow if it belongs to us (it may have stopped on its
+        # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)
         # don't stop it if it was created due to --pool because the user
         # probably wants to use it again
         if self._cluster_id and not self._opts['emr_job_flow_id'] \
                 and not self._opts['pool_emr_job_flows']:
-            log.info('Terminating job flow: %s' % self._cluster_id)
+            log.info('Terminating cluster: %s' % self._cluster_id)
             try:
                 self.make_emr_conn().terminate_jobflow(self._cluster_id)
             except Exception as e:
@@ -1070,8 +1070,8 @@ class EMRJobRunner(MRJobRunner):
     def _cleanup_logs(self):
         super(EMRJobRunner, self)._cleanup_logs()
 
-        # delete the log files, if it's a job flow we created (the logs
-        # belong to the job flow)
+        # delete the log files, if it's a cluster we created (the logs
+        # belong to the cluster)
         if self._s3_log_dir() and not self._opts['emr_job_flow_id'] \
                 and not self._opts['pool_emr_job_flows']:
             try:
@@ -1081,14 +1081,14 @@ class EMRJobRunner(MRJobRunner):
                 log.exception(e)
 
     def _cleanup_job(self):
-        # kill the job if we won't be taking down the whole job flow
+        # kill the job if we won't be taking down the whole cluster
         if not self._cluster_id:
             # Nothing we can do.
             return
 
         if not (self._opts['emr_job_flow_id'] or
                 self._opts['pool_emr_job_flows']):
-            # we're taking down the job flow, don't bother
+            # we're taking down the cluster, don't bother
             return
 
         try:
@@ -1114,25 +1114,25 @@ class EMRJobRunner(MRJobRunner):
                 except IOError:
                     pass
 
-            log.info('Unable to kill job without terminating job flow and'
+            log.info('Unable to kill job without terminating cluster and'
                      ' job is still running. You may wish to terminate it'
-                     ' yourself with "python -m mrjob.tools.emr.terminate_job_'
-                     'flow %s".' % self._cluster_id)
+                     ' yourself with "python -m mrjob.tools.emr.terminate'
+                     '_cluster %s".' % self._cluster_id)
 
     def _cleanup_job_flow(self):
         if not self._cluster_id:
-            # If we don't have a job flow, then we can't terminate it.
+            # If we don't have a cluster, then we can't terminate it.
             return
 
         emr_conn = self.make_emr_conn()
         try:
-            log.info("Attempting to terminate job flow")
+            log.info("Attempting to terminate cluster")
             emr_conn.terminate_jobflow(self._cluster_id)
         except Exception as e:
             # Something happened with boto and the user should know.
             log.exception(e)
             return
-        log.info('Job flow %s successfully terminated' % self._cluster_id)
+        log.info('cluster %s successfully terminated' % self._cluster_id)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.
@@ -1150,11 +1150,11 @@ class EMRJobRunner(MRJobRunner):
 
         if (cluster.status.state == 'WAITING' and
                 cluster.autoterminate != 'true'):
-            raise Exception('Operation requires job flow to terminate, but'
+            raise Exception('Operation requires cluster to terminate, but'
                             ' it may never do so.')
 
         while not self._cluster_is_done(cluster):
-            msg = 'Waiting for job flow to terminate (currently %s)' % (
+            msg = 'Waiting for cluster to terminate (currently %s)' % (
                 cluster.status.state)
             log.info(msg)
             time.sleep(self._opts['check_emr_status_every'])
@@ -1194,19 +1194,19 @@ class EMRJobRunner(MRJobRunner):
             count, role, instance_type, market, name, bidprice=bid_price)
 
     def _create_job_flow(self, persistent=False, steps=None):
-        """Create an empty job flow on EMR, and return the ID of that
+        """Create an empty cluster on EMR, and return the ID of that
         job.
 
         If the ``emr_tags`` option is set, also tags the cluster (which
         is a separate API call).
 
-        persistent -- if this is true, create the job flow with the keep_alive
+        persistent -- if this is true, create the cluster with the keep_alive
             option, indicating the job will have to be manually terminated.
         """
         # make sure we can see the files we copied to S3
         self._wait_for_s3_eventual_consistency()
 
-        log.info('Creating Elastic MapReduce job flow')
+        log.info('Creating Elastic MapReduce cluster')
         args = self._job_flow_args(persistent, steps)
 
         emr_conn = self.make_emr_conn()
@@ -1219,7 +1219,7 @@ class EMRJobRunner(MRJobRunner):
          # keep track of when we started our job
         self._emr_job_start = time.time()
 
-        log.info('Job flow created with ID: %s' % emr_job_flow_id)
+        log.info('Cluster created with ID: %s' % emr_job_flow_id)
 
         # set EMR tags for the cluster, if any
         tags = self._opts['emr_tags']
@@ -1308,7 +1308,7 @@ class EMRJobRunner(MRJobRunner):
         if persistent or self._opts['pool_emr_job_flows']:
             args['keep_alive'] = True
 
-            # only use idle termination script on persistent job flows
+            # only use idle termination script on persistent clusters
             # add it last, so that we don't count bootstrapping as idle time
             if self._opts['max_hours_idle']:
                 s3_uri = self._upload_mgr.uri(
@@ -1375,7 +1375,7 @@ class EMRJobRunner(MRJobRunner):
 
     @property
     def _action_on_failure(self):
-        # don't terminate other people's job flows
+        # don't terminate other people's clusters
         if (self._opts['emr_action_on_failure']):
             return self._opts['emr_action_on_failure']
         elif (self._opts['emr_job_flow_id'] or
@@ -1476,21 +1476,21 @@ class EMRJobRunner(MRJobRunner):
         self._create_s3_tmp_bucket_if_needed()
         emr_conn = self.make_emr_conn()
 
-        # try to find a job flow from the pool. basically auto-fill
+        # try to find a cluster from the pool. basically auto-fill
         # 'emr_job_flow_id' if possible and then follow normal behavior.
         if self._opts['pool_emr_job_flows'] and not self._cluster_id:
             cluster_id = self._find_cluster(num_steps=len(self._get_steps()))
             if cluster_id:
                 self._cluster_id = cluster_id
 
-        # create a job flow if we're not already using an existing one
+        # create a cluster if we're not already using an existing one
         if not self._cluster_id:
             self._cluster_id = self._create_job_flow(
                 persistent=False)
-            log.info('Created new job flow %s' %
+            log.info('Created new cluster %s' %
                      self._cluster_id)
         else:
-            log.info('Adding our job to existing job flow %s' %
+            log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
 
         # define out steps
@@ -1518,7 +1518,7 @@ class EMRJobRunner(MRJobRunner):
         num_steps = len(step_ids)
 
         if num_steps != len(self._get_steps()):
-            raise AssertionError("Can't find our steps in the job flow!")
+            raise AssertionError("Can't find our steps in the cluster!")
 
         # clear out _log_interpretations if for some reason it was
         # already filled
@@ -1918,7 +1918,7 @@ class EMRJobRunner(MRJobRunner):
         if self._master_bootstrap_script_path:
             return
 
-        # don't bother if we're not starting a job flow
+        # don't bother if we're not starting a cluster
         if self._opts['emr_job_flow_id']:
             return
 
@@ -2130,7 +2130,7 @@ class EMRJobRunner(MRJobRunner):
     ### EMR JOB MANAGEMENT UTILS ###
 
     def make_persistent_job_flow(self):
-        """Create a new EMR job flow that requires manual termination, and
+        """Create a new EMR cluster that requires manual termination, and
         return its ID.
 
         You can also fetch the job ID by calling self.get_emr_job_flow_id()
@@ -2144,10 +2144,10 @@ class EMRJobRunner(MRJobRunner):
     def make_persistent_cluster(self):
         if (self._cluster_id):
             raise AssertionError(
-                'This runner is already associated with job flow ID %s' %
+                'This runner is already associated with cluster ID %s' %
                 (self._cluster_id))
 
-        log.info('Creating persistent job flow to run several jobs in...')
+        log.info('Creating persistent cluster to run several jobs in...')
 
         self._add_bootstrap_files_for_upload(persistent=True)
         self._upload_local_files_to_s3()
@@ -2192,7 +2192,7 @@ class EMRJobRunner(MRJobRunner):
         - total compute units for master node
         - time left to an even instance hour
 
-        The most desirable job flows come *last* in the list.
+        The most desirable clusters come *last* in the list.
 
         :return: tuple of (:py:class:`botoemr.emrobject.Cluster`,
                            num_steps_in_cluster)
@@ -2235,11 +2235,11 @@ class EMRJobRunner(MRJobRunner):
         key_cluster_steps_list = []
 
         def add_if_match(cluster):
-            # this may be a retry due to locked job flows
+            # this may be a retry due to locked clusters
             if cluster.id in exclude:
                 return
 
-            # only take persistent job flows
+            # only take persistent clusters
             if cluster.autoterminate != 'false':
                 return
 
@@ -2269,7 +2269,7 @@ class EMRJobRunner(MRJobRunner):
                 ami_version = getattr(cluster, 'runningamiversion', '')
                 # Support partial matches, e.g. let a request for
                 # '2.4' pass if the version is '2.4.2'. The version
-                # extracted from the existing job flow should always
+                # extracted from the existing cluster should always
                 # be a full major.minor.patch, so checking matching
                 # prefixes should be sufficient.
                 if not ami_version.startswith(self._opts['ami_version']):
@@ -2277,11 +2277,11 @@ class EMRJobRunner(MRJobRunner):
 
             steps = list(_yield_all_steps(emr_conn, cluster.id))
 
-            # there is a hard limit of 256 steps per job flow
+            # there is a hard limit of 256 steps per cluster
             if len(steps) + num_steps > _MAX_STEPS_PER_CLUSTER:
                 return
 
-            # in rare cases, job flow can be WAITING *and* have incomplete
+            # in rare cases, cluster can be WAITING *and* have incomplete
             # steps. We could just check for PENDING steps, but we're
             # trying to be defensive about EMR adding a new step state.
             for step in steps:
@@ -2335,7 +2335,7 @@ class EMRJobRunner(MRJobRunner):
                         continue
 
                 # don't require instances to be running; we'd be worse off if
-                # we started our own job flow from scratch. (This can happen if
+                # we started our own cluster from scratch. (This can happen if
                 # the previous job finished while some task instances were
                 # still being provisioned.)
                 cu = (int(ig.requestedinstancecount) *
@@ -2376,7 +2376,7 @@ class EMRJobRunner(MRJobRunner):
                 in sorted(key_cluster_steps_list)]
 
     def _find_cluster(self, num_steps=1):
-        """Find a job flow that can host this runner. Prefer flows with more
+        """Find a cluster that can host this runner. Prefer flows with more
         compute units. Break ties by choosing flow with longest idle time.
         Return ``None`` if no suitable flows exist.
         """
@@ -2387,7 +2387,7 @@ class EMRJobRunner(MRJobRunner):
         end_time = now + timedelta(minutes=max_wait_time)
         time_sleep = timedelta(seconds=JOB_FLOW_SLEEP_INTERVAL)
 
-        log.info("Attempting to find an available job flow...")
+        log.info("Attempting to find an available cluster...")
         while now <= end_time:
             cluster_info_list = self._usable_clusters(
                 emr_conn=emr_conn,
@@ -2408,7 +2408,7 @@ class EMRJobRunner(MRJobRunner):
                 # Reset the exclusion set since it is possible to reclaim a
                 # lock that was previously unavailable.
                 exclude = set()
-                log.info("No job flows available in pool '%s'. Checking again"
+                log.info("No clusters available in pool '%s'. Checking again"
                          " in %d seconds." % (
                              self._opts['emr_job_flow_pool_name'],
                              int(JOB_FLOW_SLEEP_INTERVAL)))
@@ -2423,7 +2423,7 @@ class EMRJobRunner(MRJobRunner):
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to
-        match jobs and job flows. This first argument passed to the bootstrap
+        match jobs and clusters. This first argument passed to the bootstrap
         script will be ``'pool-'`` plus this hash.
 
         The way the hash is calculated may vary between point releases
@@ -2431,7 +2431,7 @@ class EMRJobRunner(MRJobRunner):
         """
         things_to_hash = [
             # exclude mrjob.tar.gz because it's only created if the
-            # job starts its own job flow (also, its hash changes every time
+            # job starts its own cluster (also, its hash changes every time
             # since the tarball contains different timestamps).
             # The filenames/md5sums are sorted because we need to
             # ensure the order they're added doesn't affect the hash
@@ -2530,7 +2530,7 @@ class EMRJobRunner(MRJobRunner):
         return self._hadoop_version
 
     def get_ami_version(self):
-        """Get the AMI that our job flow is running.
+        """Get the AMI that our cluster is running.
 
         .. versionadded:: 0.4.5
         """

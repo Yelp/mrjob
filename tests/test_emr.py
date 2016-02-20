@@ -133,7 +133,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             self.assertEqual(mock_s3_fs_snapshot, self.mock_s3_fs)
 
             # make sure AdditionalInfo was JSON-ified from the config file.
-            # checked now because you can't actually read it from the job flow
+            # checked now because you can't actually read it from the cluster
             # on real EMR.
             self.assertEqual(runner._opts['additional_emr_info'],
                              '{"key": "value"}')
@@ -291,7 +291,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
 
     def test_attach_to_existing_cluster(self):
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        # set log_uri to None, so that when we describe the job flow, it
+        # set log_uri to None, so that when we describe the cluster, it
         # won't have the loguri attribute, to test Issue #112
         cluster_id = emr_conn.run_jobflow(
             name='Development Cluster', log_uri=None,
@@ -311,7 +311,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
             runner.run()
 
             # Issue 182: don't create the bootstrap script when
-            # attaching to another job flow
+            # attaching to another cluster
             self.assertIsNone(runner._master_bootstrap_script_path)
 
             for line in runner.stream_output():
@@ -323,7 +323,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
 
     def test_dont_take_down_cluster_on_failure(self):
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        # set log_uri to None, so that when we describe the job flow, it
+        # set log_uri to None, so that when we describe the cluster, it
         # won't have the loguri attribute, to test Issue #112
         cluster_id = emr_conn.run_jobflow(
             name='Development Cluster', log_uri=None,
@@ -1562,7 +1562,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         self.assertNotEqual(actual_cluster_id, cluster_id)
 
-        # terminate the job flow created by this assert, to avoid
+        # terminate the cluster created by this assert, to avoid
         # very confusing behavior (see Issue #331)
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
         emr_conn.terminate_jobflow(actual_cluster_id)
@@ -1586,7 +1586,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             self.prepare_runner_for_ssh(runner)
             runner.run()
 
-            # Make sure that the runner made a pooling-enabled job flow
+            # Make sure that the runner made a pooling-enabled cluster
             emr_conn = runner.make_emr_conn()
             bootstrap_actions = list(_yield_all_bootstrap_actions(
                 emr_conn, runner.get_cluster_id()))
@@ -1751,7 +1751,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             ec2_instance_type='c1.xlarge',
             num_ec2_instances=3)
 
-        # join the pooled job flow even though it has less instances total,
+        # join the pooled cluster even though it has less instances total,
         # since they're have enough memory and CPU
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
@@ -1774,7 +1774,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=10)
 
         # We implicitly want a MASTER instance with c1.xlarge. The pooled
-        # job flow has an m1.medium master instance and 9 c1.xlarge core
+        # cluster has an m1.medium master instance and 9 c1.xlarge core
         # instances, which doesn't match.
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-emr-job-flows',
@@ -1882,7 +1882,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_dont_join_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster('pool1')
 
-        # fill the job flow
+        # fill the cluster
         self.mock_emr_clusters[cluster_id]._steps = 255 * [
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
@@ -1904,7 +1904,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_join_almost_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster('pool1')
 
-        # fill the job flow
+        # fill the cluster
         self.mock_emr_clusters[cluster_id]._steps = 255 * [
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
@@ -2062,7 +2062,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         self.assertEqual(runner_2._find_cluster(), cluster_id_2)
 
     def test_dont_destroy_own_pooled_cluster_on_failure(self):
-        # Issue 242: job failure shouldn't kill the pooled job flows
+        # Issue 242: job failure shouldn't kill the pooled clusters
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '--pool-emr-job-flow'])
         mr_job.sandbox()
@@ -2093,7 +2093,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         self.assertEqual(cluster.status.state, 'WAITING')
 
     def test_dont_destroy_other_pooled_cluster_on_failure(self):
-        # Issue 242: job failure shouldn't kill the pooled job flows
+        # Issue 242: job failure shouldn't kill the pooled clusters
         _, cluster_id = self.make_pooled_cluster()
 
         self.mock_emr_failures = {(cluster_id, 0): None}
@@ -2450,8 +2450,8 @@ class CleanUpJobTestCase(MockBotoTestCase):
                 self.assertTrue(m().terminate_jobflow.called)
 
     def test_kill_job_flow_if_successful(self):
-        # If they are setting up the cleanup to kill the job flow, mrjob should
-        # kill the job flow independent of job success.
+        # If they are setting up the cleanup to kill the cluster, mrjob should
+        # kill the cluster independent of job success.
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:

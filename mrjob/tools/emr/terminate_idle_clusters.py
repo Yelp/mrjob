@@ -36,22 +36,22 @@ Options::
                         (e.g. us-west-1.elasticmapreduce.amazonaws.com).
                         Default is to infer this from aws_region.
   --max-hours-idle=MAX_HOURS_IDLE
-                        Max number of hours a job flow can go without
+                        Max number of hours a cluster can go without
                         bootstrapping, running a step, or having a new step
                         created. This will fire even if there are pending
                         steps which EMR has failed to start. Make sure you set
                         this higher than the amount of time your jobs can take
                         to start instances and bootstrap.
   --max-mins-locked=MAX_MINS_LOCKED
-                        Max number of minutes a job flow can be locked while
+                        Max number of minutes a cluster can be locked while
                         idle.
   --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
-                        Terminate job flows that are within this many minutes
+                        Terminate clusters that are within this many minutes
                         of the end of a full hour since the job started
                         running AND have no pending steps.
   --pool-name=POOL_NAME
-                        Only terminate job flows in the given named pool.
-  --pooled-only         Only terminate pooled job flows
+                        Only terminate clusters in the given named pool.
+  --pooled-only         Only terminate pooled clusters
   -q, --quiet           Don't print anything to stderr
   --s3-endpoint=S3_ENDPOINT
                         Host to connect to when communicating with S3 (e.g. s3
@@ -59,7 +59,7 @@ Options::
                         from region (see --aws-region).
   -t, --test            Don't actually delete any files; just log that we
                         would
-  --unpooled-only       Only terminate un-pooled job flows
+  --unpooled-only       Only terminate un-pooled clusters
   -v, --verbose         print more messages to stderr
 """
 from __future__ import print_function
@@ -157,22 +157,22 @@ def maybe_terminate_clusters(dry_run=False,
     num_pending = 0
     num_running = 0
 
-    # We don't filter by job flow state because we want this to work even
+    # We don't filter by cluster state because we want this to work even
     # if Amazon adds another kind of idle state.
     for cluster_summary in _yield_all_clusters(emr_conn):
         cluster_id = cluster_summary.id
 
-        # check if job flow is done
+        # check if cluster is done
         if is_cluster_done(cluster_summary):
             num_done += 1
             continue
 
-        # check if job flow is starting
+        # check if cluster is starting
         if is_cluster_starting(cluster_summary):
             num_starting += 1
             continue
 
-        # check if job flow is bootstrapping
+        # check if cluster is bootstrapping
         if is_cluster_bootstrapping(cluster_summary):
             num_bootstrapping += 1
             continue
@@ -205,7 +205,7 @@ def maybe_terminate_clusters(dry_run=False,
             num_idle += 1
 
         log.debug(
-            'Job flow %s %s for %s, %s to end of hour, %s (%s)' %
+            'cluster %s %s for %s, %s to end of hour, %s (%s)' %
             (cluster_id,
              'pending' if is_pending else 'idle',
              strip_microseconds(time_idle),
@@ -213,7 +213,7 @@ def maybe_terminate_clusters(dry_run=False,
              ('unpooled' if pool is None else 'in %s pool' % pool),
              cluster_summary.name))
 
-        # filter out job flows that don't meet our criteria
+        # filter out clusters that don't meet our criteria
         if (max_hours_idle is not None and
                 time_idle <= timedelta(hours=max_hours_idle)):
             continue
@@ -248,21 +248,21 @@ def maybe_terminate_clusters(dry_run=False,
             quiet=quiet)
 
     log.info(
-        'Job flow statuses: %d starting, %d bootstrapping, %d running,'
+        'Cluster statuses: %d starting, %d bootstrapping, %d running,'
         ' %d pending, %d idle, %d active non-streaming, %d done' % (
             num_starting, num_bootstrapping, num_running,
             num_pending, num_idle, num_non_streaming, num_done))
 
 
 def is_cluster_done(cluster):
-    """Return True if the given job flow is done running."""
+    """Return True if the given cluster is done running."""
     return (cluster.status.state == 'TERMINATING' or
             hasattr(cluster.status.timeline, 'enddatetime'))
 
 
 def is_cluster_non_streaming(steps):
-    """Return ``True`` if the give job flow has steps, but none of them are
-    Hadoop streaming steps (for example, if the job flow is running Hive).
+    """Return ``True`` if the give cluster has steps, but none of them are
+    Hadoop streaming steps (for example, if the cluster is running Hive).
     """
     if not steps:
         return False
@@ -295,7 +295,7 @@ def is_cluster_running(steps):
 
 
 def is_step_running(step):
-    """Return true if the given job flow step is currently running."""
+    """Return true if the given step is currently running."""
     return (getattr(step.status, 'state', None) not in
             ('CANCELLED', 'INTERRUPTED') and
             hasattr(step.status.timeline, 'startdatetime') and
@@ -308,7 +308,7 @@ def cluster_has_pending_steps(steps):
 
 
 def time_last_active(cluster_summary, steps):
-    """When did something last happen with the given job flow?
+    """When did something last happen with the given cluster?
 
     Things we look at:
 
@@ -318,7 +318,7 @@ def time_last_active(cluster_summary, steps):
     * ``step.startdatetime`` for any step
     * ``step.enddatetime`` for any step
 
-    This is not really meant to be run on job flows which are currently
+    This is not really meant to be run on clusters which are currently
     running, or done.
     """
     timestamps = []
@@ -344,7 +344,7 @@ def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
                          is_pending, time_idle, time_to_end_of_hour,
                          dry_run=False, max_mins_locked=None, quiet=False):
 
-    fmt = ('Terminated job flow %s (%s); was %s for %s, %s to end of hour')
+    fmt = ('Terminated cluster %s (%s); was %s for %s, %s to end of hour')
     msg = fmt % (
         cluster_id, cluster_name,
         'pending' if is_pending else 'idle',
@@ -367,7 +367,7 @@ def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
             runner.make_emr_conn().terminate_jobflow(cluster_id)
             did_terminate = True
         elif not quiet:
-            log.info('%s was locked between getting job flow info and'
+            log.info('%s was locked between getting cluster info and'
                      ' trying to terminate it; skipping' % cluster_id)
 
     if did_terminate and not quiet:
@@ -376,16 +376,16 @@ def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
 
 def make_option_parser():
     usage = '%prog [options]'
-    description = ('Terminate idle EMR job flows that meet the criteria'
+    description = ('Terminate idle EMR clusters that meet the criteria'
                    ' passed in on the command line (or, by default,'
-                   ' job flows that have been idle for one hour).')
+                   ' clusters that have been idle for one hour).')
 
     option_parser = OptionParser(usage=usage, description=description)
 
     option_parser.add_option(
         '--max-hours-idle', dest='max_hours_idle',
         default=None, type='float',
-        help=('Max number of hours a job flow can go without bootstrapping,'
+        help=('Max number of hours a cluster can go without bootstrapping,'
               ' running a step, or having a new step created. This will fire'
               ' even if there are pending steps which EMR has failed to'
               ' start. Make sure you set this higher than the amount of time'
@@ -393,24 +393,24 @@ def make_option_parser():
     option_parser.add_option(
         '--max-mins-locked', dest='max_mins_locked',
         default=DEFAULT_MAX_MINUTES_LOCKED, type='float',
-        help='Max number of minutes a job flow can be locked while idle.')
+        help='Max number of minutes a cluster can be locked while idle.')
     option_parser.add_option(
         '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
         default=None, type='float',
-        help=('Terminate job flows that are within this many minutes of'
+        help=('Terminate clusters that are within this many minutes of'
               ' the end of a full hour since the job started running'
               ' AND have no pending steps.'))
     option_parser.add_option(
         '--unpooled-only', dest='unpooled_only', action='store_true',
         default=False,
-        help='Only terminate un-pooled job flows')
+        help='Only terminate un-pooled clusters')
     option_parser.add_option(
         '--pooled-only', dest='pooled_only', action='store_true',
         default=False,
-        help='Only terminate pooled job flows')
+        help='Only terminate pooled clusters')
     option_parser.add_option(
         '--pool-name', dest='pool_name', default=None,
-        help='Only terminate job flows in the given named pool.')
+        help='Only terminate clusters in the given named pool.')
     option_parser.add_option(
         '--dry-run', dest='dry_run', default=False,
         action='store_true',

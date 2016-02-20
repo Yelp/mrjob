@@ -17,10 +17,9 @@
 
 Usage::
 
-    mrjob terminate-job-flow [options] j-CLUSTERID
-    python -m mrjob.tools.emr.terminate_job_flow [options] j-CLUSTERID
+    mrjob terminate-cluster [options] j-CLUSTERID
 
-Terminate an existing EMR job flow.
+Terminate an existing EMR cluster.
 
 Options::
 
@@ -68,14 +67,14 @@ def main(cl_args=None):
 
     # create the persistent job
     runner = EMRJobRunner(**runner_kwargs(options))
-    log.debug('Terminating job flow %s' % cluster_id)
+    log.debug('Terminating cluster %s' % cluster_id)
     runner.make_emr_conn().terminate_jobflow(cluster_id)
-    log.info('Terminated job flow %s' % cluster_id)
+    log.info('Terminated cluster %s' % cluster_id)
 
 
 def make_option_parser():
     usage = '%prog [options] cluster-id'
-    description = 'Terminate an existing EMR job flow.'
+    description = 'Terminate an existing EMR cluster.'
 
     option_parser = OptionParser(usage=usage, description=description)
 

@@ -33,11 +33,11 @@ from tests.tools.emr import ToolTestCase
 
 class AuditUsageTestCase(ToolTestCase):
 
-    def test_with_no_job_flows(self):
+    def test_with_no_clusters(self):
         self.monkey_patch_stdout()
         main(['-q', '--no-conf'])  # just make sure it doesn't crash
 
-    def test_with_one_job_flow(self):
+    def test_with_one_cluster(self):
         emr_conn = boto.emr.connection.EmrConnection()
         emr_conn.run_jobflow('no name', job_flow_role='fake-instance-profile',
                              service_role='fake-service-role')
@@ -437,7 +437,7 @@ class JobFlowToFullSummaryTestCase(TestCase):
                     readydatetime='2010-06-06T04:15:00Z',
                 ),
             ),
-            # step doesn't have end time even though job flow does
+            # step doesn't have end time even though cluster does
             steps=[
                 MockEmrObject(
                     name='mr_exciting.woo.20100606.035855.000000: Step 1 of 3',

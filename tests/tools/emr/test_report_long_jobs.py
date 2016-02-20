@@ -236,7 +236,7 @@ class ReportLongJobsTestCase(MockBotoTestCase):
         sys.stdout = self._real_stdout
         super(ReportLongJobsTestCase, self).tearDown()
 
-    def test_with_no_job_flows(self):
+    def test_with_no_clusters(self):
         main(['-q', '--no-conf'])  # just make sure it doesn't crash
 
     def test_with_all_clusters(self):

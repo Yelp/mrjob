@@ -32,7 +32,7 @@ Options::
   --ami-version=AMI_VERSION
                         AMI Version to use, e.g. "2.4.11" (default "latest").
   --aws-availability-zone=AWS_AVAILABILITY_ZONE
-                        Availability zone to run the job flow on
+                        Availability zone to run the cluster on
   --aws-region=AWS_REGION
                         Region to connect to S3 and EMR on (e.g. us-west-1).
   --bootstrap=BOOTSTRAP
@@ -129,12 +129,12 @@ Options::
   --label=LABEL         custom prefix for job name, to help us identify the
                         job
   --max-hours-idle=MAX_HOURS_IDLE
-                        If we create a persistent job flow, have it
+                        If we create a persistent cluster, have it
                         automatically terminate itself after it's been idle
                         this many hours.
   --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
                         If --max-hours-idle is set, control how close to the
-                        end of an EC2 billing hour the job flow can
+                        end of an EC2 billing hour the cluster can
                         automatically terminate itself (default is 5 minutes).
   --no-emr-api-param=NO_EMR_API_PARAMS
                         Parameters to be unset when calling EMR API. You can
@@ -150,15 +150,15 @@ Options::
   --owner=OWNER         custom username to use, to help us identify who ran
                         the job
   --no-pool-emr-job-flows
-                        Don't try to run our job on a pooled job flow.
-  --pool-emr-job-flows  Add to an existing job flow or create a new one that
+                        Don't try to run our job on a pooled cluster.
+  --pool-emr-job-flows  Add to an existing cluster or create a new one that
                         does not terminate when the job completes. Overrides
-                        other job flow-related options including EC2 instance
+                        other cluster-related options including EC2 instance
                         configuration. Joins pool "default" if
                         emr_job_flow_pool_name is not specified. WARNING: do
                         not run this without
-                        mrjob.tools.emr.terminate_idle_job_flows in your
-                        crontab; job flows left idle can quickly become
+                        mrjob terminate-idle-clusters in your
+                        crontab; clusters left idle can quickly become
                         expensive!
   -q, --quiet           Don't print anything to stderr
   --s3-endpoint=S3_ENDPOINT
@@ -179,12 +179,12 @@ Options::
                         multipart uploading entirely.
   -v, --verbose         print more messages to stderr
   --visible-to-all-users
-                        Whether the job flow is visible to all IAM users of
-                        the AWS account associated with the job flow. If this
+                        Whether the cluster is visible to all IAM users of
+                        the AWS account associated with the cluster. If this
                         value is set to True, all IAM users of that AWS
                         account can view and (if they have the proper policy
-                        permissions set) manage the job flow. If it is set to
-                        False, only the IAM user that created the job flow can
+                        permissions set) manage the cluster. If it is set to
+                        False, only the IAM user that created the cluster can
                         view and manage it. This option can be overridden by
                         --emr-api-param VisibleToAllUsers=true|false.
 """
@@ -203,7 +203,7 @@ from mrjob.util import scrape_options_into_new_groups
 
 
 def main(args=None):
-    """Run the create_job_flow tool with arguments from ``sys.argv`` and
+    """Run the create_cluster tool with arguments from ``sys.argv`` and
     printing to ``sys.stdout``."""
     runner = EMRJobRunner(**runner_kwargs(args))
     cluster_id = runner.make_persistent_cluster()
@@ -239,10 +239,10 @@ def runner_kwargs(cl_args=None):
 def make_option_parser():
     usage = '%prog [options]'
     description = (
-        'Create a persistent EMR job flow to run jobs in, and print its ID to'
+        'Create a persistent EMR cluster to run jobs in, and print its ID to'
         ' stdout. WARNING: Do not run'
-        ' this without mrjob.tools.emr.terminate_idle_job_flows in your'
-        ' crontab; job flows left idle can quickly become expensive!')
+        ' this without mrjob terminate-idle-clusters in your'
+        ' crontab; clusters left idle can quickly become expensive!')
     option_parser = OptionParser(usage=usage, description=description)
 
     add_basic_opts(option_parser)

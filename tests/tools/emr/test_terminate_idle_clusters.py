@@ -1,7 +1,7 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 Lyft
 # Copyright 2014 Marc Abramowitz
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Test the idle job flow terminator"""
+"""Test the idle cluster terminator"""
 import sys
 from datetime import datetime
 from datetime import timedelta
@@ -22,21 +22,21 @@ from datetime import timedelta
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
-from mrjob.tools.emr.terminate_idle_job_flows import maybe_terminate_clusters
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_bootstrapping
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_done
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_running
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_starting
-from mrjob.tools.emr.terminate_idle_job_flows import is_cluster_non_streaming
-from mrjob.tools.emr.terminate_idle_job_flows import cluster_has_pending_steps
-from mrjob.tools.emr.terminate_idle_job_flows import time_last_active
+from mrjob.tools.emr.terminate_idle_clusters import maybe_terminate_clusters
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_bootstrapping
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_done
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_running
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_starting
+from mrjob.tools.emr.terminate_idle_clusters import is_cluster_non_streaming
+from mrjob.tools.emr.terminate_idle_clusters import cluster_has_pending_steps
+from mrjob.tools.emr.terminate_idle_clusters import time_last_active
 
 from tests.mockboto import MockBotoTestCase
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
 
 
-class JobFlowTerminationTestCase(MockBotoTestCase):
+class ClusterTerminationTestCase(MockBotoTestCase):
 
     maxDiff = None
 
@@ -44,7 +44,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
                           '-reducer', 'my_job.py --reducer']
 
     def setUp(self):
-        super(JobFlowTerminationTestCase, self).setUp()
+        super(ClusterTerminationTestCase, self).setUp()
         self.create_fake_clusters()
 
     def create_fake_clusters(self):
@@ -123,7 +123,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             ),
         )
 
-        # finished job flow
+        # finished cluster
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-DONE',
             status=MockEmrObject(
@@ -137,7 +137,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             _steps=[step(start_hours_ago=8, end_hours_ago=6)],
         ))
 
-        # idle job flow
+        # idle cluster
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-DONE_AND_IDLE',
             status=MockEmrObject(
@@ -150,7 +150,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             _steps=[step(start_hours_ago=4, end_hours_ago=2)],
         ))
 
-        # idle job flow with 4.x step format. should still be
+        # idle cluster with 4.x step format. should still be
         # recognizable as a streaming step
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-DONE_AND_IDLE_4_X',
@@ -166,7 +166,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
                          args=['hadoop-streaming'] + self._DEFAULT_STEP_ARGS)],
         ))
 
-        # idle job flow with an active lock
+        # idle cluster with an active lock
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-IDLE_AND_LOCKED',
             status=MockEmrObject(
@@ -184,7 +184,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             },
         }, time_modified=self.now)
 
-        # idle job flow with an expired lock
+        # idle cluster with an expired lock
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-IDLE_AND_EXPIRED',
             status=MockEmrObject(
@@ -202,7 +202,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             },
         }, time_modified=(self.now - timedelta(minutes=5)))
 
-        # idle job flow with an expired lock
+        # idle cluster with an expired lock
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-IDLE_BUT_INCOMPLETE_STEPS',
             status=MockEmrObject(
@@ -215,7 +215,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             _steps=[step(start_hours_ago=4, end_hours_ago=None)],
         ))
 
-        # hive job flow (looks completed but isn't)
+        # hive cluster (looks completed but isn't)
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-HIVE',
             status=MockEmrObject(
@@ -309,7 +309,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             ],
         ))
 
-        # pooled job flow reaching end of full hour
+        # pooled cluster reaching end of full hour
         self.add_mock_emr_cluster(MockEmrObject(
             _bootstrapactions=[
                 MockEmrObject(args=[], name='action 0'),
@@ -329,7 +329,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             ),
         ))
 
-        # job flow that has had pending jobs but hasn't run them
+        # cluster that has had pending jobs but hasn't run them
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-PENDING_BUT_IDLE',
             status=MockEmrObject(
@@ -436,7 +436,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
         self.assertIsNone(
             self._lock_contents(mock_cluster, steps_ahead=steps_ahead))
 
-    def assert_terminated_job_flows_locked_by_terminate(self):
+    def assert_terminated_clusters_locked_by_terminate(self):
         for cluster_id in self.ids_of_terminated_clusters():
             self.assert_locked_by_terminate(self.mock_emr_clusters[cluster_id])
 
@@ -483,14 +483,14 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
             idle_for=timedelta(hours=2),
         )
 
-    def test_hive_job_flow(self):
+    def test_hive_cluster(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-HIVE'],
             idle_for=timedelta(hours=4),
             non_streaming=True,
         )
 
-    def test_hadoop_debugging_job_flow(self):
+    def test_hadoop_debugging_cluster(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-HADOOP_DEBUGGING'],
             idle_for=timedelta(hours=2),
@@ -546,7 +546,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
     def test_increasing_idle_time(self):
         self.assertEqual(self.ids_of_terminated_clusters(), [])
 
-        # no job flows are 20 hours old
+        # no clusters are 20 hours old
         self.maybe_terminate_quietly(
             conf_paths=[], max_hours_idle=20,
             now=self.now)
@@ -576,7 +576,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(max_hours_idle=1)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
@@ -588,7 +588,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly()
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
@@ -600,7 +600,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(max_hours_idle=0)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
@@ -621,7 +621,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(mins_to_end_of_hour=6)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         # j-PENDING_BUT_IDLE is also 5 mins from end of hour, but
         # is skipped because it has pending jobs.
@@ -633,7 +633,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
         self.maybe_terminate_quietly(mins_to_end_of_hour=61,
                                                  max_hours_idle=0.01)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
@@ -646,7 +646,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(pooled_only=True)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         # pooled job was not idle for an hour (the default)
         self.assertEqual(self.ids_of_terminated_clusters(), [])
@@ -661,7 +661,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         self.maybe_terminate_quietly(unpooled_only=True)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(),
                          ['j-DEBUG_ONLY',
@@ -691,7 +691,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
         self.maybe_terminate_quietly(
             pool_name='reflecting', max_hours_idle=0.01)
 
-        self.assert_terminated_job_flows_locked_by_terminate()
+        self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(), ['j-POOLED'])
 
@@ -703,21 +703,21 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
 
     EXPECTED_STDOUT_LINES = [
-        'Terminated job flow j-POOLED (POOLED);'
+        'Terminated cluster j-POOLED (POOLED);'
         ' was idle for 0:50:00, 0:05:00 to end of hour',
-        'Terminated job flow j-PENDING_BUT_IDLE (PENDING_BUT_IDLE);'
+        'Terminated cluster j-PENDING_BUT_IDLE (PENDING_BUT_IDLE);'
         ' was pending for 2:50:00, 1:00:00 to end of hour',
-        'Terminated job flow j-DEBUG_ONLY (DEBUG_ONLY);'
+        'Terminated cluster j-DEBUG_ONLY (DEBUG_ONLY);'
         ' was idle for 2:00:00, 1:00:00 to end of hour',
-        'Terminated job flow j-DONE_AND_IDLE (DONE_AND_IDLE);'
+        'Terminated cluster j-DONE_AND_IDLE (DONE_AND_IDLE);'
         ' was idle for 2:00:00, 1:00:00 to end of hour',
-        'Terminated job flow j-DONE_AND_IDLE_4_X (DONE_AND_IDLE_4_X);'
+        'Terminated cluster j-DONE_AND_IDLE_4_X (DONE_AND_IDLE_4_X);'
         ' was idle for 2:00:00, 1:00:00 to end of hour',
-        'Terminated job flow j-IDLE_AND_EXPIRED (IDLE_AND_EXPIRED);'
+        'Terminated cluster j-IDLE_AND_EXPIRED (IDLE_AND_EXPIRED);'
         ' was idle for 2:00:00, 1:00:00 to end of hour',
-        'Terminated job flow j-IDLE_AND_FAILED (IDLE_AND_FAILED);'
+        'Terminated cluster j-IDLE_AND_FAILED (IDLE_AND_FAILED);'
         ' was idle for 3:00:00, 1:00:00 to end of hour',
-        'Terminated job flow j-HADOOP_DEBUGGING (HADOOP_DEBUGGING);'
+        'Terminated cluster j-HADOOP_DEBUGGING (HADOOP_DEBUGGING);'
         ' was idle for 2:00:00, 1:00:00 to end of hour',
     ]
 
@@ -748,7 +748,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
 
         # dry_run doesn't actually try to lock
         expected_stdout_lines = self.EXPECTED_STDOUT_LINES + [
-            'Terminated job flow j-IDLE_AND_LOCKED (IDLE_AND_LOCKED);'
+            'Terminated cluster j-IDLE_AND_LOCKED (IDLE_AND_LOCKED);'
             ' was idle for 2:00:00, 1:00:00 to end of hour']
 
         self.assertEqual(set(stdout.getvalue().splitlines()),

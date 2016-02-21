@@ -15,9 +15,12 @@
 from mrjob import cmd
 from mrjob import launch
 from mrjob.tools.emr import audit_usage
+from mrjob.tools.emr import create_cluster
 from mrjob.tools.emr import create_job_flow
 from mrjob.tools.emr import report_long_jobs
 from mrjob.tools.emr import s3_tmpwatch
+from mrjob.tools.emr import terminate_cluster
+from mrjob.tools.emr import terminate_idle_clusters
 from mrjob.tools.emr import terminate_idle_job_flows
 from mrjob.tools.emr import terminate_job_flow
 
@@ -52,8 +55,8 @@ class CommandTestCase(TestCase):
     def test_audit_usage(self):
         self._test_main_call(audit_usage, 'audit-emr-usage')
 
-    def test_create_job_flow(self):
-        self._test_main_call(create_job_flow, 'create-job-flow')
+    def test_create_cluster(self):
+        self._test_main_call(create_cluster, 'create-cluster')
 
     def test_report_long_jobs(self):
         self._test_main_call(report_long_jobs, 'report-long-jobs')
@@ -61,9 +64,19 @@ class CommandTestCase(TestCase):
     def test_s3_tmpwatch(self):
         self._test_main_call(s3_tmpwatch, 's3-tmpwatch')
 
-    def test_terminate_idle_job_flows(self):
+    def test_terminate_idle_clusters(self):
+        self._test_main_call(terminate_idle_clusters,
+                             'terminate-idle-clusters')
+
+    def test_terminate_cluster(self):
+        self._test_main_call(terminate_cluster, 'terminate-cluster')
+
+    def test_deprecated_create_job_flow(self):
+        self._test_main_call(create_job_flow, 'create-job-flow')
+
+    def test_deprecated_terminate_idle_job_flows(self):
         self._test_main_call(terminate_idle_job_flows,
                              'terminate-idle-job-flows')
 
-    def test_terminate_job_flow(self):
+    def test_deprecated_terminate_job_flow(self):
         self._test_main_call(terminate_job_flow, 'terminate-job-flow')

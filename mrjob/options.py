@@ -323,6 +323,10 @@ def add_emr_run_opts(opt_group):
             default=None, type='int',
             help='How often (in seconds) to check status of your EMR job'),
 
+        opt_group.add_option(
+            '--cluster-id', dest='cluster_id', default=None,
+            help='ID of an existing EMR cluster to run our job on'),
+
         # --ec2-key-pair is used to launch the job, not to monitor it
         opt_group.add_option(
             '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
@@ -336,7 +340,7 @@ def add_emr_run_opts(opt_group):
 
         opt_group.add_option(
             '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
-            help='ID of an existing EMR job flow to use'),
+            help='Deprecated alias for --cluster-id'),
 
         opt_group.add_option(
             '--hadoop-streaming-jar-on-emr',
@@ -353,8 +357,8 @@ def add_emr_run_opts(opt_group):
         opt_group.add_option(
             '--pool-wait-minutes', dest='pool_wait_minutes', default=None,
             type='int',
-            help=('Wait for a number of minutes for a job flow to finish'
-                  ' if a job finishes, pick up their job flow. Otherwise'
+            help=('Wait for a number of minutes for a cluster to finish'
+                  ' if a job finishes, run job on its cluster. Otherwise'
                   " create a new one. (0, the default, means don't wait)")),
 
         opt_group.add_option(
@@ -403,7 +407,7 @@ def add_emr_launch_opts(opt_group):
         opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
             default=None,
-            help='Availability zone to run the job flow on'),
+            help='Availability zone to run the cluster on'),
 
         opt_group.add_option(
             '--ec2-key-pair', dest='ec2_key_pair', default=None,
@@ -438,20 +442,20 @@ def add_emr_launch_opts(opt_group):
         opt_group.add_option(
             '--iam-service-role', dest='iam_service_role',
             default=None,
-            help=('IAM Job flow role to use for the EMR cluster - see'
+            help=('IAM service role to use for the EMR cluster -- see'
                   ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
 
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',
-            help=("If we create a persistent job flow, have it automatically"
+            help=("If we create a persistent cluster, have it automatically"
                   " terminate itself after it's been idle this many hours.")),
 
         opt_group.add_option(
             '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
             default=None, type='float',
             help=("If --max-hours-idle is set, control how close to the end"
-                  " of an EC2 billing hour the job flow can automatically"
+                  " of an EC2 billing hour the cluster can automatically"
                   " terminate itself (default is 5 minutes).")),
 
         opt_group.add_option(
@@ -461,23 +465,33 @@ def add_emr_launch_opts(opt_group):
                   " of Python at bootstrap time.")),
 
         opt_group.add_option(
+            '--no-pool-clusters', dest='pool_clusters',
+            action='store_false',
+            help="Don't run our job on a pooled cluster (the default)."),
+
+        opt_group.add_option(
             '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
             action='store_false',
-            help="Don't try to run our job on a pooled job flow."),
+            help="Deprecated alias for --no-pool-clusters"),
+
+        opt_group.add_option(
+            '--pool-clusters', dest='pool_clusters',
+            action='store_true',
+            help='Add to an existing cluster or create a new one that does'
+                 ' not terminate when the job completes. Overrides other '
+                 ' cluster-related options including EC2 instance'
+                 ' configuration. Joins pool "default" if --pool-name is not'
+                 ' specified. WARNING: do not run this without'
+                 ' mrjob terminate-idle-clusters in your crontab;'
+                 ' clusters left idle can quickly become expensive!'),
 
         opt_group.add_option(
             '--pool-emr-job-flows', dest='pool_emr_job_flows',
             action='store_true',
-            help='Add to an existing job flow or create a new one that does'
-                 ' not terminate when the job completes. Overrides other job'
-                 ' flow-related options including EC2 instance configuration.'
-                 ' Joins pool "default" if emr_job_flow_pool_name is not'
-                 ' specified. WARNING: do not run this without'
-                 ' mrjob.tools.emr.terminate_idle_job_flows in your crontab;'
-                 ' job flows left idle can quickly become expensive!'),
+            help='Deprecated alias for --pool-clusters'),
 
         opt_group.add_option(
-            '--pool-name', dest='emr_job_flow_pool_name', action='store',
+            '--pool-name', dest='pool_name', action='store',
             default=None,
             help=('Specify a pool name to join. Set to "default" if not'
                   ' specified.')),
@@ -518,14 +532,14 @@ def add_emr_launch_opts(opt_group):
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',
             default=None, action='store_true',
-            help='Make your job flow is visible to all IAM users on the same'
+            help='Make your cluster is visible to all IAM users on the same'
                  ' AWS account (the default).'
         ),
 
         opt_group.add_option(
             '--no-visible-to-all-users', dest='visible_to_all_users',
             default=None, action='store_false',
-            help='Hide your job flow from other IAM users on the same AWS'
+            help='Hide your cluster from other IAM users on the same AWS'
                  ' account.'
         ),
 

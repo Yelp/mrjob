@@ -192,7 +192,7 @@ that will terminate themselves after being idle for a certain amount of time,
 in a way that optimizes EMR/EC2's full-hour billing model.
 
 For development (not production), we now recommend always using
-:ref:`job flow pooling <pooling-job-flows>`, with :mrjob-opt:`max_hours_idle`
+:ref:`job flow pooling <pooling-clusters>`, with :mrjob-opt:`max_hours_idle`
 enabled. Update your :ref:`mrjob.conf <mrjob.conf>` like this:
 
 .. code-block:: yaml
@@ -336,7 +336,7 @@ Features
     multiple automated jobs, save time and money while debugging, and generally
     make your life simpler.
 
-    More info: :ref:`pooling-job-flows`
+    More info: :ref:`pooling-clusters`
 
 **SSH Log Fetching**
 

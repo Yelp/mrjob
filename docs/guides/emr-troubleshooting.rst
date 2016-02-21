@@ -14,41 +14,41 @@ these errors:
 As mentioned above, in addition to looking at S3, :py:mod:`mrjob` can be configured to
 also use SSH to fetch error logs directly from the master and slave nodes.
 This can speed up debugging significantly, because logs are only available on
-S3 five minutes after the job completes, or immediately after the job flow
+S3 five minutes after the job completes, or immediately after the cluster
 terminates.
 
-Using persistent job flows
+Using persistent clusters
 --------------------------
 
-When troubleshooting a job, it can be convenient to use a persistent job flow
+When troubleshooting a job, it can be convenient to use a persistent cluster
 to avoid having to wait for bootstrapping every run. **If you decide to use
-persistent job flows, add** :py:mod:`mrjob.tools.emr.terminate_idle_job_flows`
+persistent clusters, add** :py:mod:`mrjob.tools.emr.terminate_idle_clusters`
 **to your crontab or you will be billed for unused CPU time if you forget to
-explicitly terminate job flows.**
+explicitly terminate clusters.**
 
-First, use the :py:mod:`mrjob.tools.emr.create_job_flow` tool to create a
-persistent job flow::
+First, use the :py:mod:`mrjob.tools.emr.create_cluster` tool to create a
+persistent cluster::
 
-    > python -m mrjob.tools.emr.create_job_flow
+    $ mrjob create-cluster
     using configs in /etc/mrjob.conf
-    Creating persistent job flow to run several jobs in...
+    Creating persistent cluster to run several jobs in...
     creating tmp directory /scratch/username/no_script.username.20110811.185141.422311
     writing master bootstrap script to /scratch/username/no_script.username.20110811.185141.422311/b.py
     Copying non-input files into s3://scratch-bucket/tmp/no_script.username.20110811.185141.422311/files/
     Waiting 5.0s for S3 eventual consistency
-    Creating Elastic MapReduce job flow
-    Job flow created with ID: j-1NXMMBNEQHAFT
+    Creating Elastic MapReduce cluster
+    Cluster created with ID: j-1NXMMBNEQHAFT
     j-1NXMMBNEQHAFT
 
-Now you can use the job flow ID to start the troublesome job::
+Now you can use the cluster ID to start the troublesome job::
 
-    > python mrjob/buggy_job.py -r emr --emr-job-flow-id=j-1NXMMBNEQHAFT input/* > out
+    $ python mrjob/buggy_job.py -r emr --cluster-id=j-1NXMMBNEQHAFT input/* > out
     using configs in /etc/mrjob.conf
     Uploading input to s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/input/
     creating tmp directory /scratch/username/buggy_job.username.20110811.185410.536519
     writing wrapper script to /scratch/username/buggy_job.username.20110811.185410.536519/wrapper.py
     Copying non-input files into s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/files/
-    Adding our job to job flow j-1NXMMBNEQHAFT
+    Adding our job to cluster j-1NXMMBNEQHAFT
     Job launched 30.1s ago, status BOOTSTRAPPING: Running bootstrap actions
     Job launched 60.1s ago, status BOOTSTRAPPING: Running bootstrap actions
     Job launched 90.2s ago, status BOOTSTRAPPING: Running bootstrap actions
@@ -90,8 +90,8 @@ Now you can use the job flow ID to start the troublesome job::
     ...
 
 
-The same job flow ID can be used to start new jobs without waiting for a new
-job flow to bootstrap.
+The same cluster ID can be used to start new jobs without waiting for a new
+cluster to bootstrap.
 
 Note that SSH must be set up for logs to be scanned from persistent jobs.
 

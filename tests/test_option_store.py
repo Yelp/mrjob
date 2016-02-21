@@ -439,13 +439,31 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             opts = EMRRunnerOptionStore(
                 'emr',
                 dict(base_tmp_dir='/scratch',
+                     emr_job_flow_id='j-CLUSTERID',
+                     emr_job_flow_pool_name='liver',
+                     pool_emr_job_flows=True,
                      s3_scratch_uri='s3://bucket/walrus'),
                     [])
+
+            self.assertEqual(opts['cluster_id'], 'j-CLUSTERID')
+            self.assertNotIn('emr_job_flow_id', opts)
+            self.assertIn('Deprecated option emr_job_flow_id has been renamed'
+                          ' to cluster_id', stderr.getvalue())
 
             self.assertEqual(opts['local_tmp_dir'], '/scratch')
             self.assertNotIn('base_tmp_dir', opts)
             self.assertIn('Deprecated option base_tmp_dir has been renamed'
                           ' to local_tmp_dir', stderr.getvalue())
+
+            self.assertEqual(opts['pool_clusters'], True)
+            self.assertNotIn('pool_emr_job_flows', opts)
+            self.assertIn('Deprecated option pool_emr_job_flows has been'
+                          ' renamed to pool_clusters', stderr.getvalue())
+
+            self.assertEqual(opts['pool_name'], 'liver')
+            self.assertNotIn('emr_job_flow_pool_name', opts)
+            self.assertIn('Deprecated option emr_job_flow_pool_name has been'
+                          ' renamed to pool_name', stderr.getvalue())
 
             self.assertEqual(opts['s3_tmp_dir'], 's3://bucket/walrus')
             self.assertNotIn('s3_scratch_uri', opts)
@@ -459,7 +477,7 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             opts = RunnerOptionStore(
                 'inline',
                 dict(cleanup=['LOCAL_SCRATCH', 'REMOTE_SCRATCH'],
-                     cleanup_on_failure=['SCRATCH']),
+                     cleanup_on_failure=['JOB_FLOW', 'SCRATCH']),
                 [])
 
             self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'REMOTE_TMP'])
@@ -470,8 +488,10 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
                 'Deprecated cleanup option REMOTE_SCRATCH has been renamed'
                 ' to REMOTE_TMP', stderr.getvalue())
 
-            # should quietly convert string to list
-            self.assertEqual(opts['cleanup_on_failure'], ['TMP'])
+            self.assertEqual(opts['cleanup_on_failure'], ['CLUSTER', 'TMP'])
+            self.assertIn(
+                'Deprecated cleanup_on_failure option JOB_FLOW has been'
+                ' renamed to CLUSTER', stderr.getvalue())
             self.assertIn(
                 'Deprecated cleanup_on_failure option SCRATCH has been renamed'
                 ' to TMP', stderr.getvalue())

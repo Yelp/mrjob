@@ -19,12 +19,12 @@
 # Author: David Marin <dm@davidmarin.org>
 
 # This script is part of mrjob, but can be run as a bootstrap action on
-# ANY Elastic MapReduce job flow. Arguments are totally optional.
+# ANY Elastic MapReduce cluster. Arguments are totally optional.
 
-# This script runs `hadoop job -list` in a loop and considers the job flow
-# idle if no jobs are currently running. If the job flow stays idle long
+# This script runs `hadoop job -list` in a loop and considers the cluster
+# idle if no jobs are currently running. If the cluster stays idle long
 # enough AND we're close enough to the end of an EC2 billing hour, we
-# shut down the master node, which kills the job flow.
+# shut down the master node, which kills the cluster.
 
 # By default, we allow an idle time of 15 minutes, and shut down within
 # the last 5 minutes of the hour.
@@ -35,13 +35,13 @@
 # pending in EMR, or ones that you're about to submit, or jobs that started
 # running since the last time we called `hadoop job -list`.
 
-# This script will leave the job flow in the FAILED (not TERMINATED) state,
+# This script will leave the cluster in the FAILED (not TERMINATED) state,
 # with LastStateChangeReason "The master node was terminated. ". It can
 # take EMR a minute or so to realize that master node has been shut down.
 
 # full usage:
 #
-# ./terminate_idle_job_flow.sh [ max_hours_idle [ min_secs_to_end_of_hour ] ]
+# ./terminate_idle_cluster.sh [ max_hours_idle [ min_secs_to_end_of_hour ] ]
 #
 # Both arguments must be integers
 

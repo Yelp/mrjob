@@ -64,11 +64,11 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: * ``'ALL'``: delete logs and local and remote temp files; stop job flow
+#: * ``'ALL'``: delete logs and local and remote temp files; stop cluster
 #:   if on EMR and the job is not done when cleanup is run.
-#: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
-#: * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
+#: * ``'CLUSTER'``: terminate the cluster if on EMR and the job is not done
 #:    on cleanup
+#: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'LOCAL_TMP'``: delete local temp files only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
@@ -80,8 +80,8 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:     Options ending in ``TMP`` used to end in ``SCRATCH``.
 CLEANUP_CHOICES = [
     'ALL',
+    'CLUSTER',
     'JOB',
-    'JOB_FLOW',
     'LOCAL_TMP',
     'LOGS',
     'NONE',
@@ -90,6 +90,7 @@ CLEANUP_CHOICES = [
 ]
 
 _CLEANUP_DEPRECATED_ALIASES = {
+    'JOB_FLOW': 'CLUSTER',
     'LOCAL_SCRATCH': 'LOCAL_TMP',
     'REMOTE_SCRATCH': 'REMOTE_TMP',
     'SCRATCH': 'TMP',
@@ -532,6 +533,10 @@ class MRJobRunner(object):
         """
         pass  # this only happens on EMR
 
+    def _cleanup_cluster(self):
+        """Terminate the cluster if there is one."""
+        pass  # this only happens on EMR
+
     def _cleanup_logs(self):
         """Cleanup any log files that are created as a side-effect of the job.
         """
@@ -539,10 +544,6 @@ class MRJobRunner(object):
 
     def _cleanup_job(self):
         """Stop any jobs that we created that are still running."""
-        pass  # this only happens on EMR
-
-    def _cleanup_job_flow(self):
-        """Terminate the job flow if there is one."""
         pass  # this only happens on EMR
 
     def cleanup(self, mode=None):
@@ -566,8 +567,8 @@ class MRJobRunner(object):
             return any((choice in mode) for choice in args)
 
         if self._script_path and not self._ran_job:
-            if mode_has('JOB_FLOW', 'ALL'):
-                self._cleanup_job_flow()
+            if mode_has('CLUSTER', 'ALL'):
+                self._cleanup_cluster()
 
             if mode_has('JOB', 'ALL'):
                 self._cleanup_job()
@@ -589,8 +590,7 @@ class MRJobRunner(object):
             [{'group name': {'counter1': 1, 'counter2': 2}},
              {'group name': ...}]
 
-        The list contains an entry for every step of the current job, ignoring
-        earlier steps in the same job flow.
+        The list contains an entry for every step of the current job.
         """
         raise NotImplementedError
 
@@ -661,11 +661,11 @@ class MRJobRunner(object):
         """Return the version number of the Hadoop environment as a string if
         Hadoop is being used or simulated. Return None if not applicable.
 
-        :py:class:`~mrjob.emr.EMRJobRunner` infers this from the job flow.
+        :py:class:`~mrjob.emr.EMRJobRunner` infers this from the cluster.
         :py:class:`~mrjob.hadoop.HadoopJobRunner` gets this from
         ``hadoop version``. :py:class:`~mrjob.local.LocalMRJobRunner` has an
         additional `hadoop_version` option to specify which version it
-        simulates, with a default of 0.20.
+        simulates.
         :py:class:`~mrjob.inline.InlineMRJobRunner` does not simulate Hadoop at
         all.
         """

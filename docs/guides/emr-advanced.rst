@@ -1,98 +1,98 @@
 Advanced EMR usage
 ==================
 
-.. _reusing-job-flows:
+.. _reusing-clusters:
 
-Reusing Job Flows
+Reusing Clusters
 -----------------
 
-It can take several minutes to create a job flow. To decrease wait time when
+It can take several minutes to create a cluster. To decrease wait time when
 running multiple jobs, you may find it convenient to reuse a single job.
 
-:py:mod:`mrjob` includes a utility to create persistent job flows without
-running a job. For example, this command will create a job flow with 12 EC2
+:py:mod:`mrjob` includes a utility to create persistent clusters without
+running a job. For example, this command will create a cluster with 12 EC2
 instances (1 master and 11 slaves), taking all other options from
 :py:mod:`mrjob.conf`::
 
-    > python mrjob/tools/emr/create_job_flow.py --num-ec2-instances=12
+    $ mrjob create-cluster --num-ec2-instances=12
     ...
-    Job flow created with ID: j-JOBFLOWID
+    Cluster created with ID: j-CLUSTERID
 
 
-You can then add jobs to the job flow with the :option:`--emr-job-flow-id`
-switch or the `emr_job_flow_id` variable in `mrjob.conf` (see
+You can then add jobs to the cluster with the :option:`--emr-cluster-id`
+switch or the `emr_cluster_id` variable in `mrjob.conf` (see
 :py:meth:`EMRJobRunner.__init__`)::
 
-    > python mr_my_job.py -r emr --emr-job-flow-id=j-JOBFLOWID input_file.txt > out
+    $ python mr_my_job.py -r emr --emr-cluster-id=j-CLUSTERID input_file.txt > out
     ...
-    Adding our job to job flow j-JOBFLOWID
+    Adding our job to cluster j-CLUSTERID
     ...
 
 Debugging will be difficult unless you complete SSH setup (see
 :ref:`ssh-tunneling`) since the logs will not be copied from the master node to
-S3 before either five minutes pass or the job flow terminates.
+S3 before either five minutes pass or the cluster terminates.
 
-.. _pooling-job-flows:
+.. _pooling-clusters:
 
-Pooling Job Flows
+Pooling Clusters
 -----------------
 
-Manually creating job flows to reuse and specifying the job flow ID for every
-run can be tedious. In addition, it is not convenient to coordinate job flow
+Manually creating clusters to reuse and specifying the cluster ID for every
+run can be tedious. In addition, it is not convenient to coordinate cluster
 use among multiple users.
 
-To mitigate these problems, :py:mod:`mrjob` provides **job flow pools.** Rather
-than having to remember to start a job flow and copying its ID, simply pass
-:option:`--pool-emr-job-flows` on the command line. The first time you do this,
-a new job flow will be created that does not terminate when the job completes.
-When you use :option:`--pool-emr-job-flows` the next time, it will identify the
-job flow and add the job to it rather than creating a new one.
+To mitigate these problems, :py:mod:`mrjob` provides **cluster pools.** Rather
+than having to remember to start a cluster and copying its ID, simply pass
+:option:`--pool-clusters` on the command line. The first time you do this,
+a new cluster will be created that does not terminate when the job completes.
+When you use :option:`--pool-clusters` the next time, it will identify the
+cluster and add the job to it rather than creating a new one.
 
 .. warning::
 
-    If you use job flow pools, keep
-    :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` in your crontab!
-    Otherwise you may forget to terminate your job flows and waste a lot of
+    If you use cluster pools, keep
+    :py:mod:`~mrjob.tools.emr.terminate_clusters` in your crontab!
+    Otherwise you may forget to terminate your clusters and waste a lot of
     money.
 
 Alternatively, you may use the :mrjob-opt:`max_hours_idle` option to create
-self-terminating job flows; the disadvantage is that pooled jobs may
-occasionally join job flows with out knowing they are about to self-terminate
+self-terminating clusters; the disadvantage is that pooled jobs may
+occasionally join clusters with out knowing they are about to self-terminate
 (this is better for development than production).
 
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
-share the same job flows. This means that the version of :py:mod:`mrjob`,
+share the same clusters. This means that the version of :py:mod:`mrjob`,
 boostrap configuration, Hadoop version and AMI version all need to be exactly
 the same.
 
-Pooled jobs will also only use job flows with the same **pool name**, so you
-can use the :option:`--pool-name` option to partition your job flows into
+Pooled jobs will also only use clusters with the same **pool name**, so you
+can use the :option:`--pool-name` option to partition your clusters into
 separate pools.
 
 Pooling is flexible about instance type and number of instances; it will
-attempt to select the most powerful job flow available as long as the job
-flow's instances provide at least as much memory and at least as much CPU as
-your job requests. If there is a tie, it picks job flows that are closest to
+attempt to select the most powerful cluster available as long as the
+cluster's instances provide at least as much memory and at least as much CPU as
+your job requests. If there is a tie, it picks clusters that are closest to
 the end of a full hour, to minimize wasted instance hours.
 
-Amazon limits job flows to 256 steps total; pooling respects this and won't try
-to use pooled job flows that are "full." :py:mod:`mrjob` also uses an S3-based
+Amazon limits clusters to 256 steps total; pooling respects this and won't try
+to use pooled clusters that are "full." :py:mod:`mrjob` also uses an S3-based
 "locking" mechanism to prevent two jobs from simultaneously joining the same
-job flow. This is somewhat ugly but works in practice, and avoids
+cluster. This is somewhat ugly but works in practice, and avoids
 :py:mod:`mrjob` depending on Amazon services other than EMR and S3.
 
 .. warning::
 
     If S3 eventual consistency takes longer than *s3_sync_wait_time*, then you
     may encounter race conditions when using pooling, e.g. two jobs claiming
-    the same job flow at the same time, or the idle job flow killer shutting
+    the same cluster at the same time, or the idle cluster killer shutting
     down your job before it has started to run. Regions with read-after-write
     consistency (i.e. every region except US Standard) should not experience
     these issues.
 
-You can allow jobs to wait for an available job flow instead of immediately
+You can allow jobs to wait for an available cluster instead of immediately
 starting a new one by specifying a value for `--pool-wait-minutes`. mrjob will
-try to find a job flow every 30 seconds for **pool_wait_minutes**. If none is
+try to find a cluster every 30 seconds for **pool_wait_minutes**. If none is
 found during that time, mrjob will start a new one.
 
 .. _spot-instances:
@@ -102,7 +102,7 @@ Spot Instances
 
 Amazon also has a spot market for EC2 instances. You can potentially save money
 by using the spot market. The catch is that if someone bids more for instances
-that you're using, they can be taken away from your job flow. If this happens,
+that you're using, they can be taken away from your cluster. If this happens,
 you aren't charged, but your job may fail.
 
 You can specify spot market bid prices using the *ec2_core_instance_bid_price*,
@@ -128,7 +128,7 @@ your job to finish but you'd like to save time and money if you can, in which
 case you want to run task instances on the spot market and purchase master and
 core instances the regular way.
 
-Job flow pooling interacts with bid prices more or less how you'd expect; a job
+cluster pooling interacts with bid prices more or less how you'd expect; a job
 will join a pool with spot instances only if it requested spot instances at the
 same price or lower.
 
@@ -219,10 +219,10 @@ install it and use it as ``python_bin``::
     --bootstrap-cmd="sudo apt-get install -y python2.6-dbg" \
     --python-bin=python2.6-dbg
 
-Run your job in a persistent job flow. When it fails, you can SSH to your nodes
+Run your job in a persistent cluster. When it fails, you can SSH to your nodes
 to inspect the core dump files::
 
-    you@local: emr --ssh j-MYJOBFLOWID
+    you@local: emr --ssh j-MYCLUSTERID
 
     hadoop@ip-10-160-75-214:~$ gdb `which python` /tmp/cores/core.python.blah
 

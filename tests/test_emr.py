@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2015 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             self.assertEqual(mock_s3_fs_snapshot, self.mock_s3_fs)
 
             # make sure AdditionalInfo was JSON-ified from the config file.
-            # checked now because you can't actually read it from the job flow
+            # checked now because you can't actually read it from the cluster
             # on real EMR.
             self.assertEqual(runner._opts['additional_emr_info'],
                              '{"key": "value"}')
@@ -291,7 +291,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
 
     def test_attach_to_existing_cluster(self):
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        # set log_uri to None, so that when we describe the job flow, it
+        # set log_uri to None, so that when we describe the cluster, it
         # won't have the loguri attribute, to test Issue #112
         cluster_id = emr_conn.run_jobflow(
             name='Development Cluster', log_uri=None,
@@ -303,7 +303,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
             b'1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--emr-job-flow-id', cluster_id])
+                               '--cluster-id', cluster_id])
         mr_job.sandbox(stdin=stdin)
 
         results = []
@@ -311,7 +311,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
             runner.run()
 
             # Issue 182: don't create the bootstrap script when
-            # attaching to another job flow
+            # attaching to another cluster
             self.assertIsNone(runner._master_bootstrap_script_path)
 
             for line in runner.stream_output():
@@ -323,7 +323,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
 
     def test_dont_take_down_cluster_on_failure(self):
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        # set log_uri to None, so that when we describe the job flow, it
+        # set log_uri to None, so that when we describe the cluster, it
         # won't have the loguri attribute, to test Issue #112
         cluster_id = emr_conn.run_jobflow(
             name='Development Cluster', log_uri=None,
@@ -331,7 +331,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
             service_role='fake-service-role')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--emr-job-flow-id', cluster_id])
+                               '--cluster-id', cluster_id])
         mr_job.sandbox()
 
         self.add_mock_s3_data({'walrus': {}})
@@ -1086,7 +1086,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 BUCKET = 'walrus'
 BUCKET_URI = 's3://' + BUCKET + '/'
 
-LOG_DIR = 'j-JOBFLOWID/'
+LOG_DIR = 'j-CLUSTERID/'
 
 GARBAGE = \
 b"""GarbageGarbageGarbage
@@ -1385,7 +1385,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
                               bootstrap_mrjob=False,
                               bootstrap_actions=['foo', 'bar baz'],
                               bootstrap_python=False,
-                              pool_emr_job_flows=False)
+                              pool_clusters=False)
 
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
@@ -1394,7 +1394,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
                               bootstrap_python=False,
-                              pool_emr_job_flows=True)
+                              pool_clusters=True)
 
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
@@ -1527,10 +1527,10 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
     def make_pooled_cluster(self, name=None, minutes_ago=0, **kwargs):
         """Returns ``(runner, cluster_id)``. Set minutes_ago to set
-        ``jobflow.startdatetime`` to seconds before
+        ``cluster.startdatetime`` to seconds before
         ``datetime.datetime.now()``."""
-        runner = EMRJobRunner(pool_emr_job_flows=True,
-                              emr_job_flow_pool_name=name,
+        runner = EMRJobRunner(pool_clusters=True,
+                              pool_name=name,
                               **kwargs)
         cluster_id = runner.make_persistent_cluster()
         mock_cluster = self.mock_emr_clusters[cluster_id]
@@ -1562,7 +1562,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         self.assertNotEqual(actual_cluster_id, cluster_id)
 
-        # terminate the job flow created by this assert, to avoid
+        # terminate the cluster created by this assert, to avoid
         # very confusing behavior (see Issue #331)
         emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
         emr_conn.terminate_jobflow(actual_cluster_id)
@@ -1570,7 +1570,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def make_simple_runner(self, pool_name):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
         mr_job = MRTwoStepJob([
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', pool_name])
         mr_job.sandbox()
         runner = mr_job.make_runner()
@@ -1579,21 +1579,21 @@ class PoolMatchingTestCase(MockBotoTestCase):
         return runner
 
     def test_make_new_pooled_cluster(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-emr-job-flows'])
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--pool-clusters'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             self.prepare_runner_for_ssh(runner)
             runner.run()
 
-            # Make sure that the runner made a pooling-enabled job flow
+            # Make sure that the runner made a pooling-enabled cluster
             emr_conn = runner.make_emr_conn()
             bootstrap_actions = list(_yield_all_bootstrap_actions(
                 emr_conn, runner.get_cluster_id()))
 
             jf_hash, jf_name = _pool_hash_and_name(bootstrap_actions)
             self.assertEqual(jf_hash, runner._pool_hash())
-            self.assertEqual(jf_name, runner._opts['emr_job_flow_pool_name'])
+            self.assertEqual(jf_name, runner._opts['pool_name'])
 
             emr_conn.simulate_progress(runner.get_cluster_id())
             cluster = runner._describe_cluster()
@@ -1603,49 +1603,49 @@ class PoolMatchingTestCase(MockBotoTestCase):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows'])
+            '-r', 'emr', '-v', '--pool-clusters'])
 
     def test_join_named_pool(self):
         _, cluster_id = self.make_pooled_cluster('pool1')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', 'pool1'])
 
     def test_join_anyway_if_i_say_so(self):
         _, cluster_id = self.make_pooled_cluster(ami_version='2.0')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
-            '--emr-job-flow-id', cluster_id,
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--cluster-id', cluster_id,
             '--ami-version', '2.2'])
 
     def test_pooling_with_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(ami_version='2.0')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ami-version', '2.0'])
 
     def test_pooling_with_ami_version_prefix_major_minor(self):
         _, cluster_id = self.make_pooled_cluster(ami_version='2.0.0')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ami-version', '2.0'])
 
     def test_pooling_with_ami_version_prefix_major(self):
         _, cluster_id = self.make_pooled_cluster(ami_version='2.0.0')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ami-version', '2'])
 
     def test_dont_join_pool_with_wrong_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(ami_version='2.2')
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ami-version', '2.0'])
 
     def test_pooling_with_4_x_ami_version(self):
@@ -1653,49 +1653,49 @@ class PoolMatchingTestCase(MockBotoTestCase):
         _, cluster_id = self.make_pooled_cluster(ami_version='4.0.0')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ami-version', '4.0.0'])
 
     def test_pooling_with_release_label(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0'])
 
     def test_dont_join_pool_with_wrong_release_label(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.1')
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0'])
 
     def test_dont_join_pool_without_release_label(self):
         _, cluster_id = self.make_pooled_cluster(ami_version='2.2')
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0'])
 
     def test_matching_release_label_and_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ami-version', '4.0.0'])
 
     def test_non_matching_release_label_and_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ami-version', '2.2'])
 
     def test_release_label_hides_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0',
             '--ami-version', '1.0.0'])
 
@@ -1705,7 +1705,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             additional_emr_info=info)
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--additional-emr-info', info])
 
     def test_dont_join_pool_with_wrong_additional_emr_info(self):
@@ -1713,7 +1713,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--additional-emr-info', info])
 
     def test_join_pool_with_same_instance_type_and_count(self):
@@ -1722,7 +1722,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=20)
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'm2.4xlarge',
             '--num-ec2-instances', '20'])
 
@@ -1732,7 +1732,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=20)
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'm2.4xlarge',
             '--num-ec2-instances', '5'])
 
@@ -1742,7 +1742,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=20)
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'm1.medium',
             '--num-ec2-instances', '20'])
 
@@ -1751,10 +1751,10 @@ class PoolMatchingTestCase(MockBotoTestCase):
             ec2_instance_type='c1.xlarge',
             num_ec2_instances=3)
 
-        # join the pooled job flow even though it has less instances total,
+        # join the pooled cluster even though it has less instances total,
         # since they're have enough memory and CPU
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'm1.medium',
             '--num-ec2-instances', '10'])
 
@@ -1764,7 +1764,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=20)
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'm2.4xlarge',
             '--num-ec2-instances', '2'])
 
@@ -1774,10 +1774,10 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=10)
 
         # We implicitly want a MASTER instance with c1.xlarge. The pooled
-        # job flow has an m1.medium master instance and 9 c1.xlarge core
+        # cluster has an m1.medium master instance and 9 c1.xlarge core
         # instances, which doesn't match.
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'c1.xlarge',
             '--num-ec2-instances', '1'])
 
@@ -1787,7 +1787,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=10)
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'a1.sauce',
             '--num-ec2-instances', '10'])
 
@@ -1797,7 +1797,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=20)
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'a1.sauce',
             '--num-ec2-instances', '10'])
 
@@ -1807,7 +1807,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=5)
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'a1.sauce',
             '--num-ec2-instances', '10'])
 
@@ -1819,7 +1819,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         # for all we know, "a1.sauce" instances have even more memory and CPU
         # than m2.4xlarge
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-instance-type', 'a1.sauce',
             '--num-ec2-instances', '2'])
 
@@ -1828,7 +1828,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             ec2_master_instance_bid_price='0.25')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-master-instance-bid-price', '0.25'])
 
     def test_can_join_cluster_with_higher_bid_price(self):
@@ -1836,7 +1836,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             ec2_master_instance_bid_price='25.00')
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-master-instance-bid-price', '0.25'])
 
     def test_cant_join_cluster_with_lower_bid_price(self):
@@ -1845,14 +1845,14 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_instances=100)
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-master-instance-bid-price', '25.00'])
 
     def test_on_demand_satisfies_any_bid_price(self):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--ec2-master-instance-bid-price', '25.00'])
 
     def test_no_bid_price_satisfies_on_demand(self):
@@ -1860,7 +1860,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             ec2_master_instance_bid_price='25.00')
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows'])
+            '-r', 'emr', '-v', '--pool-clusters'])
 
     def test_core_and_task_instance_types(self):
         # a tricky test that mixes and matches different criteria
@@ -1872,7 +1872,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             num_ec2_task_instances=3)
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--num-ec2-core-instances', '2',
             '--num-ec2-task-instances', '10',  # more instances, but smaller
             '--ec2-core-instance-bid-price', '0.10',
@@ -1882,7 +1882,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_dont_join_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster('pool1')
 
-        # fill the job flow
+        # fill the cluster
         self.mock_emr_clusters[cluster_id]._steps = 255 * [
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
@@ -1897,14 +1897,14 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         # a two-step job shouldn't fit
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', 'pool1'],
             job_class=MRTwoStepJob)
 
     def test_join_almost_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster('pool1')
 
-        # fill the job flow
+        # fill the cluster
         self.mock_emr_clusters[cluster_id]._steps = 255 * [
             MockEmrObject(
                 actiononfailure='CANCEL_AND_WAIT',
@@ -1919,7 +1919,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         # a one-step job should fit
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', 'pool1'],
             job_class=MRWordCount)
 
@@ -1937,7 +1937,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         cluster.delay_progress_simulation = 100  # keep step PENDING
 
         self.assertDoesNotJoin(cluster_id,
-                               ['-r', 'emr', '--pool-emr-job-flows'])
+                               ['-r', 'emr', '--pool-clusters'])
 
     def test_do_join_idle_with_cancelled_steps(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()
@@ -1958,13 +1958,13 @@ class PoolMatchingTestCase(MockBotoTestCase):
         ]
 
         self.assertJoins(cluster_id,
-                         ['-r', 'emr', '--pool-emr-job-flows'])
+                         ['-r', 'emr', '--pool-clusters'])
 
     def test_dont_join_wrong_named_pool(self):
         _, cluster_id = self.make_pooled_cluster('pool1')
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--pool-name', 'not_pool1'])
 
     def test_dont_join_wrong_mrjob_version(self):
@@ -1976,7 +1976,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
 
             self.assertDoesNotJoin(cluster_id, [
-                '-r', 'emr', '-v', '--pool-emr-job-flows',
+                '-r', 'emr', '-v', '--pool-clusters',
                 '--pool-name', 'not_pool1'])
         finally:
             mrjob.__version__ = old_version
@@ -1990,7 +1990,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             bootstrap_files=[local_input_path])
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--bootstrap-file', local_input_path])
 
     def test_dont_join_differently_bootstrapped_pool(self):
@@ -2001,7 +2001,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--bootstrap-file', local_input_path])
 
     def test_dont_join_differently_bootstrapped_pool_2(self):
@@ -2016,7 +2016,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-emr-job-flows',
+            '-r', 'emr', '-v', '--pool-clusters',
             '--bootstrap-action', bootstrap_path + ' a b c'])
 
     def test_pool_contention(self):
@@ -2024,7 +2024,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         def runner_plz():
             mr_job = MRTwoStepJob([
-                '-r', 'emr', '-v', '--pool-emr-job-flows',
+                '-r', 'emr', '-v', '--pool-clusters',
                 '--pool-name', 'robert_downey_jr'])
             mr_job.sandbox()
             runner = mr_job.make_runner()
@@ -2062,9 +2062,9 @@ class PoolMatchingTestCase(MockBotoTestCase):
         self.assertEqual(runner_2._find_cluster(), cluster_id_2)
 
     def test_dont_destroy_own_pooled_cluster_on_failure(self):
-        # Issue 242: job failure shouldn't kill the pooled job flows
+        # Issue 242: job failure shouldn't kill the pooled clusters
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--pool-emr-job-flow'])
+                               '--pool-clusters'])
         mr_job.sandbox()
 
         self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
@@ -2093,13 +2093,13 @@ class PoolMatchingTestCase(MockBotoTestCase):
         self.assertEqual(cluster.status.state, 'WAITING')
 
     def test_dont_destroy_other_pooled_cluster_on_failure(self):
-        # Issue 242: job failure shouldn't kill the pooled job flows
+        # Issue 242: job failure shouldn't kill the pooled clusters
         _, cluster_id = self.make_pooled_cluster()
 
         self.mock_emr_failures = {(cluster_id, 0): None}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--pool-emr-job-flow'])
+                               '--pool-clusters'])
         mr_job.sandbox()
 
         self.mock_emr_failures = set([('j-MOCKCLUSTER0', 0)])
@@ -2134,12 +2134,12 @@ class PoolMatchingTestCase(MockBotoTestCase):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '--pool-emr-job-flows', '--max-hours-idle', '1'])
+            '-r', 'emr', '--pool-clusters', '--max-hours-idle', '1'])
 
     def test_can_join_cluster_started_with_max_hours_idle(self):
         _, cluster_id = self.make_pooled_cluster(max_hours_idle=1)
 
-        self.assertJoins(cluster_id, ['-r', 'emr', '--pool-emr-job-flows'])
+        self.assertJoins(cluster_id, ['-r', 'emr', '--pool-clusters'])
 
 
 class PoolingDisablingTestCase(MockBotoTestCase):
@@ -2147,11 +2147,11 @@ class PoolingDisablingTestCase(MockBotoTestCase):
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
         'check_emr_status_every': 0.00,
         's3_sync_wait_time': 0.00,
-        'pool_emr_job_flows': True,
+        'pool_clusters': True,
     }}}
 
     def test_can_turn_off_pooling_from_cmd_line(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--no-pool-emr-job-flows'])
+        mr_job = MRTwoStepJob(['-r', 'emr', '-v', '--no-pool-clusters'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -2256,7 +2256,7 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
             runner.run()
             self.assertDidNotUseIdleTimeoutScript(runner)
 
-    def test_non_persistent_job_flow(self):
+    def test_non_persistent_cluster(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1'])
         mr_job.sandbox()
 
@@ -2264,12 +2264,12 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
             runner.run()
             self.assertDidNotUseIdleTimeoutScript(runner)
 
-    def test_persistent_job_flow(self):
+    def test_persistent_cluster(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '0.01'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            runner.make_persistent_job_flow()
+            runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
 
     def test_mins_to_end_of_hour(self):
@@ -2278,7 +2278,7 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            runner.make_persistent_job_flow()
+            runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
 
     def test_mins_to_end_of_hour_does_nothing_without_max_hours_idle(self):
@@ -2286,7 +2286,7 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            runner.make_persistent_job_flow()
+            runner.make_persistent_cluster()
             self.assertDidNotUseIdleTimeoutScript(runner)
 
     def test_use_integers(self):
@@ -2295,11 +2295,11 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            runner.make_persistent_job_flow()
+            runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
 
-    def pooled_job_flows(self):
-        mr_job = MRWordCount(['-r', 'emr', '--pool-emr-job-flows',
+    def pooled_clusters(self):
+        mr_job = MRWordCount(['-r', 'emr', '--pool-clusters',
                               '--max-hours-idle', '0.5'])
         mr_job.sandbox()
 
@@ -2353,8 +2353,8 @@ class CleanUpJobTestCase(MockBotoTestCase):
     def _test_mode(self, mode):
         r = EMRJobRunner(conf_paths=[])
         with patch.multiple(r,
+                            _cleanup_cluster=mock.DEFAULT,
                             _cleanup_job=mock.DEFAULT,
-                            _cleanup_job_flow=mock.DEFAULT,
                             _cleanup_local_tmp=mock.DEFAULT,
                             _cleanup_logs=mock.DEFAULT,
                             _cleanup_remote_tmp=mock.DEFAULT) as mock_dict:
@@ -2363,7 +2363,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
 
     def _quick_runner(self):
         r = EMRJobRunner(conf_paths=[], ec2_key_pair_file='fake.pem',
-                         pool_emr_job_flows=True)
+                         pool_clusters=True)
         r._cluster_id = 'j-ESSEOWENS'
         r._address = 'Albuquerque, NM'
         r._ran_job = False
@@ -2371,7 +2371,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
 
     def test_cleanup_all(self):
         with self._test_mode('ALL') as m:
-            self.assertFalse(m['_cleanup_job_flow'].called)
+            self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_job'].called)
             self.assertTrue(m['_cleanup_local_tmp'].called)
             self.assertTrue(m['_cleanup_remote_tmp'].called)
@@ -2379,19 +2379,19 @@ class CleanUpJobTestCase(MockBotoTestCase):
 
     def test_cleanup_job(self):
         with self._test_mode('JOB') as m:
+            self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_local_tmp'].called)
             self.assertFalse(m['_cleanup_remote_tmp'].called)
             self.assertFalse(m['_cleanup_logs'].called)
-            self.assertFalse(m['_cleanup_job_flow'].called)
             self.assertFalse(m['_cleanup_job'].called)  # Only on failure
 
     def test_cleanup_none(self):
         with self._test_mode('NONE') as m:
+            self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_local_tmp'].called)
             self.assertFalse(m['_cleanup_remote_tmp'].called)
             self.assertFalse(m['_cleanup_logs'].called)
             self.assertFalse(m['_cleanup_job'].called)
-            self.assertFalse(m['_cleanup_job_flow'].called)
 
     def test_job_cleanup_mechanics_succeed(self):
         with no_handlers_for_logger():
@@ -2442,29 +2442,29 @@ class CleanUpJobTestCase(MockBotoTestCase):
                 r._cleanup_job()
                 m.assert_not_called()
 
-    def test_kill_job_flow(self):
+    def test_kill_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
-                r._cleanup_job_flow()
+                r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
-    def test_kill_job_flow_if_successful(self):
-        # If they are setting up the cleanup to kill the job flow, mrjob should
-        # kill the job flow independent of job success.
+    def test_kill_cluster_if_successful(self):
+        # If they are setting up the cleanup to kill the cluster, mrjob should
+        # kill the cluster independent of job success.
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
                 r._ran_job = True
-                r._cleanup_job_flow()
+                r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
-    def test_kill_persistent_job_flow(self):
+    def test_kill_persistent_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
-                r._opts['emr_job_flow_id'] = 'j-MOCKCLUSTER0'
-                r._cleanup_job_flow()
+                r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
+                r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
 
@@ -2551,7 +2551,7 @@ class JobWaitTestCase(MockBotoTestCase):
         self.assertEqual(cluster_id, 'j-successful-lock')
         self.assertEqual(self.sleep_counter, 1)
 
-    def test_timeout_waiting_for_job_flow(self):
+    def test_timeout_waiting_for_cluster(self):
         self.mock_cluster_ids.append('j-fail-lock')
         self.future_mock_cluster_ids.append('j-epic-fail-lock')
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)
@@ -2891,13 +2891,13 @@ class ActionOnFailureTestCase(MockBotoTestCase):
         self.assertEqual(runner._action_on_failure,
                          'TERMINATE_CLUSTER')
 
-    def test_default_with_job_flow_id(self):
-        runner = EMRJobRunner(emr_job_flow_id='j-JOBFLOW')
+    def test_default_with_cluster_id(self):
+        runner = EMRJobRunner(cluster_id='j-CLUSTER')
         self.assertEqual(runner._action_on_failure,
                          'CANCEL_AND_WAIT')
 
     def test_default_with_pooling(self):
-        runner = EMRJobRunner(pool_emr_job_flows=True)
+        runner = EMRJobRunner(pool_clusters=True)
         self.assertEqual(runner._action_on_failure,
                          'CANCEL_AND_WAIT')
 

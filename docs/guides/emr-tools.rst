@@ -1,8 +1,9 @@
-EMR job flow management tools
+EMR cluster management tools
 =============================
 
-Each tool can be invoked two ways: from the :doc:`mrjob command <cmd>`, or by
-running the Python module directly. Both ways are given in each example.
+These tools are generally invoked via the :doc:`mrjob command <cmd>`, but you
+can also run ``python -m <module>`` directly.
+
 
 audit_usage
 -----------
@@ -10,10 +11,10 @@ audit_usage
 .. automodule:: mrjob.tools.emr.audit_usage
 
 
-create_job_flow
+create_cluster
 ---------------
 
-.. automodule:: mrjob.tools.emr.create_job_flow
+.. automodule:: mrjob.tools.emr.create_cluster
 
 
 mrboss
@@ -34,13 +35,13 @@ s3_tmpwatch
 .. automodule:: mrjob.tools.emr.s3_tmpwatch
 
 
-terminate_job_flow
+terminate_cluster
 ------------------
 
-.. automodule:: mrjob.tools.emr.terminate_job_flow
+.. automodule:: mrjob.tools.emr.terminate_cluster
 
 
-terminate_idle_job_flows
+terminate_idle_clusters
 ------------------------
 
-.. automodule:: mrjob.tools.emr.terminate_idle_job_flows
+.. automodule:: mrjob.tools.emr.terminate_idle_clusters

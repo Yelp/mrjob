@@ -22,13 +22,10 @@ h for hours, d for days.  If no suffix is specified, time is in hours.
 Suggested usage: run this as a cron job with the -q option::
 
     0 0 * * * mrjob s3-tmpwatch -q 30d s3://your-bucket/tmp/
-    0 0 * * * python -m mrjob.tools.emr.s3_tmpwatch -q 30d \
-s3://your-bucket/tmp/
 
 Usage::
 
     mrjob s3-tmpwatch [options] <time-untouched> <URIs>
-    python -m mrjob.tools.emr.s3_tmpwatch [options] <time-untouched> <URIs>
 
 Options::
 

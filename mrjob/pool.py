@@ -14,7 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utilities related to job-flow-pooling. This code used to be in mrjob.emr.
+"""Utilities related to cluster pooling. This code used to be in mrjob.emr.
 """
 from datetime import datetime
 from datetime import timedelta
@@ -55,7 +55,7 @@ def _est_time_to_hour(cluster_summary, now=None):
 
 
 def _pool_hash_and_name(bootstrap_actions):
-    """Return the hash and pool name for the given job flow, or
+    """Return the hash and pool name for the given cluster, or
     ``(None, None)`` if it isn't pooled."""
     for bootstrap_action in bootstrap_actions:
         if bootstrap_action.name == 'master':

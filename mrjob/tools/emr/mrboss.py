@@ -17,8 +17,7 @@ results in OUTPUT_DIR.
 
 Usage::
 
-    python -m mrjob.tools.emr.mrboss JOB_FLOW_ID [options] "command string"
-    mrjob boss JOB_FLOW_ID [options] "command string"
+    mrjob boss CLUSTER_ID [options] "command string"
 
 Options::
 
@@ -35,7 +34,7 @@ Options::
                         (e.g. us-west-1.elasticmapreduce.amazonaws.com).
                         Default is to infer this from aws_region.
   -o OUTPUT_DIR, --output-dir=OUTPUT_DIR
-                        Specify an output directory (default: JOB_FLOW_ID)
+                        Specify an output directory (default: CLUSTER_ID)
   -q, --quiet           Don't print anything to stderr
   --s3-endpoint=S3_ENDPOINT
                         Host to connect to when communicating with S3 (e.g. s3
@@ -64,15 +63,15 @@ from mrjob.util import shlex_split
 
 
 def main(cl_args=None):
-    usage = 'usage: %prog JOB_FLOW_ID OUTPUT_DIR [options] "command string"'
-    description = ('Run a command on the master and all slaves of an EMR job'
-                   ' flow. Store stdout and stderr for results in OUTPUT_DIR.')
+    usage = 'usage: %prog CLUSTER_ID OUTPUT_DIR [options] "command string"'
+    description = ('Run a command on the master and all slaves of an EMR'
+                   ' cluster. Store stdout/stderr for results in OUTPUT_DIR.')
 
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option('-o', '--output-dir', dest='output_dir',
                              default=None,
                              help="Specify an output directory (default:"
-                             " JOB_FLOW_ID)")
+                             " CLUSTER_ID)")
     add_basic_opts(option_parser)
     add_emr_connect_opts(option_parser)
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
@@ -92,19 +91,19 @@ def main(cl_args=None):
         option_parser.print_help()
         sys.exit(1)
 
-    job_flow_id, cmd_string = args[:2]
+    cluster_id, cmd_string = args[:2]
     cmd_args = shlex_split(cmd_string)
 
-    output_dir = os.path.abspath(options.output_dir or job_flow_id)
+    output_dir = os.path.abspath(options.output_dir or cluster_id)
 
-    with EMRJobRunner(emr_job_flow_id=job_flow_id, **runner_kwargs) as runner:
+    with EMRJobRunner(cluster_id=cluster_id, **runner_kwargs) as runner:
         runner._enable_slave_ssh_access()
         run_on_all_nodes(runner, output_dir, cmd_args)
 
 
 def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     """Given an :py:class:`EMRJobRunner`, run the command specified by
-    *cmd_args* on all nodes in the job flow and save the stdout and stderr of
+    *cmd_args* on all nodes in the cluster and save the stdout and stderr of
     each run to subdirectories of *output_dir*.
 
     You should probably have run :py:meth:`_enable_slave_ssh_access()` on the

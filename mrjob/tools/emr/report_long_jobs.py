@@ -20,7 +20,6 @@
 Suggested usage: run this as a daily cron job with the ``-q`` option::
 
     0 0 * * * mrjob report-long-jobs
-    0 0 * * * python -m mrjob.tools.emr.report_long_jobs -q
 
 Options::
 
@@ -107,7 +106,7 @@ def runner_kwargs(options):
 def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
     """Identify jobs that have been running or pending for a long time.
 
-    :param clusters: a list of :py:class:`boto.emr.emrobject.JobFlow`
+    :param clusters: a list of :py:class:`boto.emr.emrobject.Cluster`
                       objects to inspect.
     :param min_time: a :py:class:`datetime.timedelta`: report jobs running or
                      pending longer than this
@@ -117,8 +116,8 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
     For each job that is running or pending longer than *min_time*, yields
     a dictionary with the following keys:
 
-    * *job_flow_id*: the job flow's unique ID (e.g. ``j-SOMEJOBFLOW``)
-    * *name*: name of the step, or the job flow when bootstrapping
+    * *cluster_id*: the cluster's unique ID (e.g. ``j-SOMECLUSTER``)
+    * *name*: name of the step, or the cluster when bootstrapping
     * *state*: state of the step (``'RUNNING'`` or ``'PENDING'``) or, if there
                is no step, the cluster (``'STARTING'`` or ``'BOOTSTRAPPING'``)
     * *time*: amount of time step was running or pending, as a
@@ -145,7 +144,7 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
                        'state': cs.status.state,
                        'time': time_running})
 
-        # the default case: running job flows
+        # the default case: running clusters
         if cs.status.state != 'RUNNING':
             continue
 
@@ -175,7 +174,7 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
         elif pending_steps:
             step = pending_steps[0]
 
-            # PENDING job should have run starting when the job flow
+            # PENDING job should have run starting when the cluster
             # became ready, or the previous step completed
             start_timestamp = cs.status.timeline.readydatetime
             for step in steps:

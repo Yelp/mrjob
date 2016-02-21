@@ -12,12 +12,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Audit EMR usage over the past 2 weeks, sorted by job flow name and user.
+"""Audit EMR usage over the past 2 weeks, sorted by cluster name and user.
 
 Usage::
 
     mrjob audit-emr-usage > report
-    python -m mrjob.tools.emr.audit_usage > report
 
 Options::
 
@@ -82,11 +81,11 @@ def main(args):
 
     now = datetime.utcnow()
 
-    log.info('getting job flow history...')
+    log.info('getting cluster history...')
     clusters = list(yield_clusters(
         max_days_ago=options.max_days_ago, now=now, **runner_kwargs(options)))
 
-    log.info('compiling job flow stats...')
+    log.info('compiling cluster stats...')
     stats = clusters_to_stats(clusters, now=now)
 
     print_report(stats, now=now)
@@ -120,7 +119,7 @@ def runner_kwargs(options):
 
 
 def clusters_to_stats(clusters, now=None):
-    """Aggregate statistics for several job flows into a dictionary.
+    """Aggregate statistics for several clusters into a dictionary.
 
     :param clusters: a sequence of dicts with the keys ``bootstrap_actions``,
                      ``cluster``, ``steps``.
@@ -130,11 +129,11 @@ def clusters_to_stats(clusters, now=None):
     Returns a dictionary with many keys, including:
 
     * *summaries*: A list of dictionaries; the result of running
-      :py:func:`cluster_to_full_summary` on each job flow.
+      :py:func:`cluster_to_full_summary` on each cluster.
 
     total usage:
 
-    * *nih_billed*: total normalized instances hours billed, for all job flows
+    * *nih_billed*: total normalized instances hours billed, for all clusters
     * *nih_used*: total normalized instance hours actually used for
       bootstrapping and running jobs.
     * *nih_bbnu*: total usage billed but not used (`nih_billed - nih_used`)
@@ -142,7 +141,7 @@ def clusters_to_stats(clusters, now=None):
     further breakdown of total usage:
 
     * *bootstrap_nih_used*: total usage for bootstrapping
-    * *end_nih_bbnu*: unused time at the end of job flows
+    * *end_nih_bbnu*: unused time at the end of clusters
     * *job_nih_used*: total usage for jobs (`nih_used - bootstrap_nih_used`)
     * *other_nih_bbnu*: other unused time (`nih_bbnu - end_nih_bbnu`)
 
@@ -161,14 +160,14 @@ def clusters_to_stats(clusters, now=None):
       normalized instance hours, using ``(None, None)`` for non-:py:mod:`mrjob`
       jobs. This does not include bootstrapping.
     * *job_step_to_nih_\*_no_pool*: Same as *job_step_to_nih_\**, but only
-      including non-pooled job flows.
+      including non-pooled clusters.
     * *owner_to_nih_\**: map from jobs' owners (usually the user who ran them)
       to normalized instance hours, with ``None`` for non-:py:mod:`mrjob` jobs.
       This includes usage data for bootstrapping.
     * *pool_to_nih_\**: Map from pool name to normalized instance hours,
       with ``None`` for non-pooled jobs and non-:py:mod:`mrjob` jobs.
     """
-    s = {}  # stats for all job flows
+    s = {}  # stats for all clusters
 
     s['clusters'] = [cluster_to_full_summary(cluster, now=now)
                      for cluster in clusters]
@@ -241,7 +240,7 @@ def clusters_to_stats(clusters, now=None):
 
 
 def cluster_to_full_summary(cluster, now=None):
-    """Convert a job flow to a full summary for use in creating a report,
+    """Convert a cluster to a full summary for use in creating a report,
     including billing/usage information.
 
     :param cluster: a :py:class:`boto.emr.EmrObject`
@@ -251,7 +250,7 @@ def cluster_to_full_summary(cluster, now=None):
     Returns a dictionary with the keys from
     :py:func:`cluster_to_basic_summary` plus:
 
-    * *nih_billed*: total normalized instances hours billed for this job flow
+    * *nih_billed*: total normalized instances hours billed for this cluster
     * *nih_used*: total normalized instance hours actually used for
       bootstrapping and running jobs.
     * *nih_bbnu*: total usage billed but not used (`nih_billed - nih_used`)
@@ -277,7 +276,7 @@ def cluster_to_full_summary(cluster, now=None):
 
 
 def cluster_to_basic_summary(cluster, now=None):
-    """Extract fields such as creation time, owner, etc. from the job flow,
+    """Extract fields such as creation time, owner, etc. from the cluster,
     so we can safely reference them without using :py:func:`getattr`.
 
     :param cluster: a :py:class:`boto.emr.EmrObject`
@@ -285,28 +284,28 @@ def cluster_to_basic_summary(cluster, now=None):
                 Defaults to the current time.
 
     Returns a dictionary with the following keys. These will be ``None`` if the
-    corresponding field in the job flow is unavailable.
+    corresponding field in the cluster is unavailable.
 
-    * *created*: UTC `datetime.datetime` that the job flow was created,
+    * *created*: UTC `datetime.datetime` that the cluster was created,
       or ``None``
-    * *end*: UTC `datetime.datetime` that the job flow finished, or ``None``
-    * *id*: job flow ID, or ``None`` (this should never happen)
-    * *label*: The label for the job flow (usually the module name of the
+    * *end*: UTC `datetime.datetime` that the cluster finished, or ``None``
+    * *id*: cluster ID, or ``None`` (this should never happen)
+    * *label*: The label for the cluster (usually the module name of the
       :py:class:`~mrjob.job.MRJob` script that started it), or
-      ``None`` for non-:py:mod:`mrjob` job flows.
-    * *name*: job flow name, or ``None`` (this should never happen)
-    * *nih*: number of normalized instance hours used by the job flow.
-    * *num_steps*: Number of steps in the job flow.
-    * *owner*: The owner for the job flow (usually the user that started it),
-      or ``None`` for non-:py:mod:`mrjob` job flows.
-    * *pool*: pool name (e.g. ``'default'``) if the job flow is pooled,
+      ``None`` for non-:py:mod:`mrjob` clusters.
+    * *name*: cluster name, or ``None`` (this should never happen)
+    * *nih*: number of normalized instance hours used by the cluster.
+    * *num_steps*: Number of steps in the cluster.
+    * *owner*: The owner for the cluster (usually the user that started it),
+      or ``None`` for non-:py:mod:`mrjob` clusters.
+    * *pool*: pool name (e.g. ``'default'``) if the cluster is pooled,
       otherwise ``None``.
-    * *ran*: How long the job flow ran, or has been running, as a
+    * *ran*: How long the cluster ran, or has been running, as a
       :py:class:`datetime.timedelta`. This will be ``timedelta(0)`` if
-      the job flow hasn't started.
-    * *ready*: UTC `datetime.datetime` that the job flow finished
+      the cluster hasn't started.
+    * *ready*: UTC `datetime.datetime` that the cluster finished
       bootstrapping, or ``None``
-    * *state*: The job flow's state as a string (e.g. ``'RUNNING'``)
+    * *state*: The cluster's state as a string (e.g. ``'RUNNING'``)
     """
     if now is None:
         now = datetime.utcnow()
@@ -352,10 +351,10 @@ def cluster_to_basic_summary(cluster, now=None):
 
 
 def cluster_to_usage_data(cluster, basic_summary=None, now=None):
-    """Break billing/usage information for a job flow down by job.
+    """Break billing/usage information for a cluster down by job.
 
     :param cluster: a :py:class:`boto.emr.EmrObject`
-    :param basic_summary: a basic summary of the job flow, returned by
+    :param basic_summary: a basic summary of the cluster, returned by
                           :py:func:`cluster_to_basic_summary`. If this
                           is ``None``, we'll call
                           :py:func:`cluster_to_basic_summary` ourselves.
@@ -364,7 +363,7 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
 
     Returns a list of dictionaries containing usage information, one for
     bootstrapping, and one for each step that ran or is currently running. If
-    the job flow hasn't started yet, return ``[]``.
+    the cluster hasn't started yet, return ``[]``.
 
     Usage dictionaries have the following keys:
 
@@ -372,7 +371,7 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
     * *end_billing*: the effective end of the job for billing purposes, either
       when the next job starts, the current time if the job
       is still running, or the end of the next full hour
-      in the job flow.
+      in the cluster.
     * *nih_billed*: normalized instances hours billed for this job or
       bootstrapping step
     * *nih_used*: normalized instance hours actually used for running
@@ -384,9 +383,9 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
       of normalized instance hours billed/used/billed but not used during
       the hour starting at that time
     * *label*: job's label (usually the module name of the job), or for the
-      bootstrapping step, the label of the job flow
+      bootstrapping step, the label of the cluster
     * *owner*: job's owner (usually the user that started it), or for the
-      bootstrapping step, the owner of the job flow
+      bootstrapping step, the owner of the cluster
     * *start*: when the job or bootstrapping step started, as a
       :py:class:`datetime.datetime`
     """
@@ -405,8 +404,8 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
     nih_per_sec = bcs['nih'] / (full_hours * 3600.0)
 
     # Don't actually count a step as billed for the full hour until
-    # the job flow finishes. This means that our total "nih_billed"
-    # will be less than normalizedinstancehours in the job flow, but it
+    # the cluster finishes. This means that our total "nih_billed"
+    # will be less than normalizedinstancehours in the cluster, but it
     # also keeps stats stable for steps that have already finished.
     if bcs['end']:
         cluster_end_billing = bcs['created'] + timedelta(hours=full_hours)
@@ -584,9 +583,9 @@ def subdivide_interval_by_hour(start, end):
 
 
 def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
-    """Get relevant job flow information from EMR.
+    """Get relevant cluster information from EMR.
 
-    :param float max_days_ago: If set, don't fetch job flows created longer
+    :param float max_days_ago: If set, don't fetch clusters created longer
                                than this many days ago.
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
@@ -628,10 +627,10 @@ def print_report(stats, now=None):
     s = stats
 
     if not s['clusters']:
-        print('No job flows created in the past two months!')
+        print('No clusters created in the past two months!')
         return
 
-    print('Total  # of Job Flows: %d' % len(s['clusters']))
+    print('Total  # of Clusters: %d' % len(s['clusters']))
     print()
 
     print('* All times are in UTC.')
@@ -692,7 +691,7 @@ def print_report(stats, now=None):
             h -= timedelta(hours=1)
         print()
 
-    print('* Job flows are considered to belong to the user and job that')
+    print('* clusters are considered to belong to the user and job that')
     print('  started them or last ran on them.')
     print()
 
@@ -758,8 +757,8 @@ def print_report(stats, now=None):
         print('  %9.2f %s' % (nih_bbnu, pool or '(not pooled)'))
     print()
 
-    # Top job flows
-    print('All job flows, by total time billed:')
+    # Top clusters
+    print('All clusters, by total time billed:')
     top_clusters = sorted(s['clusters'],
                           key=lambda cs: (-cs['nih_billed'], cs['name']))
     for cs in top_clusters:
@@ -767,7 +766,7 @@ def print_report(stats, now=None):
             cs['nih_billed'], cs['id'], cs['name']))
     print()
 
-    print('All job flows, by time billed but not used:')
+    print('All clusters, by time billed but not used:')
     top_clusters_bbnu = sorted(
         s['clusters'], key=lambda cs: (-cs['nih_bbnu'], cs['name']))
     for cs in top_clusters_bbnu:
@@ -776,7 +775,7 @@ def print_report(stats, now=None):
     print()
 
     # Details
-    print('Details for all job flows:')
+    print('Details for all clusters:')
     print()
     print(' id              state                  created             steps'
           '        time ran     billed    waste   user   name')

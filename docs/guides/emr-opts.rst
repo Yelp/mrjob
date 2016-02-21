@@ -66,7 +66,7 @@ about setting these options.
 
     path to file containing the SSH key for EMR
 
-Job flow creation and configuration
+Cluster creation and configuration
 -----------------------------------
 
 .. mrjob-opt::
@@ -130,7 +130,7 @@ Job flow creation and configuration
     :default: ``{}``
 
     Additional raw parameters to pass directly to the EMR API when creating a
-    job flow. This allows old versions of `mrjob` to access new API features.
+    cluster. This allows old versions of `mrjob` to access new API features.
     See `the API documentation for RunJobFlow`_ for the full list of options.
 
     .. _`the API documentation for RunJobFlow`:
@@ -264,7 +264,7 @@ Job flow creation and configuration
     :set: emr
     :default: ``None``
 
-    If we create a persistent job flow, have it automatically terminate itself
+    If we create a persistent cluster, have it automatically terminate itself
     after it's been idle this many hours AND we're within
     :mrjob-opt:`mins_to_end_of_hour` of an EC2 billing hour.
 
@@ -278,7 +278,7 @@ Job flow creation and configuration
     :default: 5.0
 
     If :mrjob-opt:`max_hours_idle` is set, controls how close to the end of an
-    EC2 billing hour the job flow can automatically terminate itself.
+    EC2 billing hour the cluster can automatically terminate itself.
 
     .. versionadded:: 0.4.1
 
@@ -307,16 +307,16 @@ Job flow creation and configuration
     :set: emr
     :default: ``True``
 
-    If true (the default) EMR job flows will be visible to all IAM users.
-    Otherwise, the job flow will only be visible to the IAM user that created
+    If true (the default) EMR clusters will be visible to all IAM users.
+    Otherwise, the cluster will only be visible to the IAM user that created
     it.
 
     .. warning::
 
         You should almost certainly not set this to ``False`` if you are
-        :ref:`pooling-job-flows` with other users; other users will
-        not be able to reuse your job flows, and
-        :py:mod:`~mrjob.tools.emr.terminate_idle_job_flows` won't be
+        :ref:`pooling-clusters` with other users; other users will
+        not be able to reuse your clusters, and
+        :py:mod:`~mrjob.tools.emr.terminate_idle_clusters` won't be
         able to shut them down when they become idle.
 
     .. versionadded:: 0.4.1
@@ -335,7 +335,7 @@ and install another Python binary.
     :set: all
     :default: ``[]``
 
-    A list of lines of shell script to run once on each node in your job flow,
+    A list of lines of shell script to run once on each node in your cluster,
     at bootstrap time.
 
     This option is complex and powerful; the best way to get started is to
@@ -452,7 +452,7 @@ and install another Python binary.
     Scripts to upload and then run at bootstrap time. Pass
     ``path/to/script# args`` to :mrjob-opt:`bootstrap` instead.
 
-Monitoring the job flow
+Monitoring the cluster
 -----------------------
 
 .. mrjob-opt::
@@ -602,7 +602,7 @@ Number and type of instances
     run task instances without core instances (because there's nowhere to host
     HDFS).
 
-Choosing/creating a job flow to join
+Choosing/creating a cluster to join
 ------------------------------------
 
 .. mrjob-opt::
@@ -614,53 +614,53 @@ Choosing/creating a job flow to join
 
     What happens if step of your job fails
 
-    * ``'CANCEL_AND_WAIT'`` cancels all steps on the job flow
+    * ``'CANCEL_AND_WAIT'`` cancels all steps on the cluster
     * ``'CONTINUE'`` continues to the next step (useful when submitting several
-        jobs to the same job flow)
-    * ``'TERMINATE_CLUSTER'`` shuts down the job flow entirely
+        jobs to the same cluster)
+    * ``'TERMINATE_CLUSTER'`` shuts down the cluster entirely
 
     The default is ``'CANCEL_AND_WAIT'`` when using pooling (see
-    :mrjob-opt:`pool_emr_job_flows`) or an existing job flow (see
-    :mrjob-opt:`emr_job_flow_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
+    :mrjob-opt:`pool_clusters`) or an existing cluster (see
+    :mrjob-opt:`cluster_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
 
     .. versionadded:: 0.4.3
 
 .. mrjob-opt::
-    :config: emr_job_flow_id
-    :switch: --emr-job-flow-id
+    :config: cluster_id
+    :switch: --cluster-id
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: automatically create a job flow and use it
+    :default: automatically create a cluster and use it
 
-    The ID of a persistent EMR job flow to run jobs in.  It's fine for other
-    jobs to be using the job flow; we give our job's steps a unique ID.
+    The ID of a persistent EMR cluster to run jobs in.  It's fine for other
+    jobs to be using the cluster; we give our job's steps a unique ID.
 
 .. mrjob-opt::
-    :config: emr_job_flow_pool_name
-    :switch: --emr-job-flow-pool-name
+    :config: pool_name
+    :switch: --pool-name
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'default'``
 
-    Specify a pool name to join. Does not imply ``pool_emr_job_flows``.
+    Specify a pool name to join. Does not imply :mrjob-opt:`pool_clusters`.
 
 .. mrjob-opt::
-    :config: pool_emr_job_flows
-    :switch: --pool-emr-job-flows
+    :config: pool_clusters
+    :switch: --pool-clusters
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``False``
 
-    Try to run the job on a ``WAITING`` pooled job flow with the same
+    Try to run the job on a ``WAITING`` pooled cluster with the same
     bootstrap configuration. Prefer the one with the most compute units. Use
-    S3 to "lock" the job flow and ensure that the job is not scheduled behind
-    another job. If no suitable job flow is `WAITING`, create a new pooled job
-    flow.
+    S3 to "lock" the cluster and ensure that the job is not scheduled behind
+    another job. If no suitable cluster is `WAITING`, create a new pooled
+    cluster.
 
     .. warning:: Do not run this without either setting
         :mrjob-opt:`max_hours_idle` or putting
-        :py:mod:`mrjob.tools.emr.terminate.idle_job_flows` in your crontab; job
-        flows left idle can quickly become expensive!
+        :py:mod:`mrjob.tools.emr.terminate_idle_clusters` in your crontab;
+        clusters left idle can quickly become expensive!
 
 .. mrjob-opt::
     :config: pool_wait_minutes
@@ -669,9 +669,9 @@ Choosing/creating a job flow to join
     :set: emr
     :default: 0
 
-    If pooling is enabled and no job flow is available, retry finding a job
-    flow every 30 seconds until this many minutes have passed, then start a new
-    job flow instead of joining one.
+    If pooling is enabled and no cluster is available, retry finding a cluster
+    every 30 seconds until this many minutes have passed, then start a new
+    cluster instead of joining one.
 
 
 S3 paths and options
@@ -702,9 +702,8 @@ MRJob uses boto to manipulate/access S3.
     :default: append ``logs`` to :mrjob-opt:`s3_tmp_dir`
 
     Where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for
-    your job flow will go into a subdirectory, e.g.
-    ``s3://yourbucket/logs/j-JOBFLOWID/``. in this example
-    s3://yourbucket/logs/j-YOURJOBID/).
+    your cluster will go into a subdirectory, e.g.
+    ``s3://yourbucket/logs/j-CLUSTERID/``.
 
 .. mrjob-opt::
     :config: s3_tmp_dir

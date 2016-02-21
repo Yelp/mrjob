@@ -109,7 +109,7 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         # jobconf variables set by our own job (e.g. files "uploaded")
         #
-        # By convention, we use the Hadoop 0.21 (newer) versions of the
+        # By convention, we use the Hadoop 2 versions of the
         # jobconf variables internally (they get auto-translated before
         # running the job)
         self._internal_jobconf = {}

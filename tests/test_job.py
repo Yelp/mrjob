@@ -184,6 +184,8 @@ class CountersAndStatusTestCase(TestCase):
 
         self.assertRaises(TypeError,
                           mr_job.increment_counter, 'Foo', 'Bar', 'two')
+
+
         self.assertRaises(TypeError,
                           mr_job.increment_counter, 'Foo', 'Bar', None)
 

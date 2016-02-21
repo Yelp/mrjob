@@ -106,7 +106,7 @@ def runner_kwargs(options):
 def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
     """Identify jobs that have been running or pending for a long time.
 
-    :param clusters: a list of :py:class:`boto.emr.emrobject.JobFlow`
+    :param clusters: a list of :py:class:`boto.emr.emrobject.Cluster`
                       objects to inspect.
     :param min_time: a :py:class:`datetime.timedelta`: report jobs running or
                      pending longer than this
@@ -116,7 +116,7 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
     For each job that is running or pending longer than *min_time*, yields
     a dictionary with the following keys:
 
-    * *job_flow_id*: the cluster's unique ID (e.g. ``j-SOMECLUSTER``)
+    * *cluster_id*: the cluster's unique ID (e.g. ``j-SOMECLUSTER``)
     * *name*: name of the step, or the cluster when bootstrapping
     * *state*: state of the step (``'RUNNING'`` or ``'PENDING'``) or, if there
                is no step, the cluster (``'STARTING'`` or ``'BOOTSTRAPPING'``)

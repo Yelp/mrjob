@@ -1210,7 +1210,7 @@ class EMRJobRunner(MRJobRunner):
         self._wait_for_s3_eventual_consistency()
 
         log.info('Creating Elastic MapReduce cluster')
-        args = self._job_flow_args(persistent, steps)
+        args = self._cluster_args(persistent, steps)
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
@@ -1233,7 +1233,7 @@ class EMRJobRunner(MRJobRunner):
 
         return cluster_id
 
-    def _job_flow_args(self, persistent=False, steps=None):
+    def _cluster_args(self, persistent=False, steps=None):
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
         api_params = {}

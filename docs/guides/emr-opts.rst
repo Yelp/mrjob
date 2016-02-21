@@ -620,14 +620,14 @@ Choosing/creating a cluster to join
     * ``'TERMINATE_CLUSTER'`` shuts down the cluster entirely
 
     The default is ``'CANCEL_AND_WAIT'`` when using pooling (see
-    :mrjob-opt:`pool_emr_job_flows`) or an existing cluster (see
-    :mrjob-opt:`emr_job_flow_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
+    :mrjob-opt:`pool_clusters`) or an existing cluster (see
+    :mrjob-opt:`cluster_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
 
     .. versionadded:: 0.4.3
 
 .. mrjob-opt::
-    :config: emr_job_flow_id
-    :switch: --emr-job-flow-id
+    :config: cluster_id
+    :switch: --cluster-id
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: automatically create a cluster and use it
@@ -636,17 +636,17 @@ Choosing/creating a cluster to join
     jobs to be using the cluster; we give our job's steps a unique ID.
 
 .. mrjob-opt::
-    :config: emr_job_flow_pool_name
-    :switch: --emr-job-flow-pool-name
+    :config: pool_name
+    :switch: --pool-name
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'default'``
 
-    Specify a pool name to join. Does not imply ``pool_emr_job_flows``.
+    Specify a pool name to join. Does not imply :mrjob-opt:`pool_clusters`.
 
 .. mrjob-opt::
-    :config: pool_emr_job_flows
-    :switch: --pool-emr-job-flows
+    :config: pool_clusters
+    :switch: --pool-clusters
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``False``

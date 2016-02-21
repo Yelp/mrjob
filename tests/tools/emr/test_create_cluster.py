@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Test the create-job-flow script"""
+"""Test the create-cluster script"""
 import sys
 
 from mrjob.tools.emr.create_cluster import main as create_cluster_main
@@ -54,7 +54,6 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'ec2_task_instance_type': None,
              'emr_api_params': {},
              'emr_endpoint': None,
-             'emr_job_flow_pool_name': None,
              'emr_tags': {},
              'enable_emr_debugging': None,
              'iam_endpoint': None,
@@ -67,7 +66,8 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'num_ec2_instances': None,
              'num_ec2_task_instances': None,
              'owner': None,
-             'pool_emr_job_flows': None,
+             'pool_clusters': None,
+             'pool_name': None,
              'release_label': None,
              's3_endpoint': None,
              's3_log_uri': None,

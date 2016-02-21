@@ -64,8 +64,8 @@ from mrjob.util import shlex_split
 
 def main(cl_args=None):
     usage = 'usage: %prog CLUSTER_ID OUTPUT_DIR [options] "command string"'
-    description = ('Run a command on the master and all slaves of an EMR job'
-                   ' flow. Store stdout and stderr for results in OUTPUT_DIR.')
+    description = ('Run a command on the master and all slaves of an EMR'
+                   ' cluster. Store stdout/stderr for results in OUTPUT_DIR.')
 
     option_parser = OptionParser(usage=usage, description=description)
     option_parser.add_option('-o', '--output-dir', dest='output_dir',
@@ -96,7 +96,7 @@ def main(cl_args=None):
 
     output_dir = os.path.abspath(options.output_dir or cluster_id)
 
-    with EMRJobRunner(emr_job_flow_id=cluster_id, **runner_kwargs) as runner:
+    with EMRJobRunner(cluster_id=cluster_id, **runner_kwargs) as runner:
         runner._enable_slave_ssh_access()
         run_on_all_nodes(runner, output_dir, cmd_args)
 

@@ -42,7 +42,7 @@ persistent cluster::
 
 Now you can use the cluster ID to start the troublesome job::
 
-    $ python mrjob/buggy_job.py -r emr --emr-job-flow-id=j-1NXMMBNEQHAFT input/* > out
+    $ python mrjob/buggy_job.py -r emr --cluster-id=j-1NXMMBNEQHAFT input/* > out
     using configs in /etc/mrjob.conf
     Uploading input to s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/input/
     creating tmp directory /scratch/username/buggy_job.username.20110811.185410.536519

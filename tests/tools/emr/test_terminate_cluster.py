@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Test the job flow termination tool"""
+"""Test the cluster termination tool"""
 from mrjob.emr import EMRJobRunner
 from mrjob.patched_boto import patched_describe_cluster
 from mrjob.tools.emr.terminate_cluster import main as terminate_main
@@ -28,7 +28,7 @@ class TerminateToolTestCase(ToolTestCase):
         self.assertEqual(True, True)
 
     def test_terminate_cluster(self):
-        cluster_id = self.make_cluster(pool_emr_job_flows=True)
+        cluster_id = self.make_cluster(pool_clusters=True)
         self.monkey_patch_argv('--quiet', '--no-conf', 'j-MOCKCLUSTER0')
 
         terminate_main()

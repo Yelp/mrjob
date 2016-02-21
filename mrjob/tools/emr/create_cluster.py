@@ -111,7 +111,7 @@ Options::
                         Optional host to connect to when communicating with S3
                         (e.g. us-west-1.elasticmapreduce.amazonaws.com).
                         Default is to infer this from aws_region.
-  --pool-name=EMR_JOB_FLOW_POOL_NAME
+  --pool-name=POOL_NAME
                         Specify a pool name to join. Set to "default" if not
                         specified.
   --disable-emr-debugging
@@ -124,7 +124,7 @@ Options::
   --iam-job-flow-role=IAM_JOB_FLOW_ROLE
                         Deprecated alias for --iam-instance-profile
   --iam-service-role=IAM_SERVICE_ROLE
-                        IAM Job flow role to use for the EMR cluster - see
+                        IAM service role to use for the EMR cluster - see
                         "Configure IAM Roles for Amazon EMR" in AWS docs
   --label=LABEL         custom prefix for job name, to help us identify the
                         job
@@ -149,13 +149,13 @@ Options::
                         Incompatible with --num-ec2-instances.
   --owner=OWNER         custom username to use, to help us identify who ran
                         the job
-  --no-pool-emr-job-flows
+  --no-pool-clusters
                         Don't try to run our job on a pooled cluster.
-  --pool-emr-job-flows  Add to an existing cluster or create a new one that
+  --pool-clusters       Add to an existing cluster or create a new one that
                         does not terminate when the job completes. Overrides
                         other cluster-related options including EC2 instance
                         configuration. Joins pool "default" if
-                        emr_job_flow_pool_name is not specified. WARNING: do
+                        --pool-name is not specified. WARNING: do
                         not run this without
                         mrjob terminate-idle-clusters in your
                         crontab; clusters left idle can quickly become

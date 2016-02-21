@@ -19,11 +19,11 @@ instances (1 master and 11 slaves), taking all other options from
     Cluster created with ID: j-CLUSTERID
 
 
-You can then add jobs to the cluster with the :option:`--emr-job-flow-id`
-switch or the `emr_job_flow_id` variable in `mrjob.conf` (see
+You can then add jobs to the cluster with the :option:`--emr-cluster-id`
+switch or the `emr_cluster_id` variable in `mrjob.conf` (see
 :py:meth:`EMRJobRunner.__init__`)::
 
-    $ python mr_my_job.py -r emr --emr-job-flow-id=j-CLUSTERID input_file.txt > out
+    $ python mr_my_job.py -r emr --emr-cluster-id=j-CLUSTERID input_file.txt > out
     ...
     Adding our job to cluster j-CLUSTERID
     ...
@@ -43,9 +43,9 @@ use among multiple users.
 
 To mitigate these problems, :py:mod:`mrjob` provides **cluster pools.** Rather
 than having to remember to start a cluster and copying its ID, simply pass
-:option:`--pool-emr-job-flows` on the command line. The first time you do this,
+:option:`--pool-clusters` on the command line. The first time you do this,
 a new cluster will be created that does not terminate when the job completes.
-When you use :option:`--pool-emr-job-flows` the next time, it will identify the
+When you use :option:`--pool-clusters` the next time, it will identify the
 cluster and add the job to it rather than creating a new one.
 
 .. warning::

@@ -88,7 +88,7 @@ AMI_HADOOP_VERSION_UPDATES = {
 # extra step to use when debugging_step=True is passed to run_jobflow()
 DEBUGGING_STEP = JarStep(
     name='Setup Hadoop Debugging',
-    action_on_failure='TERMINATE_JOB_FLOW',
+    action_on_failure='TERMINATE_CLUSTER',
     main_class=None,
     jar=EmrConnection.DebuggingJar,
     step_args=EmrConnection.DebuggingArgs)
@@ -266,7 +266,7 @@ class MockBotoTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_jobflow(runner.get_emr_job_flow_id())
+            return emr_conn.describe_jobflow(runner.get_cluster_id())
 
     def connect_s3(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
@@ -585,7 +585,7 @@ def to_rfc1123(when):
 
 class MockEmrConnection(object):
     """Mock out boto.emr.EmrConnection. This actually handles a small
-    state machine that simulates EMR job flows."""
+    state machine that simulates EMR clusters."""
 
     # hook for simulating SSL cert errors. To use this, do:
     #
@@ -1169,7 +1169,7 @@ class MockEmrConnection(object):
             return None
 
     def simulate_progress(self, cluster_id, now=None):
-        """Simulate progress on the given job flow. This is automatically
+        """Simulate progress on the given cluster. This is automatically
         run when we call :py:meth:`describe_step`, and, when the cluster is
         ``TERMINATING``, :py:meth:`describe_cluster`.
 
@@ -1278,7 +1278,7 @@ class MockEmrConnection(object):
                         bucket_name: {key_name + 'part-%05d' % i: part}})
             elif (cluster_id, step_num) in self.mock_emr_output:
                 raise AssertionError(
-                    "can't use output for job flow ID %s, step %d "
+                    "can't use output for cluster ID %s, step %d "
                     "(it doesn't output to S3)" %
                     (cluster_id, step_num))
 

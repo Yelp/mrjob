@@ -2256,7 +2256,7 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
             runner.run()
             self.assertDidNotUseIdleTimeoutScript(runner)
 
-    def test_non_persistent_job_flow(self):
+    def test_non_persistent_cluster(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1'])
         mr_job.sandbox()
 
@@ -2264,12 +2264,12 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
             runner.run()
             self.assertDidNotUseIdleTimeoutScript(runner)
 
-    def test_persistent_job_flow(self):
+    def test_persistent_cluster(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '0.01'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            runner.make_persistent_job_flow()
+            runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
 
     def test_mins_to_end_of_hour(self):
@@ -2278,7 +2278,7 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            runner.make_persistent_job_flow()
+            runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
 
     def test_mins_to_end_of_hour_does_nothing_without_max_hours_idle(self):
@@ -2286,7 +2286,7 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            runner.make_persistent_job_flow()
+            runner.make_persistent_cluster()
             self.assertDidNotUseIdleTimeoutScript(runner)
 
     def test_use_integers(self):
@@ -2295,10 +2295,10 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            runner.make_persistent_job_flow()
+            runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
 
-    def pooled_job_flows(self):
+    def pooled_clusters(self):
         mr_job = MRWordCount(['-r', 'emr', '--pool-clusters',
                               '--max-hours-idle', '0.5'])
         mr_job.sandbox()
@@ -2442,14 +2442,14 @@ class CleanUpJobTestCase(MockBotoTestCase):
                 r._cleanup_job()
                 m.assert_not_called()
 
-    def test_kill_job_flow(self):
+    def test_kill_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
                 r._cleanup_job_flow()
                 self.assertTrue(m().terminate_jobflow.called)
 
-    def test_kill_job_flow_if_successful(self):
+    def test_kill_cluster_if_successful(self):
         # If they are setting up the cleanup to kill the cluster, mrjob should
         # kill the cluster independent of job success.
         with no_handlers_for_logger('mrjob.emr'):
@@ -2459,7 +2459,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
                 r._cleanup_job_flow()
                 self.assertTrue(m().terminate_jobflow.called)
 
-    def test_kill_persistent_job_flow(self):
+    def test_kill_persistent_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
@@ -2551,7 +2551,7 @@ class JobWaitTestCase(MockBotoTestCase):
         self.assertEqual(cluster_id, 'j-successful-lock')
         self.assertEqual(self.sleep_counter, 1)
 
-    def test_timeout_waiting_for_job_flow(self):
+    def test_timeout_waiting_for_cluster(self):
         self.mock_cluster_ids.append('j-fail-lock')
         self.future_mock_cluster_ids.append('j-epic-fail-lock')
         runner = EMRJobRunner(conf_paths=[], pool_wait_minutes=1)

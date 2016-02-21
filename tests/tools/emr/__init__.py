@@ -48,4 +48,4 @@ class ToolTestCase(MockBotoTestCase):
             s3_tmp_dir='s3://walrus/',
             s3_sync_wait_time=0))
         with EMRJobRunner(**kwargs) as runner:
-            return runner.make_persistent_job_flow()
+            return runner.make_persistent_cluster()

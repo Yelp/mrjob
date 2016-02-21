@@ -799,7 +799,7 @@ class EMRJobRunner(MRJobRunner):
 
         Create the master bootstrap script if necessary.
 
-        persistent -- set by make_persistent_job_flow()
+        persistent -- set by make_persistent_cluster()
         """
         # lazily create mrjob.tar.gz
         if self._bootstrap_mrjob():

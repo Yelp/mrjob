@@ -70,7 +70,7 @@ class SimMRJobRunner(MRJobRunner):
     * ``mapreduce.task.output.dir``
     * ``mapreduce.task.partition``
 
-    If you specify *hadoop_version* <= 0.21, the simulated environment
+    If you specify *hadoop_version* of 1.x (or 0.20), the simulated environment
     variables will change to use the names corresponding with the older Hadoop
     version.
 
@@ -458,7 +458,7 @@ class SimMRJobRunner(MRJobRunner):
         (e.g. ``'mapreduce.map.input.file'``) to its value, which is always
         a string.
         """
-        # By convention, we use the newer (Hadoop 0.21+) jobconf names and
+        # By convention, we use the newer (Hadoop 2) jobconf names and
         # translate them at the very end.
         j = {}
 

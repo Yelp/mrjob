@@ -506,7 +506,7 @@ class HadoopArgsTestCase(EmptyMrjobConfTestCase):
         with job.make_runner() as runner:
             with no_handlers_for_logger('mrjob.runner'):
                 with patch.object(runner,
-                                  'get_hadoop_version', return_value='0.21'):
+                                  'get_hadoop_version', return_value='2.7.1'):
                     self.assertEqual(
                         runner._hadoop_args_for_step(0),
                         ['-D', 'mapred.jobtracker.maxtasks.per.job=1',

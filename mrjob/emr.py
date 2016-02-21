@@ -321,6 +321,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'num_ec2_instances',
         'num_ec2_task_instances',
         'pool_clusters',
+        'pool_name',
         'pool_wait_minutes',
         'release_label',
         's3_endpoint',

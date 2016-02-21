@@ -439,6 +439,7 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             opts = EMRRunnerOptionStore(
                 'emr',
                 dict(base_tmp_dir='/scratch',
+                     emr_job_flow_id='j-CLUSTERID',
                      s3_scratch_uri='s3://bucket/walrus'),
                     [])
 

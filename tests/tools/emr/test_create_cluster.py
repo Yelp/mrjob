@@ -67,6 +67,7 @@ class JobFlowInspectionTestCase(ToolTestCase):
              'num_ec2_task_instances': None,
              'owner': None,
              'pool_clusters': None,
+             'pool_emr_job_flows': None,
              'pool_name': None,
              'release_label': None,
              's3_endpoint': None,

@@ -440,13 +440,30 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
                 'emr',
                 dict(base_tmp_dir='/scratch',
                      emr_job_flow_id='j-CLUSTERID',
+                     emr_job_flow_pool_name='liver',
+                     pool_emr_job_flows=True,
                      s3_scratch_uri='s3://bucket/walrus'),
                     [])
+
+            self.assertEqual(opts['cluster_id'], 'j-CLUSTERID')
+            self.assertNotIn('emr_job_flow_id', opts)
+            self.assertIn('Deprecated option emr_job_flow_id has been renamed'
+                          ' to cluster_id', stderr.getvalue())
 
             self.assertEqual(opts['local_tmp_dir'], '/scratch')
             self.assertNotIn('base_tmp_dir', opts)
             self.assertIn('Deprecated option base_tmp_dir has been renamed'
                           ' to local_tmp_dir', stderr.getvalue())
+
+            self.assertEqual(opts['pool_clusters'], True)
+            self.assertNotIn('pool_emr_job_flows', opts)
+            self.assertIn('Deprecated option pool_emr_job_flows has been'
+                          ' renamed to pool_clusters', stderr.getvalue())
+
+            self.assertEqual(opts['pool_name'], 'liver')
+            self.assertNotIn('emr_job_flow_pool_name', opts)
+            self.assertIn('Deprecated option emr_job_flow_pool_name has been'
+                          ' renamed to pool_name', stderr.getvalue())
 
             self.assertEqual(opts['s3_tmp_dir'], 's3://bucket/walrus')
             self.assertNotIn('s3_scratch_uri', opts)

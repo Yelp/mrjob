@@ -1196,7 +1196,7 @@ class EMRJobRunner(MRJobRunner):
         return boto.emr.instance_group.InstanceGroup(
             count, role, instance_type, market, name, bidprice=bid_price)
 
-    def _create_job_flow(self, persistent=False, steps=None):
+    def _create_cluster(self, persistent=False, steps=None):
         """Create an empty cluster on EMR, and return the ID of that
         job.
 
@@ -1488,7 +1488,7 @@ class EMRJobRunner(MRJobRunner):
 
         # create a cluster if we're not already using an existing one
         if not self._cluster_id:
-            self._cluster_id = self._create_job_flow(
+            self._cluster_id = self._create_cluster(
                 persistent=False)
             log.info('Created new cluster %s' %
                      self._cluster_id)
@@ -2158,7 +2158,7 @@ class EMRJobRunner(MRJobRunner):
         # don't allow user to call run()
         self._ran_job = True
 
-        self._cluster_id = self._create_job_flow(persistent=True)
+        self._cluster_id = self._create_cluster(persistent=True)
 
         return self._cluster_id
 

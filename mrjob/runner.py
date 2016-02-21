@@ -66,9 +66,9 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:
 #: * ``'ALL'``: delete logs and local and remote temp files; stop job flow
 #:   if on EMR and the job is not done when cleanup is run.
-#: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
-#: * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
+#: * ``'CLUSTER'``: terminate the cluster if on EMR and the job is not done
 #:    on cleanup
+#: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'LOCAL_TMP'``: delete local temp files only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
@@ -80,8 +80,8 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:     Options ending in ``TMP`` used to end in ``SCRATCH``.
 CLEANUP_CHOICES = [
     'ALL',
+    'CLUSTER',
     'JOB',
-    'JOB_FLOW',
     'LOCAL_TMP',
     'LOGS',
     'NONE',
@@ -90,6 +90,7 @@ CLEANUP_CHOICES = [
 ]
 
 _CLEANUP_DEPRECATED_ALIASES = {
+    'JOB_FLOW': 'CLUSTER',
     'LOCAL_SCRATCH': 'LOCAL_TMP',
     'REMOTE_SCRATCH': 'REMOTE_TMP',
     'SCRATCH': 'TMP',
@@ -532,6 +533,10 @@ class MRJobRunner(object):
         """
         pass  # this only happens on EMR
 
+    def _cleanup_cluster(self):
+        """Terminate the cluster if there is one."""
+        pass  # this only happens on EMR
+
     def _cleanup_logs(self):
         """Cleanup any log files that are created as a side-effect of the job.
         """
@@ -539,10 +544,6 @@ class MRJobRunner(object):
 
     def _cleanup_job(self):
         """Stop any jobs that we created that are still running."""
-        pass  # this only happens on EMR
-
-    def _cleanup_job_flow(self):
-        """Terminate the job flow if there is one."""
         pass  # this only happens on EMR
 
     def cleanup(self, mode=None):
@@ -566,8 +567,8 @@ class MRJobRunner(object):
             return any((choice in mode) for choice in args)
 
         if self._script_path and not self._ran_job:
-            if mode_has('JOB_FLOW', 'ALL'):
-                self._cleanup_job_flow()
+            if mode_has('CLUSTER', 'ALL'):
+                self._cleanup_cluster()
 
             if mode_has('JOB', 'ALL'):
                 self._cleanup_job()

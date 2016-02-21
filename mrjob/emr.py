@@ -1122,7 +1122,7 @@ class EMRJobRunner(MRJobRunner):
                      ' yourself with "python -m mrjob.tools.emr.terminate'
                      '_cluster %s".' % self._cluster_id)
 
-    def _cleanup_job_flow(self):
+    def _cleanup_cluster(self):
         if not self._cluster_id:
             # If we don't have a cluster, then we can't terminate it.
             return

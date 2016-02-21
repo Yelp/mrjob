@@ -2353,8 +2353,8 @@ class CleanUpJobTestCase(MockBotoTestCase):
     def _test_mode(self, mode):
         r = EMRJobRunner(conf_paths=[])
         with patch.multiple(r,
+                            _cleanup_cluster=mock.DEFAULT,
                             _cleanup_job=mock.DEFAULT,
-                            _cleanup_job_flow=mock.DEFAULT,
                             _cleanup_local_tmp=mock.DEFAULT,
                             _cleanup_logs=mock.DEFAULT,
                             _cleanup_remote_tmp=mock.DEFAULT) as mock_dict:
@@ -2371,7 +2371,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
 
     def test_cleanup_all(self):
         with self._test_mode('ALL') as m:
-            self.assertFalse(m['_cleanup_job_flow'].called)
+            self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_job'].called)
             self.assertTrue(m['_cleanup_local_tmp'].called)
             self.assertTrue(m['_cleanup_remote_tmp'].called)
@@ -2379,19 +2379,19 @@ class CleanUpJobTestCase(MockBotoTestCase):
 
     def test_cleanup_job(self):
         with self._test_mode('JOB') as m:
+            self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_local_tmp'].called)
             self.assertFalse(m['_cleanup_remote_tmp'].called)
             self.assertFalse(m['_cleanup_logs'].called)
-            self.assertFalse(m['_cleanup_job_flow'].called)
             self.assertFalse(m['_cleanup_job'].called)  # Only on failure
 
     def test_cleanup_none(self):
         with self._test_mode('NONE') as m:
+            self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_local_tmp'].called)
             self.assertFalse(m['_cleanup_remote_tmp'].called)
             self.assertFalse(m['_cleanup_logs'].called)
             self.assertFalse(m['_cleanup_job'].called)
-            self.assertFalse(m['_cleanup_job_flow'].called)
 
     def test_job_cleanup_mechanics_succeed(self):
         with no_handlers_for_logger():
@@ -2446,7 +2446,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
-                r._cleanup_job_flow()
+                r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
     def test_kill_cluster_if_successful(self):
@@ -2456,7 +2456,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
                 r._ran_job = True
-                r._cleanup_job_flow()
+                r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
     def test_kill_persistent_cluster(self):
@@ -2464,7 +2464,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
             r = self._quick_runner()
             with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
                 r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
-                r._cleanup_job_flow()
+                r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
 

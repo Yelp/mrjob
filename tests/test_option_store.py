@@ -477,7 +477,7 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             opts = RunnerOptionStore(
                 'inline',
                 dict(cleanup=['LOCAL_SCRATCH', 'REMOTE_SCRATCH'],
-                     cleanup_on_failure=['SCRATCH']),
+                     cleanup_on_failure=['JOB_FLOW', 'SCRATCH']),
                 [])
 
             self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'REMOTE_TMP'])
@@ -488,8 +488,10 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
                 'Deprecated cleanup option REMOTE_SCRATCH has been renamed'
                 ' to REMOTE_TMP', stderr.getvalue())
 
-            # should quietly convert string to list
-            self.assertEqual(opts['cleanup_on_failure'], ['TMP'])
+            self.assertEqual(opts['cleanup_on_failure'], ['CLUSTER', 'TMP'])
+            self.assertIn(
+                'Deprecated cleanup_on_failure option JOB_FLOW has been'
+                ' renamed to CLUSTER', stderr.getvalue())
             self.assertIn(
                 'Deprecated cleanup_on_failure option SCRATCH has been renamed'
                 ' to TMP', stderr.getvalue())

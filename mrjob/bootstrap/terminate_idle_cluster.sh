@@ -41,7 +41,7 @@
 
 # full usage:
 #
-# ./terminate_idle_job_flow.sh [ max_hours_idle [ min_secs_to_end_of_hour ] ]
+# ./terminate_idle_cluster.sh [ max_hours_idle [ min_secs_to_end_of_hour ] ]
 #
 # Both arguments must be integers
 

@@ -121,8 +121,6 @@ Options::
   --iam-instance-profile=IAM_INSTANCE_PROFILE
                         EC2 instance profile to use for the EMR cluster - see
                         "Configure IAM Roles for Amazon EMR" in AWS docs
-  --iam-job-flow-role=IAM_JOB_FLOW_ROLE
-                        Deprecated alias for --iam-instance-profile
   --iam-service-role=IAM_SERVICE_ROLE
                         IAM service role to use for the EMR cluster - see
                         "Configure IAM Roles for Amazon EMR" in AWS docs

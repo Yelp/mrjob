@@ -2379,9 +2379,9 @@ class EMRJobRunner(MRJobRunner):
                 in sorted(key_cluster_steps_list)]
 
     def _find_cluster(self, num_steps=1):
-        """Find a cluster that can host this runner. Prefer flows with more
-        compute units. Break ties by choosing flow with longest idle time.
-        Return ``None`` if no suitable flows exist.
+        """Find a cluster that can host this runner. Prefer clusters with more
+        compute units. Break ties by choosing cluster with longest idle time.
+        Return ``None`` if no suitable clusters exist.
         """
         exclude = set()
         emr_conn = self.make_emr_conn()

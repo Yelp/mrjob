@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Audit EMR usage over the past 2 weeks, sorted by job flow name and user.
+"""Audit EMR usage over the past 2 weeks, sorted by cluster name and user.
 
 Usage::
 

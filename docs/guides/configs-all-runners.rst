@@ -107,11 +107,10 @@ Temp files and cleanup
     List of which kinds of directories to delete when a job succeeds. Valid
     choices are:
 
-    * ``'ALL'``: delete logs and local and remote temp files; stop job flow
+    * ``'ALL'``: delete logs and local and remote temp files; stop cluster
         if on EMR and the job is not done when cleanup is run.
+    * ``'CLUSTER'``: terminate EMR cluster if job not done when cleanup is run
     * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
-    * ``'JOB_FLOW'``: terminate the job flow if on EMR and the job is not done
-        on cleanup
     * ``'LOCAL_TMP'``: delete local temp files only
     * ``'LOGS'``: delete logs only
     * ``'NONE'``: delete nothing

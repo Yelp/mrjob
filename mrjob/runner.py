@@ -64,7 +64,7 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 #: cleanup options:
 #:
-#: * ``'ALL'``: delete logs and local and remote temp files; stop job flow
+#: * ``'ALL'``: delete logs and local and remote temp files; stop cluster
 #:   if on EMR and the job is not done when cleanup is run.
 #: * ``'CLUSTER'``: terminate the cluster if on EMR and the job is not done
 #:    on cleanup
@@ -590,8 +590,7 @@ class MRJobRunner(object):
             [{'group name': {'counter1': 1, 'counter2': 2}},
              {'group name': ...}]
 
-        The list contains an entry for every step of the current job, ignoring
-        earlier steps in the same job flow.
+        The list contains an entry for every step of the current job.
         """
         raise NotImplementedError
 
@@ -662,11 +661,11 @@ class MRJobRunner(object):
         """Return the version number of the Hadoop environment as a string if
         Hadoop is being used or simulated. Return None if not applicable.
 
-        :py:class:`~mrjob.emr.EMRJobRunner` infers this from the job flow.
+        :py:class:`~mrjob.emr.EMRJobRunner` infers this from the cluster.
         :py:class:`~mrjob.hadoop.HadoopJobRunner` gets this from
         ``hadoop version``. :py:class:`~mrjob.local.LocalMRJobRunner` has an
         additional `hadoop_version` option to specify which version it
-        simulates, with a default of 0.20.
+        simulates.
         :py:class:`~mrjob.inline.InlineMRJobRunner` does not simulate Hadoop at
         all.
         """

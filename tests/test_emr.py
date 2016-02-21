@@ -2064,7 +2064,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_dont_destroy_own_pooled_cluster_on_failure(self):
         # Issue 242: job failure shouldn't kill the pooled clusters
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--pool-emr-job-flow'])
+                               '--pool-clusters'])
         mr_job.sandbox()
 
         self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
@@ -2099,7 +2099,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         self.mock_emr_failures = {(cluster_id, 0): None}
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--pool-emr-job-flow'])
+                               '--pool-clusters'])
         mr_job.sandbox()
 
         self.mock_emr_failures = set([('j-MOCKCLUSTER0', 0)])

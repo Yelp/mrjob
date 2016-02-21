@@ -22,7 +22,7 @@ from tests.mockboto import MockEmrObject
 from tests.tools.emr import ToolTestCase
 
 
-class JobFlowInspectionTestCase(ToolTestCase):
+class ClusterInspectionTestCase(ToolTestCase):
 
     maxDiff = None
 

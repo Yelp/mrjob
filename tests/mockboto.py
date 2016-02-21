@@ -1,4 +1,4 @@
-# Copyright 2009-2015 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -254,19 +254,6 @@ class MockBotoTestCase(SandboxedTestCase):
         with self.make_runner('-v', *args) as runner:
             runner.run()
             return runner._describe_cluster()
-
-    def run_and_get_job_flow(self, *args):
-        # set up a job flow without caring about what the job is or what its
-        # inputs are.
-        stdin = BytesIO(b'foo\nbar\n')
-        mr_job = MRTwoStepJob(
-            ['-r', 'emr', '-v'] + list(args))
-        mr_job.sandbox(stdin=stdin)
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            emr_conn = runner.make_emr_conn()
-            return emr_conn.describe_jobflow(runner.get_cluster_id())
 
     def connect_s3(self, *args, **kwargs):
         kwargs['mock_s3_fs'] = self.mock_s3_fs

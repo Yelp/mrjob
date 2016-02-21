@@ -97,7 +97,7 @@ class TestPoolHashAndName(TestCase):
 
         self.assertEqual(_pool_hash_and_name(actions), (None, None))
 
-    def test_pooled_job_flow(self):
+    def test_pooled_cluster(self):
         actions = [
             MockEmrObject(args=[
                 MockEmrObject(
@@ -109,7 +109,7 @@ class TestPoolHashAndName(TestCase):
         self.assertEqual(_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
-    def test_pooled_job_flow_with_other_bootstrap_actions(self):
+    def test_pooled_cluster_with_other_bootstrap_actions(self):
         actions = [
             MockEmrObject(args=[], name='action 0'),
             MockEmrObject(args=[], name='action 1'),
@@ -123,7 +123,7 @@ class TestPoolHashAndName(TestCase):
         self.assertEqual(_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
-    def test_pooled_job_flow_with_max_hours_idle(self):
+    def test_pooled_cluster_with_max_hours_idle(self):
         # max hours idle is added AFTER the master bootstrap script,
         # which was a problem when we just look at the last action
         actions = [

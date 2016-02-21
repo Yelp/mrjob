@@ -36,7 +36,7 @@ from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
 
 
-class JobFlowTerminationTestCase(MockBotoTestCase):
+class ClusterTerminationTestCase(MockBotoTestCase):
 
     maxDiff = None
 
@@ -44,7 +44,7 @@ class JobFlowTerminationTestCase(MockBotoTestCase):
                           '-reducer', 'my_job.py --reducer']
 
     def setUp(self):
-        super(JobFlowTerminationTestCase, self).setUp()
+        super(ClusterTerminationTestCase, self).setUp()
         self.create_fake_clusters()
 
     def create_fake_clusters(self):

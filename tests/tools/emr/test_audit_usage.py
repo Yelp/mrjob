@@ -47,7 +47,7 @@ class AuditUsageTestCase(ToolTestCase):
         self.assertIn(b'j-MOCKCLUSTER0', sys.stdout.getvalue())
 
 
-class JobFlowToFullSummaryTestCase(TestCase):
+class ClusterToFullSummaryTestCase(TestCase):
 
     maxDiff = None  # show whole diff when tests fail
 

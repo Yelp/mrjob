@@ -148,6 +148,7 @@ work.
     class MyJob(MRJob):
         # (your job)
 
+    # no, stop, what are you doing?!?!
     mr_job = MyJob(args=[args])
     with mr_job.make_runner() as runner:
         runner.run()

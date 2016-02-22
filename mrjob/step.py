@@ -53,6 +53,46 @@ def _IDENTITY_REDUCER(key, values):
         yield key, value
 
 
+class StepFailedException(Exception):
+    """Exception to throw when a step fails.
+
+    This will automatically be caught
+    and converted to an error message by :py:meth:`mrjob.job.MRJob.run`, but
+    you may wish to catch it if you
+    :ref:`run your job programatically <runners-programmatically`.
+    """
+
+    def __init__(self, reason=None, step_num=None, num_steps=None):
+        """Initialize a reason for step failure.
+
+        :param string reason: brief explanation of which step failed
+        :param int step_num: which step failed (0-indexed)
+        :param int num_steps: number of steps in the job
+
+        *reason* should not be several lines long; use ``log.error(...)``
+        for that.
+        """
+        self.reason = reason
+        self.step_num = step_num
+        self.num_steps = num_steps
+
+    def __str__(self):
+        """Human-readable version of the exception. Note that this 1-indexes
+        *step_num*."""
+        return 'Step%s%s failed%s' % (
+            '' if self.step_num is None else ' %d' % (self.step_num + 1),
+            '' if (self.step_num is None or self.num_steps is None) else
+                   ' of %d' % self.num_steps,
+            '' if self.reason is None else ': %s' % self.reason)
+
+    def __repr__(self):
+        return '%s(%s)' % (
+            self.__class__.__name__,
+            ', '.join(('%s=%r' % (k, getattr(self, k))
+                       for k in ('reason', 'step_num', 'num_steps')
+                       if getattr(self, k) is not None)))
+
+
 class MRStep(object):
     """Represents steps handled by the script containing your job.
 

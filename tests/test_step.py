@@ -16,6 +16,7 @@
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
+from mrjob.step import StepFailedException
 
 from tests.py2 import TestCase
 from tests.quiet import logger_disabled
@@ -30,6 +31,37 @@ def identity_mapper(k=None, v=None):
 def identity_reducer(k, vals):
     for v in vals:
         yield k, v
+
+
+class StepFailedExceptionTestCase(TestCase):
+
+    def test_empty(self):
+        ex = StepFailedException()
+        self.assertEqual(str(ex), 'Step failed')
+        self.assertEqual(repr(ex), 'StepFailedException()')
+
+    def test_reason(self):
+        ex = StepFailedException('Hadoop is feeling sad today')
+        self.assertEqual(str(ex), 'Step failed: Hadoop is feeling sad today')
+        self.assertEqual(
+            repr(ex),
+            "StepFailedException(reason='Hadoop is feeling sad today')")
+
+    def test_step_num(self):
+        ex = StepFailedException(step_num=0)
+        self.assertEqual(str(ex), 'Step 1 failed')
+        self.assertEqual(repr(ex), 'StepFailedException(step_num=0)')
+
+    def test_step_num_with_num_steps(self):
+        ex = StepFailedException(step_num=0, num_steps=4)
+        self.assertEqual(str(ex), 'Step 1 of 4 failed')
+        self.assertEqual(repr(ex),
+                         'StepFailedException(step_num=0, num_steps=4)')
+
+    def test_num_steps_with_no_step_num(self):
+        ex = StepFailedException(num_steps=4)
+        self.assertEqual(str(ex), 'Step failed')
+        self.assertEqual(repr(ex), 'StepFailedException(num_steps=4)')
 
 
 class JarStepTestCase(TestCase):

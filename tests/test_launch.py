@@ -27,7 +27,9 @@ from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import StringIO
+from mrjob.step import StepFailedException
 
+from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
@@ -73,18 +75,58 @@ class MRCustomJobLauncher(MRJobLauncher):
 ### Test cases ###
 
 
-class NoOutputTestCase(TestCase):
+class RunJobTestCase(TestCase):
+
+    def _make_launcher(self, *args):
+        """Make a launcher, add a mock runner (``launcher.mock_runner``), and
+        set it up so that ``launcher.make_runner().__enter__()`` returns
+        ``launcher.mock_runner()``.
+        """
+        launcher = MRJobLauncher(args=['--no-conf', ''] + list(args))
+        launcher.sandbox()
+
+        launcher.mock_runner = Mock()
+        launcher.mock_runner.stream_output.return_value = [b'a line\n']
+
+        launcher.make_runner = MagicMock()  # include __enter__
+        launcher.make_runner.return_value.__enter__.return_value = (
+            launcher.mock_runner)
+
+        return launcher
+
+    def test_output(self):
+        launcher = self._make_launcher()
+
+        launcher.run_job()
+
+        self.assertEqual(launcher.stdout.getvalue(), b'a line\n')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
 
     def test_no_output(self):
-        launcher = MRJobLauncher(args=['--no-conf', '--no-output', ''])
-        launcher.sandbox()
-        with patch.object(launcher, 'make_runner') as m_make_runner:
-            runner = Mock()
-            _mock_context_mgr(m_make_runner, runner)
-            runner.stream_output.return_value = ['a line']
-            launcher.run_job()
-            self.assertEqual(launcher.stdout.getvalue(), b'')
-            self.assertEqual(launcher.stderr.getvalue(), b'')
+        launcher = self._make_launcher('--no-output')
+
+        launcher.run_job()
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
+
+    def test_exit_on_step_failure(self):
+        launcher = self._make_launcher()
+        launcher.mock_runner.run.side_effect = StepFailedException
+
+        self.assertRaises(SystemExit, launcher.run_job)
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertIn(b'Step failed', launcher.stderr.getvalue())
+
+    def test_pass_through_other_exceptions(self):
+        launcher = self._make_launcher()
+        launcher.mock_runner.run.side_effect = OSError
+
+        self.assertRaises(OSError, launcher.run_job)
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
 
 
 class CommandLineArgsTestCase(TestCase):

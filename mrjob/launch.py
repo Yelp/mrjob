@@ -39,6 +39,7 @@ from mrjob.parse import parse_key_value_list
 from mrjob.parse import parse_port_range_list
 from mrjob.py2 import PY2
 from mrjob.runner import CLEANUP_CHOICES
+from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
@@ -222,7 +223,13 @@ class MRJobLauncher(object):
                             stream=log_stream)
 
         with self.make_runner() as runner:
-            runner.run()
+            try:
+                runner.run()
+            except StepFailedException as e:
+                # no need for a runner stacktrace if step failed; runners will
+                # log more useful information anyway
+                log.error(str(e))
+                sys.exit(1)
 
             if not self.options.no_output:
                 for line in runner.stream_output():

@@ -27,6 +27,7 @@ from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
+from mrjob.step import StepFailedException
 from mrjob.util import bash_wrap
 
 from tests.mockhadoop import add_mock_hadoop_counters
@@ -719,7 +720,7 @@ class JarStepTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             with logger_disabled('mrjob.hadoop'):
                 # `hadoop jar` doesn't actually accept URIs
-                self.assertRaises(Exception, runner.run)
+                self.assertRaises(StepFailedException, runner.run)
 
         hadoop_cmd_args = get_mock_hadoop_cmd_args()
 

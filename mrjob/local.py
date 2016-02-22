@@ -15,6 +15,7 @@
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
 import logging
+from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -24,6 +25,7 @@ from mrjob.parse import parse_mr_job_stderr
 from mrjob.py2 import string_types
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import SimRunnerOptionStore
+from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 
@@ -257,13 +259,14 @@ class LocalMRJobRunner(SimMRJobRunner):
 
             # try to throw a useful exception
             if tb_lines:
-                raise Exception(
-                    'Command %r returned non-zero exit status %d:\n%s' %
-                    (proc_dict['args'], returncode, ''.join(tb_lines)))
-            else:
-                raise Exception(
-                    'Command %r returned non-zero exit status %d' %
-                    (proc_dict['args'], returncode))
+                for line in tb_lines:
+                    log.error(line.rstrip('\r\n'))
+
+            reason = str(
+                CalledProcessError(returncode, proc_dict['args']))
+            raise StepFailedException(
+                reason=reason, step_num=step_num,
+                num_steps=len(self._get_steps()))
 
     def _process_stderr_from_script(self, stderr, step_num=0):
         """Handle stderr a line at time:

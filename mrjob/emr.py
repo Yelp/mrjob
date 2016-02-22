@@ -111,6 +111,7 @@ from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.ssh import ssh_slave_addresses
 from mrjob.ssh import ssh_terminate_single_job
+from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 from mrjob.util import random_identifier
@@ -1483,7 +1484,7 @@ class EMRJobRunner(MRJobRunner):
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
         if self._opts['pool_clusters'] and not self._cluster_id:
-            cluster_id = self._find_cluster(num_steps=len(self._get_steps()))
+            cluster_id = self._find_cluster(num_steps=self._num_steps())
             if cluster_id:
                 self._cluster_id = cluster_id
 
@@ -1532,10 +1533,11 @@ class EMRJobRunner(MRJobRunner):
             # this will raise an exception if a step fails
             log.info('Waiting for step %d of %d (%s) to complete...' % (
                 step_num + 1, num_steps, step_id))
-            self._wait_for_step_to_complete(step_id)
+            self._wait_for_step_to_complete(step_id, step_num, num_steps)
 
 
-    def _wait_for_step_to_complete(self, step_id):
+    def _wait_for_step_to_complete(
+            self, step_id, step_num=None, num_steps=None):
         """Helper for _wait_for_step_to_complete(). Wait for
         step with the given ID to complete, and fetch counters.
         If it fails, attempt to diagnose the error, and raise an
@@ -1545,6 +1547,9 @@ class EMRJobRunner(MRJobRunner):
         :param step_num: which step this is out of the steps
                          belonging to our job (0-indexed)
         :param num_steps: number of steps in our job
+
+        *step_num* and *num_steps* are optional and only used when raising
+        a :py:class:`~mrjob.step.StepFailedException`.
 
         This also adds an item to self._log_interpretations
         """
@@ -1645,7 +1650,7 @@ class EMRJobRunner(MRJobRunner):
                     log.error('Probable cause of failure:\n\n%s\n\n' %
                               _format_error(error))
 
-            raise Exception
+            raise StepFailedException(step_num=step_num, num_steps=num_steps)
 
     def _log_step_progress(self):
         """Tunnel to the job tracker/resource manager and log the
@@ -1755,9 +1760,12 @@ class EMRJobRunner(MRJobRunner):
             # wait for logs to be on S3
             self._wait_for_terminating_cluster_to_terminate()
 
-            s3_log_uri = posixpath.join(
-                self._s3_log_dir(), (s3_dir_name or dir_name))
-            log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
+            # TODO: test that this gets run!
+            if self._s3_log_dir():
+                s3_log_uri = posixpath.join(
+                    self._s3_log_dir(), (s3_dir_name or dir_name))
+                log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
+                yield [s3_log_uri]
 
     def _wait_for_terminating_cluster_to_terminate(self):
         """If the cluster is already terminating, wait for it to terminate,

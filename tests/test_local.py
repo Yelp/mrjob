@@ -334,8 +334,9 @@ class LargeAmountsOfStderrTestCase(TestCase):
                 mr_job.run_job()
         except TimeoutException:
             raise
-        except Exception as e:
-            # we expect the job to throw an exception
+        except SystemExit as e:
+            # we expect the job to throw a StepFailedException,
+            # which causes run_job to call sys.exit()
 
             # look for expected output from MRVerboseJob
             stderr = mr_job.stderr.getvalue()
@@ -357,13 +358,10 @@ class ExitWithoutExceptionTestCase(TestCase):
         mr_job = MRExit42Job(['--no-conf', '--runner=local'])
         mr_job.sandbox()
 
-        try:
-            mr_job.run_job()
-        except StepFailedException as e:
-            self.assertIn('returned non-zero exit status 42', repr(e))
-            return
+        self.assertRaises(SystemExit, mr_job.run_job)
 
-        self.fail()
+        self.assertIn(b'returned non-zero exit status 42',
+                      mr_job.stderr.getvalue())
 
 
 class PythonBinTestCase(EmptyMrjobConfTestCase):

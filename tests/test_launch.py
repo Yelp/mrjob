@@ -34,7 +34,6 @@ from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
-from tests.sandbox import PatcherTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
 from tests.sandbox import patch_fs_s3
@@ -76,16 +75,7 @@ class MRCustomJobLauncher(MRJobLauncher):
 ### Test cases ###
 
 
-class RunJobTestCase(PatcherTestCase):
-
-    class MockSystemExit(Exception):
-        pass
-
-    def setUp(self):
-        super(RunJobTestCase, self).setUp()
-
-        self.mock_exit = self.start(
-            patch('sys.exit', side_effect=self.MockSystemExit))
+class RunJobTestCase(TestCase):
 
     def _make_launcher(self, *args):
         """Make a launcher, add a mock runner (``launcher.mock_runner``), and
@@ -124,9 +114,7 @@ class RunJobTestCase(PatcherTestCase):
         launcher = self._make_launcher()
         launcher.mock_runner.run.side_effect = StepFailedException
 
-        self.assertRaises(self.MockSystemExit, launcher.run_job)
-
-        self.mock_exit.assert_called_once_with(1)
+        self.assertRaises(SystemExit, launcher.run_job)
 
         self.assertEqual(launcher.stdout.getvalue(), b'')
         self.assertIn(b'Step failed', launcher.stderr.getvalue())
@@ -136,8 +124,6 @@ class RunJobTestCase(PatcherTestCase):
         launcher.mock_runner.run.side_effect = OSError
 
         self.assertRaises(OSError, launcher.run_job)
-
-        self.assertFalse(self.mock_exit.called)
 
         self.assertEqual(launcher.stdout.getvalue(), b'')
         self.assertEqual(launcher.stderr.getvalue(), b'')

@@ -85,7 +85,7 @@ Cluster creation and configuration
     :switch: --ami-version
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'3.7.0'``
+    :default: ``'3.11.0'``
 
     EMR AMI version to use. This controls which Hadoop version(s) are
     available and which version of Python is installed, among other things;

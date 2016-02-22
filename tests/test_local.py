@@ -340,7 +340,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
             # look for expected output from MRVerboseJob
             stderr = mr_job.stderr.getvalue()
             self.assertIn(
-                b"Counters from step 1:\n\tFoo\n\t\tBar=10000", stderr)
+                b"Counters: 1\n\tFoo\n\t\tBar=10000", stderr)
             self.assertIn(b'status: 0\n', stderr)
             self.assertIn(b'status: 99\n', stderr)
             self.assertNotIn(b'status: 100\n', stderr)

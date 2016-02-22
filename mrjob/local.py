@@ -18,11 +18,12 @@ import logging
 from subprocess import Popen
 from subprocess import PIPE
 
-from mrjob.sim import SimMRJobRunner
-from mrjob.sim import SimRunnerOptionStore
+from mrjob.logs.counters import _format_counters
 from mrjob.parse import find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.py2 import string_types
+from mrjob.sim import SimMRJobRunner
+from mrjob.sim import SimRunnerOptionStore
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 
@@ -249,7 +250,11 @@ class LocalMRJobRunner(SimMRJobRunner):
         returncode = proc.wait()
 
         if returncode != 0:
-            self._print_counters(step_nums=[step_num])
+            # show counters before raising exception
+            counters = self._counters[step_num]
+            if counters:
+                log.info(_format_counters(counters))
+
             # try to throw a useful exception
             if tb_lines:
                 raise Exception(

@@ -77,6 +77,7 @@ from mrjob.iam import FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
+from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _pick_error
@@ -1547,9 +1548,6 @@ class EMRJobRunner(MRJobRunner):
 
         This also adds an item to self._log_interpretations
         """
-        # just using step_num for _print_counters(). This is messy
-        step_num = len(self._log_interpretations)
-
         log_interpretation = dict(step_id=step_id)
         self._log_interpretations.append(log_interpretation)
 
@@ -1622,10 +1620,16 @@ class EMRJobRunner(MRJobRunner):
             if step.status.state != 'CANCELLED':
                 log.info('Attempting to fetch counters from logs...')
                 self._interpret_step_log(log_interpretation)
-                if not _pick_counters(log_interpretation):
-                    self._interpret_history_log(log_interpretation)
 
-                self._print_counters(step_nums=[step_num])
+                counters = _pick_counters(log_interpretation)
+                if not counters:
+                    self._interpret_history_log(log_interpretation)
+                    counters = _pick_counters(log_interpretation)
+
+                if counters:
+                    log.info(_format_counters(counters))
+                else:
+                    log.warning('No counters found')
 
             if step.status.state == 'COMPLETED':
                 return

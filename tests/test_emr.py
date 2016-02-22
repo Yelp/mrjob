@@ -50,7 +50,7 @@ from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
-from mrjog.step import StepFailedException
+from mrjob.step import StepFailedException
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip

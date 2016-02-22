@@ -149,7 +149,7 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 _DEFAULT_AWS_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
-_DEFAULT_AMI_VERSION = '3.7.0'
+_DEFAULT_AMI_VERSION = '3.11.0'
 
 # Hadoop streaming jar on 1-3.x AMIs
 _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'

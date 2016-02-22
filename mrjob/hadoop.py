@@ -51,6 +51,7 @@ from mrjob.py2 import to_string
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import UploadDirManager
+from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import unique
 from mrjob.util import which
@@ -462,7 +463,10 @@ class HadoopJobRunner(MRJobRunner):
                     log.error('Probable cause of failure:\n\n%s\n' %
                               _format_error(error))
 
-                raise CalledProcessError(returncode, step_args)
+                reason = str(CalledProcessError(returncode, step_args))
+                raise StepFailedException(
+                    reason=reason, step_num=step_num,
+                    num_steps=self._num_steps())
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)

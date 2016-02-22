@@ -50,6 +50,7 @@ from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
+from mrjog.step import StepFailedException
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
@@ -211,7 +212,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             with mr_job.make_runner() as runner:
                 self.assertIsInstance(runner, EMRJobRunner)
 
-                self.assertRaises(Exception, runner.run)
+                self.assertRaises(StepFailedException, runner.run)
                 self.assertIn('\n  FAILED\n',
                               stderr.getvalue())
 
@@ -341,7 +342,7 @@ class ExistingClusterTestCase(MockBotoTestCase):
             self.assertIsInstance(runner, EMRJobRunner)
             self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
-                self.assertRaises(Exception, runner.run)
+                self.assertRaises(StepFailedException, runner.run)
 
             emr_conn = runner.make_emr_conn()
             cluster_id = runner.get_cluster_id()
@@ -2073,7 +2074,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             self.assertIsInstance(runner, EMRJobRunner)
             self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
-                self.assertRaises(Exception, runner.run)
+                self.assertRaises(StepFailedException, runner.run)
 
             emr_conn = runner.make_emr_conn()
             cluster_id = runner.get_cluster_id()
@@ -2108,7 +2109,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             self.assertIsInstance(runner, EMRJobRunner)
             self.prepare_runner_for_ssh(runner)
             with logger_disabled('mrjob.emr'):
-                self.assertRaises(Exception, runner.run)
+                self.assertRaises(StepFailedException, runner.run)
 
             self.assertEqual(runner.get_cluster_id(), cluster_id)
 

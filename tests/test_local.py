@@ -24,7 +24,7 @@ from io import BytesIO
 
 import mrjob
 from mrjob.local import LocalMRJobRunner
-
+from mrjob.step import StepFailedException
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
@@ -346,7 +346,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
             self.assertNotIn(b'status: 100\n', stderr)
             self.assertIn(b'STDERR: Qux\n', stderr)
             # exception should appear in exception message
-            self.assertIn('BOOM', repr(e))
+            self.assertIn(b'BOOM', stderr)
         else:
             raise AssertionError()
 
@@ -359,7 +359,7 @@ class ExitWithoutExceptionTestCase(TestCase):
 
         try:
             mr_job.run_job()
-        except Exception as e:
+        except StepFailedException as e:
             self.assertIn('returned non-zero exit status 42', repr(e))
             return
 

@@ -35,6 +35,7 @@ from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
+from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _pick_error
@@ -445,12 +446,15 @@ class HadoopJobRunner(MRJobRunner):
 
             log_interpretation['step'] = step_interpretation
 
-            if 'counters' not in step_interpretation:
-                log.info('Attempting to read counters from history log')
+            counters = _pick_counters(log_interpretation)
+            if not counters:
                 self._interpret_history_log(log_interpretation)
+                counters = _pick_counters(log_interpretation)
 
-            # just print counters for this one step
-            self._print_counters(step_nums=[step_num])
+            if counters:
+                log.info(_format_counters(counters))
+            else:
+                log.warning('No counters found')
 
             if returncode:
                 error = self._pick_error(log_interpretation)

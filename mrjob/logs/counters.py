@@ -14,6 +14,24 @@
 # limitations under the License.
 """Utility methods for dealing with counters (not including parsers)."""
 
+
+def _format_counters(counters, indent='\t'):
+    """Convert a map from group -> counter name -> amount to a message
+    similar to that printed by the Hadoop binary, with no trailing newline.
+    """
+    num_counters = sum(len(counter_to_amount)
+                       for group, counter_to_amount in counters.items())
+    message = 'Counters: %d' % num_counters
+
+    for group, group_counters in sorted(counters.items()):
+        if group_counters:
+            message += '\n%s%s' % (indent, group)
+            for counter, amount in sorted(group_counters.items()):
+                message += '\n%s%s%s=%d' % (indent, indent, counter, amount)
+
+    return message
+
+
 def _pick_counters(log_interpretation):
     """Pick counters from a dictionary possibly containing
     step and history interpretations."""

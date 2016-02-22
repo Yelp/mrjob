@@ -231,6 +231,7 @@ class RunnerOptionStore(OptionStore):
 
             if opt in _CLEANUP_DEPRECATED_ALIASES:
                 aliased_opt = _CLEANUP_DEPRECATED_ALIASES[opt]
+                # TODO: don't do this when option value is None
                 log.warning(
                     'Deprecated %s option %s%s has been renamed to %s' % (
                         opt_key, opt, from_where, aliased_opt))
@@ -593,28 +594,6 @@ class MRJobRunner(object):
         The list contains an entry for every step of the current job.
         """
         raise NotImplementedError
-
-    # TODO: move this to mrjob.logs.counters
-    def _print_counters(self, step_nums=None):
-        """Log this run's counters in a user-friendly way.
-
-        :type step_nums: list of int
-        :param step_nums: Optional list of indexes of steps in
-                          ``self.counters()`` to filter on.
-
-        Prints step nums 1-indexed (e.g. "step 1"), but *step_nums* is
-        0-indexed (e.g. [0]).
-        """
-        for step_num, step_counters in enumerate(self.counters()):
-            if step_nums is None or step_num in step_nums:
-                log.info('Counters from step %d:' % (step_num + 1))
-                if step_counters:
-                    for group, group_counters in sorted(step_counters.items()):
-                        log.info('\t%s' % group)
-                        for counter, amount in sorted(group_counters.items()):
-                            log.info('\t\t%s=%d' % (counter, amount))
-                else:
-                    log.info('  (none found)')
 
     ### hooks for the with statement ###
 

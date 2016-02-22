@@ -25,6 +25,7 @@ from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
+from mrjob.logs.counters import _format_counters
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import read_input
@@ -266,7 +267,9 @@ class SimMRJobRunner(MRJobRunner):
             self._prev_outfiles.append(output_path)
 
         self.per_step_runner_finish(step_num)
-        self._print_counters(step_nums=[step_num])
+        counters = self._counters[step_num]
+        if counters:
+            log.info(_format_counters(counters))
 
     def _run_step(self, step_num, step_type, input_path, output_path,
                   working_dir, env):

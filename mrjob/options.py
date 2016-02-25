@@ -165,7 +165,7 @@ def add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '-r', '--runner', dest='runner', default=default_runner,
-            choices=('local', 'hadoop', 'emr', 'inline'),
+            choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
             help=('Where to run the job: local to run locally, hadoop to run'
                   ' on your Hadoop cluster, emr to run on Amazon'
                   ' ElasticMapReduce, and inline for local debugging. Default'
@@ -285,6 +285,10 @@ def add_hadoop_opts(opt_group):
             help='Deprecated alias for --hadoop-tmp-dir'),
     ]
 
+def add_dataproc_opts(opt_group):
+    """Options for ``dataproc`` runner"""
+    return (add_emr_launch_opts(opt_group) +
+            add_emr_run_opts(opt_group))
 
 def add_emr_opts(opt_group):
     """Options for ``emr`` runner"""

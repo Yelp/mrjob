@@ -26,6 +26,7 @@ from optparse import OptionParser
 
 from mrjob.conf import combine_dicts
 from mrjob.options import add_basic_opts
+from mrjob.options import add_dataproc_opts
 from mrjob.options import add_emr_opts
 from mrjob.options import add_hadoop_emr_opts
 from mrjob.options import add_hadoop_opts
@@ -170,6 +171,11 @@ class MRJobLauncher(object):
             # avoid requiring dependencies (such as boto) for other runners
             from mrjob.emr import EMRJobRunner
             return EMRJobRunner(**self.emr_job_runner_kwargs())
+
+        elif self.options.runner == 'dataproc':
+            # avoid requiring dependencies (such as boto) for other runners
+            from mrjob.dataproc import DataprocJobRunner
+            return DataprocJobRunner(**self.dataproc_job_runner_kwargs())
 
         elif self.options.runner == 'hadoop':
             from mrjob.hadoop import HadoopJobRunner
@@ -320,7 +326,16 @@ class MRJobLauncher(object):
             'Running on EMR (these apply when you set -r emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
 
-        add_emr_opts(self.emr_opt_group)
+        # add_emr_opts(self.emr_opt_group)
+
+
+        # options for running the job on Dataproc
+        self.dataproc_opt_group = OptionGroup(
+            self.option_parser,
+            'Running on Dataproc (these apply when you set -r dataproc)')
+        self.option_parser.add_option_group(self.dataproc_opt_group)
+
+        add_dataproc_opts(self.dataproc_opt_group)
 
     def all_option_groups(self):
         return (self.option_parser, self.proto_opt_group,
@@ -541,6 +556,19 @@ class MRJobLauncher(object):
         return combine_dicts(
             self.job_runner_kwargs(),
             self._get_kwargs_from_opt_group(self.emr_opt_group))
+
+    def dataproc_job_runner_kwargs(self):
+        """Keyword arguments to create create runners when
+        :py:meth:`make_runner` is called, when we run a job on EMR
+        (``-r emr``).
+
+        :return: map from arg name to value
+
+        Re-define this if you want finer control when running jobs on EMR.
+        """
+        return combine_dicts(
+            self.job_runner_kwargs(),
+            self._get_kwargs_from_opt_group(self.dataproc_opt_group))
 
     def hadoop_job_runner_kwargs(self):
         """Keyword arguments to create create runners when

@@ -62,6 +62,7 @@ class Filesystem(object):
         has no concept of them)
 
         Corresponds roughly to: ``hadoop fs -ls -R path_glob``
+
         """
         raise NotImplementedError
 

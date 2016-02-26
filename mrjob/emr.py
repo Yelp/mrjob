@@ -275,6 +275,15 @@ def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
     time.sleep(sync_wait_time)
     return _lock_acquire_step_2(key, job_key)
 
+def _get_reason(cluster_or_step):
+    """Extract statechangereason.message from a boto Cluster or Step.
+
+    Default to ``''``."""
+    return getattr(
+        getattr(cluster_or_step.status, 'statechangereason', ''),
+        'message', '').rstrip()
+
+
 
 class EMRRunnerOptionStore(RunnerOptionStore):
 
@@ -1535,7 +1544,6 @@ class EMRJobRunner(MRJobRunner):
                 step_num + 1, num_steps, step_id))
             self._wait_for_step_to_complete(step_id, step_num, num_steps)
 
-
     def _wait_for_step_to_complete(
             self, step_id, step_num=None, num_steps=None):
         """Helper for _wait_for_step_to_complete(). Wait for
@@ -1569,12 +1577,8 @@ class EMRJobRunner(MRJobRunner):
             if step.status.state == 'PENDING':
                 cluster = self._describe_cluster()
 
-                reason_desc = ''
-                reason = getattr(
-                    getattr(cluster.status, 'statechangereason', ''),
-                    'message', '')
-                if reason:
-                    reason_desc = ': ' + reason
+                reason = _get_reason(cluster)
+                reason_desc = (': %s' % reason) if reason else ''
 
                 log.info('  PENDING (cluster is %s%s)' % (
                     cluster.status.state, reason_desc))
@@ -1603,19 +1607,29 @@ class EMRJobRunner(MRJobRunner):
             else:
                 # step has failed somehow. *reason* seems to only be set
                 # when job is cancelled (e.g. 'Job terminated')
-                reason_desc = ''
-                reason = getattr(
-                    getattr(step.status, 'statechangereason' ,''),
-                    'message', '')
-                if reason:
-                    reason_desc = ' (%s)' % reason
+                reason = _get_reason(step)
+                reason_desc = (' (%s)' % reason) if reason else ''
 
                 log.info('  %s%s' % (
                    step.status.state, reason_desc))
 
-                # maybe it failed due to an IAM issue? if so, tell the user
-                # what to do to fix it
-                self._check_for_missing_default_iam_roles()
+                # print cluster status; this might give more context
+                # why step didn't succeed
+                cluster = self._describe_cluster()
+                reason = _get_reason(cluster)
+                reason_desc = (': %s' % reason) if reason else ''
+                log.info('Cluster %s %s %s%s' % (
+                    cluster.id,
+                    'was' if 'ED' in cluster.status.state else 'is',
+                    cluster.status.state,
+                    reason_desc))
+
+                if cluster.status.state in (
+                        'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                    # was it caused by IAM roles?
+                    self._check_for_missing_default_iam_roles(cluster)
+                    # was it caused by a key pair from the wrong region?
+                    self._check_for_key_pair_from_wrong_region(cluster)
 
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters
@@ -1685,23 +1699,39 @@ class EMRJobRunner(MRJobRunner):
             if tunnel_handle is not None:
                 tunnel_handle.close()
 
-    def _check_for_missing_default_iam_roles(self):
+    def _check_for_missing_default_iam_roles(self, cluster):
         """If cluster couldn't start due to missing IAM roles, tell
         user what to do."""
-        cluster = self._describe_cluster()
+        if not cluster:
+            cluster = self._describe_cluster()
 
-        reason = getattr(
-            getattr(cluster.status, 'statechangereason' ,''),
-            'message', '')
-        if any(reason.rstrip().endswith('/%s is invalid' % role)
+        reason = _get_reason(cluster)
+        if any(reason.endswith('/%s is invalid' % role)
                for role in (FALLBACK_INSTANCE_PROFILE,
                             FALLBACK_SERVICE_ROLE)):
             log.warning(
-                '\n\n'
+                '\n'
                 'Ask your admin to create the default EMR roles'
                 ' by following:\n\n'
                 '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
                 '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
+
+    def _check_for_key_pair_from_wrong_region(self, cluster):
+        """Help users tripped up by the default AWS region changing
+        in mrjob v0.5.0 (see #1111) by pointing them to the
+        docs for creating EC2 key pairs."""
+        if not self._opts.is_default('aws_region'):
+            return
+
+        reason = _get_reason(cluster)
+        if reason == 'The given SSH key name was invalid':
+            log.warning(
+                '\n'
+                'The default AWS region is now %s. Create SSH keys for'
+                ' %s by following:\n\n'
+                '    https://pythonhosted.org/mrjob/guides'
+                '/emr-quickstart.html#configuring-ssh-credentials\n' %
+                (_DEFAULT_AWS_REGION, _DEFAULT_AWS_REGION))
 
     def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""

@@ -518,6 +518,7 @@ class HadoopJobRunner(MRJobRunner):
             args.append('-reducer')
             args.append(reducer)
         else:
+            # TODO: translate this to YARN/pre-YARN
             args.extend(['-D', 'mapred.reduce.tasks=0'])
 
         return args

@@ -10,9 +10,10 @@ Configuring your AWS credentials allows mrjob to run your jobs on Elastic
 MapReduce and use S3.
 
 * Create an `Amazon Web Services account <http://aws.amazon.com/>`_
-* Sign up for `Elastic MapReduce <http://aws.amazon.com/elasticmapreduce/>`_
-* Get your access and secret keys (click "Security Credentials" on `your
-  account page <http://aws.amazon.com/account/>`_)
+* Go to the `Your Security Credentials
+  <https://console.aws.amazon.com/iam/home?#security_credential>`__, click
+  on **Access Keys**, and then **Create New Access Key**. Make sure to copy the
+  secret access key, as there is no way to recover it after creation.
 
 Now you can either set the environment variables :envvar:`AWS_ACCESS_KEY_ID`
 and :envvar:`AWS_SECRET_ACCESS_KEY`, or set **aws_access_key_id** and
@@ -33,10 +34,10 @@ master nodes to view live progress, see the job tracker in your browser, and
 fetch error logs quickly.
 
 * Go to https://console.aws.amazon.com/ec2/home
-* Make sure the **Region** dropdown (upper left) matches the region you want
-  to run jobs in (usually "US East").
-* Click on **Key Pairs** (lower left)
-* Click on **Create Key Pair** (center).
+* Make sure the **Region** dropdown (upper right, second from the right)
+  matches the region you want to run jobs in (usually "Oregon").
+* Click on **Key Pairs** (left sidebar, under **Network & Security**)
+* Click on **Create Key Pair** (top left).
 * Name your key pair ``EMR`` (any name will work but that's what we're using
   in this example)
 * Save :file:`EMR.pem` wherever you like (``~/.ssh`` is a good place)

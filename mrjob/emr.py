@@ -1601,17 +1601,14 @@ class EMRJobRunner(MRJobRunner):
                 log.info('  COMPLETED')
                 # will fetch counters, below, and then return
             else:
-                # step has failed somehow
-
-                # these fields definitely exist, but currently, message doesn't
-                # seem to be filled (at least, the AWS CLI can't see it
-                # either)
+                # step has failed somehow. *reason* seems to only be set
+                # when job is cancelled (e.g. 'Job terminated')
                 reason_desc = ''
                 reason = getattr(
                     getattr(step.status, 'statechangereason' ,''),
                     'message', '')
                 if reason:
-                    reason_desc = ' (%s)' % reason_desc
+                    reason_desc = ' (%s)' % reason
 
                 log.info('  %s%s' % (
                    step.status.state, reason_desc))

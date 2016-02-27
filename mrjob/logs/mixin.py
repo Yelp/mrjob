@@ -80,7 +80,7 @@ class LogInterpretationMixin(object):
         """Return interpretation of the step log. Either implement
         this, or fill ``'step'`` yourself (e.g. from Hadoop binary's
         output."""
-        raise NotImplementedError
+        return None
 
     ### stuff to call ###
 

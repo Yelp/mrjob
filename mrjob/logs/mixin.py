@@ -1,0 +1,173 @@
+# -*- coding: utf-8 -*-
+# Copyright 2016 Yelp and Contributors
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""Runner mixin for counters and probable cause of failure.
+
+This relies on passing around a *log_interpretation* dictionary, which
+is described in detail in :py:mod:`mrjob.logs`.
+
+This mixin doesn't yet handle step logs because the EMR and Hadoop runners
+handle them so differently. It's up to you to fill in the 'step' field
+of your log interpretation; the mixin can't do much without it because
+it needs it for the job/application ID.
+
+Your runner should generally have one log interpretation per step,
+though the mixin doesn't care how or where you store them.
+"""
+from logging import getLogger
+
+from mrjob.compat import uses_yarn
+from mrjob.logs.counters import _pick_counters
+from mrjob.logs.errors import _pick_error
+from mrjob.logs.history import _interpret_history_log
+from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.task import _interpret_task_logs
+from mrjob.logs.task import _ls_task_syslogs
+
+
+log = getLogger(__name__)
+
+
+class LogInterpretationMixin(object):
+    """Mix this in to your runner class to simplify log interpretation."""
+    # this mixin is meant to be tightly bound to MRJobRunner, but
+    # currently it only relies on self.fs and self.get_hadoop_version()
+
+    ### stuff to redefine ###
+
+    def _stream_history_log_dirs(self):
+        """Yield lists of directories (usually, URIs) to search for history
+        logs in.
+
+        Usually, you'll want to add logging messages (e.g.
+        'Searching for history logs in ...'
+        """
+        return ()
+
+    def _stream_task_log_dirs(self, application_id=None):
+        """Yield lists of directories (usually, URIs) to search for task
+        logs in.
+
+        Usually, you'll want to add logging messages (e.g.
+        'Searching for task syslogs in...')
+        """
+        return ()
+
+    def _get_step_log_interpretation(self, log_interpretation):
+        """Return interpretation of the step log. Either implement
+        this, or fill ``'step'`` yourself (e.g. from Hadoop binary's
+        output."""
+        raise NotImplementedError
+
+    ### stuff to call ###
+
+    def _pick_counters(self, log_interpretation):
+        """Pick counters from our log interpretation, interpreting
+        history logs if need be."""
+        counters = _pick_counters(log_interpretation)
+
+        if not counters:
+            log.info('Attempting to fetch counters from logs...')
+            self._interpret_step_log(log_interpretation)
+            counters = _pick_counters(log_interpretation)
+
+        if not counters:
+            self._interpret_history_log(log_interpretation)
+            counters = _pick_counters(log_interpretation)
+
+        return counters
+
+    def _pick_error(self, log_interpretation):
+        """Pick probable cause of failure (only call this if job fails)."""
+        if not all(log_type in log_interpretation for
+                   log_type in ('job', 'step', 'task')):
+            log.info('Scanning logs for probable cause of failure...')
+            self._interpret_step_log(log_interpretation)
+            self._interpret_history_log(log_interpretation)
+            self._interpret_task_logs(log_interpretation)
+
+        return _pick_error(log_interpretation)
+
+    ### stuff that should just work ###
+
+    def _interpret_history_log(self, log_interpretation):
+        """Fetch history log and add 'history' to log_interpretation."""
+        if 'history' in log_interpretation:
+            return   # already interpreted
+
+        job_id = log_interpretation.get('step', {}).get('job_id')
+        if not job_id:
+            log.warning("Can't fetch history log; missing job ID")
+            return
+
+        log_interpretation['history'] = _interpret_history_log(
+            self.fs, self._ls_history_logs(job_id=job_id))
+
+    def _ls_history_logs(self, job_id=None):
+        """Yield history log matches, logging a message for each one."""
+        for match in _ls_history_logs(
+                self.fs, self._stream_history_log_dirs(), job_id=job_id):
+            log.info('  Parsing history log: %s' % match['path'])
+            yield match
+
+    def _interpret_step_log(self, log_interpretation):
+        """Add *step* to the log interpretation, if it's not already there."""
+        if 'step' in log_interpretation:
+            return
+
+        step_interpretation = self._get_step_log_interpretation(
+            log_interpretation)
+        if step_interpretation:
+            log_interpretation['step'] = step_interpretation
+
+    def _interpret_task_logs(self, log_interpretation, partial=True):
+        """Fetch task syslogs and stderr, and add 'task' to interpretation."""
+        if 'task' in log_interpretation and (
+                partial or not log_interpretation['task'].get('partial')):
+            return   # already interpreted
+
+        step_interpretation = log_interpretation.get('step') or {}
+        application_id = step_interpretation.get('application_id')
+        job_id = step_interpretation.get('job_id')
+
+        yarn = uses_yarn(self.get_hadoop_version())
+
+        if yarn:
+            if not application_id:
+                log.warning("Can't fetch task logs; missing application ID")
+                return
+        else:
+            if not job_id:
+                log.warning("Can't fetch task logs; missing job ID")
+                return
+
+        def stderr_callback(stderr_path):
+            log.info('  Parsing task stderr: %s' % stderr_path)
+
+        log_interpretation['task'] = _interpret_task_logs(
+            self.fs,
+            self._ls_task_syslogs(
+                application_id=application_id, job_id=job_id),
+            partial=partial,
+            stderr_callback=stderr_callback)
+
+    def _ls_task_syslogs(self, application_id=None, job_id=None):
+        """Yield task log matches, logging a message for each one."""
+        for match in _ls_task_syslogs(
+                self.fs,
+                self._stream_task_log_dirs(application_id=application_id),
+                application_id=application_id,
+                job_id=job_id):
+            log.info('  Parsing task syslog: %s' % match['path'])
+            yield match

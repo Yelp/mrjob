@@ -80,13 +80,9 @@ from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
-from mrjob.logs.errors import _pick_error
-from mrjob.logs.history import _interpret_history_log
-from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_emr_step_log
 from mrjob.logs.step import _ls_emr_step_logs
-from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _ls_task_syslogs
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -509,7 +505,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['release_label'] = 'emr-' + self['ami_version']
 
 
-class EMRJobRunner(MRJobRunner):
+class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
     Invoked when you run your job with ``-r emr``.
 
@@ -1634,14 +1630,7 @@ class EMRJobRunner(MRJobRunner):
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters
             if step.status.state != 'CANCELLED':
-                log.info('Attempting to fetch counters from logs...')
-                self._interpret_step_log(log_interpretation)
-
-                counters = _pick_counters(log_interpretation)
-                if not counters:
-                    self._interpret_history_log(log_interpretation)
-                    counters = _pick_counters(log_interpretation)
-
+                counters = self._pick_counters(log_interpretation)
                 if counters:
                     log.info(_format_counters(counters))
                 else:
@@ -1651,12 +1640,7 @@ class EMRJobRunner(MRJobRunner):
                 return
 
             if step.status.state == 'FAILED':
-                log.info('Scanning logs for probable cause of failure...')
-                self._interpret_step_log(log_interpretation)
-                self._interpret_history_log(log_interpretation)
-                self._interpret_task_logs(log_interpretation)
-
-                error = _pick_error(log_interpretation)
+                error = self._pick_error(log_interpretation)
                 if error:
                     log.error('Probable cause of failure:\n\n%s\n\n' %
                               _format_error(error))
@@ -1751,11 +1735,60 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_key, step_num + 1)
 
-    ## LOG PARSING ##
+    ## LOG PARSING (implementation of LogInterpretationMixin) ##
+
+    def _stream_history_log_dirs(self):
+        """Get lists of directories to look for the history log in."""
+        # in YARN, the history log lives on HDFS, which we currently
+        # don't have a way to access (see #990 for a possible solution), and
+        # isn't copied to S3
+        #
+        # Fortunately, in YARN, everything we want is in the step
+        # log anyway.
+        if uses_yarn(self.get_hadoop_version()):
+            return []
+
+        return self._stream_log_dirs(
+            'history log', dir_name='history', s3_dir_name='jobs')
+
+    def _stream_task_log_dirs(self, application_id=None):
+        """Get lists of directories to look for the task logs in."""
+        if application_id:
+            dir_name = posixpath.join('userlogs', application_id)
+            s3_dir_name = posixpath.join('task-attempts', application_id)
+        else:
+            dir_name = 'userlogs'
+            s3_dir_name = 'task-attempts'
+
+        return self._stream_log_dirs(
+            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
+
+    def _get_step_log_interpretation(self, log_interpretation):
+        """Fetch and interpret the step log."""
+        step_id = log_interpretation.get('step_id')
+        if not step_id:
+            log.warning("Can't fetch step log; missing step ID")
+            return
+
+        return _interpret_emr_step_log(
+            self.fs, self._ls_step_logs(step_id=step_id))
+
+    def _ls_step_logs(self, step_id):
+        """Yield step log matches, logging a message for each one."""
+        for match in _ls_emr_step_logs(
+                self.fs, self._stream_step_log_dirs(step_id),
+                step_id=step_id):
+            log.info('  Parsing step log: %s' % match['path'])
+            yield match
+
+    def _stream_step_log_dirs(self, step_id):
+        """Get lists of directories to look for the step log in."""
+        dir_name = posixpath.join('steps', step_id)
+        return self._stream_log_dirs('step log', dir_name)
 
     def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name=None,
                          ssh_to_slaves=False):
-        """Stream log dirs for the given kind of log.
+        """Stream log dirs for any kind of log.
 
         Our general strategy is first, if SSH is enabled, to SSH into the
         master node (and possibly slaves, if *ssh_to_slaves* is set).
@@ -1829,121 +1862,9 @@ class EMRJobRunner(MRJobRunner):
             time.sleep(self._opts['check_emr_status_every'])
             cluster = self._describe_cluster()
 
-    # TODO: merge interpret/ls code with similar code in hadoop.py
-
-    ### history log ###
-
-    def _interpret_history_log(self, log_interpretation):
-        """Fetch history log and add 'history' to log_interpretation."""
-        if 'history' not in log_interpretation:
-            job_id = log_interpretation.get('step', {}).get('job_id')
-            if not job_id:
-                log.warning("Can't fetch history log without job ID")
-                return {}
-
-            log_interpretation['history'] = _interpret_history_log(
-                self.fs, self._ls_history_logs(job_id=job_id))
-
-        return log_interpretation['history']
-
-    def _ls_history_logs(self, job_id=None):
-        """Yield history log matches, logging a message for each one."""
-        for match in _ls_history_logs(
-                self.fs, self._stream_history_log_dirs(), job_id=job_id):
-            log.info('  Parsing history log: %s' % match['path'])
-            yield match
-
-    def _stream_history_log_dirs(self):
-        """Get lists of directories to look for the history log in."""
-        # in YARN, the history log lives on HDFS, which we currently
-        # don't have a way to access (see #990 for a possible solution), and
-        # isn't copied to S3
-        #
-        # Fortunately, in YARN, everything we want is in the step
-        # log anyway.
-        if uses_yarn(self.get_hadoop_version()):
-            return []
-
-        return self._stream_log_dirs(
-            'history log', dir_name='history', s3_dir_name='jobs')
-
-    ### step log ###
-
-    def _interpret_step_log(self, log_interpretation):
-        """Fetch step log and add 'step' to log_interpretation."""
-        if 'step' not in log_interpretation:
-            step_id = log_interpretation.get('step_id')
-            if not step_id:
-                log.warning("Can't fetch step log without step ID")
-                return {}
-
-            log_interpretation['step'] = _interpret_emr_step_log(
-                self.fs, self._ls_step_logs(step_id=step_id))
-
-        return log_interpretation['step']
-
-    def _ls_step_logs(self, step_id):
-        """Yield step log matches, logging a message for each one."""
-        for match in _ls_emr_step_logs(
-                self.fs, self._stream_step_log_dirs(step_id),
-                step_id=step_id):
-            log.info('  Parsing step log: %s' % match['path'])
-            yield match
-
-    def _stream_step_log_dirs(self, step_id):
-        """Get lists of directories to look for the step log in."""
-        dir_name = posixpath.join('steps', step_id)
-        return self._stream_log_dirs('step log', dir_name)
-
-    ### task logs ###
-
-    def _interpret_task_logs(self, log_interpretation):
-
-        def stderr_callback(stderr_path):
-            log.info('  Parsing task stderr: %s' % stderr_path)
-
-        if 'task' not in log_interpretation:
-            step_interpretation = log_interpretation.get('step') or {}
-            application_id = step_interpretation.get('application_id')
-            job_id = step_interpretation.get('job_id')
-
-            yarn = uses_yarn(self.get_hadoop_version())
-
-            if yarn and application_id is None:
-                log.warning("Can't fetch task logs without application ID")
-                return {}
-            elif not yarn and job_id is None:
-                log.warning("Can't fetch task logs without job ID")
-                return {}
-
-            log_interpretation['task'] = _interpret_task_logs(
-                self.fs, self._ls_task_syslogs(
-                    application_id=application_id, job_id=job_id),
-                stderr_callback=stderr_callback)
-
-        return log_interpretation['task']
-
-    def _ls_task_syslogs(self, application_id=None, job_id=None):
-        """Yield task log matches, logging a message for each one."""
-        for match in _ls_task_syslogs(
-                self.fs, self._stream_task_log_dirs(
-                    application_id=application_id),
-                application_id=application_id, job_id=job_id):
-            log.info('  Parsing task syslog: %s' % match['path'])
-            yield match
-
-    def _stream_task_log_dirs(self, application_id=None):
-        if application_id:
-            dir_name = posixpath.join('userlogs', application_id)
-            s3_dir_name = posixpath.join('task-attempts', application_id)
-        else:
-            dir_name = 'userlogs'
-            s3_dir_name = 'task-attempts'
-
-        return self._stream_log_dirs(
-            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
-
     def counters(self):
+        # not using self._pick_counters() because we don't want to
+        # initiate a log fetch
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
 

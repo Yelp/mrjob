@@ -206,7 +206,6 @@ def add_runner_opts(opt_group, default_runner='local'):
                   ' current Python interpreter.')),
     ]
 
-
 def add_local_opts(opt_group):
     """Options for ``inline`` and ``local`` runners."""
     return [
@@ -214,7 +213,6 @@ def add_local_opts(opt_group):
             '--hadoop-version', dest='hadoop_version', default=None,
             help=('Specific version of Hadoop to simulate')),
     ]
-
 
 def add_hadoop_emr_opts(opt_group):
     """Options for ``hadoop`` and ``emr`` runners"""
@@ -259,7 +257,6 @@ def add_hadoop_emr_opts(opt_group):
             help='Skip the checks to ensure all input paths exist'),
     ]
 
-
 def add_hadoop_opts(opt_group):
     """Options for ``hadoop`` runner"""
     return [
@@ -285,17 +282,80 @@ def add_hadoop_opts(opt_group):
             help='Deprecated alias for --hadoop-tmp-dir'),
     ]
 
+# TODO - mtai @ davidmarin - pulled common dataproc/emr opt here
+def add_dataproc_emr_opts(opt_group):
+    return [
+        opt_group.add_option(
+            '--bootstrap', dest='bootstrap', action='append',
+            help=('A shell command to set up libraries etc. before any steps'
+                  ' (e.g. "sudo apt-get -qy install python3"). You may'
+                  ' interpolate files available via URL or locally with Hadoop'
+                  ' Distributed Cache syntax ("sudo dpkg -i foo.deb#")')),
+
+        opt_group.add_option(
+            '--bootstrap-python', dest='bootstrap_python',
+            action='store_true', default=None,
+            help=('Attempt to install a compatible version of Python'
+                  ' at boostrap time. Currently this only does anything'
+                  ' for Python 3, for which it is enabled by default.')),
+    ]
+
 def add_dataproc_opts(opt_group):
     """Options for ``dataproc`` runner"""
-    return (add_emr_launch_opts(opt_group) +
-            add_emr_run_opts(opt_group))
+    return [
+        opt_group.add_option(
+            '--gcp-project', dest='gcp_project', default=None,
+            help=('Project to run Dataproc jobs in.')),
+
+        opt_group.add_option(
+            '--gcp-region', dest='gcp_region', default='global',
+            help=('Region to run Dataproc jobs in. Default is global')),
+
+        opt_group.add_option(
+            '--gcp-zone', dest='gcp_zone', default=None,
+            help=('Zone to run Dataproc jobs in.  ')),
+
+        # TODO - mtai @ davidmarin - collapse cluster_id
+        opt_group.add_option(
+            '--gcp-cluster', dest='gcp_cluster',
+            help=('Dataproc cluster name - REQUIRED')),
+
+        # instance types
+        # TODO - mtai @ davidmarin - collapse with ec2_instance_type
+        opt_group.add_option(
+            '--gce-machine-type', dest='gce_machine_type', default=None,
+            help=('Type of EC2 instance(s) to launch (e.g. m1.medium,'
+                  ' c3.xlarge, r3.xlarge). See'
+                  ' http://aws.amazon.com/ec2/instance-types/ for the full'
+                  ' list.')),
+
+        # instance number - WORKER ONLY, no pre-emptible
+        # TODO - mtai @ davidmarin - collapse with num_ec2_instances
+        opt_group.add_option(
+            '--gce_num_instances', dest='gce_num_instances', default=None,
+            type='int',
+            help='Total number of Worker instances to launch '),
+
+        # TODO - mtai @ davidmarin - collapse with s3_sync_wait_time
+        opt_group.add_option(
+            '--gcs-sync-wait-time', dest='gcs_sync_wait_time', default=None,
+            type='float',
+            help=('How long to wait for GCS to reach eventual consistency. This'
+                  ' is typically less than a second but the'
+                  ' default is 5.0 to be safe.')),
+
+        # TODO - mtai @ davidmarin - collapse with s3_tmp_dir
+        opt_group.add_option(
+            '--gcs-tmp-dir', dest='gcs_tmp_dir', default=None,
+            help='URI on GCS to use as our temp directory.'),
+    ]
+
 
 def add_emr_opts(opt_group):
     """Options for ``emr`` runner"""
     return (add_emr_connect_opts(opt_group) +
             add_emr_launch_opts(opt_group) +
             add_emr_run_opts(opt_group))
-
 
 def add_emr_connect_opts(opt_group):
     """Options for connecting to the EMR API."""
@@ -556,13 +616,6 @@ def add_emr_bootstrap_opts(opt_group):
     return [
 
         opt_group.add_option(
-            '--bootstrap', dest='bootstrap', action='append',
-            help=('A shell command to set up libraries etc. before any steps'
-                  ' (e.g. "sudo apt-get -qy install python3"). You may'
-                  ' interpolate files available via URL or locally with Hadoop'
-                  ' Distributed Cache syntax ("sudo dpkg -i foo.deb#")')),
-
-        opt_group.add_option(
             '--bootstrap-action', dest='bootstrap_actions', action='append',
             default=[],
             help=('Raw bootstrap action scripts to run before any of the other'
@@ -585,13 +638,6 @@ def add_emr_bootstrap_opts(opt_group):
                   ' bootstrap_cmds (for example, debian packages). These will'
                   ' be made public on S3 due to a limitation of the bootstrap'
                   ' feature. You can use --bootstrap-file more than once.')),
-
-        opt_group.add_option(
-            '--bootstrap-python', dest='bootstrap_python',
-            action='store_true', default=None,
-            help=('Attempt to install a compatible version of Python'
-                  ' at boostrap time. Currently this only does anything'
-                  ' for Python 3, for which it is enabled by default.')),
 
         opt_group.add_option(
             '--bootstrap-python-package', dest='bootstrap_python_packages',

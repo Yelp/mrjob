@@ -26,6 +26,7 @@ from optparse import OptionParser
 
 from mrjob.conf import combine_dicts
 from mrjob.options import add_basic_opts
+from mrjob.options import add_dataproc_emr_opts
 from mrjob.options import add_dataproc_opts
 from mrjob.options import add_emr_opts
 from mrjob.options import add_hadoop_emr_opts
@@ -320,14 +321,14 @@ class MRJobLauncher(object):
 
         add_hadoop_opts(self.hadoop_opt_group)
 
-        # options for running the job on EMR
-        self.emr_opt_group = OptionGroup(
+        # options for running the job on Dataproc or EMR
+        self.dataproc_emr_opt_group = OptionGroup(
             self.option_parser,
-            'Running on EMR (these apply when you set -r emr)')
-        self.option_parser.add_option_group(self.emr_opt_group)
+            'Running on Dataproc or EMR (these apply when you set -r dataproc or'
+            ' -r emr)')
+        self.option_parser.add_option_group(self.dataproc_emr_opt_group)
 
-        # add_emr_opts(self.emr_opt_group)
-
+        add_dataproc_emr_opts(self.dataproc_emr_opt_group)
 
         # options for running the job on Dataproc
         self.dataproc_opt_group = OptionGroup(
@@ -336,6 +337,16 @@ class MRJobLauncher(object):
         self.option_parser.add_option_group(self.dataproc_opt_group)
 
         add_dataproc_opts(self.dataproc_opt_group)
+
+
+        # options for running the job on EMR
+        self.emr_opt_group = OptionGroup(
+            self.option_parser,
+            'Running on EMR (these apply when you set -r emr)')
+        self.option_parser.add_option_group(self.emr_opt_group)
+
+        add_emr_opts(self.emr_opt_group)
+
 
     def all_option_groups(self):
         return (self.option_parser, self.proto_opt_group,

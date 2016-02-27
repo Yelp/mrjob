@@ -38,13 +38,9 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
-from mrjob.logs.errors import _pick_error
-from mrjob.logs.history import _interpret_history_log
-from mrjob.logs.history import _ls_history_logs
+from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
-from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _ls_task_syslogs
 from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
@@ -163,7 +159,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         })
 
 
-class HadoopJobRunner(MRJobRunner):
+class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
     Invoked when you run your job with ``-r hadoop``.
 
@@ -447,11 +443,7 @@ class HadoopJobRunner(MRJobRunner):
 
             log_interpretation['step'] = step_interpretation
 
-            counters = _pick_counters(log_interpretation)
-            if not counters:
-                self._interpret_history_log(log_interpretation)
-                counters = _pick_counters(log_interpretation)
-
+            counters = self._pick_counters(log_interpretation)
             if counters:
                 log.info(_format_counters(counters))
             else:
@@ -463,6 +455,7 @@ class HadoopJobRunner(MRJobRunner):
                     log.error('Probable cause of failure:\n\n%s\n' %
                               _format_error(error))
 
+                # use CalledProcessError's well-known message format
                 reason = str(CalledProcessError(returncode, step_args))
                 raise StepFailedException(
                     reason=reason, step_num=step_num,
@@ -479,8 +472,6 @@ class HadoopJobRunner(MRJobRunner):
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
     def _args_for_streaming_step(self, step_num):
-        version = self.get_hadoop_version()
-
         hadoop_streaming_jar = self.get_hadoop_streaming_jar()
         if not hadoop_streaming_jar:
             raise Exception('no Hadoop streaming jar')
@@ -580,106 +571,29 @@ class HadoopJobRunner(MRJobRunner):
             except Exception as e:
                 log.exception(e)
 
-    ### LOG FETCHING/PARSING ###
+    ### LOG (implementation of LogInterpretationMixin) ###
 
-    def _interpret_history_log(self, log_interpretation):
-        """Find and interpret the history log, storing the
-        interpretation in ``log_interpretation['history']``."""
-        if 'history' not in log_interpretation:
-            # get job ID from output of hadoop command
-            step_interpretation = log_interpretation.get('step') or {}
-            job_id = step_interpretation.get('job_id')
+    def _stream_history_log_dirs(self, output_dir=None):
+        """Yield lists of directories to look for the history log in."""
+        for log_dir in unique(self._hadoop_log_dirs(output_dir=output_dir)):
+            if self.fs.exists(log_dir):
+                log.info('Looking for history log in %s...' % log_dir)
+                yield [log_dir]
 
-            if not job_id:
-                log.warning("Can't fetch history without job ID")
-                return {}
+    def _stream_task_log_dirs(self, application_id=None, output_dir=None):
+        """Yield lists of directories to look for the task logs in."""
+        # Note: this is unlikely to be super-helpful on "real" (multi-node)
+        # pre-YARN Hadoop because task logs aren't generally shipped to a
+        # local directory. It's a start, anyways. See #1201.
+        for log_dir in unique(self._hadoop_log_dirs(output_dir=output_dir)):
+            if application_id:
+                path = self.fs.join(log_dir, 'userlogs', application_id)
+            else:
+                path = self.fs.join(log_dir, 'userlogs')
 
-            def stream_history_log_dirs():
-                for log_dir in unique(
-                        self._hadoop_log_dirs(
-                            output_dir=step_interpretation.get('output_dir'))):
-
-                    if self.fs.exists(log_dir):
-                         log.info('Looking for history log in %s' % log_dir)
-                         yield [log_dir]
-
-            # wrap _ls_history_logs() to add logging
-            def ls_history_logs():
-                # there should be at most one history log
-                for match in _ls_history_logs(
-                        self.fs, stream_history_log_dirs(), job_id=job_id):
-                    log.info('Found history log: %s' % match['path'])
-                    yield match
-
-            log_interpretation['history'] = _interpret_history_log(
-                self.fs, ls_history_logs())
-
-        return log_interpretation['history']
-
-    def _interpret_task_logs(self, log_interpretation):
-        """Find and interpret the task logs, storing the
-        interpretation in ``log_interpretation['task']``."""
-        if 'task' not in log_interpretation:
-            # get job/application ID from output of hadoop command
-            step_interpretation = log_interpretation.get('step') or {}
-            application_id = step_interpretation.get('application_id')
-            job_id = step_interpretation.get('job_id')
-
-            yarn = uses_yarn(self.get_hadoop_version())
-
-            if yarn and application_id is None:
-                log.warning("Can't fetch task logs without application ID")
-                return {}
-            elif not yarn and job_id is None:
-                log.warning("Can't fetch task logs without job ID")
-                return {}
-
-            # Note: this is unlikely to be super-helpful on "real" (multi-node)
-            # pre-YARN Hadoop because task logs aren't generally shipped to a
-            # local directory. It's a start, anyways. See #1201.
-            def stream_task_log_dirs():
-                for log_dir in unique(
-                    self._hadoop_log_dirs(
-                        output_dir=step_interpretation.get('output_dir'))):
-
-                    if yarn:
-                        path = self.fs.join(
-                            log_dir, 'userlogs', application_id)
-                    else:
-                        # sometimes pre-YARN attempt logs are organized by
-                        # job_id,
-                        # sometimes not. Play it safe
-                        path = self.fs.join(log_dir, 'userlogs')
-
-                    if self.fs.exists(path):
-                        log.info('Scanning task syslogs in %s' % path)
-                        yield [path]
-
-            # wrap _ls_task_syslogs() to add logging
-            def ls_task_syslogs():
-                # there should be at most one history log
-                for match in _ls_task_syslogs(
-                        self.fs, stream_task_log_dirs(),
-                        application_id=application_id, job_id=job_id):
-
-                    # TODO: this isn't really correct because
-                    # _interpret_task_logs() sorts the logs paths and
-                    # scans starting at the most recent one. Probably
-                    # should have _ls_task_syslogs() do the sorting.
-                    log.info('  Scanning for errors: %s' % match['path'])
-                    yield match
-
-            log_interpretation['task'] = _interpret_task_logs(
-                self.fs, ls_task_syslogs())
-
-        return log_interpretation['task']
-
-    def _pick_error(self, log_interpretation):
-        """Find probable cause of failure, and return it."""
-        self._interpret_history_log(log_interpretation)
-        self._interpret_task_logs(log_interpretation)
-
-        return _pick_error(log_interpretation)
+            if self.fs.exists(path):
+                log.info('Looking for task syslogs in %s...' % path)
+                yield [path]
 
     def counters(self):
         return [_pick_counters(log_interpretation)

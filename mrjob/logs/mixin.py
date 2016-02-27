@@ -46,22 +46,34 @@ class LogInterpretationMixin(object):
 
     ### stuff to redefine ###
 
-    def _stream_history_log_dirs(self):
+    def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories (usually, URIs) to search for history
         logs in.
 
         Usually, you'll want to add logging messages (e.g.
         'Searching for history logs in ...'
+
+        :param output_dir: Output directory for step (optional), to look
+            for logs (e.g. on Cloudera).
         """
         return ()
 
-    def _stream_task_log_dirs(self, application_id=None):
+    def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Yield lists of directories (usually, URIs) to search for task
         logs in.
 
         Usually, you'll want to add logging messages (e.g.
         'Searching for task syslogs in...')
+
+        :param application_id: YARN application ID (optional), so we can ls
+            the relevant subdirectory of `userlogs/` rather than the whole
+            thing
+        :param output_dir: Output directory for step (optional), to look
+            for logs (e.g. on Cloudera).
         """
+        # sometimes pre-YARN logs are organized by job ID, but not always,
+        # so we don't bother with job_id; just ls() the entire userlogs
+        # dir and depend on regexes to find the right subdir.
         return ()
 
     def _get_step_log_interpretation(self, log_interpretation):
@@ -106,18 +118,25 @@ class LogInterpretationMixin(object):
         if 'history' in log_interpretation:
             return   # already interpreted
 
-        job_id = log_interpretation.get('step', {}).get('job_id')
+        step_interpretation = log_interpretation.get('step') or {}
+
+        job_id = step_interpretation.get('job_id')
         if not job_id:
             log.warning("Can't fetch history log; missing job ID")
             return
 
-        log_interpretation['history'] = _interpret_history_log(
-            self.fs, self._ls_history_logs(job_id=job_id))
+        output_dir = step_interpretation.get('output_dir')
 
-    def _ls_history_logs(self, job_id=None):
+        log_interpretation['history'] = _interpret_history_log(
+            self.fs, self._ls_history_logs(
+                job_id=job_id, output_dir=output_dir))
+
+    def _ls_history_logs(self, job_id=None, output_dir=None):
         """Yield history log matches, logging a message for each one."""
         for match in _ls_history_logs(
-                self.fs, self._stream_history_log_dirs(), job_id=job_id):
+                self.fs,
+                self._stream_history_log_dirs(output_dir=output_dir),
+                job_id=job_id):
             log.info('  Parsing history log: %s' % match['path'])
             yield match
 
@@ -138,8 +157,10 @@ class LogInterpretationMixin(object):
             return   # already interpreted
 
         step_interpretation = log_interpretation.get('step') or {}
+
         application_id = step_interpretation.get('application_id')
         job_id = step_interpretation.get('job_id')
+        output_dir = step_interpretation.get('output_dir')
 
         yarn = uses_yarn(self.get_hadoop_version())
 
@@ -158,15 +179,19 @@ class LogInterpretationMixin(object):
         log_interpretation['task'] = _interpret_task_logs(
             self.fs,
             self._ls_task_syslogs(
-                application_id=application_id, job_id=job_id),
+                application_id=application_id,
+                job_id=job_id,
+                output_dir=output_dir),
             partial=partial,
             stderr_callback=stderr_callback)
 
-    def _ls_task_syslogs(self, application_id=None, job_id=None):
+    def _ls_task_syslogs(
+            self, application_id=None, job_id=None, output_dir=None):
         """Yield task log matches, logging a message for each one."""
         for match in _ls_task_syslogs(
                 self.fs,
-                self._stream_task_log_dirs(application_id=application_id),
+                self._stream_task_log_dirs(
+                    application_id=application_id, output_dir=output_dir),
                 application_id=application_id,
                 job_id=job_id):
             log.info('  Parsing task syslog: %s' % match['path'])

@@ -1735,10 +1735,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_key, step_num + 1)
 
-    ## LOG PARSING (implementation of LogInterpretationMixin) ##
+    ### LOG PARSING (implementation of LogInterpretationMixin) ###
 
-    def _stream_history_log_dirs(self):
-        """Get lists of directories to look for the history log in."""
+    def _stream_history_log_dirs(self, output_dir=None):
+        """Yield lists of directories to look for the history log in."""
         # in YARN, the history log lives on HDFS, which we currently
         # don't have a way to access (see #990 for a possible solution), and
         # isn't copied to S3
@@ -1751,7 +1751,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return self._stream_log_dirs(
             'history log', dir_name='history', s3_dir_name='jobs')
 
-    def _stream_task_log_dirs(self, application_id=None):
+    def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Get lists of directories to look for the task logs in."""
         if application_id:
             dir_name = posixpath.join('userlogs', application_id)

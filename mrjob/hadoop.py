@@ -27,6 +27,7 @@ except ImportError:
     pty = None
 
 import mrjob.step
+from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -487,6 +488,14 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         # specific args.
         args.extend(self._hadoop_args_for_step(step_num))
 
+        mapper, combiner, reducer = (
+            self._hadoop_streaming_commands(step_num))
+
+        # if no reducer, shut off reducer tasks
+        if not reducer:
+            args.extend(['-D', ('%s=0' % translate_jobconf(
+                'mapreduce.job.reduces', self.get_hadoop_version()))])
+
         # set up input
         for input_uri in self._hdfs_step_input_files(step_num):
             args.extend(['-input', input_uri])
@@ -494,9 +503,6 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         # set up output
         args.append('-output')
         args.append(self._hdfs_step_output_dir(step_num))
-
-        mapper, combiner, reducer = (
-            self._hadoop_streaming_commands(step_num))
 
         args.append('-mapper')
         args.append(mapper)
@@ -508,9 +514,6 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         if reducer:
             args.append('-reducer')
             args.append(reducer)
-        else:
-            # TODO: translate this to YARN/pre-YARN
-            args.extend(['-D', 'mapred.reduce.tasks=0'])
 
         return args
 

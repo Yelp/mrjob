@@ -66,3 +66,58 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
 
         self.runner._get_step_log_interpretation.assert_called_once_with(
             self.log_interpretation)
+
+
+class PickCountersTestCase(LogInterpretationMixinTestCase):
+
+    def setUp(self):
+        super(PickCountersTestCase, self).setUp()
+
+        self.runner._interpret_history_log = Mock()
+        self.runner._interpret_step_log = Mock()
+
+    def test_counter_already_present(self):
+        self.log_interpretation = dict(
+            step=dict(counters={'foo': {'bar': 1}}))
+
+        self.assertEqual(
+            self.runner._pick_counters(self.log_interpretation),
+            {'foo': {'bar': 1}})
+
+        # don't log anything if runner._pick_counters() doesn't have
+        # to fetch any new information
+        self.assertFalse(self.log.info.called)
+        self.assertFalse(self.runner._interpret_step_log.called)
+        self.assertFalse(self.runner._interpret_history_log.called)
+
+    def test_counter_from_step_logs(self):
+        def mock_interpret_step_log(log_interpretation):
+            log_interpretation['step'] = dict(
+                counters={'foo': {'bar': 1}})
+
+        self.runner._interpret_step_log = Mock(
+            side_effect=mock_interpret_step_log)
+
+        self.assertEqual(
+            self.runner._pick_counters(self.log_interpretation),
+            {'foo': {'bar': 1}})
+
+        self.assertTrue(self.log.info.called)  # 'Attempting to fetch...'
+        self.assertTrue(self.runner._interpret_step_log.called)
+        self.assertFalse(self.runner._interpret_history_log.called)
+
+    def test_counter_from_history_logs(self):
+        def mock_interpret_history_log(log_interpretation):
+            log_interpretation['history'] = dict(
+                counters={'foo': {'bar': 1}})
+
+        self.runner._interpret_history_log = Mock(
+            side_effect=mock_interpret_history_log)
+
+        self.assertEqual(
+            self.runner._pick_counters(self.log_interpretation),
+            {'foo': {'bar': 1}})
+
+        self.assertTrue(self.log.info.called)  # 'Attempting to fetch...'
+        self.assertTrue(self.runner._interpret_step_log.called)
+        self.assertTrue(self.runner._interpret_history_log.called)

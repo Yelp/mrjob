@@ -738,22 +738,21 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         local filesystem.
         """
         if self._fs is None:
-            self._s3_fs = S3Filesystem(
+            s3_fs = S3Filesystem(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 aws_security_token=self._opts['aws_security_token'],
                 s3_endpoint=self._opts['s3_endpoint'])
 
             if self._opts['ec2_key_pair_file']:
-                self._ssh_fs = SSHFilesystem(
+                ssh_fs = SSHFilesystem(
                     ssh_bin=self._opts['ssh_bin'],
                     ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
-                self._fs = CompositeFilesystem(self._ssh_fs, self._s3_fs,
-                                               LocalFilesystem())
+                self._fs = CompositeFilesystem(
+                    ssh_fs, s3_fs, LocalFilesystem())
             else:
-                self._ssh_fs = None
-                self._fs = CompositeFilesystem(self._s3_fs, LocalFilesystem())
+                self._fs = CompositeFilesystem(s3_fs, LocalFilesystem())
 
         return self._fs
 
@@ -1797,7 +1796,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         TERMINATING, we first wait for it to terminate (since that
         will trigger copying logs over).
         """
-        if self._ssh_fs:
+        if self.fs.can_handle_path('ssh:///'):
             ssh_host = self._address_of_master()
             if ssh_host:
                 hosts = [ssh_host]

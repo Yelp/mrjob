@@ -220,8 +220,6 @@ class MockBotoTestCase(SandboxedTestCase):
 
         # re-initialize fs
         runner._fs = None
-        runner._ssh_fs = None
-        runner._s3_fs = None
         #runner.fs
 
     def add_slave(self):

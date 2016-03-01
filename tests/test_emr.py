@@ -3353,3 +3353,98 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def test_stream_history_log_dirs_without_ssh(self):
         self._test_stream_history_log_dirs(ssh=False)
+
+    def _test_stream_step_log_dirs(self, ssh):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        results = runner._stream_step_log_dirs('s-STEPID')
+
+        if ssh:
+            self.log.info.reset_mock()
+
+            self.assertEqual(next(results), [
+                'ssh://master/mnt/var/log/hadoop/steps/s-STEPID',
+            ])
+            self.assertFalse(
+                self._wait_for_terminating_cluster_to_terminate.called)
+            self.log.info.assert_called_once_with(
+                'Looking for step log in /mnt/var/log/hadoop/steps/s-STEPID'
+                ' on master...')
+
+        self.log.info.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/steps/s-STEPID',
+        ])
+        self.assertTrue(
+            self._wait_for_terminating_cluster_to_terminate.called)
+        self.log.info.assert_called_once_with(
+            'Looking for step log in'
+            ' s3://bucket/logs/j-CLUSTERID/steps/s-STEPID...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_step_log_dirs_with_ssh(self):
+        self._test_stream_step_log_dirs(ssh=True)
+
+    def test_stream_step_log_dirs_without_ssh(self):
+        self._test_stream_step_log_dirs(ssh=False)
+
+    def _test_stream_task_log_dirs(self, ssh, bad_ssh_slave_hosts=False):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        if bad_ssh_slave_hosts:
+            self.ssh_slave_hosts.side_effect=IOError
+
+        results = runner._stream_task_log_dirs()
+
+        if ssh:
+            self.log.reset_mock()
+
+            if bad_ssh_slave_hosts:
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/hadoop/userlogs',
+                ])
+                self.assertTrue(self.log.warning.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
+                    ' on master...')
+            else:
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/hadoop/userlogs',
+                    'ssh://master!slave1/mnt/var/log/hadoop/userlogs',
+                    'ssh://master!slave2/mnt/var/log/hadoop/userlogs',
+                ])
+                self.assertFalse(self.log.warning.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
+                    ' on master and task/core nodes...')
+
+            self.assertFalse(
+                self._wait_for_terminating_cluster_to_terminate.called)
+
+        self.log.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/task-attempts',
+        ])
+        self.assertTrue(
+            self._wait_for_terminating_cluster_to_terminate.called)
+        self.log.info.assert_called_once_with(
+            'Looking for task logs in'
+            ' s3://bucket/logs/j-CLUSTERID/task-attempts...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_task_log_dirs_with_ssh(self):
+        self._test_stream_task_log_dirs(ssh=True)
+
+    def test_stream_task_log_dirs_with_bad_ssh_slave_hosts(self):
+        self._test_stream_task_log_dirs(ssh=True, bad_ssh_slave_hosts=True)
+
+    def test_stream_task_log_dirs_without_ssh(self):
+        self._test_stream_task_log_dirs(ssh=False)

@@ -18,22 +18,114 @@ from tests.py2 import patch
 from tests.sandbox import PatcherTestCase
 
 
-class MockRunner(Mock, LogInterpretationMixin):
-    pass
-
 
 class LogInterpretationMixinTestCase(PatcherTestCase):
 
+    class MockRunner(Mock, LogInterpretationMixin):
+        pass
+
     def setUp(self):
-        self.runner = MockRunner()
+        self.runner = self.MockRunner()
         self.log = self.start(patch('mrjob.logs.mixin.log'))
+
+
+class InterpretHistoryLogTestCase(LogInterpretationMixinTestCase):
+
+    def setUp(self):
+        super(InterpretHistoryLogTestCase, self).setUp()
+
+        self.runner._ls_history_logs = Mock()
+        self._interpret_history_log = (
+            self.start(patch('mrjob.logs.mixin._interpret_history_log')))
+
+    def test_history_interpretation_already_filled(self):
+        log_interpretation = dict(history={})
+
+        self.runner._interpret_history_log(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation, dict(history={}))
+
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._interpret_history_log.called)
+        self.assertFalse(self.runner._ls_history_logs.called)
+
+    def test_no_job_id(self):
+        log_interpretation = dict(step={})
+
+        self.runner._interpret_history_log(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation, dict(step={}))
+
+        self.assertTrue(self.log.warning.called)
+        self.assertFalse(self._interpret_history_log.called)
+        self.assertFalse(self.runner._ls_history_logs.called)
+
+    def test_with_job_id(self):
+        self._interpret_history_log.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(step=dict(job_id='job_1'))
+
+        self.runner._interpret_history_log(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation,
+            dict(step=dict(job_id='job_1'),
+                 history=dict(counters={'foo': {'bar': 1}})))
+
+        self.assertFalse(self.log.warning.called)
+        self.runner._ls_history_logs.assert_called_once_with(
+            job_id='job_1', output_dir=None)
+        self._interpret_history_log.assert_called_once_with(
+            self.runner.fs, self.runner._ls_history_logs.return_value)
+
+    def test_with_job_id_and_output_dir(self):
+        self._interpret_history_log.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(
+            step=dict(job_id='job_1', output_dir='hdfs:///path/'))
+
+        self.runner._interpret_history_log(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation,
+            dict(step=dict(job_id='job_1', output_dir='hdfs:///path/'),
+                 history=dict(counters={'foo': {'bar': 1}})))
+
+        self.assertFalse(self.log.warning.called)
+        self.runner._ls_history_logs.assert_called_once_with(
+            job_id='job_1', output_dir='hdfs:///path/')
+        self._interpret_history_log.assert_called_once_with(
+            self.runner.fs, self.runner._ls_history_logs.return_value)
+
+
+
+
 
 
 class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
 
+    def setUp(self):
+        super(InterpretStepLogTestCase, self).setUp()
+
+        self.runner._get_step_log_interpretation = Mock()
+
+    def test_step_interpretation_already_filled(self):
+        log_interpretation = dict(step={})
+
+        self.runner._interpret_step_log(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation, dict(step={}))
+
+        self.assertFalse(self.runner._get_step_log_interpretation.called)
+
     def test_step_interpretation(self):
-        self.runner._get_step_log_interpretation = Mock(
-            return_value=dict(job_id='job_1'))
+        self.runner._get_step_log_interpretation.return_value = dict(
+            job_id='job_1')
 
         log_interpretation = {}
 
@@ -46,15 +138,8 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
         self.runner._get_step_log_interpretation.assert_called_once_with(
             log_interpretation)
 
-        # calling _interpret_step_log again shouldn't result in another
-        # call to _get_step_log_interpretation
-        self.runner._interpret_step_log(log_interpretation)
-        self.runner._get_step_log_interpretation.assert_called_once_with(
-            log_interpretation)
-
     def test_no_step_interpretation(self):
-        self.runner._get_step_log_interpretation = Mock(
-            return_value=None)
+        self.runner._get_step_log_interpretation.return_value = None
 
         log_interpretation = {}
 
@@ -137,7 +222,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
         self.runner._interpret_step_log = Mock()
         self.runner._interpret_task_logs = Mock()
 
-        self.mock_pick_error = self.start(
+        self._pick_error = self.start(
             patch('mrjob.logs.mixin._pick_error'))
 
     def test_logs_already_interpreted(self):
@@ -146,7 +231,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
 
         self.assertEqual(
             self.runner._pick_error(log_interpretation),
-            self.mock_pick_error.return_value)
+            self._pick_error.return_value)
 
         # don't log a message or interpret logs
         self.assertFalse(self.log.info.called)
@@ -157,7 +242,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
     def _test_interpret_all_logs(self, log_interpretation):
         self.assertEqual(
             self.runner._pick_error(log_interpretation),
-            self.mock_pick_error.return_value)
+            self._pick_error.return_value)
 
         # log a message ('Scanning logs...') and call _interpret() methods
         self.assertTrue(self.log.info.called)

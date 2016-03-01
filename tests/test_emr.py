@@ -3493,3 +3493,46 @@ class LsStepLogsTestCase(MockBotoTestCase):
                       self.log.info.call_args[0][0])
 
         self.assertRaises(StopIteration, next, results)
+
+
+class GetStepLogInterpretationTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(GetStepLogInterpretationTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._interpret_emr_step_log = self.start(patch(
+            'mrjob.emr._interpret_emr_step_log'))
+        self._ls_step_logs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ls_step_logs'))
+
+    def test_basic(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = dict(step_id='s-STEPID')
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(log_interpretation),
+            self._interpret_emr_step_log.return_value)
+
+        self.assertFalse(self.log.warning.called)
+        self._ls_step_logs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_log.assert_called_once_with(
+            runner.fs, self._ls_step_logs.return_value)
+
+    def test_no_step_id(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = {}
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(log_interpretation), None)
+
+        self.assertTrue(self.log.warning.called)
+        self.assertFalse(self._ls_step_logs.called)
+        self.assertFalse(self._interpret_emr_step_log.called)

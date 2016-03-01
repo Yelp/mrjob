@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from copy import deepcopy
+
 from mrjob.logs.mixin import LogInterpretationMixin
 
 from tests.py2 import Mock
@@ -102,10 +104,6 @@ class InterpretHistoryLogTestCase(LogInterpretationMixinTestCase):
             self.runner.fs, self.runner._ls_history_logs.return_value)
 
 
-
-
-
-
 class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
 
     def setUp(self):
@@ -149,6 +147,81 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
 
         self.runner._get_step_log_interpretation.assert_called_once_with(
             log_interpretation)
+
+
+class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
+
+    def setUp(self):
+        super(InterpretTaskLogsTestCase, self).setUp()
+
+        self.runner._ls_task_syslogs = Mock()
+        self._interpret_task_logs = (
+            self.start(patch('mrjob.logs.mixin._interpret_task_logs')))
+        self.runner.get_hadoop_version = Mock(return_value='2.7.1')
+
+    def _test_task_interpretation_already_filled(
+            self, log_interpretation, **kwargs):
+        orig_log_interpretation = deepcopy(log_interpretation)
+
+        self.runner._interpret_task_logs(log_interpretation, **kwargs)
+
+        self.assertEqual(log_interpretation, orig_log_interpretation)
+
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._interpret_task_logs.called)
+        self.assertFalse(self.runner._ls_task_syslogs.called)
+
+    def test_task_interpretation_already_filled(self):
+        log_interpretation = dict(task={})
+
+        self._test_task_interpretation_already_filled(log_interpretation)
+
+    def test_task_interpretation_already_partially_filled(self):
+        log_interpretation = dict(task=dict(partial=True))
+
+        self._test_task_interpretation_already_filled(log_interpretation)
+
+    def test_task_interpretation_already_fully_filled(self):
+        # if partial=False, only accept complete task interpretations
+        log_interpretation = dict(task={})
+
+        self._test_task_interpretation_already_filled(
+            log_interpretation, partial=False)
+
+    def test_missing_application_id(self):
+        log_interpretation = dict(step=dict(job_id='job_1'))
+
+        self.runner._interpret_task_logs(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation, dict(step=dict(job_id='job_1')))
+
+        self.assertTrue(self.log.warning.called)
+        self.assertFalse(self._interpret_task_logs.called)
+        self.assertFalse(self.runner._ls_task_syslogs.called)
+
+    def test_missing_job_id(self):
+        self.runner.get_hadoop_version.return_value = '1.0.3'
+
+        log_interpretation = dict(step=dict(application_id='application_1'))
+
+        self.runner._interpret_task_logs(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation,
+            dict(step=dict(application_id='application_1')))
+
+        self.assertTrue(self.log.warning.called)
+        self.assertFalse(self._interpret_task_logs.called)
+        self.assertFalse(self.runner._ls_task_syslogs.called)
+
+
+
+
+
+
+
+
 
 
 class PickCountersTestCase(LogInterpretationMixinTestCase):

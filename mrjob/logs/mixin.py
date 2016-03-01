@@ -39,6 +39,14 @@ from mrjob.logs.task import _ls_task_syslogs
 log = getLogger(__name__)
 
 
+
+# a callback for _interpret_task_logs(). Breaking it out to make
+# testing easier
+def _log_parsing_task_stderr(stderr_path):
+    log.info('  Parsing task stderr: %s' % stderr_path)
+
+
+
 class LogInterpretationMixin(object):
     """Mix this in to your runner class to simplify log interpretation."""
     # this mixin is meant to be tightly bound to MRJobRunner, but
@@ -173,9 +181,6 @@ class LogInterpretationMixin(object):
                 log.warning("Can't fetch task logs; missing job ID")
                 return
 
-        def stderr_callback(stderr_path):
-            log.info('  Parsing task stderr: %s' % stderr_path)
-
         log_interpretation['task'] = _interpret_task_logs(
             self.fs,
             self._ls_task_syslogs(
@@ -183,7 +188,7 @@ class LogInterpretationMixin(object):
                 job_id=job_id,
                 output_dir=output_dir),
             partial=partial,
-            stderr_callback=stderr_callback)
+            stderr_callback=_log_parsing_task_stderr)
 
     def _ls_task_syslogs(
             self, application_id=None, job_id=None, output_dir=None):

@@ -386,9 +386,8 @@ class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
         # verify that the keyword args get passed through and
         # that logging happens in the right order
 
-        self._ls_history_logs.return_value=[
-            dict(path='hdfs:///logs/'),
-            dict(path='s3://bucket/logs/'),
+        self._ls_history_logs.return_value = [
+            dict(path='hdfs:///history/history.jhist'),
         ]
 
         results = self.runner._ls_history_logs(
@@ -396,7 +395,8 @@ class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertFalse(self.log.info.called)
 
-        self.assertEqual(next(results), dict(path='hdfs:///logs/'))
+        self.assertEqual(next(results),
+                         dict(path='hdfs:///history/history.jhist'))
 
         self.runner._stream_history_log_dirs.assert_called_once_with(
             output_dir='hdfs:///output/')
@@ -406,11 +406,8 @@ class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
             job_id='job_1')
 
         self.assertEqual(self.log.info.call_count, 1)
-        self.assertIn('hdfs:///logs/', self.log.info.call_args[0][0])
-
-        self.assertEqual(next(results), dict(path='s3://bucket/logs/'))
-        self.assertEqual(self.log.info.call_count, 2)
-        self.assertIn('s3://bucket/logs/', self.log.info.call_args[0][0])
+        self.assertIn('hdfs:///history/history.jhist',
+                      self.log.info.call_args[0][0])
 
         self.assertRaises(StopIteration, next, results)
 
@@ -429,9 +426,9 @@ class LsTaskSyslogsTestCase(LogInterpretationMixinTestCase):
         # verify that the keyword args get passed through and
         # that logging happens in the right order
 
-        self._ls_task_syslogs.return_value=[
-            dict(path='hdfs:///logs/'),
-            dict(path='s3://bucket/logs/'),
+        self._ls_task_syslogs.return_value = [
+            dict(path='hdfs:///userlogs/1/syslog'),
+            dict(path='hdfs:///userlogs/2/syslog'),
         ]
 
         results = self.runner._ls_task_syslogs(
@@ -440,7 +437,7 @@ class LsTaskSyslogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertFalse(self.log.info.called)
 
-        self.assertEqual(next(results), dict(path='hdfs:///logs/'))
+        self.assertEqual(next(results), dict(path='hdfs:///userlogs/1/syslog'))
 
         self.runner._stream_task_log_dirs.assert_called_once_with(
             application_id='app_1',
@@ -452,11 +449,13 @@ class LsTaskSyslogsTestCase(LogInterpretationMixinTestCase):
             job_id='job_1')
 
         self.assertEqual(self.log.info.call_count, 1)
-        self.assertIn('hdfs:///logs/', self.log.info.call_args[0][0])
+        self.assertIn('hdfs:///userlogs/1/syslog',
+                      self.log.info.call_args[0][0])
 
-        self.assertEqual(next(results), dict(path='s3://bucket/logs/'))
+        self.assertEqual(next(results), dict(path='hdfs:///userlogs/2/syslog'))
         self.assertEqual(self.log.info.call_count, 2)
-        self.assertIn('s3://bucket/logs/', self.log.info.call_args[0][0])
+        self.assertIn('hdfs:///userlogs/2/syslog',
+                      self.log.info.call_args[0][0])
 
         self.assertRaises(StopIteration, next, results)
 

@@ -1775,7 +1775,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _ls_step_logs(self, step_id):
         """Yield step log matches, logging a message for each one."""
         for match in _ls_emr_step_logs(
-                self.fs, self._stream_step_log_dirs(step_id),
+                self.fs, self._stream_step_log_dirs(step_id=step_id),
                 step_id=step_id):
             log.info('  Parsing step log: %s' % match['path'])
             yield match

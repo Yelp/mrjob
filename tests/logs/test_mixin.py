@@ -372,6 +372,95 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
         self.assertTrue(self.runner._interpret_history_log.called)
 
 
+class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
+
+    def setUp(self):
+        super(LsHistoryLogsTestCase, self).setUp()
+
+        self._ls_history_logs = self.start(patch(
+            'mrjob.logs.mixin._ls_history_logs'))
+        self.runner._stream_history_log_dirs = Mock()
+
+    def test_basic(self):
+        # the _ls_history_log() method is a very thin wrapper. Just
+        # verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        self._ls_history_logs.return_value=[
+            dict(path='hdfs:///logs/'),
+            dict(path='s3://bucket/logs/'),
+        ]
+
+        results = self.runner._ls_history_logs(
+            job_id='job_1', output_dir='hdfs:///output/')
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results), dict(path='hdfs:///logs/'))
+
+        self.runner._stream_history_log_dirs.assert_called_once_with(
+            output_dir='hdfs:///output/')
+        self._ls_history_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._stream_history_log_dirs.return_value,
+            job_id='job_1')
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn('hdfs:///logs/', self.log.info.call_args[0][0])
+
+        self.assertEqual(next(results), dict(path='s3://bucket/logs/'))
+        self.assertEqual(self.log.info.call_count, 2)
+        self.assertIn('s3://bucket/logs/', self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
+
+class LsTaskSyslogsTestCase(LogInterpretationMixinTestCase):
+
+    def setUp(self):
+        super(LsTaskSyslogsTestCase, self).setUp()
+
+        self._ls_task_syslogs = self.start(patch(
+            'mrjob.logs.mixin._ls_task_syslogs'))
+        self.runner._stream_task_log_dirs = Mock()
+
+    def test_basic(self):
+        # the _ls_task_syslogs() method is a very thin wrapper. Just
+        # verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        self._ls_task_syslogs.return_value=[
+            dict(path='hdfs:///logs/'),
+            dict(path='s3://bucket/logs/'),
+        ]
+
+        results = self.runner._ls_task_syslogs(
+            application_id='app_1',
+            job_id='job_1', output_dir='hdfs:///output/')
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results), dict(path='hdfs:///logs/'))
+
+        self.runner._stream_task_log_dirs.assert_called_once_with(
+            application_id='app_1',
+            output_dir='hdfs:///output/')
+        self._ls_task_syslogs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._stream_task_log_dirs.return_value,
+            application_id='app_1',
+            job_id='job_1')
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn('hdfs:///logs/', self.log.info.call_args[0][0])
+
+        self.assertEqual(next(results), dict(path='s3://bucket/logs/'))
+        self.assertEqual(self.log.info.call_count, 2)
+        self.assertIn('s3://bucket/logs/', self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
+
 class PickErrorsTestCase(LogInterpretationMixinTestCase):
 
     def setUp(self):

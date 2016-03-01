@@ -1816,15 +1816,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     ssh_host, '!' + host if host != ssh_host else '',
                     path) for host in hosts]
 
-            # wait for logs to be on S3
-            self._wait_for_terminating_cluster_to_terminate()
+        # wait for logs to be on S3
+        self._wait_for_terminating_cluster_to_terminate()
 
-            # TODO: test that this gets run!
-            if self._s3_log_dir():
-                s3_log_uri = posixpath.join(
-                    self._s3_log_dir(), (s3_dir_name or dir_name))
-                log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
-                yield [s3_log_uri]
+        if self._s3_log_dir():
+            s3_log_uri = posixpath.join(
+                self._s3_log_dir(), (s3_dir_name or dir_name))
+            log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
+            yield [s3_log_uri]
 
     def _wait_for_terminating_cluster_to_terminate(self):
         """If the cluster is already terminating, wait for it to terminate,

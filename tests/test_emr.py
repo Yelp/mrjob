@@ -3282,3 +3282,74 @@ class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
 
     def test_terminated_with_errors(self):
         self._test_silently_exits_on_state('TERMINATED_WITH_ERRORS')
+
+
+class StreamLogDirsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(StreamLogDirsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._address_of_master = self.start(patch(
+            'mrjob.emr.EMRJobRunner._address_of_master',
+            return_value='master'))
+
+        self.get_hadoop_version = self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='2.4.0'))
+
+        self.ssh_slave_hosts = self.start(patch(
+            'mrjob.fs.ssh.SSHFilesystem.ssh_slave_hosts',
+            return_value=['slave1', 'slave2']))
+
+        self._s3_log_dir = self.start(patch(
+            'mrjob.emr.EMRJobRunner._s3_log_dir',
+            return_value='s3://bucket/logs/j-CLUSTERID'))
+
+        self._wait_for_terminating_cluster_to_terminate = self.start(patch(
+            'mrjob.emr.EMRJobRunner'
+            '._wait_for_terminating_cluster_to_terminate'))
+
+    def test_cant_stream_history_log_dirs_in_yarn(self):
+        runner = EMRJobRunner()
+
+        self.assertEqual(runner._stream_history_log_dirs(), [])
+
+    def _test_stream_history_log_dirs(self, ssh):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        results = runner._stream_history_log_dirs()
+
+        if ssh:
+            self.log.info.reset_mock()
+
+            self.assertEqual(next(results), [
+                'ssh://master/mnt/var/log/hadoop/history',
+            ])
+            self.assertFalse(
+                self._wait_for_terminating_cluster_to_terminate.called)
+            self.log.info.assert_called_once_with(
+                'Looking for history log in /mnt/var/log/hadoop/history'
+                ' on master...')
+
+        self.log.info.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/jobs',
+        ])
+        self.assertTrue(
+            self._wait_for_terminating_cluster_to_terminate.called)
+        self.log.info.assert_called_once_with(
+            'Looking for history log in'
+            ' s3://bucket/logs/j-CLUSTERID/jobs...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_history_log_dirs_with_ssh(self):
+        self._test_stream_history_log_dirs(ssh=True)
+
+    def test_stream_history_log_dirs_without_ssh(self):
+        self._test_stream_history_log_dirs(ssh=False)

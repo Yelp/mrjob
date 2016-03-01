@@ -14,6 +14,7 @@
 from copy import deepcopy
 
 from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.mixin import _log_parsing_task_stderr
 
 from tests.py2 import Mock
 from tests.py2 import patch
@@ -188,6 +189,91 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self._test_task_interpretation_already_filled(
             log_interpretation, partial=False)
 
+    def test_replace_partial_interpretation_with_full(self):
+        log_interpretation = dict(
+            step=dict(application_id='app_id'),
+            task=dict(partial=True))
+
+        self.runner._interpret_task_logs(log_interpretation, partial=False)
+
+        self.assertTrue(self.runner._ls_task_syslogs.called)
+        self.assertTrue(self._interpret_task_logs.called)
+
+    def test_application_id(self):
+        self._interpret_task_logs.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(step=dict(application_id='app_1'))
+
+        self.runner._interpret_task_logs(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation,
+            dict(step=dict(application_id='app_1'),
+                 task=dict(counters={'foo': {'bar': 1}})))
+
+        self.assertFalse(self.log.warning.called)
+        self.runner._ls_task_syslogs.assert_called_once_with(
+            application_id='app_1',
+            job_id=None,
+            output_dir=None)
+        self._interpret_task_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._ls_task_syslogs.return_value,
+            partial=True,
+            stderr_callback=_log_parsing_task_stderr)
+
+    def test_job_id(self):
+        self.runner.get_hadoop_version.return_value = '1.0.3'
+
+        self._interpret_task_logs.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(step=dict(job_id='job_1'))
+
+        self.runner._interpret_task_logs(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation,
+            dict(step=dict(job_id='job_1'),
+                 task=dict(counters={'foo': {'bar': 1}})))
+
+        self.assertFalse(self.log.warning.called)
+        self.runner._ls_task_syslogs.assert_called_once_with(
+            application_id=None,
+            job_id='job_1',
+            output_dir=None)
+        self._interpret_task_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._ls_task_syslogs.return_value,
+            partial=True,
+            stderr_callback=_log_parsing_task_stderr)
+
+    def test_output_dir(self):
+        self._interpret_task_logs.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(
+            step=dict(application_id='app_1', output_dir='hdfs:///path/'))
+
+        self.runner._interpret_task_logs(log_interpretation)
+
+        self.assertEqual(
+            log_interpretation,
+            dict(step=dict(application_id='app_1', output_dir='hdfs:///path/'),
+                 task=dict(counters={'foo': {'bar': 1}})))
+
+        self.assertFalse(self.log.warning.called)
+        self.runner._ls_task_syslogs.assert_called_once_with(
+            application_id='app_1',
+            job_id=None,
+            output_dir='hdfs:///path/')
+        self._interpret_task_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._ls_task_syslogs.return_value,
+            partial=True,
+            stderr_callback=_log_parsing_task_stderr)
+
     def test_missing_application_id(self):
         log_interpretation = dict(step=dict(job_id='job_1'))
 
@@ -203,13 +289,13 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
     def test_missing_job_id(self):
         self.runner.get_hadoop_version.return_value = '1.0.3'
 
-        log_interpretation = dict(step=dict(application_id='application_1'))
+        log_interpretation = dict(step=dict(app_id='app_1'))
 
         self.runner._interpret_task_logs(log_interpretation)
 
         self.assertEqual(
             log_interpretation,
-            dict(step=dict(application_id='application_1')))
+            dict(step=dict(app_id='app_1')))
 
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._interpret_task_logs.called)

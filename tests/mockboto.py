@@ -1013,7 +1013,7 @@ class MockEmrConnection(object):
 
         if cluster.status.state == 'TERMINATING':
             # simulate progress, to support
-            # _wait_for_terminating_cluster_to_terminate()
+            # _wait_for_logs_on_s3()
             self.simulate_progress(cluster_id)
 
         return cluster

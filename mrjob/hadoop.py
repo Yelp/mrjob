@@ -581,6 +581,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         for log_dir in unique(self._hadoop_log_dirs(output_dir=output_dir)):
             if self.fs.exists(log_dir):
                 log.info('Looking for history log in %s...' % log_dir)
+                # logs aren't always in a subdir named history/
                 yield [log_dir]
 
     def _stream_task_log_dirs(self, application_id=None, output_dir=None):

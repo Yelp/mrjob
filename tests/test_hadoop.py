@@ -38,6 +38,7 @@ from tests.mockhadoop import get_mock_hdfs_root
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
+from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import call
 from tests.py2 import patch
@@ -404,6 +405,134 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
         self.mock_hadoop_version = '1.0.3'
         self.assertEqual(list(self.runner._hadoop_log_dirs()),
                          ['/mnt/var/log/hadoop'])
+
+
+
+class StreamingLogDirsTestCase(SandboxedTestCase):
+    # tests for the _stream_*_log_dirs() methods, mocking out
+    # _hadoop_log_dirs(), which is tested above
+
+    def setUp(self):
+        super(StreamingLogDirsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.hadoop.log'))
+
+        self.runner = HadoopJobRunner()
+        self.runner._hadoop_log_dirs = Mock(return_value=[])
+        self.runner.fs.exists = Mock(return_value=True)
+
+        self.log.reset_mock()  # ignore logging from HadoopJobRunner init
+
+
+
+class StreamHistoryLogDirsTestCase(StreamingLogDirsTestCase):
+
+    def test_empty(self):
+        results = self.runner._stream_history_log_dirs()
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_basic(self):
+        self.runner._hadoop_log_dirs.return_value = [
+            '/mnt/var/logs/hadoop', 'hdfs:///logs']
+
+        results = self.runner._stream_history_log_dirs()
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results), ['/mnt/var/logs/hadoop'])
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn('/mnt/var/logs/hadoop', self.log.info.call_args[0][0])
+
+        self.assertEqual(next(results), ['hdfs:///logs'])
+
+        self.assertEqual(self.log.info.call_count, 2)
+        self.assertIn('hdfs:///logs', self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_output_dir(self):
+        output_dir = 'hdfs:///path/to/output'
+        self.runner._hadoop_log_dirs.return_value = [output_dir]
+
+        results = self.runner._stream_history_log_dirs(output_dir=output_dir)
+
+        self.assertEqual(next(results), [output_dir])
+
+        self.runner._hadoop_log_dirs.assert_called_with(output_dir=output_dir)
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_fs_exists(self):
+        self.runner._hadoop_log_dirs.return_value = [
+            '/mnt/var/logs/hadoop', 'hdfs:///logs']
+        self.runner.fs.exists.return_value = False
+
+        results = self.runner._stream_history_log_dirs()
+
+        self.assertRaises(StopIteration, next, results)
+
+
+class StreamTaskLogDirsTestCase(StreamingLogDirsTestCase):
+
+    def test_empty(self):
+        results = self.runner._stream_task_log_dirs()
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_basic(self):
+        self.runner._hadoop_log_dirs.return_value = [
+            '/mnt/var/logs/hadoop', 'hdfs:///logs']
+
+        results = self.runner._stream_task_log_dirs()
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results), ['/mnt/var/logs/hadoop/userlogs'])
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn('/mnt/var/logs/hadoop', self.log.info.call_args[0][0])
+
+        self.assertEqual(next(results), ['hdfs:///logs/userlogs'])
+
+        self.assertEqual(self.log.info.call_count, 2)
+        self.assertIn('hdfs:///logs/userlogs', self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_output_dir(self):
+        output_dir = 'hdfs:///path/to/output'
+        self.runner._hadoop_log_dirs.return_value = [output_dir]
+
+        results = self.runner._stream_task_log_dirs(output_dir=output_dir)
+
+        self.assertEqual(next(results), [output_dir + '/userlogs'])
+
+        self.runner._hadoop_log_dirs.assert_called_with(output_dir=output_dir)
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_application_id(self):
+        self.runner._hadoop_log_dirs.return_value = ['hdfs:///logs']
+
+        results = self.runner._stream_task_log_dirs(application_id='app_1')
+
+        self.assertEqual(next(results), ['hdfs:///logs/userlogs/app_1'])
+
+    def test_fs_exists(self):
+        self.runner._hadoop_log_dirs.return_value = [
+            '/mnt/var/logs/hadoop', 'hdfs:///logs']
+        self.runner.fs.exists.return_value = False
+
+        results = self.runner._stream_task_log_dirs()
+
+        self.assertRaises(StopIteration, next, results)
+
 
 
 

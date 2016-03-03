@@ -3502,8 +3502,8 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self.log = self.start(patch('mrjob.emr.log'))
 
-        self._interpret_emr_step_log = self.start(patch(
-            'mrjob.emr._interpret_emr_step_log'))
+        self._interpret_emr_step_logs = self.start(patch(
+            'mrjob.emr._interpret_emr_step_logs'))
         self._ls_step_logs = self.start(patch(
             'mrjob.emr.EMRJobRunner._ls_step_logs'))
 
@@ -3516,11 +3516,11 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self.assertEqual(
             runner._get_step_log_interpretation(log_interpretation),
-            self._interpret_emr_step_log.return_value)
+            self._interpret_emr_step_logs.return_value)
 
         self.assertFalse(self.log.warning.called)
         self._ls_step_logs.assert_called_once_with(step_id='s-STEPID')
-        self._interpret_emr_step_log.assert_called_once_with(
+        self._interpret_emr_step_logs.assert_called_once_with(
             runner.fs, self._ls_step_logs.return_value)
 
     def test_no_step_id(self):
@@ -3535,4 +3535,4 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._ls_step_logs.called)
-        self.assertFalse(self._interpret_emr_step_log.called)
+        self.assertFalse(self._interpret_emr_step_logs.called)

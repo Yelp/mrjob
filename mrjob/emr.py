@@ -81,7 +81,7 @@ from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
-from mrjob.logs.step import _interpret_emr_step_log
+from mrjob.logs.step import _interpret_emr_step_logs
 from mrjob.logs.step import _ls_emr_step_logs
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
@@ -1769,7 +1769,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.warning("Can't fetch step log; missing step ID")
             return
 
-        return _interpret_emr_step_log(
+        return _interpret_emr_step_logs(
             self.fs, self._ls_step_logs(step_id=step_id))
 
     def _ls_step_logs(self, step_id):

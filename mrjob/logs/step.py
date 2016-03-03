@@ -98,28 +98,37 @@ def _match_emr_step_log_path(path, step_id=None):
     return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'))
 
 
-# TODO: change to _interpret_emr_step_logs()
-def _interpret_emr_step_log(fs, matches):
-    """Extract information from step log (see :py:func:`_parse_step_log()`)"""
-    # we expect to go through this loop 0 or 1 times
+def _interpret_emr_step_logs(fs, matches):
+    """Extract information from step log (see :py:func:`_parse_step_log()`),
+    which may be split into several chunks by timestamp"""
+    # walk through logs in order; this is basically a single log. Crossing our
+    # fingers and hoping EMR's log rotation won't split a log4j record in half
+    matches = sorted(
+        matches, key=lambda m: (m['timestamp'] is None, m['timestamp'] or ''))
+
+    # going to merge results for each log into final result
+    errors = []
+    result = {}
+
     for match in matches:
         path = match['path']
 
-        result = _parse_step_log(_cat_log(fs, path))
+        interpretation = _parse_step_log(_cat_log(fs, path))
 
-        # add missing IDs and patch path into hadoop errors
-        _add_implied_job_id(result)
+        result.update(interpretation)
         for error in result.get('errors') or ():
             if 'hadoop_error' in error:
                 error['hadoop_error']['path'] = path
             _add_implied_task_id(error)
+            errors.append(error)
 
-        return result
+    _add_implied_job_id(result)
+    if errors:
+        result['errors'] = errors
 
-    return {}  # whoops, no logs
+    return result
 
 
-# TODO: possibly allow custom filters for non-log4j crud from other jars?
 def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     """Parse stderr from the ``hadoop jar`` command. Works like
     :py:func:`_parse_step_log` (same return format)  with a few extra features

@@ -13,8 +13,9 @@
 # limitations under the License.
 import errno
 
-from mrjob.logs.step import _parse_hadoop_log4j_records
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
+from mrjob.logs.step import _match_emr_step_log_path
+from mrjob.logs.step import _parse_hadoop_log4j_records
 from mrjob.logs.step import _parse_indented_counters
 from mrjob.logs.step import _parse_step_log
 from mrjob.py2 import StringIO
@@ -357,3 +358,40 @@ class ParseIndentedCountersTestCase(TestCase):
                 'Launched map tasks': 2,
             },
         })
+
+
+# path matching
+class MatchEMRStepLogPathTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_match_emr_step_log_path(''), None)
+
+    def test_local(self):
+        log_path = '/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/syslog'
+
+        self.assertEqual(
+            _match_emr_step_log_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp=None))
+
+    def test_s3(self):
+        log_path = (
+            's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
+            '/s-2BQ5U0ZHTR16N/syslog.gz')
+
+        self.assertEqual(
+            _match_emr_step_log_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp=None))
+
+    def test_s3_log_rotation(self):
+        log_path = (
+            's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
+            '/s-2BQ5U0ZHTR16N/syslog.2016-02-26-23.gz')
+
+        self.assertEqual(
+            _match_emr_step_log_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp='2016-02-26-23'))
+
+    def test_match_syslog_only(self):
+        log_path = '/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/controller'
+
+        self.assertEqual(_match_emr_step_log_path(log_path), None)

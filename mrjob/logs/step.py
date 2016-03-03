@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 Yelp and Contributors
+# Copyright 2015-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,11 +27,12 @@ from .wrap import _cat_log
 from .wrap import _ls_logs
 
 
-# path of step log (these only exist on EMR)
+# path of step log (these only exist on EMR). Step syslogs on S3 are
+# rotated and timestamped with YYYY-MM-DD-HH
 _EMR_STEP_LOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<step_id>s-[A-Z0-9]+)/'
-    r'syslog(?P<suffix>\.\w+)?')
+    r'syslog(\.(?P<timestamp>[\d-]+))?(?P<suffix>\.\w+)?')
 
 # hadoop streaming always prints "packageJobJar..." to stdout,
 # and prints Streaming Command Failed! to stderr on failure
@@ -94,9 +95,10 @@ def _match_emr_step_log_path(path, step_id=None):
     if not (step_id is None or m.group('step_id') == step_id):
         return None
 
-    return dict(step_id=m.group('step_id'))
+    return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'))
 
 
+# TODO: change to _interpret_emr_step_logs()
 def _interpret_emr_step_log(fs, matches):
     """Extract information from step log (see :py:func:`_parse_step_log()`)"""
     # we expect to go through this loop 0 or 1 times

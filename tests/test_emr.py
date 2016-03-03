@@ -3282,3 +3282,257 @@ class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
 
     def test_terminated_with_errors(self):
         self._test_silently_exits_on_state('TERMINATED_WITH_ERRORS')
+
+
+class StreamLogDirsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(StreamLogDirsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._address_of_master = self.start(patch(
+            'mrjob.emr.EMRJobRunner._address_of_master',
+            return_value='master'))
+
+        self.get_hadoop_version = self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='2.4.0'))
+
+        self.ssh_slave_hosts = self.start(patch(
+            'mrjob.fs.ssh.SSHFilesystem.ssh_slave_hosts',
+            return_value=['slave1', 'slave2']))
+
+        self._s3_log_dir = self.start(patch(
+            'mrjob.emr.EMRJobRunner._s3_log_dir',
+            return_value='s3://bucket/logs/j-CLUSTERID'))
+
+        self._wait_for_terminating_cluster_to_terminate = self.start(patch(
+            'mrjob.emr.EMRJobRunner'
+            '._wait_for_terminating_cluster_to_terminate'))
+
+    def test_cant_stream_history_log_dirs_in_yarn(self):
+        runner = EMRJobRunner()
+
+        self.assertEqual(runner._stream_history_log_dirs(), [])
+
+    def _test_stream_history_log_dirs(self, ssh):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        results = runner._stream_history_log_dirs()
+
+        if ssh:
+            self.log.info.reset_mock()
+
+            self.assertEqual(next(results), [
+                'ssh://master/mnt/var/log/hadoop/history',
+            ])
+            self.assertFalse(
+                self._wait_for_terminating_cluster_to_terminate.called)
+            self.log.info.assert_called_once_with(
+                'Looking for history log in /mnt/var/log/hadoop/history'
+                ' on master...')
+
+        self.log.info.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/jobs',
+        ])
+        self.assertTrue(
+            self._wait_for_terminating_cluster_to_terminate.called)
+        self.log.info.assert_called_once_with(
+            'Looking for history log in'
+            ' s3://bucket/logs/j-CLUSTERID/jobs...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_history_log_dirs_with_ssh(self):
+        self._test_stream_history_log_dirs(ssh=True)
+
+    def test_stream_history_log_dirs_without_ssh(self):
+        self._test_stream_history_log_dirs(ssh=False)
+
+    def _test_stream_step_log_dirs(self, ssh):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        results = runner._stream_step_log_dirs('s-STEPID')
+
+        if ssh:
+            self.log.info.reset_mock()
+
+            self.assertEqual(next(results), [
+                'ssh://master/mnt/var/log/hadoop/steps/s-STEPID',
+            ])
+            self.assertFalse(
+                self._wait_for_terminating_cluster_to_terminate.called)
+            self.log.info.assert_called_once_with(
+                'Looking for step log in /mnt/var/log/hadoop/steps/s-STEPID'
+                ' on master...')
+
+        self.log.info.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/steps/s-STEPID',
+        ])
+        self.assertTrue(
+            self._wait_for_terminating_cluster_to_terminate.called)
+        self.log.info.assert_called_once_with(
+            'Looking for step log in'
+            ' s3://bucket/logs/j-CLUSTERID/steps/s-STEPID...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_step_log_dirs_with_ssh(self):
+        self._test_stream_step_log_dirs(ssh=True)
+
+    def test_stream_step_log_dirs_without_ssh(self):
+        self._test_stream_step_log_dirs(ssh=False)
+
+    def _test_stream_task_log_dirs(self, ssh, bad_ssh_slave_hosts=False):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        if bad_ssh_slave_hosts:
+            self.ssh_slave_hosts.side_effect=IOError
+
+        results = runner._stream_task_log_dirs()
+
+        if ssh:
+            self.log.reset_mock()
+
+            if bad_ssh_slave_hosts:
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/hadoop/userlogs',
+                ])
+                self.assertTrue(self.log.warning.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
+                    ' on master...')
+            else:
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/hadoop/userlogs',
+                    'ssh://master!slave1/mnt/var/log/hadoop/userlogs',
+                    'ssh://master!slave2/mnt/var/log/hadoop/userlogs',
+                ])
+                self.assertFalse(self.log.warning.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
+                    ' on master and task/core nodes...')
+
+            self.assertFalse(
+                self._wait_for_terminating_cluster_to_terminate.called)
+
+        self.log.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/task-attempts',
+        ])
+        self.assertTrue(
+            self._wait_for_terminating_cluster_to_terminate.called)
+        self.log.info.assert_called_once_with(
+            'Looking for task logs in'
+            ' s3://bucket/logs/j-CLUSTERID/task-attempts...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_task_log_dirs_with_ssh(self):
+        self._test_stream_task_log_dirs(ssh=True)
+
+    def test_stream_task_log_dirs_with_bad_ssh_slave_hosts(self):
+        self._test_stream_task_log_dirs(ssh=True, bad_ssh_slave_hosts=True)
+
+    def test_stream_task_log_dirs_without_ssh(self):
+        self._test_stream_task_log_dirs(ssh=False)
+
+
+class LsStepLogsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(LsStepLogsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._ls_emr_step_logs = self.start(patch(
+            'mrjob.emr._ls_emr_step_logs'))
+        self._stream_step_log_dirs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._stream_step_log_dirs'))
+
+    def test_basic(self):
+        # just verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        self._ls_emr_step_logs.return_value = [
+            dict(path='s3://bucket/logs/steps/syslog'),
+        ]
+
+        runner = EMRJobRunner()
+
+        self.log.info.reset_mock()
+
+        results = runner._ls_step_logs(step_id='s-STEPID')
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results),
+                         dict(path='s3://bucket/logs/steps/syslog'))
+
+        self._stream_step_log_dirs.assert_called_once_with(
+            step_id='s-STEPID')
+        self._ls_emr_step_logs.assert_called_once_with(
+            runner.fs,
+            self._stream_step_log_dirs.return_value,
+            step_id='s-STEPID')
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn('s3://bucket/logs/steps/syslog',
+                      self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
+
+class GetStepLogInterpretationTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(GetStepLogInterpretationTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._interpret_emr_step_log = self.start(patch(
+            'mrjob.emr._interpret_emr_step_log'))
+        self._ls_step_logs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ls_step_logs'))
+
+    def test_basic(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = dict(step_id='s-STEPID')
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(log_interpretation),
+            self._interpret_emr_step_log.return_value)
+
+        self.assertFalse(self.log.warning.called)
+        self._ls_step_logs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_log.assert_called_once_with(
+            runner.fs, self._ls_step_logs.return_value)
+
+    def test_no_step_id(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = {}
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(log_interpretation), None)
+
+        self.assertTrue(self.log.warning.called)
+        self.assertFalse(self._ls_step_logs.called)
+        self.assertFalse(self._interpret_emr_step_log.called)

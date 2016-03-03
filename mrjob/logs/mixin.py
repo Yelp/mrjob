@@ -99,7 +99,7 @@ class LogInterpretationMixin(object):
 
         if not counters:
             log.info('Attempting to fetch counters from logs...')
-            self._interpret_step_log(log_interpretation)
+            self._interpret_step_logs(log_interpretation)
             counters = _pick_counters(log_interpretation)
 
         if not counters:
@@ -113,7 +113,7 @@ class LogInterpretationMixin(object):
         if not all(log_type in log_interpretation for
                    log_type in ('job', 'step', 'task')):
             log.info('Scanning logs for probable cause of failure...')
-            self._interpret_step_log(log_interpretation)
+            self._interpret_step_logs(log_interpretation)
             self._interpret_history_log(log_interpretation)
             self._interpret_task_logs(log_interpretation)
 
@@ -148,7 +148,7 @@ class LogInterpretationMixin(object):
             log.info('  Parsing history log: %s' % match['path'])
             yield match
 
-    def _interpret_step_log(self, log_interpretation):
+    def _interpret_step_logs(self, log_interpretation):
         """Add *step* to the log interpretation, if it's not already there."""
         if 'step' in log_interpretation:
             return

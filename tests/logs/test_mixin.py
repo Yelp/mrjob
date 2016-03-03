@@ -115,7 +115,7 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
     def test_step_interpretation_already_filled(self):
         log_interpretation = dict(step={})
 
-        self.runner._interpret_step_log(log_interpretation)
+        self.runner._interpret_step_logs(log_interpretation)
 
         self.assertEqual(
             log_interpretation, dict(step={}))
@@ -128,7 +128,7 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
 
         log_interpretation = {}
 
-        self.runner._interpret_step_log(log_interpretation)
+        self.runner._interpret_step_logs(log_interpretation)
 
         self.assertEqual(
             log_interpretation,
@@ -142,7 +142,7 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
 
         log_interpretation = {}
 
-        self.runner._interpret_step_log(log_interpretation)
+        self.runner._interpret_step_logs(log_interpretation)
 
         self.assertEqual(log_interpretation, {})
 
@@ -316,7 +316,7 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
         super(PickCountersTestCase, self).setUp()
 
         self.runner._interpret_history_log = Mock()
-        self.runner._interpret_step_log = Mock()
+        self.runner._interpret_step_logs = Mock()
 
         # no need to mock mrjob.logs.counters._pick_counters();
         # what it does is really straightforward
@@ -332,16 +332,16 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
         # don't log anything if runner._pick_counters() doesn't have
         # to fetch any new information
         self.assertFalse(self.log.info.called)
-        self.assertFalse(self.runner._interpret_step_log.called)
+        self.assertFalse(self.runner._interpret_step_logs.called)
         self.assertFalse(self.runner._interpret_history_log.called)
 
     def test_counter_from_step_logs(self):
-        def mock_interpret_step_log(log_interpretation):
+        def mock_interpret_step_logs(log_interpretation):
             log_interpretation['step'] = dict(
                 counters={'foo': {'bar': 1}})
 
-        self.runner._interpret_step_log = Mock(
-            side_effect=mock_interpret_step_log)
+        self.runner._interpret_step_logs = Mock(
+            side_effect=mock_interpret_step_logs)
 
         log_interpretation = {}
 
@@ -350,7 +350,7 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
             {'foo': {'bar': 1}})
 
         self.assertTrue(self.log.info.called)  # 'Attempting to fetch...'
-        self.assertTrue(self.runner._interpret_step_log.called)
+        self.assertTrue(self.runner._interpret_step_logs.called)
         self.assertFalse(self.runner._interpret_history_log.called)
 
     def test_counter_from_history_logs(self):
@@ -368,7 +368,7 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
             {'foo': {'bar': 1}})
 
         self.assertTrue(self.log.info.called)  # 'Attempting to fetch...'
-        self.assertTrue(self.runner._interpret_step_log.called)
+        self.assertTrue(self.runner._interpret_step_logs.called)
         self.assertTrue(self.runner._interpret_history_log.called)
 
 
@@ -466,7 +466,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
         super(PickErrorsTestCase, self).setUp()
 
         self.runner._interpret_history_log = Mock()
-        self.runner._interpret_step_log = Mock()
+        self.runner._interpret_step_logs = Mock()
         self.runner._interpret_task_logs = Mock()
 
         self._pick_error = self.start(
@@ -483,7 +483,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
         # don't log a message or interpret logs
         self.assertFalse(self.log.info.called)
         self.assertFalse(self.runner._interpret_history_log.called)
-        self.assertFalse(self.runner._interpret_step_log.called)
+        self.assertFalse(self.runner._interpret_step_logs.called)
         self.assertFalse(self.runner._interpret_task_logs.called)
 
     def _test_interpret_all_logs(self, log_interpretation):
@@ -494,7 +494,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
         # log a message ('Scanning logs...') and call _interpret() methods
         self.assertTrue(self.log.info.called)
         self.assertTrue(self.runner._interpret_history_log.called)
-        self.assertTrue(self.runner._interpret_step_log.called)
+        self.assertTrue(self.runner._interpret_step_logs.called)
         self.assertTrue(self.runner._interpret_task_logs.called)
 
     def test_empty_log_interpretation(self):

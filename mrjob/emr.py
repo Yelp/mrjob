@@ -1855,9 +1855,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             try:
                 log.info(
-                    'Waiting %d minutes for logs to transfer to S3...\n'
-                    '(ctrl-c to skip this)\n\n'
-                    'You can fetch logs faster over SSH; see '
+                    'Waiting %d minutes for logs to transfer to S3...'
+                    ' (ctrl-c to skip)\n\n'
+                    'To fetch logs immediately next time, set up SSH. See:\n'
                     'https://pythonhosted.org/mrjob/guides'
                     '/emr-quickstart.html#configuring-ssh-credentials\n' %
                     _S3_LOG_WAIT_MINUTES)

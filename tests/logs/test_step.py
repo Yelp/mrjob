@@ -370,8 +370,9 @@ class MatchEMRStepLogPathTestCase(TestCase):
     def test_empty(self):
         self.assertEqual(_match_emr_step_log_path(''), None)
 
-    def test_local(self):
-        log_path = '/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/syslog'
+    def test_ssh(self):
+        log_path = (
+            'ssh://masterssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/syslog')
 
         self.assertEqual(
             _match_emr_step_log_path(log_path),
@@ -396,7 +397,7 @@ class MatchEMRStepLogPathTestCase(TestCase):
             dict(step_id='s-2BQ5U0ZHTR16N', timestamp='2016-02-26-23'))
 
     def test_match_syslog_only(self):
-        log_path = '/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/controller'
+        log_path = 'ssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/controller'
 
         self.assertEqual(_match_emr_step_log_path(log_path), None)
 
@@ -451,7 +452,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
         self.assertEqual(self.interpret_emr_step_logs(), {})
 
     def test_single_log(self):
-        log_path = '/mnt/var/log/hadoop/steps/s-STEPID/syslog'
+        log_path = 'ssh://master/mnt/var/log/hadoop/steps/s-STEPID/syslog'
 
         self.mock_paths = [log_path]
 
@@ -463,7 +464,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
                          dict(output_dir='hdfs:///output'))
 
     def test_implied_job_id(self):
-        log_path = '/mnt/var/log/hadoop/steps/s-STEPID/syslog'
+        log_path = 'ssh://master/mnt/var/log/hadoop/steps/s-STEPID/syslog'
 
         self.mock_paths = [log_path]
 
@@ -477,7 +478,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
 
     def test_error(self):
         # test patching in path and implied ID
-        log_path = '/mnt/var/log/hadoop/steps/s-STEPID/syslog'
+        log_path = 'ssh://master/mnt/var/log/hadoop/steps/s-STEPID/syslog'
 
         self.mock_paths = [log_path]
 

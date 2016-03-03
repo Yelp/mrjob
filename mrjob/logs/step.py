@@ -80,8 +80,13 @@ def _ls_emr_step_logs(fs, log_dir_stream, step_id=None):
     path: path/URI of step file
     step_id: step_id in *path* (must match *step_id* if set)
     """
-    return _ls_logs(fs, log_dir_stream, _match_emr_step_log_path,
-                    step_id=step_id)
+    matches = _ls_logs(fs, log_dir_stream, _match_emr_step_log_path,
+                       step_id=step_id)
+
+    # "recency" isn't useful here; sort by timestamp, with unstamped
+    # log last
+    return sorted(matches,
+                  key=lambda m: (m['timestamp'] is None, m['timestamp'] or ''))
 
 
 def _match_emr_step_log_path(path, step_id=None):
@@ -101,11 +106,6 @@ def _match_emr_step_log_path(path, step_id=None):
 def _interpret_emr_step_logs(fs, matches):
     """Extract information from step log (see :py:func:`_parse_step_log()`),
     which may be split into several chunks by timestamp"""
-    # walk through logs in order; this is basically a single log. Crossing our
-    # fingers and hoping EMR's log rotation won't split a log4j record in half
-    matches = sorted(
-        matches, key=lambda m: (m['timestamp'] is None, m['timestamp'] or ''))
-
     # going to merge results for each log into final result
     errors = []
     result = {}

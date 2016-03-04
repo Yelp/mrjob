@@ -203,7 +203,9 @@ class MRJobFileOptionsTestCase(TestCase):
 class NoMRJobConfTestCase(TestCase):
 
     def test_no_mrjob_confs(self):
-        with patch.object(conf, 'real_mrjob_conf_path', return_value=None):
+        with patch.object(
+                conf, '_expanded_mrjob_conf_path', return_value=None):
+
             mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])
             mr_job.sandbox(stdin=BytesIO(b'0\n1\n2\n'))
 

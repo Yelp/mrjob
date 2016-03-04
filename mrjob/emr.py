@@ -56,7 +56,6 @@ import mrjob
 import mrjob.step
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
-from mrjob.aws import _MAX_STEPS_PER_CLUSTER
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
@@ -126,6 +125,8 @@ _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
 # if we SSH into a node, default place to look for Hadoop logs
 _EMR_HADOOP_LOG_DIR = '/mnt/var/log/hadoop'
 
+# EMR's hard limit on number of steps in a cluster
+_MAX_STEPS_PER_CLUSTER = 256
 
 MAX_SSH_RETRIES = 20
 

@@ -129,12 +129,6 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
 }
 
 
-### EMR ###
-
-# EMR's hard limit on number of steps in a cluster
-_MAX_STEPS_PER_CLUSTER = 256
-
-
 ### Regions ###
 
 # Based on http://docs.aws.amazon.com/general/latest/gr/rande.html

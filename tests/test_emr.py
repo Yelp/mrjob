@@ -3234,10 +3234,10 @@ class SetupLineEncodingTestCase(MockBotoTestCase):
                         m_open.mock_calls)
 
 
-class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
+class WaitForLogsOnS3TestCase(MockBotoTestCase):
 
     def setUp(self):
-        super(WaitForTerminatingClusterToTerminateTestCase, self).setUp()
+        super(WaitForLogsOnS3TestCase, self).setUp()
 
         job = MRTwoStepJob(['-r', 'emr'])
         job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
@@ -3249,41 +3249,87 @@ class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
 
         self.mock_log = self.start(patch('mrjob.emr.log'))
 
-    def _test_silently_exits_on_state(self, state):
-        self.cluster.status.state = state
+        self.mock_sleep = self.start(patch('time.sleep'))
 
-        self.runner._wait_for_terminating_cluster_to_terminate()
+    def assert_waits_five_minutes(self):
+        waited = set(self.runner._waited_for_logs_on_s3)
+        step_num = len(self.runner._log_interpretations)
 
-        self.assertEqual(self.runner._describe_cluster().status.state, state)
+        self.runner._wait_for_logs_on_s3()
+
+        self.assertTrue(self.mock_log.info.called)
+        self.mock_sleep.assert_called_once_with(300)
+
+        self.assertEqual(
+            self.runner._waited_for_logs_on_s3,
+            waited | set([step_num]))
+
+    def assert_silently_exits(self):
+        state = self.cluster.status.state
+        waited = set(self.runner._waited_for_logs_on_s3)
+
+        self.runner._wait_for_logs_on_s3()
+
         self.assertFalse(self.mock_log.info.called)
+        self.assertEqual(waited, self.runner._waited_for_logs_on_s3)
+        self.assertEqual(self.runner._describe_cluster().status.state, state)
 
     def test_starting(self):
-        self._test_silently_exits_on_state('STARTING')
+        self.cluster.status.state = 'STARTING'
+        self.assert_waits_five_minutes()
 
     def test_bootstrapping(self):
-        self._test_silently_exits_on_state('BOOTSTRAPPING')
+        self.cluster.status.state = 'BOOTSTRAPPING'
+        self.assert_waits_five_minutes()
 
     def test_running(self):
-        self._test_silently_exits_on_state('RUNNING')
+        self.cluster.status.state = 'RUNNING'
+        self.assert_waits_five_minutes()
 
     def test_waiting(self):
-        self._test_silently_exits_on_state('WAITING')
+        self.cluster.status.state = 'WAITING'
+        self.assert_waits_five_minutes()
 
     def test_terminating(self):
         self.cluster.status.state = 'TERMINATING'
         self.cluster.delay_progress_simulation = 1
 
-        self.runner._wait_for_terminating_cluster_to_terminate()
+        self.runner._wait_for_logs_on_s3()
 
         self.assertEqual(self.runner._describe_cluster().status.state,
                          'TERMINATED')
         self.assertTrue(self.mock_log.info.called)
 
     def test_terminated(self):
-        self._test_silently_exits_on_state('TERMINATED')
+        self.cluster.status.state = 'TERMINATED'
+        self.assert_silently_exits()
 
     def test_terminated_with_errors(self):
-        self._test_silently_exits_on_state('TERMINATED_WITH_ERRORS')
+        self.cluster.status.state = 'TERMINATED_WITH_ERRORS'
+        self.assert_silently_exits()
+
+    def test_ctrl_c(self):
+        self.mock_sleep.side_effect = KeyboardInterrupt
+
+        self.assertEqual(self.runner._waited_for_logs_on_s3, set())
+
+        self.runner._wait_for_logs_on_s3()
+
+        self.assertTrue(self.mock_log.info.called)
+        self.mock_sleep.assert_called_once_with(300)
+
+        # still shouldn't make user ctrl-c again
+        self.assertEqual(self.runner._waited_for_logs_on_s3, set([0]))
+
+    def test_already_waited_five_minutes(self):
+        self.runner._waited_for_logs_on_s3.add(0)
+        self.assert_silently_exits()
+
+    def test_waited_for_previous_step(self):
+        self.runner._waited_for_logs_on_s3.add(0)
+        self.runner._log_interpretations.append({})
+
+        self.assert_waits_five_minutes()
 
 
 class StreamLogDirsTestCase(MockBotoTestCase):
@@ -3309,9 +3355,9 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner._s3_log_dir',
             return_value='s3://bucket/logs/j-CLUSTERID'))
 
-        self._wait_for_terminating_cluster_to_terminate = self.start(patch(
+        self._wait_for_logs_on_s3 = self.start(patch(
             'mrjob.emr.EMRJobRunner'
-            '._wait_for_terminating_cluster_to_terminate'))
+            '._wait_for_logs_on_s3'))
 
     def test_cant_stream_history_log_dirs_in_yarn(self):
         runner = EMRJobRunner()
@@ -3332,7 +3378,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
                 'ssh://master/mnt/var/log/hadoop/history',
             ])
             self.assertFalse(
-                self._wait_for_terminating_cluster_to_terminate.called)
+                self._wait_for_logs_on_s3.called)
             self.log.info.assert_called_once_with(
                 'Looking for history log in /mnt/var/log/hadoop/history'
                 ' on master...')
@@ -3343,7 +3389,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             's3://bucket/logs/j-CLUSTERID/jobs',
         ])
         self.assertTrue(
-            self._wait_for_terminating_cluster_to_terminate.called)
+            self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
             'Looking for history log in'
             ' s3://bucket/logs/j-CLUSTERID/jobs...')
@@ -3370,7 +3416,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
                 'ssh://master/mnt/var/log/hadoop/steps/s-STEPID',
             ])
             self.assertFalse(
-                self._wait_for_terminating_cluster_to_terminate.called)
+                self._wait_for_logs_on_s3.called)
             self.log.info.assert_called_once_with(
                 'Looking for step log in /mnt/var/log/hadoop/steps/s-STEPID'
                 ' on master...')
@@ -3381,7 +3427,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             's3://bucket/logs/j-CLUSTERID/steps/s-STEPID',
         ])
         self.assertTrue(
-            self._wait_for_terminating_cluster_to_terminate.called)
+            self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
             'Looking for step log in'
             ' s3://bucket/logs/j-CLUSTERID/steps/s-STEPID...')
@@ -3427,7 +3473,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
                     ' on master and task/core nodes...')
 
             self.assertFalse(
-                self._wait_for_terminating_cluster_to_terminate.called)
+                self._wait_for_logs_on_s3.called)
 
         self.log.reset_mock()
 
@@ -3435,7 +3481,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             's3://bucket/logs/j-CLUSTERID/task-attempts',
         ])
         self.assertTrue(
-            self._wait_for_terminating_cluster_to_terminate.called)
+            self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
             'Looking for task logs in'
             ' s3://bucket/logs/j-CLUSTERID/task-attempts...')

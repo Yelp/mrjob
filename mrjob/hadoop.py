@@ -107,30 +107,6 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
 
 
-def hadoop_prefix_from_bin(hadoop_bin):
-    """Given a path to the hadoop binary, return the path of the implied
-    hadoop home, or None if we don't know.
-
-    Don't return the parent directory of directories in the default
-    path (not ``/``, ``/usr``, or ``/usr/local``).
-    """
-    # resolve unqualified binary name (relative paths are okay)
-    if '/' not in hadoop_bin:
-        hadoop_bin = which(hadoop_bin)
-        if not hadoop_bin:
-            return None
-
-    # use parent of hadoop_bin's directory
-    hadoop_home = posixpath.abspath(
-        posixpath.join(posixpath.realpath(posixpath.dirname(hadoop_bin)), '..')
-    )
-
-    if hadoop_home in _BAD_HADOOP_HOMES:
-        return None
-
-    return hadoop_home
-
-
 class HadoopRunnerOptionStore(RunnerOptionStore):
 
     # TODO: deprecate hadoop_home
@@ -280,7 +256,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
                 yield path
 
         # guess it from the path of the Hadoop binary
-        hadoop_home = hadoop_prefix_from_bin(self.get_hadoop_bin()[0])
+        hadoop_home = _hadoop_prefix_from_bin(self.get_hadoop_bin()[0])
         if hadoop_home:
             yield hadoop_home
 
@@ -606,6 +582,32 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
 # These don't require state from HadoopJobRunner, so making them functions.
 # Feel free to convert them back into methods as need be
+
+
+
+def _hadoop_prefix_from_bin(hadoop_bin):
+    """Given a path to the hadoop binary, return the path of the implied
+    hadoop home, or None if we don't know.
+
+    Don't return the parent directory of directories in the default
+    path (not ``/``, ``/usr``, or ``/usr/local``).
+    """
+    # resolve unqualified binary name (relative paths are okay)
+    if '/' not in hadoop_bin:
+        hadoop_bin = which(hadoop_bin)
+        if not hadoop_bin:
+            return None
+
+    # use parent of hadoop_bin's directory
+    hadoop_home = posixpath.abspath(
+        posixpath.join(posixpath.realpath(posixpath.dirname(hadoop_bin)), '..')
+    )
+
+    if hadoop_home in _BAD_HADOOP_HOMES:
+        return None
+
+    return hadoop_home
+
 
 def _log_line_from_hadoop(line, level=None):
     """Log ``'HADOOP: <line>'``. *line* should be a string.

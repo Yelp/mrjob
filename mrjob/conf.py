@@ -92,7 +92,7 @@ class OptionStore(dict):
         dictionary with the ultimate values.
         """
         self.update(combine_opts(self.COMBINERS, *self.cascading_dicts))
-        self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
+        self._opt_priority = self._calculate_opt_priority()
 
     def is_default(self, key):
         return self._opt_priority[key] < 2

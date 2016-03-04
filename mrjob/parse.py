@@ -36,10 +36,6 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
-# match the filename of a hadoop streaming jar
-HADOOP_STREAMING_JAR_RE = re.compile(
-    r'^hadoop.*streaming.*(?<!-sources)\.jar$')
-
 # match an mrjob job key (used to uniquely identify the job)
 JOB_KEY_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 

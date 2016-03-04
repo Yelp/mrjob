@@ -42,7 +42,6 @@ from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
-from mrjob.parse import HADOOP_STREAMING_JAR_RE
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
 from mrjob.runner import MRJobRunner
@@ -59,6 +58,9 @@ log = logging.getLogger(__name__)
 # don't look for the hadoop streaming jar here!
 _BAD_HADOOP_HOMES = ['/', '/usr', '/usr/local']
 
+# where YARN stores history logs, etc. on HDFS by default
+_DEFAULT_YARN_HDFS_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging'
+
 # places to look for the Hadoop streaming jar if we're inside EMR
 _EMR_HADOOP_STREAMING_JAR_DIRS = [
     # for the 2.x and 3.x AMIs (the 2.x AMIs also set $HADOOP_HOME properly)
@@ -66,7 +68,6 @@ _EMR_HADOOP_STREAMING_JAR_DIRS = [
     # for the 4.x AMIs
     '/usr/lib/hadoop-mapreduce',
 ]
-
 
 # places to look for logs if we're inside EMR.
 _EMR_HADOOP_LOG_DIRS = [
@@ -85,15 +86,18 @@ _HADOOP_COUNTER_GROUP_RE = re.compile(b'^(?P<indent>\s+)(?P<group>.*)$')
 _HADOOP_COUNTER_RE = re.compile(
     b'^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
 
+# the one thing Hadoop streaming prints to stderr not in log format
+_HADOOP_NON_LOG_LINE_RE = re.compile(r'^Streaming Command Failed!')
+
 # if we see this from Hadoop, it actually came from stdout and shouldn't
 # be logged
 _HADOOP_STDOUT_RE = re.compile(br'^packageJobJar: ')
 
-# the one thing Hadoop streaming prints to stderr not in log format
-_HADOOP_NON_LOG_LINE_RE = re.compile(r'^Streaming Command Failed!')
+# match the filename of a hadoop streaming jar
+_HADOOP_STREAMING_JAR_RE = re.compile(
+    r'^hadoop.*streaming.*(?<!-sources)\.jar$')
 
-# where YARN stores history logs, etc. on HDFS by default
-_DEFAULT_YARN_HDFS_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging'
+
 
 
 
@@ -227,7 +231,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
             streaming_jars = []
             for path in self.fs.ls(path):
-                if HADOOP_STREAMING_JAR_RE.match(posixpath.basename(path)):
+                if _HADOOP_STREAMING_JAR_RE.match(posixpath.basename(path)):
                     streaming_jars.append(path)
 
             if streaming_jars:

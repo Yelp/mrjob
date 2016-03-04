@@ -95,10 +95,10 @@ class InlineMRJobRunner(SimMRJobRunner):
         # Inline mode does not use a wrapper script (no subprocesses)
         pass
 
-    def warn_ignored_opts(self):
+    def _warn_ignored_opts(self):
         """ Warn the user of opts being ignored by this runner.
         """
-        super(InlineMRJobRunner, self).warn_ignored_opts()
+        super(InlineMRJobRunner, self)._warn_ignored_opts()
         for ignored_opt in self.IGNORED_LOCAL_OPTS:
             if ((not self._opts.is_default(ignored_opt)) and
                     self._opts[ignored_opt]):

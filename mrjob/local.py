@@ -132,7 +132,7 @@ class LocalMRJobRunner(SimMRJobRunner):
             procs_args, output_path, working_dir, env)
         self._all_proc_dicts.extend(proc_dicts)
 
-    def per_step_runner_finish(self, step_num):
+    def _per_step_runner_finish(self, step_num):
         for proc_dict in self._all_proc_dicts:
             self._wait_for_process(proc_dict, step_num)
 

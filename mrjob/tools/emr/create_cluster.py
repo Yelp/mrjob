@@ -192,11 +192,11 @@ from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import add_basic_opts
-from mrjob.options import add_emr_connect_opts
-from mrjob.options import add_emr_launch_opts
-from mrjob.options import alphabetize_options
-from mrjob.options import fix_custom_options
+from mrjob.options import _add_basic_opts
+from mrjob.options import _add_emr_connect_opts
+from mrjob.options import _add_emr_launch_opts
+from mrjob.options import _alphabetize_options
+from mrjob.options import _fix_custom_options
 from mrjob.util import scrape_options_into_new_groups
 
 
@@ -217,7 +217,7 @@ def runner_kwargs(cl_args=None):
     options, args = option_parser.parse_args(cl_args)
 
     # fix emr_api_params and emr_tags
-    fix_custom_options(options, option_parser)
+    _fix_custom_options(options, option_parser)
 
     if args:
         option_parser.error('takes no arguments')
@@ -243,7 +243,7 @@ def make_option_parser():
         ' crontab; clusters left idle can quickly become expensive!')
     option_parser = OptionParser(usage=usage, description=description)
 
-    add_basic_opts(option_parser)
+    _add_basic_opts(option_parser)
     # these aren't nicely broken down, just scrape specific options
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
         option_parser: (
@@ -252,10 +252,10 @@ def make_option_parser():
             'owner',
         ),
     })
-    add_emr_connect_opts(option_parser)
-    add_emr_launch_opts(option_parser)
+    _add_emr_connect_opts(option_parser)
+    _add_emr_launch_opts(option_parser)
 
-    alphabetize_options(option_parser)
+    _alphabetize_options(option_parser)
     return option_parser
 
 

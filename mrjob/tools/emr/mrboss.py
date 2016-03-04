@@ -52,9 +52,9 @@ import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import add_basic_opts
-from mrjob.options import add_emr_connect_opts
-from mrjob.options import alphabetize_options
+from mrjob.options import _add_basic_opts
+from mrjob.options import _add_emr_connect_opts
+from mrjob.options import _alphabetize_options
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_run_with_recursion
 from mrjob.util import random_identifier
@@ -72,12 +72,12 @@ def main(cl_args=None):
                              default=None,
                              help="Specify an output directory (default:"
                              " CLUSTER_ID)")
-    add_basic_opts(option_parser)
-    add_emr_connect_opts(option_parser)
+    _add_basic_opts(option_parser)
+    _add_emr_connect_opts(option_parser)
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
         option_parser: ('ec2_key_pair_file', 'ssh_bin'),
     })
-    alphabetize_options(option_parser)
+    _alphabetize_options(option_parser)
 
     options, args = option_parser.parse_args(cl_args)
 

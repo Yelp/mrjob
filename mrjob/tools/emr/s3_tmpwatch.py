@@ -52,8 +52,8 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
-from mrjob.options import add_basic_opts
-from mrjob.options import alphabetize_options
+from mrjob.options import _add_basic_opts
+from mrjob.options import _alphabetize_options
 from mrjob.parse import parse_s3_uri
 from mrjob.util import scrape_options_into_new_groups
 
@@ -141,12 +141,12 @@ def make_option_parser():
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
-    add_basic_opts(option_parser)
+    _add_basic_opts(option_parser)
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
         option_parser: ('aws_region', 's3_endpoint'),
     })
 
-    alphabetize_options(option_parser)
+    _alphabetize_options(option_parser)
 
     return option_parser
 

@@ -28,7 +28,7 @@ from mrjob.py2 import string_types
 
 log = logging.getLogger(__name__)
 
-JOBCONF_DICT_LIST = [
+_JOBCONF_DICT_LIST = [
     {'1.0': 'StorageId',
      '2.0': 'dfs.datanode.StorageId'},
     {'1.0': 'create.empty.dir.if.nonexist',
@@ -546,7 +546,7 @@ JOBCONF_DICT_LIST = [
 ]
 
 # Handle compatibility for 0.x versions of Hadoop too
-for jobconf_dict in JOBCONF_DICT_LIST:
+for jobconf_dict in _JOBCONF_DICT_LIST:
     jobconf_dict['0.20'] = jobconf_dict['1.0']
     jobconf_dict['0.21'] = jobconf_dict['2.0']
 
@@ -564,7 +564,7 @@ def _dict_list_to_compat_map(dict_list):
     return compat_map
 
 
-_JOBCONF_MAP = _dict_list_to_compat_map(JOBCONF_DICT_LIST)
+_JOBCONF_MAP = _dict_list_to_compat_map(_JOBCONF_DICT_LIST)
 
 
 def jobconf_from_env(variable, default=None):

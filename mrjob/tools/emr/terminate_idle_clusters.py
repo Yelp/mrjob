@@ -70,7 +70,7 @@ import logging
 from optparse import OptionParser
 import re
 
-from mrjob.emr import attempt_to_acquire_lock
+from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
@@ -355,7 +355,7 @@ def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
     if dry_run:
         did_terminate = True
     else:
-        status = attempt_to_acquire_lock(
+        status = _attempt_to_acquire_lock(
             runner.fs.make_s3_conn(),
             runner._lock_uri(cluster_id, num_steps),
             runner._opts['s3_sync_wait_time'],

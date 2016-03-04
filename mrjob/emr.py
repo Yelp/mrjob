@@ -128,10 +128,10 @@ _EMR_HADOOP_LOG_DIR = '/mnt/var/log/hadoop'
 # EMR's hard limit on number of steps in a cluster
 _MAX_STEPS_PER_CLUSTER = 256
 
-MAX_SSH_RETRIES = 20
+_MAX_SSH_RETRIES = 20
 
 # ssh should fail right away if it can't bind a port
-WAIT_FOR_SSH_TO_FAIL = 1.0
+_WAIT_FOR_SSH_TO_FAIL = 1.0
 
 # amount of time to wait between checks for available pooled clusters
 _POOLING_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
@@ -227,7 +227,7 @@ def _step_ids_for_job(steps, job_key):
     return step_ids
 
 
-def make_lock_uri(s3_tmp_dir, cluster_id, step_num):
+def _make_lock_uri(s3_tmp_dir, cluster_id, step_num):
     """Generate the URI to lock the cluster ``cluster_id``"""
     return s3_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
 
@@ -260,7 +260,7 @@ def _lock_acquire_step_2(key, job_key):
     return (key_value == job_key.encode('utf_8'))
 
 
-def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
+def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
                             mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
@@ -993,7 +993,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.debug('> %s' % cmd_line(args))
 
             ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            time.sleep(WAIT_FOR_SSH_TO_FAIL)
+            time.sleep(_WAIT_FOR_SSH_TO_FAIL)
             ssh_proc.poll()
             # still running. We are golden
             if ssh_proc.returncode is None:
@@ -1028,7 +1028,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         try:
             # seed random port selection on cluster ID
             random.seed(self._cluster_id)
-            num_picks = min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports']))
+            num_picks = min(_MAX_SSH_RETRIES,
+                            len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:
             random.setstate(random_state)
@@ -2357,7 +2358,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 num_steps=num_steps)
             if cluster_info_list:
                 cluster_id, num_steps = cluster_info_list[-1]
-                status = attempt_to_acquire_lock(
+                status = _attempt_to_acquire_lock(
                     self.fs, self._lock_uri(cluster_id, num_steps),
                     self._opts['s3_sync_wait_time'], self._job_key)
                 if status:
@@ -2379,9 +2380,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return None
 
     def _lock_uri(self, cluster_id, num_steps):
-        return make_lock_uri(self._opts['s3_tmp_dir'],
-                             cluster_id,
-                             num_steps + 1)
+        return _make_lock_uri(self._opts['s3_tmp_dir'],
+                              cluster_id,
+                              num_steps + 1)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to

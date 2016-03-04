@@ -27,7 +27,7 @@ v0.5.0, 2015-??-?? -- ???
      * S3 Filesystem:
        * connect to each S3 bucket on appropriate endpoint (#1028)
          * fall back to default if we can't get bucket location (#1170)
-       * removed support for _$folder$ keys
+       * removed special treatment of _$folder$ keys
        * recurse "subdirectories" even if uri lacks trailing / (#1183)
      * removed iam_job_flow_role option (use iam_instance_profile)
      * custom hadoop_streaming_jar gets properly uploaded

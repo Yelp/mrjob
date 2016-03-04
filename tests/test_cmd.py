@@ -37,7 +37,7 @@ class CommandTestCase(TestCase):
             else:
                 raise ValueError
 
-        p = patch.object(cmd, 'error', side_effect=error)
+        p = patch.object(cmd, '_error', side_effect=error)
         p.start()
         self.addCleanup(p.stop)
 

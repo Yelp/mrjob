@@ -39,7 +39,7 @@ from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
 from mrjob.emr import _yield_all_steps
-from mrjob.emr import attempt_to_acquire_lock
+from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import filechunkio
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.job import MRJob
@@ -2181,15 +2181,17 @@ class S3LockTestCase(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[])
 
         self.assertEqual(
-            True, attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
+            True,
+            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
 
         self.assertEqual(
-            False, attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
+            False,
+            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
 
     def test_lock_expiration(self):
         runner = EMRJobRunner(conf_paths=[])
 
-        did_lock = attempt_to_acquire_lock(
+        did_lock = _attempt_to_acquire_lock(
             runner.fs, self.expired_lock_uri, 0, 'jf1',
             mins_to_expiration=5)
         self.assertEqual(True, did_lock)
@@ -2472,7 +2474,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
 class JobWaitTestCase(MockBotoTestCase):
 
     # A list of job ids that hold booleans of whether or not the job can
-    # acquire a lock. Helps simulate mrjob.emr.attempt_to_acquire_lock.
+    # acquire a lock. Helps simulate mrjob.emr._attempt_to_acquire_lock.
     JOB_ID_LOCKS = {
         'j-fail-lock': False,
         'j-successful-lock': True,
@@ -2509,7 +2511,7 @@ class JobWaitTestCase(MockBotoTestCase):
                                 side_effect=side_effect_usable_clusters))
         self.start(patch.object(EMRJobRunner, '_lock_uri',
                                 side_effect=side_effect_lock_uri))
-        self.start(patch.object(mrjob.emr, 'attempt_to_acquire_lock',
+        self.start(patch.object(mrjob.emr, '_attempt_to_acquire_lock',
                                 side_effect=side_effect_acquire_lock))
         self.start(patch.object(time, 'sleep',
                                 side_effect=side_effect_time_sleep))

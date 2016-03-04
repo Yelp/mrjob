@@ -72,8 +72,8 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
-from mrjob.iam import FALLBACK_INSTANCE_PROFILE
-from mrjob.iam import FALLBACK_SERVICE_ROLE
+from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
+from mrjob.iam import _FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.counters import _format_counters
@@ -1369,8 +1369,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 raise
             log.warning(
                 "Can't access IAM API, trying default instance profile: %s" %
-                FALLBACK_INSTANCE_PROFILE)
-            return FALLBACK_INSTANCE_PROFILE
+                _FALLBACK_INSTANCE_PROFILE)
+            return _FALLBACK_INSTANCE_PROFILE
 
     def _service_role(self):
         try:
@@ -1381,8 +1381,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 raise
             log.warning(
                 "Can't access IAM API, trying default service role: %s" %
-                FALLBACK_SERVICE_ROLE)
-            return FALLBACK_SERVICE_ROLE
+                _FALLBACK_SERVICE_ROLE)
+            return _FALLBACK_SERVICE_ROLE
 
     @property
     def _action_on_failure(self):
@@ -1692,8 +1692,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         reason = _get_reason(cluster)
         if any(reason.endswith('/%s is invalid' % role)
-               for role in (FALLBACK_INSTANCE_PROFILE,
-                            FALLBACK_SERVICE_ROLE)):
+               for role in (_FALLBACK_INSTANCE_PROFILE,
+                            _FALLBACK_SERVICE_ROLE)):
             log.warning(
                 '\n'
                 'Ask your admin to create the default EMR roles'

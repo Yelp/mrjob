@@ -154,6 +154,10 @@ _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 # intermediary jar used on 4.x AMIs
 _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
+# we have to wait this many minutes for logs to transfer to S3 (or wait
+# for the cluster to terminate)
+_S3_LOG_WAIT_MINUTES = 5
+
 
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
@@ -651,6 +655,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         #
         # This will be filled by _wait_for_steps_to_complete()
         self._log_interpretations = []
+
+        # set of step numbers (0-indexed) where we waited 5 minutes for logs to
+        # transfer to S3 (so we don't do it twice)
+        self._waited_for_logs_on_s3 = set()
 
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
@@ -1817,7 +1825,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     path) for host in hosts]
 
         # wait for logs to be on S3
-        self._wait_for_terminating_cluster_to_terminate()
+        self._wait_for_logs_on_s3()
 
         if self._s3_log_dir():
             s3_log_uri = posixpath.join(
@@ -1825,7 +1833,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
             yield [s3_log_uri]
 
-    def _wait_for_terminating_cluster_to_terminate(self):
+    def _wait_for_logs_on_s3(self):
         """If the cluster is already terminating, wait for it to terminate,
         so that logs will be transferred to S3.
 
@@ -1838,7 +1846,30 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return  # already terminated
 
         if cluster.status.state != 'TERMINATING':
-            return  # not going to terminate anytime soon
+            # going to need to wait for logs to get archived to S3
+            step_num = len(self._log_interpretations)
+
+            # already did this for this step
+            if step_num in self._waited_for_logs_on_s3:
+                return
+
+            try:
+                log.info(
+                    'Waiting %d minutes for logs to transfer to S3...'
+                    ' (ctrl-c to skip)\n\n'
+                    'To fetch logs immediately next time, set up SSH. See:\n'
+                    'https://pythonhosted.org/mrjob/guides'
+                    '/emr-quickstart.html#configuring-ssh-credentials\n' %
+                    _S3_LOG_WAIT_MINUTES)
+
+                time.sleep(60 * _S3_LOG_WAIT_MINUTES)
+            except KeyboardInterrupt:
+                pass
+
+            # do this even if they ctrl-c'ed; don't make them do it
+            # for every log for this step
+            self._waited_for_logs_on_s3.add(step_num)
+            return
 
         log.info('Waiting for cluster (%s) to terminate...' %
                  cluster.id)

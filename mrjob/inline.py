@@ -27,7 +27,7 @@ from mrjob.sim import SimRunnerOptionStore
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 
-__author__ = 'Matthew Tai <mtai@adku.com>'
+__author__ = 'Matthew Tai <taim@google.com>'
 
 log = logging.getLogger(__name__)
 

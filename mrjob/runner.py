@@ -1188,7 +1188,6 @@ class MRJobRunner(object):
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
 
-        # new-style jobconf
         version = self.get_hadoop_version()
 
         # translate the jobconf configuration names to match

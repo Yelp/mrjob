@@ -80,13 +80,9 @@ from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
-from mrjob.logs.errors import _pick_error
-from mrjob.logs.history import _interpret_history_log
-from mrjob.logs.history import _ls_history_logs
-from mrjob.logs.step import _interpret_emr_step_log
+from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.step import _interpret_emr_step_logs
 from mrjob.logs.step import _ls_emr_step_logs
-from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _ls_task_syslogs
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -157,6 +153,10 @@ _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 
 # intermediary jar used on 4.x AMIs
 _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
+
+# we have to wait this many minutes for logs to transfer to S3 (or wait
+# for the cluster to terminate)
+_S3_LOG_WAIT_MINUTES = 5
 
 
 def s3_key_to_uri(s3_key):
@@ -274,6 +274,15 @@ def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
 
     time.sleep(sync_wait_time)
     return _lock_acquire_step_2(key, job_key)
+
+def _get_reason(cluster_or_step):
+    """Extract statechangereason.message from a boto Cluster or Step.
+
+    Default to ``''``."""
+    return getattr(
+        getattr(cluster_or_step.status, 'statechangereason', ''),
+        'message', '').rstrip()
+
 
 
 class EMRRunnerOptionStore(RunnerOptionStore):
@@ -500,7 +509,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['release_label'] = 'emr-' + self['ami_version']
 
 
-class EMRJobRunner(MRJobRunner):
+class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
     Invoked when you run your job with ``-r emr``.
 
@@ -647,6 +656,10 @@ class EMRJobRunner(MRJobRunner):
         # This will be filled by _wait_for_steps_to_complete()
         self._log_interpretations = []
 
+        # set of step numbers (0-indexed) where we waited 5 minutes for logs to
+        # transfer to S3 (so we don't do it twice)
+        self._waited_for_logs_on_s3 = set()
+
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
         aren't already set.
@@ -733,22 +746,21 @@ class EMRJobRunner(MRJobRunner):
         local filesystem.
         """
         if self._fs is None:
-            self._s3_fs = S3Filesystem(
+            s3_fs = S3Filesystem(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 aws_security_token=self._opts['aws_security_token'],
                 s3_endpoint=self._opts['s3_endpoint'])
 
             if self._opts['ec2_key_pair_file']:
-                self._ssh_fs = SSHFilesystem(
+                ssh_fs = SSHFilesystem(
                     ssh_bin=self._opts['ssh_bin'],
                     ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
-                self._fs = CompositeFilesystem(self._ssh_fs, self._s3_fs,
-                                               LocalFilesystem())
+                self._fs = CompositeFilesystem(
+                    ssh_fs, s3_fs, LocalFilesystem())
             else:
-                self._ssh_fs = None
-                self._fs = CompositeFilesystem(self._s3_fs, LocalFilesystem())
+                self._fs = CompositeFilesystem(s3_fs, LocalFilesystem())
 
         return self._fs
 
@@ -1535,7 +1547,6 @@ class EMRJobRunner(MRJobRunner):
                 step_num + 1, num_steps, step_id))
             self._wait_for_step_to_complete(step_id, step_num, num_steps)
 
-
     def _wait_for_step_to_complete(
             self, step_id, step_num=None, num_steps=None):
         """Helper for _wait_for_step_to_complete(). Wait for
@@ -1569,12 +1580,8 @@ class EMRJobRunner(MRJobRunner):
             if step.status.state == 'PENDING':
                 cluster = self._describe_cluster()
 
-                reason_desc = ''
-                reason = getattr(
-                    getattr(cluster.status, 'statechangereason', ''),
-                    'message', '')
-                if reason:
-                    reason_desc = ': ' + reason
+                reason = _get_reason(cluster)
+                reason_desc = (': %s' % reason) if reason else ''
 
                 log.info('  PENDING (cluster is %s%s)' % (
                     cluster.status.state, reason_desc))
@@ -1601,36 +1608,36 @@ class EMRJobRunner(MRJobRunner):
                 log.info('  COMPLETED')
                 # will fetch counters, below, and then return
             else:
-                # step has failed somehow
-
-                # these fields definitely exist, but currently, message doesn't
-                # seem to be filled (at least, the AWS CLI can't see it
-                # either)
-                reason_desc = ''
-                reason = getattr(
-                    getattr(step.status, 'statechangereason' ,''),
-                    'message', '')
-                if reason:
-                    reason_desc = ' (%s)' % reason_desc
+                # step has failed somehow. *reason* seems to only be set
+                # when job is cancelled (e.g. 'Job terminated')
+                reason = _get_reason(step)
+                reason_desc = (' (%s)' % reason) if reason else ''
 
                 log.info('  %s%s' % (
                    step.status.state, reason_desc))
 
-                # maybe it failed due to an IAM issue? if so, tell the user
-                # what to do to fix it
-                self._check_for_missing_default_iam_roles()
+                # print cluster status; this might give more context
+                # why step didn't succeed
+                cluster = self._describe_cluster()
+                reason = _get_reason(cluster)
+                reason_desc = (': %s' % reason) if reason else ''
+                log.info('Cluster %s %s %s%s' % (
+                    cluster.id,
+                    'was' if 'ED' in cluster.status.state else 'is',
+                    cluster.status.state,
+                    reason_desc))
+
+                if cluster.status.state in (
+                        'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                    # was it caused by IAM roles?
+                    self._check_for_missing_default_iam_roles(cluster)
+                    # was it caused by a key pair from the wrong region?
+                    self._check_for_key_pair_from_wrong_region(cluster)
 
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters
             if step.status.state != 'CANCELLED':
-                log.info('Attempting to fetch counters from logs...')
-                self._interpret_step_log(log_interpretation)
-
-                counters = _pick_counters(log_interpretation)
-                if not counters:
-                    self._interpret_history_log(log_interpretation)
-                    counters = _pick_counters(log_interpretation)
-
+                counters = self._pick_counters(log_interpretation)
                 if counters:
                     log.info(_format_counters(counters))
                 else:
@@ -1640,12 +1647,7 @@ class EMRJobRunner(MRJobRunner):
                 return
 
             if step.status.state == 'FAILED':
-                log.info('Scanning logs for probable cause of failure...')
-                self._interpret_step_log(log_interpretation)
-                self._interpret_history_log(log_interpretation)
-                self._interpret_task_logs(log_interpretation)
-
-                error = _pick_error(log_interpretation)
+                error = self._pick_error(log_interpretation)
                 if error:
                     log.error('Probable cause of failure:\n\n%s\n\n' %
                               _format_error(error))
@@ -1688,23 +1690,39 @@ class EMRJobRunner(MRJobRunner):
             if tunnel_handle is not None:
                 tunnel_handle.close()
 
-    def _check_for_missing_default_iam_roles(self):
+    def _check_for_missing_default_iam_roles(self, cluster):
         """If cluster couldn't start due to missing IAM roles, tell
         user what to do."""
-        cluster = self._describe_cluster()
+        if not cluster:
+            cluster = self._describe_cluster()
 
-        reason = getattr(
-            getattr(cluster.status, 'statechangereason' ,''),
-            'message', '')
-        if any(reason.rstrip().endswith('/%s is invalid' % role)
+        reason = _get_reason(cluster)
+        if any(reason.endswith('/%s is invalid' % role)
                for role in (FALLBACK_INSTANCE_PROFILE,
                             FALLBACK_SERVICE_ROLE)):
             log.warning(
-                '\n\n'
+                '\n'
                 'Ask your admin to create the default EMR roles'
                 ' by following:\n\n'
                 '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
                 '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
+
+    def _check_for_key_pair_from_wrong_region(self, cluster):
+        """Help users tripped up by the default AWS region changing
+        in mrjob v0.5.0 (see #1111) by pointing them to the
+        docs for creating EC2 key pairs."""
+        if not self._opts.is_default('aws_region'):
+            return
+
+        reason = _get_reason(cluster)
+        if reason == 'The given SSH key name was invalid':
+            log.warning(
+                '\n'
+                'The default AWS region is now %s. Create SSH keys for'
+                ' %s by following:\n\n'
+                '    https://pythonhosted.org/mrjob/guides'
+                '/emr-quickstart.html#configuring-ssh-credentials\n' %
+                (_DEFAULT_AWS_REGION, _DEFAULT_AWS_REGION))
 
     def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
@@ -1724,11 +1742,60 @@ class EMRJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
                 self._job_key, step_num + 1)
 
-    ## LOG PARSING ##
+    ### LOG PARSING (implementation of LogInterpretationMixin) ###
+
+    def _stream_history_log_dirs(self, output_dir=None):
+        """Yield lists of directories to look for the history log in."""
+        # in YARN, the history log lives on HDFS, which we currently
+        # don't have a way to access (see #990 for a possible solution), and
+        # isn't copied to S3
+        #
+        # Fortunately, in YARN, everything we want is in the step
+        # log anyway.
+        if uses_yarn(self.get_hadoop_version()):
+            return []
+
+        return self._stream_log_dirs(
+            'history log', dir_name='history', s3_dir_name='jobs')
+
+    def _stream_task_log_dirs(self, application_id=None, output_dir=None):
+        """Get lists of directories to look for the task logs in."""
+        if application_id:
+            dir_name = posixpath.join('userlogs', application_id)
+            s3_dir_name = posixpath.join('task-attempts', application_id)
+        else:
+            dir_name = 'userlogs'
+            s3_dir_name = 'task-attempts'
+
+        return self._stream_log_dirs(
+            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
+
+    def _get_step_log_interpretation(self, log_interpretation):
+        """Fetch and interpret the step log."""
+        step_id = log_interpretation.get('step_id')
+        if not step_id:
+            log.warning("Can't fetch step log; missing step ID")
+            return
+
+        return _interpret_emr_step_logs(
+            self.fs, self._ls_step_logs(step_id=step_id))
+
+    def _ls_step_logs(self, step_id):
+        """Yield step log matches, logging a message for each one."""
+        for match in _ls_emr_step_logs(
+                self.fs, self._stream_step_log_dirs(step_id=step_id),
+                step_id=step_id):
+            log.info('  Parsing step log: %s' % match['path'])
+            yield match
+
+    def _stream_step_log_dirs(self, step_id):
+        """Get lists of directories to look for the step log in."""
+        dir_name = posixpath.join('steps', step_id)
+        return self._stream_log_dirs('step log', dir_name)
 
     def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name=None,
                          ssh_to_slaves=False):
-        """Stream log dirs for the given kind of log.
+        """Stream log dirs for any kind of log.
 
         Our general strategy is first, if SSH is enabled, to SSH into the
         master node (and possibly slaves, if *ssh_to_slaves* is set).
@@ -1737,7 +1804,7 @@ class EMRJobRunner(MRJobRunner):
         TERMINATING, we first wait for it to terminate (since that
         will trigger copying logs over).
         """
-        if self._ssh_fs:
+        if self.fs.can_handle_path('ssh:///'):
             ssh_host = self._address_of_master()
             if ssh_host:
                 hosts = [ssh_host]
@@ -1757,17 +1824,16 @@ class EMRJobRunner(MRJobRunner):
                     ssh_host, '!' + host if host != ssh_host else '',
                     path) for host in hosts]
 
-            # wait for logs to be on S3
-            self._wait_for_terminating_cluster_to_terminate()
+        # wait for logs to be on S3
+        self._wait_for_logs_on_s3()
 
-            # TODO: test that this gets run!
-            if self._s3_log_dir():
-                s3_log_uri = posixpath.join(
-                    self._s3_log_dir(), (s3_dir_name or dir_name))
-                log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
-                yield [s3_log_uri]
+        if self._s3_log_dir():
+            s3_log_uri = posixpath.join(
+                self._s3_log_dir(), (s3_dir_name or dir_name))
+            log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
+            yield [s3_log_uri]
 
-    def _wait_for_terminating_cluster_to_terminate(self):
+    def _wait_for_logs_on_s3(self):
         """If the cluster is already terminating, wait for it to terminate,
         so that logs will be transferred to S3.
 
@@ -1780,7 +1846,30 @@ class EMRJobRunner(MRJobRunner):
             return  # already terminated
 
         if cluster.status.state != 'TERMINATING':
-            return  # not going to terminate anytime soon
+            # going to need to wait for logs to get archived to S3
+            step_num = len(self._log_interpretations)
+
+            # already did this for this step
+            if step_num in self._waited_for_logs_on_s3:
+                return
+
+            try:
+                log.info(
+                    'Waiting %d minutes for logs to transfer to S3...'
+                    ' (ctrl-c to skip)\n\n'
+                    'To fetch logs immediately next time, set up SSH. See:\n'
+                    'https://pythonhosted.org/mrjob/guides'
+                    '/emr-quickstart.html#configuring-ssh-credentials\n' %
+                    _S3_LOG_WAIT_MINUTES)
+
+                time.sleep(60 * _S3_LOG_WAIT_MINUTES)
+            except KeyboardInterrupt:
+                pass
+
+            # do this even if they ctrl-c'ed; don't make them do it
+            # for every log for this step
+            self._waited_for_logs_on_s3.add(step_num)
+            return
 
         log.info('Waiting for cluster (%s) to terminate...' %
                  cluster.id)
@@ -1802,121 +1891,9 @@ class EMRJobRunner(MRJobRunner):
             time.sleep(self._opts['check_emr_status_every'])
             cluster = self._describe_cluster()
 
-    # TODO: merge interpret/ls code with similar code in hadoop.py
-
-    ### history log ###
-
-    def _interpret_history_log(self, log_interpretation):
-        """Fetch history log and add 'history' to log_interpretation."""
-        if 'history' not in log_interpretation:
-            job_id = log_interpretation.get('step', {}).get('job_id')
-            if not job_id:
-                log.warning("Can't fetch history log without job ID")
-                return {}
-
-            log_interpretation['history'] = _interpret_history_log(
-                self.fs, self._ls_history_logs(job_id=job_id))
-
-        return log_interpretation['history']
-
-    def _ls_history_logs(self, job_id=None):
-        """Yield history log matches, logging a message for each one."""
-        for match in _ls_history_logs(
-                self.fs, self._stream_history_log_dirs(), job_id=job_id):
-            log.info('  Parsing history log: %s' % match['path'])
-            yield match
-
-    def _stream_history_log_dirs(self):
-        """Get lists of directories to look for the history log in."""
-        # in YARN, the history log lives on HDFS, which we currently
-        # don't have a way to access (see #990 for a possible solution), and
-        # isn't copied to S3
-        #
-        # Fortunately, in YARN, everything we want is in the step
-        # log anyway.
-        if uses_yarn(self.get_hadoop_version()):
-            return []
-
-        return self._stream_log_dirs(
-            'history log', dir_name='history', s3_dir_name='jobs')
-
-    ### step log ###
-
-    def _interpret_step_log(self, log_interpretation):
-        """Fetch step log and add 'step' to log_interpretation."""
-        if 'step' not in log_interpretation:
-            step_id = log_interpretation.get('step_id')
-            if not step_id:
-                log.warning("Can't fetch step log without step ID")
-                return {}
-
-            log_interpretation['step'] = _interpret_emr_step_log(
-                self.fs, self._ls_step_logs(step_id=step_id))
-
-        return log_interpretation['step']
-
-    def _ls_step_logs(self, step_id):
-        """Yield step log matches, logging a message for each one."""
-        for match in _ls_emr_step_logs(
-                self.fs, self._stream_step_log_dirs(step_id),
-                step_id=step_id):
-            log.info('  Parsing step log: %s' % match['path'])
-            yield match
-
-    def _stream_step_log_dirs(self, step_id):
-        """Get lists of directories to look for the step log in."""
-        dir_name = posixpath.join('steps', step_id)
-        return self._stream_log_dirs('step log', dir_name)
-
-    ### task logs ###
-
-    def _interpret_task_logs(self, log_interpretation):
-
-        def stderr_callback(stderr_path):
-            log.info('  Parsing task stderr: %s' % stderr_path)
-
-        if 'task' not in log_interpretation:
-            step_interpretation = log_interpretation.get('step') or {}
-            application_id = step_interpretation.get('application_id')
-            job_id = step_interpretation.get('job_id')
-
-            yarn = uses_yarn(self.get_hadoop_version())
-
-            if yarn and application_id is None:
-                log.warning("Can't fetch task logs without application ID")
-                return {}
-            elif not yarn and job_id is None:
-                log.warning("Can't fetch task logs without job ID")
-                return {}
-
-            log_interpretation['task'] = _interpret_task_logs(
-                self.fs, self._ls_task_syslogs(
-                    application_id=application_id, job_id=job_id),
-                stderr_callback=stderr_callback)
-
-        return log_interpretation['task']
-
-    def _ls_task_syslogs(self, application_id=None, job_id=None):
-        """Yield task log matches, logging a message for each one."""
-        for match in _ls_task_syslogs(
-                self.fs, self._stream_task_log_dirs(
-                    application_id=application_id),
-                application_id=application_id, job_id=job_id):
-            log.info('  Parsing task syslog: %s' % match['path'])
-            yield match
-
-    def _stream_task_log_dirs(self, application_id=None):
-        if application_id:
-            dir_name = posixpath.join('userlogs', application_id)
-            s3_dir_name = posixpath.join('task-attempts', application_id)
-        else:
-            dir_name = 'userlogs'
-            s3_dir_name = 'task-attempts'
-
-        return self._stream_log_dirs(
-            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
-
     def counters(self):
+        # not using self._pick_counters() because we don't want to
+        # initiate a log fetch
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
 

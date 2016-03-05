@@ -3232,10 +3232,10 @@ class SetupLineEncodingTestCase(MockBotoTestCase):
                         m_open.mock_calls)
 
 
-class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
+class WaitForLogsOnS3TestCase(MockBotoTestCase):
 
     def setUp(self):
-        super(WaitForTerminatingClusterToTerminateTestCase, self).setUp()
+        super(WaitForLogsOnS3TestCase, self).setUp()
 
         job = MRTwoStepJob(['-r', 'emr'])
         job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
@@ -3247,38 +3247,338 @@ class WaitForTerminatingClusterToTerminateTestCase(MockBotoTestCase):
 
         self.mock_log = self.start(patch('mrjob.emr.log'))
 
-    def _test_silently_exits_on_state(self, state):
-        self.cluster.status.state = state
+        self.mock_sleep = self.start(patch('time.sleep'))
 
-        self.runner._wait_for_terminating_cluster_to_terminate()
+    def assert_waits_five_minutes(self):
+        waited = set(self.runner._waited_for_logs_on_s3)
+        step_num = len(self.runner._log_interpretations)
 
-        self.assertEqual(self.runner._describe_cluster().status.state, state)
+        self.runner._wait_for_logs_on_s3()
+
+        self.assertTrue(self.mock_log.info.called)
+        self.mock_sleep.assert_called_once_with(300)
+
+        self.assertEqual(
+            self.runner._waited_for_logs_on_s3,
+            waited | set([step_num]))
+
+    def assert_silently_exits(self):
+        state = self.cluster.status.state
+        waited = set(self.runner._waited_for_logs_on_s3)
+
+        self.runner._wait_for_logs_on_s3()
+
         self.assertFalse(self.mock_log.info.called)
+        self.assertEqual(waited, self.runner._waited_for_logs_on_s3)
+        self.assertEqual(self.runner._describe_cluster().status.state, state)
 
     def test_starting(self):
-        self._test_silently_exits_on_state('STARTING')
+        self.cluster.status.state = 'STARTING'
+        self.assert_waits_five_minutes()
 
     def test_bootstrapping(self):
-        self._test_silently_exits_on_state('BOOTSTRAPPING')
+        self.cluster.status.state = 'BOOTSTRAPPING'
+        self.assert_waits_five_minutes()
 
     def test_running(self):
-        self._test_silently_exits_on_state('RUNNING')
+        self.cluster.status.state = 'RUNNING'
+        self.assert_waits_five_minutes()
 
     def test_waiting(self):
-        self._test_silently_exits_on_state('WAITING')
+        self.cluster.status.state = 'WAITING'
+        self.assert_waits_five_minutes()
 
     def test_terminating(self):
         self.cluster.status.state = 'TERMINATING'
         self.cluster.delay_progress_simulation = 1
 
-        self.runner._wait_for_terminating_cluster_to_terminate()
+        self.runner._wait_for_logs_on_s3()
 
         self.assertEqual(self.runner._describe_cluster().status.state,
                          'TERMINATED')
         self.assertTrue(self.mock_log.info.called)
 
     def test_terminated(self):
-        self._test_silently_exits_on_state('TERMINATED')
+        self.cluster.status.state = 'TERMINATED'
+        self.assert_silently_exits()
 
     def test_terminated_with_errors(self):
-        self._test_silently_exits_on_state('TERMINATED_WITH_ERRORS')
+        self.cluster.status.state = 'TERMINATED_WITH_ERRORS'
+        self.assert_silently_exits()
+
+    def test_ctrl_c(self):
+        self.mock_sleep.side_effect = KeyboardInterrupt
+
+        self.assertEqual(self.runner._waited_for_logs_on_s3, set())
+
+        self.runner._wait_for_logs_on_s3()
+
+        self.assertTrue(self.mock_log.info.called)
+        self.mock_sleep.assert_called_once_with(300)
+
+        # still shouldn't make user ctrl-c again
+        self.assertEqual(self.runner._waited_for_logs_on_s3, set([0]))
+
+    def test_already_waited_five_minutes(self):
+        self.runner._waited_for_logs_on_s3.add(0)
+        self.assert_silently_exits()
+
+    def test_waited_for_previous_step(self):
+        self.runner._waited_for_logs_on_s3.add(0)
+        self.runner._log_interpretations.append({})
+
+        self.assert_waits_five_minutes()
+
+
+class StreamLogDirsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(StreamLogDirsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._address_of_master = self.start(patch(
+            'mrjob.emr.EMRJobRunner._address_of_master',
+            return_value='master'))
+
+        self.get_hadoop_version = self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='2.4.0'))
+
+        self.ssh_slave_hosts = self.start(patch(
+            'mrjob.fs.ssh.SSHFilesystem.ssh_slave_hosts',
+            return_value=['slave1', 'slave2']))
+
+        self._s3_log_dir = self.start(patch(
+            'mrjob.emr.EMRJobRunner._s3_log_dir',
+            return_value='s3://bucket/logs/j-CLUSTERID'))
+
+        self._wait_for_logs_on_s3 = self.start(patch(
+            'mrjob.emr.EMRJobRunner'
+            '._wait_for_logs_on_s3'))
+
+    def test_cant_stream_history_log_dirs_in_yarn(self):
+        runner = EMRJobRunner()
+
+        self.assertEqual(runner._stream_history_log_dirs(), [])
+
+    def _test_stream_history_log_dirs(self, ssh):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        results = runner._stream_history_log_dirs()
+
+        if ssh:
+            self.log.info.reset_mock()
+
+            self.assertEqual(next(results), [
+                'ssh://master/mnt/var/log/hadoop/history',
+            ])
+            self.assertFalse(
+                self._wait_for_logs_on_s3.called)
+            self.log.info.assert_called_once_with(
+                'Looking for history log in /mnt/var/log/hadoop/history'
+                ' on master...')
+
+        self.log.info.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/jobs',
+        ])
+        self.assertTrue(
+            self._wait_for_logs_on_s3.called)
+        self.log.info.assert_called_once_with(
+            'Looking for history log in'
+            ' s3://bucket/logs/j-CLUSTERID/jobs...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_history_log_dirs_with_ssh(self):
+        self._test_stream_history_log_dirs(ssh=True)
+
+    def test_stream_history_log_dirs_without_ssh(self):
+        self._test_stream_history_log_dirs(ssh=False)
+
+    def _test_stream_step_log_dirs(self, ssh):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        results = runner._stream_step_log_dirs('s-STEPID')
+
+        if ssh:
+            self.log.info.reset_mock()
+
+            self.assertEqual(next(results), [
+                'ssh://master/mnt/var/log/hadoop/steps/s-STEPID',
+            ])
+            self.assertFalse(
+                self._wait_for_logs_on_s3.called)
+            self.log.info.assert_called_once_with(
+                'Looking for step log in /mnt/var/log/hadoop/steps/s-STEPID'
+                ' on master...')
+
+        self.log.info.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/steps/s-STEPID',
+        ])
+        self.assertTrue(
+            self._wait_for_logs_on_s3.called)
+        self.log.info.assert_called_once_with(
+            'Looking for step log in'
+            ' s3://bucket/logs/j-CLUSTERID/steps/s-STEPID...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_step_log_dirs_with_ssh(self):
+        self._test_stream_step_log_dirs(ssh=True)
+
+    def test_stream_step_log_dirs_without_ssh(self):
+        self._test_stream_step_log_dirs(ssh=False)
+
+    def _test_stream_task_log_dirs(self, ssh, bad_ssh_slave_hosts=False):
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        self.get_hadoop_version.return_value = '1.0.3'
+
+        if bad_ssh_slave_hosts:
+            self.ssh_slave_hosts.side_effect=IOError
+
+        results = runner._stream_task_log_dirs()
+
+        if ssh:
+            self.log.reset_mock()
+
+            if bad_ssh_slave_hosts:
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/hadoop/userlogs',
+                ])
+                self.assertTrue(self.log.warning.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
+                    ' on master...')
+            else:
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/hadoop/userlogs',
+                    'ssh://master!slave1/mnt/var/log/hadoop/userlogs',
+                    'ssh://master!slave2/mnt/var/log/hadoop/userlogs',
+                ])
+                self.assertFalse(self.log.warning.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
+                    ' on master and task/core nodes...')
+
+            self.assertFalse(
+                self._wait_for_logs_on_s3.called)
+
+        self.log.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/task-attempts',
+        ])
+        self.assertTrue(
+            self._wait_for_logs_on_s3.called)
+        self.log.info.assert_called_once_with(
+            'Looking for task logs in'
+            ' s3://bucket/logs/j-CLUSTERID/task-attempts...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_task_log_dirs_with_ssh(self):
+        self._test_stream_task_log_dirs(ssh=True)
+
+    def test_stream_task_log_dirs_with_bad_ssh_slave_hosts(self):
+        self._test_stream_task_log_dirs(ssh=True, bad_ssh_slave_hosts=True)
+
+    def test_stream_task_log_dirs_without_ssh(self):
+        self._test_stream_task_log_dirs(ssh=False)
+
+
+class LsStepLogsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(LsStepLogsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._ls_emr_step_logs = self.start(patch(
+            'mrjob.emr._ls_emr_step_logs'))
+        self._stream_step_log_dirs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._stream_step_log_dirs'))
+
+    def test_basic(self):
+        # just verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        self._ls_emr_step_logs.return_value = [
+            dict(path='s3://bucket/logs/steps/syslog'),
+        ]
+
+        runner = EMRJobRunner()
+
+        self.log.info.reset_mock()
+
+        results = runner._ls_step_logs(step_id='s-STEPID')
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results),
+                         dict(path='s3://bucket/logs/steps/syslog'))
+
+        self._stream_step_log_dirs.assert_called_once_with(
+            step_id='s-STEPID')
+        self._ls_emr_step_logs.assert_called_once_with(
+            runner.fs,
+            self._stream_step_log_dirs.return_value,
+            step_id='s-STEPID')
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn('s3://bucket/logs/steps/syslog',
+                      self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
+
+class GetStepLogInterpretationTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(GetStepLogInterpretationTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._interpret_emr_step_logs = self.start(patch(
+            'mrjob.emr._interpret_emr_step_logs'))
+        self._ls_step_logs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ls_step_logs'))
+
+    def test_basic(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = dict(step_id='s-STEPID')
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(log_interpretation),
+            self._interpret_emr_step_logs.return_value)
+
+        self.assertFalse(self.log.warning.called)
+        self._ls_step_logs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_logs.assert_called_once_with(
+            runner.fs, self._ls_step_logs.return_value)
+
+    def test_no_step_id(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = {}
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(log_interpretation), None)
+
+        self.assertTrue(self.log.warning.called)
+        self.assertFalse(self._ls_step_logs.called)
+        self.assertFalse(self._interpret_emr_step_logs.called)

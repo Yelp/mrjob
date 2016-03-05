@@ -59,7 +59,7 @@ class StepFailedException(Exception):
     This will automatically be caught
     and converted to an error message by :py:meth:`mrjob.job.MRJob.run`, but
     you may wish to catch it if you
-    :ref:`run your job programatically <runners-programmatically`.
+    :ref:`run your job programatically <runners-programmatically>`.
     """
 
     def __init__(self, reason=None, step_num=None, num_steps=None):

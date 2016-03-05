@@ -151,28 +151,6 @@ Installing System Packages
 EMR gives you access to a variety of different Amazon Machine Images, or AMIs
 for short (see :mrjob-opt:`ami_version`).
 
-2.x AMIs
-^^^^^^^^
-
-The 2.x AMIs are based on `Debian 6.0.2 (Squeeze)
-<http://www.debian.org/News/2011/20110625>`_, and use :command:`apt-get`. For
-example, to install Cython:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        - sudo apt-get install -y cython
-
-Don't forget the ``-y``; otherwise your bootstrap script will hang waiting for
-user input that will never come.
-
-The full list of Squeeze packages is
-`here <https://packages.debian.org/squeeze/>`__. Squeeze was
-released in February 2011, so none of these packages are going to be
-super up-to-date.
-
 3.x and 4.x AMIs
 ^^^^^^^^^^^^^^^^
 
@@ -199,6 +177,28 @@ and then go to ``http://aws.amazon.com/amazon-linux-ami/YYYY.MM-packages``
 Keep in mind that Amazon Linux has zero support for Python 3 outside
 the ``python34`` and ``python34-docs`` packages themselves;
 :ref:`install and use pip <using-pip-py3>` instead.
+
+2.x AMIs
+^^^^^^^^
+
+The 2.x AMIs are based on `Debian 6.0.2 (Squeeze)
+<http://www.debian.org/News/2011/20110625>`_, and use :command:`apt-get`. For
+example, to install Cython:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - sudo apt-get install -y cython
+
+Don't forget the ``-y``; otherwise your bootstrap script will hang waiting for
+user input that will never come.
+
+The full list of Squeeze packages is
+`here <https://packages.debian.org/squeeze/>`__. Squeeze was
+released in February 2011, so none of these packages are going to be
+super up-to-date.
 
 I don't know or care which AMI version I'm using
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

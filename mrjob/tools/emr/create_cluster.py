@@ -203,12 +203,12 @@ from mrjob.util import scrape_options_into_new_groups
 def main(args=None):
     """Run the create_cluster tool with arguments from ``sys.argv`` and
     printing to ``sys.stdout``."""
-    runner = EMRJobRunner(**runner_kwargs(args))
+    runner = EMRJobRunner(**_runner_kwargs(args))
     cluster_id = runner.make_persistent_cluster()
     print(cluster_id)
 
 
-def runner_kwargs(cl_args=None):
+def _runner_kwargs(cl_args=None):
     """Parse command line arguments into arguments for
     :py:class:`EMRJobRunner`
     """

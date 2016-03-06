@@ -80,19 +80,19 @@ def main(args, now=None):
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     log.info('getting information about running jobs')
-    emr_conn = EMRJobRunner(**runner_kwargs(options)).make_emr_conn()
+    emr_conn = EMRJobRunner(**_runner_kwargs(options)).make_emr_conn()
     cluster_summaries = _yield_all_clusters(
         emr_conn, cluster_states=['STARTING', 'BOOTSTRAPPING', 'RUNNING'])
 
     min_time = timedelta(hours=options.min_hours)
 
-    job_info = find_long_running_jobs(
+    job_info = _find_long_running_jobs(
         emr_conn, cluster_summaries, min_time, now=now)
 
-    print_report(job_info)
+    _print_report(job_info)
 
 
-def runner_kwargs(options):
+def _runner_kwargs(options):
     """Given the command line options, return the arguments to
     :py:class:`EMRJobRunner`
     """
@@ -103,7 +103,7 @@ def runner_kwargs(options):
     return kwargs
 
 
-def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
+def _find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
     """Identify jobs that have been running or pending for a long time.
 
     :param clusters: a list of :py:class:`boto.emr.emrobject.Cluster`
@@ -191,19 +191,19 @@ def find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
                        'time': time_pending})
 
 
-def print_report(job_info):
+def _print_report(job_info):
     """Takes in a dictionary of info about a long-running job (see
-    :py:func:`find_long_running_jobs`), and prints information about it
+    :py:func:`_find_long_running_jobs`), and prints information about it
     on a single (long) line.
     """
     for ji in job_info:
         print('%-15s %13s for %17s (%s)' % (
             ji['cluster_id'],
-            ji['state'], format_timedelta(ji['time']),
+            ji['state'], _format_timedelta(ji['time']),
             ji['name']))
 
 
-def format_timedelta(time):
+def _format_timedelta(time):
     """Format a timedelta for use in a columnar format. This just
     tweaks stuff like ``'3 days, 9:00:00'`` to line up with
     ``'3 days, 10:00:00'``

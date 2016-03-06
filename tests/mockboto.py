@@ -38,9 +38,9 @@ from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_values
 from mrjob.emr import EMRJobRunner
+from mrjob.parse import _RFC1123
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
-from mrjob.parse import RFC1123
 from mrjob.ssh import SSH_LOG_ROOT
 
 from tests.mockssh import create_mock_ssh_script
@@ -568,7 +568,7 @@ def to_rfc1123(when):
     # AWS sends us a time zone in all cases, but in Python it's more
     # annoying to figure out time zones, so just fake it.
     assert when.tzinfo is None
-    return when.strftime(RFC1123) + 'GMT'
+    return when.strftime(_RFC1123) + 'GMT'
 
 
 class MockEmrConnection(object):

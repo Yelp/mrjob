@@ -48,7 +48,6 @@ from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.ssh import SSH_LOG_ROOT
-from mrjob.ssh import SSH_PREFIX
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
@@ -2332,11 +2331,11 @@ class TestCatFallback(MockBotoTestCase):
         mock_ssh_file('testmaster', 'etc/init.d', b'meow')
 
         ssh_cat_gen = runner.fs.cat(
-            SSH_PREFIX + runner._address + '/etc/init.d')
+            'ssh://' + runner._address + '/etc/init.d')
         self.assertEqual(list(ssh_cat_gen)[0].rstrip(), b'meow')
         self.assertRaises(
             IOError, list,
-            runner.fs.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
+            runner.fs.cat('ssh://' + runner._address + '/does_not_exist'))
 
     def test_ssh_cat_errlog(self):
         # A file *containing* an error message shouldn't cause an error.
@@ -2346,7 +2345,7 @@ class TestCatFallback(MockBotoTestCase):
         error_message = b'cat: logs/err.log: No such file or directory\n'
         mock_ssh_file('testmaster', 'logs/err.log', error_message)
         self.assertEqual(
-            list(runner.fs.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
+            list(runner.fs.cat('ssh://' + runner._address + '/logs/err.log')),
             [error_message])
 
 

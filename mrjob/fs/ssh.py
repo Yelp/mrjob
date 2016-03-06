@@ -20,7 +20,6 @@ from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import SSH_PREFIX
 from mrjob.ssh import SSH_URI_RE
 from mrjob.util import random_identifier
 from mrjob.util import read_file
@@ -107,7 +106,7 @@ class SSHFilesystem(Filesystem):
         for line in output:
             # skip directories, we only want to return downloadable files
             if line and not line.endswith('/'):
-                yield SSH_PREFIX + addr + line
+                yield 'ssh://' + addr + line
 
     def md5sum(self, path):
         raise IOError()  # not implemented

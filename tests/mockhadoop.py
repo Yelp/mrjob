@@ -45,6 +45,7 @@ import stat
 import sys
 
 from mrjob.compat import uses_yarn
+from mrjob.hadoop import _HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
 from mrjob.util import shlex_split
 

@@ -25,7 +25,6 @@ from subprocess import PIPE
 
 from mrjob.py2 import to_string
 
-SSH_LOG_ROOT = '/mnt/var/log/hadoop'
 HADOOP_JOB_LIST_NUM_RE = re.compile(r'(\d+) jobs currently running')
 # Fields: JobId, State, StartTime, UserName (hadoop), Priority, SchedulingInfo
 # We only care about JobId.

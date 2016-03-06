@@ -47,7 +47,6 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
-from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap

@@ -37,9 +37,9 @@ from mrjob.util import read_file
 log = logging.getLogger(__name__)
 
 # if EMR throttles us, how long to wait (in seconds) before trying again?
-EMR_BACKOFF = 20
-EMR_BACKOFF_MULTIPLIER = 1.5
-EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
+_EMR_BACKOFF = 20
+_EMR_BACKOFF_MULTIPLIER = 1.5
+_EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
 
 def s3_key_to_uri(s3_key):
@@ -64,9 +64,9 @@ def wrap_aws_conn(raw_conn):
 
     return RetryWrapper(raw_conn,
                         retry_if=retry_if,
-                        backoff=EMR_BACKOFF,
-                        multiplier=EMR_BACKOFF_MULTIPLIER,
-                        max_tries=EMR_MAX_TRIES)
+                        backoff=_EMR_BACKOFF,
+                        multiplier=_EMR_BACKOFF_MULTIPLIER,
+                        max_tries=_EMR_MAX_TRIES)
 
 
 class S3Filesystem(Filesystem):

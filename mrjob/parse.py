@@ -36,13 +36,6 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
-# match an mrjob job key (used to uniquely identify the job)
-JOB_KEY_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
-
-# match an mrjob step name (these are used to name steps in EMR)
-STEP_NAME_RE = re.compile(
-    r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+): Step (\d+) of (\d+)$')
-
 log = logging.getLogger(__name__)
 
 

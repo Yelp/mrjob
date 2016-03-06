@@ -50,6 +50,7 @@ from datetime import datetime
 from datetime import timedelta
 import math
 import logging
+import re
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
@@ -60,11 +61,16 @@ from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
 from mrjob.options import _add_emr_connect_opts
 from mrjob.options import _alphabetize_options
-from mrjob.parse import JOB_KEY_RE
-from mrjob.parse import STEP_NAME_RE
 from mrjob.parse import iso8601_to_datetime
 from mrjob.patched_boto import patched_describe_cluster
 from mrjob.util import strip_microseconds
+
+# match an mrjob job key (used to uniquely identify the job)
+_JOB_KEY_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
+
+# match an mrjob step name (these are used to name steps in EMR)
+_STEP_NAME_RE = re.compile(
+    r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+): Step (\d+) of (\d+)$')
 
 log = logging.getLogger(__name__)
 
@@ -339,7 +345,7 @@ def cluster_to_basic_summary(cluster, now=None):
         if len(args) == 2 and args[0].startswith('pool-'):
             bcs['pool'] = args[1]
 
-    m = JOB_KEY_RE.match(bcs['name'] or '')
+    m = _JOB_KEY_RE.match(bcs['name'] or '')
     if m:
         bcs['label'], bcs['owner'] = m.group(1), m.group(2)
     else:
@@ -443,7 +449,7 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
             else:
                 step_end = now
 
-        m = STEP_NAME_RE.match(getattr(step, 'name', ''))
+        m = _STEP_NAME_RE.match(getattr(step, 'name', ''))
         if m:
             step_label = m.group(1)
             step_owner = m.group(2)

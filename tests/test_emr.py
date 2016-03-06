@@ -43,7 +43,6 @@ from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import filechunkio
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.job import MRJob
-from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
@@ -51,6 +50,7 @@ from mrjob.py2 import StringIO
 from mrjob.ssh import SSH_LOG_ROOT
 from mrjob.ssh import SSH_PREFIX
 from mrjob.step import StepFailedException
+from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
@@ -150,7 +150,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             self.assertTrue(any(runner.fs.ls(runner.get_output_dir())))
 
             cluster = runner._describe_cluster()
-            name_match = JOB_KEY_RE.match(cluster.name)
+            name_match = _JOB_KEY_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
 

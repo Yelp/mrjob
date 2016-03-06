@@ -213,7 +213,7 @@ def runner_kwargs(cl_args=None):
     :py:class:`EMRJobRunner`
     """
     # parser command-line args
-    option_parser = make_option_parser()
+    option_parser = _make_option_parser()
     options, args = option_parser.parse_args(cl_args)
 
     # fix emr_api_params and emr_tags
@@ -234,7 +234,7 @@ def runner_kwargs(cl_args=None):
     return kwargs
 
 
-def make_option_parser():
+def _make_option_parser():
     usage = '%prog [options]'
     description = (
         'Create a persistent EMR cluster to run jobs in, and print its ID to'

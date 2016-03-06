@@ -94,7 +94,7 @@ DEBUG_JAR_RE = re.compile(
 
 
 def main(cl_args=None):
-    option_parser = make_option_parser()
+    option_parser = _make_option_parser()
     options, args = option_parser.parse_args(cl_args)
 
     if args:
@@ -374,7 +374,7 @@ def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
         print(msg)
 
 
-def make_option_parser():
+def _make_option_parser():
     usage = '%prog [options]'
     description = ('Terminate idle EMR clusters that meet the criteria'
                    ' passed in on the command line (or, by default,'

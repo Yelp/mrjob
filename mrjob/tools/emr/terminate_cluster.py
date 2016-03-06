@@ -56,7 +56,7 @@ log = logging.getLogger(__name__)
 
 def main(cl_args=None):
     # parser command-line args
-    option_parser = make_option_parser()
+    option_parser = _make_option_parser()
     options, args = option_parser.parse_args(cl_args)
 
     if len(args) != 1:
@@ -72,7 +72,7 @@ def main(cl_args=None):
     log.info('Terminated cluster %s' % cluster_id)
 
 
-def make_option_parser():
+def _make_option_parser():
     usage = '%prog [options] cluster-id'
     description = 'Terminate an existing EMR cluster.'
 

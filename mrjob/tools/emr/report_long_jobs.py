@@ -71,7 +71,7 @@ def main(args, now=None):
     if now is None:
         now = datetime.utcnow()
 
-    option_parser = make_option_parser()
+    option_parser = _make_option_parser()
     options, args = option_parser.parse_args(args)
 
     if args:
@@ -217,7 +217,7 @@ def format_timedelta(time):
         return result
 
 
-def make_option_parser():
+def _make_option_parser():
     usage = '%prog [options]'
     description = ('Report jobs running for more than a certain number of'
                    ' hours (by default, %.1f). This can help catch buggy jobs'

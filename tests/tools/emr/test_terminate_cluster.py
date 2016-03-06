@@ -16,7 +16,7 @@
 from mrjob.emr import EMRJobRunner
 from mrjob.patched_boto import _patched_describe_cluster
 from mrjob.tools.emr.terminate_cluster import main as terminate_main
-from mrjob.tools.emr.terminate_cluster import make_option_parser
+from mrjob.tools.emr.terminate_cluster import _make_option_parser
 
 from tests.tools.emr import ToolTestCase
 
@@ -24,7 +24,7 @@ from tests.tools.emr import ToolTestCase
 class TerminateToolTestCase(ToolTestCase):
 
     def test_make_option_parser(self):
-        make_option_parser()
+        _make_option_parser()
         self.assertEqual(True, True)
 
     def test_terminate_cluster(self):

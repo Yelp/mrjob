@@ -77,7 +77,7 @@ log = logging.getLogger(__name__)
 
 def main(args):
     # parser command-line args
-    option_parser = make_option_parser()
+    option_parser = _make_option_parser()
     options, args = option_parser.parse_args(args)
 
     if args:
@@ -97,7 +97,7 @@ def main(args):
     print_report(stats, now=now)
 
 
-def make_option_parser():
+def _make_option_parser():
     usage = '%prog [options]'
     description = 'Print a giant report on EMR usage.'
 

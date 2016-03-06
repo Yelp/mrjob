@@ -62,7 +62,7 @@ log = logging.getLogger(__name__)
 
 
 def main(cl_args=None):
-    option_parser = make_option_parser()
+    option_parser = _make_option_parser()
     options, args = option_parser.parse_args(cl_args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
@@ -124,7 +124,7 @@ def process_time(time):
         return timedelta(hours=int(time))
 
 
-def make_option_parser():
+def _make_option_parser():
     usage = '%prog [options] <time-untouched> <URIs>'
     description = (
         'Delete all files in a given URI that are older than a specified'

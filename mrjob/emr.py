@@ -89,9 +89,9 @@ from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.patched_boto import patched_describe_cluster
-from mrjob.patched_boto import patched_describe_step
-from mrjob.patched_boto import patched_list_steps
+from mrjob.patched_boto import _patched_describe_cluster
+from mrjob.patched_boto import _patched_describe_step
+from mrjob.patched_boto import _patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
@@ -208,10 +208,10 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
     """Get all steps for the cluster, making successive API calls
     if necessary.
 
-    Calls :py:func:`~mrjob.patched_boto.patched_list_steps`, to work around
+    Calls :py:func:`~mrjob.patched_boto._patched_list_steps`, to work around
     `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
     """
-    for resp in _repeat(patched_list_steps, emr_conn, cluster_id,
+    for resp in _repeat(_patched_list_steps, emr_conn, cluster_id,
                         *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
@@ -1577,7 +1577,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                       self._opts['check_emr_status_every'])
             time.sleep(self._opts['check_emr_status_every'])
 
-            step = patched_describe_step(emr_conn, self._cluster_id, step_id)
+            step = _patched_describe_step(emr_conn, self._cluster_id, step_id)
 
             if step.status.state == 'PENDING':
                 cluster = self._describe_cluster()
@@ -2362,7 +2362,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         for cluster_summary in _yield_all_clusters(
                 emr_conn, cluster_states=['WAITING']):
-            cluster = patched_describe_cluster(emr_conn, cluster_summary.id)
+            cluster = _patched_describe_cluster(emr_conn, cluster_summary.id)
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for
@@ -2502,7 +2502,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
-        return patched_describe_cluster(emr_conn, self._cluster_id)
+        return _patched_describe_cluster(emr_conn, self._cluster_id)
 
     def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls

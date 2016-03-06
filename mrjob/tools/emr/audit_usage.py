@@ -62,7 +62,7 @@ from mrjob.options import _add_basic_opts
 from mrjob.options import _add_emr_connect_opts
 from mrjob.options import _alphabetize_options
 from mrjob.parse import iso8601_to_datetime
-from mrjob.patched_boto import patched_describe_cluster
+from mrjob.patched_boto import _patched_describe_cluster
 from mrjob.util import strip_microseconds
 
 # match an mrjob job key (used to uniquely identify the job)
@@ -612,7 +612,7 @@ def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
             emr_conn, created_after=created_after):
         cluster_id = cluster_summary.id
 
-        cluster = patched_describe_cluster(emr_conn, cluster_id)
+        cluster = _patched_describe_cluster(emr_conn, cluster_id)
         cluster.steps = list(_yield_all_steps(emr_conn, cluster_id))
         cluster.bootstrapactions = list(
             _yield_all_bootstrap_actions(emr_conn, cluster_id))

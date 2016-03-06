@@ -103,7 +103,7 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet,
                          verbose=options.verbose)
 
-    maybe_terminate_clusters(
+    _maybe_terminate_clusters(
         dry_run=options.dry_run,
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,
@@ -113,11 +113,11 @@ def main(cl_args=None):
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
         quiet=(options.quiet > 1),
-        **runner_kwargs(options)
+        **_runner_kwargs(options)
     )
 
 
-def runner_kwargs(options):
+def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'max_hours_idle',
                        'max_mins_locked',
@@ -129,16 +129,16 @@ def runner_kwargs(options):
     return kwargs
 
 
-def maybe_terminate_clusters(dry_run=False,
-                             max_hours_idle=None,
-                             mins_to_end_of_hour=None,
-                             now=None,
-                             pool_name=None,
-                             pooled_only=False,
-                             unpooled_only=False,
-                             max_mins_locked=None,
-                             quiet=False,
-                             **kwargs):
+def _maybe_terminate_clusters(dry_run=False,
+                              max_hours_idle=None,
+                              mins_to_end_of_hour=None,
+                              now=None,
+                              pool_name=None,
+                              pooled_only=False,
+                              unpooled_only=False,
+                              max_mins_locked=None,
+                              quiet=False,
+                              **kwargs):
     if now is None:
         now = datetime.utcnow()
 
@@ -163,17 +163,17 @@ def maybe_terminate_clusters(dry_run=False,
         cluster_id = cluster_summary.id
 
         # check if cluster is done
-        if is_cluster_done(cluster_summary):
+        if _is_cluster_done(cluster_summary):
             num_done += 1
             continue
 
         # check if cluster is starting
-        if is_cluster_starting(cluster_summary):
+        if _is_cluster_starting(cluster_summary):
             num_starting += 1
             continue
 
         # check if cluster is bootstrapping
-        if is_cluster_bootstrapping(cluster_summary):
+        if _is_cluster_bootstrapping(cluster_summary):
             num_bootstrapping += 1
             continue
 
@@ -182,18 +182,18 @@ def maybe_terminate_clusters(dry_run=False,
 
         # we can't really tell if non-streaming jobs are idle or not, so
         # let them be (see Issue #60)
-        if is_cluster_non_streaming(steps):
+        if _is_cluster_non_streaming(steps):
             num_non_streaming += 1
             continue
 
-        if any(is_step_running(step) for step in steps):
+        if any(_is_step_running(step) for step in steps):
             num_running += 1
             continue
 
         # cluster is idle
-        time_idle = now - time_last_active(cluster_summary, steps)
+        time_idle = now - _time_last_active(cluster_summary, steps)
         time_to_end_of_hour = _est_time_to_hour(cluster_summary, now=now)
-        is_pending = cluster_has_pending_steps(steps)
+        is_pending = _cluster_has_pending_steps(steps)
 
         bootstrap_actions = list(_yield_all_bootstrap_actions(
             emr_conn, cluster_id))
@@ -235,7 +235,7 @@ def maybe_terminate_clusters(dry_run=False,
             continue
 
         # terminate idle cluster
-        terminate_and_notify(
+        _terminate_and_notify(
             runner=runner,
             cluster_id=cluster_id,
             cluster_name=cluster_summary.name,
@@ -254,13 +254,13 @@ def maybe_terminate_clusters(dry_run=False,
             num_pending, num_idle, num_non_streaming, num_done))
 
 
-def is_cluster_done(cluster):
+def _is_cluster_done(cluster):
     """Return True if the given cluster is done running."""
     return (cluster.status.state == 'TERMINATING' or
             hasattr(cluster.status.timeline, 'enddatetime'))
 
 
-def is_cluster_non_streaming(steps):
+def _is_cluster_non_streaming(steps):
     """Return ``True`` if the give cluster has steps, but none of them are
     Hadoop streaming steps (for example, if the cluster is running Hive).
     """
@@ -280,21 +280,21 @@ def is_cluster_non_streaming(steps):
         return True
 
 
-def is_cluster_starting(cluster_summary):
+def _is_cluster_starting(cluster_summary):
     return cluster_summary.status.state == 'STARTING'
 
 
-def is_cluster_bootstrapping(cluster_summary):
+def _is_cluster_bootstrapping(cluster_summary):
     """Return ``True`` if *cluster_summary* is currently bootstrapping."""
     return (cluster_summary.status.state != 'STARTING' and
             not hasattr(cluster_summary.status.timeline, 'readydatetime'))
 
 
-def is_cluster_running(steps):
-    return any(is_step_running(step) for step in steps)
+def _is_cluster_running(steps):
+    return any(_is_step_running(step) for step in steps)
 
 
-def is_step_running(step):
+def _is_step_running(step):
     """Return true if the given step is currently running."""
     return (getattr(step.status, 'state', None) not in
             ('CANCELLED', 'INTERRUPTED') and
@@ -302,12 +302,12 @@ def is_step_running(step):
             not hasattr(step.status.timeline, 'enddatetime'))
 
 
-def cluster_has_pending_steps(steps):
+def _cluster_has_pending_steps(steps):
     """Does *cluster* have any steps in the ``PENDING`` state?"""
     return any(step.status.state == 'PENDING' for step in steps)
 
 
-def time_last_active(cluster_summary, steps):
+def _time_last_active(cluster_summary, steps):
     """When did something last happen with the given cluster?
 
     Things we look at:
@@ -340,7 +340,7 @@ def time_last_active(cluster_summary, steps):
     return iso8601_to_datetime(last_timestamp)
 
 
-def terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
+def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
                          is_pending, time_idle, time_to_end_of_hour,
                          dry_run=False, max_mins_locked=None, quiet=False):
 

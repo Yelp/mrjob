@@ -56,7 +56,6 @@ import mrjob
 import mrjob.step
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
-from mrjob.aws import _MAX_STEPS_PER_CLUSTER
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
@@ -73,8 +72,8 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
-from mrjob.iam import FALLBACK_INSTANCE_PROFILE
-from mrjob.iam import FALLBACK_SERVICE_ROLE
+from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
+from mrjob.iam import _FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.counters import _format_counters
@@ -90,9 +89,9 @@ from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.patched_boto import patched_describe_cluster
-from mrjob.patched_boto import patched_describe_step
-from mrjob.patched_boto import patched_list_steps
+from mrjob.patched_boto import _patched_describe_cluster
+from mrjob.patched_boto import _patched_describe_step
+from mrjob.patched_boto import _patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
@@ -126,11 +125,13 @@ _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
 # if we SSH into a node, default place to look for Hadoop logs
 _EMR_HADOOP_LOG_DIR = '/mnt/var/log/hadoop'
 
+# EMR's hard limit on number of steps in a cluster
+_MAX_STEPS_PER_CLUSTER = 256
 
-MAX_SSH_RETRIES = 20
+_MAX_SSH_RETRIES = 20
 
 # ssh should fail right away if it can't bind a port
-WAIT_FOR_SSH_TO_FAIL = 1.0
+_WAIT_FOR_SSH_TO_FAIL = 1.0
 
 # amount of time to wait between checks for available pooled clusters
 _POOLING_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
@@ -207,10 +208,10 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
     """Get all steps for the cluster, making successive API calls
     if necessary.
 
-    Calls :py:func:`~mrjob.patched_boto.patched_list_steps`, to work around
+    Calls :py:func:`~mrjob.patched_boto._patched_list_steps`, to work around
     `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
     """
-    for resp in _repeat(patched_list_steps, emr_conn, cluster_id,
+    for resp in _repeat(_patched_list_steps, emr_conn, cluster_id,
                         *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
@@ -230,7 +231,7 @@ def _step_ids_for_job(steps, job_key):
     return step_ids
 
 
-def make_lock_uri(s3_tmp_dir, cluster_id, step_num):
+def _make_lock_uri(s3_tmp_dir, cluster_id, step_num):
     """Generate the URI to lock the cluster ``cluster_id``"""
     return s3_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
 
@@ -263,7 +264,7 @@ def _lock_acquire_step_2(key, job_key):
     return (key_value == job_key.encode('utf_8'))
 
 
-def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
+def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
                             mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
@@ -1000,7 +1001,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.debug('> %s' % cmd_line(args))
 
             ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            time.sleep(WAIT_FOR_SSH_TO_FAIL)
+            time.sleep(_WAIT_FOR_SSH_TO_FAIL)
             ssh_proc.poll()
             # still running. We are golden
             if ssh_proc.returncode is None:
@@ -1035,7 +1036,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         try:
             # seed random port selection on cluster ID
             random.seed(self._cluster_id)
-            num_picks = min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports']))
+            num_picks = min(_MAX_SSH_RETRIES,
+                            len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:
             random.setstate(random_state)
@@ -1375,8 +1377,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 raise
             log.warning(
                 "Can't access IAM API, trying default instance profile: %s" %
-                FALLBACK_INSTANCE_PROFILE)
-            return FALLBACK_INSTANCE_PROFILE
+                _FALLBACK_INSTANCE_PROFILE)
+            return _FALLBACK_INSTANCE_PROFILE
 
     def _service_role(self):
         try:
@@ -1387,8 +1389,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 raise
             log.warning(
                 "Can't access IAM API, trying default service role: %s" %
-                FALLBACK_SERVICE_ROLE)
-            return FALLBACK_SERVICE_ROLE
+                _FALLBACK_SERVICE_ROLE)
+            return _FALLBACK_SERVICE_ROLE
 
     @property
     def _action_on_failure(self):
@@ -1575,7 +1577,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                       self._opts['check_emr_status_every'])
             time.sleep(self._opts['check_emr_status_every'])
 
-            step = patched_describe_step(emr_conn, self._cluster_id, step_id)
+            step = _patched_describe_step(emr_conn, self._cluster_id, step_id)
 
             if step.status.state == 'PENDING':
                 cluster = self._describe_cluster()
@@ -1698,8 +1700,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         reason = _get_reason(cluster)
         if any(reason.endswith('/%s is invalid' % role)
-               for role in (FALLBACK_INSTANCE_PROFILE,
-                            FALLBACK_SERVICE_ROLE)):
+               for role in (_FALLBACK_INSTANCE_PROFILE,
+                            _FALLBACK_SERVICE_ROLE)):
             log.warning(
                 '\n'
                 'Ask your admin to create the default EMR roles'
@@ -2360,7 +2362,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         for cluster_summary in _yield_all_clusters(
                 emr_conn, cluster_states=['WAITING']):
-            cluster = patched_describe_cluster(emr_conn, cluster_summary.id)
+            cluster = _patched_describe_cluster(emr_conn, cluster_summary.id)
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for
@@ -2387,7 +2389,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 num_steps=num_steps)
             if cluster_info_list:
                 cluster_id, num_steps = cluster_info_list[-1]
-                status = attempt_to_acquire_lock(
+                status = _attempt_to_acquire_lock(
                     self.fs, self._lock_uri(cluster_id, num_steps),
                     self._opts['s3_sync_wait_time'], self._job_key)
                 if status:
@@ -2409,9 +2411,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return None
 
     def _lock_uri(self, cluster_id, num_steps):
-        return make_lock_uri(self._opts['s3_tmp_dir'],
-                             cluster_id,
-                             num_steps + 1)
+        return _make_lock_uri(self._opts['s3_tmp_dir'],
+                              cluster_id,
+                              num_steps + 1)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to
@@ -2500,7 +2502,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
-        return patched_describe_cluster(emr_conn, self._cluster_id)
+        return _patched_describe_cluster(emr_conn, self._cluster_id)
 
     def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls

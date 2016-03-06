@@ -39,18 +39,16 @@ from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
 from mrjob.emr import _yield_all_steps
-from mrjob.emr import attempt_to_acquire_lock
+from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import filechunkio
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.job import MRJob
-from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
-from mrjob.ssh import SSH_LOG_ROOT
-from mrjob.ssh import SSH_PREFIX
 from mrjob.step import StepFailedException
+from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
@@ -150,7 +148,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             self.assertTrue(any(runner.fs.ls(runner.get_output_dir())))
 
             cluster = runner._describe_cluster()
-            name_match = JOB_KEY_RE.match(cluster.name)
+            name_match = _JOB_KEY_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
 
@@ -2181,15 +2179,17 @@ class S3LockTestCase(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[])
 
         self.assertEqual(
-            True, attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
+            True,
+            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
 
         self.assertEqual(
-            False, attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
+            False,
+            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
 
     def test_lock_expiration(self):
         runner = EMRJobRunner(conf_paths=[])
 
-        did_lock = attempt_to_acquire_lock(
+        did_lock = _attempt_to_acquire_lock(
             runner.fs, self.expired_lock_uri, 0, 'jf1',
             mins_to_expiration=5)
         self.assertEqual(True, did_lock)
@@ -2330,11 +2330,11 @@ class TestCatFallback(MockBotoTestCase):
         mock_ssh_file('testmaster', 'etc/init.d', b'meow')
 
         ssh_cat_gen = runner.fs.cat(
-            SSH_PREFIX + runner._address + '/etc/init.d')
+            'ssh://' + runner._address + '/etc/init.d')
         self.assertEqual(list(ssh_cat_gen)[0].rstrip(), b'meow')
         self.assertRaises(
             IOError, list,
-            runner.fs.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
+            runner.fs.cat('ssh://' + runner._address + '/does_not_exist'))
 
     def test_ssh_cat_errlog(self):
         # A file *containing* an error message shouldn't cause an error.
@@ -2344,7 +2344,7 @@ class TestCatFallback(MockBotoTestCase):
         error_message = b'cat: logs/err.log: No such file or directory\n'
         mock_ssh_file('testmaster', 'logs/err.log', error_message)
         self.assertEqual(
-            list(runner.fs.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
+            list(runner.fs.cat('ssh://' + runner._address + '/logs/err.log')),
             [error_message])
 
 
@@ -2472,7 +2472,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
 class JobWaitTestCase(MockBotoTestCase):
 
     # A list of job ids that hold booleans of whether or not the job can
-    # acquire a lock. Helps simulate mrjob.emr.attempt_to_acquire_lock.
+    # acquire a lock. Helps simulate mrjob.emr._attempt_to_acquire_lock.
     JOB_ID_LOCKS = {
         'j-fail-lock': False,
         'j-successful-lock': True,
@@ -2509,7 +2509,7 @@ class JobWaitTestCase(MockBotoTestCase):
                                 side_effect=side_effect_usable_clusters))
         self.start(patch.object(EMRJobRunner, '_lock_uri',
                                 side_effect=side_effect_lock_uri))
-        self.start(patch.object(mrjob.emr, 'attempt_to_acquire_lock',
+        self.start(patch.object(mrjob.emr, '_attempt_to_acquire_lock',
                                 side_effect=side_effect_acquire_lock))
         self.start(patch.object(time, 'sleep',
                                 side_effect=side_effect_time_sleep))

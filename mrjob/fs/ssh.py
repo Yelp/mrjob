@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
+import re
 import posixpath
 
 from io import BytesIO
@@ -20,11 +21,12 @@ from mrjob.ssh import ssh_cat
 from mrjob.ssh import ssh_copy_key
 from mrjob.ssh import ssh_ls
 from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import SSH_PREFIX
-from mrjob.ssh import SSH_URI_RE
 from mrjob.util import random_identifier
 from mrjob.util import read_file
 
+
+_SSH_URI_RE = re.compile(
+    r'^ssh://(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$')
 
 log = logging.getLogger(__name__)
 
@@ -55,13 +57,13 @@ class SSHFilesystem(Filesystem):
         self._host_to_slave_hosts = {}
 
     def can_handle_path(self, path):
-        return SSH_URI_RE.match(path) is not None
+        return _SSH_URI_RE.match(path) is not None
 
     def du(self, path_glob):
         raise IOError()  # not implemented
 
     def ls(self, path_glob):
-        if SSH_URI_RE.match(path_glob):
+        if _SSH_URI_RE.match(path_glob):
             for item in self._ssh_ls(path_glob):
                 yield item
             return
@@ -89,7 +91,7 @@ class SSHFilesystem(Filesystem):
 
     def _ssh_ls(self, uri):
         """Helper for ls(); obeys globbing"""
-        m = SSH_URI_RE.match(uri)
+        m = _SSH_URI_RE.match(uri)
         addr = m.group('hostname')
         if not addr:
             raise ValueError
@@ -107,13 +109,13 @@ class SSHFilesystem(Filesystem):
         for line in output:
             # skip directories, we only want to return downloadable files
             if line and not line.endswith('/'):
-                yield SSH_PREFIX + addr + line
+                yield 'ssh://' + addr + line
 
     def md5sum(self, path):
         raise IOError()  # not implemented
 
     def _cat_file(self, filename):
-        ssh_match = SSH_URI_RE.match(filename)
+        ssh_match = _SSH_URI_RE.match(filename)
         addr = ssh_match.group('hostname') or self._address_of_master()
 
         keyfile = self._key_filename_for(addr)

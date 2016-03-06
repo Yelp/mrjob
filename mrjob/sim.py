@@ -100,7 +100,7 @@ class SimMRJobRunner(MRJobRunner):
         self._prev_outfiles = []
         self._counters = []
 
-    def warn_ignored_opts(self):
+    def _warn_ignored_opts(self):
         """ If the user has provided options that are not supported
         by the dev runners log warnings for each of the ignored options
         """
@@ -165,7 +165,7 @@ class SimMRJobRunner(MRJobRunner):
         pass
 
     def _run(self):
-        self.warn_ignored_opts()
+        self._warn_ignored_opts()
         _error_on_bad_paths(self.fs, self._input_paths)
         self._create_setup_wrapper_script(local=True)
         self._setup_output_dir()
@@ -266,7 +266,7 @@ class SimMRJobRunner(MRJobRunner):
 
             self._prev_outfiles.append(output_path)
 
-        self.per_step_runner_finish(step_num)
+        self._per_step_runner_finish(step_num)
         counters = self._counters[step_num]
         if counters:
             log.info(_format_counters(counters))
@@ -278,7 +278,7 @@ class SimMRJobRunner(MRJobRunner):
         """
         raise NotImplementedError("Subclass must implement this method")
 
-    def per_step_runner_finish(self, step_num):
+    def _per_step_runner_finish(self, step_num):
         """ Runner specific method to be executed to mark the step completion.
         Only the local runner implements this method
         """

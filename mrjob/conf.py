@@ -92,7 +92,7 @@ class OptionStore(dict):
         dictionary with the ultimate values.
         """
         self.update(combine_opts(self.COMBINERS, *self.cascading_dicts))
-        self._opt_priority = calculate_opt_priority(self, self.cascading_dicts)
+        self._opt_priority = self._calculate_opt_priority()
 
     def is_default(self, key):
         return self._opt_priority[key] < 2
@@ -108,6 +108,28 @@ class OptionStore(dict):
             return super(OptionStore, self).__setitem__(key, value)
         else:
             raise KeyError(key)
+
+    def _calculate_opt_priority(self):
+        """Keep track of where in the order opts were specified,
+        to handle opts that affect the same thing (e.g. ec2_*instance_type).
+
+        Here is a rough guide to the values set by this function. They are
+
+            Where specified     Priority
+            unset everywhere    -1
+            blank               0
+            non-blank default   1
+            base conf file      2
+            inheriting conf     [3-n]
+            command line        n+1
+        """
+        opt_priority = dict((opt, -1) for opt in self)
+        for priority, opt_dict in enumerate(self.cascading_dicts):
+            if opt_dict:
+                for opt, value in opt_dict.items():
+                    if value is not None:
+                        opt_priority[opt] = priority
+        return opt_priority
 
 
 ### finding config files ###
@@ -142,9 +164,7 @@ def find_mrjob_conf():
         return None
 
 
-# TODO: rename and hide this function in v0.5.0
-
-def real_mrjob_conf_path(conf_path=None):
+def _expanded_mrjob_conf_path(conf_path=None):
     """Return the path of a single conf file. If *conf_path* is ``False``,
     return ``None``, and if it's ``None``, return :py:func:`find_mrjob_conf`.
     Otherwise, expand environment variables and ``~`` in *conf_path* and
@@ -288,7 +308,7 @@ def _strip_clear_tag(v):
 
 ### reading mrjob.conf ###
 
-def conf_object_at_path(conf_path):
+def _conf_object_at_path(conf_path):
     if conf_path is None:
         return None
 
@@ -334,8 +354,8 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
         This will only load each config file once, even if it's referenced
         from multiple paths due to symlinks.
     """
-    conf_path = real_mrjob_conf_path(conf_path)
-    conf = conf_object_at_path(conf_path)
+    conf_path = _expanded_mrjob_conf_path(conf_path)
+    conf = _conf_object_at_path(conf_path)
 
     if conf is None:
         return [(None, {})]
@@ -635,33 +655,3 @@ def combine_opts(combiners, *opts_list):
         final_opts[key] = combine_func(*values)
 
     return final_opts
-
-
-### PRIORITY ###
-
-
-# TODO: Move inside OptionStore
-def calculate_opt_priority(opts, opt_dicts):
-    """Keep track of where in the order opts were specified,
-    to handle opts that affect the same thing (e.g. ec2_*instance_type).
-
-    Here is a rough guide to the values set by this function. They are
-
-        Where specified     Priority
-        unset everywhere    -1
-        blank               0
-        non-blank default   1
-        base conf file      2
-        inheriting conf     [3-n]
-        command line        n+1
-
-    :type opts: iterable
-    :type opt_dicts: list of dicts with keys also appearing in **opts**
-    """
-    opt_priority = dict((opt, -1) for opt in opts)
-    for priority, opt_dict in enumerate(opt_dicts):
-        if opt_dict:
-            for opt, value in opt_dict.items():
-                if value is not None:
-                    opt_priority[opt] = priority
-    return opt_priority

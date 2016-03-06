@@ -20,11 +20,11 @@ from datetime import datetime
 from datetime import timedelta
 
 import boto.emr.connection
-from mrjob.tools.emr.audit_usage import cluster_to_full_summary
-from mrjob.tools.emr.audit_usage import subdivide_interval_by_date
-from mrjob.tools.emr.audit_usage import subdivide_interval_by_hour
+from mrjob.tools.emr.audit_usage import _cluster_to_full_summary
+from mrjob.tools.emr.audit_usage import _percent
+from mrjob.tools.emr.audit_usage import _subdivide_interval_by_date
+from mrjob.tools.emr.audit_usage import _subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
-from mrjob.tools.emr.audit_usage import percent
 
 from tests.mockboto import MockEmrObject
 from tests.py2 import TestCase
@@ -66,7 +66,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ),
         )
 
-        summary = cluster_to_full_summary(cluster)
+        summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 6, 0, 0),
@@ -118,7 +118,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ),
         )
 
-        summary = cluster_to_full_summary(
+        summary = _cluster_to_full_summary(
             cluster, now=datetime(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
@@ -169,7 +169,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ),
         )
 
-        summary = cluster_to_full_summary(
+        summary = _cluster_to_full_summary(
             cluster, now=datetime(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
@@ -221,7 +221,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ),
         )
 
-        summary = cluster_to_full_summary(
+        summary = _cluster_to_full_summary(
             cluster, now=datetime(2010, 6, 6, 1))
 
         self.assertEqual(summary, {
@@ -263,7 +263,7 @@ class ClusterToFullSummaryTestCase(TestCase):
         # this shouldn't happen in practice; just a robustness check
         cluster = MockEmrObject()
 
-        summary = cluster_to_full_summary(cluster)
+        summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': None,
@@ -299,7 +299,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ),
         )
 
-        summary = cluster_to_full_summary(cluster)
+        summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 30),
@@ -366,7 +366,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ],
         )
 
-        summary = cluster_to_full_summary(
+        summary = _cluster_to_full_summary(
             cluster, now=datetime(2010, 6, 6, 5, 30))
 
         self.assertEqual(summary, {
@@ -450,7 +450,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ]
         )
 
-        summary = cluster_to_full_summary(cluster)
+        summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 6, 4, 0),
@@ -551,7 +551,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ],
         )
 
-        summary = cluster_to_full_summary(cluster)
+        summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 30),
@@ -701,7 +701,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             ],
         )
 
-        summary = cluster_to_full_summary(cluster)
+        summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
             'created': datetime(2010, 6, 5, 23, 30),
@@ -801,7 +801,7 @@ class SubdivideIntervalByDateTestCase(TestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
-            subdivide_interval_by_date(
+            _subdivide_interval_by_date(
                 datetime(2010, 6, 6, 4, 26),
                 datetime(2010, 6, 6, 4, 26),
             ),
@@ -810,7 +810,7 @@ class SubdivideIntervalByDateTestCase(TestCase):
 
     def test_same_day(self):
         self.assertEqual(
-            subdivide_interval_by_date(
+            _subdivide_interval_by_date(
                 datetime(2010, 6, 6, 4, 0),
                 datetime(2010, 6, 6, 6, 0),
             ),
@@ -819,7 +819,7 @@ class SubdivideIntervalByDateTestCase(TestCase):
 
     def test_start_at_midnight(self):
         self.assertEqual(
-            subdivide_interval_by_date(
+            _subdivide_interval_by_date(
                 datetime(2010, 6, 6, 0, 0),
                 datetime(2010, 6, 6, 5, 0),
             ),
@@ -828,7 +828,7 @@ class SubdivideIntervalByDateTestCase(TestCase):
 
     def test_end_at_midnight(self):
         self.assertEqual(
-            subdivide_interval_by_date(
+            _subdivide_interval_by_date(
                 datetime(2010, 6, 5, 23, 0),
                 datetime(2010, 6, 6, 0, 0),
             ),
@@ -837,7 +837,7 @@ class SubdivideIntervalByDateTestCase(TestCase):
 
     def test_split_over_midnight(self):
         self.assertEqual(
-            subdivide_interval_by_date(
+            _subdivide_interval_by_date(
                 datetime(2010, 6, 5, 23, 0),
                 datetime(2010, 6, 6, 5, 0),
             ),
@@ -847,7 +847,7 @@ class SubdivideIntervalByDateTestCase(TestCase):
 
     def test_full_days(self):
         self.assertEqual(
-            subdivide_interval_by_date(
+            _subdivide_interval_by_date(
                 datetime(2010, 6, 5, 23, 0),
                 datetime(2010, 6, 10, 5, 0),
             ),
@@ -864,7 +864,7 @@ class SubdivideIntervalByHourTestCase(TestCase):
 
     def test_zero_interval(self):
         self.assertEqual(
-            subdivide_interval_by_hour(
+            _subdivide_interval_by_hour(
                 datetime(2010, 6, 6, 4, 26),
                 datetime(2010, 6, 6, 4, 26),
             ),
@@ -873,7 +873,7 @@ class SubdivideIntervalByHourTestCase(TestCase):
 
     def test_same_hour(self):
         self.assertEqual(
-            subdivide_interval_by_hour(
+            _subdivide_interval_by_hour(
                 datetime(2010, 6, 6, 4, 24),
                 datetime(2010, 6, 6, 4, 26),
             ),
@@ -882,7 +882,7 @@ class SubdivideIntervalByHourTestCase(TestCase):
 
     def test_start_at_midnight(self):
         self.assertEqual(
-            subdivide_interval_by_hour(
+            _subdivide_interval_by_hour(
                 datetime(2010, 6, 6, 0, 0),
                 datetime(2010, 6, 6, 0, 3),
             ),
@@ -891,7 +891,7 @@ class SubdivideIntervalByHourTestCase(TestCase):
 
     def test_end_at_midnight(self):
         self.assertEqual(
-            subdivide_interval_by_hour(
+            _subdivide_interval_by_hour(
                 datetime(2010, 6, 5, 23, 55),
                 datetime(2010, 6, 6, 0, 0),
             ),
@@ -900,7 +900,7 @@ class SubdivideIntervalByHourTestCase(TestCase):
 
     def test_split_over_midnight(self):
         self.assertEqual(
-            subdivide_interval_by_hour(
+            _subdivide_interval_by_hour(
                 datetime(2010, 6, 5, 23, 55),
                 datetime(2010, 6, 6, 0, 3),
             ),
@@ -910,7 +910,7 @@ class SubdivideIntervalByHourTestCase(TestCase):
 
     def test_full_hours(self):
         self.assertEqual(
-            subdivide_interval_by_hour(
+            _subdivide_interval_by_hour(
                 datetime(2010, 6, 5, 23, 40),
                 datetime(2010, 6, 6, 2, 10),
             ),
@@ -924,9 +924,9 @@ class SubdivideIntervalByHourTestCase(TestCase):
 class PercentTestCase(TestCase):
 
     def test_basic(self):
-        self.assertEqual(62.5, percent(5, 8))
+        self.assertEqual(62.5, _percent(5, 8))
 
     def test_default(self):
-        self.assertEqual(0.0, percent(1, 0))
-        self.assertEqual(0.0, percent(0, 0))
-        self.assertEqual(None, percent(0, 0, default=None))
+        self.assertEqual(0.0, _percent(1, 0))
+        self.assertEqual(0.0, _percent(0, 0))
+        self.assertEqual(None, _percent(0, 0, default=None))

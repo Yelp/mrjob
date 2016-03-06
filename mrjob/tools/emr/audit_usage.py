@@ -50,6 +50,7 @@ from datetime import datetime
 from datetime import timedelta
 import math
 import logging
+import re
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
@@ -57,21 +58,26 @@ from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_steps
 from mrjob.job import MRJob
-from mrjob.options import add_basic_opts
-from mrjob.options import add_emr_connect_opts
-from mrjob.options import alphabetize_options
-from mrjob.parse import JOB_KEY_RE
-from mrjob.parse import STEP_NAME_RE
+from mrjob.options import _add_basic_opts
+from mrjob.options import _add_emr_connect_opts
+from mrjob.options import _alphabetize_options
 from mrjob.parse import iso8601_to_datetime
-from mrjob.patched_boto import patched_describe_cluster
+from mrjob.patched_boto import _patched_describe_cluster
 from mrjob.util import strip_microseconds
+
+# match an mrjob job key (used to uniquely identify the job)
+_JOB_KEY_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
+
+# match an mrjob step name (these are used to name steps in EMR)
+_STEP_NAME_RE = re.compile(
+    r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+): Step (\d+) of (\d+)$')
 
 log = logging.getLogger(__name__)
 
 
 def main(args):
     # parser command-line args
-    option_parser = make_option_parser()
+    option_parser = _make_option_parser()
     options, args = option_parser.parse_args(args)
 
     if args:
@@ -82,16 +88,16 @@ def main(args):
     now = datetime.utcnow()
 
     log.info('getting cluster history...')
-    clusters = list(yield_clusters(
-        max_days_ago=options.max_days_ago, now=now, **runner_kwargs(options)))
+    clusters = list(_yield_clusters(
+        max_days_ago=options.max_days_ago, now=now, **_runner_kwargs(options)))
 
     log.info('compiling cluster stats...')
-    stats = clusters_to_stats(clusters, now=now)
+    stats = _clusters_to_stats(clusters, now=now)
 
-    print_report(stats, now=now)
+    _print_report(stats, now=now)
 
 
-def make_option_parser():
+def _make_option_parser():
     usage = '%prog [options]'
     description = 'Print a giant report on EMR usage.'
 
@@ -102,15 +108,15 @@ def make_option_parser():
         help=('Max number of days ago to look at jobs. By default, we go back'
               ' as far as EMR supports (currently about 2 months)'))
 
-    add_basic_opts(option_parser)
-    add_emr_connect_opts(option_parser)
+    _add_basic_opts(option_parser)
+    _add_emr_connect_opts(option_parser)
 
-    alphabetize_options(option_parser)
+    _alphabetize_options(option_parser)
 
     return option_parser
 
 
-def runner_kwargs(options):
+def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'max_days_ago'):
         del kwargs[unused_arg]
@@ -118,7 +124,7 @@ def runner_kwargs(options):
     return kwargs
 
 
-def clusters_to_stats(clusters, now=None):
+def _clusters_to_stats(clusters, now=None):
     """Aggregate statistics for several clusters into a dictionary.
 
     :param clusters: a sequence of dicts with the keys ``bootstrap_actions``,
@@ -129,7 +135,7 @@ def clusters_to_stats(clusters, now=None):
     Returns a dictionary with many keys, including:
 
     * *summaries*: A list of dictionaries; the result of running
-      :py:func:`cluster_to_full_summary` on each cluster.
+      :py:func:`_cluster_to_full_summary` on each cluster.
 
     total usage:
 
@@ -169,7 +175,7 @@ def clusters_to_stats(clusters, now=None):
     """
     s = {}  # stats for all clusters
 
-    s['clusters'] = [cluster_to_full_summary(cluster, now=now)
+    s['clusters'] = [_cluster_to_full_summary(cluster, now=now)
                      for cluster in clusters]
 
     # from here on out, we only process s['clusters']
@@ -239,7 +245,7 @@ def clusters_to_stats(clusters, now=None):
     return s
 
 
-def cluster_to_full_summary(cluster, now=None):
+def _cluster_to_full_summary(cluster, now=None):
     """Convert a cluster to a full summary for use in creating a report,
     including billing/usage information.
 
@@ -255,11 +261,11 @@ def cluster_to_full_summary(cluster, now=None):
       bootstrapping and running jobs.
     * *nih_bbnu*: total usage billed but not used (`nih_billed - nih_used`)
     * *usage*: job-specific usage information, returned by
-      :py:func:`cluster_to_usage_data`.
+      :py:func:`_cluster_to_usage_data`.
     """
-    cs = cluster_to_basic_summary(cluster, now=now)
+    cs = _cluster_to_basic_summary(cluster, now=now)
 
-    cs['usage'] = cluster_to_usage_data(
+    cs['usage'] = _cluster_to_usage_data(
         cluster, basic_summary=cs, now=now)
 
     # add up billing info
@@ -275,7 +281,7 @@ def cluster_to_full_summary(cluster, now=None):
     return cs
 
 
-def cluster_to_basic_summary(cluster, now=None):
+def _cluster_to_basic_summary(cluster, now=None):
     """Extract fields such as creation time, owner, etc. from the cluster,
     so we can safely reference them without using :py:func:`getattr`.
 
@@ -318,10 +324,10 @@ def cluster_to_basic_summary(cluster, now=None):
     status = getattr(cluster, 'status', None)
     timeline = getattr(status, 'timeline', None)
 
-    bcs['created'] = to_datetime(getattr(
+    bcs['created'] = _to_datetime(getattr(
         timeline, 'creationdatetime', None))
-    bcs['ready'] = to_datetime(getattr(timeline, 'readydatetime', None))
-    bcs['end'] = to_datetime(getattr(timeline, 'enddatetime', None))
+    bcs['ready'] = _to_datetime(getattr(timeline, 'readydatetime', None))
+    bcs['end'] = _to_datetime(getattr(timeline, 'enddatetime', None))
 
     if bcs['created']:
         bcs['ran'] = (bcs['end'] or now) - bcs['created']
@@ -339,7 +345,7 @@ def cluster_to_basic_summary(cluster, now=None):
         if len(args) == 2 and args[0].startswith('pool-'):
             bcs['pool'] = args[1]
 
-    m = JOB_KEY_RE.match(bcs['name'] or '')
+    m = _JOB_KEY_RE.match(bcs['name'] or '')
     if m:
         bcs['label'], bcs['owner'] = m.group(1), m.group(2)
     else:
@@ -350,14 +356,14 @@ def cluster_to_basic_summary(cluster, now=None):
     return bcs
 
 
-def cluster_to_usage_data(cluster, basic_summary=None, now=None):
+def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
     """Break billing/usage information for a cluster down by job.
 
     :param cluster: a :py:class:`boto.emr.EmrObject`
     :param basic_summary: a basic summary of the cluster, returned by
-                          :py:func:`cluster_to_basic_summary`. If this
+                          :py:func:`_cluster_to_basic_summary`. If this
                           is ``None``, we'll call
-                          :py:func:`cluster_to_basic_summary` ourselves.
+                          :py:func:`_cluster_to_basic_summary` ourselves.
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
@@ -389,7 +395,7 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
     * *start*: when the job or bootstrapping step started, as a
       :py:class:`datetime.datetime`
     """
-    bcs = basic_summary or cluster_to_basic_summary(cluster)
+    bcs = basic_summary or _cluster_to_basic_summary(cluster)
 
     if now is None:
         now = datetime.utcnow()
@@ -400,7 +406,7 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
     # Figure out billing rate per second for the job, given that
     # normalizedinstancehours is how much we're charged up until
     # the next full hour.
-    full_hours = math.ceil(to_secs(bcs['ran']) / 60.0 / 60.0)
+    full_hours = math.ceil(_to_secs(bcs['ran']) / 60.0 / 60.0)
     nih_per_sec = bcs['nih'] / (full_hours * 3600.0)
 
     # Don't actually count a step as billed for the full hour until
@@ -432,9 +438,9 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
         if not hasattr(step_timeline, 'startdatetime'):
             break
 
-        step_start = to_datetime(step_timeline.startdatetime)
+        step_start = _to_datetime(step_timeline.startdatetime)
 
-        step_end = to_datetime(getattr(step_timeline, 'enddatetime', None))
+        step_end = _to_datetime(getattr(step_timeline, 'enddatetime', None))
         if step_end is None:
             # step started running and was cancelled. credit it for 0 usage
             if bcs['end']:
@@ -443,7 +449,7 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
             else:
                 step_end = now
 
-        m = STEP_NAME_RE.match(getattr(step, 'name', ''))
+        m = _STEP_NAME_RE.match(getattr(step, 'name', ''))
         if m:
             step_label = m.group(1)
             step_owner = m.group(2)
@@ -470,34 +476,34 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
 
         interval['nih_used'] = (
             nih_per_sec *
-            to_secs(interval['end'] - interval['start']))
+            _to_secs(interval['end'] - interval['start']))
 
         interval['date_to_nih_used'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
-            in subdivide_interval_by_date(interval['start'],
+            in _subdivide_interval_by_date(interval['start'],
                                           interval['end']).items())
 
         interval['hour_to_nih_used'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
-            in subdivide_interval_by_hour(interval['start'],
+            in _subdivide_interval_by_hour(interval['start'],
                                           interval['end']).items())
 
         interval['nih_billed'] = (
             nih_per_sec *
-            to_secs(interval['end_billing'] - interval['start']))
+            _to_secs(interval['end_billing'] - interval['start']))
 
         interval['date_to_nih_billed'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
-            in subdivide_interval_by_date(interval['start'],
+            in _subdivide_interval_by_date(interval['start'],
                                           interval['end_billing']).items())
 
         interval['hour_to_nih_billed'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
-            in subdivide_interval_by_hour(interval['start'],
+            in _subdivide_interval_by_hour(interval['start'],
                                           interval['end_billing']).items())
 
         # time billed but not used
@@ -518,28 +524,28 @@ def cluster_to_usage_data(cluster, basic_summary=None, now=None):
     return intervals
 
 
-def subdivide_interval_by_date(start, end):
+def _subdivide_interval_by_date(start, end):
     """Convert a time interval to a map from :py:class:`datetime.date` to
     the number of seconds within the interval on that date.
 
     *start* and *end* are :py:class:`datetime.datetime` objects.
     """
     if start.date() == end.date():
-        date_to_secs = {start.date(): to_secs(end - start)}
+        date_to_secs = {start.date(): _to_secs(end - start)}
     else:
         date_to_secs = {}
 
-        date_to_secs[start.date()] = to_secs(
+        date_to_secs[start.date()] = _to_secs(
             datetime(start.year, start.month, start.day) + timedelta(days=1) -
             start)
 
-        date_to_secs[end.date()] = to_secs(
+        date_to_secs[end.date()] = _to_secs(
             end - datetime(end.year, end.month, end.day))
 
         # fill in dates in the middle
         cur_date = start.date() + timedelta(days=1)
         while cur_date < end.date():
-            date_to_secs[cur_date] = to_secs(timedelta(days=1))
+            date_to_secs[cur_date] = _to_secs(timedelta(days=1))
             cur_date += timedelta(days=1)
 
     # remove zeros
@@ -549,7 +555,7 @@ def subdivide_interval_by_date(start, end):
     return date_to_secs
 
 
-def subdivide_interval_by_hour(start, end):
+def _subdivide_interval_by_hour(start, end):
     """Convert a time interval to a map from hours (represented as
     :py:class:`datetime.datetime` for the start of the hour) to the number of
     seconds during that hour that are within the interval
@@ -560,19 +566,19 @@ def subdivide_interval_by_hour(start, end):
     end_hour = end.replace(minute=0, second=0, microsecond=0)
 
     if start_hour == end_hour:
-        hour_to_secs = {start_hour: to_secs(end - start)}
+        hour_to_secs = {start_hour: _to_secs(end - start)}
     else:
         hour_to_secs = {}
 
-        hour_to_secs[start_hour] = to_secs(
+        hour_to_secs[start_hour] = _to_secs(
             start_hour + timedelta(hours=1) - start)
 
-        hour_to_secs[end_hour] = to_secs(end - end_hour)
+        hour_to_secs[end_hour] = _to_secs(end - end_hour)
 
         # fill in dates in the middle
         cur_hour = start_hour + timedelta(hours=1)
         while cur_hour < end_hour:
-            hour_to_secs[cur_hour] = to_secs(timedelta(hours=1))
+            hour_to_secs[cur_hour] = _to_secs(timedelta(hours=1))
             cur_hour += timedelta(hours=1)
 
     # remove zeros
@@ -582,7 +588,7 @@ def subdivide_interval_by_hour(start, end):
     return hour_to_secs
 
 
-def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
+def _yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
     """Get relevant cluster information from EMR.
 
     :param float max_days_ago: If set, don't fetch clusters created longer
@@ -606,7 +612,7 @@ def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
             emr_conn, created_after=created_after):
         cluster_id = cluster_summary.id
 
-        cluster = patched_describe_cluster(emr_conn, cluster_id)
+        cluster = _patched_describe_cluster(emr_conn, cluster_id)
         cluster.steps = list(_yield_all_steps(emr_conn, cluster_id))
         cluster.bootstrapactions = list(
             _yield_all_bootstrap_actions(emr_conn, cluster_id))
@@ -614,10 +620,10 @@ def yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
         yield cluster
 
 
-def print_report(stats, now=None):
+def _print_report(stats, now=None):
     """Print final report.
 
-    :param stats: a dictionary returned by :py:func:`clusters_to_stats`
+    :param stats: a dictionary returned by :py:func:`_clusters_to_stats`
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
     """
@@ -648,7 +654,7 @@ def print_report(stats, now=None):
 
     # total compute-unit hours used
     def with_pct(usage):
-        return (usage, percent(usage, s['nih_billed']))
+        return (usage, _percent(usage, s['nih_billed']))
 
     print('Total billed:  %9.2f  %5.1f%%' % with_pct(s['nih_billed']))
     print('  Total used:  %9.2f  %5.1f%%' % with_pct(s['nih_used']))
@@ -670,7 +676,7 @@ def print_report(stats, now=None):
                 s['date_to_nih_billed'].get(d, 0.0),
                 s['date_to_nih_used'].get(d, 0.0),
                 s['date_to_nih_bbnu'].get(d, 0.0),
-                percent(s['date_to_nih_bbnu'].get(d, 0.0),
+                _percent(s['date_to_nih_bbnu'].get(d, 0.0),
                         s['date_to_nih_billed'].get(d, 0.0))))
             d -= timedelta(days=1)
         print()
@@ -686,7 +692,7 @@ def print_report(stats, now=None):
                 s['hour_to_nih_billed'].get(h, 0.0),
                 s['hour_to_nih_used'].get(h, 0.0),
                 s['hour_to_nih_bbnu'].get(h, 0.0),
-                percent(s['hour_to_nih_bbnu'].get(h, 0.0),
+                _percent(s['hour_to_nih_bbnu'].get(h, 0.0),
                         s['hour_to_nih_billed'].get(h, 0.0))))
             h -= timedelta(hours=1)
         print()
@@ -790,7 +796,7 @@ def print_report(stats, now=None):
             (cs['owner'] or ''), (cs['label'] or ('not started by mrjob'))))
 
 
-def to_secs(delta):
+def _to_secs(delta):
     """Convert a :py:class:`datetime.timedelta` to a number of seconds.
 
     (This is basically a backport of
@@ -801,7 +807,7 @@ def to_secs(delta):
             delta.microseconds / 1000000.0)
 
 
-def to_datetime(iso8601_time):
+def _to_datetime(iso8601_time):
     """Convert a ISO8601-formatted datetime (from :py:mod:`boto`) to
     a :py:class:`datetime.datetime`."""
     if iso8601_time is None:
@@ -810,7 +816,7 @@ def to_datetime(iso8601_time):
     return iso8601_to_datetime(iso8601_time)
 
 
-def percent(x, total, default=0.0):
+def _percent(x, total, default=0.0):
     """Return what percentage *x* is of *total*, or *default* if
     *total* is zero."""
     if total:

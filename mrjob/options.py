@@ -39,7 +39,7 @@ def _append_to_conf_paths(option, opt_str, value, parser):
         parser.values.conf_paths.append(value)
 
 
-def add_protocol_opts(opt_group):
+def _add_protocol_opts(opt_group):
     """Add options related to choosing protocols.
     """
     return [
@@ -54,7 +54,7 @@ def add_protocol_opts(opt_group):
     ]
 
 
-def add_basic_opts(opt_group):
+def _add_basic_opts(opt_group):
     """Options for all command line tools"""
 
     return [
@@ -79,7 +79,7 @@ def add_basic_opts(opt_group):
     ]
 
 
-def add_runner_opts(opt_group, default_runner='local'):
+def _add_runner_opts(opt_group, default_runner='local'):
     """Options for all runners."""
     return [
         opt_group.add_option(
@@ -207,7 +207,7 @@ def add_runner_opts(opt_group, default_runner='local'):
     ]
 
 
-def add_local_opts(opt_group):
+def _add_local_opts(opt_group):
     """Options for ``inline`` and ``local`` runners."""
     return [
         opt_group.add_option(
@@ -216,7 +216,7 @@ def add_local_opts(opt_group):
     ]
 
 
-def add_hadoop_emr_opts(opt_group):
+def _add_hadoop_emr_opts(opt_group):
     """Options for ``hadoop`` and ``emr`` runners"""
     return [
         opt_group.add_option(
@@ -260,7 +260,7 @@ def add_hadoop_emr_opts(opt_group):
     ]
 
 
-def add_hadoop_opts(opt_group):
+def _add_hadoop_opts(opt_group):
     """Options for ``hadoop`` runner"""
     return [
         opt_group.add_option(
@@ -286,14 +286,14 @@ def add_hadoop_opts(opt_group):
     ]
 
 
-def add_emr_opts(opt_group):
+def _add_emr_opts(opt_group):
     """Options for ``emr`` runner"""
-    return (add_emr_connect_opts(opt_group) +
-            add_emr_launch_opts(opt_group) +
-            add_emr_run_opts(opt_group))
+    return (_add_emr_connect_opts(opt_group) +
+            _add_emr_launch_opts(opt_group) +
+            _add_emr_run_opts(opt_group))
 
 
-def add_emr_connect_opts(opt_group):
+def _add_emr_connect_opts(opt_group):
     """Options for connecting to the EMR API."""
     return [
         opt_group.add_option(
@@ -315,7 +315,7 @@ def add_emr_connect_opts(opt_group):
     ]
 
 
-def add_emr_run_opts(opt_group):
+def _add_emr_run_opts(opt_group):
     """Options for running and monitoring a job on EMR."""
     return [
         opt_group.add_option(
@@ -397,7 +397,7 @@ def add_emr_run_opts(opt_group):
     ]
 
 
-def add_emr_launch_opts(opt_group):
+def _add_emr_launch_opts(opt_group):
     """Options for launching a cluster (including bootstrapping)."""
     return [
         opt_group.add_option(
@@ -543,10 +543,10 @@ def add_emr_launch_opts(opt_group):
                  ' account.'
         ),
 
-    ] + add_emr_bootstrap_opts(opt_group) + add_emr_instance_opts(opt_group)
+    ] + _add_emr_bootstrap_opts(opt_group) + _add_emr_instance_opts(opt_group)
 
 
-def add_emr_bootstrap_opts(opt_group):
+def _add_emr_bootstrap_opts(opt_group):
     """Add options having to do with bootstrapping (other than
     :mrjob-opt:`bootstrap_mrjob`, which is shared with other runners)."""
     return [
@@ -617,7 +617,7 @@ def add_emr_bootstrap_opts(opt_group):
     ]
 
 
-def add_emr_instance_opts(opt_group):
+def _add_emr_instance_opts(opt_group):
     """Add options having to do with instance creation"""
     return [
         # AMI
@@ -704,17 +704,17 @@ def add_emr_instance_opts(opt_group):
     ]
 
 
-def print_help_for_groups(*args):
+def _print_help_for_groups(*args):
     option_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
     option_parser.option_groups = args
     option_parser.print_help()
 
 
-def alphabetize_options(opt_group):
+def _alphabetize_options(opt_group):
     opt_group.option_list.sort(key=lambda opt: opt.dest or '')
 
 
-def fix_custom_options(options, option_parser):
+def _fix_custom_options(options, option_parser):
     """Update *options* to handle KEY=VALUE options, etc."""
     if hasattr(options, 'cmdenv'):
         cmdenv_err = '--cmdenv argument %r is not of the form KEY=VALUE'

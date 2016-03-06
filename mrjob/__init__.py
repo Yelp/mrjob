@@ -101,7 +101,7 @@ __credits__ = [
     'Steve Spencer <steve@bigfrog.net>',
     'Jyry Suvilehto <jyry.suvilehto@iki.fi>',
     'Phil Swanson <swanson.p@gmail.com>',
-    'Matthew Tai <mtai@adku.com>',
+    'Matthew Tai <taim@google.com>',
     'Diogo Terror <me@diogoterror.com>',
     'Paul Wais <pwais@yelp.com>',
     'Derek Wilson <jderekwilson@gmail.com>',

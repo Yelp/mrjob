@@ -29,10 +29,10 @@ from mrjob.conf import combine_dicts
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
-from mrjob.parse import JOB_KEY_RE
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.runner import MRJobRunner
+from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
@@ -127,7 +127,7 @@ class TestJobName(TestCase):
 
     def test_empty(self):
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), getpass.getuser())
@@ -135,14 +135,14 @@ class TestJobName(TestCase):
     def test_empty_no_user(self):
         self.getuser_should_fail = True
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), 'no_user')
 
     def test_auto_label(self):
         runner = MRTwoStepJob(['--no-conf']).make_runner()
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'mr_two_step_job')
         self.assertEqual(match.group(2), getpass.getuser())
@@ -150,7 +150,7 @@ class TestJobName(TestCase):
     def test_auto_owner(self):
         os.environ['USER'] = 'mcp'
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), 'mcp')
@@ -160,7 +160,7 @@ class TestJobName(TestCase):
 
         os.environ['USER'] = 'mcp'
         runner = MRTwoStepJob(['--no-conf']).make_runner()
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'mr_two_step_job')
         self.assertEqual(match.group(2), 'mcp')
@@ -175,7 +175,7 @@ class TestJobName(TestCase):
     def test_owner_and_label_switches(self):
         runner_opts = ['--no-conf', '--owner=ads', '--label=ads_chain']
         runner = MRTwoStepJob(runner_opts).make_runner()
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'ads_chain')
         self.assertEqual(match.group(2), 'ads')
@@ -183,7 +183,7 @@ class TestJobName(TestCase):
     def test_owner_and_label_kwargs(self):
         runner = InlineMRJobRunner(conf_paths=[],
                                    owner='ads', label='ads_chain')
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'ads_chain')
         self.assertEqual(match.group(2), 'ads')

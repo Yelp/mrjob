@@ -36,17 +36,6 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
-# match the filename of a hadoop streaming jar
-HADOOP_STREAMING_JAR_RE = re.compile(
-    r'^hadoop.*streaming.*(?<!-sources)\.jar$')
-
-# match an mrjob job key (used to uniquely identify the job)
-JOB_KEY_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
-
-# match an mrjob step name (these are used to name steps in EMR)
-STEP_NAME_RE = re.compile(
-    r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+): Step (\d+) of (\d+)$')
-
 log = logging.getLogger(__name__)
 
 
@@ -55,15 +44,15 @@ log = logging.getLogger(__name__)
 
 # Used to parse the real netloc out of a malformed path from early Python 2.6
 # urlparse()
-NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
+_NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
 # Used to check if the candidate uri is actually a local windows path.
-WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
+_WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
 
 
 def is_windows_path(uri):
     """Return True if *uri* is a windows path."""
-    if WINPATH_RE.match(uri):
+    if _WINPATH_RE.match(uri):
         return True
     else:
         return False
@@ -123,7 +112,7 @@ def urlparse(urlstring, scheme='', allow_fragments=True, *args, **kwargs):
     (scheme, netloc, path, params, query, fragment) = (
         urlparse_buggy(urlstring, scheme, allow_fragments, *args, **kwargs))
     if netloc == '' and path.startswith('//'):
-        m = NETLOC_RE.match(path)
+        m = _NETLOC_RE.match(path)
         netloc = m.group(1)
         path = m.group(2)
     if allow_fragments and '#' in path and not fragment:
@@ -220,7 +209,7 @@ def parse_mr_job_stderr(stderr, counters=None):
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
 
-def find_python_traceback(lines):
+def _find_python_traceback(lines):
     """Scan subprocess stderr for Python traceback."""
     # Essentially, we detect the start of the traceback, and continue
     # until we find a non-indented line, with some special rules for exceptions
@@ -314,25 +303,25 @@ def _parse_progress_from_resource_manager(html_bytes):
 
 # sometimes AWS gives us seconds as a decimal, which we can't parse
 # with boto.utils.ISO8601
-SUBSECOND_RE = re.compile('\.[0-9]+')
+_SUBSECOND_RE = re.compile('\.[0-9]+')
 
 
 # Thu, 29 Mar 2012 04:55:44 GMT
-RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
+_RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
 
 
 # TODO: test this, now that it uses UTC time
 def iso8601_to_timestamp(iso8601_time):
-    iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
+    iso8601_time = _SUBSECOND_RE.sub('', iso8601_time)
     try:
         return calendar.timegm(time.strptime(iso8601_time, boto.utils.ISO8601))
     except ValueError:
-        return calendar.timegm(time.strptime(iso8601_time, RFC1123))
+        return calendar.timegm(time.strptime(iso8601_time, _RFC1123))
 
 
 def iso8601_to_datetime(iso8601_time):
-    iso8601_time = SUBSECOND_RE.sub('', iso8601_time)
+    iso8601_time = _SUBSECOND_RE.sub('', iso8601_time)
     try:
         return datetime.strptime(iso8601_time, boto.utils.ISO8601)
     except ValueError:
-        return datetime.strptime(iso8601_time, RFC1123)
+        return datetime.strptime(iso8601_time, _RFC1123)

@@ -20,7 +20,7 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.logs.counters import _format_counters
-from mrjob.parse import find_python_traceback
+from mrjob.parse import _find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.py2 import string_types
 from mrjob.sim import SimMRJobRunner
@@ -132,7 +132,7 @@ class LocalMRJobRunner(SimMRJobRunner):
             procs_args, output_path, working_dir, env)
         self._all_proc_dicts.extend(proc_dicts)
 
-    def per_step_runner_finish(self, step_num):
+    def _per_step_runner_finish(self, step_num):
         for proc_dict in self._all_proc_dicts:
             self._wait_for_process(proc_dict, step_num)
 
@@ -242,7 +242,7 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         stderr_lines = self._process_stderr_from_script(
             proc.stderr, step_num=step_num)
-        tb_lines = find_python_traceback(stderr_lines)
+        tb_lines = _find_python_traceback(stderr_lines)
 
         # proc.stdout isn't always defined
         if proc.stdout:

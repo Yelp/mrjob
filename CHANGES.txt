@@ -27,12 +27,12 @@ v0.5.0, 2015-??-?? -- ???
      * S3 Filesystem:
        * connect to each S3 bucket on appropriate endpoint (#1028)
          * fall back to default if we can't get bucket location (#1170)
-       * removed support for _$folder$ keys
+       * removed special treatment of _$folder$ keys
        * recurse "subdirectories" even if uri lacks trailing / (#1183)
      * removed iam_job_flow_role option (use iam_instance_profile)
      * custom hadoop_streaming_jar gets properly uploaded
      * 4.x AMIs are supported (#1105)
-       * added --release-label switch (--ami-version 4.0.0 also works)
+       * added --release-label switch (--ami-version 4.x.y also works)
      * don't try to clean up job when there's no cluster ID (#1170)
    * Hadoop
      * counters are parsed from Hadoop binary stderr in YARN (#1153)
@@ -44,9 +44,14 @@ v0.5.0, 2015-??-?? -- ???
      * fs.du() now works on YARN (#1155)
      * fs.du() now returns 0 for nonexistent files instead of erroring
      * fs.rm() now uses -skipTrash
+     * dropped support for Hadoop prior to 0.20.203 (#1208)
    * Inline/Local
      * runner.fs raises IOError if passed URIs (#1185)
  * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())
+ * removed mrjob.compat methods to support Hadoop prior to 0.20.203:
+   * supports_combiners_in_hadoop_streaming()
+   * supports_new_distributed_cache_options()
+   * uses_generic_jobconf()
  * removed mrjob.conf.combine_cmd_lists()
  * removed fetch-logs tool (#1127)
  * Python-version-specific mrjob commands (#1104)

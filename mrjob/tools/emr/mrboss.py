@@ -98,10 +98,10 @@ def main(cl_args=None):
 
     with EMRJobRunner(cluster_id=cluster_id, **runner_kwargs) as runner:
         runner._enable_slave_ssh_access()
-        run_on_all_nodes(runner, output_dir, cmd_args)
+        _run_on_all_nodes(runner, output_dir, cmd_args)
 
 
-def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
+def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     """Given an :py:class:`EMRJobRunner`, run the command specified by
     *cmd_args* on all nodes in the cluster and save the stdout and stderr of
     each run to subdirectories of *output_dir*.

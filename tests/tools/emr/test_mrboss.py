@@ -19,7 +19,7 @@ import shutil
 import tempfile
 
 from mrjob.emr import EMRJobRunner
-from mrjob.tools.emr.mrboss import run_on_all_nodes
+from mrjob.tools.emr.mrboss import _run_on_all_nodes
 from tests.mockssh import mock_ssh_file
 from tests.mockboto import MockBotoTestCase
 from tests.test_emr import BUCKET_URI
@@ -57,7 +57,7 @@ class MRBossTestCase(MockBotoTestCase):
     def test_one_node(self):
         mock_ssh_file('testmaster', 'some_file', b'file contents')
 
-        run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
+        _run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
                          print_stderr=False)
 
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
@@ -74,7 +74,7 @@ class MRBossTestCase(MockBotoTestCase):
 
         self.runner.fs  # force initialization of _ssh_fs
 
-        run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
+        _run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
                          print_stderr=False)
 
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:

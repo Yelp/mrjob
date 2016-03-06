@@ -25,10 +25,10 @@ from subprocess import PIPE
 
 from mrjob.py2 import to_string
 
-HADOOP_JOB_LIST_NUM_RE = re.compile(r'(\d+) jobs currently running')
+_HADOOP_JOB_LIST_NUM_RE = re.compile(r'(\d+) jobs currently running')
 # Fields: JobId, State, StartTime, UserName (hadoop), Priority, SchedulingInfo
 # We only care about JobId.
-HADOOP_JOB_LIST_INFO_RE = re.compile(r'(\S+)\s+\d+\s+\d+\s+hadoop\s+\w+\s+\w+')
+_HADOOP_JOB_LIST_INFO_RE = re.compile(r'(\S+)\s+\d+\s+\d+\s+hadoop\s+\w+\s+\w+')
 
 
 log = logging.getLogger(__name__)
@@ -197,7 +197,7 @@ def ssh_terminate_single_job(ssh_bin, address, ec2_key_pair_file):
         raise IOError('Could not read results of "hadoop job -list" and so'
                       ' could not terminate job:\n%s' % job_list_out)
 
-    num_jobs_match = HADOOP_JOB_LIST_NUM_RE.match(job_list_lines[0])
+    num_jobs_match = _HADOOP_JOB_LIST_NUM_RE.match(job_list_lines[0])
     if not num_jobs_match:
         job_list_output_error()
     if int(num_jobs_match.group(1)) > 1:
@@ -206,7 +206,7 @@ def ssh_terminate_single_job(ssh_bin, address, ec2_key_pair_file):
     if int(num_jobs_match.group(1)) == 0:
         return None
 
-    job_info_match = HADOOP_JOB_LIST_INFO_RE.match(job_list_lines[2])
+    job_info_match = _HADOOP_JOB_LIST_INFO_RE.match(job_list_lines[2])
     if not job_info_match:
         job_list_output_error()
     job_id = to_string(job_info_match.group(1))

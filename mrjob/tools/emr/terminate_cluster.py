@@ -66,7 +66,7 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
-    runner = EMRJobRunner(**runner_kwargs(options))
+    runner = EMRJobRunner(**_runner_kwargs(options))
     log.debug('Terminating cluster %s' % cluster_id)
     runner.make_emr_conn().terminate_jobflow(cluster_id)
     log.info('Terminated cluster %s' % cluster_id)
@@ -90,7 +90,7 @@ def _make_option_parser():
     return option_parser
 
 
-def runner_kwargs(options):
+def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'test'):
         del kwargs[unused_arg]

@@ -1873,7 +1873,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             try:
-                if not fs.can_handle_path('ssh:///'):
+                if not self.fs.can_handle_path('ssh:///'):
                     log.info(
                         'Waiting %d minutes for logs to transfer to S3...'
                         ' (ctrl-c to skip)\n\n'

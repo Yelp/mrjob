@@ -864,7 +864,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.info('Copying local files to %s...' % self._upload_mgr.prefix)
 
         for path, s3_uri in self._upload_mgr.path_to_uri().items():
-            log.info('  %s -> %s' % (path, s3_uri))
+            log.debug('  %s -> %s' % (path, s3_uri))
             self._upload_contents(s3_uri, path)
 
     def _upload_contents(self, s3_uri, path):

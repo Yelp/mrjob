@@ -1873,15 +1873,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             try:
+                log.info('Waiting %d minutes for logs to transfer to S3...'
+                         ' (ctrl-c to skip)' % _S3_LOG_WAIT_MINUTES)
+
                 if not self.fs.can_handle_path('ssh:///'):
                     log.info(
-                        'Waiting %d minutes for logs to transfer to S3...'
-                        ' (ctrl-c to skip)\n\n'
+                        '\n'
                         'To fetch logs immediately next time, set up SSH.'
                         ' See:\n'
                         'https://pythonhosted.org/mrjob/guides'
-                        '/emr-quickstart.html#configuring-ssh-credentials\n' %
-                        _S3_LOG_WAIT_MINUTES)
+                        '/emr-quickstart.html#configuring-ssh-credentials\n')
 
                 time.sleep(60 * _S3_LOG_WAIT_MINUTES)
             except KeyboardInterrupt:

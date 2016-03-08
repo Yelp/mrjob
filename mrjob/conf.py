@@ -155,12 +155,12 @@ def find_mrjob_conf():
         yield '/etc/mrjob.conf'
 
     for path in candidates():
-        log.debug('looking for configs in %s' % path)
+        log.debug('Looking for configs in %s' % path)
         if os.path.exists(path):
-            log.info('using configs in %s' % path)
+            log.info('Using configs in %s' % path)
             return path
     else:
-        log.info("no configs found; falling back on auto-configuration")
+        log.info('No configs found; falling back on auto-configuration')
         return None
 
 

@@ -672,7 +672,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # set s3_tmp_dir by checking for existing buckets
         if not self._opts['s3_tmp_dir']:
             self._set_s3_tmp_dir()
-            log.info('using %s as our temp dir on S3' %
+            log.info('Using %s as our temp dir on S3' %
                      self._opts['s3_tmp_dir'])
 
         self._opts['s3_tmp_dir'] = self._check_and_fix_s3_dir(
@@ -1153,7 +1153,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # Something happened with boto and the user should know.
             log.exception(e)
             return
-        log.info('cluster %s successfully terminated' % self._cluster_id)
+        log.info('Cluster %s successfully terminated' % self._cluster_id)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.

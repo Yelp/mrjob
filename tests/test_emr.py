@@ -3249,14 +3249,14 @@ class WaitForLogsOnS3TestCase(MockBotoTestCase):
 
         self.mock_sleep = self.start(patch('time.sleep'))
 
-    def assert_waits_five_minutes(self):
+    def assert_waits_ten_minutes(self):
         waited = set(self.runner._waited_for_logs_on_s3)
         step_num = len(self.runner._log_interpretations)
 
         self.runner._wait_for_logs_on_s3()
 
         self.assertTrue(self.mock_log.info.called)
-        self.mock_sleep.assert_called_once_with(300)
+        self.mock_sleep.assert_called_once_with(600)
 
         self.assertEqual(
             self.runner._waited_for_logs_on_s3,
@@ -3274,19 +3274,19 @@ class WaitForLogsOnS3TestCase(MockBotoTestCase):
 
     def test_starting(self):
         self.cluster.status.state = 'STARTING'
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
     def test_bootstrapping(self):
         self.cluster.status.state = 'BOOTSTRAPPING'
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
     def test_running(self):
         self.cluster.status.state = 'RUNNING'
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
     def test_waiting(self):
         self.cluster.status.state = 'WAITING'
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
     def test_terminating(self):
         self.cluster.status.state = 'TERMINATING'
@@ -3314,12 +3314,12 @@ class WaitForLogsOnS3TestCase(MockBotoTestCase):
         self.runner._wait_for_logs_on_s3()
 
         self.assertTrue(self.mock_log.info.called)
-        self.mock_sleep.assert_called_once_with(300)
+        self.mock_sleep.assert_called_once_with(600)
 
         # still shouldn't make user ctrl-c again
         self.assertEqual(self.runner._waited_for_logs_on_s3, set([0]))
 
-    def test_already_waited_five_minutes(self):
+    def test_already_waited_ten_minutes(self):
         self.runner._waited_for_logs_on_s3.add(0)
         self.assert_silently_exits()
 
@@ -3327,7 +3327,7 @@ class WaitForLogsOnS3TestCase(MockBotoTestCase):
         self.runner._waited_for_logs_on_s3.add(0)
         self.runner._log_interpretations.append({})
 
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
 
 class StreamLogDirsTestCase(MockBotoTestCase):

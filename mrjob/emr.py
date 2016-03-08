@@ -1756,17 +1756,25 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if uses_yarn(self.get_hadoop_version()):
             return []
 
+        if version_gte(self.get_ami_version(), '4'):
+            s3_dir_name = 'hadoop-mapreduce/history'
+        else:
+            s3_dir_name = 'jobs'
+
         return self._stream_log_dirs(
-            'history log', dir_name='history', s3_dir_name='jobs')
+            'history log', dir_name='history', s3_dir_name=s3_dir_name)
 
     def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Get lists of directories to look for the task logs in."""
-        if application_id:
-            dir_name = posixpath.join('userlogs', application_id)
-            s3_dir_name = posixpath.join('task-attempts', application_id)
+        dir_name = 'userlogs'
+        if version_gte(self.get_ami_version(), '4'):
+            s3_dir_name = 'containers'
         else:
-            dir_name = 'userlogs'
             s3_dir_name = 'task-attempts'
+
+        if application_id:
+            dir_name = posixpath.join(dir_name, application_id)
+            s3_dir_name = posixpath.join(s3_dir_name, application_id)
 
         return self._stream_log_dirs(
             'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)

@@ -33,13 +33,13 @@ from mrjob.emr import _4_X_INTERMEDIARY_JAR
 from mrjob.emr import _DEFAULT_AMI_VERSION
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
+from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
 from mrjob.emr import _yield_all_steps
-from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import filechunkio
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.job import MRJob
@@ -3341,6 +3341,10 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner._address_of_master',
             return_value='master'))
 
+        self.get_ami_version = self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_ami_version',
+            return_value=_DEFAULT_AMI_VERSION))
+
         self.get_hadoop_version = self.start(patch(
             'mrjob.emr.EMRJobRunner.get_hadoop_version',
             return_value='2.4.0'))
@@ -3362,10 +3366,13 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
         self.assertEqual(runner._stream_history_log_dirs(), [])
 
-    def _test_stream_history_log_dirs(self, ssh):
+    def _test_stream_history_log_dirs(
+            self, ssh, ami_version=_DEFAULT_AMI_VERSION,
+            expected_s3_dir_name='jobs'):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
         self.get_hadoop_version.return_value = '1.0.3'
+        self.get_ami_version.return_value = ami_version
 
         results = runner._stream_history_log_dirs()
 
@@ -3384,13 +3391,14 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self.log.info.reset_mock()
 
         self.assertEqual(next(results), [
-            's3://bucket/logs/j-CLUSTERID/jobs',
+            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
         ])
         self.assertTrue(
             self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
             'Looking for history log in'
-            ' s3://bucket/logs/j-CLUSTERID/jobs...')
+            ' s3://bucket/logs/j-CLUSTERID/' +
+            expected_s3_dir_name + '...')
 
         self.assertRaises(StopIteration, next, results)
 
@@ -3399,6 +3407,11 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def test_stream_history_log_dirs_without_ssh(self):
         self._test_stream_history_log_dirs(ssh=False)
+
+    def test_stream_history_log_dirs_from_4_x_amis(self):
+        self._test_stream_history_log_dirs(
+            ssh=True, ami_version='4.3.0',
+            expected_s3_dir_name='hadoop-mapreduce/history')
 
     def _test_stream_step_log_dirs(self, ssh):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
@@ -3438,36 +3451,51 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def test_stream_step_log_dirs_without_ssh(self):
         self._test_stream_step_log_dirs(ssh=False)
 
-    def _test_stream_task_log_dirs(self, ssh, bad_ssh_slave_hosts=False):
+    def _test_stream_task_log_dirs(
+            self, ssh, bad_ssh_slave_hosts=False, application_id=None,
+            ami_version=_DEFAULT_AMI_VERSION,
+            expected_local_path='/mnt/var/log/hadoop/userlogs',
+            expected_dir_name='userlogs',
+            expected_s3_dir_name='task-attempts'
+        ):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
         self.get_hadoop_version.return_value = '1.0.3'
+        self.get_ami_version.return_value = ami_version
 
         if bad_ssh_slave_hosts:
             self.ssh_slave_hosts.side_effect=IOError
 
-        results = runner._stream_task_log_dirs()
+        results = runner._stream_task_log_dirs(application_id=application_id)
 
         if ssh:
             self.log.reset_mock()
 
+            local_path = '/mnt/var/log/hadoop/userlogs'
+            if application_id:
+                local_path = posixpath.join(local_path, application_id)
+
             if bad_ssh_slave_hosts:
                 self.assertEqual(next(results), [
-                    'ssh://master/mnt/var/log/hadoop/userlogs',
+                    'ssh://master/mnt/var/log/hadoop/' + expected_dir_name,
                 ])
                 self.assertTrue(self.log.warning.called)
                 self.log.info.assert_called_once_with(
-                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
+                    'Looking for task logs in /mnt/var/log/hadoop/' +
+                    expected_dir_name +
                     ' on master...')
             else:
                 self.assertEqual(next(results), [
-                    'ssh://master/mnt/var/log/hadoop/userlogs',
-                    'ssh://master!slave1/mnt/var/log/hadoop/userlogs',
-                    'ssh://master!slave2/mnt/var/log/hadoop/userlogs',
+                    'ssh://master/mnt/var/log/hadoop/' + expected_dir_name,
+                    'ssh://master!slave1/mnt/var/log/hadoop/' +
+                    expected_dir_name,
+                    'ssh://master!slave2/mnt/var/log/hadoop/' +
+                    expected_dir_name,
                 ])
                 self.assertFalse(self.log.warning.called)
                 self.log.info.assert_called_once_with(
-                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
+                    'Looking for task logs in /mnt/var/log/hadoop/' +
+                    expected_dir_name +
                     ' on master and task/core nodes...')
 
             self.assertFalse(
@@ -3476,13 +3504,14 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self.log.reset_mock()
 
         self.assertEqual(next(results), [
-            's3://bucket/logs/j-CLUSTERID/task-attempts',
+            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
         ])
         self.assertTrue(
             self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
             'Looking for task logs in'
-            ' s3://bucket/logs/j-CLUSTERID/task-attempts...')
+            ' s3://bucket/logs/j-CLUSTERID/' +
+            expected_s3_dir_name + '...')
 
         self.assertRaises(StopIteration, next, results)
 
@@ -3494,6 +3523,20 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def test_stream_task_log_dirs_without_ssh(self):
         self._test_stream_task_log_dirs(ssh=False)
+
+    def test_stream_task_log_dirs_with_application_id(self):
+        self._test_stream_task_log_dirs(
+            ssh=True, application_id='application_1',
+            expected_dir_name='userlogs/application_1',
+            expected_s3_dir_name='task-attempts/application_1')
+
+    def test_stream_task_log_dirs_from_4_x_amis(self):
+        self._test_stream_task_log_dirs(
+            ssh=True, application_id='application_1',
+            ami_version='4.3.0',
+            expected_dir_name='userlogs/application_1',
+            expected_s3_dir_name='containers/application_1')
+
 
 
 class LsStepLogsTestCase(MockBotoTestCase):

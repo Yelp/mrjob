@@ -156,8 +156,10 @@ _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
 # we have to wait this many minutes for logs to transfer to S3 (or wait
-# for the cluster to terminate)
-_S3_LOG_WAIT_MINUTES = 5
+# for the cluster to terminate). Docs say logs are transferred every 5
+# minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
+# 5 minutes plus time to copy the logs, or something like that.
+_S3_LOG_WAIT_MINUTES = 10
 
 
 def s3_key_to_uri(s3_key):

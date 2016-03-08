@@ -1750,7 +1750,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
         if version_gte(self.get_ami_version(), '4'):
-            # currently denied access by the yarn user, see #1244
+            # denied access on some 4.x AMIs by the yarn user, see #1244
             dir_name = 'hadoop-mapreduce/history'
             s3_dir_name = 'hadoop-mapreduce/history'
         elif version_gte(self.get_ami_version(), '3'):
@@ -1770,7 +1770,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Get lists of directories to look for the task logs in."""
         if version_gte(self.get_ami_version(), '4'):
-            # currently denied access by the yarn user, see #1244
+            # denied access on some 4.x AMIs by the yarn user, see #1244
             dir_name = 'hadoop-yarn/containers'
             s3_dir_name = 'containers'
         else:

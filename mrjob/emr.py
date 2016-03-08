@@ -122,8 +122,8 @@ _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '4': dict(name='resource manager', path='/cluster', port=8088),
 }
 
-# if we SSH into a node, default place to look for Hadoop logs
-_EMR_HADOOP_LOG_DIR = '/mnt/var/log/hadoop'
+# if we SSH into a node, default place to look for logs
+_EMR_LOG_DIR = '/mnt/var/log'
 
 # EMR's hard limit on number of steps in a cluster
 _MAX_STEPS_PER_CLUSTER = 256
@@ -156,8 +156,10 @@ _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
 # we have to wait this many minutes for logs to transfer to S3 (or wait
-# for the cluster to terminate)
-_S3_LOG_WAIT_MINUTES = 5
+# for the cluster to terminate). Docs say logs are transferred every 5
+# minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
+# 5 minutes plus time to copy the logs, or something like that.
+_S3_LOG_WAIT_MINUTES = 10
 
 
 def s3_key_to_uri(s3_key):
@@ -670,7 +672,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # set s3_tmp_dir by checking for existing buckets
         if not self._opts['s3_tmp_dir']:
             self._set_s3_tmp_dir()
-            log.info('using %s as our temp dir on S3' %
+            log.info('Using %s as our temp dir on S3' %
                      self._opts['s3_tmp_dir'])
 
         self._opts['s3_tmp_dir'] = self._check_and_fix_s3_dir(
@@ -698,8 +700,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 s3_location_constraint_for_region(self._opts['aws_region'])):
 
                 # Regions are both specified and match
-                log.info("using existing temp bucket %s" %
-                         tmp_bucket_name)
+                log.debug("using existing temp bucket %s" %
+                          tmp_bucket_name)
                 self._opts['s3_tmp_dir'] = ('s3://%s/tmp/' %
                                                 tmp_bucket_name)
                 return
@@ -707,7 +709,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # That may have all failed. If so, pick a name.
         tmp_bucket_name = 'mrjob-' + random_identifier()
         self._s3_tmp_bucket_to_create = tmp_bucket_name
-        log.info("creating new temp bucket %s" % tmp_bucket_name)
+        log.debug("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
 
     def _s3_log_dir(self):
@@ -724,8 +726,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _create_s3_tmp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
         if self._s3_tmp_bucket_to_create:
-            log.info('creating S3 bucket %r to use as temp space' %
-                     self._s3_tmp_bucket_to_create)
+            log.debug('creating S3 bucket %r to use as temp space' %
+                      self._s3_tmp_bucket_to_create)
             location = s3_location_constraint_for_region(
                 self._opts['aws_region'])
             self.fs.create_bucket(
@@ -861,10 +863,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Copy local files tracked by self._upload_mgr to S3."""
         self._create_s3_tmp_bucket_if_needed()
 
-        log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
+        log.info('Copying local files to %s...' % self._upload_mgr.prefix)
 
         for path, s3_uri in self._upload_mgr.path_to_uri().items():
-            log.debug('uploading %s -> %s' % (path, s3_uri))
+            log.debug('  %s -> %s' % (path, s3_uri))
             self._upload_contents(s3_uri, path)
 
     def _upload_contents(self, s3_uri, path):
@@ -1151,13 +1153,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # Something happened with boto and the user should know.
             log.exception(e)
             return
-        log.info('cluster %s successfully terminated' % self._cluster_id)
+        log.info('Cluster %s successfully terminated' % self._cluster_id)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.
         """
-        log.info('Waiting %.1fs for S3 eventual consistency' %
-                 self._opts['s3_sync_wait_time'])
+        log.debug('Waiting %.1fs for S3 eventual consistency...' %
+                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
     def _cluster_is_done(self, cluster):
@@ -1225,7 +1227,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # make sure we can see the files we copied to S3
         self._wait_for_s3_eventual_consistency()
 
-        log.info('Creating Elastic MapReduce cluster')
+        log.debug('Creating Elastic MapReduce cluster')
         args = self._cluster_args(persistent, steps)
 
         emr_conn = self.make_emr_conn()
@@ -1238,7 +1240,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
          # keep track of when we started our job
         self._emr_job_start = time.time()
 
-        log.info('Cluster created with ID: %s' % cluster_id)
+        log.debug('Cluster created with ID: %s' % cluster_id)
 
         # set EMR tags for the cluster, if any
         tags = self._opts['emr_tags']
@@ -1506,8 +1508,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._cluster_id:
             self._cluster_id = self._create_cluster(
                 persistent=False)
-            log.info('Created new cluster %s' %
-                     self._cluster_id)
+            log.info('Created new cluster %s' % self._cluster_id)
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
@@ -1748,29 +1749,43 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
-        # in YARN, the history log lives on HDFS, which we currently
-        # don't have a way to access (see #990 for a possible solution), and
-        # isn't copied to S3
-        #
-        # Fortunately, in YARN, everything we want is in the step
-        # log anyway.
-        if uses_yarn(self.get_hadoop_version()):
-            return []
+        if version_gte(self.get_ami_version(), '4'):
+            # denied access on some 4.x AMIs by the yarn user, see #1244
+            dir_name = 'hadoop-mapreduce/history'
+            s3_dir_name = 'hadoop-mapreduce/history'
+        elif version_gte(self.get_ami_version(), '3'):
+            # on the 3.x AMIs, the history log lives inside HDFS and isn't
+            # copied to S3. We don't need it anyway; everything relevant
+            # is in the step log
+            return iter([])
+        else:
+            dir_name = 'hadoop/history'
+            s3_dir_name = 'jobs'
 
         return self._stream_log_dirs(
-            'history log', dir_name='history', s3_dir_name='jobs')
+            'history log',
+            dir_name=dir_name,
+            s3_dir_name=s3_dir_name)
 
     def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Get lists of directories to look for the task logs in."""
-        if application_id:
-            dir_name = posixpath.join('userlogs', application_id)
-            s3_dir_name = posixpath.join('task-attempts', application_id)
+        if version_gte(self.get_ami_version(), '4'):
+            # denied access on some 4.x AMIs by the yarn user, see #1244
+            dir_name = 'hadoop-yarn/containers'
+            s3_dir_name = 'containers'
         else:
-            dir_name = 'userlogs'
+            dir_name = 'hadoop/userlogs'
             s3_dir_name = 'task-attempts'
 
+        if application_id:
+            dir_name = posixpath.join(dir_name, application_id)
+            s3_dir_name = posixpath.join(s3_dir_name, application_id)
+
         return self._stream_log_dirs(
-            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
+            'task logs',
+            dir_name=dir_name,
+            s3_dir_name=s3_dir_name,
+            ssh_to_slaves=True)  # TODO: does this make sense on YARN?
 
     def _get_step_log_interpretation(self, log_interpretation):
         """Fetch and interpret the step log."""
@@ -1792,10 +1807,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _stream_step_log_dirs(self, step_id):
         """Get lists of directories to look for the step log in."""
-        dir_name = posixpath.join('steps', step_id)
-        return self._stream_log_dirs('step log', dir_name)
+        return self._stream_log_dirs(
+            'step log',
+            dir_name=posixpath.join('hadoop', 'steps', step_id),
+            s3_dir_name=posixpath.join('steps', step_id))
 
-    def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name=None,
+    def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name,
                          ssh_to_slaves=False):
         """Stream log dirs for any kind of log.
 
@@ -1819,7 +1836,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         log.warning('Could not get slave addresses for %s' %
                                     ssh_host)
 
-                path = posixpath.join(_EMR_HADOOP_LOG_DIR, dir_name)
+                path = posixpath.join(_EMR_LOG_DIR, dir_name)
                 log.info('Looking for %s in %s on %s...' % (
                     log_desc, path, host_desc))
                 yield ['ssh://%s%s%s' % (
@@ -1856,13 +1873,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             try:
-                log.info(
-                    'Waiting %d minutes for logs to transfer to S3...'
-                    ' (ctrl-c to skip)\n\n'
-                    'To fetch logs immediately next time, set up SSH. See:\n'
-                    'https://pythonhosted.org/mrjob/guides'
-                    '/emr-quickstart.html#configuring-ssh-credentials\n' %
-                    _S3_LOG_WAIT_MINUTES)
+                log.info('Waiting %d minutes for logs to transfer to S3...'
+                         ' (ctrl-c to skip)' % _S3_LOG_WAIT_MINUTES)
+
+                if not self.fs.can_handle_path('ssh:///'):
+                    log.info(
+                        '\n'
+                        'To fetch logs immediately next time, set up SSH.'
+                        ' See:\n'
+                        'https://pythonhosted.org/mrjob/guides'
+                        '/emr-quickstart.html#configuring-ssh-credentials\n')
 
                 time.sleep(60 * _S3_LOG_WAIT_MINUTES)
             except KeyboardInterrupt:
@@ -1951,7 +1971,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
         path = os.path.join(self._get_local_tmp_dir(), 'b.py')
-        log.info('writing master bootstrap script to %s' % path)
+        log.debug('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
@@ -2381,7 +2401,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         end_time = now + timedelta(minutes=max_wait_time)
         time_sleep = timedelta(seconds=_POOLING_SLEEP_INTERVAL)
 
-        log.info("Attempting to find an available cluster...")
+        log.info('Attempting to find an available cluster...')
         while now <= end_time:
             cluster_info_list = self._usable_clusters(
                 emr_conn=emr_conn,
@@ -2402,8 +2422,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # Reset the exclusion set since it is possible to reclaim a
                 # lock that was previously unavailable.
                 exclude = set()
-                log.info("No clusters available in pool '%s'. Checking again"
-                         " in %d seconds." % (
+                log.info('No clusters available in pool %r. Checking again'
+                         ' in %d seconds.' % (
                              self._opts['pool_name'],
                              int(_POOLING_SLEEP_INTERVAL)))
                 time.sleep(_POOLING_SLEEP_INTERVAL)

@@ -663,7 +663,7 @@ class MRJobRunner(object):
         cleaned up by self.cleanup()"""
         if not self._local_tmp_dir:
             path = os.path.join(self._opts['local_tmp_dir'], self._job_key)
-            log.info('creating tmp directory %s' % path)
+            log.info('Creating temp directory %s' % path)
             if os.path.isdir(path):
                 shutil.rmtree(path)
             os.makedirs(path)

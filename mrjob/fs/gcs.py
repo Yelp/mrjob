@@ -14,18 +14,16 @@
 # limitations under the License.
 import fnmatch
 import logging
-import posixpath
-import socket
 
 # from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
 from mrjob.parse import urlparse
-from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
-from mrjob.util import read_file
+
 
 from apiclient import discovery
 from oauth2client.client import GoogleCredentials
+from apiclient.http import MediaIoBaseDownload
 from apiclient import http
 import io
 import json
@@ -33,6 +31,7 @@ import base64
 import binascii
 
 log = logging.getLogger(__name__)
+
 
 class GCSFilesystem(Filesystem):
     """Filesystem for Google Cloud Storage (GCS) URIs. Typically you will get one of these via
@@ -115,12 +114,22 @@ class GCSFilesystem(Filesystem):
             raise Exception("path for md5 sum doesn't resolve to single object" + path)
 
     def _cat_file(self, filename):
-        # TODO: implement this for GCS
-        # stream lines from the s3 key
-        s3_key = self.get_s3_key(filename)
-        # yields_lines=False: warn read_file that s3_key yields chunks of bytes
-        return read_file(
-            s3_key_to_uri(s3_key), fileobj=s3_key, yields_lines=False)
+        bucket_name, object_name = parse_gcs_uri(filename)
+        req = self.service.objects().get_media(bucket=bucket_name, object=object_name)
+        fh = io.BytesIO()
+        downloader = MediaIoBaseDownload(fh, req, chunksize=1024*1024)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+            if status:
+                log.info("Download %d%%." % int(status.progress() * 100))
+            log.info("Download Complete for " + filename)
+        """ TODO: So, at this point we have the file content as you can see it using fh.getvalue().
+        But rather than re-implementing the decompression logic (to deal with compressed files) I'd rather
+        use the same read_file() method (in util.py) that the S3 and local versions are using.
+        But I can't figure out how to build the right file object to pass it to read_file().
+        Help appreciated.
+        """
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on GCS because there are

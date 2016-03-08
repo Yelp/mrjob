@@ -3361,17 +3361,12 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner'
             '._wait_for_logs_on_s3'))
 
-    def test_cant_stream_history_log_dirs_in_yarn(self):
-        runner = EMRJobRunner()
-
-        self.assertEqual(runner._stream_history_log_dirs(), [])
-
     def _test_stream_history_log_dirs(
             self, ssh, ami_version=_DEFAULT_AMI_VERSION,
+            expected_dir_name='hadoop/history',
             expected_s3_dir_name='jobs'):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
-        self.get_hadoop_version.return_value = '1.0.3'
         self.get_ami_version.return_value = ami_version
 
         results = runner._stream_history_log_dirs()
@@ -3380,13 +3375,13 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             self.log.info.reset_mock()
 
             self.assertEqual(next(results), [
-                'ssh://master/mnt/var/log/hadoop/history',
+                'ssh://master/mnt/var/log/' + expected_dir_name,
             ])
             self.assertFalse(
                 self._wait_for_logs_on_s3.called)
             self.log.info.assert_called_once_with(
-                'Looking for history log in /mnt/var/log/hadoop/history'
-                ' on master...')
+                'Looking for history log in /mnt/var/log/' +
+                expected_dir_name + ' on master...')
 
         self.log.info.reset_mock()
 
@@ -3402,15 +3397,23 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
         self.assertRaises(StopIteration, next, results)
 
-    def test_stream_history_log_dirs_with_ssh(self):
-        self._test_stream_history_log_dirs(ssh=True)
+    def test_stream_history_log_dirs_from_2_x_amis_with_ssh(self):
+        self._test_stream_history_log_dirs(
+            ami_version='2.4.11', ssh=True)
 
-    def test_stream_history_log_dirs_without_ssh(self):
-        self._test_stream_history_log_dirs(ssh=False)
+    def test_stream_history_log_dirs_from_2_x_amis_with_ssh(self):
+        self._test_stream_history_log_dirs(
+            ami_version='2.4.11', ssh=False)
+
+    def test_cant_stream_history_log_dirs_from_3_x_amis(self):
+        runner = EMRJobRunner()
+        results = runner._stream_history_log_dirs()
+        self.assertRaises(StopIteration, next, results)
 
     def test_stream_history_log_dirs_from_4_x_amis(self):
         self._test_stream_history_log_dirs(
             ssh=True, ami_version='4.3.0',
+            expected_dir_name='hadoop-mapreduce/history',
             expected_s3_dir_name='hadoop-mapreduce/history')
 
     def _test_stream_step_log_dirs(self, ssh):
@@ -3455,7 +3458,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             self, ssh, bad_ssh_slave_hosts=False, application_id=None,
             ami_version=_DEFAULT_AMI_VERSION,
             expected_local_path='/mnt/var/log/hadoop/userlogs',
-            expected_dir_name='userlogs',
+            expected_dir_name='hadoop/userlogs',
             expected_s3_dir_name='task-attempts'
         ):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
@@ -3477,26 +3480,22 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
             if bad_ssh_slave_hosts:
                 self.assertEqual(next(results), [
-                    'ssh://master/mnt/var/log/hadoop/' + expected_dir_name,
+                    'ssh://master/mnt/var/log/' + expected_dir_name,
                 ])
                 self.assertTrue(self.log.warning.called)
                 self.log.info.assert_called_once_with(
-                    'Looking for task logs in /mnt/var/log/hadoop/' +
-                    expected_dir_name +
-                    ' on master...')
+                    'Looking for task logs in /mnt/var/log/' +
+                    expected_dir_name + ' on master...')
             else:
                 self.assertEqual(next(results), [
-                    'ssh://master/mnt/var/log/hadoop/' + expected_dir_name,
-                    'ssh://master!slave1/mnt/var/log/hadoop/' +
-                    expected_dir_name,
-                    'ssh://master!slave2/mnt/var/log/hadoop/' +
-                    expected_dir_name,
+                    'ssh://master/mnt/var/log/' + expected_dir_name,
+                    'ssh://master!slave1/mnt/var/log/' + expected_dir_name,
+                    'ssh://master!slave2/mnt/var/log/' + expected_dir_name,
                 ])
                 self.assertFalse(self.log.warning.called)
                 self.log.info.assert_called_once_with(
-                    'Looking for task logs in /mnt/var/log/hadoop/' +
-                    expected_dir_name +
-                    ' on master and task/core nodes...')
+                    'Looking for task logs in /mnt/var/log/' +
+                    expected_dir_name + ' on master and task/core nodes...')
 
             self.assertFalse(
                 self._wait_for_logs_on_s3.called)
@@ -3527,14 +3526,14 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def test_stream_task_log_dirs_with_application_id(self):
         self._test_stream_task_log_dirs(
             ssh=True, application_id='application_1',
-            expected_dir_name='userlogs/application_1',
+            expected_dir_name='hadoop/userlogs/application_1',
             expected_s3_dir_name='task-attempts/application_1')
 
     def test_stream_task_log_dirs_from_4_x_amis(self):
         self._test_stream_task_log_dirs(
             ssh=True, application_id='application_1',
             ami_version='4.3.0',
-            expected_dir_name='userlogs/application_1',
+            expected_dir_name='hadoop-yarn/containers/application_1',
             expected_s3_dir_name='containers/application_1')
 
 

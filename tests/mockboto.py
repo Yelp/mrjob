@@ -37,7 +37,7 @@ except ImportError:
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_values
-from mrjob.emr import _EMR_HADOOP_LOG_DIR
+from mrjob.emr import _EMR_LOG_DIR
 from mrjob.emr import EMRJobRunner
 from mrjob.parse import _RFC1123
 from mrjob.parse import is_s3_uri
@@ -194,7 +194,7 @@ class MockBotoTestCase(SandboxedTestCase):
         # Create temporary directories and add them to MOCK_SSH_ROOTS
         master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
         os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % master_ssh_root
-        mock_ssh_dir('testmaster', _EMR_HADOOP_LOG_DIR + '/history')
+        mock_ssh_dir('testmaster', _EMR_LOG_DIR + '/hadoop/history')
 
         if not hasattr(self, 'slave_ssh_roots'):
             self.slave_ssh_roots = []

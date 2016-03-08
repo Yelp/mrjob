@@ -122,8 +122,8 @@ _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '4': dict(name='resource manager', path='/cluster', port=8088),
 }
 
-# if we SSH into a node, default place to look for Hadoop logs
-_EMR_HADOOP_LOG_DIR = '/mnt/var/log/hadoop'
+# if we SSH into a node, default place to look for logs
+_EMR_LOG_DIR = '/mnt/var/log'
 
 # EMR's hard limit on number of steps in a cluster
 _MAX_STEPS_PER_CLUSTER = 256
@@ -1749,29 +1749,30 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
-        # in YARN, the history log lives on HDFS, which we currently
-        # don't have a way to access (see #990 for a possible solution), and
-        # isn't copied to S3
-        #
-        # Fortunately, in YARN, everything we want is in the step
-        # log anyway.
-        if uses_yarn(self.get_hadoop_version()):
-            return []
-
         if version_gte(self.get_ami_version(), '4'):
+            dir_name = 'hadoop-mapreduce/history'
             s3_dir_name = 'hadoop-mapreduce/history'
+        elif version_gte(self.get_ami_version(), '3'):
+            # on the 3.x AMIs, the history log lives inside HDFS and isn't
+            # copied to S3. We don't need it anyway; everything relevant
+            # is in the step log
+            return iter([])
         else:
+            dir_name = 'hadoop/history'
             s3_dir_name = 'jobs'
 
         return self._stream_log_dirs(
-            'history log', dir_name='history', s3_dir_name=s3_dir_name)
+            'history log',
+            dir_name=dir_name,
+            s3_dir_name=s3_dir_name)
 
     def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Get lists of directories to look for the task logs in."""
-        dir_name = 'userlogs'
         if version_gte(self.get_ami_version(), '4'):
+            dir_name = 'hadoop-yarn/containers'
             s3_dir_name = 'containers'
         else:
+            dir_name = 'hadoop/userlogs'
             s3_dir_name = 'task-attempts'
 
         if application_id:
@@ -1779,7 +1780,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_dir_name = posixpath.join(s3_dir_name, application_id)
 
         return self._stream_log_dirs(
-            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
+            'task logs',
+            dir_name=dir_name,
+            s3_dir_name=s3_dir_name,
+            ssh_to_slaves=True)  # TODO: does this make sense on YARN?
 
     def _get_step_log_interpretation(self, log_interpretation):
         """Fetch and interpret the step log."""
@@ -1801,10 +1805,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _stream_step_log_dirs(self, step_id):
         """Get lists of directories to look for the step log in."""
-        dir_name = posixpath.join('steps', step_id)
-        return self._stream_log_dirs('step log', dir_name)
+        return self._stream_log_dirs(
+            'step log',
+            dir_name=posixpath.join('hadoop', 'steps', step_id),
+            s3_dir_name=posixpath.join('steps', step_id))
 
-    def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name=None,
+    def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name,
                          ssh_to_slaves=False):
         """Stream log dirs for any kind of log.
 
@@ -1828,7 +1834,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         log.warning('Could not get slave addresses for %s' %
                                     ssh_host)
 
-                path = posixpath.join(_EMR_HADOOP_LOG_DIR, dir_name)
+                path = posixpath.join(_EMR_LOG_DIR, dir_name)
                 log.info('Looking for %s in %s on %s...' % (
                     log_desc, path, host_desc))
                 yield ['ssh://%s%s%s' % (

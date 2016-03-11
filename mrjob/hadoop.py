@@ -625,7 +625,7 @@ def _log_line_from_hadoop(line, level=None):
 def _log_record_from_hadoop(record):
     """Log log4j record parsed from hadoop stderr."""
     if _is_counter_log4j_record(record):
-        log.info('(parsing counters)')
+        log.info('  (parsing counters)')
     else:
         level = getattr(logging, record.get('level') or '', None)
         _log_line_from_hadoop(record['message'], level=level)

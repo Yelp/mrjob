@@ -496,8 +496,7 @@ class SimMRJobRunner(MRJobRunner):
             ','.join(cache_local_archives))
 
         # task and attempt IDs
-        # TODO: these are a crappy imitation of task/attempt IDs
-        #       see mrjob.logs.ids for examples
+        # TODO: these are a crappy imitation of task/attempt IDs (see #1254)
         j['mapreduce.task.id'] = 'task_%s_%s_%04d%d' % (
             self._job_key, step_type.lower(), step_num, task_num)
         # (we only have one attempt)

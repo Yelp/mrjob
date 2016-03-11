@@ -1950,6 +1950,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._opts['bootstrap_python']:
             return []
 
+        # apt-get no longer works on 2.x AMIs
+        if not (version_get(self._opts['ami_version'], '3')):
+            return []
+
         if PY2:
             # Python 2 is already installed; install pip and ujson
 
@@ -1957,8 +1961,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # but there's no harm in running these commands twice, and
             # bootstrap_python_packages is deprecated anyway.)
             return [
-                ['sudo apt-get install -y python-pip || '
-                 'sudo yum install -y python-pip'],
+                ['sudo yum install -y python-pip'],
                 ['sudo pip install --upgrade ujson'],
             ]
         else:
@@ -1999,21 +2002,25 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
             if PY2:
-                log.warning(
-                    "bootstrap_python_packages is deprecated since v0.4.2 and"
-                    " will be removed in v0.6.0. Consider using bootstrap"
-                    " instead.")
+                if version_gte(self._opts['ami_version'], '3'):
+                    log.warning(
+                        'bootstrap_python_packages is deprecated since v0.4.2'
+                        ' and will be removed in v0.6.0. Consider using'
+                        ' bootstrap instead.')
 
-                # this works on any AMI version
-                bootstrap.append(['sudo apt-get install -y python-pip || '
-                                  'sudo yum install -y python-pip'])
+                    bootstrap.append(['sudo yum install -y python-pip'])
 
-                for path in self._opts['bootstrap_python_packages']:
-                    path_dict = parse_legacy_hash_path('file', path)
-                    # don't worry about inspecting the tarball; pip is smart
-                    # enough to deal with that
-                    bootstrap.append(['sudo pip install ', path_dict])
-
+                    for path in self._opts['bootstrap_python_packages']:
+                        path_dict = parse_legacy_hash_path('file', path)
+                        # don't worry about inspecting the tarball; pip is
+                        # smart enough to deal with that
+                        bootstrap.append(['sudo pip install ', path_dict])
+                else:
+                    log.warning(
+                        'bootstrap_python_packages is deprecated and is no'
+                        ' longer supported on the 2.x AMIs. See'
+                        ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                        '-cookbook.html#using-pip for an alternative.')
             else:
                 log.warning(
                     'bootstrap_python_packages is deprecated and is not'

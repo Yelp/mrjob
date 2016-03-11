@@ -172,6 +172,9 @@ class SimMRJobRunner(MRJobRunner):
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
+            log.info('Running step %d of %d...' % (
+                step_num + 1, self._num_steps()))
+
             self._check_step_works_with_runner(step)
             self._counters.append({})
 
@@ -193,7 +196,7 @@ class SimMRJobRunner(MRJobRunner):
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
             final_outfile = os.path.join(self._output_dir, 'part-%05d' % i)
-            log.info('Moving %s -> %s' % (outfile, final_outfile))
+            log.debug('Moving %s -> %s' % (outfile, final_outfile))
             shutil.move(outfile, final_outfile)
 
     def _invoke_step(self, step_num, step_type):
@@ -259,7 +262,7 @@ class SimMRJobRunner(MRJobRunner):
             output_path = os.path.join(
                 self._get_local_tmp_dir(),
                 outfile_prefix + '_part-%05d' % task_num)
-            log.info('writing to %s' % output_path)
+            log.debug('Writing to %s' % output_path)
 
             self._run_step(step_num, step_type, input_path, output_path,
                            working_dir, env)

@@ -226,7 +226,7 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         :return: dict(proc=Popen, args=[process args], write_to=file)
         """
-        log.info('> %s > %s' % (' | '.join(
+        log.debug('> %s > %s' % (' | '.join(
             args if isinstance(args, string_types) else cmd_line(args)
             for args in procs_args), output_path))
 
@@ -284,10 +284,10 @@ class LocalMRJobRunner(SimMRJobRunner):
             # in practice there's only going to be at most one line in
             # one of these lists, but the code is cleaner this way
             for status in parsed['statuses']:
-                log.info('status: %s' % status)
+                log.info('Status: %s' % status)
 
             for line in parsed['other']:
-                log.error('STDERR: %s' % line.rstrip('\r\n'))
+                log.debug('STDERR: %s' % line.rstrip('\r\n'))
                 yield line
 
     def _default_python_bin(self, local=False):

@@ -481,7 +481,7 @@ class MRJobRunner(object):
                 'WARNING! Trying to stream output from a closed runner, output'
                 ' will probably be empty.')
 
-        log.info('Streaming final output from %s' % output_dir)
+        log.info('Streaming final output from %s...' % output_dir)
 
         def split_path(path):
             while True:
@@ -519,7 +519,7 @@ class MRJobRunner(object):
         This won't remove output_dir if it's outside of our tmp dir.
         """
         if self._local_tmp_dir:
-            log.info('removing tmp directory %s' % self._local_tmp_dir)
+            log.info('Removing tmp directory %s...' % self._local_tmp_dir)
             try:
                 shutil.rmtree(self._local_tmp_dir)
             except OSError as e:
@@ -929,7 +929,7 @@ class MRJobRunner(object):
             return
 
         path = os.path.join(self._get_local_tmp_dir(), dest)
-        log.info('writing wrapper script to %s' % path)
+        log.debug('Writing wrapper script to %s' % path)
 
         contents = self._setup_wrapper_script_content(setup)
         for line in contents:
@@ -1266,7 +1266,7 @@ class MRJobRunner(object):
         env['TMPDIR'] = self._opts['local_tmp_dir']
         env['TEMP'] = self._opts['local_tmp_dir']
 
-        log.info('writing to %s' % output_path)
+        log.debug('Writing to %s' % output_path)
 
         err_path = os.path.join(self._get_local_tmp_dir(), 'sort-stderr')
 
@@ -1275,7 +1275,7 @@ class MRJobRunner(object):
             with open(output_path, 'wb') as output:
                 with open(err_path, 'wb') as err:
                     args = ['sort'] + list(input_paths)
-                    log.info('> %s' % cmd_line(args))
+                    log.debug('> %s' % cmd_line(args))
                     try:
                         check_call(args, stdout=output, stderr=err, env=env)
                         return
@@ -1285,11 +1285,11 @@ class MRJobRunner(object):
         # Looks like we're using Windows sort
         self._sort_is_windows_sort = True
 
-        log.info('Piping files into sort for Windows compatibility')
+        log.debug('Piping files into sort for Windows compatibility')
         with open(output_path, 'wb') as output:
             with open(err_path, 'wb') as err:
                 args = ['sort']
-                log.info('> %s' % cmd_line(args))
+                log.debug('> %s' % cmd_line(args))
                 proc = Popen(args, stdin=PIPE, stdout=output, stderr=err,
                              env=env)
 

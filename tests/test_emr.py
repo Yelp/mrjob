@@ -3001,9 +3001,8 @@ class BootstrapPythonTestCase(MockBotoTestCase):
 
     if PY2:
         EXPECTED_BOOTSTRAP = [
-            ['sudo apt-get install -y python-pip || '
-             'sudo yum install -y python-pip'],
-             ['sudo pip install --upgrade ujson']]
+            ['sudo yum install -y python-pip'],
+            ['sudo pip install --upgrade ujson']]
     else:
         EXPECTED_BOOTSTRAP = [['sudo yum install -y python34']]
 
@@ -3033,8 +3032,8 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             self.assertEqual(runner._bootstrap_python(), [])
             self.assertEqual(runner._bootstrap, [])
 
-    def _test_old_ami_version(self, ami_version):
-        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', ami_version])
+    def test_ami_version_3_6_0(self):
+        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', '3.6.0'])
 
         with no_handlers_for_logger('mrjob.emr'):
             stderr = StringIO()
@@ -3050,11 +3049,19 @@ class BootstrapPythonTestCase(MockBotoTestCase):
                 if not PY2:
                     self.assertIn('will probably not work', stderr.getvalue())
 
-    def test_ami_version_3_6_0(self):
-        self._test_old_ami_version('3.6.0')
+    def _test_2_x_ami(self, ami_version):
+        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', ami_version])
+
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._opts['bootstrap_python'], True)
+            self.assertEqual(runner._bootstrap_python(), [])
+            self.assertEqual(runner._bootstrap, [])
+
+    def test_ami_version_2_4_11(self):
+        self._test_2_x_ami('2.4.11')
 
     def test_ami_version_latest(self):
-        self._test_old_ami_version('latest')
+        self._test_2_x_ami('latest')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])

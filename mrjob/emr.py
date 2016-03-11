@@ -1951,7 +1951,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return []
 
         # apt-get no longer works on 2.x AMIs
-        if not (version_gte(self._opts['ami_version'], '3')):
+        if (self._opts['ami_version'] == 'latest' or
+            not version_gte(self._opts['ami_version'], '3')):
             return []
 
         if PY2:
@@ -2002,7 +2003,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
             if PY2:
-                if version_gte(self._opts['ami_version'], '3'):
+                if (self._opts['ami_version'] != 'latest' and
+                    version_gte(self._opts['ami_version'], '3')):
+
                     log.warning(
                         'bootstrap_python_packages is deprecated since v0.4.2'
                         ' and will be removed in v0.6.0. Consider using'

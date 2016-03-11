@@ -1951,7 +1951,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return []
 
         # apt-get no longer works on 2.x AMIs
-        if not (version_get(self._opts['ami_version'], '3')):
+        if not (version_gte(self._opts['ami_version'], '3')):
             return []
 
         if PY2:

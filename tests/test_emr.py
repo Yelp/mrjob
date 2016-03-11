@@ -1272,7 +1272,7 @@ class TestNoBoto(TestCase):
         self.assertRaises(ImportError, EMRJobRunner, conf_paths=[])
 
 
-class TestMasterBootstrapScript(MockBotoTestCase):
+class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_usr_bin_env(self):
         runner = EMRJobRunner(conf_paths=[],
@@ -1289,7 +1289,8 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
-    def test_create_master_bootstrap_script(self):
+    def _test_create_master_bootstrap_script(
+            self, ami_version=None, expect_bootstrap_python_packages=PY2):
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
         with open(foo_py_path, 'w'):
@@ -1300,6 +1301,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
+                              ami_version=ami_version,
                               bootstrap=[
                                   PYTHON_BIN + ' ' +
                                   foo_py_path + '#bar.py',
@@ -1341,7 +1343,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         assertScriptDownloads(runner._mrjob_tar_gz_path)
         assertScriptDownloads('speedups.sh')
         assertScriptDownloads('/tmp/s.sh')
-        if PY2:
+        if expect_bootstrap_python_packages:
             assertScriptDownloads(yelpy_tar_gz_path)
 
         # check scripts get run
@@ -1364,13 +1366,23 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
-        if PY2:
-            self.assertIn('sudo apt-get install -y python-pip || '
-                          'sudo yum install -y python-pip', lines)
+        if expect_bootstrap_python_packages:
+            self.assertIn('sudo yum install -y python-pip', lines)
             self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)
         self.assertIn('$__mrjob_PWD/s.sh', lines)
+
+    def test_create_master_bootstrap_script(self):
+        self._test_create_master_bootstrap_script()
+
+    def test_create_master_bootstrap_script_on_2_4_11_ami(self):
+        self._test_create_master_bootstrap_script(
+            ami_version='2.4.11', expect_bootstrap_python_packages=False)
+
+    def test_create_master_bootstrap_script_on_latest_ami(self):
+        self._test_create_master_bootstrap_script(
+            ami_version='latest', expect_bootstrap_python_packages=False)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
@@ -3001,9 +3013,8 @@ class BootstrapPythonTestCase(MockBotoTestCase):
 
     if PY2:
         EXPECTED_BOOTSTRAP = [
-            ['sudo apt-get install -y python-pip || '
-             'sudo yum install -y python-pip'],
-             ['sudo pip install --upgrade ujson']]
+            ['sudo yum install -y python-pip'],
+            ['sudo pip install --upgrade ujson']]
     else:
         EXPECTED_BOOTSTRAP = [['sudo yum install -y python34']]
 
@@ -3033,8 +3044,8 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             self.assertEqual(runner._bootstrap_python(), [])
             self.assertEqual(runner._bootstrap, [])
 
-    def _test_old_ami_version(self, ami_version):
-        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', ami_version])
+    def test_ami_version_3_6_0(self):
+        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', '3.6.0'])
 
         with no_handlers_for_logger('mrjob.emr'):
             stderr = StringIO()
@@ -3050,11 +3061,19 @@ class BootstrapPythonTestCase(MockBotoTestCase):
                 if not PY2:
                     self.assertIn('will probably not work', stderr.getvalue())
 
-    def test_ami_version_3_6_0(self):
-        self._test_old_ami_version('3.6.0')
+    def _test_2_x_ami(self, ami_version):
+        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', ami_version])
+
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._opts['bootstrap_python'], True)
+            self.assertEqual(runner._bootstrap_python(), [])
+            self.assertEqual(runner._bootstrap, [])
+
+    def test_ami_version_2_4_11(self):
+        self._test_2_x_ami('2.4.11')
 
     def test_ami_version_latest(self):
-        self._test_old_ami_version('latest')
+        self._test_2_x_ami('latest')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])

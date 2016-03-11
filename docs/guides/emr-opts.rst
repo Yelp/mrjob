@@ -402,12 +402,14 @@ and install another Python binary.
    :set: emr
    :default: ``True``
 
-   Attempt to install a compatible version of Python at bootstrap time.
+   Attempt to install a compatible version of Python at bootstrap time,
+   and, if possible, `ujson`.
 
-   Python 2 is already installed on all AMIs, but if you're in Python 2,
-   this will also install :command:`pip` and the ``ujson`` library.
+   In Python 2, install :command:`pip` and the ``ujson`` library (Python 2
+   is already installed on all AMIs). This does nothing on the (deprecated)
+   2.x AMIs because :command:`apt-get` no longer works.
 
-   In Python 3 this option attempts to install Python 3.4 from a package
+   In Python 3, this option attempts to install Python 3.4 from a package
    (``sudo yum install -y python34``), which will work unless you've set
    :mrjob-opt:`ami_version` to something earlier than 3.7.0.
 
@@ -436,7 +438,8 @@ and install another Python binary.
     ``pip install path/to/tarballs/*.tar.gz#`` to :mrjob-opt:`bootstrap`
     instead.
 
-    In addition to being deprecated, this option only works in Python 2.
+    In addition to being deprecated, this option only works in Python 2,
+    and only on the 3.x AMIs and later.
     See :ref:`Installing packages with pip on Python 3 <using-pip-py3>`
     to see how to do this on Python 3.
 

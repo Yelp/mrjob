@@ -104,7 +104,7 @@ from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
-from mrjob.ssh import ssh_slave_addresses
+from mrjob.ssh import _ssh_slave_addresses
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
@@ -2544,7 +2544,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     # TODO: this is only used by mrboss; otherwise we do this through fs
     def _addresses_of_slaves(self):
         if not self._ssh_slave_addrs:
-            self._ssh_slave_addrs = ssh_slave_addresses(
+            self._ssh_slave_addrs = _ssh_slave_addresses(
                 self._opts['ssh_bin'],
                 self._address_of_master(),
                 self._opts['ec2_key_pair_file'])

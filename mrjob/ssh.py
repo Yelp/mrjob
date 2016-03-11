@@ -90,7 +90,7 @@ def _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
 
     Confused yet?
 
-    For bang paths to work, :py:func:`ssh_copy_key` must have been run, and
+    For bang paths to work, :py:func:`_ssh_copy_key` must have been run, and
     the ``keyfile`` argument must be the same as was passed to that function.
     """
     if '!' in address:
@@ -109,7 +109,7 @@ def _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
         return _ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
 
 
-def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
+def _ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """Prepare master to SSH to slaves by copying the EMR private key to the
     master node. This is done via ``cat`` to avoid having to store an
     ``scp_bin`` variable.
@@ -125,7 +125,7 @@ def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
                               stdin=f.read()))
 
 
-def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
+def _ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
     """Get the IP addresses of the slave nodes. Fails silently because it
     makes testing easier and if things are broken they will fail before this
     function is called.
@@ -140,7 +140,7 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
     return [ip for ip in ips.split('\n') if ip]
 
 
-def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
+def _ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Return the file at ``path`` as a string. Raises ``IOError`` if the
     file doesn't exist or SSH access fails.
 
@@ -157,7 +157,7 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     return out
 
 
-def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
+def _ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Recursively list files under ``path`` on the specified SSH host.
     Return the file at ``path`` as a string. Raises ``IOError`` if the
     path doesn't exist or SSH access fails.

@@ -535,14 +535,19 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
                     for p in self._get_input_paths()]
         else:
             return [posixpath.join(
-                self._hadoop_tmp_dir, 'step-output', str(step_num))]
+                self._hadoop_tmp_dir,
+                'step-output/%04d' % (step_num - 1)
+            )]
+
 
     def _hdfs_step_output_dir(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:
             return posixpath.join(
-                self._hadoop_tmp_dir, 'step-output', str(step_num + 1))
+                self._hadoop_tmp_dir,
+                'step-output/%04d' % step_num
+            )
 
     def _cleanup_local_tmp(self):
         super(HadoopJobRunner, self)._cleanup_local_tmp()

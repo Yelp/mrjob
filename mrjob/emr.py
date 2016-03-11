@@ -1694,16 +1694,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     for path in self._get_input_paths()]
         else:
             # put intermediate data in HDFS
-            return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_key, step_num)]
+            return ['hdfs:///tmp/mrjob/%s/step-output/%04d/' % (
+                self._job_key, step_num - 1)]
 
     def _step_output_uri(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:
             # put intermediate data in HDFS
-            return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_key, step_num + 1)
+            return 'hdfs:///tmp/mrjob/%s/step-output/%04d/' % (
+                self._job_key, step_num)
 
     ### LOG PARSING (implementation of LogInterpretationMixin) ###
 

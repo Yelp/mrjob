@@ -185,7 +185,7 @@ class SimMRJobRunner(MRJobRunner):
                 # of self._prev_outfiles
                 sort_output_path = os.path.join(
                     self._get_local_tmp_dir(),
-                    'step-%d-mapper-sorted' % step_num)
+                    'step-%04d-mapper-sorted' % step_num)
 
                 self._invoke_sort(self._step_input_paths(), sort_output_path)
                 self._prev_outfiles = [sort_output_path]
@@ -210,7 +210,7 @@ class SimMRJobRunner(MRJobRunner):
 
         jobconf = self._jobconf_for_step(step_num)
 
-        outfile_prefix = 'step-%d-%s' % (step_num, step_type)
+        outfile_prefix = 'step-%04d-%s' % (step_num, step_type)
 
         # allow setting number of tasks from jobconf
         if step_type == 'reducer':
@@ -496,10 +496,12 @@ class SimMRJobRunner(MRJobRunner):
             ','.join(cache_local_archives))
 
         # task and attempt IDs
-        j['mapreduce.task.id'] = 'task_%s_%s_%05d%d' % (
+        # TODO: these are a crappy imitation of task/attempt IDs
+        #       see mrjob.logs.ids for examples
+        j['mapreduce.task.id'] = 'task_%s_%s_%04d%d' % (
             self._job_key, step_type.lower(), step_num, task_num)
         # (we only have one attempt)
-        j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%05d%d_0' % (
+        j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%04d%d_0' % (
             self._job_key, step_type.lower(), step_num, task_num)
 
         # not actually sure what's correct for combiners here. It'll definitely

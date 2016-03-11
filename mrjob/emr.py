@@ -1081,7 +1081,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # delete all the files we created
         if self._s3_tmp_dir:
             try:
-                log.info('Removing all files in %s' % self._s3_tmp_dir)
+                log.info('Removing s3 temp directory %s...' % self._s3_tmp_dir)
                 self.fs.rm(self._s3_tmp_dir)
                 self._s3_tmp_dir = None
             except Exception as e:
@@ -1095,7 +1095,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._s3_log_dir() and not self._opts['cluster_id'] \
                 and not self._opts['pool_clusters']:
             try:
-                log.info('Removing all files in %s' % self._s3_log_dir())
+                log.info('Removing log files in %s...' % self._s3_log_dir())
                 self.fs.rm(self._s3_log_dir())
             except Exception as e:
                 log.exception(e)

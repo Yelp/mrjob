@@ -227,7 +227,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         """Search for the hadoop streaming jar. See
         :py:meth:`_hadoop_streaming_jar_dirs` for where we search."""
         for path in unique(self._hadoop_streaming_jar_dirs()):
-            log.info('Looking for Hadoop streaming jar in %s' % path)
+            log.info('Looking for Hadoop streaming jar in %s...' % path)
 
             streaming_jars = []
             for path in self.fs.ls(path):
@@ -343,12 +343,12 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         self.fs.mkdir(self._upload_mgr.prefix)
 
-        log.info('Copying local files into %s' % self._upload_mgr.prefix)
+        log.info('Copying local files to %s...' % self._upload_mgr.prefix)
         for path, uri in self._upload_mgr.path_to_uri().items():
             self._upload_to_hdfs(path, uri)
 
     def _upload_to_hdfs(self, path, target):
-        log.debug('Uploading %s -> %s on HDFS' % (path, target))
+        log.debug('  %s -> %s' % (path, target))
         self.fs._put(path, target)
 
     def _dump_stdin_to_local_file(self):
@@ -357,7 +357,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
          # prompt user, so they don't think the process has stalled
         log.info('reading from STDIN')
 
-        log.debug('dumping stdin to local file %s' % stdin_path)
+        log.debug('dumping stdin to local file %s...' % stdin_path)
         stdin_file = open(stdin_path, 'wb')
         for line in self._stdin:
             stdin_file.write(line)
@@ -370,7 +370,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
             # log this *after* _args_for_step(), which can start a search
             # for the Hadoop streaming jar
-            log.info('Running step %d of %d' %
+            log.info('Running step %d of %d...' %
                       (step_num + 1, self._num_steps()))
             log.debug('> %s' % cmd_line(step_args))
 
@@ -548,7 +548,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         super(HadoopJobRunner, self)._cleanup_local_tmp()
 
         if self._hadoop_tmp_dir:
-            log.info('deleting %s from HDFS' % self._hadoop_tmp_dir)
+            log.info('Removing HDFS temp directory %s...' %
+                     self._hadoop_tmp_dir)
             try:
                 self.fs.rm(self._hadoop_tmp_dir)
             except Exception as e:
@@ -614,11 +615,11 @@ def _hadoop_prefix_from_bin(hadoop_bin):
 
 
 def _log_line_from_hadoop(line, level=None):
-    """Log ``'HADOOP: <line>'``. *line* should be a string.
+    """Log ``'  <line>'``. *line* should be a string.
 
     Optionally specify a logging level (default is logging.INFO).
     """
-    log.log(level or logging.INFO, 'HADOOP: %s' % line)
+    log.log(level or logging.INFO, '  %s' % line)
 
 
 def _log_record_from_hadoop(record):

@@ -107,11 +107,12 @@ class HadoopFilesystem(Filesystem):
                     yield os.path.join(path, 'bin')
 
         for path in unique(yield_paths()):
-            log.info('Looking for hadoop binary in %s' % (path or '$PATH'))
+            log.info('Looking for hadoop binary in %s...' % (path or '$PATH'))
 
             hadoop_bin = which('hadoop', path=path)
 
             if hadoop_bin:
+                log.info('Found hadoop binary: %s' % hadoop_bin)
                 return [hadoop_bin]
         else:
             log.info("Falling back to 'hadoop'")

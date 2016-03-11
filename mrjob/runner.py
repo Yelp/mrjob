@@ -519,7 +519,7 @@ class MRJobRunner(object):
         This won't remove output_dir if it's outside of our tmp dir.
         """
         if self._local_tmp_dir:
-            log.info('Removing tmp directory %s...' % self._local_tmp_dir)
+            log.info('Removing temp directory %s...' % self._local_tmp_dir)
             try:
                 shutil.rmtree(self._local_tmp_dir)
             except OSError as e:

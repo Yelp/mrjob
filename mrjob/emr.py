@@ -105,7 +105,6 @@ from mrjob.setup import UploadDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import ssh_terminate_single_job
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
@@ -1100,45 +1099,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 self.fs.rm(self._s3_log_dir())
             except Exception as e:
                 log.exception(e)
-
-    def _cleanup_job(self):
-        # kill the job if we won't be taking down the whole cluster
-        if not self._cluster_id:
-            # Nothing we can do.
-            return
-
-        if not (self._opts['cluster_id'] or
-                self._opts['pool_clusters']):
-            # we're taking down the cluster, don't bother
-            return
-
-        try:
-            addr = self._address_of_master()
-        except IOError:
-            # if we can't get the address of the master node, job probably
-            # isn't running
-            return
-
-        if not self._ran_job:
-            if self._opts['ec2_key_pair_file']:
-                try:
-                    log.info("Attempting to terminate job...")
-                    had_job = ssh_terminate_single_job(
-                        self._opts['ssh_bin'],
-                        addr,
-                        self._opts['ec2_key_pair_file'])
-                    if had_job:
-                        log.info("Succeeded in terminating job")
-                    else:
-                        log.info("Job appears to have already been terminated")
-                    return
-                except IOError:
-                    pass
-
-            log.info('Unable to kill job without terminating cluster and'
-                     ' job is still running. You may wish to terminate it'
-                     ' yourself with "python -m mrjob.tools.emr.terminate'
-                     '_cluster %s".' % self._cluster_id)
 
     def _cleanup_cluster(self):
         if not self._cluster_id:

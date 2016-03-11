@@ -2394,55 +2394,6 @@ class CleanUpJobTestCase(MockBotoTestCase):
             self.assertFalse(m['_cleanup_logs'].called)
             self.assertFalse(m['_cleanup_job'].called)
 
-    def test_job_cleanup_mechanics_succeed(self):
-        with no_handlers_for_logger():
-            r = self._quick_runner()
-            with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
-                r._cleanup_job()
-            self.assertTrue(m.called)
-            m.assert_any_call(['ssh'], 'Albuquerque, NM', 'fake.pem')
-
-    def test_job_cleanup_mechanics_ssh_fail(self):
-        def die_ssh(*args, **kwargs):
-            raise IOError
-
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            stderr = StringIO()
-            log_to_stream('mrjob.emr', stderr)
-            with patch.object(mrjob.emr, 'ssh_terminate_single_job',
-                              side_effect=die_ssh):
-                r._cleanup_job()
-                self.assertIn('Unable to kill job', stderr.getvalue())
-
-    def test_job_cleanup_mechanics_not_started(self):
-        r = self._quick_runner()
-        r._cluster_id = None
-        with patch.object(mrjob.emr, 'ssh_terminate_single_job') as p:
-            r._cleanup_job()
-            p.assert_not_called()
-
-    def test_job_cleanup_mechanics_io_fail(self):
-        def die_io(*args, **kwargs):
-            raise IOError
-
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            with patch.object(mrjob.emr, 'ssh_terminate_single_job',
-                              side_effect=die_io):
-                stderr = StringIO()
-                log_to_stream('mrjob.emr', stderr)
-                r._cleanup_job()
-                self.assertIn('Unable to kill job', stderr.getvalue())
-
-    def test_dont_kill_if_successful(self):
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
-                r._ran_job = True
-                r._cleanup_job()
-                m.assert_not_called()
-
     def test_kill_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()

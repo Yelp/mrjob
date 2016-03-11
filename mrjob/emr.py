@@ -1944,6 +1944,19 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         self._master_bootstrap_script_path = path
 
+    def _on_pre_3_x_ami(self):
+        """Are we on an AMI prior to 3.x (where apt-get no longer works)?
+
+        This just checks ``self._opts``; it doesn't require the cluster
+        to be running."""
+        if self._opts['release_label']:  # hides ami_version
+            return False
+
+        if self._opts['ami_version'] == 'latest':
+            return True
+
+        return not version_gte(self._opts['ami_version'], '3')
+
     def _bootstrap_python(self):
         """Return a (possibly empty) list of parsed commands (in the same
         format as returned by parse_setup_cmd())'"""
@@ -1951,8 +1964,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return []
 
         # apt-get no longer works on 2.x AMIs
-        if (self._opts['ami_version'] == 'latest' or
-            not version_gte(self._opts['ami_version'], '3')):
+        if self._on_pre_3_x_ami():
             return []
 
         if PY2:
@@ -2003,9 +2015,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
             if PY2:
-                if (self._opts['ami_version'] != 'latest' and
-                    version_gte(self._opts['ami_version'], '3')):
-
+                if self._on_pre_3_x_ami():
+                    log.warning(
+                        'bootstrap_python_packages is deprecated and is no'
+                        ' longer supported on the 2.x AMIs. See'
+                        ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                        '-cookbook.html#using-pip for an alternative.')
+                else:
                     log.warning(
                         'bootstrap_python_packages is deprecated since v0.4.2'
                         ' and will be removed in v0.6.0. Consider using'
@@ -2018,12 +2034,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         # don't worry about inspecting the tarball; pip is
                         # smart enough to deal with that
                         bootstrap.append(['sudo pip install ', path_dict])
-                else:
-                    log.warning(
-                        'bootstrap_python_packages is deprecated and is no'
-                        ' longer supported on the 2.x AMIs. See'
-                        ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                        '-cookbook.html#using-pip for an alternative.')
             else:
                 log.warning(
                     'bootstrap_python_packages is deprecated and is not'

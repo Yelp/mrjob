@@ -17,10 +17,10 @@ import posixpath
 
 from io import BytesIO
 from mrjob.fs.base import Filesystem
-from mrjob.ssh import ssh_cat
-from mrjob.ssh import ssh_copy_key
-from mrjob.ssh import ssh_ls
-from mrjob.ssh import ssh_slave_addresses
+from mrjob.ssh import _ssh_cat
+from mrjob.ssh import _ssh_copy_key
+from mrjob.ssh import _ssh_ls
+from mrjob.ssh import _ssh_slave_addresses
 from mrjob.util import random_identifier
 from mrjob.util import read_file
 
@@ -83,8 +83,8 @@ class SSHFilesystem(Filesystem):
         if host not in self._host_to_key_filename:
             # copy the key if we haven't already
             keyfile = 'mrjob-%s.pem' % random_identifier()
-            ssh_copy_key(self._ssh_bin, host, self._ec2_key_pair_file, keyfile)
-            # don't set above; ssh_copy_key() may throw an IOError
+            _ssh_copy_key(self._ssh_bin, host, self._ec2_key_pair_file, keyfile)
+            # don't set above; _ssh_copy_key() may throw an IOError
             self._host_to_key_filename[host] = keyfile
 
         return self._host_to_key_filename[host]
@@ -98,7 +98,7 @@ class SSHFilesystem(Filesystem):
 
         keyfile = self._key_filename_for(addr)
 
-        output = ssh_ls(
+        output = _ssh_ls(
             self._ssh_bin,
             addr,
             self._ec2_key_pair_file,
@@ -120,7 +120,7 @@ class SSHFilesystem(Filesystem):
 
         keyfile = self._key_filename_for(addr)
 
-        output = ssh_cat(
+        output = _ssh_cat(
             self._ssh_bin,
             addr,
             self._ec2_key_pair_file,
@@ -148,7 +148,7 @@ class SSHFilesystem(Filesystem):
     def ssh_slave_hosts(self, host, force=False):
         """Get a list of the slave hosts reachable through *hosts*"""
         if force or host not in self._host_to_slave_hosts:
-            self._host_to_slave_hosts[host] = ssh_slave_addresses(
+            self._host_to_slave_hosts[host] = _ssh_slave_addresses(
                 self._ssh_bin, host, self._ec2_key_pair_file)
 
         return self._host_to_slave_hosts[host]

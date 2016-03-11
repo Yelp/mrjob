@@ -545,7 +545,7 @@ class MRJobRunner(object):
 
     def _cleanup_job(self):
         """Stop any jobs that we created that are still running."""
-        pass  # this only happens on EMR
+        pass  # currently disabled (see #1241)
 
     def cleanup(self, mode=None):
         """Clean up running jobs, temp files, and logs, subject to the

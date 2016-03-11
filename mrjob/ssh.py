@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 
 def _ssh_args(ssh_bin, address, ec2_key_pair_file):
-    """Helper method for :py:func:`ssh_run` to build an argument list for
+    """Helper method for :py:func:`_ssh_run` to build an argument list for
     ``subprocess``. Specifies an identity, disables strict host key checking,
     and adds the ``hadoop`` username.
     """
@@ -49,7 +49,7 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
     ]
 
 
-def check_output(out, err):
+def _check_output(out, err):
     if err:
         if (b'No such file or directory' in err or
             b'Warning: Permanently added' not in err):  # noqa
@@ -62,7 +62,7 @@ def check_output(out, err):
     return out
 
 
-def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
+def _ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     """Shortcut to call ssh on a Hadoop node via ``subprocess``.
 
     :param ssh_bin: Path to ``ssh`` binary
@@ -79,7 +79,7 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     return p.communicate(stdin)
 
 
-def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
+def _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
                            cmd_args):
     """Some files exist on the master and can be accessed directly via SSH,
     but some files are on the slaves which can only be accessed via the master
@@ -90,7 +90,7 @@ def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
 
     Confused yet?
 
-    For bang paths to work, :py:func:`ssh_copy_key` must have been run, and
+    For bang paths to work, :py:func:`_ssh_copy_key` must have been run, and
     the ``keyfile`` argument must be the same as was passed to that function.
     """
     if '!' in address:
@@ -103,13 +103,13 @@ def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
             '-o', 'UserKnownHostsFile=/dev/null',
             'hadoop@%s' % (host2,),
         ]
-        return ssh_run(ssh_bin, host1, ec2_key_pair_file,
+        return _ssh_run(ssh_bin, host1, ec2_key_pair_file,
                        more_args + list(cmd_args))
     else:
-        return ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
+        return _ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
 
 
-def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
+def _ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """Prepare master to SSH to slaves by copying the EMR private key to the
     master node. This is done via ``cat`` to avoid having to store an
     ``scp_bin`` variable.
@@ -121,11 +121,11 @@ def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """
     with open(ec2_key_pair_file, 'rb') as f:
         args = ['bash -c "cat > %s" && chmod 600 %s' % (keyfile, keyfile)]
-        check_output(*ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
+        _check_output(*_ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
                               stdin=f.read()))
 
 
-def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
+def _ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
     """Get the IP addresses of the slave nodes. Fails silently because it
     makes testing easier and if things are broken they will fail before this
     function is called.
@@ -135,12 +135,12 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
 
     cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
     args = ['bash -c "%s"' % cmd]
-    ips = to_string(check_output(
-        *ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)))
+    ips = to_string(_check_output(
+        *_ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)))
     return [ip for ip in ips.split('\n') if ip]
 
 
-def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
+def _ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Return the file at ``path`` as a string. Raises ``IOError`` if the
     file doesn't exist or SSH access fails.
 
@@ -151,13 +151,13 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = check_output(*ssh_run_with_recursion(ssh_bin, address,
+    out = _check_output(*_ssh_run_with_recursion(ssh_bin, address,
                                                ec2_key_pair_file,
                                                keyfile, ['cat', path]))
     return out
 
 
-def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
+def _ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     """Recursively list files under ``path`` on the specified SSH host.
     Return the file at ``path`` as a string. Raises ``IOError`` if the
     path doesn't exist or SSH access fails.
@@ -169,50 +169,9 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = to_string(check_output(*ssh_run_with_recursion(
+    out = to_string(_check_output(*_ssh_run_with_recursion(
         ssh_bin, address, ec2_key_pair_file, keyfile,
         ['find', '-L', path, '-type', 'f'])))
     if 'No such file or directory' in out:
         raise IOError("No such file or directory: %s" % path)
     return out.split('\n')
-
-
-def ssh_terminate_single_job(ssh_bin, address, ec2_key_pair_file):
-    """Terminate the only job running the Hadoop cluster with master node
-    *address* using 'hadoop job -kill JOB_ID'. Return string output of command
-    or None if there was no job to termiante. Raise :py:class:`IOError` if some
-    other error occurred.
-
-    :param ssh_bin: Path to ``ssh`` binary
-    :param address: Address of your job's master node
-    :param ec2_key_pair_file: Path to the key pair file (argument to ``-i``)
-
-    :return: ``True`` if successful, ``False`` if no job was running
-    """
-    job_list_out = to_string(check_output(*ssh_run(
-        ssh_bin, address, ec2_key_pair_file, ['hadoop', 'job', '-list'])))
-    job_list_lines = job_list_out.splitlines()
-
-    def job_list_output_error():
-        raise IOError('Could not read results of "hadoop job -list" and so'
-                      ' could not terminate job:\n%s' % job_list_out)
-
-    num_jobs_match = _HADOOP_JOB_LIST_NUM_RE.match(job_list_lines[0])
-    if not num_jobs_match:
-        job_list_output_error()
-    if int(num_jobs_match.group(1)) > 1:
-        raise IOError('More than one job is running; unclear which one to'
-                      ' terminate, so not terminating any jobs')
-    if int(num_jobs_match.group(1)) == 0:
-        return None
-
-    job_info_match = _HADOOP_JOB_LIST_INFO_RE.match(job_list_lines[2])
-    if not job_info_match:
-        job_list_output_error()
-    job_id = to_string(job_info_match.group(1))
-
-    job_kill_out = to_string(check_output(*ssh_run(
-        ssh_bin, address, ec2_key_pair_file,
-        ['hadoop', 'job', '-kill', job_id])))
-
-    return job_kill_out

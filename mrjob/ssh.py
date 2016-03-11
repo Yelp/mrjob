@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 
 
 def _ssh_args(ssh_bin, address, ec2_key_pair_file):
-    """Helper method for :py:func:`ssh_run` to build an argument list for
+    """Helper method for :py:func:`_ssh_run` to build an argument list for
     ``subprocess``. Specifies an identity, disables strict host key checking,
     and adds the ``hadoop`` username.
     """
@@ -62,7 +62,7 @@ def _check_output(out, err):
     return out
 
 
-def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
+def _ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     """Shortcut to call ssh on a Hadoop node via ``subprocess``.
 
     :param ssh_bin: Path to ``ssh`` binary
@@ -79,7 +79,7 @@ def ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     return p.communicate(stdin)
 
 
-def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
+def _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
                            cmd_args):
     """Some files exist on the master and can be accessed directly via SSH,
     but some files are on the slaves which can only be accessed via the master
@@ -103,10 +103,10 @@ def ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
             '-o', 'UserKnownHostsFile=/dev/null',
             'hadoop@%s' % (host2,),
         ]
-        return ssh_run(ssh_bin, host1, ec2_key_pair_file,
+        return _ssh_run(ssh_bin, host1, ec2_key_pair_file,
                        more_args + list(cmd_args))
     else:
-        return ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
+        return _ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
 
 
 def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
@@ -121,7 +121,7 @@ def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """
     with open(ec2_key_pair_file, 'rb') as f:
         args = ['bash -c "cat > %s" && chmod 600 %s' % (keyfile, keyfile)]
-        _check_output(*ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
+        _check_output(*_ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
                               stdin=f.read()))
 
 
@@ -136,7 +136,7 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
     cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
     args = ['bash -c "%s"' % cmd]
     ips = to_string(_check_output(
-        *ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)))
+        *_ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)))
     return [ip for ip in ips.split('\n') if ip]
 
 
@@ -151,7 +151,7 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = _check_output(*ssh_run_with_recursion(ssh_bin, address,
+    out = _check_output(*_ssh_run_with_recursion(ssh_bin, address,
                                                ec2_key_pair_file,
                                                keyfile, ['cat', path]))
     return out
@@ -169,7 +169,7 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = to_string(_check_output(*ssh_run_with_recursion(
+    out = to_string(_check_output(*_ssh_run_with_recursion(
         ssh_bin, address, ec2_key_pair_file, keyfile,
         ['find', '-L', path, '-type', 'f'])))
     if 'No such file or directory' in out:

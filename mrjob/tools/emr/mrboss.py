@@ -56,7 +56,7 @@ from mrjob.options import _add_basic_opts
 from mrjob.options import _add_emr_connect_opts
 from mrjob.options import _alphabetize_options
 from mrjob.ssh import ssh_copy_key
-from mrjob.ssh import ssh_run_with_recursion
+from mrjob.ssh import _ssh_run_with_recursion
 from mrjob.util import random_identifier
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import shlex_split
@@ -125,7 +125,7 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
 
     for addr in addresses:
 
-        stdout, stderr = ssh_run_with_recursion(
+        stdout, stderr = _ssh_run_with_recursion(
             ssh_bin,
             addr,
             ec2_key_pair_file,

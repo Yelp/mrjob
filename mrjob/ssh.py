@@ -49,7 +49,7 @@ def _ssh_args(ssh_bin, address, ec2_key_pair_file):
     ]
 
 
-def check_output(out, err):
+def _check_output(out, err):
     if err:
         if (b'No such file or directory' in err or
             b'Warning: Permanently added' not in err):  # noqa
@@ -121,7 +121,7 @@ def ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """
     with open(ec2_key_pair_file, 'rb') as f:
         args = ['bash -c "cat > %s" && chmod 600 %s' % (keyfile, keyfile)]
-        check_output(*ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
+        _check_output(*ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
                               stdin=f.read()))
 
 
@@ -135,7 +135,7 @@ def ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
 
     cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
     args = ['bash -c "%s"' % cmd]
-    ips = to_string(check_output(
+    ips = to_string(_check_output(
         *ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)))
     return [ip for ip in ips.split('\n') if ip]
 
@@ -151,7 +151,7 @@ def ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = check_output(*ssh_run_with_recursion(ssh_bin, address,
+    out = _check_output(*ssh_run_with_recursion(ssh_bin, address,
                                                ec2_key_pair_file,
                                                keyfile, ['cat', path]))
     return out
@@ -169,7 +169,7 @@ def ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
     """
-    out = to_string(check_output(*ssh_run_with_recursion(
+    out = to_string(_check_output(*ssh_run_with_recursion(
         ssh_bin, address, ec2_key_pair_file, keyfile,
         ['find', '-L', path, '-type', 'f'])))
     if 'No such file or directory' in out:

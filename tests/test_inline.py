@@ -313,9 +313,9 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         self.assertEqual(results['mapreduce.map.input.length'], '4')
         self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_mapper_000000_0' % runner._job_key)
+                       'attempt_%s_mapper_00000_0' % runner._job_key)
         self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_mapper_000000' % runner._job_key)
+                       'task_%s_mapper_00000' % runner._job_key)
         self.assertEqual(results['mapreduce.task.ismap'], 'true')
         self.assertEqual(results['mapreduce.task.output.dir'],
                          runner._output_dir)

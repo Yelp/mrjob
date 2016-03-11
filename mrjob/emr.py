@@ -1709,11 +1709,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
-        if version_gte(self.get_ami_version(), '4'):
-            # denied access on some 4.x AMIs by the yarn user, see #1244
-            dir_name = 'hadoop-mapreduce/history'
-            s3_dir_name = 'hadoop-mapreduce/history'
-        elif version_gte(self.get_ami_version(), '3'):
+        # History logs have different paths on the 4.x AMIs.
+        #
+        # Disabling until we can effectively fetch these logs over SSH;
+        # on 4.3.0 there are permissions issues (see #1244), and
+        # on 4.0.0 the logs aren't on the filesystem at all (see #1253).
+        #
+        # Unlike on 3.x, the history logs *are* available on S3, but they're
+        # not useful enough to justify the wait when SSH is set up
+
+        #if version_gte(self.get_ami_version(), '4'):
+        #    # denied access on some 4.x AMIs by the yarn user, see #1244
+        #    dir_name = 'hadoop-mapreduce/history'
+        #    s3_dir_name = 'hadoop-mapreduce/history'
+        if version_gte(self.get_ami_version(), '3'):
             # on the 3.x AMIs, the history log lives inside HDFS and isn't
             # copied to S3. We don't need it anyway; everything relevant
             # is in the step log

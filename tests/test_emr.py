@@ -1272,7 +1272,7 @@ class TestNoBoto(TestCase):
         self.assertRaises(ImportError, EMRJobRunner, conf_paths=[])
 
 
-class TestMasterBootstrapScript(MockBotoTestCase):
+class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_usr_bin_env(self):
         runner = EMRJobRunner(conf_paths=[],
@@ -1289,7 +1289,8 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
-    def test_create_master_bootstrap_script(self):
+    def _test_create_master_bootstrap_script(
+            self, ami_version=None, expect_bootstrap_python_packages=PY2):
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
         with open(foo_py_path, 'w'):
@@ -1300,6 +1301,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
+                              ami_version=ami_version,
                               bootstrap=[
                                   PYTHON_BIN + ' ' +
                                   foo_py_path + '#bar.py',
@@ -1341,7 +1343,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         assertScriptDownloads(runner._mrjob_tar_gz_path)
         assertScriptDownloads('speedups.sh')
         assertScriptDownloads('/tmp/s.sh')
-        if PY2:
+        if expect_bootstrap_python_packages:
             assertScriptDownloads(yelpy_tar_gz_path)
 
         # check scripts get run
@@ -1364,13 +1366,23 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
-        if PY2:
-            self.assertIn('sudo apt-get install -y python-pip || '
-                          'sudo yum install -y python-pip', lines)
+        if expect_bootstrap_python_packages:
+            self.assertIn('sudo yum install -y python-pip', lines)
             self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)
         self.assertIn('$__mrjob_PWD/s.sh', lines)
+
+    def test_create_master_bootstrap_script(self):
+        self._test_create_master_bootstrap_script()
+
+    def test_create_master_bootstrap_script_on_2_4_11_ami(self):
+        self._test_create_master_bootstrap_script(
+            ami_version='2.4.11', expect_bootstrap_python_packages=False)
+
+    def test_create_master_bootstrap_script_on_latest_ami(self):
+        self._test_create_master_bootstrap_script(
+            ami_version='latest', expect_bootstrap_python_packages=False)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,

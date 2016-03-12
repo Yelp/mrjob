@@ -2152,6 +2152,34 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         self.assertJoins(cluster_id, ['-r', 'emr', '--pool-clusters'])
 
+    def test_can_join_cluster_with_same_key_pair(self):
+        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+
+        self.assertJoins(
+            cluster_id,
+            ['-r', 'emr', '--ec2-key-pair', 'EMR', '--pool-clusters'])
+
+    def test_cant_join_cluster_with_different_key_pair(self):
+        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--ec2-key-pair', 'EMR2', '--pool-clusters'])
+
+    def test_cant_join_cluster_with_missing_key_pair(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--ec2-key-pair', 'EMR2', '--pool-clusters'])
+
+    def test_ignore_key_pair_if_we_have_none(self):
+        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+
+        self.assertJoins(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters'])
+
 
 class PoolingDisablingTestCase(MockBotoTestCase):
 

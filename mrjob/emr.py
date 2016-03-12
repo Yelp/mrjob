@@ -2242,8 +2242,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if (self._opts['ec2_key_pair'] and
                 self._opts['ec2_key_pair'] !=
                 getattr(getattr(cluster,
-                    'ec2instanceattributes',
-                    object()), 'ec2keyname', None)):
+                    'ec2instanceattributes', None), 'ec2keyname', None)):
                 return
 
             # this may be a retry due to locked clusters

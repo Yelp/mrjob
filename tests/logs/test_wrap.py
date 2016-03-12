@@ -110,13 +110,20 @@ class LsLogsTestCase(TestCase):
         def mock_fs_ls(log_dir):
             prefix = log_dir.rstrip('/') + '/'
 
+            exists = False
+
             for p in self.mock_paths:
                 if isinstance(p, Exception):
                     raise p
                 elif p.startswith(prefix):
                     yield p
+                    exists = True
+
+        def mock_fs_exists(log_dir):
+            return any(mock_fs_ls(log_dir))
 
         self.mock_fs.ls = Mock(side_effect=mock_fs_ls)
+        self.mock_fs.exists = Mock(side_effect=mock_fs_exists)
 
         # a matcher that cheerfully passes through kwargs
         def mock_matcher(path, **kwargs):
@@ -135,6 +142,9 @@ class LsLogsTestCase(TestCase):
 
     def test_no_paths(self):
         self.assertEqual(self._ls_logs([['/path/to/logs']]), [])
+
+        self.assertTrue(self.mock_fs.exists.called)
+        self.assertFalse(self.mock_fs.ls.called)
 
     def test_log_dirs_cant_be_str(self):
         self.assertRaises(TypeError, self._ls_logs, ['/path/to/logs'])

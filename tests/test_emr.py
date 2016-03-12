@@ -3381,10 +3381,15 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self.assertRaises(StopIteration, next, results)
 
     def test_stream_history_log_dirs_from_4_x_amis(self):
-        self._test_stream_history_log_dirs(
-            ssh=True, ami_version='4.3.0',
-            expected_dir_name='hadoop-mapreduce/history',
-            expected_s3_dir_name='hadoop-mapreduce/history')
+        # history log fetching is disabled until we fix
+        # #1244 and #1253
+        runner = EMRJobRunner(ami_version='4.3.0')
+        results = runner._stream_history_log_dirs()
+        self.assertRaises(StopIteration, next, results)
+        #self._test_stream_history_log_dirs(
+        #    ssh=True, ami_version='4.3.0',
+        #    expected_dir_name='hadoop-mapreduce/history',
+        #    expected_s3_dir_name='hadoop-mapreduce/history')
 
     def _test_stream_step_log_dirs(self, ssh):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None

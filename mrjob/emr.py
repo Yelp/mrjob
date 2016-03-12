@@ -1081,7 +1081,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # delete all the files we created
         if self._s3_tmp_dir:
             try:
-                log.info('Removing all files in %s' % self._s3_tmp_dir)
+                log.info('Removing s3 temp directory %s...' % self._s3_tmp_dir)
                 self.fs.rm(self._s3_tmp_dir)
                 self._s3_tmp_dir = None
             except Exception as e:
@@ -1095,7 +1095,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._s3_log_dir() and not self._opts['cluster_id'] \
                 and not self._opts['pool_clusters']:
             try:
-                log.info('Removing all files in %s' % self._s3_log_dir())
+                log.info('Removing log files in %s...' % self._s3_log_dir())
                 self.fs.rm(self._s3_log_dir())
             except Exception as e:
                 log.exception(e)
@@ -1694,26 +1694,35 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     for path in self._get_input_paths()]
         else:
             # put intermediate data in HDFS
-            return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_key, step_num)]
+            return ['hdfs:///tmp/mrjob/%s/step-output/%04d/' % (
+                self._job_key, step_num - 1)]
 
     def _step_output_uri(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:
             # put intermediate data in HDFS
-            return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_key, step_num + 1)
+            return 'hdfs:///tmp/mrjob/%s/step-output/%04d/' % (
+                self._job_key, step_num)
 
     ### LOG PARSING (implementation of LogInterpretationMixin) ###
 
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
-        if version_gte(self.get_ami_version(), '4'):
-            # denied access on some 4.x AMIs by the yarn user, see #1244
-            dir_name = 'hadoop-mapreduce/history'
-            s3_dir_name = 'hadoop-mapreduce/history'
-        elif version_gte(self.get_ami_version(), '3'):
+        # History logs have different paths on the 4.x AMIs.
+        #
+        # Disabling until we can effectively fetch these logs over SSH;
+        # on 4.3.0 there are permissions issues (see #1244), and
+        # on 4.0.0 the logs aren't on the filesystem at all (see #1253).
+        #
+        # Unlike on 3.x, the history logs *are* available on S3, but they're
+        # not useful enough to justify the wait when SSH is set up
+
+        #if version_gte(self.get_ami_version(), '4'):
+        #    # denied access on some 4.x AMIs by the yarn user, see #1244
+        #    dir_name = 'hadoop-mapreduce/history'
+        #    s3_dir_name = 'hadoop-mapreduce/history'
+        if version_gte(self.get_ami_version(), '3'):
             # on the 3.x AMIs, the history log lives inside HDFS and isn't
             # copied to S3. We don't need it anyway; everything relevant
             # is in the step log

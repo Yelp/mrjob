@@ -326,7 +326,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
         signal.signal(signal.SIGALRM, self._old_alarm_handler)
 
     def test_large_amounts_of_stderr(self):
-        mr_job = MRVerboseJob(['--no-conf', '-r', 'local'])
+        mr_job = MRVerboseJob(['--no-conf', '-r', 'local', '-v'])
         mr_job.sandbox()
 
         try:
@@ -342,9 +342,9 @@ class LargeAmountsOfStderrTestCase(TestCase):
             stderr = mr_job.stderr.getvalue()
             self.assertIn(
                 b"Counters: 1\n\tFoo\n\t\tBar=10000", stderr)
-            self.assertIn(b'status: 0\n', stderr)
-            self.assertIn(b'status: 99\n', stderr)
-            self.assertNotIn(b'status: 100\n', stderr)
+            self.assertIn(b'Status: 0\n', stderr)
+            self.assertIn(b'Status: 99\n', stderr)
+            self.assertNotIn(b'Status: 100\n', stderr)
             self.assertIn(b'STDERR: Qux\n', stderr)
             # exception should appear in exception message
             self.assertIn(b'BOOM', stderr)
@@ -390,7 +390,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
         mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf',
-                               '-r', 'local'])
+                               '-r', 'local', '-v'])
         mr_job.sandbox(stdin=[b'bar\n'])
 
         with no_handlers_for_logger():

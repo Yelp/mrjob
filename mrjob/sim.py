@@ -172,6 +172,9 @@ class SimMRJobRunner(MRJobRunner):
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
+            log.info('Running step %d of %d...' % (
+                step_num + 1, self._num_steps()))
+
             self._check_step_works_with_runner(step)
             self._counters.append({})
 
@@ -182,7 +185,7 @@ class SimMRJobRunner(MRJobRunner):
                 # of self._prev_outfiles
                 sort_output_path = os.path.join(
                     self._get_local_tmp_dir(),
-                    'step-%d-mapper-sorted' % step_num)
+                    'step-%04d-mapper-sorted' % step_num)
 
                 self._invoke_sort(self._step_input_paths(), sort_output_path)
                 self._prev_outfiles = [sort_output_path]
@@ -193,7 +196,7 @@ class SimMRJobRunner(MRJobRunner):
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
             final_outfile = os.path.join(self._output_dir, 'part-%05d' % i)
-            log.info('Moving %s -> %s' % (outfile, final_outfile))
+            log.debug('Moving %s -> %s' % (outfile, final_outfile))
             shutil.move(outfile, final_outfile)
 
     def _invoke_step(self, step_num, step_type):
@@ -207,7 +210,7 @@ class SimMRJobRunner(MRJobRunner):
 
         jobconf = self._jobconf_for_step(step_num)
 
-        outfile_prefix = 'step-%d-%s' % (step_num, step_type)
+        outfile_prefix = 'step-%04d-%s' % (step_num, step_type)
 
         # allow setting number of tasks from jobconf
         if step_type == 'reducer':
@@ -259,7 +262,7 @@ class SimMRJobRunner(MRJobRunner):
             output_path = os.path.join(
                 self._get_local_tmp_dir(),
                 outfile_prefix + '_part-%05d' % task_num)
-            log.info('writing to %s' % output_path)
+            log.debug('Writing to %s' % output_path)
 
             self._run_step(step_num, step_type, input_path, output_path,
                            working_dir, env)
@@ -493,10 +496,11 @@ class SimMRJobRunner(MRJobRunner):
             ','.join(cache_local_archives))
 
         # task and attempt IDs
-        j['mapreduce.task.id'] = 'task_%s_%s_%05d%d' % (
+        # TODO: these are a crappy imitation of task/attempt IDs (see #1254)
+        j['mapreduce.task.id'] = 'task_%s_%s_%04d%d' % (
             self._job_key, step_type.lower(), step_num, task_num)
         # (we only have one attempt)
-        j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%05d%d_0' % (
+        j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%04d%d_0' % (
             self._job_key, step_type.lower(), step_num, task_num)
 
         # not actually sure what's correct for combiners here. It'll definitely

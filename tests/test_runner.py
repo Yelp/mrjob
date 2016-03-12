@@ -833,7 +833,7 @@ class SetupTestCase(SandboxedTestCase):
 
         with no_handlers_for_logger('mrjob.local'):
             stderr = StringIO()
-            log_to_stream('mrjob.local', stderr)
+            log_to_stream('mrjob.local', stderr, debug=True)
 
             with job.make_runner() as r:
                 r.run()

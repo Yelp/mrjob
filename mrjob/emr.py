@@ -2238,6 +2238,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         key_cluster_steps_list = []
 
         def add_if_match(cluster):
+            # skip if user specified a key pair and it doesn't match
+            if (self._opts['ec2_key_pair'] and
+                self._opts['ec2_key_pair'] !=
+                getattr(getattr(cluster,
+                    'ec2instanceattributes', None), 'ec2keyname', None)):
+                return
+
             # this may be a retry due to locked clusters
             if cluster.id in exclude:
                 return

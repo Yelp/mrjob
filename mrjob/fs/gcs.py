@@ -62,10 +62,16 @@ class GCSFilesystem(Filesystem):
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
-
     def __init__(self):
-        credentials = GoogleCredentials.get_application_default()
-        self._service = discovery.build('storage', 'v1', credentials=credentials)
+        self._api_client = None
+
+    @property
+    def api_client(self):
+        if not self._api_client:
+            credentials = GoogleCredentials.get_application_default()
+            self._api_client = discovery.build('storage', 'v1', credentials=credentials)
+
+        return self._api_client
 
     def can_handle_path(self, path):
         return is_gcs_uri(path)
@@ -102,7 +108,7 @@ class GCSFilesystem(Filesystem):
         else:
             dir_glob = path_glob + '*'
 
-        list_request = self._service.objects().list(bucket=bucket_name, fields=_LS_FIELDS_TO_RETURN)
+        list_request = self.api_client.objects().list(bucket=bucket_name, fields=_LS_FIELDS_TO_RETURN)
 
         while list_request:
             resp = list_request.execute()
@@ -120,7 +126,7 @@ class GCSFilesystem(Filesystem):
                 item['size'] = int(item['size'])
                 yield item
 
-            list_request = self._service.objects().list_next(list_request, resp)
+            list_request = self.api_client.objects().list_next(list_request, resp)
 
     def md5sum(self, path):
         object_list = list(self._ls_detailed(path))
@@ -144,7 +150,7 @@ class GCSFilesystem(Filesystem):
         """Make a directory. This does nothing on GCS because there are
         no directories.
         """
-        raise NotImplementedError
+        pass
 
     def exists(self, path_glob):
         """Does the given path exist?
@@ -152,7 +158,7 @@ class GCSFilesystem(Filesystem):
         If dest is a directory (ends with a "/"), we check if there are
         any files starting with that path.
         """
-        # just fall back on ls(); it's smart
+        # TODO - mtai @ davidmarin - catch specific Exceptions
         try:
             paths = self.ls(path_glob)
         except:
@@ -164,7 +170,7 @@ class GCSFilesystem(Filesystem):
         bucket_name, base_name = _path_glob_to_parsed_gcs_uri(path_glob)
 
         for item in self._ls_detailed(path_glob):
-            req = self._service.objects().delete(bucket=bucket_name, object=item['name'])
+            req = self.api_client.objects().delete(bucket=bucket_name, object=item['name'])
             log.debug("deleting " + item['_uri'])
             req.execute()
 
@@ -172,7 +178,7 @@ class GCSFilesystem(Filesystem):
         io_obj = io.BytesIO()
         return self._upload_io(io_obj, dest_uri)
 
-    def upload(self, src_path, dest_uri):
+    def put(self, src_path, dest_uri):
         """Uploads a local file to a specific destination."""
         io_obj = io.FileIO(src_path)
         return self._upload_io(io_obj, dest_uri)
@@ -181,7 +187,7 @@ class GCSFilesystem(Filesystem):
         bucket_name, object_name = parse_gcs_uri(src_uri)
 
         # Chunked file download
-        req = self._service.objects().get_media(bucket=bucket_name, object=object_name)
+        req = self.api_client.objects().get_media(bucket=bucket_name, object=object_name)
         downloader = http.MediaIoBaseDownload(io_obj, req)
 
         done = False
@@ -201,7 +207,7 @@ class GCSFilesystem(Filesystem):
 
         # Chunked file upload
         media = http.MediaIoBaseUpload(io_obj, _BINARY_MIMETYPE, resumable=True)
-        upload_req = self._service.objects().insert(bucket=bucket, name=name, media_body=media)
+        upload_req = self.api_client.objects().insert(bucket=bucket, name=name, media_body=media)
 
         upload_resp = None
         while upload_resp is None:
@@ -217,17 +223,17 @@ class GCSFilesystem(Filesystem):
         if prefix:
             list_kwargsp['prefix'] = prefix
 
-        req = self._service.buckets().list(**list_kwargs)
+        req = self.api_client.buckets().list(**list_kwargs)
         resp = req.execute()
 
         return resp['items']
 
     def bucket_get(self, bucket):
-        req = self._service.buckets().get(bucket=bucket)
+        req = self.api_client.buckets().get(bucket=bucket)
         return req.execute()
 
     def bucket_create(self, project, bucket, location='', object_ttl_days=None):
-        """Create a bucket on S3, optionally setting location constraint."""
+        """Create a bucket on GCS, optionally setting location constraint."""
         # https://cloud.google.com/storage/docs/lifecycle
         insert_kwargs = dict(project=project, name=bucket)
 
@@ -241,7 +247,7 @@ class GCSFilesystem(Filesystem):
             )
             insert_kwargs['lifecycle'] = dict(rule=[lifecycle_rule])
 
-        req = self._service.buckets().insert(**insert_kwargs)
+        req = self.api_client.buckets().insert(**insert_kwargs)
         return req.execute()
 
 def is_gcs_uri(uri):
@@ -271,24 +277,3 @@ def parse_gcs_uri(uri):
         raise ValueError('Invalid GCS URI: %s' % uri)
 
     return components.netloc, components.path[1:]
-
-if __name__ == "__main__":
-    try:
-        from oauth2client.client import GoogleCredentials
-        from googleapiclient import discovery
-    except ImportError:
-        # don't require boto; MRJobs don't actually need it when running
-        #  inside hadoop streaming
-        GoogleCredentials = None
-        discovery = None
-
-    fs = GCSFilesystem()
-    test_path = "gs://boulder-input-data/mrjob-boulder-kir/part-00000"
-
-    # ls_gen = list(fs._ls_detailed(test_path))
-    # import pprint
-    # pprint.pprint(ls_gen)
-    #
-    # for line in fs.cat(test_path):
-    #     print line.rstrip('\n')
-    # fs.upload("/Users/vbp/code/boulder/CHANGES.txt", "gs://boulder-input-data/vbptest/changes")

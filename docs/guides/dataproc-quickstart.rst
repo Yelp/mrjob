@@ -12,10 +12,14 @@ Dataproc and use GCS.
 * Create a `Google Cloud Platform account <http://cloud.google.com/>`_
 * Setup a Billing Account and associate Billing with your Project
 * Go to the API Manager and do the following
+
   * Enable API: Google Cloud Storage
   * Enable API: Google Cloud Dataproc API
   * Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
-* Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`
+
+* Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`_
+
+`How GCP Default credentials work <https://developers.google.com/identity/protocols/application-default-credentials#howtheywork>`_
 
 .. _running-a-dataproc-job:
 
@@ -31,11 +35,9 @@ cluster, with the following changes:
 * The Hadoop version is specified by the `Dataproc version <https://cloud.google.com/dataproc/dataproc-versions>`_
 
 This the output of this command should be identical to the output shown in
-:doc:`quickstart`, but it should take much longer:
+:doc:`quickstart`, but it should take much longer::
 
     > python word_count.py -r dataproc README.txt
-
-::
     "chars" 3654
     "lines" 123
     "words" 417
@@ -60,7 +62,7 @@ output streamed back to your local machine. For that, use
 There are many other ins and outs of effectively using mrjob with Dataproc.
 This is a strictly no-outs body of documentation!
 
-.. _picking-cluster-config:
+.. _picking-dataproc-cluster-config:
 
 Choosing Type and Number of GCE Instances
 -----------------------------------------
@@ -104,7 +106,7 @@ Here are some things to consider when tuning your instance settings:
   (and more memory).
 
 The basic way to control type and number of instances is with the
-*vm_type* and *num_worker* options, on the command line like
+:mrjob-opt:`vm_type` and :mrjob-opt:`num_worker` options, on the command line like
 this::
 
     --vm-type n1-highcpu-8 --num-worker 4
@@ -121,6 +123,6 @@ than ``n1-standard-1`` to schedule tasks.  *vm_type* only applies to
 instances that actually run tasks. (In this example, there are 1 ``n1-standard-1``
 master instance, and 4 ``n1-highcpu-8`` worker instances.) You *will* need a larger
 master instance if you have a very large number of input files; in this case,
-use the *vm_type_master* option.
+use the :mrjob-opt:`vm_type_master` option.
 
-If you want to run preemptible instances, use the *vm_type_preemptible* and *num_preemptible* options.
+If you want to run preemptible instances, use the :mrjob-opt:`vm_type_preemptible` and :mrjob-opt:`num_preemptible` options.

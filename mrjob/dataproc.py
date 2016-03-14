@@ -44,7 +44,7 @@ from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.gcs import is_gcs_uri
 
 from mrjob.parse import is_uri
-
+from mrjob.py2 import PY2
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import BootstrapWorkingDirManager
@@ -63,6 +63,12 @@ _DEFAULT_VM_TYPE = 'n1-standard-1'
 _DEFAULT_CLOUD_API_COOLDOWN_SECS = 10.0
 _DEFAULT_FS_SYNC_SECS = 5.0
 _DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS = 28
+
+_DATAPROC_CLUSTER_STATES_READY = frozenset(['UPDATING', 'RUNNING'])
+_DATAPROC_CLUSTER_STATES_ERROR = frozenset(['ERROR', 'DELETING'])
+
+_DATAPROC_JOB_STATES_ACTIVE = frozenset(['PENDING', 'RUNNING', 'CANCEL_PENDING'])
+_DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
 
 # bootstrap action which automatically terminates idle clusters
 # _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
@@ -267,7 +273,7 @@ class DataprocJobRunner(MRJobRunner):
         # when did our particular task start?
         self._dataproc_job_start = None
 
-        # This will be filled by _wait_for_steps_to_complete()
+        # This will be filled by _run_steps()
         self._log_interpretations = []
 
 
@@ -320,7 +326,7 @@ class DataprocJobRunner(MRJobRunner):
 
     def _run(self):
         self._launch()
-        self._wait_for_steps_to_complete()
+        self._run_steps()
 
     def _launch(self):
         self._prepare_for_launch()
@@ -415,7 +421,7 @@ class DataprocJobRunner(MRJobRunner):
             log.debug('uploading %s -> %s' % (path, gcs_uri))
 
             # TODO - mtai @ davidmarin - Implement upload function for other FSs
-            self.fs.upload(path, gcs_uri)
+            self.fs.put(path, gcs_uri)
 
         self._wait_for_fs_sync()
 
@@ -462,9 +468,16 @@ class DataprocJobRunner(MRJobRunner):
     def _cleanup_logs(self):
         super(DataprocJobRunner, self)._cleanup_logs()
 
-    # TODO - mtai @ davidmarin - Revisit
     def _cleanup_job(self):
-        pass
+        job_prefix = self._dataproc_job_prefix()
+        for current_job in self._api_job_list(self._cluster_id, state_matcher='ACTIVE'):
+            current_job_id = current_job['reference']['jobId']
+
+            if not current_job_id.startswith(job_prefix):
+                continue
+
+            self._api_job_cancel(current_job_id)
+            _wait_for('job cancellation', self._opts['cloud_api_cooldown_secs'])
 
     def _cleanup_cluster(self):
         try:
@@ -568,34 +581,34 @@ class DataprocJobRunner(MRJobRunner):
         # keep track of when we launched our job
         self._dataproc_job_start = time.time()
 
-    def _wait_for_steps_to_complete(self):
-        """Wait for every step of the job to complete, one by one."""
+    def _dataproc_job_prefix(self):
+        return _cleanse_gcp_job_id(self._job_key)
 
+    def _run_steps(self):
+        """Wait for every step of the job to complete, one by one."""
         total_steps = self._num_steps()
         # define out steps
         for step_num in xrange(total_steps):
-            # NOTE - mtai @ davidmarin - Dataproc accepts multiple jobs at once
-            # NOTE - mtai @ davidmarin - In this particular implementation, we must build each step on the fly and submit it and WAIT for step completion
-            # NOTE - mtai @ davidmarin - we THEN iterate through the loop and continue on
+            job_id = self._launch_step(step_num)
 
-            # Build each step
-            hadoop_job = self._build_dataproc_hadoop_job(step_num)
-
-            # Clean-up step name
-            step_name = '%s - Step %d of %d' % (self._job_key, step_num + 1, self._num_steps())
-            cleansed_step_name = _cleanse_gcp_job_id(step_name)
-
-            # Submit it
-            log.info('Submitting Dataproc Hadoop Job - %s', cleansed_step_name)
-            job_id = self._api_job_submit_hadoop(cleansed_step_name, hadoop_job)
-            log.info('Submitted Dataproc Hadoop Job - %s', job_id)
-
-            assert job_id == cleansed_step_name
-
-            # Wait for Job completion
             self._wait_for_step_to_complete(job_id, step_num=step_num, num_steps=total_steps)
 
             log.info('Completed Dataproc Hadoop Job - %s', job_id)
+
+    def _launch_step(self, job_prefix, step_num):
+        # Build each step
+        hadoop_job = self._build_dataproc_hadoop_job(step_num)
+
+        # Clean-up step name
+        step_name = '%s---step-%05d-of-%05d' % (self._dataproc_job_prefix(), step_num + 1, self._num_steps())
+
+        # Submit it
+        log.info('Submitting Dataproc Hadoop Job - %s', step_name)
+        job_id = self._api_job_submit_hadoop(step_name, hadoop_job)
+        log.info('Submitted Dataproc Hadoop Job - %s', job_id)
+
+        assert job_id == step_name
+        return job_id
 
     def _wait_for_step_to_complete(self, job_id, step_num=None, num_steps=None):
         """Helper for _wait_for_step_to_complete(). Wait for
@@ -609,9 +622,6 @@ class DataprocJobRunner(MRJobRunner):
         self._log_interpretations.append(log_interpretation)
 
         while True:
-            # don't antagonize Dataproc's throttling
-            _wait_for('job completion', self._opts['cloud_api_cooldown_secs'])
-            
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus
             job_result = self._api_job_get(job_id)
 
@@ -620,17 +630,17 @@ class DataprocJobRunner(MRJobRunner):
 
             log.info('%s  %s - %s' % (job_id, job_start_time, job_state))
 
-            # TODO - mtai @ davidmarin - State checking is NOT tested at this point, see included URL for Dataproc Job states
             # NOTE -  mtai @ davidmarin - https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State
-            if job_state not in ('DONE', 'ERROR', 'CANCELLED'):
+            if job_state in _DATAPROC_JOB_STATES_ACTIVE:
+                _wait_for('job completion', self._opts['cloud_api_cooldown_secs'])
                 continue
 
             # we're done, will return at the end of this
-            if job_state == 'DONE':
+            elif job_state == 'DONE':
                 break
 
-            elif job_state == 'ERROR':
-                raise StepFailedException(step_num=step_num, num_steps=num_steps)
+            raise StepFailedException(step_num=step_num, num_steps=num_steps)
+
 
     def _step_input_uris(self, step_num):
         """Get the gs:// URIs for input for the given step."""
@@ -639,7 +649,7 @@ class DataprocJobRunner(MRJobRunner):
                     for path in self._get_input_paths()]
         else:
             # put intermediate data in HDFS
-            return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (
+            return ['hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
                 self._job_key, step_num)]
 
     def _step_output_uri(self, step_num):
@@ -647,7 +657,7 @@ class DataprocJobRunner(MRJobRunner):
             return self._output_dir
         else:
             # put intermediate data in HDFS
-            return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
+            return 'hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
                 self._job_key, step_num + 1)
 
     def counters(self):
@@ -722,17 +732,21 @@ class DataprocJobRunner(MRJobRunner):
         if not self._opts['bootstrap_python']:
             return []
 
-        # Python 2 is already installed; install pip and ujson
+        if PY2:
+            # Python 2 is already installed; install pip and ujson
 
-        # (We also install python-pip for bootstrap_python_packages,
-        # but there's no harm in running these commands twice, and
-        # bootstrap_python_packages is deprecated anyway.)
+            # (We also install python-pip for bootstrap_python_packages,
+            # but there's no harm in running these commands twice, and
+            # bootstrap_python_packages is deprecated anyway.)
+            return [
+                ['sudo apt-get install -y python-pip python-dev'],
+                ['sudo pip install --upgrade ujson'],
+            ]
 
-        # NOTE - mtai @ davidmarin - Dataproc uses apt-get, ujson needs python-dev installed
         return [
-            ['sudo apt-get install -y python-pip python-dev'],
-            ['sudo pip install --upgrade ujson'],
-        ]
+                ['sudo apt-get install -y python3 python3-pip python3-dev'],
+                ['sudo pip3 install --upgrade ujson'],
+            ]
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with
@@ -804,10 +818,6 @@ class DataprocJobRunner(MRJobRunner):
 
 
     def _cluster_args(self):
-        # TODO - documentation error, friendly error message when cluster_name has caps
-        # clusterName can't have caps, limited to alphanumeric, up to 54 characters
-        # clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).
-
         # TODO - add idle termination script to bootstrap actions
         # TODO - investigate whether termination script will do the right thing WRT shutdown
         # TODO - investigate whether termination script in bootstrap actions will timeout
@@ -884,34 +894,51 @@ class DataprocJobRunner(MRJobRunner):
             body=cluster_data
         ).execute()
 
+
+        # See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State
         cluster_state = None
-
-        # TODO - mtai @ davidmarin - See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State
-        # TODO - mtai @ davidmarin - We should probably pull these strings to constants
-
-        # TODO - mtai @ davidmarin - Can end up in infinite loop if cluster_state doesn't end up in (RUNNING,ERROR)
-        while bool(cluster_state != 'RUNNING'):
-            result_describe =  self.api_client.clusters().get(
+        while cluster_state not in _DATAPROC_CLUSTER_STATES_READY:
+            result_describe = self.api_client.clusters().get(
                 projectId=self._gcp_project,
                 region=_DATAPROC_API_REGION,
                 clusterName=cluster_id).execute()
     
             cluster_state = result_describe['status']['state']
-            if cluster_state == 'ERROR':
+            if cluster_state in _DATAPROC_CLUSTER_STATES_ERROR:
                 raise Exception(result_describe)
     
-            _wait_for('cluster to launch', self._opts['cloud_api_cooldown_secs'])
+            _wait_for('cluster ready to accept jobs', self._opts['cloud_api_cooldown_secs'])
 
         # TODO - mtai @ davidmarin - We should probably do something nicer here...
-        assert cluster_state == 'RUNNING'
-        return self._gcp_project
-    
+        assert cluster_state in _DATAPROC_CLUSTER_STATES_READY
+        return cluster_id
+
     def _api_cluster_delete(self, cluster_id):
         return self.api_client.clusters().delete(
             projectId=self._gcp_project,
             region=_DATAPROC_API_REGION,
             clusterName=cluster_id
         ).execute()
+
+
+    def _api_job_list(self, cluster_id, state_matcher=None):
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/list#JobStateMatcher
+        list_kwargs = dict(
+            projectId=self._gcp_project,
+            region=_DATAPROC_API_REGION,
+            clusterName=cluster_id
+        )
+        if state_matcher:
+            list_kwargs['jobStateMatcher'] = state_matcher
+
+        list_request = self.api_client.jobs().list(**list_kwargs)
+        while list_request:
+            resp = list_request.execute()
+
+            for current_item in resp['items']:
+                yield current_item
+
+            list_request = self.api_client.jobs().list_next(list_request, resp)
 
     def _api_job_get(self, job_id):
         return self.api_client.jobs().get(

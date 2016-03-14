@@ -33,7 +33,7 @@ Cluster creation and configuration
     :switch: --cloud-zone
     :type: :ref:`string <data-type-string>`
     :set: dataproc
-    :default: GCP/AWS default
+    :default: gcloud SDK default
 
     Availability zone to run the job in
 
@@ -42,7 +42,7 @@ Cluster creation and configuration
     :switch: --cloud-region
     :type: :ref:`string <data-type-string>`
     :set: dataproc
-    :default: ``'us-central-1'``
+    :default: gcloud SDK default
 
     region to run Dataproc jobs on (e.g.  ``us-central-1``). Also used by mrjob
     to create temporary buckets if you don't set :mrjob-opt:`fs_tmpdir`
@@ -53,7 +53,7 @@ Cluster creation and configuration
     :switch: --cloud-image
     :type: :ref:`string <data-type-string>`
     :set: dataproc
-    :default: ``'1.0'``
+    :default: ````
 
     Cloud Image to run Dataproc jobs on.  See `the Dataproc docs on specifying the Dataproc version`_.  for details.
 
@@ -71,7 +71,7 @@ and install another Python binary.
     :config: bootstrap
     :switch: --bootstrap
     :type: :ref:`string list <data-type-string-list>`
-    :set: all
+    :set: dataproc
     :default: ``[]``
 
     A list of lines of shell script to run once on each node in your cluster,
@@ -219,5 +219,5 @@ MRJob uses google-api-python-client to manipulate/access FS.
     :set: dataproc
     :default: 5.0
 
-    How long to wait for S3 to reach eventual consistency. This is typically
-    less than a second (zero in U.S. West), but the default is 5.0 to be safe.
+    How long to wait for GCS to reach eventual consistency. This is typically
+    less than a second, but the default is 5.0 to be safe.

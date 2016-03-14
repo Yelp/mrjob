@@ -19,18 +19,41 @@ import logging
 from mrjob.fs.base import Filesystem
 from mrjob.parse import urlparse
 from mrjob.runner import GLOB_RE
-
+from mrjob.util import read_file
 
 from apiclient import discovery
 from oauth2client.client import GoogleCredentials
-from apiclient.http import MediaIoBaseDownload
 from apiclient import http
 import io
-import json
+import os
+import tempfile
 import base64
 import binascii
 
 log = logging.getLogger(__name__)
+
+_BINARY_MIMETYPE = 'application/octet-stream'
+_LS_FIELDS_TO_RETURN = 'nextPageToken,items(id,size,name,md5Hash)'
+
+
+def _base64_to_hex(base64_encoded):
+    base64_decoded = base64.decodestring(base64_encoded)
+    return binascii.hexlify(base64_decoded)
+
+
+def _path_glob_to_parsed_gcs_uri(path_glob):
+    # support globs
+    glob_match = GLOB_RE.match(path_glob)
+
+    # we're going to search for all keys starting with base_uri
+    if glob_match:
+        # cut it off at first wildcard
+        base_uri = glob_match.group(1)
+    else:
+        base_uri = path_glob
+
+    bucket_name, base_name = parse_gcs_uri(base_uri)
+    return bucket_name, base_name
 
 
 class GCSFilesystem(Filesystem):
@@ -42,20 +65,20 @@ class GCSFilesystem(Filesystem):
 
     def __init__(self):
         credentials = GoogleCredentials.get_application_default()
-        self.service = discovery.build('storage', 'v1', credentials=credentials)
+        self._service = discovery.build('storage', 'v1', credentials=credentials)
 
     def can_handle_path(self, path):
         return is_gcs_uri(path)
 
     def du(self, path_glob):
         """Get the size of all files matching path_glob."""
-        return sum(item[1] for item in self.lsWithInfo(path_glob))
+        return sum(item['size'] for item in self._ls_detailed(path_glob))
 
     def ls(self, path_glob):
-        for item in self.lsWithInfo(path_glob):
-            yield item[0]
+        for item in self._ls_detailed(path_glob):
+            yield item['_uri']
 
-    def lsWithInfo(self, path_glob):
+    def _ls_detailed(self, path_glob):
         """Recursively list files on GCS and includes some metadata about them:
         - uri
         - size
@@ -71,17 +94,7 @@ class GCSFilesystem(Filesystem):
 
         scheme = urlparse(path_glob).scheme
 
-        # support globs
-        glob_match = GLOB_RE.match(path_glob)
-
-        # we're going to search for all keys starting with base_uri
-        if glob_match:
-            # cut it off at first wildcard
-            base_uri = glob_match.group(1)
-        else:
-            base_uri = path_glob
-
-        bucket_name, base_name = parse_gcs_uri(base_uri)
+        bucket_name, _ = _path_glob_to_parsed_gcs_uri(path_glob)
 
         # allow subdirectories of the path/glob
         if path_glob and not path_glob.endswith('/'):
@@ -89,47 +102,43 @@ class GCSFilesystem(Filesystem):
         else:
             dir_glob = path_glob + '*'
 
+        list_request = self._service.objects().list(bucket=bucket_name, fields=_LS_FIELDS_TO_RETURN)
 
-        fields_to_return = "nextPageToken,items(id,size,bucket,name,md5Hash,etag)"
-        req = self.service.objects().list(bucket=bucket_name, fields=fields_to_return)
-        while req:
-            resp = req.execute()
-            resp_json = json.loads(json.dumps(resp))
-            for item in resp_json["items"]:
+        while list_request:
+            resp = list_request.execute()
+            for item in resp['items']:
                 # We generate the item URI by adding the "gs://" prefix and snipping the "/generation"
                 # number which is at the end of the id that we retrieved.
-                uri = "%s://%s" % (scheme, item["id"].rpartition("/")[0])
+                file_path, _, generation = item['id'].rpartition('/')
+                uri = "%s://%s" % (scheme, file_path)
+
                 # enforce globbing
                 if not (fnmatch.fnmatchcase(uri, path_glob) or fnmatch.fnmatchcase(uri, dir_glob)):
                     continue
-                yield uri, long(item["size"]), item["bucket"], item["name"], item["md5Hash"], item["etag"]
-            req = self.service.objects().list_next(req, resp)
+
+                item['_uri'] = uri
+                item['size'] = int(item['size'])
+                yield item
+
+            list_request = self._service.objects().list_next(list_request, resp)
 
     def md5sum(self, path):
-        object_list = list(self.lsWithInfo(path))
-        print object_list
-        if len(object_list) == 1:
-            return binascii.hexlify(base64.decodestring(object_list[0][4]))
-        else:
+        object_list = list(self._ls_detailed(path))
+        if len(object_list) != 1:
             raise Exception("path for md5 sum doesn't resolve to single object" + path)
 
-    def _cat_file(self, filename):
-        bucket_name, object_name = parse_gcs_uri(filename)
-        req = self.service.objects().get_media(bucket=bucket_name, object=object_name)
-        fh = io.BytesIO()
-        downloader = MediaIoBaseDownload(fh, req, chunksize=1024*1024)
-        done = False
-        while not done:
-            status, done = downloader.next_chunk()
-            if status:
-                log.info("Download %d%%." % int(status.progress() * 100))
-            log.info("Download Complete for " + filename)
-        """ TODO: So, at this point we have the file content as you can see it using fh.getvalue().
-        But rather than re-implementing the decompression logic (to deal with compressed files) I'd rather
-        use the same read_file() method (in util.py) that the S3 and local versions are using.
-        But I can't figure out how to build the right file object to pass it to read_file().
-        Help appreciated.
-        """
+        item = object_list[0]
+        return _base64_to_hex(item['md5Hash'])
+
+    def _cat_file(self, gcs_uri):
+        tmp_fd, tmp_path = tempfile.mkstemp()
+        tmp_fileobj = os.fdopen(tmp_fd, 'w+b')
+
+        self._download_io(tmp_fileobj, gcs_uri)
+
+        tmp_fileobj.seek(0)
+
+        return read_file(gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on GCS because there are
@@ -152,28 +161,81 @@ class GCSFilesystem(Filesystem):
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
-        for item in self.lsWithInfo(path_glob):
-            req = self.service.objects().delete(bucket=item[2], object=item[3])
-            log.debug("deleting " + item[0])
+        bucket_name, base_name = _path_glob_to_parsed_gcs_uri(path_glob)
+
+        for item in self._ls_detailed(path_glob):
+            req = self._service.objects().delete(bucket=bucket_name, object=item['name'])
+            log.debug("deleting " + item['_uri'])
             req.execute()
 
-    def touchz(self, dest):
-        """ TODO: too much common code between touchz and updload. Refactor.
-        Make an empty file in the given location. Raises an error if
-        a file already exists in that location."""
-        if self.exists(dest):
-            raise Exception("File already exists: " + dest)
-        media = http.MediaIoBaseUpload(io.BytesIO(""), "text/plain")
-        req = self.service.objects().insert( bucket=parse_gcs_uri(dest)[0], name=parse_gcs_uri(dest)[1], media_body=media)
-        req.execute()
+    def touchz(self, dest_uri):
+        io_obj = io.BytesIO()
+        return self._upload_io(io_obj, dest_uri)
 
-    def upload(self, local_path, destination_uri):
+    def upload(self, src_path, dest_uri):
         """Uploads a local file to a specific destination."""
-        if self.exists(destination_uri):
-            raise Exception("File already exists: " + destination_uri)
-        media = http.MediaIoBaseUpload(io.FileIO(local_path), "text/plain")
-        req = self.service.objects().insert( bucket=parse_gcs_uri(destination_uri)[0], name=parse_gcs_uri(destination_uri)[1], media_body=media)
-        req.execute()
+        io_obj = io.FileIO(src_path)
+        return self._upload_io(io_obj, dest_uri)
+
+    def _download_io(self, io_obj, src_uri):
+        bucket_name, object_name = parse_gcs_uri(src_uri)
+
+        # Chunked file download
+        req = self._service.objects().get_media(bucket=bucket_name, object=object_name)
+        downloader = http.MediaIoBaseDownload(io_obj, req)
+
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+            if status:
+                log.debug("Download %d%%." % int(status.progress() * 100))
+
+        log.debug("Download Complete for %s", src_uri)
+        return io_obj
+
+    def _upload_io(self, io_obj, dest_uri):
+        bucket, name = parse_gcs_uri(dest_uri)
+
+        if self.exists(dest_uri):
+            raise Exception("File already exists: " + dest_uri)
+
+        # Chunked file upload
+        media = http.MediaIoBaseUpload(io_obj, _BINARY_MIMETYPE, resumable=True)
+        upload_req = self._service.objects().insert(bucket=bucket, name=name, media_body=media)
+
+        upload_resp = None
+        while upload_resp is None:
+          status, upload_resp = upload_req.next_chunk()
+          if status:
+            log.debug("Uploaded %d%%." % int(status.progress() * 100))
+
+        log.debug('Upload Complete! %s', dest_uri)
+
+    def get_all_buckets(self, project_name):
+        """Create a bucket on S3, optionally setting location constraint."""
+
+        req = self._service.buckets().list(project=project_name)
+        resp = req.execute()
+
+        return resp['items']
+
+
+    def create_tmp_bucket(self, bucket_name, location=''):
+        """Create a bucket on S3, optionally setting location constraint."""
+        # https://cloud.google.com/storage/docs/lifecycle
+        lifecycle_rule = dict(
+            action=dict(type='Delete'),
+            condition=dict(age=28)
+        )
+
+        insert_kwargs = dict()
+        insert_kwargs['name'] = bucket_name
+        insert_kwargs['lifecycle'] = dict(rule=[lifecycle_rule])
+        if location:
+            insert_kwargs['location'] = location
+
+        req = self._service.buckets().insert(**insert_kwargs)
+        return req.execute()
 
 def is_gcs_uri(uri):
     """Return True if *uri* can be parsed into an S3 URI, False otherwise.
@@ -203,7 +265,6 @@ def parse_gcs_uri(uri):
 
     return components.netloc, components.path[1:]
 
-
 if __name__ == "__main__":
     try:
         from oauth2client.client import GoogleCredentials
@@ -215,10 +276,11 @@ if __name__ == "__main__":
         discovery = None
 
     fs = GCSFilesystem()
-    testPath = "gs://boulder-input-data/big.txt"
-    ls_gen = fs.ls(testPath)
-    print list(ls_gen)
-    print fs.md5sum(testPath)
-    #fs.upload("/Users/vbp/code/boulder/CHANGES.txt", "gs://boulder-input-data/vbptest/changes")
+    test_path = "gs://boulder-input-data/mrjob-boulder-kir/part-00000"
+    ls_gen = list(fs._ls_detailed(test_path))
+    import pprint
+    pprint.pprint(ls_gen)
 
-
+    for line in fs.cat(test_path):
+        print line.rstrip('\n')
+    # fs.upload("/Users/vbp/code/boulder/CHANGES.txt", "gs://boulder-input-data/vbptest/changes")

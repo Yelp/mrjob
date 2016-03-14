@@ -60,7 +60,16 @@ from mrjob.util import random_identifier
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_GCP_REGION = 'global'
+_DEFAULT_DATAPROC_REGION = 'global'
+
+
+# bootstrap action which automatically terminates idle clusters
+_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
+    os.path.dirname(mrjob.__file__),
+    'bootstrap',
+    'terminate_idle_cluster.sh')
+
+
 _HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar'
 
 # TODO - mtai @ davidmarin - Example invocation options for mrjob.py
@@ -72,8 +81,8 @@ _HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.j
 # TODO - mtai @ davidmarin - Re-implement logs parsing?  See dataproc metainfo and driver output - ask Dennis Huo for more details
 # 'gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/mr_most_used_word-taim-20160228-172000-034993---Step-2-of-2/driveroutput'
 
-# TODO - mtai @ davidmarin - We should re-instance the bucket creation logic used in EMR
-_DEFAULT_GCS_BUCKET = 'boulder-input-data'
+# - step-by-step docs on how to create an account, enable Dataproc, and set up credentials, similar to the Configuring AWS Credentials section of the mrjob docs (https://pythonhosted.org/mrjob/guides/emr-quickstart.html#amazon-setup).
+
 
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
@@ -89,7 +98,7 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         'gcp_project',
         'gcp_region',
         'gcp_zone',
-        'gcp_cluster',
+        'dataproc_cluster',
 
         'gce_machine_type',
         'gce_num_instances',
@@ -113,9 +122,6 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
 
     def __init__(self, alias, opts, conf_paths):
         super(DataprocRunnerOptionStore, self).__init__(alias, opts, conf_paths)
-
-        # TODO - mtai @ davidmarin - As of 2016-02-26, the ONLY valid region is "global"
-        self['gcp_region'] = _DEFAULT_GCP_REGION
 
         # Dataproc requires a master and >= 2 worker instances
         # gce_num_instances refers ONLY to number of WORKER instances and does NOT include the required 1 instance for master
@@ -171,8 +177,8 @@ class DataprocJobRunner(MRJobRunner):
         # if we're going to create a bucket to use as temp space, we don't
         # want to actually create it until we run the job (Issue #50).
         # This variable helps us create the bucket as needed
+        self._gcs_tmp_bucket_to_create = None
 
-        # TODO - mtai @ davidmarin - We should re-instance the bucket creation logic used in EMR, instead creating buckets in GCS
         self._fix_gcs_tmp_opts()
 
         # use job key to make a unique tmp dir
@@ -202,10 +208,12 @@ class DataprocJobRunner(MRJobRunner):
         # we'll create the script later
         self._master_bootstrap_script_path = None
 
+        # TODO - read default GCP project/region/zone from gcloud SDK if not available
         self._gcp_project = self._opts['gcp_project']
         self._gcp_region = self._opts['gcp_region']
         self._gcp_zone = self._opts['gcp_zone']
-        self._gcp_cluster = self._opts['gcp_cluster']
+
+        self._dataproc_cluster = self._opts['gcp_cluster']
 
         self._dataproc_client = None
 
@@ -237,14 +245,32 @@ class DataprocJobRunner(MRJobRunner):
             log.info('using %s as our temp dir on GCS' %
                      self._opts['gcs_tmp_dir'])
 
-        self._opts['gcs_tmp_dir'] = self._check_and_fix_gcs_dir(
-            self._opts['gcs_tmp_dir'])
+        self._opts['gcs_tmp_dir'] = self._check_and_fix_gcs_dir(self._opts['gcs_tmp_dir'])
 
     def _set_gcs_tmp_dir(self):
         """Helper for _fix_gcs_tmp_dir"""
-        mrjob_tmp = 'mrjob-%s' % random_identifier()
-        self._opts['gcs_tmp_dir'] = ('gs://%s/tmp/%s' % (_DEFAULT_GCS_BUCKET, mrjob_tmp))
-        return
+        buckets = self.fs.get_all_buckets()
+        mrjob_buckets = [b for b in buckets if b['name'].startswith('mrjob-')]
+
+        # Loop over buckets until we find one that is not region-
+        #   restricted, matches aws_region, or can be used to
+        #   infer aws_region if no aws_region is specified
+        for tmp_bucket in mrjob_buckets:
+            tmp_bucket_name = tmp_bucket['name']
+
+            # TODO - validate location == gcp_region
+            if tmp_bucket['location'] == self._gcp_region:
+                # Regions are both specified and match
+                log.info("using existing temp bucket %s" % tmp_bucket_name)
+                self._opts['s3_tmp_dir'] = ('gcs://%s/tmp/' % tmp_bucket_name)
+                return
+
+        tmp_bucket_name = 'mrjob-' + random_identifier()
+        self._gcs_tmp_bucket_to_create = tmp_bucket_name
+        log.info("creating new temp bucket %s" % tmp_bucket_name)
+
+        self._opts['gcs_tmp_dir'] = 'gs://%s/tmp/' % tmp_bucket_name
+
 
     def _check_and_fix_gcs_dir(self, gcs_uri):
         """Helper for __init__"""
@@ -333,6 +359,11 @@ class DataprocJobRunner(MRJobRunner):
         if self._master_bootstrap_script_path:
             self._upload_mgr.add(self._master_bootstrap_script_path)
 
+        # Add max-hours-idle script if we need it
+        if self._opts['max_hours_idle']:
+            self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+
+
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
@@ -351,6 +382,8 @@ class DataprocJobRunner(MRJobRunner):
                 self._upload_mgr.add(step['jar'])
 
     def _upload_local_files_to_gcs(self):
+        self._create_gcs_tmp_bucket_if_needed()
+
         """Copy local files tracked by self._upload_mgr to GCS."""
         log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
 
@@ -360,13 +393,28 @@ class DataprocJobRunner(MRJobRunner):
             # TODO - mtai @ davidmarin - Implement upload function for other FSs
             self.fs.upload(path, gcs_uri)
 
+
+    def _create_gcs_tmp_bucket_if_needed(self):
+        """Make sure temp bucket exists"""
+        if not self._gcs_tmp_bucket_to_create:
+            return
+
+        log.info('creating GCS bucket %r to use as temp space' %
+                 self._gcs_tmp_bucket_to_create)
+
+        # TODO - choose regional location based on parameters
+        # https://cloud.google.com/storage/docs/bucket-locations
+        location = self._gcp_region
+
+        self.fs.create_tmp_bucket(self._gcs_tmp_bucket_to_create, location=location)
+        self._gcs_tmp_bucket_to_create = None
+
     ### Running the job ###
 
     def cleanup(self, mode=None):
         super(DataprocJobRunner, self).cleanup(mode=mode)
 
-        # TODO - mtai @ davidmarin - Clusters are NOT being automatically cleaned up
-        # self._cleanup_cluster()
+        self._cleanup_cluster()
 
     def _cleanup_remote_tmp(self):
         # delete all the files we created
@@ -393,7 +441,7 @@ class DataprocJobRunner(MRJobRunner):
         except Exception as e:
             log.exception(e)
             return
-        log.info('cluster %s successfully terminated' % self._gcp_cluster)
+        log.info('cluster %s successfully terminated' % self._dataproc_cluster)
 
     def _wait_for_gcs_eventual_consistency(self):
         """Sleep for a little while, to give GCS a chance to sync up.
@@ -460,11 +508,12 @@ class DataprocJobRunner(MRJobRunner):
         return output_hadoop_job
 
     def _launch_dataproc_cluster(self):
-        """Create an empty cluster on Dataproc, and set self._gcp_cluster to
+        """Create an empty cluster on Dataproc, and set self._dataproc_cluster to
         its ID."""
+        self._create_gcs_tmp_bucket_if_needed()
         self._wait_for_gcs_eventual_consistency()
 
-        self._gcp_cluster_start = time.time()
+        self._dataproc_cluster_start = time.time()
 
         # make sure we can see the files we copied to GCS
         log.info('Creating Dataproc Hadoop cluster')
@@ -472,17 +521,15 @@ class DataprocJobRunner(MRJobRunner):
         # NOTE - mtai @ davidmarin - We create the cluster if its missing, otherwise we join an existing one
         # NOTE - mtai @ davidmarin - The cluster MUST be created before submitting jobs, otherwise job submission fails
 
-        # TODO - mtai @ davidmarin - change the way we auto-create cluster names
         # "clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'"
-        self._gcp_cluster = self._gcp_cluster or "default-%s" % self._opts['owner']
-
+        self._dataproc_cluster = self._dataproc_cluster or "mrjob-%s" % random_identifier()
         try:
             self._get_cluster()
-            log.info('Adding our job to existing cluster %s' % self._gcp_cluster)
+            log.info('Adding our job to existing cluster %s' % self._dataproc_cluster)
         # TODO - mtai @ davidmarin - Change Exception to HttpError and check 404 for cluster does not exist
         except Exception as e:
             self._create_cluster()
-            log.info('Created new cluster %s' % self._gcp_cluster)
+            log.info('Created new cluster %s' % self._dataproc_cluster)
 
         # keep track of when we launched our job
         self._dataproc_job_start = time.time()
@@ -591,7 +638,7 @@ class DataprocJobRunner(MRJobRunner):
         # TODO - mtai @ davidmarin - Don't know when we don't need to do this...
         # TODO - mtai @ davidmarin - for now, we're always creating the master_bootstrap_script
         #  don't bother if we're not starting a cluster
-        # if self._gcp_cluster:
+        # if self._dataproc_cluster:
         #     return
 
         # Also don't bother if we're not bootstrapping
@@ -622,6 +669,7 @@ class DataprocJobRunner(MRJobRunner):
             mrjob_bootstrap.append(
                 ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
                  cmd_line(self._python_bin())])
+
 
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
@@ -724,26 +772,26 @@ class DataprocJobRunner(MRJobRunner):
 
         return out
 
-    ### Dataproc-specific Stuff ###
-    #
 
-    def _get_cluster(self):
-        return self.dataproc_client.clusters().get(
-            projectId=self._gcp_project,
-            region=self._gcp_region,
-            clusterName=self._gcp_cluster
-        ).execute()
-
-    def _create_cluster(self):
-        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create
-        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get
-
+    def _cluster_args(self):
         # TODO - documentation error, friendly error message when cluster_name has caps
         # clusterName can't have caps, limited to alphanumeric, up to 54 characters
         # clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).
 
-        # TODO - very odd to use / notation
-        # gcloud config set core/project google.com:pm-hackathon
+        # TODO - add idle termination script to bootstrap actions
+        # TODO - investigate whether termination script will do the right thing WRT shutdown
+        # TODO - investigate whether termination script in bootstrap actions will timeout
+        # # only use idle termination script on persistent clusters
+        # # add it last, so that we don't count bootstrapping as idle time
+        # if self._opts['max_hours_idle']:
+        #     gcs_uri = self._upload_mgr.uri(
+        #         _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+        #     # script takes args in (integer) seconds
+        #     mrjob_bootstrap.append([
+        #         gcs_uri,
+        #         int(self._opts['max_hours_idle'] * 3600),
+        #         int(self._opts['mins_to_end_of_hour'] * 60)
+        #     ])
 
         gce_num_instances = int(self._opts['gce_num_instances'])
         assert gce_num_instances >= 2
@@ -777,7 +825,7 @@ class DataprocJobRunner(MRJobRunner):
 
         cluster_data = {
             'projectId': self._gcp_project,
-            'clusterName': self._gcp_cluster,
+            'clusterName': self._dataproc_cluster,
             'config': {
                 'gceClusterConfig': {
                     'zoneUri': zone_uri
@@ -790,11 +838,27 @@ class DataprocJobRunner(MRJobRunner):
                 ]
             }
         }
+        return cluster_data
 
+    ### Dataproc-specific Stuff ###
+    #
+
+    def _get_cluster(self):
+        return self.dataproc_client.clusters().get(
+            projectId=self._gcp_project,
+            region=_DEFAULT_DATAPROC_REGION,
+            clusterName=self._dataproc_cluster
+        ).execute()
+
+    def _create_cluster(self):
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get
+        cluster_data = self._cluster_args()
         self.dataproc_client.clusters().create(
             projectId=self._gcp_project,
-            region=self._gcp_region,
+            region=_DEFAULT_DATAPROC_REGION,
             body=cluster_data).execute()
+
         cluster_state = None
 
         # TODO - mtai @ davidmarin - See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State
@@ -803,8 +867,8 @@ class DataprocJobRunner(MRJobRunner):
         # TODO - mtai @ davidmarin - Can end up in infinite loop if cluster_state doesn't end up in (RUNNING,ERROR)
         while bool(cluster_state != 'RUNNING'):
             result_describe =  self.dataproc_client.clusters().get(projectId=self._gcp_project,
-                                               region=self._gcp_region,
-                                               clusterName=self._gcp_cluster).execute()
+                                               region=_DEFAULT_DATAPROC_REGION,
+                                               clusterName=self._dataproc_cluster).execute()
     
             cluster_state = result_describe['status']['state']
             if cluster_state == 'ERROR':
@@ -820,28 +884,28 @@ class DataprocJobRunner(MRJobRunner):
     def _delete_cluster(self):
         return self.dataproc_client.clusters().delete(
             projectId=self._gcp_project,
-            region=self._gcp_region,
-            clusterName=self._gcp_cluster
+            region=_DEFAULT_DATAPROC_REGION,
+            clusterName=self._dataproc_cluster
         ).execute()
 
     def _get_job(self, job_id):
         return self.dataproc_client.jobs().get(
             projectId=self._gcp_project,
-            region=self._gcp_region,
+            region=_DEFAULT_DATAPROC_REGION,
             jobId=job_id
         ).execute()
     
     def _cancel_job(self, job_id):
         return self.dataproc_client.jobs().cancel(
             projectId=self._gcp_project,
-            region=self._gcp_region,
+            region=_DEFAULT_DATAPROC_REGION,
             jobId=job_id
         ).execute()
 
     def _delete_job(self, job_id):
         return self.dataproc_client.jobs().delete(
             projectId=self._gcp_project,
-            region=self._gcp_region,
+            region=_DEFAULT_DATAPROC_REGION,
             jobId=job_id
         ).execute()
 
@@ -856,7 +920,7 @@ class DataprocJobRunner(MRJobRunner):
                     "jobId": step_name,
                 },
                 "placement": {
-                    "clusterName": self._gcp_cluster
+                    "clusterName": self._dataproc_cluster
                 },
                 "hadoopJob": hadoop_job
             }
@@ -864,7 +928,7 @@ class DataprocJobRunner(MRJobRunner):
 
         result = self.dataproc_client.jobs().submit(
             projectId=self._gcp_project,
-            region=self._gcp_region,
+            region=_DEFAULT_DATAPROC_REGION,
             body=job_data).execute()
 
         # TODO - mtai @ davidmarin - Add error checking in case job submission fails

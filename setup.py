@@ -25,6 +25,7 @@ try:
             'ujson': ['ujson'],
         },
         'install_requires': [
+            'google-api-python-client>=1.5.0',
             'boto>=2.35.0',
             'filechunkio',
             'PyYAML>=3.08',

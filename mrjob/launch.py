@@ -264,6 +264,10 @@ class MRJobLauncher(object):
             help='show this message and exit')
 
         self.option_parser.add_option(
+            '--help-dataproc', dest='help_dataproc', action='store_true', default=False,
+            help='show Dataproc-related options')
+
+        self.option_parser.add_option(
             '--help-emr', dest='help_emr', action='store_true', default=False,
             help='show EMR-related options')
 
@@ -463,8 +467,14 @@ class MRJobLauncher(object):
         if self.options.help_main:
             self._help_main()
 
+        if self.options.help_dataproc:
+            print_help_for_groups(self.dataproc_emr_opt_group,
+                                  self.dataproc_opt_group)
+            sys.exit(0)
+
         if self.options.help_emr:
-            print_help_for_groups(self.hadoop_emr_opt_group,
+            print_help_for_groups(self.dataproc_emr_opt_group,
+                                  self.hadoop_emr_opt_group,
                                   self.emr_opt_group)
             sys.exit(0)
 

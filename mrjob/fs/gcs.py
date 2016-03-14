@@ -211,28 +211,35 @@ class GCSFilesystem(Filesystem):
 
         log.debug('Upload Complete! %s', dest_uri)
 
-    def get_all_buckets(self, project_name):
-        """Create a bucket on S3, optionally setting location constraint."""
+    def buckets_list(self, project, prefix=None):
+        """List buckets on GCS."""
+        list_kwargs = dict(project=project)
+        if prefix:
+            list_kwargsp['prefix'] = prefix
 
-        req = self._service.buckets().list(project=project_name)
+        req = self._service.buckets().list(**list_kwargs)
         resp = req.execute()
 
         return resp['items']
 
+    def bucket_get(self, project, bucket):
+        req = self._service.buckets().get(project=project, name=bucket)
+        return req.execute()
 
-    def create_tmp_bucket(self, bucket_name, location=''):
+    def bucket_create(self, project, bucket, location='', object_ttl_days=None):
         """Create a bucket on S3, optionally setting location constraint."""
         # https://cloud.google.com/storage/docs/lifecycle
-        lifecycle_rule = dict(
-            action=dict(type='Delete'),
-            condition=dict(age=28)
-        )
+        insert_kwargs = dict(project=project, name=bucket)
 
-        insert_kwargs = dict()
-        insert_kwargs['name'] = bucket_name
-        insert_kwargs['lifecycle'] = dict(rule=[lifecycle_rule])
         if location:
             insert_kwargs['location'] = location
+
+        if object_ttl_days is not None:
+            lifecycle_rule = dict(
+                action=dict(type='Delete'),
+                condition=dict(age=object_ttl_days)
+            )
+            insert_kwargs['lifecycle'] = dict(rule=[lifecycle_rule])
 
         req = self._service.buckets().insert(**insert_kwargs)
         return req.execute()

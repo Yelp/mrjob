@@ -1,0 +1,223 @@
+Dataproc runner options
+=======================
+
+All options from :doc:`configs-all-runners` and :doc:`configs-hadoopy-runners`
+are available to Dataproc emr runner.
+
+Google credentials
+------------------
+
+See :ref:`google-setup` for specific instructions
+about setting these options.
+
+
+Choosing/creating a cluster to join
+------------------------------------
+
+.. mrjob-opt::
+    :config: cluster_id
+    :switch: --cluster-id
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: automatically create a cluster and use it
+
+    The ID of a persistent Dataproc cluster to run jobs in.  It's fine for other
+    jobs to be using the cluster; we give our job's steps a unique ID.
+
+
+Cluster creation and configuration
+-----------------------------------
+
+.. mrjob-opt::
+    :config: cloud_zone
+    :switch: --cloud-zone
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: GCP/AWS default
+
+    Availability zone to run the job in
+
+.. mrjob-opt::
+    :config: cloud_region
+    :switch: --cloud-region
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: ``'us-central-1'``
+
+    region to run Dataproc jobs on (e.g.  ``us-central-1``). Also used by mrjob
+    to create temporary buckets if you don't set :mrjob-opt:`fs_tmpdir`
+    explicitly.
+
+.. mrjob-opt::
+    :config: cloud_image
+    :switch: --cloud-image
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: ``'1.0'``
+
+    Cloud Image to run Dataproc jobs on.  See `the Dataproc docs on specifying the Dataproc version`_.  for details.
+
+    .. _`the Dataproc docs on specifying the Dataproc version`:
+        https://cloud.google.com/dataproc/dataproc-versions
+
+Bootstrapping
+-------------
+
+These options apply at *bootstrap time*, before the Hadoop cluster has
+started. Bootstrap time is a good time to install Debian packages or compile
+and install another Python binary.
+
+.. mrjob-opt::
+    :config: bootstrap
+    :switch: --bootstrap
+    :type: :ref:`string list <data-type-string-list>`
+    :set: all
+    :default: ``[]``
+
+    A list of lines of shell script to run once on each node in your cluster,
+    at bootstrap time.
+
+    This option is complex and powerful; the best way to get started is to
+    read the :doc:`emr-bootstrap-cookbook`.
+
+    Passing expressions like ``path#name`` will cause
+    *path* to be automatically uploaded to the task's working directory
+    with the filename *name*, marked as executable, and interpolated into the
+    script by their absolute path on the machine running the script. *path*
+    may also be a URI, and ``~`` and environment variables within *path*
+    will be resolved based on the local environment. *name* is optional.
+    For details of parsing, see :py:func:`~mrjob.setup.parse_setup_cmd`.
+
+    Unlike with :mrjob-opt:`setup`, archives are not supported (unpack them
+    yourself).
+
+    Remember to put ``sudo`` before commands requiring root privileges!
+
+
+.. mrjob-opt::
+   :config: bootstrap_python
+   :switch: --bootstrap-python, --no-bootstrap-python
+   :type: boolean
+   :set: dataproc
+   :default: ``True``
+
+   Attempt to install a compatible version of Python at bootstrap time.
+
+   Python 2 is already installed on all images, but if you're in Python 2,
+   this will also install :command:`pip` and the ``ujson`` library.
+
+   .. versionadded:: 0.5.0
+
+Monitoring the cluster
+-----------------------
+
+.. mrjob-opt::
+    :config: cloud_api_cooldown_secs
+    :switch: --cloud-api-cooldown-secs
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: 10
+
+    How often to check on the status of Dataproc jobs in seconds. If you set this
+    too low, GCP will throttle you.
+
+Number and type of instances
+----------------------------
+
+.. mrjob-opt::
+    :config: vm_type
+    :switch: --vm-type
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: ``'n1-standard-1'``
+
+    What sort of GCE instance(s) to use on the nodes that actually run tasks
+    (see https://cloud.google.com/compute/docs/machine-types).  When you run multiple
+    instances (see :mrjob-opt:`vm_type`), the master node is just
+    coordinating the other nodes, so usually the default instance type
+    (``n1-standard-1``) is fine, and using larger instances is wasteful.
+
+.. mrjob-opt::
+    :config: vm_type_master
+    :switch: --vm-type-master
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: ``'n1-standard-1'``
+
+    like :mrjob-opt:`vm_type`, but only for the master Hadoop node.
+    This node hosts the task tracker and HDFS, and runs tasks if there are no
+    other nodes. Usually you just want to use :mrjob-opt:`vm_type`.
+
+.. mrjob-opt::
+    :config: vm_type_worker
+    :switch: --vm-type-worker
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: value of :mrjob-opt:`vm_type`
+
+    like :mrjob-opt:`vm_type`, but only for worker Hadoop nodes; these nodes run tasks and host HDFS. Usually you
+    just want to use :mrjob-opt:`vm_type`.
+
+
+.. mrjob-opt::
+    :config: vm_type_preemptible
+    :switch: --vm-type-preemptible
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: value of :mrjob-opt:`vm_type`
+
+    like :mrjob-opt:`vm_type`, but only for the task Hadoop nodes;
+    these nodes run tasks but do not host HDFS. Usually you just want to use
+    :mrjob-opt:`vm_type`.
+
+
+.. mrjob-opt::
+    :config: num_worker
+    :switch: --num-worker
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: 2
+
+    Number of worker instances to start up. These run your job and
+    host HDFS.
+
+.. mrjob-opt::
+    :config: num_preemptible
+    :switch: --num-preemptible
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: 0
+
+    Number of task instances to start up.  These run your job but do not host
+    HDFS. If you use this, you must set :mrjob-opt:`num_worker`; Dataproc does not allow you to
+    run task instances without core instances (because there's nowhere to host
+    HDFS).
+
+FS paths and options
+--------------------
+MRJob uses google-api-python-client to manipulate/access FS.
+
+.. mrjob-opt::
+    :config: fs_tmpdir
+    :switch: --fs-tmpdir
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: (automatic)
+
+    GCS directory (URI ending in ``/``) to use as temp space, e.g.
+    ``gs://yourbucket/tmp/``.
+
+    By default, mrjob looks for a bucket belong to you whose name starts with
+    ``mrjob-`` and which matches :mrjob-opt:`cloud_region`. If it can't find
+    one, it creates one with a random name. This option is then set to `tmp/`
+    in this bucket (e.g. ``gs://mrjob-01234567890abcdef/tmp/``).
+
+.. mrjob-opt::
+    :config: fs_sync_secs
+    :switch: --fs-sync-secs
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: 5.0
+
+    How long to wait for S3 to reach eventual consistency. This is typically
+    less than a second (zero in U.S. West), but the default is 5.0 to be safe.

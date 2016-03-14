@@ -282,9 +282,12 @@ def add_hadoop_opts(opt_group):
             help='Deprecated alias for --hadoop-tmp-dir'),
     ]
 
-# TODO - mtai @ davidmarin - pulled common dataproc/emr opt here
 def add_dataproc_emr_opts(opt_group):
     return [
+        opt_group.add_option(
+            '--cluster-id', dest='cluster_id', default=None,
+            help='ID of an existing cluster to run our job on'),
+
         opt_group.add_option(
             '--bootstrap', dest='bootstrap', action='append',
             help=('A shell command to set up libraries etc. before any steps'
@@ -305,49 +308,68 @@ def add_dataproc_opts(opt_group):
     return [
         opt_group.add_option(
             '--gcp-project', dest='gcp_project', default=None,
-            help=('Project to run Dataproc jobs in.')),
+            help='Project to run Dataproc jobs in.'),
+
+        # TODO - mtai @ davidmarin - adopt below suggested varnames for Dataproc / EMR
+        opt_group.add_option(
+            '--cloud-region', dest='cloud_region', default='global',
+            help='Region to run Dataproc/EMR jobs in. Default is global'),
 
         opt_group.add_option(
-            '--gcp-region', dest='gcp_region', default='global',
-            help=('Region to run Dataproc jobs in. Default is global')),
+            '--cloud-zone', dest='cloud_zone', default=None,
+            help='Zone to run Dataproc/EMR jobs in.  '),
 
         opt_group.add_option(
-            '--gcp-zone', dest='gcp_zone', default=None,
-            help=('Zone to run Dataproc jobs in.  ')),
+            '--cloud-image', dest='cloud_image', default=None,
+            help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
 
-        # TODO - mtai @ davidmarin - collapse cluster_id
         opt_group.add_option(
-            '--gcp-cluster', dest='gcp_cluster',
-            help=('Dataproc cluster name - REQUIRED')),
+            '--cloud-api-cooldown-secs', dest='cloud_api_cooldown_secs', default=None,
+            help='How often (in seconds) to check status of your job/cluster'),
 
         # instance types
-        # TODO - mtai @ davidmarin - collapse with ec2_instance_type
         opt_group.add_option(
-            '--gce-machine-type', dest='gce_machine_type', default=None,
-            help=('Type of EC2 instance(s) to launch (e.g. m1.medium,'
-                  ' c3.xlarge, r3.xlarge). See'
-                  ' http://aws.amazon.com/ec2/instance-types/ for the full'
-                  ' list.')),
+            '--vm-type', dest='vm_type', default=None,
+            help=('Type of GCE/EC2 instance(s) to launch \n'
+                  ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4 - See https://cloud.google.com/compute/docs/machine-types\n'
+                  ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge - See http://aws.amazon.com/ec2/instance-types/'
+                  )),
 
-        # instance number - WORKER ONLY, no pre-emptible
-        # TODO - mtai @ davidmarin - collapse with num_ec2_instances
         opt_group.add_option(
-            '--gce_num_instances', dest='gce_num_instances', default=None,
+            '--vm-type-master', dest='vm_type_master', default=None,
+            help='Type of GCE/EC2 master instance(s) to launch'),
+
+        opt_group.add_option(
+            '--vm-type-worker', dest='vm_type_worker', default=None,
+            help='Type of GCE/EC2 worker instance(s) to launch'),
+
+        opt_group.add_option(
+            '--vm-type-preemptible', dest='vm_type_preemptible', default=None,
+            help='Type of GCE/EC2 preemptible worker instance(s) to launch'),
+
+
+        opt_group.add_option(
+            '--num-worker', dest='num_worker', default=None,
             type='int',
             help='Total number of Worker instances to launch '),
 
-        # TODO - mtai @ davidmarin - collapse with s3_sync_wait_time
         opt_group.add_option(
-            '--gcs-sync-wait-time', dest='gcs_sync_wait_time', default=None,
+            '--num-preemptible', dest='num_preemptible', default=None,
+            type='int',
+            help='Total number of preemptible Worker instances to launch '),
+
+
+        opt_group.add_option(
+            '--fs-sync-secs', dest='fs_sync_secs', default=None,
             type='float',
-            help=('How long to wait for GCS to reach eventual consistency. This'
+            help=('How long to wait for remote FS to reach eventual consistency. This'
                   ' is typically less than a second but the'
                   ' default is 5.0 to be safe.')),
 
-        # TODO - mtai @ davidmarin - collapse with s3_tmp_dir
         opt_group.add_option(
-            '--gcs-tmp-dir', dest='gcs_tmp_dir', default=None,
-            help='URI on GCS to use as our temp directory.'),
+            '--fs-tmpdir', dest='fs_tmpdir', default=None,
+            help='URI on remote FS to use as our temp directory.'),
+
     ]
 
 
@@ -386,10 +408,6 @@ def add_emr_run_opts(opt_group):
             '--check-emr-status-every', dest='check_emr_status_every',
             default=None, type='int',
             help='How often (in seconds) to check status of your EMR job'),
-
-        opt_group.add_option(
-            '--cluster-id', dest='cluster_id', default=None,
-            help='ID of an existing EMR cluster to run our job on'),
 
         # --ec2-key-pair is used to launch the job, not to monitor it
         opt_group.add_option(

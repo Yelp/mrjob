@@ -16,6 +16,7 @@ Guides
     guides/setup-cookbook.rst
     guides/hadoop-cookbook.rst
     guides/testing.rst
+    guides/dataproc.rst
     guides/emr.rst
     guides/contributing.rst
     guides/runner-job-interactions.rst

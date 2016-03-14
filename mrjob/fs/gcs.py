@@ -222,8 +222,8 @@ class GCSFilesystem(Filesystem):
 
         return resp['items']
 
-    def bucket_get(self, project, bucket):
-        req = self._service.buckets().get(project=project, name=bucket)
+    def bucket_get(self, bucket):
+        req = self._service.buckets().get(bucket=bucket)
         return req.execute()
 
     def bucket_create(self, project, bucket, location='', object_ttl_days=None):
@@ -284,10 +284,11 @@ if __name__ == "__main__":
 
     fs = GCSFilesystem()
     test_path = "gs://boulder-input-data/mrjob-boulder-kir/part-00000"
-    ls_gen = list(fs._ls_detailed(test_path))
-    import pprint
-    pprint.pprint(ls_gen)
 
-    for line in fs.cat(test_path):
-        print line.rstrip('\n')
+    # ls_gen = list(fs._ls_detailed(test_path))
+    # import pprint
+    # pprint.pprint(ls_gen)
+    #
+    # for line in fs.cat(test_path):
+    #     print line.rstrip('\n')
     # fs.upload("/Users/vbp/code/boulder/CHANGES.txt", "gs://boulder-input-data/vbptest/changes")

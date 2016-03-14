@@ -73,6 +73,10 @@ mrjob's modules can be put in four categories:
 
     * :py:mod:`mrjob.local`: Run Hadoop Streaming-only jobs in subprocesses
 
+  * Google Cloud Dataproc
+
+    * :py:mod:`mrjob.dataproc`: Submit jobs to Dataproc
+
   * Amazon Elastic MapReduce
 
     * :py:mod:`mrjob.emr`: Submit jobs to EMR
@@ -90,6 +94,8 @@ mrjob's modules can be put in four categories:
 
   * :py:mod:`mrjob.fs.composite`: Support multiple filesystems; if one fails,
     "fall through" to another
+
+  * :py:mod:`mrjob.fs.gcs`: Google Cloud Storage
 
   * :py:mod:`mrjob.fs.hadoop`: HDFS
 

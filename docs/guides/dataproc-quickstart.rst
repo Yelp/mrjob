@@ -4,32 +4,23 @@ Dataproc Quickstart
 .. _google-setup:
 
 Configuring Google Cloud Platform (GCP) credentials
----------------------------
+---------------------------------------------------
 
 Configuring your GCP credentials allows mrjob to run your jobs on
 Dataproc and use GCS.
 
 * Create a `Google Cloud Platform account <http://cloud.google.com/>`_
-* Setup a Billing Account
-* Setup a Project
-* Go to the `Your Security Credentials
-  <https://console.aws.amazon.com/iam/home?#security_credential>`__, click
-  on **Access Keys**, and then **Create New Access Key**. Make sure to copy the
-  secret access key, as there is no way to recover it after creation.
-
-Now you can either set the environment variables :envvar:`AWS_ACCESS_KEY_ID`
-and :envvar:`AWS_SECRET_ACCESS_KEY`, or set **aws_access_key_id** and
-**aws_secret_access_key** in your ``mrjob.conf`` file like this::
-
-    runners:
-      emr:
-        aws_access_key_id: <your key ID>
-        aws_secret_access_key: <your secret>
+* Setup a Billing Account and associate Billing with your Project
+* Go to the API Manager and do the following
+  * Enable API: Google Cloud Storage
+  * Enable API: Google Cloud Dataproc API
+  * Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
+* Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`
 
 .. _running-a-dataproc-job:
 
 Running a Dataproc Job
-------------------
+----------------------
 
 Running a job on Dataproc is just like running it locally or on your own Hadoop
 cluster, with the following changes:
@@ -43,6 +34,8 @@ This the output of this command should be identical to the output shown in
 :doc:`quickstart`, but it should take much longer:
 
     > python word_count.py -r dataproc README.txt
+
+::
     "chars" 3654
     "lines" 123
     "words" 417
@@ -87,9 +80,12 @@ Instances perform one of three roles:
   HDFS.
 * **Preemptible Worker**: You may have zero or more of these. These run tasks, but do *not*
   host HDFS. This is mostly useful because your cluster can lose task instances
-  without killing your job (see `Preemptible VMs <https://cloud.google.com/dataproc/preemptible-vms>`).
+  without killing your job (see `Preemptible VMs <https://cloud.google.com/dataproc/preemptible-vms>`_).
 
-By default, :py:mod:`mrjob` runs a single ``n1-standard-1``, which is a cheap but not very powerful instance type. This can be quite adequate for testing your code on a small subset of your data, but otherwise give little advantage over running a job locally. To get more performance out of your job, you can either add more instances, use more powerful instances, or both.
+By default, :py:mod:`mrjob` runs a single ``n1-standard-1``, which is a cheap but not
+very powerful instance type. This can be quite adequate for testing your code on a small subset of your
+data, but otherwise give little advantage over running a job locally. To get more performance out of
+your job, you can either add more instances, use more powerful instances, or both.
 
 Here are some things to consider when tuning your instance settings:
 
@@ -108,26 +104,23 @@ Here are some things to consider when tuning your instance settings:
   (and more memory).
 
 The basic way to control type and number of instances is with the
-*gce_machine_type* and *gce_num_instances* options, on the command line like
+*vm_type* and *num_worker* options, on the command line like
 this::
 
-    --gce-machine-type n1-highcpu-8 --gce-num-instances 5
+    --vm-type n1-highcpu-8 --num-worker 4
 
 or in :py:mod:`mrjob.conf`, like this::
 
     runners:
       dataproc:
-        gce_machine_type: n1-highcpu-8
-        gce_num_instances: 4
+        vm_type: n1-highcpu-8
+        num_worker: 4
 
 In most cases, your master instance type doesn't need to be larger
-than ``n1-standard-1`` to schedule tasks, so *ec2_instance_type* only applies to
+than ``n1-standard-1`` to schedule tasks.  *vm_type* only applies to
 instances that actually run tasks. (In this example, there are 1 ``n1-standard-1``
-master instance, and 4 ``n1-highcpu-8`` core instances.) You *will* need a larger
+master instance, and 4 ``n1-highcpu-8`` worker instances.) You *will* need a larger
 master instance if you have a very large number of input files; in this case,
-use the *ec2_master_instance_type* option.
+use the *vm_type_master* option.
 
-If you want to run task instances, you instead must specify the number of core
-and task instances directly with the *num_ec2_core_instances* and
-*num_ec2_task_instances* options. There are also *ec2_core_instance_type* and
-*ec2_task_instance_type* options if you want to set these directly.
+If you want to run preemptible instances, use the *vm_type_preemptible* and *num_preemptible* options.

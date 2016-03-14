@@ -34,7 +34,8 @@ Internally, the general order of operations is:
 Each runner runs a single job once; if you want to run a job multiple
 times, make multiple runners.
 
-Subclasses: :py:class:`~mrjob.emr.EMRJobRunner`,
+Subclasses: :py:class:`~mrjob.emr.DataprocJobRunner`,
+:py:class:`~mrjob.emr.EMRJobRunner`,
 :py:class:`~mrjob.hadoop.HadoopJobRunner`,
 :py:class:`~mrjob.inline.InlineMRJobRunner`,
 :py:class:`~mrjob.local.LocalMRJobRunner`
@@ -76,6 +77,14 @@ Running on your own Hadoop cluster
 * Run your job with ``-r hadoop``::
 
     python your_mr_job_sub_class.py -r hadoop < input > output
+
+Running on Dataproc
+-------------------
+
+* Set up your Google account and credentials (see :ref:`google-setup`)
+* Run your job with ``-r dataproc``::
+
+    python your_mr_job_sub_class.py -r dataproc < input > output
 
 Running on EMR
 --------------

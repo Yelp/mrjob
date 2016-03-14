@@ -354,8 +354,8 @@ class MRJobLauncher(object):
 
     def all_option_groups(self):
         return (self.option_parser, self.proto_opt_group,
-                self.runner_opt_group, self.hadoop_emr_opt_group,
-                self.emr_opt_group, self.local_opt_group)
+                self.runner_opt_group, self.hadoop_opt_group, self.dataproc_emr_opt_group, self.hadoop_emr_opt_group,
+                self.dataproc_opt_group, self.emr_opt_group, self.local_opt_group)
 
     def is_task(self):
         """True if this is a mapper, combiner, or reducer.

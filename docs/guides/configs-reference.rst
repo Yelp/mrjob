@@ -85,6 +85,12 @@ In addition, it ignores *hadoop_input_format*, *hadoop_output_format*,
 *steps_python_bin*, *upload_archives*, and *upload_files*.
 
 
+Additional options for :py:class:`~mrjob.dataproc.DataprocJobRunner`
+--------------------------------------------------------------------
+
+.. mrjob-optlist:: dataproc
+
+
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`
 ----------------------------------------------------------
 

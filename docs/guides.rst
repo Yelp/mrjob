@@ -17,5 +17,6 @@ Guides
     guides/hadoop-cookbook.rst
     guides/testing.rst
     guides/emr.rst
+    guides/py2-vs-py3.rst
     guides/contributing.rst
     guides/runner-job-interactions.rst

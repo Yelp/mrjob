@@ -10,29 +10,28 @@ For a complete list of changes, see `CHANGES.txt
 -----
 
 Python 3
-========
+^^^^^^^^
 
-mrjob now fully supports Python 3.3+. We did this in a way that should be totally transparent to existing Python 2 users (you don't have to suddenly start handling ``unicode`` instead of ``str``). For more information, see :ref:`py2-vs-py3`.
+mrjob now fully supports Python 3.3+. We did this in a way that should be totally transparent to existing Python 2 users (you don't have to suddenly start handling ``unicode`` instead of ``str``). For more information, see :doc:`guides/py2-vs-py3`.
 
 If you run a job with Python 3, mrjob will automatically install Python 3 on ElasticMapreduce AMIs (see :mrjob-opt:`bootstrap_python`).
 
 The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. `mrjob3`, `mrjob3.4`), in case you install mrjob for multiple versions of Python.
 
 Hadoop
-======
+^^^^^^
 
-mrjob should now work out-of-the box on almost any Hadoop setup. If :command:`hadoop` is in your path, or you set any commonly-used :envvar:`$HADOOP_*` enivornment variable, mrjob will find the Hadoop binary, the streaming jar, and your logs, without any help on your part (see :mrjob-opt:`hadoop_bin` and :mrjob-opt:`hadoop_streaming_jar` for details).
+mrjob should now work out-of-the box on almost any Hadoop setup. If :command:`hadoop` is in your path, or you set any commonly-used :envvar:`$HADOOP_*` environment variable, mrjob will find the Hadoop binary, the streaming jar, and your logs, without any help on your part (see :mrjob-opt:`hadoop_bin` and :mrjob-opt:`hadoop_streaming_jar` for details).
 
 mrjob has been updated to probably support Hadoop 2 (YARN), and still supports Hadoop 1. This release *does* drop all support for Hadoop prior to 0.20.203 (mrjob is actually a few months older than Hadoop 0.20.203, so this used to matter).
 
 3.x and 4.x AMIs
-================
+^^^^^^^^^^^^^^^^
 
 mrjob now fully supports the 3.x and 4.x Elastic MapReduce AMIs, including fetching counters and finding probable cause of job failure.
 
-For the 4.x AMIs, you can either use the new :mrjob-opt:`release_label` option, or continue using :mrjob-opt:`ami_version`; both work.
-
 The default :mrjob-opt:`ami_version` is now ``3.11.0``. Our plan is to continue updating this to the lastest (non-broken) 3.x AMI for each 0.5.x release of mrjob.
+For the 4.x AMIs, you can either use the new :mrjob-opt:`release_label` option, or continue using :mrjob-opt:`ami_version`; both work.
 
 mrjob continues to support 2.x AMIs, however:
 
@@ -40,31 +39,36 @@ mrjob continues to support 2.x AMIs, however:
 
    2.x AMIs are officially deprecated by AWS because they are based on a very old version of Debian (squeeze), which breaks :command:`apt-get` and exposes you to security holes. If you're on a 2.x AMI, please, please switch in the near future.
 
-New default AWS Region
-======================
+AWS Regions
+^^^^^^^^^^^
 
-The new default :mrjob-opt:`aws_region` is ``us-west-2`` (Oregon). This both matches the default in the EMR console and, according to Amazon, is :ref:`carbon neutral <https://aws.amazon.com/about-aws/sustainability/>`__.
+The new default :mrjob-opt:`aws_region` is ``us-west-2`` (Oregon). This both matches the default in the EMR console and, according to Amazon, is `carbon neutral <https://aws.amazon.com/about-aws/sustainability/>`__.
 
-This change should be transparent to most users. However, EC2 key pairs (i.e. SSH credentials) are region-specific, so if you set up SSH but don't explicitly specify your AWS region, you should :ref:`create new SSH keys <ssh-tunneling>` for the ``us-west-2`` region.
+mrjob is much smarter about the way it handles regions when interacting with S3:
+ - automatically creates temp bucket in the same region as jobs
+ - connects to S3 buckets on the endpoint matching their region (no more 307 erros)
+ - no longer uses the temp bucket's location to choose where you run your job
 
-Log Interpretation
-==================
+An edge case that might affect you: EC2 key pairs (i.e. SSH credentials) are region-specific, so if you've set up SSH but not explicitly specified a region, you may get an error saying your key pair is invalid. You can fix this by :ref:`creating new SSH keys <ssh-tunneling>` for the ``us-west-2`` region (mrjob will tell you this as well).
+
+Log interpretation
+^^^^^^^^^^^^^^^^^^
 
 The part of mrjob that fetches counters and tells you what probably caused your job to fail was basically unmaintainable and has been totally rewritten. Not only do we now have solid support across Hadoop and EMR AMI versions, but if we missed anything, it should be straightforward to support it.
 
 Once casualty of this change was the :command:`mrjob fetch-logs` command, which means mrjob no longer offers a way to fetch or interpret logs from a *past* job (we do plan to re-introduce this functionality).
 
 ujson
-=====
+^^^^^
 
 By default, mrjob will use ``ujson`` (rather than ``simplejson``), if it is available, to encode intermediate and output data from your job
 
 mrjob will also try to install ``ujson`` on EMR by default when it can do so quickly and reliably (see :mrjob-opt:`bootstrap_python`).
 
-If you wish, you can now explicitly turn off ``ujson`` (e.g. :py:class:`mrjob.protocol.StandardJSONProtocol`) or require it (:py:class:`mrjob.protocol.UltraJSONProtocol).
+If you wish, you can now explicitly turn off ``ujson`` (e.g. :py:class:`~mrjob.protocol.StandardJSONProtocol`) or require it (:py:class:`~mrjob.protocol.UltraJSONProtocol`).
 
-Cleaner status messages
-=======================
+Status messages
+^^^^^^^^^^^^^^^
 
 The logging messages that mrjob prints as it runs your job kind of accreted over time without any real standard for what should be ``log.info()`` vs. ``log.debug()``. We've tried to cut these messages down to the basics (either useful info, like where a temp directory is, or something that tells you why you're waiting). If there are any messages you miss, try running your job with ``-v``.
 
@@ -72,7 +76,7 @@ Also, when a step in your job fails, mrjob no longer prints a useless stacktrace
 
 
 Deprecation
-===========
+^^^^^^^^^^^
 
 mrjob v0.4.6 contains many, many deprecation warnings about things being removed in v0.5.0. v0.5.0 is here, and they have been. If you have a specific problem, try searching `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_, which calls these out specifically.

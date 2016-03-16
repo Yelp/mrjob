@@ -12,7 +12,7 @@ For a complete list of changes, see `CHANGES.txt
 Python 3
 ^^^^^^^^
 
-mrjob now fully supports Python 3.3+ in a way that should be totally transparent to existing Python 2 users (you don't have to suddenly start handling ``unicode`` instead of ``str``). For more information, see :doc:`guides/py2-vs-py3`.
+mrjob now fully supports Python 3.3+ in a way that should be transparent to existing Python 2 users (you don't have to suddenly start handling ``unicode`` instead of ``str``). For more information, see :doc:`guides/py2-vs-py3`.
 
 If you run a job with Python 3, mrjob will automatically install Python 3 on ElasticMapreduce AMIs (see :mrjob-opt:`bootstrap_python`).
 

@@ -81,8 +81,8 @@ class StepFailedException(Exception):
         *step_num*."""
         return 'Step%s%s failed%s' % (
             '' if self.step_num is None else ' %d' % (self.step_num + 1),
-            '' if (self.step_num is None or self.num_steps is None) else
-                   ' of %d' % self.num_steps,
+            '' if (self.step_num is None or self.num_steps is None) else (
+                ' of %d' % self.num_steps),
             '' if self.reason is None else ': %s' % self.reason)
 
     def __repr__(self):

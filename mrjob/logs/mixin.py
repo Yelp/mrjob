@@ -35,16 +35,13 @@ from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.task import _interpret_task_logs
 from mrjob.logs.task import _ls_task_syslogs
 
-
 log = getLogger(__name__)
-
 
 
 # a callback for _interpret_task_logs(). Breaking it out to make
 # testing easier
 def _log_parsing_task_stderr(stderr_path):
     log.info('  Parsing task stderr: %s' % stderr_path)
-
 
 
 class LogInterpretationMixin(object):

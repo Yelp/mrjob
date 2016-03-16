@@ -245,7 +245,6 @@ class RunnerOptionStore(OptionStore):
         opts[opt_key] = opt_list
 
 
-
 class MRJobRunner(object):
     """Abstract base class for all runners"""
 

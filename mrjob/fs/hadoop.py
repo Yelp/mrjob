@@ -46,7 +46,6 @@ _HADOOP_RM_NO_SUCH_FILE = re.compile(br'^rmr?: .*No such file.*$')
 _HADOOP_VERSION_RE = re.compile(br'^.*?(?P<version>(\d|\.)+).*?$')
 
 
-
 class HadoopFilesystem(Filesystem):
     """Filesystem for URIs accepted by ``hadoop fs``. Typically you will get
     one of these via ``HadoopJobRunner().fs``, composed with

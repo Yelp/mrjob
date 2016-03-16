@@ -436,7 +436,7 @@ class MRJobLauncher(object):
 
         if self.options.help_emr:
             _print_help_for_groups(self.hadoop_emr_opt_group,
-                                  self.emr_opt_group)
+                                   self.emr_opt_group)
             sys.exit(0)
 
         if self.options.help_hadoop:

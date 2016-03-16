@@ -158,6 +158,7 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
 _COUNTER_RE = re.compile(br'^reporter:counter:([^,]*),([^,]*),(-?\d+)$')
 _STATUS_RE = re.compile(br'^reporter:status:(.*)$')
 
+
 def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
@@ -259,12 +260,12 @@ def _find_python_traceback(lines):
         return None
 
 
-
 ### job tracker/resource manager ###
 
 _JOB_TRACKER_HTML_RE = re.compile(br'\b(\d{1,3}\.\d{2})%')
 _RESOURCE_MANAGER_JS_RE = re.compile(
     br'.*(application_[_\d]+).*width:(\d{1,3}.\d)%')
+
 
 def _parse_progress_from_job_tracker(html_bytes):
     """Pull (map_percent, reduce_percent) from job tracker HTML as floats,
@@ -274,6 +275,7 @@ def _parse_progress_from_job_tracker(html_bytes):
         return float(matches[0]), float(matches[1])
     else:
         return None, None
+
 
 # TODO: this has two issues:
 # - reports progress of previous steps

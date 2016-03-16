@@ -76,6 +76,7 @@ __credits__ = [
     'Colin Matthias <cmatthias@cogolabs.com>',
     'Baris Metin <bmetin@yelp.com>',
     'Konark Modi <modi.konark@gmail.com>',
+    'Marco Montagna <marcojoemontagna@gmail.com>',
     'Tetsuya Morimoto <tetsuya.morimoto@gmail.com>',
     'Hendrik Muhs <hendrik@cliqz.com>',
     'Zach Musgrave <zmusgrave@gmail.com>',

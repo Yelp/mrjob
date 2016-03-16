@@ -1,5 +1,3 @@
-from io import BytesIO
-
 from mrjob.examples.mr_word_freq_count import MRWordFreqCount
 
 from tests.job import run_job

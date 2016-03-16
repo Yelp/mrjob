@@ -237,6 +237,7 @@ def _list_attached_role_policies(conn, role_name, marker=None, max_items=None):
     return conn.get_response('ListAttachedRolePolicies', params,
                              list_marker='AttachedPolicies')
 
+
 def _attach_role_policy(conn, role_name, policy_arn):
     params = {'PolicyArn': policy_arn,
               'RoleName': role_name}

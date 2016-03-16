@@ -98,9 +98,6 @@ _HADOOP_STREAMING_JAR_RE = re.compile(
     r'^hadoop.*streaming.*(?<!-sources)\.jar$')
 
 
-
-
-
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
     if is_uri(path):
@@ -371,7 +368,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             # log this *after* _args_for_step(), which can start a search
             # for the Hadoop streaming jar
             log.info('Running step %d of %d...' %
-                      (step_num + 1, self._num_steps()))
+                     (step_num + 1, self._num_steps()))
             log.debug('> %s' % cmd_line(step_args))
 
             log_interpretation = {}
@@ -539,7 +536,6 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
                 'step-output/%04d' % (step_num - 1)
             )]
 
-
     def _hdfs_step_output_dir(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
@@ -592,7 +588,6 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
 # These don't require state from HadoopJobRunner, so making them functions.
 # Feel free to convert them back into methods as need be
-
 
 
 def _hadoop_prefix_from_bin(hadoop_bin):

@@ -37,7 +37,6 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
-from tests.py2 import patch
 from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger

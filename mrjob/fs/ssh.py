@@ -13,7 +13,6 @@
 # limitations under the License.
 import logging
 import re
-import posixpath
 
 from io import BytesIO
 from mrjob.fs.base import Filesystem
@@ -83,7 +82,8 @@ class SSHFilesystem(Filesystem):
         if host not in self._host_to_key_filename:
             # copy the key if we haven't already
             keyfile = 'mrjob-%s.pem' % random_identifier()
-            _ssh_copy_key(self._ssh_bin, host, self._ec2_key_pair_file, keyfile)
+            _ssh_copy_key(
+                self._ssh_bin, host, self._ec2_key_pair_file, keyfile)
             # don't set above; _ssh_copy_key() may throw an IOError
             self._host_to_key_filename[host] = keyfile
 

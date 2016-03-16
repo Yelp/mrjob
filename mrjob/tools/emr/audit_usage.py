@@ -482,13 +482,13 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
             (d, nih_per_sec * secs)
             for d, secs
             in _subdivide_interval_by_date(interval['start'],
-                                          interval['end']).items())
+                                           interval['end']).items())
 
         interval['hour_to_nih_used'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
             in _subdivide_interval_by_hour(interval['start'],
-                                          interval['end']).items())
+                                           interval['end']).items())
 
         interval['nih_billed'] = (
             nih_per_sec *
@@ -498,13 +498,13 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
             (d, nih_per_sec * secs)
             for d, secs
             in _subdivide_interval_by_date(interval['start'],
-                                          interval['end_billing']).items())
+                                           interval['end_billing']).items())
 
         interval['hour_to_nih_billed'] = dict(
             (d, nih_per_sec * secs)
             for d, secs
             in _subdivide_interval_by_hour(interval['start'],
-                                          interval['end_billing']).items())
+                                           interval['end_billing']).items())
 
         # time billed but not used
         interval['nih_bbnu'] = interval['nih_billed'] - interval['nih_used']
@@ -677,7 +677,7 @@ def _print_report(stats, now=None):
                 s['date_to_nih_used'].get(d, 0.0),
                 s['date_to_nih_bbnu'].get(d, 0.0),
                 _percent(s['date_to_nih_bbnu'].get(d, 0.0),
-                        s['date_to_nih_billed'].get(d, 0.0))))
+                         s['date_to_nih_billed'].get(d, 0.0))))
             d -= timedelta(days=1)
         print()
 
@@ -693,7 +693,7 @@ def _print_report(stats, now=None):
                 s['hour_to_nih_used'].get(h, 0.0),
                 s['hour_to_nih_bbnu'].get(h, 0.0),
                 _percent(s['hour_to_nih_bbnu'].get(h, 0.0),
-                        s['hour_to_nih_billed'].get(h, 0.0))))
+                         s['hour_to_nih_billed'].get(h, 0.0))))
             h -= timedelta(hours=1)
         print()
 
@@ -709,8 +709,9 @@ def _print_report(stats, now=None):
     print()
 
     print('Top jobs, by time billed but not used:')
-    for label, nih_bbnu in sorted(s['label_to_nih_bbnu'].items(),
-                                  key=lambda lb_nih1: (-lb_nih1[1], lb_nih1[0])):
+    for label, nih_bbnu in sorted(
+            s['label_to_nih_bbnu'].items(),
+            key=lambda lb_nih1: (-lb_nih1[1], lb_nih1[0])):
         print('  %9.2f %s' % (nih_bbnu, label))
     print()
 

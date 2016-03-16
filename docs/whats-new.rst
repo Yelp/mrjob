@@ -97,7 +97,7 @@ Many things that were deprecated in 0.4.6 have been removed:
  - options:
 
    - :py:data:`~mrjob.runner.IF_SUCCESSFUL` :mrjob-opt:`cleanup` option (use :py:data:`~mrjob.runner.ALL`)
-   - *iam_job_flow_role* (now :mrjob-opt:`iam_instance_profile`)
+   - *iam_job_flow_role* (use :mrjob-opt:`iam_instance_profile`)
    - :mrjob-opt:`bootstrap_python_packages` is still around until mrjob 0.6.0, but no longer does anything on 2.x AMIs (because we can't :command:`apt-get install python-pip`)
 
  - functions and methods:

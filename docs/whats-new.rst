@@ -89,6 +89,7 @@ To avoid a similar wave of deprecation warnings in the future, the name of every
 Other changes
 ^^^^^^^^^^^^^
 
+ - mrjob now requires ``boto`` 2.35.0 or newer (2.35.0 is more than a year old, so chances are you're already doing this). Later 0.5.x releases of mrjob may require newer versions of ``boto``.
  - :mrjob-opt:`visible_to_all_users` now defaults to ``True``
  - mrjob now follows symlinks when :py:meth:`~mrjob.fs.local.LocalFileSystem.ls`\ ing the local filesystem (beware recursive symlinks!)
  - minor changes to :py:mod:`mrjob.util`:

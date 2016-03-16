@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2009-2015 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ __credits__ = [
     'Reno Bowen <renobowen@gmail.com>',
     'James Brown <jbrown@uber.com>',
     'Kevin Burke <kevin@twilio.com>',
+    'Tim Chan <macrotim@gmail.com>',
     'Ewen Cheslack-Postava <me@ewencp.org>',
     'Ben Chess <bchess@yelp.com>',
     'Jordan Christensen <jc@kobo.com>',
@@ -58,6 +59,7 @@ __credits__ = [
     'Stephen Johnson <steve@steveasleep.com>',
     'Ben Jolitz <Ben.Jolitz.Acxiom.com>',
     'Matt Jones <matt@mhjones.org>',
+    'Mike Kaplinskiy <mkaplinskiy@twitter.com>',
     'Kamil Kisiel <kamil@kamilkisiel.net>',
     'Evan Klitzke <evan@eklitzke.org>',
     'Alex Konradi <alexkonradi@gmail.com>',
@@ -71,12 +73,14 @@ __credits__ = [
     'Shusen Liu <liushusen.smart@gmail.com>',
     'Adrian Maceiras <amac425@utexas.edu>',
     'Dallas Marlow <dallas@vineapp.com>',
+    'Colin Matthias <cmatthias@cogolabs.com>',
     'Baris Metin <bmetin@yelp.com>',
     'Konark Modi <modi.konark@gmail.com>',
     'Tetsuya Morimoto <tetsuya.morimoto@gmail.com>',
     'Hendrik Muhs <hendrik@cliqz.com>',
     'Zach Musgrave <zmusgrave@gmail.com>',
     'Sean Myers <seanmyers0608@gmail.com>',
+    'Ryan Neal <ryanneal@yelp.com>',
     'Spencer Nelson <s@spenczar.com>',
     'Dávid Nemeskey <david@cliqz.com>',
     'Daniel Nephin <dnephin@yelp.com>',
@@ -87,17 +91,20 @@ __credits__ = [
     'Andrew Price <andrew.price@ensighten.com>',
     'Wahbeh Qardaji <wahbeh.qardaji@gmail.com>',
     'Anusha Rajan <anusha@yelp.com>',
+    'Ram Rengaswamy <ramr@beeswax.com>',
     'Pavel Repin <prepin@gmail.com>',
     'Jimmy Retzlaff <jretz@yelp.com>',
     'Alejandro Rivera <alejandro.rivera@msn.com>',
     'Ned Rockson <ned@tellapart.com>',
     'Alain Rodriguez <eagle5command@gmail.com>',
     'Taro Sato <okomestudio@gmail.com>',
+    'Ed Schofield <ed@pythoncharmers.com>',
     'Paul Scott <paul@duedil.com>',
     'David Selassie <selassid@gmail.com>',
     'Alex Shkop <a.v.shkop@gmail.com>',
     'Jesse Shieh <jesse@adku.com>',
     'Isaac Slavitt <isaac.slavitt@gmail.com>',
+    'Anthony Sottile <asottile@umich.edu>',
     'Steve Spencer <steve@bigfrog.net>',
     'Jyry Suvilehto <jyry.suvilehto@iki.fi>',
     'Phil Swanson <swanson.p@gmail.com>',

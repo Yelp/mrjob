@@ -105,16 +105,17 @@ Many things that were deprecated in 0.4.6 have been removed:
    - positional arguments to :py:meth:`mrjob.job.MRJob.mr()` (don't even use :py:meth:`~mrjob.job.MRJob.mr()`; use :py:class:`mrjob.step.MRStep`)
    - ``mrjob.job.MRJob.jar()`` (use :py:class:`mrjob.step.JarStep`)
    - *step_args* and *name* arguments to :py:class:`mrjob.step.JarStep` (use *args* instead of *step_args*, and don't use *name* at all)
-   - :py:class:`mrjob.step.MRJobStep` (renamed to :py:class:`mrjob.step.MRStep`)
-   - :py:func:`mrjob.compat.get_jobconf_value` (renamed to :py:func:`~mrjob.compat.jobconf_from_env`)
-   - :py:meth:`mrjob.job.MRJob.parse_counters` and :py:meth:`mrjob.job.parse_output`
+   - :py:class:`mrjob.step.MRJobStep` (use :py:class:`mrjob.step.MRStep`)
+   - :py:func:`mrjob.compat.get_jobconf_value` (use to :py:func:`~mrjob.compat.jobconf_from_env`)
+   - :py:meth:`mrjob.job.MRJob.parse_counters`
+   - :py:meth:`mrjob.job.MRJob.parse_output`
    - :py:func:`mrjob.conf.combine_cmd_lists`
 
 :py:mod:`mrjob.compat` functions :py:func:`~mrjob.compat.supports_combiners_in_hadoop_streaming`, :py:func:`~mrjob.compat.supports_new_distributed_cache_options`, and :py:func:`~mrjob.compat.uses_generic_jobconf`, which only existed to support very old versions of Hadoop, were removed without deprecation warnings (sorry!).
 
 To avoid a similar wave of deprecation warnings in the future, the name of every part of mrjob that isn't meant to be a stable interface provided by the library now starts with an underscore. You can still use these things (or copy them; it's Open Source), but there's no guarantee they'll exist in the next release.
 
-If you want to get ahead of the game, here is a list of things that were deprecated starting in mrjob 0.5.0 (do these *after* upgrading mrjob):
+If you want to get ahead of the game, here is a list of things that are deprecated starting in mrjob 0.5.0 (do these *after* upgrading mrjob):
 
   - options:
 

@@ -60,7 +60,6 @@ from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import map_version
-from mrjob.compat import uses_yarn
 from mrjob.compat import version_gte
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts

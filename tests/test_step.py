@@ -19,7 +19,6 @@ from mrjob.step import MRStep
 from mrjob.step import StepFailedException
 
 from tests.py2 import TestCase
-from tests.quiet import logger_disabled
 
 
 # functions we don't really care about the values of

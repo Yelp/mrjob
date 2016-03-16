@@ -24,7 +24,6 @@ from mrjob.parse import _find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.py2 import string_types
 from mrjob.sim import SimMRJobRunner
-from mrjob.sim import SimRunnerOptionStore
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split

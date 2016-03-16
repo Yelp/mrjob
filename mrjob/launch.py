@@ -35,10 +35,7 @@ from mrjob.options import _add_runner_opts
 from mrjob.options import _alphabetize_options
 from mrjob.options import _fix_custom_options
 from mrjob.options import _print_help_for_groups
-from mrjob.parse import parse_key_value_list
-from mrjob.parse import parse_port_range_list
 from mrjob.py2 import PY2
-from mrjob.runner import CLEANUP_CHOICES
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream

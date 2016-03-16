@@ -15,7 +15,6 @@
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
 import calendar
-import json
 import logging
 import re
 import time
@@ -23,8 +22,6 @@ from datetime import datetime
 from functools import wraps
 from io import BytesIO
 
-from mrjob.compat import version_gte
-from mrjob.py2 import PY2
 from mrjob.py2 import ParseResult
 from mrjob.py2 import to_string
 from mrjob.py2 import urlparse as urlparse_buggy

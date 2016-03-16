@@ -436,8 +436,6 @@ class SimMRJobRunner(MRJobRunner):
         We use :py:func:`~mrjob.conf.combine_local_envs`, so ``PATH``
         environment variables are handled specially.
         """
-        version = self.get_hadoop_version()
-
         user_jobconf = self._jobconf_for_step(step_num)
 
         simulated_jobconf = self._simulate_jobconf_for_step(

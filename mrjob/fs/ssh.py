@@ -13,7 +13,6 @@
 # limitations under the License.
 import logging
 import re
-import posixpath
 
 from io import BytesIO
 from mrjob.fs.base import Filesystem

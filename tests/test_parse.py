@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
 import sys
 from io import BytesIO
 from subprocess import PIPE
@@ -28,11 +27,8 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.py2 import StringIO
-from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
-from tests.quiet import no_handlers_for_logger
 
 
 

@@ -21,17 +21,14 @@ import itertools
 import json
 import logging
 import sys
-from io import BytesIO
 from optparse import OptionGroup
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.py2 import integer_types

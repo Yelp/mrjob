@@ -14,7 +14,6 @@
 # limitations under the License.
 import logging
 import os.path
-import posixpath
 import re
 from io import BytesIO
 from subprocess import Popen

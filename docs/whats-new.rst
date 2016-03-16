@@ -102,7 +102,7 @@ Many things that were deprecated in 0.4.6 have been removed:
 
  - functions and methods:
 
-   - positional arguments to :py:meth:`mrjob.job.MRJob.mr()` (don't even use :py:meth:`~mrjob.job.MRJob.mr()`; use :py:class:`mrjob.job.step.MRStep`)
+   - positional arguments to :py:meth:`mrjob.job.MRJob.mr()` (don't even use :py:meth:`~mrjob.job.MRJob.mr()`; use :py:class:`mrjob.step.MRStep`)
    - ``mrjob.job.MRJob.jar()`` (use :py:class:`mrjob.step.JarStep`)
    - *step_args* and *name* arguments to :py:class:`mrjob.step.JarStep` (use *args* instead of *step_args*, and don't use *name* at all)
    - :py:class:`mrjob.step.MRJobStep` (renamed to :py:class:`mrjob.step.MRStep`)

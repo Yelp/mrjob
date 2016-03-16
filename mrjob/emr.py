@@ -110,7 +110,6 @@ from mrjob.util import shlex_split
 from mrjob.util import random_identifier
 
 
-
 log = logging.getLogger(__name__)
 
 # how to set up the SSH tunnel for various AMI versions
@@ -265,7 +264,7 @@ def _lock_acquire_step_2(key, job_key):
 
 
 def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
-                            mins_to_expiration=None):
+                             mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
@@ -276,6 +275,7 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
     time.sleep(sync_wait_time)
     return _lock_acquire_step_2(key, job_key)
 
+
 def _get_reason(cluster_or_step):
     """Extract statechangereason.message from a boto Cluster or Step.
 
@@ -283,7 +283,6 @@ def _get_reason(cluster_or_step):
     return getattr(
         getattr(cluster_or_step.status, 'statechangereason', ''),
         'message', '').rstrip()
-
 
 
 class EMRRunnerOptionStore(RunnerOptionStore):
@@ -455,8 +454,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 max(self._opt_priority['num_ec2_core_instances'],
                     self._opt_priority['num_ec2_task_instances'])):
                 log.warning('Mixing num_ec2_instances and'
-                         ' num_ec2_{core,task}_instances does not make sense;'
-                         ' ignoring num_ec2_instances')
+                            ' num_ec2_{core,task}_instances does not make'
+                            ' sense; ignoring num_ec2_instances')
             # recalculate number of EC2 instances
             self['num_ec2_instances'] = (
                 1 +
@@ -505,8 +504,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         to "emr-" plus *ami_version*. (Leave *ami_version* as-is;
         *release_label* overrides it anyway.)"""
         if (not self['release_label'] and
-            self['ami_version'] != 'latest' and
-            version_gte(self['ami_version'], '4')):
+                self['ami_version'] != 'latest' and
+                version_gte(self['ami_version'], '4')):
             self['release_label'] = 'emr-' + self['ami_version']
 
 
@@ -694,14 +693,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket.name
 
-            if (tmp_bucket.get_location() ==
-                s3_location_constraint_for_region(self._opts['aws_region'])):
+            if (tmp_bucket.get_location() == s3_location_constraint_for_region(
+                    self._opts['aws_region'])):
 
                 # Regions are both specified and match
                 log.debug("using existing temp bucket %s" %
                           tmp_bucket_name)
                 self._opts['s3_tmp_dir'] = ('s3://%s/tmp/' %
-                                                tmp_bucket_name)
+                                            tmp_bucket_name)
                 return
 
         # That may have all failed. If so, pick a name.
@@ -1485,8 +1484,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         tags = self._opts['emr_tags']
         if tags:
             log.info('Setting EMR tags: %s' %
-                    ', '.join('%s=%s' % (tag, value)
-                              for tag, value in tags.items()))
+                     ', '.join('%s=%s' % (tag, value)
+                               for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
     def _wait_for_steps_to_complete(self):
@@ -1553,7 +1552,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 time_running_desc = ''
 
                 startdatetime = getattr(
-                    getattr(step.status, 'timeline', ''), 'startdatetime' ,'')
+                    getattr(step.status, 'timeline', ''), 'startdatetime', '')
                 if startdatetime:
                     start = iso8601_to_timestamp(startdatetime)
                     time_running_desc = ' for %.1fs' % (time.time() - start)
@@ -1576,7 +1575,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 reason_desc = (' (%s)' % reason) if reason else ''
 
                 log.info('  %s%s' % (
-                   step.status.state, reason_desc))
+                    step.status.state, reason_desc))
 
                 # print cluster status; this might give more context
                 # why step didn't succeed
@@ -1717,10 +1716,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # Unlike on 3.x, the history logs *are* available on S3, but they're
         # not useful enough to justify the wait when SSH is set up
 
-        #if version_gte(self.get_ami_version(), '4'):
-        #    # denied access on some 4.x AMIs by the yarn user, see #1244
-        #    dir_name = 'hadoop-mapreduce/history'
-        #    s3_dir_name = 'hadoop-mapreduce/history'
+        # if version_gte(self.get_ami_version(), '4'):
+        #     # denied access on some 4.x AMIs by the yarn user, see #1244
+        #     dir_name = 'hadoop-mapreduce/history'
+        #     s3_dir_name = 'hadoop-mapreduce/history'
         if version_gte(self.get_ami_version(), '3'):
             # on the 3.x AMIs, the history log lives inside HDFS and isn't
             # copied to S3. We don't need it anyway; everything relevant
@@ -1875,7 +1874,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('  %s%s' % (cluster.status.state, reason_desc))
 
             if cluster.status.state in (
-                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                    'TERMINATED', 'TERMINATED_WITH_ERRORS'):
                 return
 
             time.sleep(self._opts['check_emr_status_every'])
@@ -1992,7 +1991,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             # we have to have at least on AMI 3.7.0
             if (self._opts['ami_version'] == 'latest' or
-                not version_gte(self._opts['ami_version'], '3.7.0')):
+                    not version_gte(self._opts['ami_version'], '3.7.0')):
                 log.warning(
                     'bootstrapping Python 3 will probably not work on'
                     ' AMIs prior to 3.7.0. For an alternative, see:'
@@ -2241,7 +2240,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if (self._opts['ec2_key_pair'] and
                 self._opts['ec2_key_pair'] !=
                 getattr(getattr(cluster,
-                    'ec2instanceattributes', None), 'ec2keyname', None)):
+                                'ec2instanceattributes', None),
+                        'ec2keyname', None)):
                 return
 
             # this may be a retry due to locked clusters
@@ -2266,8 +2266,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if self._opts['release_label']:
                 # just check for exact match. EMR doesn't have a concept
                 # of partial release labels like it does for AMI versions.
-                if (getattr(cluster, 'releaselabel', '') !=
-                    self._opts['release_label']):
+                release_label = getattr(cluster, 'releaselabel', '')
+
+                if release_label != self._opts['release_label']:
                     return
             elif self._opts['ami_version'] == 'latest':
                 # look for other clusters where "latest" was requested
@@ -2530,8 +2531,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return {}
 
         return dict((step_num, step.id)
-            for step_num, step in
-            enumerate(self._list_steps_for_cluster(), start=1))
+                    for step_num, step in
+                    enumerate(self._list_steps_for_cluster(), start=1))
 
     def get_hadoop_version(self):
         if self._hadoop_version is None:

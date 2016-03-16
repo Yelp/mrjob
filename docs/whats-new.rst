@@ -16,7 +16,7 @@ mrjob now fully supports Python 3.3+ in a way that should be transparent to exis
 
 If you run a job with Python 3, mrjob will automatically install Python 3 on ElasticMapreduce AMIs (see :mrjob-opt:`bootstrap_python`).
 
-The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. `mrjob3`, `mrjob3.4`), in case you install mrjob for multiple versions of Python.
+The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. :command:`mrjob3`, :command:`mrjob3.4`), in case you install mrjob for multiple versions of Python.
 
 Hadoop
 ^^^^^^
@@ -128,7 +128,8 @@ If you want to get ahead of the game, here is a list of things that are deprecat
   - functions and methods:
 
     - :py:meth:`mrjob.job.MRJob.is_mapper_or_reducer` is now :py:meth:`~mrjob.job.MRJob.is_task`
-    - filesystem methods :py:meth:`~mrjob.fs.Filesystem.path_exists` and :py:meth:`~mrjob.fs.Filesystem.path_join` are now :py:meth:`~mrjob.fs.Filesystem.exists` and :py:meth:`~mrjob.fs.Filesystem.join`
+    - :py:class:`~mrjob.fs.base.Filesystem` method ``path_exists()`` is now simply :py:meth:`~mrjob.fs.base.Filesystem.exists`
+    - :py:class:`~mrjob.fs.base.Filesystem` method ``path_join()`` is now simply :py:meth:`~mrjob.fs.base.Filesystem.join`
     - Use ``runner.fs`` explicitly when accessing filesystem methods (e.g. ``runner.fs.ls()``, not ``runner.ls()``)
 
 Other changes

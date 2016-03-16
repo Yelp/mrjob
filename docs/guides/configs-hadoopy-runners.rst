@@ -206,4 +206,4 @@ Options available to hadoop runner only
 
     .. versionchanged:: 0.5.0
 
-       This option used to be named ``hdfs_scratch_uri``.
+       This option used to be named ``hdfs_scratch_dir``.

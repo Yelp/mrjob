@@ -20,8 +20,10 @@ from .terminate_cluster import main as real_main
 
 
 def main(args):
-    print('terminate-job-flow is a deprecated alias for'
-          ' terminate-cluster and will be removed in v0.6.0')
+    print(
+        'terminate-job-flow is a deprecated alias for'
+        ' terminate-cluster and will be removed in v0.6.0',
+        file=stderr)
     real_main(args)
 
 

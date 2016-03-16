@@ -20,7 +20,6 @@ import os
 import os.path
 import pty
 from io import BytesIO
-from subprocess import CalledProcessError
 from subprocess import check_call
 
 from mrjob.fs.hadoop import HadoopFilesystem

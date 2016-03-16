@@ -245,7 +245,6 @@ class RunnerOptionStore(OptionStore):
         opts[opt_key] = opt_list
 
 
-
 class MRJobRunner(object):
     """Abstract base class for all runners"""
 
@@ -834,8 +833,6 @@ class MRJobRunner(object):
                 return None, False
 
     def _hadoop_streaming_commands(self, step_num):
-        version = self.get_hadoop_version()
-
         # Hadoop streaming stuff
         mapper, bash_wrap_mapper = self._render_substep(
             step_num, 'mapper')
@@ -1187,8 +1184,6 @@ class MRJobRunner(object):
 
         # hadoop_extra_args
         args.extend(self._opts['hadoop_extra_args'])
-
-        version = self.get_hadoop_version()
 
         # translate the jobconf configuration names to match
         # the hadoop version

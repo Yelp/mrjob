@@ -341,8 +341,8 @@ def _time_last_active(cluster_summary, steps):
 
 
 def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
-                         is_pending, time_idle, time_to_end_of_hour,
-                         dry_run=False, max_mins_locked=None, quiet=False):
+                          is_pending, time_idle, time_to_end_of_hour,
+                          dry_run=False, max_mins_locked=None, quiet=False):
 
     fmt = ('Terminated cluster %s (%s); was %s for %s, %s to end of hour')
     msg = fmt % (

@@ -24,7 +24,6 @@ from io import BytesIO
 
 import mrjob
 from mrjob.local import LocalMRJobRunner
-from mrjob.step import StepFailedException
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
@@ -334,7 +333,7 @@ class LargeAmountsOfStderrTestCase(TestCase):
                 mr_job.run_job()
         except TimeoutException:
             raise
-        except SystemExit as e:
+        except SystemExit:
             # we expect the job to throw a StepFailedException,
             # which causes run_job to call sys.exit()
 

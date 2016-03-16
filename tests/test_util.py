@@ -17,7 +17,6 @@ import gzip
 import optparse
 import os
 import shutil
-import stat
 import sys
 import tarfile
 import tempfile
@@ -45,7 +44,6 @@ from mrjob.util import which
 
 from tests.py2 import TestCase
 from tests.py2 import patch
-from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import random_seed

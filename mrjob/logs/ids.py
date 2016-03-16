@@ -22,7 +22,7 @@ def _sort_by_recency(ds, container_to_attempt_id=None):
     most recent ones come first (e.g. to find the best error, or the best
     log file to look for an error in).
     """
-    sort_key=_make_time_sort_key(container_to_attempt_id)
+    sort_key = _make_time_sort_key(container_to_attempt_id)
     return sorted(ds, key=sort_key, reverse=True)
 
 
@@ -116,7 +116,6 @@ def _add_implied_job_id(d):
             d['job_id'] = _to_job_id(d['task_id'])
         elif d.get('application_id'):
             d['job_id'] = _to_job_id(d['application_id'])
-
 
 
 def _attempt_id_to_task_id(attempt_id):

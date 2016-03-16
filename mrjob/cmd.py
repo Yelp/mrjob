@@ -100,7 +100,7 @@ def _mrboss(args):
 
 
 @_command('report-long-jobs', 'Report EMR jobs which have been running for a'
-         ' long time')
+          ' long time')
 def _report_long_jobs(args):
     from mrjob.tools.emr.report_long_jobs import main
     main(args)

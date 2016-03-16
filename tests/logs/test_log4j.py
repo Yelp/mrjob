@@ -13,10 +13,8 @@
 # limitations under the License.
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
 from mrjob.py2 import StringIO
-from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
-from tests.quiet import no_handlers_for_logger
 
 
 class ParseHadoopLog4JRecordsCase(TestCase):

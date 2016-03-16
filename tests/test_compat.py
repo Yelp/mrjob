@@ -27,7 +27,6 @@ from mrjob.compat import uses_yarn
 
 from tests.py2 import TestCase
 from tests.py2 import patch
-from tests.quiet import no_handlers_for_logger
 
 
 class GetJobConfValueTestCase(TestCase):

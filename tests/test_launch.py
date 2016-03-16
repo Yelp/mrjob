@@ -24,10 +24,8 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.conf import combine_envs
-from mrjob.hadoop import HadoopJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
-from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 
@@ -36,9 +34,7 @@ from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
-from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
-from tests.sandbox import patch_fs_s3
 
 
 def _mock_context_mgr(m, return_value):

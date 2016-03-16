@@ -71,7 +71,6 @@ def _patched_describe_step(emr_conn, *args, **kwargs):
         boto.emr.emrobject.ClusterTimeline = ClusterTimeline
 
 
-
 class _Configuration(EmrObject):
     """The Configuration class, per
     http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_Cluster.html.

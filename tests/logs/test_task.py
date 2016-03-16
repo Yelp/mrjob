@@ -21,7 +21,6 @@ from mrjob.logs.task import _syslog_to_stderr_path
 
 from tests.py2 import Mock
 from tests.py2 import TestCase
-from tests.py2 import call
 from tests.py2 import patch
 from tests.sandbox import PatcherTestCase
 

@@ -25,12 +25,6 @@ from subprocess import PIPE
 
 from mrjob.py2 import to_string
 
-_HADOOP_JOB_LIST_NUM_RE = re.compile(r'(\d+) jobs currently running')
-# Fields: JobId, State, StartTime, UserName (hadoop), Priority, SchedulingInfo
-# We only care about JobId.
-_HADOOP_JOB_LIST_INFO_RE = re.compile(r'(\S+)\s+\d+\s+\d+\s+hadoop\s+\w+\s+\w+')
-
-
 log = logging.getLogger(__name__)
 
 
@@ -80,7 +74,7 @@ def _ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
 
 
 def _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
-                           cmd_args):
+                            cmd_args):
     """Some files exist on the master and can be accessed directly via SSH,
     but some files are on the slaves which can only be accessed via the master
     node. To differentiate between hosts, we adopt the UUCP "bang path" syntax
@@ -104,7 +98,7 @@ def _ssh_run_with_recursion(ssh_bin, address, ec2_key_pair_file, keyfile,
             'hadoop@%s' % (host2,),
         ]
         return _ssh_run(ssh_bin, host1, ec2_key_pair_file,
-                       more_args + list(cmd_args))
+                        more_args + list(cmd_args))
     else:
         return _ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args)
 
@@ -121,8 +115,8 @@ def _ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
     """
     with open(ec2_key_pair_file, 'rb') as f:
         args = ['bash -c "cat > %s" && chmod 600 %s' % (keyfile, keyfile)]
-        _check_output(*_ssh_run(ssh_bin, master_address, ec2_key_pair_file, args,
-                              stdin=f.read()))
+        _check_output(*_ssh_run(ssh_bin, master_address, ec2_key_pair_file,
+                                args, stdin=f.read()))
 
 
 def _ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
@@ -152,8 +146,8 @@ def _ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
                     ``path`` exists on one of the slave nodes
     """
     out = _check_output(*_ssh_run_with_recursion(ssh_bin, address,
-                                               ec2_key_pair_file,
-                                               keyfile, ['cat', path]))
+                                                 ec2_key_pair_file,
+                                                 keyfile, ['cat', path]))
     return out
 
 

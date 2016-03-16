@@ -119,6 +119,9 @@ class LsLogsTestCase(TestCase):
                     yield p
                     exists = True
 
+            if not exists:
+                raise IOError
+
         def mock_fs_exists(log_dir):
             return any(mock_fs_ls(log_dir))
 

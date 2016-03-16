@@ -427,8 +427,6 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
             '" .\n',
         ]
 
-        path = '/history/history.jar'
-
         self.assertEqual(
             _parse_pre_yarn_history_log(lines),
             dict(

@@ -18,8 +18,6 @@ import getpass
 import os
 import os.path
 import posixpath
-import shutil
-import tempfile
 import time
 from contextlib import contextmanager
 from datetime import datetime
@@ -41,7 +39,6 @@ from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
 from mrjob.emr import _yield_all_steps
 from mrjob.emr import filechunkio
-from mrjob.fs.s3 import S3Filesystem
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
@@ -3399,7 +3396,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self._test_stream_history_log_dirs(
             ami_version='2.4.11', ssh=True)
 
-    def test_stream_history_log_dirs_from_2_x_amis_with_ssh(self):
+    def test_stream_history_log_dirs_from_2_x_amis_without_ssh(self):
         self._test_stream_history_log_dirs(
             ami_version='2.4.11', ssh=False)
 

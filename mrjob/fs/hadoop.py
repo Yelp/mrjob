@@ -15,7 +15,6 @@
 # limitations under the License.
 import logging
 import os.path
-import posixpath
 import re
 from io import BytesIO
 from subprocess import Popen
@@ -46,7 +45,6 @@ _HADOOP_RM_NO_SUCH_FILE = re.compile(br'^rmr?: .*No such file.*$')
 
 # find version string in "Hadoop 0.20.203" etc.
 _HADOOP_VERSION_RE = re.compile(br'^.*?(?P<version>(\d|\.)+).*?$')
-
 
 
 class HadoopFilesystem(Filesystem):

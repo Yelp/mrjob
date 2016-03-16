@@ -13,7 +13,6 @@
 # limitations under the License.
 import fnmatch
 import logging
-import posixpath
 import socket
 
 try:

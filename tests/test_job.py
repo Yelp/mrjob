@@ -26,7 +26,6 @@ from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
-from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol

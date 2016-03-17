@@ -441,10 +441,18 @@ and install another Python binary.
     ``pip install path/to/tarballs/package.tar.gz#`` to :mrjob-opt:`bootstrap`
     instead.
 
-    This option only works in Python 2. In addition, to make it work in the
+    .. _fixing-apt-get:
+
+    This option only works in Python 2. To make it work in the
     deprecated 2.x AMIs, you'll also have to update ``sources.list`` to get
-    :command:`apt-get` working; see
-    :ref:`this example <using-ujson-py2-ami-v2>`.
+    :command:`apt-get` working:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            bootstrap:
+            - sudo echo "deb http://archive.debian.org/debian/ squeeze main contrib non-free" > /etc/apt/sources.list
 
     For Python 3, see :ref:`Installing packages with pip on Python 3
     <using-pip-py3>`.

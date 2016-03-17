@@ -1286,8 +1286,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
-    def _test_create_master_bootstrap_script(
-            self, ami_version=None, expect_bootstrap_python_packages=PY2):
+    def _test_create_master_bootstrap_script(self, ami_version=None):
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
         with open(foo_py_path, 'w'):
@@ -1340,7 +1339,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         assertScriptDownloads(runner._mrjob_tar_gz_path)
         assertScriptDownloads('speedups.sh')
         assertScriptDownloads('/tmp/s.sh')
-        if expect_bootstrap_python_packages:
+        if PY2:
             assertScriptDownloads(yelpy_tar_gz_path)
 
         # check scripts get run
@@ -1363,7 +1362,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
-        if expect_bootstrap_python_packages:
+        if PY2:
             self.assertIn('sudo yum install -y python-pip', lines)
             self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
         # bootstrap_scripts
@@ -1375,11 +1374,11 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='2.4.11', expect_bootstrap_python_packages=False)
+            ami_version='2.4.11')
 
     def test_create_master_bootstrap_script_on_latest_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='latest', expect_bootstrap_python_packages=False)
+            ami_version='latest')
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,

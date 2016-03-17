@@ -2022,25 +2022,27 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # bootstrap_python_packages
         if self._opts['bootstrap_python_packages']:
             if PY2:
-                if self._on_pre_3_x_ami():
-                    log.warning(
-                        'bootstrap_python_packages is deprecated and is no'
-                        ' longer supported on the 2.x AMIs. See'
-                        ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                        '-cookbook.html#using-pip for an alternative.')
-                else:
-                    log.warning(
-                        'bootstrap_python_packages is deprecated since v0.4.2'
-                        ' and will be removed in v0.6.0. Consider using'
-                        ' bootstrap instead.')
+                log.warning(
+                    'bootstrap_python_packages is deprecated since v0.4.2'
+                    ' and will be removed in v0.6.0. Consider using'
+                    ' bootstrap instead.')
 
-                    bootstrap.append(['sudo yum install -y python-pip'])
+                if self._on_pre_3_x_ami() and not any(
+                        'sources.list' in b for b in self._opts['bootstrap']):
+                    log.warning(
+                        '\nIn addition, you need to update sources.list to'
+                        ' make bootstrap_python_packages work on 2.x AMIs;'
+                        ' see:\n\n'
+                        ' https://pythonhosted.org/mrjob/guides/emr-opts.html'
+                        '#fixing-apt-get\n')
 
-                    for path in self._opts['bootstrap_python_packages']:
-                        path_dict = parse_legacy_hash_path('file', path)
-                        # don't worry about inspecting the tarball; pip is
-                        # smart enough to deal with that
-                        bootstrap.append(['sudo pip install ', path_dict])
+                bootstrap.append(['sudo yum install -y python-pip'])
+
+                for path in self._opts['bootstrap_python_packages']:
+                    path_dict = parse_legacy_hash_path('file', path)
+                    # don't worry about inspecting the tarball; pip is
+                    # smart enough to deal with that
+                    bootstrap.append(['sudo pip install ', path_dict])
             else:
                 log.warning(
                     'bootstrap_python_packages is deprecated and is not'

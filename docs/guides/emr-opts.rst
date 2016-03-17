@@ -344,7 +344,9 @@ and install another Python binary.
     Passing expressions like ``path#name`` will cause
     *path* to be automatically uploaded to the task's working directory
     with the filename *name*, marked as executable, and interpolated into the
-    script by their absolute path on the machine running the script. *path*
+    script by their absolute path on the machine running the script.
+
+    *path*
     may also be a URI, and ``~`` and environment variables within *path*
     will be resolved based on the local environment. *name* is optional.
     For details of parsing, see :py:func:`~mrjob.setup.parse_setup_cmd`.
@@ -403,11 +405,12 @@ and install another Python binary.
    :default: ``True``
 
    Attempt to install a compatible version of Python at bootstrap time,
-   and, if possible, `ujson`.
+   and, if possible, :command:`pip` and the ``ujson`` library.
 
-   In Python 2, install :command:`pip` and the ``ujson`` library (Python 2
-   is already installed on all AMIs). This does nothing on the (deprecated)
-   2.x AMIs because :command:`apt-get` no longer works.
+   Every AMI has Python 2 installed. We install :command:`pip` and ``ujson``
+   on AMI version 3.0.0 and later. (See :ref:`this example
+   <using-ujson-py2-ami-v2>` for how to get :command:`pip` and ``ujson``
+   on the deprecated 2.x AMIs.)
 
    In Python 3, this option attempts to install Python 3.4 from a package
    (``sudo yum install -y python34``), which will work unless you've set
@@ -435,13 +438,16 @@ and install another Python binary.
     .. deprecated:: 0.4.2
 
     Paths of python modules tarballs to install on EMR. Pass
-    ``pip install path/to/tarballs/*.tar.gz#`` to :mrjob-opt:`bootstrap`
+    ``pip install path/to/tarballs/package.tar.gz#`` to :mrjob-opt:`bootstrap`
     instead.
 
-    In addition to being deprecated, this option only works in Python 2,
-    and only on the 3.x AMIs and later.
-    See :ref:`Installing packages with pip on Python 3 <using-pip-py3>`
-    to see how to do this on Python 3.
+    This option only works in Python 2. In addition, to make it work in the
+    deprecated 2.x AMIs, you'll also have to update ``sources.list`` to get
+    :command:`apt-get` working; see
+    :ref:`this example <using-ujson-py2-ami-v2>`.
+
+    For Python 3, see :ref:`Installing packages with pip on Python 3
+    <using-pip-py3>`.
 
 .. mrjob-opt::
     :config: bootstrap_scripts

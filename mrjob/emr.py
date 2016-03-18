@@ -660,6 +660,31 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # transfer to S3 (so we don't do it twice)
         self._waited_for_logs_on_s3 = set()
 
+    def _default_python_bin(self, local=False):
+        """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,
+        except we explicitly pick a minor version of Python 2
+        (``python2.6`` or ``python2.7``).
+
+        On 3.x and later, we just try to match the current minor
+        version of Python. On the 2.x AMIs, we try to use ``python2.7``
+        on 2.4.3 and later (because it comes with a working :command:`pip`),
+        and ``python2.6`` otherwise (because Python 2.7 isn't installed).
+        """
+        if local or not PY2:
+            return super(EMRJobRunner, self)._default_python_bin(local=local)
+
+        if self._opts['ami_version'] == 'latest':  # e.g. 2.4.9
+            return 'python2.7'
+        elif version_gte(self._opts['ami_version'], '3'):
+            if sys.version_info < (2, 7):
+                return 'python2.6'
+            else:
+                return 'python2.7'
+        elif version_gte(self._opts['ami_version'], '2.4.3'):
+            return 'python2.7'
+        else:
+            return 'python2.6'
+
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
         aren't already set.

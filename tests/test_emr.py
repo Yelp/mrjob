@@ -18,6 +18,7 @@ import getpass
 import os
 import os.path
 import posixpath
+import sys
 import time
 from contextlib import contextmanager
 from datetime import datetime
@@ -83,7 +84,10 @@ except ImportError:
 
 # used to match command lines
 if PY2:
-    PYTHON_BIN = 'python'
+    if sys.version_info < (2, 7):
+        PYTHON_BIN = 'python2.6'
+    else:
+        PYTHON_BIN = 'python2.7'
 else:
     PYTHON_BIN = 'python3'
 
@@ -2702,6 +2706,41 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.assertEqual(ss['step_args'][:2], ['streaming', '-v'])
         self.assertEqual(ss['step_args'][2], '-files')
         self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
+
+
+class DefaultPythonBinTestCase(MockBotoTestCase):
+
+    def test_default_ami(self):
+        # this tests 3.x and 4.x AMIs
+        runner = EMRJobRunner()
+        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+
+    def test_latest_ami(self):
+        runner = EMRJobRunner(ami_version='latest')
+        if PY2:
+            self.assertEqual(runner._default_python_bin(), ['python2.7'])
+        else:
+            self.assertEqual(runner._default_python_bin(), ['python3'])
+
+    def test_2_4_3_ami(self):
+        runner = EMRJobRunner(ami_version='2.4.3')
+        if PY2:
+            self.assertEqual(runner._default_python_bin(), ['python2.7'])
+        else:
+            self.assertEqual(runner._default_python_bin(), ['python3'])
+
+    def test_2_4_2_ami(self):
+        runner = EMRJobRunner(ami_version='2.4.3')
+        if PY2:
+            self.assertEqual(runner._default_python_bin(), ['python2.7'])
+        else:
+            self.assertEqual(runner._default_python_bin(), ['python3'])
+
+    def test_local_python_bin(self):
+        # just make sure we don't break this
+        runner = EMRJobRunner()
+        self.assertEqual(runner._default_python_bin(local=True),
+                         [sys.executable])
 
 
 class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):

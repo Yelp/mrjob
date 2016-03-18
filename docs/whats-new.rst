@@ -71,14 +71,24 @@ The part of mrjob that fetches counters and tells you what probably caused your 
 
 Once casualty of this change was the :command:`mrjob fetch-logs` command, which means mrjob no longer offers a way to fetch or interpret logs from a *past* job. We do plan to re-introduce this functionality.
 
-ujson
-^^^^^
+Protocols
+^^^^^^^^^
 
-By default, mrjob will use ``ujson`` (rather than ``simplejson``), if it is available, to encode intermediate and output data from your job.
+Protocols are now strict by default (they simply raise an exception on
+unencodable data). "Loose" protocols can be re-enabled with the
+``--no-strict-protocols`` switch; see :mrjob-opt:`strict_protocols` for
+why this is a bad idea.
 
-mrjob will also try to install ``ujson`` on EMR by default when it can do so quickly and reliably (see :mrjob-opt:`bootstrap_python`).
+Protocols will now use the much faster :py:mod:`ujson` library, if installed,
+to encode and decode JSON. This is especially recommended for simple jobs that
+spend a significant fraction of their time encoding and data (if
+you're using EMR, see :ref:`Installing ujson <installing-ujson>`).
 
-If you wish, you can now explicitly turn off ``ujson`` (e.g. :py:class:`~mrjob.protocol.StandardJSONProtocol`) or require it (:py:class:`~mrjob.protocol.UltraJSONProtocol`).
+mrjob will fall back to the :py:mod:`simplejson` library if :py:mod:`ujson`
+is not installed, and use the built-in ``json`` module if neither is installed.
+
+You can now explicitly specify which JSON implementation you wish to use
+(e.g. :py:class:`~mrjob.protocol.StandardJSONProtocol`, :py:class:`~mrjob.protocol.SimpleJSONProtocol`, :py:class:`~mrjob.protocol.UltraJSONProtocol`).
 
 Status messages
 ^^^^^^^^^^^^^^^

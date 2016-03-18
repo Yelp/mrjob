@@ -40,6 +40,13 @@ except ImportError:
 from mrjob.py2 import PY2
 from mrjob.util import safeeval
 
+
+try:
+    import simplejson
+    simplejson  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    simplejson = None
+
 try:
     import ujson
     ujson  # quiet "redefinition of unused ..." warning from pyflakes
@@ -103,9 +110,11 @@ class StandardJSONProtocol(_KeyCachingProtocol):
     """Implements :py:class:`JSONProtocol` using Python's built-in JSON
     library.
 
-    Note that the built-in library is (appropriately) strict about the JSON
-    standard; it won't accept dictionaries with non-string keys, sets, or
-    (on Python 3) bytestrings.
+    .. note::
+
+        The built-in ``json`` library is (appropriately) strict about the JSON
+        standard; it won't accept dictionaries with non-string keys, sets, or
+        (on Python 3) bytestrings.
     """
     if PY2:
         def _loads(self, value):
@@ -141,8 +150,56 @@ class StandardJSONValueProtocol(object):
             return json.dumps(value).encode('utf_8')
 
 
+class SimpleJSONProtocol(_KeyCachingProtocol):
+    """Implements :py:class:`JSONProtocol` using the :py:mod:`simplejson` library.
+    """
+    def _loads(self, value):
+        # simplejson can handle bytes even in Python 3
+        return simplejson.loads(value)
+
+    if PY2:
+        def _dumps(self, value):
+            return simplejson.dumps(value)
+    else:
+        def _dumps(self, value):
+            return simplejson.dumps(value).encode('utf_8')
+
+
+class SimpleJSONValueProtocol(object):
+    """Implements :py:class:`JSONValueProtocol` using the :py:mod:`simplejson`
+    library.
+    """
+    def read(self, line):
+        # simplejson can handle bytes even in Python 3
+        return (None, simplejson.loads(line))
+
+    if PY2:
+        def write(self, key, value):
+            return simplejson.dumps(value)
+    else:
+        def write(self, key, value):
+            return simplejson.dumps(value).encode('utf_8')
+
+
 class UltraJSONProtocol(_KeyCachingProtocol):
     """Implements :py:class:`JSONProtocol` using the :py:mod:`ujson` library.
+
+    .. warning::
+
+        :py:mod:`ujson` is about five times faster than the standard
+        implementation, but is more willing to encode things that aren't
+        strictly JSON-encodable, including sets, dictionaries with
+        tuples as keys, UTF-8 encoded bytes, and objects (!). Relying on this
+        behavior won't stop your job from working, but it can
+        make your job *dependent* on :py:mod:`ujson`, rather than just using
+        it as a speedup.
+
+    .. note::
+
+        :py:mod:`ujson` also differs from the standard implementation in that
+        it doesn't  add spaces to its JSONs (``{"foo":"bar"}`` versus
+        ``{"foo": "bar"}``). This probably won't affect anything but test
+        cases and readability.
     """
     def _loads(self, value):
         # ujson can handle bytes even in Python 3
@@ -176,6 +233,10 @@ class UltraJSONValueProtocol(object):
 if ujson:
     JSONProtocol = UltraJSONProtocol
     JSONValueProtocol = UltraJSONValueProtocol
+# if no ujson, try simplejson
+elif simplejson:
+    JSONProtocol = SimpleJSONProtocol
+    JSONValueProtocol = SimpleJSONValueProtocol
 else:
     JSONProtocol = StandardJSONProtocol
     JSONValueProtocol = StandardJSONValueProtocol

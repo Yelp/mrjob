@@ -353,7 +353,11 @@ Job execution context
 
     .. warning::
 
-        "Loose" protocols are going away in v0.6.0.
+       Non-strict protocols are going away in v0.6.0. There is no limit on
+       how much data on-strict protocols can silently swallow (potentially
+       *all* of it). If you have a problem caused by character encoding in
+       log files, consider using
+       :py:class:`~mrjob.protocol.TextValueProtocol` instead.
 
 Other
 =====

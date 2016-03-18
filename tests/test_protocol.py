@@ -24,12 +24,15 @@ from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
+from mrjob.protocol import SimpleJSONProtocol
+from mrjob.protocol import SimpleJSONValueProtocol
 from mrjob.protocol import StandardJSONProtocol
 from mrjob.protocol import StandardJSONValueProtocol
 from mrjob.protocol import TextProtocol
 from mrjob.protocol import TextValueProtocol
 from mrjob.protocol import UltraJSONProtocol
 from mrjob.protocol import UltraJSONValueProtocol
+from mrjob.protocol import simplejson
 from mrjob.protocol import ujson
 from mrjob.py2 import PY2
 
@@ -106,10 +109,15 @@ class ProtocolTestCase(TestCase):
 
 class JSONProtocolAliasesTestCase(TestCase):
 
-    def test_use_ujson_if_installed(self):
+    def test_use_ujson_or_simplejson_if_installed(self):
+        # these aliases are determined at compile time, so there
+        # isn't a straightforward way to test this through patches
         if ujson:
             self.assertEqual(JSONProtocol, UltraJSONProtocol)
             self.assertEqual(JSONValueProtocol, UltraJSONValueProtocol)
+        elif simplejson:
+            self.assertEqual(JSONProtocol, SimpleJSONProtocol)
+            self.assertEqual(JSONValueProtocol, SimpleJSONValueProtocol)
         else:
             self.assertEqual(JSONProtocol, StandardJSONProtocol)
             self.assertEqual(JSONValueProtocol, StandardJSONValueProtocol)
@@ -162,6 +170,12 @@ class StandardJSONProtocolTestCase(ProtocolTestCase):
 
         # Point class has no representation in JSON
         self.assertCantEncode(self.PROTOCOL, Point(2, 3), Point(1, 4))
+
+
+@skipIf(simplejson is None, 'simplejson module not installed')
+class SimpleJSONProtocolTestCase(StandardJSONProtocolTestCase):
+
+    PROTOCOL = SimpleJSONProtocol()
 
 
 @skipIf(ujson is None, 'ujson module not installed')
@@ -228,6 +242,12 @@ class StandardJSONValueProtocolTestCase(ProtocolTestCase):
 
         # Point class has no representation in JSON
         self.assertCantEncode(self.PROTOCOL, None, Point(1, 4))
+
+
+@skipIf(simplejson is None, 'simplejson module not installed')
+class SimpleJSONValueProtocolTestCase(StandardJSONValueProtocolTestCase):
+
+    PROTOCOL = SimpleJSONValueProtocol()
 
 
 @skipIf(ujson is None, 'ujson module not installed')
@@ -400,7 +420,6 @@ class TextProtocolTestCase(ProtocolTestCase):
         # we fall back to latin-1 for the whole line, not individual fields
         self.assertEqual(TextProtocol().read(b'caf\xe9\tol\xc3\xa9'),
                          (u'caf\xe9', u'ol\xc3\xa9'))
-
 
 
 class ReprProtocolTestCase(ProtocolTestCase):

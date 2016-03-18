@@ -228,7 +228,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
-    def _test_remote_tmp_cleanup(self, mode, tmp_len, log_len):
+    def _test_cloud_tmp_cleanup(self, mode, tmp_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})
         stdin = BytesIO(b'foo\nbar\n')
 
@@ -256,30 +256,30 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         self.assertEqual(len(list(bucket.list())), log_len)
 
     def test_cleanup_all(self):
-        self._test_remote_tmp_cleanup('ALL', 0, 0)
+        self._test_cloud_tmp_cleanup('ALL', 0, 0)
 
     def test_cleanup_tmp(self):
-        self._test_remote_tmp_cleanup('TMP', 0, 1)
+        self._test_cloud_tmp_cleanup('TMP', 0, 1)
 
     def test_cleanup_remote(self):
-        self._test_remote_tmp_cleanup('REMOTE_TMP', 0, 1)
+        self._test_cloud_tmp_cleanup('CLOUD_TMP', 0, 1)
 
     def test_cleanup_local(self):
-        self._test_remote_tmp_cleanup('LOCAL_TMP', 5, 1)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5, 1)
 
     def test_cleanup_logs(self):
-        self._test_remote_tmp_cleanup('LOGS', 5, 0)
+        self._test_cloud_tmp_cleanup('LOGS', 5, 0)
 
     def test_cleanup_none(self):
-        self._test_remote_tmp_cleanup('NONE', 5, 1)
+        self._test_cloud_tmp_cleanup('NONE', 5, 1)
 
     def test_cleanup_combine(self):
-        self._test_remote_tmp_cleanup('LOGS,REMOTE_TMP', 0, 0)
+        self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0, 0)
 
     def test_cleanup_error(self):
-        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
-                          'NONE,LOGS,REMOTE_TMP', 0, 0)
-        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
+        self.assertRaises(ValueError, self._test_cloud_tmp_cleanup,
+                          'NONE,LOGS,CLOUD_TMP', 0, 0)
+        self.assertRaises(ValueError, self._test_cloud_tmp_cleanup,
                           'GARBAGE', 0, 0)
 
 

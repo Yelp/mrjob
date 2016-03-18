@@ -110,9 +110,11 @@ class StandardJSONProtocol(_KeyCachingProtocol):
     """Implements :py:class:`JSONProtocol` using Python's built-in JSON
     library.
 
-    Note that the built-in library is (appropriately) strict about the JSON
-    standard; it won't accept dictionaries with non-string keys, sets, or
-    (on Python 3) bytestrings.
+    .. note::
+
+        The built-in ``json`` library is (appropriately) strict about the JSON
+        standard; it won't accept dictionaries with non-string keys, sets, or
+        (on Python 3) bytestrings.
     """
     if PY2:
         def _loads(self, value):
@@ -181,6 +183,23 @@ class SimpleJSONValueProtocol(object):
 
 class UltraJSONProtocol(_KeyCachingProtocol):
     """Implements :py:class:`JSONProtocol` using the :py:mod:`ujson` library.
+
+    .. warning::
+
+        :py:mod:`ujson` is about five times faster than the standard
+        implementation, but is more willing to encode things that aren't
+        strictly JSON-encodable, including sets, dictionaries with
+        tuples as keys, UTF-8 encoded bytes, and objects (!). Relying on this
+        behavior won't stop your job from working, but it can
+        make your job *dependent* on :py:mod:`ujson`, rather than just using
+        it as a speedup.
+
+    .. note::
+
+        :py:mod:`ujson` also differs from the standard implementation in that
+        it doesn't  add spaces to its JSONs (``{"foo":"bar"}`` versus
+        ``{"foo": "bar"}``). This probably won't affect anything but test
+        cases.
     """
     def _loads(self, value):
         # ujson can handle bytes even in Python 3

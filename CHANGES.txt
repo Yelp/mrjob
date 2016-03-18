@@ -9,8 +9,8 @@ v0.5.0, 2016-03-?? -- the future is in the past
    * removed testing methods parse_counters() and parse_output()
    * protocols:
      * protocols are strict by default (#724)
-     * use ujson when available, drop simplejson (#1002)
-       * can explicitly choose Standard or Ultra JSON protocol
+     * JSON protocols use ujson when available, then simplejson (#1002, #1266)
+       * can explicitly choose Standard, Simple or Ultra JSON protocol
      * raw protocols handle bytes or unicode depending on Python version
        * can explicitly choose Text or Bytes protocol
    * mrjob.step:

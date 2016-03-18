@@ -1383,13 +1383,13 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
             ami_version='2.4.11',
-            expected_python_bin='python2.7',
+            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
             expect_bootstrap_python_packages=False)
 
     def test_create_master_bootstrap_script_on_2_4_2_ami(self):
         self._test_create_master_bootstrap_script(
             ami_version='2.4.2',
-            expected_python_bin='python2.6',
+            expected_python_bin=('python2.6' if PY2 else PYTHON_BIN),
             expect_bootstrap_python_packages=False)
 
     def test_no_bootstrap_script_if_not_needed(self):

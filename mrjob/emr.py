@@ -1075,8 +1075,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             except Exception as e:
                 log.exception(e)
 
-    def _cleanup_remote_tmp(self):
-        # delete all the files we created
+    def _cleanup_cloud_tmp(self):
+        # delete all the files we created on S3
         if self._s3_tmp_dir:
             try:
                 log.info('Removing s3 temp directory %s...' % self._s3_tmp_dir)

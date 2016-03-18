@@ -1,4 +1,4 @@
-# Copyright 2009-2016 Yelp and Contributors
+# Copyright 2009-2016
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -74,8 +74,8 @@ class WithStatementTestCase(TestCase):
     def test_cleanup_local_tmp(self):
         self._test_cleanup_after_with_statement(['LOCAL_TMP'], False)
 
-    def test_cleanup_remote_tmp(self):
-        self._test_cleanup_after_with_statement(['REMOTE_TMP'], True)
+    def test_cleanup_cloud_tmp(self):
+        self._test_cleanup_after_with_statement(['CLOUD_TMP'], True)
 
     def test_cleanup_none(self):
         self._test_cleanup_after_with_statement(['NONE'], True)

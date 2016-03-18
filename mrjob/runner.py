@@ -66,33 +66,38 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:
 #: * ``'ALL'``: delete logs and local and remote temp files; stop cluster
 #:   if on EMR and the job is not done when cleanup is run.
+#: * ``'CLOUD_TMP'``: delete temp files on cloud storage (e.g. S3) only
 #: * ``'CLUSTER'``: terminate the cluster if on EMR and the job is not done
 #:    on cleanup
+#: * ``'HADOOP_TMP'``: delete temp files on HDFS only
 #: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'LOCAL_TMP'``: delete local temp files only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
-#: * ``'REMOTE_TMP'``: delete remote temp files only
-#: * ``'TMP'``: delete local and remote temp files, but not logs
+#: * ``'TMP'``: delete local, HDFS, and cloud storage temp files, but not logs
 #:
 #: .. versionchanged:: 0.5.0
 #:
-#:     Options ending in ``TMP`` used to end in ``SCRATCH``.
+#:     - ``LOCAL_TMP`` used to be ``LOCAL_SCRATCH``
+#:     - ``HADOOP_TMP`` is new (and used to be covered by ``LOCAL_SCRATCH``)
+#:     - ``CLOUD_TMP`` used to be ``REMOTE_SCRATCH``
+#:
 CLEANUP_CHOICES = [
     'ALL',
+    'CLOUD_TMP',
     'CLUSTER',
+    'HADOOP_TMP',
     'JOB',
     'LOCAL_TMP',
     'LOGS',
     'NONE',
-    'REMOTE_TMP',
     'TMP',
 ]
 
 _CLEANUP_DEPRECATED_ALIASES = {
     'JOB_FLOW': 'CLUSTER',
     'LOCAL_SCRATCH': 'LOCAL_TMP',
-    'REMOTE_SCRATCH': 'REMOTE_TMP',
+    'REMOTE_SCRATCH': 'CLOUD_TMP',
     'SCRATCH': 'TMP',
 }
 
@@ -507,6 +512,20 @@ class MRJobRunner(object):
         else:
             return mode or self._opts['cleanup']
 
+    def _cleanup_cloud_tmp(self):
+        """Cleanup any files/directories on cloud storage (e.g. S3) we created
+        while running this job. Should be safe to run this at any time, or
+        multiple times.
+        """
+        pass  # only EMR runner does this
+
+    def _cleanup_hadoop_tmp(self):
+        """Cleanup any files/directories on HDFS we created
+        while running this job. Should be safe to run this at any time, or
+        multiple times.
+        """
+        pass  # only Hadoop runner does this
+
     def _cleanup_local_tmp(self):
         """Cleanup any files/directories on the local machine we created while
         running this job. Should be safe to run this at any time, or multiple
@@ -525,13 +544,6 @@ class MRJobRunner(object):
                 log.exception(e)
 
         self._local_tmp_dir = None
-
-    def _cleanup_remote_tmp(self):
-        """Cleanup any files/directories on the remote machine (S3) we created
-        while running this job. Should be safe to run this at any time, or
-        multiple times.
-        """
-        pass  # this only happens on EMR
 
     def _cleanup_cluster(self):
         """Terminate the cluster if there is one."""
@@ -573,11 +585,14 @@ class MRJobRunner(object):
             if mode_has('JOB', 'ALL'):
                 self._cleanup_job()
 
+        if mode_has('ALL', 'TMP', 'CLOUD_TMP'):
+            self._cleanup_cloud_tmp()
+
+        if mode_has('ALL', 'TMP', 'HADOOP_TMP'):
+            self._cleanup_hadoop_tmp()
+
         if mode_has('ALL', 'TMP', 'LOCAL_TMP'):
             self._cleanup_local_tmp()
-
-        if mode_has('ALL', 'TMP', 'REMOTE_TMP'):
-            self._cleanup_remote_tmp()
 
         if mode_has('ALL', 'LOGS'):
             self._cleanup_logs()

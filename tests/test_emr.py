@@ -18,6 +18,7 @@ import getpass
 import os
 import os.path
 import posixpath
+import sys
 import time
 from contextlib import contextmanager
 from datetime import datetime
@@ -83,7 +84,10 @@ except ImportError:
 
 # used to match command lines
 if PY2:
-    PYTHON_BIN = 'python'
+    if sys.version_info < (2, 7):
+        PYTHON_BIN = 'python2.6'
+    else:
+        PYTHON_BIN = 'python2.7'
 else:
     PYTHON_BIN = 'python3'
 
@@ -577,6 +581,8 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
     def test_latest_ami_version(self):
         # "latest" is no longer actually the latest version
         with self.make_runner('--ami-version', 'latest') as runner:
+            # we should translate "latest" ourselves (see #1269)
+            self.assertEqual(runner._opts['ami_version'], '2.4.2')
             runner.run()
             self.assertEqual(runner.get_ami_version(), '2.4.2')
             self.assertEqual(runner.get_hadoop_version(), '1.0.3')
@@ -1287,7 +1293,8 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
     def _test_create_master_bootstrap_script(
-            self, ami_version=None, expect_bootstrap_python_packages=PY2):
+            self, ami_version=None, expected_python_bin=PYTHON_BIN,
+            expect_bootstrap_python_packages=PY2):
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
         with open(foo_py_path, 'w'):
@@ -1300,7 +1307,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[],
                               ami_version=ami_version,
                               bootstrap=[
-                                  PYTHON_BIN + ' ' +
+                                  expected_python_bin + ' ' +
                                   foo_py_path + '#bar.py',
                                   's3://walrus/scripts/ohnoes.sh#'],
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
@@ -1346,7 +1353,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # check scripts get run
 
         # bootstrap
-        self.assertIn(PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
+        self.assertIn(expected_python_bin + ' $__mrjob_PWD/bar.py', lines)
         self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
         # bootstrap_cmds
         self.assertIn('echo "Hi!"', lines)
@@ -1355,12 +1362,12 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # bootstrap_mrjob
         mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_tar_gz_path)
-        self.assertIn("__mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
-                      " distutils.sysconfig import get_python_lib;"
+        self.assertIn("__mrjob_PYTHON_LIB=$(" + expected_python_bin +
+                      " -c 'from distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
         self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
                       ' -C $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
+        self.assertIn('sudo ' + expected_python_bin + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
         if expect_bootstrap_python_packages:
@@ -1375,11 +1382,15 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='2.4.11', expect_bootstrap_python_packages=False)
+            ami_version='2.4.11',
+            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
+            expect_bootstrap_python_packages=False)
 
-    def test_create_master_bootstrap_script_on_latest_ami(self):
+    def test_create_master_bootstrap_script_on_2_4_2_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='latest', expect_bootstrap_python_packages=False)
+            ami_version='2.4.2',
+            expected_python_bin=('python2.6' if PY2 else PYTHON_BIN),
+            expect_bootstrap_python_packages=False)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
@@ -2704,6 +2715,39 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
 
 
+class DefaultPythonBinTestCase(MockBotoTestCase):
+
+    def test_default_ami(self):
+        # this tests 3.x AMIs
+        runner = EMRJobRunner()
+        self.assertTrue(runner._opts['ami_version'].startswith('3.'))
+        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+
+    def test_4_x_release_label(self):
+        runner = EMRJobRunner(release_label='emr-4.0.0')
+        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+
+    def test_2_4_3_ami(self):
+        runner = EMRJobRunner(ami_version='2.4.3')
+        if PY2:
+            self.assertEqual(runner._default_python_bin(), ['python2.7'])
+        else:
+            self.assertEqual(runner._default_python_bin(), ['python3'])
+
+    def test_2_4_2_ami(self):
+        runner = EMRJobRunner(ami_version='2.4.3')
+        if PY2:
+            self.assertEqual(runner._default_python_bin(), ['python2.7'])
+        else:
+            self.assertEqual(runner._default_python_bin(), ['python3'])
+
+    def test_local_python_bin(self):
+        # just make sure we don't break this
+        runner = EMRJobRunner()
+        self.assertEqual(runner._default_python_bin(local=True),
+                         [sys.executable])
+
+
 class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
 
     def launch_runner(self, *args):
@@ -3106,9 +3150,6 @@ class BootstrapPythonTestCase(MockBotoTestCase):
 
     def test_ami_version_2_4_11(self):
         self._test_2_x_ami('2.4.11')
-
-    def test_ami_version_latest(self):
-        self._test_2_x_ami('latest')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])

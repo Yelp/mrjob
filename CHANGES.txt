@@ -35,6 +35,8 @@ v0.5.0, 2016-03-?? -- the future is in the past
    * EMR:
      * default AWS region is us-west-2 (#1025)
      * default instance type is m1.medium (#992)
+     * visible_to_all_users defaults to true (#1016)
+     * matches your minor version of Python 2 on 3.x and 4.x AMIs (#1265)
      * 4.x AMIs are supported (#1105)
        * added --release-label switch (--ami-version 4.x.y also works)
      * can fetch counters and probable cause of failure on 3.x and 4.x AMIs
@@ -58,7 +60,7 @@ v0.5.0, 2016-03-?? -- the future is in the past
      * bootstrap_python_packages (deprecated) does nothing on 2.x AMIs (#1248)
      * pooling respects key pair (#1230)
      * idle cluster self-termination respects non-streaming jobs (#1145)
-     * visible_to_all_users defaults to true (#1016)
+     * deprecated "latest" AMI version not passed through to EMR (#1269)
    * Hadoop
      * works out-of the-box on most Hadoop setups (#1160)
      * works out-of the box inside EMR (2.x, 3.x, and 4.x AMIs)

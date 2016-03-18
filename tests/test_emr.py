@@ -3091,11 +3091,10 @@ class SecurityTokenTestCase(MockBotoTestCase):
 class BootstrapPythonTestCase(MockBotoTestCase):
 
     if PY2:
-        EXPECTED_BOOTSTRAP = [
-            ['sudo yum install -y python-pip'],
-            ['sudo pip install --upgrade ujson']]
+        EXPECTED_BOOTSTRAP = []
     else:
-        EXPECTED_BOOTSTRAP = [['sudo yum install -y python34']]
+        EXPECTED_BOOTSTRAP = [
+            ['sudo yum install -y python34 python34-devel python34-pip']]
 
     def test_default(self):
         mr_job = MRTwoStepJob(['-r', 'emr'])
@@ -3123,8 +3122,8 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             self.assertEqual(runner._bootstrap_python(), [])
             self.assertEqual(runner._bootstrap, [])
 
-    def test_ami_version_3_6_0(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', '3.6.0'])
+    def _test_pre_python3_ami_version(self, ami_version):
+        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', ami_version])
 
         with no_handlers_for_logger('mrjob.emr'):
             stderr = StringIO()
@@ -3140,16 +3139,12 @@ class BootstrapPythonTestCase(MockBotoTestCase):
                 if not PY2:
                     self.assertIn('will probably not work', stderr.getvalue())
 
-    def _test_2_x_ami(self, ami_version):
-        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', ami_version])
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(runner._opts['bootstrap_python'], True)
-            self.assertEqual(runner._bootstrap_python(), [])
-            self.assertEqual(runner._bootstrap, [])
+    def test_ami_version_3_6_0(self):
+        self._test_pre_python3_ami_version(ami_version='3.6.0')
 
     def test_ami_version_2_4_11(self):
-        self._test_2_x_ami('2.4.11')
+        # this *really, really* probably won't work, but what can we do?
+        self._test_pre_python3_ami_version(ami_version='2.4.11')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])

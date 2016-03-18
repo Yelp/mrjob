@@ -2010,37 +2010,23 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._opts['bootstrap_python']:
             return []
 
-        # apt-get no longer works on 2.x AMIs
-        if self._on_pre_3_x_ami():
+        if PY2:
+            # Python 2 and pip are basically already installed everywhere
+            # (Okay, there's no pip on AMIs prior to 2.4.3, but there's no
+            # longer an easy way to get it now that apt-get is broken.)
             return []
 
-        if PY2:
-            # Python 2 is already installed; install pip and ujson
+        # we have to have at least on AMI 3.7.0. But give it a shot
+        if not (self._opts['release_label'] or
+                version_gte(self._opts['ami_version'], '3.7.0')):
+            log.warning(
+                'bootstrapping Python 3 will probably not work on'
+                ' AMIs prior to 3.7.0. For an alternative, see:'
+                ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                '-cookbook.html#installing-python-from-source')
 
-            # (We also install python-pip for bootstrap_python_packages,
-            # but there's no harm in running these commands twice, and
-            # bootstrap_python_packages is deprecated anyway.)
-            return [
-                ['sudo yum install -y python-pip'],
-                ['sudo pip install --upgrade ujson'],
-            ]
-        else:
-            # the best we can do is install the Python 3.4 package
-            # (getting pip and ujson on Python 3 is much harder on EMR;
-            # see docs/guides/emr-bootstrap-cookbook.rst)
-
-            # we have to have at least on AMI 3.7.0
-            if not (self._opts['release_label'] or
-                    version_gte(self._opts['ami_version'], '3.7.0')):
-                log.warning(
-                    'bootstrapping Python 3 will probably not work on'
-                    ' AMIs prior to 3.7.0. For an alternative, see:'
-                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                    '-cookbook.html#installing-python-from-source')
-
-            return [['sudo yum install -y python34']]
-
-        return []
+        return [
+            ['sudo yum install -y python34 python34-devel python34-pip']]
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with

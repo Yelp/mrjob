@@ -402,26 +402,15 @@ and install another Python binary.
    :set: emr
    :default: ``True``
 
-   Attempt to install a compatible version of Python at bootstrap time,
-   and, if possible, `ujson`.
+   Attempt to install a compatible (major) version of Python at bootstrap time,
+   including :command:`pip` (see :ref:`using-pip`).
 
-   In Python 2, install :command:`pip` and the ``ujson`` library (Python 2
-   is already installed on all AMIs). This does nothing on the (deprecated)
-   2.x AMIs because :command:`apt-get` no longer works.
+   In Python 2, this currently does nothing (no need).
 
-   In Python 3, this option attempts to install Python 3.4 from a package
-   (``sudo yum install -y python34``), which will work unless you've set
-   :mrjob-opt:`ami_version` to something earlier than 3.7.0.
-
-   Unfortunately, there is not a simple, highly reliable way to install
-   :command:`pip` *or* ``ujson`` by default on Python 3.
-
-   If you just need pure
-   Python packages, see :ref:`Installing pip on Python 3 <using-pip-py3>`.
-   If you'd like ``ujson`` or other C packages as well, see
-   :ref:`Installing ujson on Python 3 <using-ujson-py3>`. (The latter
-   will also support Python 3 on any AMI because it compiles Python from
-   source.)
+   In Python 3, this runs
+   :command:`sudo yum install -y python34 python34-devel python34-pip`, which
+   will work unless you've set :mrjob-opt:`ami_version` to something earlier
+   than 3.7.0.
 
    .. versionadded:: 0.5.0
 

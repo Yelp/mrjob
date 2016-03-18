@@ -1293,7 +1293,8 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
     def _test_create_master_bootstrap_script(
-            self, ami_version=None, expect_bootstrap_python_packages=PY2):
+            self, ami_version=None, expected_python_bin=PYTHON_BIN,
+            expect_bootstrap_python_packages=PY2):
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
         with open(foo_py_path, 'w'):
@@ -1306,7 +1307,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[],
                               ami_version=ami_version,
                               bootstrap=[
-                                  PYTHON_BIN + ' ' +
+                                  expected_python_bin + ' ' +
                                   foo_py_path + '#bar.py',
                                   's3://walrus/scripts/ohnoes.sh#'],
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
@@ -1352,7 +1353,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # check scripts get run
 
         # bootstrap
-        self.assertIn(PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
+        self.assertIn(expected_python_bin + ' $__mrjob_PWD/bar.py', lines)
         self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
         # bootstrap_cmds
         self.assertIn('echo "Hi!"', lines)
@@ -1361,12 +1362,12 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # bootstrap_mrjob
         mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_tar_gz_path)
-        self.assertIn("__mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
-                      " distutils.sysconfig import get_python_lib;"
+        self.assertIn("__mrjob_PYTHON_LIB=$(" + expected_python_bin +
+                      " -c 'from distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
         self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
                       ' -C $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
+        self.assertIn('sudo ' + expected_python_bin + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
         if expect_bootstrap_python_packages:
@@ -1381,11 +1382,15 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='2.4.11', expect_bootstrap_python_packages=False)
+            ami_version='2.4.11',
+            expected_python_bin='python2.7',
+            expect_bootstrap_python_packages=False)
 
-    def test_create_master_bootstrap_script_on_latest_ami(self):
+    def test_create_master_bootstrap_script_on_2_4_2_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='latest', expect_bootstrap_python_packages=False)
+            ami_version='2.4.2',
+            expected_python_bin='python2.6',
+            expect_bootstrap_python_packages=False)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,

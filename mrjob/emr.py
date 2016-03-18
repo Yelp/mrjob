@@ -690,17 +690,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # on 3.x and 4.x AMIs, both versions of Python work, so just
             # match whatever version we're using locally
             if sys.version_info >= (2, 7):
-                return 'python2.7'
+                return ['python2.7']
             else:
-                return 'python2.6'
+                return ['python2.6']
         elif version_gte(self._opts['ami_version'], '2.4.3'):
             # on 2.4.3+, use python2.7 because the default python
             # doesn't have a working pip
-            return 'python2.7'
+            return ['python2.7']
         else:
             # prior to 2.4.3, Python 2.6 is the only version installed.
             # Use "python2.6" and not "python" for consistency
-            return 'python2.6'
+            return ['python2.6']
 
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they

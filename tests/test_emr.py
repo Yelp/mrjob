@@ -581,6 +581,8 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
     def test_latest_ami_version(self):
         # "latest" is no longer actually the latest version
         with self.make_runner('--ami-version', 'latest') as runner:
+            # we should translate "latest" ourselves (see #1269)
+            self.assertEqual(runner._opts['ami_version'], '2.4.2')
             runner.run()
             self.assertEqual(runner.get_ami_version(), '2.4.2')
             self.assertEqual(runner.get_hadoop_version(), '1.0.3')
@@ -2711,16 +2713,14 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
 class DefaultPythonBinTestCase(MockBotoTestCase):
 
     def test_default_ami(self):
-        # this tests 3.x and 4.x AMIs
+        # this tests 3.x AMIs
         runner = EMRJobRunner()
+        self.assertTrue(runner._opts['ami_version'].startswith('3.'))
         self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
-    def test_latest_ami(self):
-        runner = EMRJobRunner(ami_version='latest')
-        if PY2:
-            self.assertEqual(runner._default_python_bin(), ['python2.7'])
-        else:
-            self.assertEqual(runner._default_python_bin(), ['python3'])
+    def test_4_x_release_label(self):
+        runner = EMRJobRunner(release_label='emr-4.0.0')
+        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_2_4_3_ami(self):
         runner = EMRJobRunner(ami_version='2.4.3')
@@ -3145,9 +3145,6 @@ class BootstrapPythonTestCase(MockBotoTestCase):
 
     def test_ami_version_2_4_11(self):
         self._test_2_x_ami('2.4.11')
-
-    def test_ami_version_latest(self):
-        self._test_2_x_ami('latest')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])

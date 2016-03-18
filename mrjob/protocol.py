@@ -199,7 +199,7 @@ class UltraJSONProtocol(_KeyCachingProtocol):
         :py:mod:`ujson` also differs from the standard implementation in that
         it doesn't  add spaces to its JSONs (``{"foo":"bar"}`` versus
         ``{"foo": "bar"}``). This probably won't affect anything but test
-        cases.
+        cases and readability.
     """
     def _loads(self, value):
         # ujson can handle bytes even in Python 3

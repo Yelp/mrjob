@@ -36,6 +36,7 @@ v0.5.0, 2016-03-?? -- the future is in the past
      * default AWS region is us-west-2 (#1025)
      * default instance type is m1.medium (#992)
      * visible_to_all_users defaults to true (#1016)
+     * matches your minor version of Python 2 on 3.x and 4.x AMIs (#1265)
      * 4.x AMIs are supported (#1105)
        * added --release-label switch (--ami-version 4.x.y also works)
      * can fetch counters and probable cause of failure on 3.x and 4.x AMIs

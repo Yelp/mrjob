@@ -545,9 +545,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
                 'step-output/%04d' % step_num
             )
 
-    def _cleanup_local_tmp(self):
-        super(HadoopJobRunner, self)._cleanup_local_tmp()
-
+    def _cleanup_hadoop_tmp(self):
         if self._hadoop_tmp_dir:
             log.info('Removing HDFS temp directory %s...' %
                      self._hadoop_tmp_dir)

@@ -479,13 +479,13 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
                      cleanup_on_failure=['JOB_FLOW', 'SCRATCH']),
                 [])
 
-            self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'REMOTE_TMP'])
+            self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'CLOUD_TMP'])
             self.assertIn(
                 'Deprecated cleanup option LOCAL_SCRATCH has been renamed'
                 ' to LOCAL_TMP', stderr.getvalue())
             self.assertIn(
                 'Deprecated cleanup option REMOTE_SCRATCH has been renamed'
-                ' to REMOTE_TMP', stderr.getvalue())
+                ' to CLOUD_TMP', stderr.getvalue())
 
             self.assertEqual(opts['cleanup_on_failure'], ['CLUSTER', 'TMP'])
             self.assertIn(

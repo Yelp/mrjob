@@ -3,7 +3,7 @@ v0.5.0, 2016-03-?? -- the future is in the past
  * requires boto 2.35.0 or newer (#980)
    * removed many workarounds for S3 and EMR (#980), IAM (#1062)
  * jobs:
-   * is_mapper_or_reducer() renamed to is_task() (#1072)
+   * is_mapper_or_reducer() is now is_task() (#1072)
    * mr() no longer takes positional arguments (#814)
    * removed jar() (use mrjob.step.JarStep)
    * removed testing methods parse_counters() and parse_output()
@@ -23,9 +23,12 @@ v0.5.0, 2016-03-?? -- the future is in the past
      * don't bootstrap mrjob if interpreter is set (#1041)
      * fs methods path_exists() and path_join() are now exists() and join()
      * deprecation warning: use runner.fs explicitly (#1146)
-     * removed IS_SUCCESSFUL cleanup option (use ALL)
-     * *SCRATCH cleanup options renamed to *TMP (#318)
-     * base_tmp_dir option has been renamed to local_tmp_dir (#318)
+     * changes to cleanup options:
+       * removed IS_SUCCESSFUL (use ALL)
+       * LOCAL_SCRATCH is now LOCAL_TMP (#318)
+       * new HADOOP_TMP option handles HDFS cleanup (#1261)
+       * REMOTE_SCRATCH is now CLOUD_TMP (#1261)
+     * base_tmp_dir option is now local_tmp_dir (#318)
      * non-inline runners raise StepFailedException on step failure (#1219)
      * steps_python_bin defaults to current python interpreter (#1038)
      * _job_name is now _job_key (#982)
@@ -36,7 +39,7 @@ v0.5.0, 2016-03-?? -- the future is in the past
        * added --release-label switch (--ami-version 4.x.y also works)
      * can fetch counters and probable cause of failure on 3.x and 4.x AMIs
      * SSH tunnel now works on 3.x and 4.x AMIs (#1013)
-       * renamed ssh_tunnel_to_job_tracker option to ssh_tunnel
+       * ssh_tunnel_to_job_tracker option is now ssh_tunnel
      * correctly fetch step logs by step ID (#1117)
      * bootstrap_python option
      * s3_scratch_uri option is now s3_tmp_dir (#318)
@@ -88,7 +91,7 @@ v0.5.0, 2016-03-?? -- the future is in the past
  * mrjob.util:
    * file_ext() takes filename, not path
    * random_identifier() moved here from mrjob.aws
-   * renamed buffer_iterator_to_line_iterator() to to_lines()
+   * buffer_iterator_to_line_iterator() is now to_lines()
      * to_lines() no longer appends a newline to data (#819)
    * removed extract_dir_for_tar()
    * gunzip_stream() now yields chunks, not lines

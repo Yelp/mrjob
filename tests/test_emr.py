@@ -228,7 +228,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
-    def _test_remote_tmp_cleanup(self, mode, tmp_len, log_len):
+    def _test_cloud_tmp_cleanup(self, mode, tmp_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})
         stdin = BytesIO(b'foo\nbar\n')
 
@@ -256,30 +256,30 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         self.assertEqual(len(list(bucket.list())), log_len)
 
     def test_cleanup_all(self):
-        self._test_remote_tmp_cleanup('ALL', 0, 0)
+        self._test_cloud_tmp_cleanup('ALL', 0, 0)
 
     def test_cleanup_tmp(self):
-        self._test_remote_tmp_cleanup('TMP', 0, 1)
+        self._test_cloud_tmp_cleanup('TMP', 0, 1)
 
     def test_cleanup_remote(self):
-        self._test_remote_tmp_cleanup('REMOTE_TMP', 0, 1)
+        self._test_cloud_tmp_cleanup('CLOUD_TMP', 0, 1)
 
     def test_cleanup_local(self):
-        self._test_remote_tmp_cleanup('LOCAL_TMP', 5, 1)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5, 1)
 
     def test_cleanup_logs(self):
-        self._test_remote_tmp_cleanup('LOGS', 5, 0)
+        self._test_cloud_tmp_cleanup('LOGS', 5, 0)
 
     def test_cleanup_none(self):
-        self._test_remote_tmp_cleanup('NONE', 5, 1)
+        self._test_cloud_tmp_cleanup('NONE', 5, 1)
 
     def test_cleanup_combine(self):
-        self._test_remote_tmp_cleanup('LOGS,REMOTE_TMP', 0, 0)
+        self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0, 0)
 
     def test_cleanup_error(self):
-        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
-                          'NONE,LOGS,REMOTE_TMP', 0, 0)
-        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
+        self.assertRaises(ValueError, self._test_cloud_tmp_cleanup,
+                          'NONE,LOGS,CLOUD_TMP', 0, 0)
+        self.assertRaises(ValueError, self._test_cloud_tmp_cleanup,
                           'GARBAGE', 0, 0)
 
 
@@ -2384,19 +2384,53 @@ class TestCatFallback(MockBotoTestCase):
             [error_message])
 
 
-class CleanUpJobTestCase(MockBotoTestCase):
+class CleanupOptionsTestCase(MockBotoTestCase):
 
-    @contextmanager
-    def _test_mode(self, mode):
+    def setUp(self):
+        super(CleanupOptionsTestCase, self).setUp()
+
+        self.start(patch.object(EMRJobRunner, '_cleanup_cloud_tmp'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_cluster'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_hadoop_tmp'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_job'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_local_tmp'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_logs'))
+
+    def test_cleanup_all(self):
         r = EMRJobRunner(conf_paths=[])
-        with patch.multiple(r,
-                            _cleanup_cluster=mock.DEFAULT,
-                            _cleanup_job=mock.DEFAULT,
-                            _cleanup_local_tmp=mock.DEFAULT,
-                            _cleanup_logs=mock.DEFAULT,
-                            _cleanup_remote_tmp=mock.DEFAULT) as mock_dict:
-            r.cleanup(mode=mode)
-            yield mock_dict
+        r.cleanup(mode='ALL')
+
+        self.assertTrue(EMRJobRunner._cleanup_cloud_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_cluster.called)
+        self.assertTrue(EMRJobRunner._cleanup_hadoop_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_job.called)
+        self.assertTrue(EMRJobRunner._cleanup_local_tmp.called)
+        self.assertTrue(EMRJobRunner._cleanup_logs.called)
+
+    def test_cleanup_job(self):
+        r = EMRJobRunner(conf_paths=[])
+        r.cleanup(mode='JOB')
+
+        self.assertFalse(EMRJobRunner._cleanup_cloud_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_cluster.called)
+        self.assertFalse(EMRJobRunner._cleanup_hadoop_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_job.called)  # only on failure
+        self.assertFalse(EMRJobRunner._cleanup_local_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_logs.called)
+
+    def test_cleanup_none(self):
+        r = EMRJobRunner(conf_paths=[])
+        r.cleanup(mode='NONE')
+
+        self.assertFalse(EMRJobRunner._cleanup_cloud_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_cluster.called)
+        self.assertFalse(EMRJobRunner._cleanup_hadoop_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_job.called)  # only on failure
+        self.assertFalse(EMRJobRunner._cleanup_local_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_logs.called)
+
+
+class CleanupClusterTestCase(MockBotoTestCase):
 
     def _quick_runner(self):
         r = EMRJobRunner(conf_paths=[], ec2_key_pair_file='fake.pem',
@@ -2406,34 +2440,10 @@ class CleanUpJobTestCase(MockBotoTestCase):
         r._ran_job = False
         return r
 
-    def test_cleanup_all(self):
-        with self._test_mode('ALL') as m:
-            self.assertFalse(m['_cleanup_cluster'].called)
-            self.assertFalse(m['_cleanup_job'].called)
-            self.assertTrue(m['_cleanup_local_tmp'].called)
-            self.assertTrue(m['_cleanup_remote_tmp'].called)
-            self.assertTrue(m['_cleanup_logs'].called)
-
-    def test_cleanup_job(self):
-        with self._test_mode('JOB') as m:
-            self.assertFalse(m['_cleanup_cluster'].called)
-            self.assertFalse(m['_cleanup_local_tmp'].called)
-            self.assertFalse(m['_cleanup_remote_tmp'].called)
-            self.assertFalse(m['_cleanup_logs'].called)
-            self.assertFalse(m['_cleanup_job'].called)  # Only on failure
-
-    def test_cleanup_none(self):
-        with self._test_mode('NONE') as m:
-            self.assertFalse(m['_cleanup_cluster'].called)
-            self.assertFalse(m['_cleanup_local_tmp'].called)
-            self.assertFalse(m['_cleanup_remote_tmp'].called)
-            self.assertFalse(m['_cleanup_logs'].called)
-            self.assertFalse(m['_cleanup_job'].called)
-
     def test_kill_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
-            with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
+            with patch.object(EMRJobRunner, 'make_emr_conn') as m:
                 r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 

@@ -127,7 +127,7 @@ def _ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
     if not ec2_key_pair_file or not os.path.exists(ec2_key_pair_file):
         return []   # this is a testing environment
 
-    cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
+    cmd = "hdfs dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
     args = ['bash -c "%s"' % cmd]
     ips = to_string(_check_output(
         *_ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)))

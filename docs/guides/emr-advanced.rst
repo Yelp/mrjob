@@ -230,7 +230,7 @@ If you have multiple nodes, you may have to :command:`scp` your identity file
 to the master node and use it to SSH to the slave nodes, where the core dumps
 are located::
 
-    hadoop@ip-10-160-75-214:~$ hadoop dfsadmin -report | grep ^Name
+    hadoop@ip-10-160-75-214:~$ hdfs dfsadmin -report | grep ^Name
     Name: 10.166.50.85:9200
     Name: 10.177.63.114:9200
 

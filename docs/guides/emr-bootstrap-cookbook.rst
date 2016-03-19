@@ -24,6 +24,8 @@ tasks on EMR apparently have access to :command:`sudo`).
 Installing Python packages with pip
 -----------------------------------
 
+.. _installing-ujson:
+
 :command:`pip` is the standard way to install Python packages.
 
 on Python 2

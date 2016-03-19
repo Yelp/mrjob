@@ -87,6 +87,7 @@ AMI_HADOOP_VERSION_UPDATES = {
     '3.0.0': '2.2.0',
     '3.1.0': '2.4.0',
     '4.0.0': '2.6.0',
+    '4.3.0': '2.7.1',
 }
 
 # extra step to use when debugging_step=True is passed to run_jobflow()

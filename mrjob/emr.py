@@ -22,6 +22,7 @@ import posixpath
 import random
 import signal
 import socket
+import sys
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -145,6 +146,10 @@ _DEFAULT_AWS_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_AMI_VERSION = '3.11.0'
+
+# EMR translates the dead/deprecated "latest" AMI version to 2.4.2
+# (2.4.2 isn't actually the latest version by a long shot)
+_AMI_VERSION_LATEST = '2.4.2'
 
 # Hadoop streaming jar on 1-3.x AMIs
 _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
@@ -378,6 +383,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['aws_region'] = _DEFAULT_AWS_REGION
 
         self._fix_ec2_instance_opts()
+        self._fix_ami_version_latest()
         self._fix_release_label_opt()
 
     def default_options(self):
@@ -498,14 +504,20 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 except ValueError:
                     pass  # maybe EMR will accept non-floats?
 
+    def _fix_ami_version_latest(self):
+        """Translate the dead/deprecated *ami_version* value ``latest``
+        to ``2.4.2`` up-front, so our code doesn't have to deal with
+        non-numeric AMI versions."""
+        if self['ami_version'] == 'latest':
+            self['ami_version'] = _AMI_VERSION_LATEST
+
     def _fix_release_label_opt(self):
         """If *release_label* is not set and *ami_version* is set to version
         4 or higher (which the EMR API won't accept), set *release_label*
         to "emr-" plus *ami_version*. (Leave *ami_version* as-is;
         *release_label* overrides it anyway.)"""
-        if (not self['release_label'] and
-                self['ami_version'] != 'latest' and
-                version_gte(self['ami_version'], '4')):
+        if (version_gte(self['ami_version'], '4') and
+                not self['release_label']):
             self['release_label'] = 'emr-' + self['ami_version']
 
 
@@ -659,6 +671,36 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # set of step numbers (0-indexed) where we waited 5 minutes for logs to
         # transfer to S3 (so we don't do it twice)
         self._waited_for_logs_on_s3 = set()
+
+    def _default_python_bin(self, local=False):
+        """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,
+        except we explicitly pick a minor version of Python 2
+        (``python2.6`` or ``python2.7``).
+
+        On 3.x and later, we just try to match the current minor
+        version of Python. On the 2.x AMIs, we try to use ``python2.7``
+        on 2.4.3 and later (because it comes with a working :command:`pip`),
+        and ``python2.6`` otherwise (because Python 2.7 isn't installed).
+        """
+        if local or not PY2:
+            return super(EMRJobRunner, self)._default_python_bin(local=local)
+
+        if self._opts['release_label'] or version_gte(
+                self._opts['ami_version'], '3'):
+            # on 3.x and 4.x AMIs, both versions of Python work, so just
+            # match whatever version we're using locally
+            if sys.version_info >= (2, 7):
+                return ['python2.7']
+            else:
+                return ['python2.6']
+        elif version_gte(self._opts['ami_version'], '2.4.3'):
+            # on 2.4.3+, use python2.7 because the default python
+            # doesn't have a working pip
+            return ['python2.7']
+        else:
+            # prior to 2.4.3, Python 2.6 is the only version installed.
+            # Use "python2.6" and not "python" for consistency
+            return ['python2.6']
 
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
@@ -1951,6 +1993,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         self._master_bootstrap_script_path = path
 
+    # TODO: we may not need this
     def _on_pre_3_x_ami(self):
         """Are we on an AMI prior to 3.x (where apt-get no longer works)?
 
@@ -1958,11 +2001,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         to be running."""
         if self._opts['release_label']:  # hides ami_version
             return False
-
-        if self._opts['ami_version'] == 'latest':
-            return True
-
-        return not version_gte(self._opts['ami_version'], '3')
+        else:
+            return not version_gte(self._opts['ami_version'], '3')
 
     def _bootstrap_python(self):
         """Return a (possibly empty) list of parsed commands (in the same
@@ -1970,37 +2010,23 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._opts['bootstrap_python']:
             return []
 
-        # apt-get no longer works on 2.x AMIs
-        if self._on_pre_3_x_ami():
+        if PY2:
+            # Python 2 and pip are basically already installed everywhere
+            # (Okay, there's no pip on AMIs prior to 2.4.3, but there's no
+            # longer an easy way to get it now that apt-get is broken.)
             return []
 
-        if PY2:
-            # Python 2 is already installed; install pip and ujson
+        # we have to have at least on AMI 3.7.0. But give it a shot
+        if not (self._opts['release_label'] or
+                version_gte(self._opts['ami_version'], '3.7.0')):
+            log.warning(
+                'bootstrapping Python 3 will probably not work on'
+                ' AMIs prior to 3.7.0. For an alternative, see:'
+                ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                '-cookbook.html#installing-python-from-source')
 
-            # (We also install python-pip for bootstrap_python_packages,
-            # but there's no harm in running these commands twice, and
-            # bootstrap_python_packages is deprecated anyway.)
-            return [
-                ['sudo yum install -y python-pip'],
-                ['sudo pip install --upgrade ujson'],
-            ]
-        else:
-            # the best we can do is install the Python 3.4 package
-            # (getting pip and ujson on Python 3 is much harder on EMR;
-            # see docs/guides/emr-bootstrap-cookbook.rst)
-
-            # we have to have at least on AMI 3.7.0
-            if (self._opts['ami_version'] == 'latest' or
-                    not version_gte(self._opts['ami_version'], '3.7.0')):
-                log.warning(
-                    'bootstrapping Python 3 will probably not work on'
-                    ' AMIs prior to 3.7.0. For an alternative, see:'
-                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                    '-cookbook.html#installing-python-from-source')
-
-            return [['sudo yum install -y python34']]
-
-        return []
+        return [
+            ['sudo yum install -y python34 python34-devel python34-pip']]
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with
@@ -2271,10 +2297,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 release_label = getattr(cluster, 'releaselabel', '')
 
                 if release_label != self._opts['release_label']:
-                    return
-            elif self._opts['ami_version'] == 'latest':
-                # look for other clusters where "latest" was requested
-                if getattr(cluster, 'requestedamiversion', '') != 'latest':
                     return
             else:
                 # match actual AMI version

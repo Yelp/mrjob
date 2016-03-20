@@ -11,7 +11,7 @@ Dataproc and use GCS.
 
 * Create a `Google Cloud Platform account <http://cloud.google.com/>`_
 * Setup a Billing Account and associate Billing with your Project
-* Go to the API Manager and do the following
+* Go to the API Manager and...
 
   * Enable API: Google Cloud Storage
   * Enable API: Google Cloud Dataproc API
@@ -19,7 +19,10 @@ Dataproc and use GCS.
 
 * Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`_
 
+`Dataproc Documentation <https://cloud.google.com/dataproc/overview>`_
+
 `How GCP Default credentials work <https://developers.google.com/identity/protocols/application-default-credentials#howtheywork>`_
+
 
 .. _running-a-dataproc-job:
 

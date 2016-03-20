@@ -19,6 +19,7 @@ import os.path
 import pipes
 import time
 import re
+import subprocess
 
 try:
     from oauth2client.client import GoogleCredentials
@@ -29,6 +30,13 @@ except ImportError:
     # inside hadoop streaming
     GoogleCredentials = None
     discovery = None
+
+try:
+    # Python 2
+    import ConfigParser as configparser
+except ImportError:
+    # Python 3
+    import configparser
 
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
@@ -60,6 +68,9 @@ _DATAPROC_API_REGION = 'global'
 _DATAPROC_MIN_WORKERS = 2
 
 _DEFAULT_VM_TYPE = 'n1-standard-1'
+
+# default imageVersion to use on Dataproc. This will be updated with each version
+_DEFAULT_CLOUD_IMAGE = '1.0'
 _DEFAULT_CLOUD_API_COOLDOWN_SECS = 10.0
 _DEFAULT_FS_SYNC_SECS = 5.0
 _DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS = 28
@@ -69,6 +80,29 @@ _DATAPROC_CLUSTER_STATES_ERROR = frozenset(['ERROR', 'DELETING'])
 
 _DATAPROC_JOB_STATES_ACTIVE = frozenset(['PENDING', 'RUNNING', 'CANCEL_PENDING'])
 _DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
+
+_DATAPROC_IMAGE_TO_HADOOP_VERSION = {
+    '0.1': '2.7.1',
+    '0.2': '2.7.1',
+    '1.0': '2.7.2'
+}
+# XXX - don't hard-code the bucket
+# XXX - uniquely named cluster for each job
+# XXX - shut down cluster in finally: block after job completes/fails (i.e. implement _cleanup_cluster())
+# XXX - working _cat_file() =^.^=
+# XXX - step-by-step docs on how to create an account, enable Dataproc, and set up credentials, similar to the Configuring AWS Credentials section of the mrjob docs (https://pythonhosted.org/mrjob/guides/emr-quickstart.html#amazon-setup).
+#
+# Here is what I'd really consider a minimal implementation (though the above is enough to get checked into master):
+#
+# XXX run with -r dataproc and no additional switches. This would require:
+# XXX auto-create bucket (if temp dir isn't specified)
+# XXX default region and zone if none specified
+# XXX read project name and credentials from environment ($GOOGLE_APPLICATION_CREDENTIALS?)
+# - auto-terminate clusters after idle for 5 minutes (using something like mrjob/bootstrap/terminate_idle_cluster.sh in an initialization action)
+#   - (and/or have Dataproc introduce this as a built-in feature, though I think it'll be faster to get it done in mrjob)
+# - complete unit tests
+#   - Recommend you just use mock/patch, and not write mock dataproc like we do for EMR and Hadoop. I'm pretty confident in my mocking skills at this point, so feel free to ask me questions if you get stuck. :)
+
 
 # bootstrap action which automatically terminates idle clusters
 # _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
@@ -87,13 +121,9 @@ _HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.j
 # TODO - mtai @ davidmarin - Re-implement logs parsing?  See dataproc metainfo and driver output - ask Dennis Huo for more details
 # 'gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/mr_most_used_word-taim-20160228-172000-034993---Step-2-of-2/driveroutput'
 
-# - step-by-step docs on how to create an account, enable Dataproc, and set up credentials, similar to the Configuring AWS Credentials section of the mrjob docs (https://pythonhosted.org/mrjob/guides/emr-quickstart.html#amazon-setup).
-
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
 #################### BEGIN - Helper fxns for _cluster_args ####################
-
-
 def _gcp_zone_uri(project, zone):
     return 'https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s' % dict(project=project, zone=zone)
 
@@ -127,6 +157,23 @@ def _check_and_fix_fs_dir(gcs_uri):
 
     return gcs_uri
 
+def _read_gcloud_config():
+    gcloud_output = subprocess.check_output('gcloud config list', shell=True)
+    gcloud_output_as_unicode = gcloud_output.decode('utf-8')
+
+    cloud_cfg = configparser.RawConfigParser(allow_no_value=True)
+    cloud_cfg.readfp(io.StringIO(gcloud_output_as_unicode))
+
+    return _cfg_to_dot_path_dict(cloud_cfg)
+
+def _cfg_to_dot_path_dict(cfg_parser):
+    config_dict = dict()
+    for current_section in cfg_parser.sections():
+        for current_option, current_value in cfg_parser.items(current_section):
+            varname = '{}.{}'.format(current_section, current_option)
+            config_dict[varname] = current_value
+
+    return config_dict
 
 class DataprocRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
@@ -181,8 +228,9 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         super_opts = super(DataprocRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'bootstrap_python': True,
+            'cloud_image': _DEFAULT_CLOUD_IMAGE,
             'cloud_api_cooldown_secs': _DEFAULT_CLOUD_API_COOLDOWN_SECS,
-
+            
             'vm_type': _DEFAULT_VM_TYPE,
             'vm_type_master': _DEFAULT_VM_TYPE,
 
@@ -221,14 +269,16 @@ class DataprocJobRunner(MRJobRunner):
         """:py:class:`~mrjob.dataproc.DataprocJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
-\
+
         """
         super(DataprocJobRunner, self).__init__(**kwargs)
 
-        # TODO - read default GCP project/region/zone from gcloud SDK if not available
-        self._gcp_project = self._opts['gcp_project']
-        self._gcp_region = self._opts['cloud_region']
-        self._gcp_zone = self._opts['cloud_zone']
+        # read gcloud SDK defaults
+        gcloud_config = _read_gcloud_config()
+
+        self._gcp_project = self._opts['gcp_project'] or gcloud_config['core.project']
+        self._gcp_region = self._opts['cloud_region'] or gcloud_config['compute.region']
+        self._gcp_zone = self._opts['cloud_zone'] or gcloud_config['compute.zone']
 
         # cluster_id can be None here
         self._cluster_id = self._opts['cluster_id']
@@ -272,6 +322,10 @@ class DataprocJobRunner(MRJobRunner):
 
         # when did our particular task start?
         self._dataproc_job_start = None
+
+        # init hadoop, ami version caches
+        self._cloud_version = None
+        self._hadoop_version = None
 
         # This will be filled by _run_steps()
         self._log_interpretations = []
@@ -595,7 +649,7 @@ class DataprocJobRunner(MRJobRunner):
 
             log.info('Completed Dataproc Hadoop Job - %s', job_id)
 
-    def _launch_step(self, job_prefix, step_num):
+    def _launch_step(self, step_num):
         # Build each step
         hadoop_job = self._build_dataproc_hadoop_job(step_num)
 
@@ -663,6 +717,30 @@ class DataprocJobRunner(MRJobRunner):
     def counters(self):
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
+
+    ### Bootstrapping ###
+
+    def get_hadoop_version(self):
+        if self._hadoop_version is None:
+            self._store_cluster_info()
+        return self._hadoop_version
+
+    def get_cloud_version(self):
+        """Get the version that our cluster is running.
+        """
+        if self._cloud_version is None:
+            self._store_cluster_info()
+        return self._cloud_version
+
+
+    def _store_cluster_info(self):
+        """Set self._ami_version and self._hadoop_version."""
+        if not self._cluster_id:
+            raise AssertionError('cluster has not yet been created')
+
+        cluster = self._api_cluster_get(self._cluster_id)
+        self._cloud_version = cluster['config']['softwareConfig']['imageVersion']
+        self._hadoop_version = _DATAPROC_IMAGE_TO_HADOOP_VERSION[self._cloud_version]
 
     ### Bootstrapping ###
 

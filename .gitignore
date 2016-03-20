@@ -5,6 +5,7 @@
 *~
 *.swp
 .eggs
+.cache
 .idea
 .project
 .pydevproject

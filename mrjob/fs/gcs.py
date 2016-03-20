@@ -158,10 +158,10 @@ class GCSFilesystem(Filesystem):
         If dest is a directory (ends with a "/"), we check if there are
         any files starting with that path.
         """
-        # TODO - mtai @ davidmarin - catch specific Exceptions
+        # TODO - mtai @ davidmarin - catch specific Exceptions, not sure what types of exceptions this can throw
         try:
             paths = self.ls(path_glob)
-        except:
+        except Exception as e:
             paths = []
         return any(paths)
 

@@ -14,12 +14,13 @@ jobs.
    :target: https://travis-ci.org/Yelp/mrjob
 
 mrjob fully supports Amazon's Elastic MapReduce (EMR) service, which allows you
-to buy time on a Hadoop cluster on an hourly basis. It also works with your own
+to buy time on a Hadoop cluster on an hourly basis. mrjob has basic support for Google Cloud Dataproc (Dataproc)
+which allows you to buy time on a Hadoop cluster on a minute-by-minute basis.  It also works with your own
 Hadoop cluster.
 
 Some important features:
 
-* Run jobs on EMR, your own Hadoop cluster, or locally (for testing).
+* Run jobs on EMR, Google Cloud Dataproc, your own Hadoop cluster, or locally (for testing).
 * Write multi-step jobs (one map-reduce step feeds into the next)
 * Duplicate your production environment inside Hadoop
     * Upload your source tree and put it in your job's ``$PYTHONPATH``
@@ -27,10 +28,11 @@ Some important features:
     * Set environment variables (e.g. ``$TZ``)
     * Easily install python packages from tarballs (EMR only)
     * Setup handled transparently by ``mrjob.conf`` config file
-* Automatically interpret error logs from EMR
-* SSH tunnel to hadoop job tracker on EMR
+* Automatically interpret error logs (EMR only)
+* SSH tunnel to hadoop job tracker (EMR only)
 * Minimal setup
     * To run on EMR, set ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY``
+    * To run on Dataproc, set up your Google account and credentials (see :ref:`google-setup`)
     * To run on your Hadoop cluster, just make sure ``$HADOOP_HOME`` is set.
 
 Installation
@@ -85,8 +87,11 @@ Try It Out!
     python mrjob/examples/mr_word_freq_count.py README.rst > counts
     # on EMR
     python mrjob/examples/mr_word_freq_count.py README.rst -r emr > counts
+    # on Dataproc
+    python mrjob/examples/mr_word_freq_count.py README.rst -r dataproc > counts
     # on your Hadoop cluster
     python mrjob/examples/mr_word_freq_count.py README.rst -r hadoop > counts
+
 
 Setting up EMR on Amazon
 ------------------------
@@ -96,6 +101,19 @@ Setting up EMR on Amazon
   `your account page <http://aws.amazon.com/account/>`_)
 * Set the environment variables ``$AWS_ACCESS_KEY_ID`` and
   ``$AWS_SECRET_ACCESS_KEY`` accordingly
+
+Setting up Dataproc on Google
+-----------------------------
+
+* Create a `Google Cloud Platform account <http://cloud.google.com/>`_
+* Setup a Billing Account and associate Billing with your Project
+* Go to the API Manager and...
+
+  * Enable API: Google Cloud Storage
+  * Enable API: Google Cloud Dataproc API
+  * Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
+
+* Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`_
 
 Advanced Configuration
 ----------------------
@@ -124,6 +142,7 @@ Reference
 
 * `Hadoop Streaming <http://hadoop.apache.org/docs/stable1/streaming.html>`_
 * `Elastic MapReduce <http://aws.amazon.com/documentation/elasticmapreduce/>`_
+* `Google Cloud Dataproc <https://cloud.google.com/dataproc/overview>`_
 
 More Information
 ----------------

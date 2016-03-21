@@ -1371,9 +1371,8 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertIn('sudo ' + expected_python_bin + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
-        if PY2:
-            self.assertIn('sudo yum install -y python-pip', lines)
-            self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
+        self.assertIn(('sudo ' + expected_python_bin +
+                       ' -m pip install $__mrjob_PWD/yelpy.tar.gz'), lines)
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)
         self.assertIn('$__mrjob_PWD/s.sh', lines)

@@ -2045,36 +2045,26 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         bootstrap = []
 
-        # bootstrap_python_packages
+        # bootstrap_python_packages. Deprecated but still works, except
         if self._opts['bootstrap_python_packages']:
-            if PY2:
-                log.warning(
-                    'bootstrap_python_packages is deprecated since v0.4.2'
-                    ' and will be removed in v0.6.0. Consider using'
-                    ' bootstrap instead.')
+            log.warning(
+                'bootstrap_python_packages is deprecated since v0.4.2'
+                ' and will be removed in v0.6.0. Consider using'
+                ' bootstrap instead.')
 
-                if self._on_pre_3_x_ami() and not any(
-                        'sources.list' in b for b in self._opts['bootstrap']):
-                    log.warning(
-                        '\nIn addition, you need to update sources.list to'
-                        ' make bootstrap_python_packages work on 2.x AMIs;'
-                        ' see:\n\n'
-                        ' https://pythonhosted.org/mrjob/guides/emr-opts.html'
-                        '#fixing-apt-get\n')
+            # bootstrap_python_packages won't work on AMI 3.0.0 (out-of-date
+            # SSL keys) and AMI 2.4.2 and earlier (no pip, and have to fix
+            # sources.list to apt-get it). These AMIs are so old it's probably
+            # not worth dedicating code to this, but can add a warning if
+            # need be.
 
-                bootstrap.append(['sudo yum install -y python-pip'])
-
-                for path in self._opts['bootstrap_python_packages']:
-                    path_dict = parse_legacy_hash_path('file', path)
-                    # don't worry about inspecting the tarball; pip is
-                    # smart enough to deal with that
-                    bootstrap.append(['sudo pip install ', path_dict])
-            else:
-                log.warning(
-                    'bootstrap_python_packages is deprecated and is not'
-                    ' supported on Python 3. See'
-                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                    '-cookbook.html#using-pip for an alternative.')
+            for path in self._opts['bootstrap_python_packages']:
+                path_dict = parse_legacy_hash_path('file', path)
+                # a little safer to use Python than pip binary; for example,
+                # there is a python3 binary but no pip-3 (only pip-3.4)
+                bootstrap.append(
+                    ['sudo %s -m pip install ' % cmd_line(self._python_bin()),
+                     path_dict])
 
         # setup_cmds
         if self._opts['bootstrap_cmds']:

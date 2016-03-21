@@ -426,24 +426,13 @@ and install another Python binary.
     .. deprecated:: 0.4.2
 
     Paths of python modules tarballs to install on EMR. Pass
-    ``pip install path/to/tarballs/package.tar.gz#`` to :mrjob-opt:`bootstrap`
-    instead.
+    ``sudo pip-x.y install path/to/package.tar.gz#`` to
+    :mrjob-opt:`bootstrap` instead.
 
-    .. _fixing-apt-get:
-
-    This option only works in Python 2. To make it work in the
-    deprecated 2.x AMIs, you'll also have to update ``sources.list`` to get
-    :command:`apt-get` working:
-
-    .. code-block:: yaml
-
-        runners:
-          emr:
-            bootstrap:
-            - sudo echo "deb http://archive.debian.org/debian/ squeeze main contrib non-free" > /etc/apt/sources.list
-
-    For Python 3, see :ref:`Installing packages with pip on Python 3
-    <using-pip-py3>`.
+    Also, please consider installing packages directly from
+    `PyPI <https://pypi.python.org/pypi>`_ instead (
+    ``sudo pip-x.y install package-name``); PyPI is much more
+    robust/production-ready than when this option was first created.
 
 .. mrjob-opt::
     :config: bootstrap_scripts

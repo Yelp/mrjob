@@ -31,9 +31,10 @@ Installing Python packages with pip
 on Python 2
 ^^^^^^^^^^^
 
-mrjob installs :command:`pip` by default in Python 2 (see
-:mrjob-opt:`bootstrap_mrjob`), so all you have to do is run it with
-:command:`sudo`:
+As long as you're using AMI version 3.0.0 or later, mrjob automatically
+installs :command:`pip` by default in Python 2 (see
+:mrjob-opt:`bootstrap_mrjob`). All you have to do is run it with
+:command:`sudo`. For example:
 
 .. code-block:: yaml
 
@@ -42,9 +43,10 @@ mrjob installs :command:`pip` by default in Python 2 (see
         bootstrap:
         - sudo pip install dateglob mr3po
 
-(Just using ``dateglob`` and ``mr3po`` as examples.)
+See `PyPI <https://pypi.python.org/pypi>`_ for a the full list of available
+Python packages.
 
-You can also install packages from a requirements file:
+You can also install packages from a `requirements <https://pip.pypa.io/en/stable/user_guide/#requirements-files>`__ file:
 
 .. code-block:: yaml
 
@@ -61,6 +63,10 @@ Or a tarball:
       emr:
         bootstrap:
         - sudo pip install /local/path/of/tarball.tar.gz#
+
+If you *must* run on the (deprecated) 2.x AMIs, see
+:ref:`below <using-ujson-py2-ami-v2>` for what it takes to get :command:`pip`
+working.
 
 If you turned off :mrjob-opt:`bootstrap_mrjob` but still want :command:`pip`,
 the relevant package is ``python-pip``; see :ref:`bootstrap-system-packages`.
@@ -107,12 +113,33 @@ Installing ujson
 ``ujson`` is a fast, pure-C library; if installed, mrjob will automatically
 use it to turbocharge JSON-serialization.
 
-on Python 2
-^^^^^^^^^^^
+on Python 2 (3.x AMIs and later)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-On Python 2, mrjob automatically installs ``ujson`` for you. Done! (If you
-turned off :mrjob-opt:`bootstrap_mrjob`, the relevant Python package is
-``ujson``; see :ref:`using-pip`.)
+On Python 2, mrjob automatically installs ``ujson`` for you as long as you're
+using AMI version 3.0.0 or later. Done!
+
+.. _using-ujson-py2-ami-v2:
+
+on Python 2 (2.x AMIs)
+^^^^^^^^^^^^^^^^^^^^^^
+
+The 2.x AMI series is based on version of Debian
+(`Squeeze <http://www.debian.org/News/2011/20110625>`_) that is so old it
+has been "archived", which means that you need to update
+``/etc/apt/sources.list`` before you can install packages.
+
+Here's how to update ``sources.list``, install ``pip``,
+and then :command:`pip install` the ``ujson`` library:
+
+.. code-block:: yaml
+
+    runners:
+      emr:
+        bootstrap:
+        - sudo echo "deb http://archive.debian.org/debian/ squeeze main contrib non-free" > /etc/apt/sources.list
+        - sudo apt-get install -y python-pip
+        - sudo pip install ujson
 
 .. _using-ujson-py3:
 
@@ -143,7 +170,6 @@ what's faster.
 
 The most efficient solution would be to build your own Python 3 RPM and just
 install that, but that's beyond the scope of this cookbook.
-
 
 .. _bootstrap-system-packages:
 
@@ -183,39 +209,14 @@ the ``python34`` and ``python34-docs`` packages themselves;
 2.x AMIs
 ^^^^^^^^
 
-The 2.x AMIs are based on `Debian 6.0.2 (Squeeze)
-<http://www.debian.org/News/2011/20110625>`_, and use :command:`apt-get`. For
-example, to install Cython:
+The 2.x AMIs are based on a very old version of Debian. You probably shouldn't
+be using them at all, but if you do, you'll need to apply a small fix
+before you can :command:`apt-get install -y` packages; see
+:ref:`above <using-ujson-py2-ami-v2>` for an example of how to do this.
 
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        - sudo apt-get install -y cython
-
-Don't forget the ``-y``; otherwise your bootstrap script will hang waiting for
-user input that will never come.
-
-The full list of Squeeze packages is
-`here <https://packages.debian.org/squeeze/>`__. Squeeze was
-released in February 2011, so none of these packages are going to be
-super up-to-date.
-
-I don't know or care which AMI version I'm using
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-Yeah, and a lot of packages probably have the same name in both distributions
-anyway, right?
-
-Here's a trick you can use to install, for example, ``python-pip`` on any AMI:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        - sudo apt-get install -y python-pip || sudo yum install -y python-pip
+See the `full list of Squeeze packages
+<https://packages.debian.org/squeeze/>`__ for all the (very old versions of)
+software you can install.
 
 .. _installing-python-from-source:
 

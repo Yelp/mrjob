@@ -57,7 +57,6 @@ v0.5.0, 2016-03-?? -- the future is in the past
      * removed iam_job_flow_role option (use iam_instance_profile)
      * custom hadoop_streaming_jar gets properly uploaded
      * job cleanup temporarily disabled (#1241)
-     * bootstrap_python_packages (deprecated) does nothing on 2.x AMIs (#1248)
      * pooling respects key pair (#1230)
      * idle cluster self-termination respects non-streaming jobs (#1145)
      * deprecated "latest" AMI version not passed through to EMR (#1269)

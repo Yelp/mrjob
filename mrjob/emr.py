@@ -1993,17 +1993,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         self._master_bootstrap_script_path = path
 
-    # TODO: we may not need this
-    def _on_pre_3_x_ami(self):
-        """Are we on an AMI prior to 3.x (where apt-get no longer works)?
-
-        This just checks ``self._opts``; it doesn't require the cluster
-        to be running."""
-        if self._opts['release_label']:  # hides ami_version
-            return False
-        else:
-            return not version_gte(self._opts['ami_version'], '3')
-
     def _bootstrap_python(self):
         """Return a (possibly empty) list of parsed commands (in the same
         format as returned by parse_setup_cmd())'"""

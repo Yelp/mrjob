@@ -29,8 +29,8 @@ Cluster creation and configuration
 -----------------------------------
 
 .. mrjob-opt::
-    :config: cloud_zone
-    :switch: --cloud-zone
+    :config: zone
+    :switch: --zone
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: gcloud SDK default
@@ -38,8 +38,8 @@ Cluster creation and configuration
     Availability zone to run the job in
 
 .. mrjob-opt::
-    :config: cloud_region
-    :switch: --cloud-region
+    :config: region
+    :switch: --region
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: gcloud SDK default
@@ -49,8 +49,8 @@ Cluster creation and configuration
     explicitly.
 
 .. mrjob-opt::
-    :config: cloud_image
-    :switch: --cloud-image
+    :config: image_version
+    :switch: --image-version
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: ````
@@ -125,50 +125,50 @@ Number and type of instances
 ----------------------------
 
 .. mrjob-opt::
-    :config: vm_type
-    :switch: --vm-type
+    :config: instance_type
+    :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: ``'n1-standard-1'``
 
     What sort of GCE instance(s) to use on the nodes that actually run tasks
     (see https://cloud.google.com/compute/docs/machine-types).  When you run multiple
-    instances (see :mrjob-opt:`vm_type`), the master node is just
+    instances (see :mrjob-opt:`instance_type`), the master node is just
     coordinating the other nodes, so usually the default instance type
     (``n1-standard-1``) is fine, and using larger instances is wasteful.
 
 .. mrjob-opt::
-    :config: vm_type_master
-    :switch: --vm-type-master
+    :config: instance_type_master
+    :switch: --instance-type-master
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: ``'n1-standard-1'``
 
-    like :mrjob-opt:`vm_type`, but only for the master Hadoop node.
+    like :mrjob-opt:`instance_type`, but only for the master Hadoop node.
     This node hosts the task tracker and HDFS, and runs tasks if there are no
-    other nodes. Usually you just want to use :mrjob-opt:`vm_type`.
+    other nodes. Usually you just want to use :mrjob-opt:`instance_type`.
 
 .. mrjob-opt::
-    :config: vm_type_worker
-    :switch: --vm-type-worker
+    :config: instance_type_worker
+    :switch: --instance-type-worker
     :type: :ref:`string <data-type-string>`
     :set: dataproc
-    :default: value of :mrjob-opt:`vm_type`
+    :default: value of :mrjob-opt:`instance_type`
 
-    like :mrjob-opt:`vm_type`, but only for worker Hadoop nodes; these nodes run tasks and host HDFS. Usually you
-    just want to use :mrjob-opt:`vm_type`.
+    like :mrjob-opt:`instance_type`, but only for worker Hadoop nodes; these nodes run tasks and host HDFS. Usually you
+    just want to use :mrjob-opt:`instance_type`.
 
 
 .. mrjob-opt::
-    :config: vm_type_preemptible
-    :switch: --vm-type-preemptible
+    :config: instance_type_preemptible
+    :switch: --instance-type-preemptible
     :type: :ref:`string <data-type-string>`
     :set: dataproc
-    :default: value of :mrjob-opt:`vm_type`
+    :default: value of :mrjob-opt:`instance_type`
 
-    like :mrjob-opt:`vm_type`, but only for the task Hadoop nodes;
+    like :mrjob-opt:`instance_type`, but only for the task Hadoop nodes;
     these nodes run tasks but do not host HDFS. Usually you just want to use
-    :mrjob-opt:`vm_type`.
+    :mrjob-opt:`instance_type`.
 
 
 .. mrjob-opt::
@@ -208,7 +208,7 @@ MRJob uses google-api-python-client to manipulate/access FS.
     ``gs://yourbucket/tmp/``.
 
     By default, mrjob looks for a bucket belong to you whose name starts with
-    ``mrjob-`` and which matches :mrjob-opt:`cloud_region`. If it can't find
+    ``mrjob-`` and which matches :mrjob-opt:`region`. If it can't find
     one, it creates one with a random name. This option is then set to `tmp/`
     in this bucket (e.g. ``gs://mrjob-01234567890abcdef/tmp/``).
 

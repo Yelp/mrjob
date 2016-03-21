@@ -109,23 +109,23 @@ Here are some things to consider when tuning your instance settings:
   (and more memory).
 
 The basic way to control type and number of instances is with the
-:mrjob-opt:`vm_type` and :mrjob-opt:`num_worker` options, on the command line like
+:mrjob-opt:`instance_type` and :mrjob-opt:`num_worker` options, on the command line like
 this::
 
-    --vm-type n1-highcpu-8 --num-worker 4
+    --instance-type n1-highcpu-8 --num-worker 4
 
 or in :py:mod:`mrjob.conf`, like this::
 
     runners:
       dataproc:
-        vm_type: n1-highcpu-8
+        instance_type: n1-highcpu-8
         num_worker: 4
 
 In most cases, your master instance type doesn't need to be larger
-than ``n1-standard-1`` to schedule tasks.  *vm_type* only applies to
+than ``n1-standard-1`` to schedule tasks.  *instance_type* only applies to
 instances that actually run tasks. (In this example, there are 1 ``n1-standard-1``
 master instance, and 4 ``n1-highcpu-8`` worker instances.) You *will* need a larger
 master instance if you have a very large number of input files; in this case,
-use the :mrjob-opt:`vm_type_master` option.
+use the :mrjob-opt:`instance_type_master` option.
 
-If you want to run preemptible instances, use the :mrjob-opt:`vm_type_preemptible` and :mrjob-opt:`num_preemptible` options.
+If you want to run preemptible instances, use the :mrjob-opt:`instance_type_preemptible` and :mrjob-opt:`num_preemptible` options.

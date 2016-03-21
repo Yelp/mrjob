@@ -64,13 +64,15 @@ from mrjob.util import random_identifier
 
 log = logging.getLogger(__name__)
 
+_DATAPROC_API_ENDPOINT = 'dataproc'
+_DATAPROC_API_VERSION = 'v1'
 _DATAPROC_API_REGION = 'global'
 _DATAPROC_MIN_WORKERS = 2
 
-_DEFAULT_VM_TYPE = 'n1-standard-1'
+DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 
 # default imageVersion to use on Dataproc. This will be updated with each version
-_DEFAULT_CLOUD_IMAGE = '1.0'
+_DEFAULT_IMAGE_VERSION = '1.0'
 _DEFAULT_CLOUD_API_COOLDOWN_SECS = 10.0
 _DEFAULT_FS_SYNC_SECS = 5.0
 _DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS = 28
@@ -112,9 +114,6 @@ _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
 
 _HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar'
 
-# TODO - mtai @ davidmarin - Example invocation options for mrjob.py
-#   -r dataproc gs://boulder-input-data/*.txt --output gs://boulder-input-data/mrjob-boulder
-
 # TODO - mtai @ davidmarin - Re-implement SSH tunneling? - Content pulled from job run output
 # The url to track the job: http://default-taim-m:8088/proxy/application_1456679373146_0002/
 
@@ -124,19 +123,22 @@ _HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.j
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
 #################### BEGIN - Helper fxns for _cluster_args ####################
+
+
 def _gcp_zone_uri(project, zone):
     return 'https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s' % dict(project=project, zone=zone)
 
 
-def _gcp_instance_group_config(project, zone, count, vm_type, is_preemptible=False):
+def _gcp_instance_group_config(project, zone, count, instance_type, is_preemptible=False):
     zone_uri = _gcp_zone_uri(project, zone)
-    machine_uri = "%(zone_uri)s/machineTypes/%(machine_type)s" % dict(zone_uri=zone_uri, machine_type=vm_type)
+    machine_uri = "%(zone_uri)s/machineTypes/%(machine_type)s" % dict(zone_uri=zone_uri, machine_type=instance_type)
 
     return dict(
         numInstances=count,
         machineTypeUri=machine_uri,
         isPreemptible=is_preemptible
     )
+
 #################### END -  Helper fxns for _cluster_args ####################
 
 
@@ -144,8 +146,10 @@ def _wait_for(msg, sleep_secs):
     log.info("Waiting for %s - sleeping %.1f second(s)", msg, sleep_secs)
     time.sleep(sleep_secs)
 
+
 def _cleanse_gcp_job_id(job_id):
     return re.sub('[^a-zA-Z0-9_\-]', '-', job_id)
+
 
 def _check_and_fix_fs_dir(gcs_uri):
     """Helper for __init__"""
@@ -157,6 +161,7 @@ def _check_and_fix_fs_dir(gcs_uri):
 
     return gcs_uri
 
+
 def _read_gcloud_config():
     gcloud_output = subprocess.check_output('gcloud config list', shell=True)
     gcloud_output_as_unicode = gcloud_output.decode('utf-8')
@@ -165,6 +170,7 @@ def _read_gcloud_config():
     cloud_cfg.readfp(io.StringIO(gcloud_output_as_unicode))
 
     return _cfg_to_dot_path_dict(cloud_cfg)
+
 
 def _cfg_to_dot_path_dict(cfg_parser):
     config_dict = dict()
@@ -180,15 +186,15 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         'gcp_project',
 
         'cluster_id',
-        'cloud_region',
-        'cloud_zone',
-        'cloud_image',
+        'region',
+        'zone',
+        'image_version',
         'cloud_api_cooldown_secs',
 
-        'vm_type',
-        'vm_type_master',
-        'vm_type_worker',
-        'vm_type_preemptible',
+        'instance_type',
+        'instance_type_master',
+        'instance_type_worker',
+        'instance_type_preemptible',
 
         'num_worker',
         'num_preemptible',
@@ -209,8 +215,8 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
     })
 
     DEFAULT_FALLBACKS = {
-        'vm_type_worker': 'vm_type',
-        'vm_type_preemptible': 'vm_type'
+        'instance_type_worker': 'instance_type',
+        'instance_type_preemptible': 'instance_type'
     }
     def __init__(self, alias, opts, conf_paths):
         super(DataprocRunnerOptionStore, self).__init__(alias, opts, conf_paths)
@@ -228,11 +234,11 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         super_opts = super(DataprocRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'bootstrap_python': True,
-            'cloud_image': _DEFAULT_CLOUD_IMAGE,
+            'image_version': _DEFAULT_IMAGE_VERSION,
             'cloud_api_cooldown_secs': _DEFAULT_CLOUD_API_COOLDOWN_SECS,
             
-            'vm_type': _DEFAULT_VM_TYPE,
-            'vm_type_master': _DEFAULT_VM_TYPE,
+            'instance_type': DEFAULT_INSTANCE_TYPE,
+            'instance_type_master': DEFAULT_INSTANCE_TYPE,
 
             'num_worker': _DATAPROC_MIN_WORKERS,
             'num_preemptible': 0,
@@ -277,8 +283,8 @@ class DataprocJobRunner(MRJobRunner):
         gcloud_config = _read_gcloud_config()
 
         self._gcp_project = self._opts['gcp_project'] or gcloud_config['core.project']
-        self._gcp_region = self._opts['cloud_region'] or gcloud_config['compute.region']
-        self._gcp_zone = self._opts['cloud_zone'] or gcloud_config['compute.zone']
+        self._gcp_region = self._opts['region'] or gcloud_config['compute.region']
+        self._gcp_zone = self._opts['zone'] or gcloud_config['compute.zone']
 
         # cluster_id can be None here
         self._cluster_id = self._opts['cluster_id']
@@ -324,7 +330,7 @@ class DataprocJobRunner(MRJobRunner):
         self._dataproc_job_start = None
 
         # init hadoop, ami version caches
-        self._cloud_version = None
+        self._image_version = None
         self._hadoop_version = None
 
         # This will be filled by _run_steps()
@@ -336,7 +342,7 @@ class DataprocJobRunner(MRJobRunner):
         if not self._api_client:
             credentials = GoogleCredentials.get_application_default()
 
-            api_client = discovery.build('dataproc', 'v1', credentials=credentials)
+            api_client = discovery.build(_DATAPROC_API_ENDPOINT, _DATAPROC_API_VERSION, credentials=credentials)
             self._api_client = api_client.projects().regions()
 
         return self._api_client
@@ -361,7 +367,7 @@ class DataprocJobRunner(MRJobRunner):
 
         mrjob_buckets = self.fs.buckets_list(self._gcp_project, prefix='mrjob-')
 
-        # Loop over buckets until we find one that matches cloud_region
+        # Loop over buckets until we find one that matches region
         chosen_bucket_name = None
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket['name']
@@ -467,7 +473,8 @@ class DataprocJobRunner(MRJobRunner):
 
     def _upload_local_files_to_fs(self):
         """Copy local files tracked by self._upload_mgr to FS."""
-        self._create_fs_bucket()
+        bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
+        self._create_fs_bucket(bucket_name)
 
         log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
 
@@ -725,12 +732,12 @@ class DataprocJobRunner(MRJobRunner):
             self._store_cluster_info()
         return self._hadoop_version
 
-    def get_cloud_version(self):
+    def get_image_version(self):
         """Get the version that our cluster is running.
         """
-        if self._cloud_version is None:
+        if self._image_version is None:
             self._store_cluster_info()
-        return self._cloud_version
+        return self._image_version
 
 
     def _store_cluster_info(self):
@@ -739,8 +746,8 @@ class DataprocJobRunner(MRJobRunner):
             raise AssertionError('cluster has not yet been created')
 
         cluster = self._api_cluster_get(self._cluster_id)
-        self._cloud_version = cluster['config']['softwareConfig']['imageVersion']
-        self._hadoop_version = _DATAPROC_IMAGE_TO_HADOOP_VERSION[self._cloud_version]
+        self._image_version = cluster['config']['softwareConfig']['imageVersion']
+        self._hadoop_version = _DATAPROC_IMAGE_TO_HADOOP_VERSION[self._image_version]
 
     ### Bootstrapping ###
 
@@ -926,19 +933,19 @@ class DataprocJobRunner(MRJobRunner):
         # Task tracker
         master_instance_group_config = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gcp_zone,
-            count=1, vm_type=self._opts['vm_type_master']
+            count=1, instance_type=self._opts['instance_type_master']
         )
 
         # Compute + storage
         worker_instance_group_config = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gcp_zone,
-            count=self._opts['num_worker'], vm_type=self._opts['vm_type_worker']
+            count=self._opts['num_worker'], instance_type=self._opts['instance_type_worker']
         )
 
         # Compute ONLY
         secondary_worker_instance_group_config = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gcp_zone,
-            count=self._opts['num_preemptible'], vm_type=self._opts['vm_type_preemptible'], is_preemptible=True
+            count=self._opts['num_preemptible'], instance_type=self._opts['instance_type_preemptible'], is_preemptible=True
         )
 
         cluster_config['masterConfig'] = master_instance_group_config
@@ -947,8 +954,8 @@ class DataprocJobRunner(MRJobRunner):
             cluster_config['secondaryWorkerConfig'] = secondary_worker_instance_group_config
 
         # See - https://cloud.google.com/dataproc/dataproc-versions
-        if self._opts['cloud_image']:
-            cluster_config['softwareConfig'] = dict(imageVersion=self._opts['cloud_image'])
+        if self._opts['image_version']:
+            cluster_config['softwareConfig'] = dict(imageVersion=self._opts['image_version'])
 
         cluster_data = dict(projectId=self._gcp_project, clusterName=self._cluster_id, config=cluster_config)
         return cluster_data

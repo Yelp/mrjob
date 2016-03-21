@@ -17,19 +17,14 @@ import copy
 import getpass
 import os
 import os.path
-import posixpath
-import shutil
-import tempfile
-import time
+
 from contextlib import contextmanager
-from datetime import datetime
-from datetime import timedelta
 from io import BytesIO
 
 import mrjob
 import mrjob.dataproc
 from mrjob.dataproc import DataprocJobRunner
-from mrjob.dataproc import _DEFAULT_CLOUD_IMAGE
+from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.job import MRJob
@@ -37,26 +32,19 @@ from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import parse_gcs_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
-from mrjob.ssh import SSH_PREFIX
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
-from tests.mockgoogleapiclient import MockBotoTestCase
-from tests.mockgoogleapiclient import MockEmrConnection
-from tests.mockgoogleapiclient import MockEmrObject
-from tests.mockssh import mock_ssh_dir
-from tests.mockssh import mock_ssh_file
+from tests.mockgoogleapiclient import MockGoogleAPITestCase
+
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
-from tests.py2 import Mock
 from tests.py2 import TestCase
-from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
-from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
@@ -79,7 +67,7 @@ else:
     PYTHON_BIN = 'python3'
 
 
-class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
+class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
         'cloud_api_cooldown_secs': 0.00,
@@ -95,10 +83,10 @@ class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
             local_input_file.write(b'bar\nqux\n')
 
         remote_input_path = 'gs://walrus/data/foo'
-        self.add_mock_gcs_data({'walrus': {'data/foo': b'foo\n'}})
+        self.put_gcs_data({'walrus': {'data/foo': b'foo\n'}})
 
         # setup fake output
-        self.mock_emr_output = {('j-MOCKCLUSTER0', 1): [
+        self.mock_dataproc_output = {('j-MOCKCLUSTER0', 1): [
             b'1\t"qux"\n2\t"bar"\n', b'2\t"foo"\n5\tnull\n']}
 
         mr_job = MRHadoopFormatJob(['-r', 'dataproc', '-v',
@@ -121,7 +109,7 @@ class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
             # make sure AdditionalInfo was JSON-ified from the config file.
             # checked now because you can't actually read it from the cluster
             # on real Dataproc.
-            self.assertEqual(runner._opts['additional_emr_info'],
+            self.assertEqual(runner._opts['additional_dataproc_info'],
                              '{"key": "value"}')
             runner.run()
 
@@ -141,8 +129,8 @@ class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            emr_conn = runner.make_emr_conn()
-            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+            dataproc_conn = runner.make_dataproc_conn()
+            steps = list(_yield_all_steps(dataproc_conn, runner.get_cluster_id()))
 
             step_0_args = [a.value for a in steps[0].config.args]
             step_1_args = [a.value for a in steps[1].config.args]
@@ -175,10 +163,10 @@ class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
         self.assertFalse(any(runner.fs.ls(runner.get_output_dir())))
 
         # job should get terminated
-        emr_conn = runner.make_emr_conn()
+        dataproc_conn = runner.make_dataproc_conn()
         cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            emr_conn.simulate_progress(cluster_id)
+            dataproc_conn.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED')
@@ -187,8 +175,8 @@ class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v'])
         mr_job.sandbox()
 
-        self.add_mock_gcs_data({'walrus': {}})
-        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
+        self.put_gcs_data({'walrus': {}})
+        self.mock_dataproc_failures = {('j-MOCKCLUSTER0', 0): None}
 
         with no_handlers_for_logger('mrjob.dataproc'):
             stderr = StringIO()
@@ -201,10 +189,10 @@ class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
                 self.assertIn('\n  FAILED\n',
                               stderr.getvalue())
 
-                emr_conn = runner.make_emr_conn()
+                dataproc_conn = runner.make_dataproc_conn()
                 cluster_id = runner.get_cluster_id()
                 for _ in range(10):
-                    emr_conn.simulate_progress(cluster_id)
+                    dataproc_conn.simulate_progress(cluster_id)
 
                 cluster = runner._describe_cluster()
                 self.assertEqual(cluster.status.state,
@@ -213,13 +201,13 @@ class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
             # job should get terminated on cleanup
             cluster_id = runner.get_cluster_id()
             for _ in range(10):
-                emr_conn.simulate_progress(cluster_id)
+                dataproc_conn.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
     def _test_remote_tmp_cleanup(self, mode, tmp_len, log_len):
-        self.add_mock_gcs_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})
+        self.put_gcs_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})
         stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v',
@@ -273,19 +261,19 @@ class DataprocJobRunnerEndToEndTestCase(MockBotoTestCase):
                           'GARBAGE', 0, 0)
 
 
-class ExistingClusterTestCase(MockBotoTestCase):
+class ExistingClusterTestCase(MockGoogleAPITestCase):
 
     def test_attach_to_existing_cluster(self):
-        emr_conn = DataprocJobRunner(conf_paths=[]).make_emr_conn()
+        dataproc_conn = DataprocJobRunner(conf_paths=[]).make_dataproc_conn()
         # set log_uri to None, so that when we describe the cluster, it
         # won't have the loguri attribute, to test Issue #112
-        cluster_id = emr_conn.run_jobflow(
+        cluster_id = dataproc_conn.run_jobflow(
             name='Development Cluster', log_uri=None,
             keep_alive=True, job_flow_role='fake-instance-profile',
             service_role='fake-service-role')
 
         stdin = BytesIO(b'foo\nbar\n')
-        self.mock_emr_output = {(cluster_id, 1): [
+        self.mock_dataproc_output = {(cluster_id, 1): [
             b'1\t"bar"\n1\t"foo"\n2\tnull\n']}
 
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v',
@@ -308,10 +296,10 @@ class ExistingClusterTestCase(MockBotoTestCase):
                          [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_take_down_cluster_on_failure(self):
-        emr_conn = DataprocJobRunner(conf_paths=[]).make_emr_conn()
+        dataproc_conn = DataprocJobRunner(conf_paths=[]).make_dataproc_conn()
         # set log_uri to None, so that when we describe the cluster, it
         # won't have the loguri attribute, to test Issue #112
-        cluster_id = emr_conn.run_jobflow(
+        cluster_id = dataproc_conn.run_jobflow(
             name='Development Cluster', log_uri=None,
             keep_alive=True, job_flow_role='fake-instance-profile',
             service_role='fake-service-role')
@@ -320,8 +308,8 @@ class ExistingClusterTestCase(MockBotoTestCase):
                                '--cluster-id', cluster_id])
         mr_job.sandbox()
 
-        self.add_mock_gcs_data({'walrus': {}})
-        self.mock_emr_failures = set([('j-MOCKCLUSTER0', 0)])
+        self.put_gcs_data({'walrus': {}})
+        self.mock_dataproc_failures = set([('j-MOCKCLUSTER0', 0)])
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, DataprocJobRunner)
@@ -329,30 +317,30 @@ class ExistingClusterTestCase(MockBotoTestCase):
             with logger_disabled('mrjob.dataproc'):
                 self.assertRaises(StepFailedException, runner.run)
 
-            emr_conn = runner.make_emr_conn()
+            dataproc_conn = runner.make_dataproc_conn()
             cluster_id = runner.get_cluster_id()
             for _ in range(10):
-                emr_conn.simulate_progress(cluster_id)
+                dataproc_conn.simulate_progress(cluster_id)
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster.status.state, 'WAITING')
 
         # job shouldn't get terminated by cleanup
-        emr_conn = runner.make_emr_conn()
+        dataproc_conn = runner.make_dataproc_conn()
         cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            emr_conn.simulate_progress(cluster_id)
+            dataproc_conn.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'WAITING')
 
 
-class CloudAndHadoopVersionTestCase(MockBotoTestCase):
+class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
 
     def test_default(self):
         with self.make_runner() as runner:
             runner.run()
-            self.assertEqual(runner.get_cloud_version(), _DEFAULT_CLOUD_IMAGE)
+            self.assertEqual(runner.get_cloud_version(), _DEFAULT_IMAGE_VERSION)
             self.assertEqual(runner.get_hadoop_version(), '2.7.2')
 
     def test_image_0_1(self):
@@ -366,7 +354,7 @@ class CloudAndHadoopVersionTestCase(MockBotoTestCase):
 
     def _assert_cloud_hadoop_version(self, cloud_version, hadoop_version):
         args = []
-        with self.make_runner('--cloud-image', cloud_version) as runner:
+        with self.make_runner('--image-version', cloud_version) as runner:
             runner.run()
             self.assertEqual(runner.get_cloud_version(), cloud_version)
             self.assertEqual(runner.get_hadoop_version(), hadoop_version)
@@ -376,11 +364,11 @@ class CloudAndHadoopVersionTestCase(MockBotoTestCase):
             with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
                 runner.run()
                 self.assertEqual(runner.get_cloud_version(),
-                                 _DEFAULT_CLOUD_IMAGE)
+                                 _DEFAULT_IMAGE_VERSION)
                 self.assertEqual(runner.get_hadoop_version(), '2.7.2')
 
 
-class ZoneTestCase(MockBotoTestCase):
+class ZoneTestCase(MockGoogleAPITestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
         'cloud_api_cooldown_secs': 0.00,
@@ -397,22 +385,22 @@ class ZoneTestCase(MockBotoTestCase):
                              'PUPPYLAND')
 
 
-class RegionTestCase(MockBotoTestCase):
+class RegionTestCase(MockGoogleAPITestCase):
 
     def test_default(self):
         runner = DataprocJobRunner()
-        self.assertEqual(runner._opts['cloud_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_explicit_region(self):
-        runner = DataprocJobRunner(cloud_region='us-east-1')
-        self.assertEqual(runner._opts['cloud_region'], 'us-east-1')
+        runner = DataprocJobRunner(region='us-east-1')
+        self.assertEqual(runner._opts['region'], 'us-east-1')
 
     def test_cannot_be_empty(self):
-        runner = DataprocJobRunner(cloud_region='')
-        self.assertEqual(runner._opts['cloud_region'], 'us-west-2')
+        runner = DataprocJobRunner(region='')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
 
-class TmpBucketTestCase(MockBotoTestCase):
+class TmpBucketTestCase(MockGoogleAPITestCase):
 
     def assert_new_tmp_bucket(self, location, **runner_kwargs):
         """Assert that if we create an DataprocJobRunner with the given keyword
@@ -437,15 +425,15 @@ class TmpBucketTestCase(MockBotoTestCase):
 
     def test_us_west_1(self):
         self.assert_new_tmp_bucket('us-west-1',
-                                       cloud_region='us-west-1')
+                                       region='us-west-1')
 
     def test_us_east_1(self):
         # location should be blank
         self.assert_new_tmp_bucket('',
-                                       cloud_region='us-east-1')
+                                       region='us-east-1')
 
     def test_reuse_mrjob_bucket_in_same_region(self):
-        self.add_mock_gcs_data({'mrjob-1': {}}, location='us-west-2')
+        self.put_gcs_data({'mrjob-1': {}}, location='us-west-2')
 
         runner = DataprocJobRunner()
         self.assertEqual(runner._opts['s3_tmp_dir'],
@@ -453,27 +441,27 @@ class TmpBucketTestCase(MockBotoTestCase):
 
     def test_ignore_mrjob_bucket_in_different_region(self):
         # this tests 687
-        self.add_mock_gcs_data({'mrjob-1': {}}, location='')
+        self.put_gcs_data({'mrjob-1': {}}, location='')
 
         self.assert_new_tmp_bucket('us-west-2')
 
     def test_ignore_non_mrjob_bucket_in_different_region(self):
-        self.add_mock_gcs_data({'walrus': {}}, location='us-west-2')
+        self.put_gcs_data({'walrus': {}}, location='us-west-2')
 
         self.assert_new_tmp_bucket('us-west-2')
 
     def test_reuse_mrjob_bucket_in_us_east_1(self):
         # us-east-1 is special because the location "constraint" for its
         # buckets is '', not 'us-east-1'
-        self.add_mock_gcs_data({'mrjob-1': {}}, location='')
+        self.put_gcs_data({'mrjob-1': {}}, location='')
 
-        runner = DataprocJobRunner(cloud_region='us-east-1')
+        runner = DataprocJobRunner(region='us-east-1')
 
         self.assertEqual(runner._opts['s3_tmp_dir'],
                          'gs://mrjob-1/tmp/')
 
     def test_explicit_tmp_uri(self):
-        self.add_mock_gcs_data({'walrus': {}}, location='us-west-2')
+        self.put_gcs_data({'walrus': {}}, location='us-west-2')
 
         runner = DataprocJobRunner(s3_tmp_dir='gs://walrus/tmp/')
 
@@ -481,19 +469,19 @@ class TmpBucketTestCase(MockBotoTestCase):
                          'gs://walrus/tmp/')
 
     def test_cross_region_explicit_tmp_uri(self):
-        self.add_mock_gcs_data({'walrus': {}}, location='us-west-2')
+        self.put_gcs_data({'walrus': {}}, location='us-west-2')
 
-        runner = DataprocJobRunner(cloud_region='us-west-1',
+        runner = DataprocJobRunner(region='us-west-1',
                               s3_tmp_dir='gs://walrus/tmp/')
 
         self.assertEqual(runner._opts['s3_tmp_dir'],
                          'gs://walrus/tmp/')
 
-        # tmp bucket shouldn't influence cloud_region (it did in 0.4.x)
-        self.assertEqual(runner._opts['cloud_region'], 'us-west-1')
+        # tmp bucket shouldn't influence region (it did in 0.4.x)
+        self.assertEqual(runner._opts['region'], 'us-west-1')
 
 
-class EC2InstanceGroupTestCase(MockBotoTestCase):
+class EC2InstanceGroupTestCase(MockGoogleAPITestCase):
 
     maxDiff = None
 
@@ -508,9 +496,9 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         runner = DataprocJobRunner(**opts)
         cluster_id = runner.make_persistent_cluster()
 
-        emr_conn = runner.make_emr_conn()
+        dataproc_conn = runner.make_dataproc_conn()
         instance_groups = list(
-            _yield_all_instance_groups(emr_conn, cluster_id))
+            _yield_all_instance_groups(dataproc_conn, cluster_id))
 
         # convert actual instance groups to dicts
         role_to_actual = {}
@@ -537,9 +525,9 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         self.assertEqual(role_to_actual, role_to_expected)
 
     def set_in_mrjob_conf(self, **kwargs):
-        emr_opts = copy.deepcopy(self.MRJOB_CONF_CONTENTS)
-        emr_opts['runners']['dataproc'].update(kwargs)
-        patcher = mrjob_conf_patcher(emr_opts)
+        dataproc_opts = copy.deepcopy(self.MRJOB_CONF_CONTENTS)
+        dataproc_opts['runners']['dataproc'].update(kwargs)
+        patcher = mrjob_conf_patcher(dataproc_opts)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -758,7 +746,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             master=(1, 'm1.medium', None),
             task=(5, 'm1.medium', None))
 
-    def test_pass_invalid_bid_prices_through_to_emr(self):
+    def test_pass_invalid_bid_prices_through_to_dataproc(self):
         self.assertRaises(
             boto.exception.EmrResponseError,
             self._test_instance_groups,
@@ -840,7 +828,7 @@ class TestNoBoto(TestCase):
         self.assertRaises(ImportError, DataprocJobRunner, conf_paths=[])
 
 
-class TestMasterBootstrapScript(MockBotoTestCase):
+class TestMasterBootstrapScript(MockGoogleAPITestCase):
 
     def test_usr_bin_env(self):
         runner = DataprocJobRunner(conf_paths=[],
@@ -979,8 +967,8 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
         cluster_id = runner.make_persistent_cluster()
 
-        emr_conn = runner.make_emr_conn()
-        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        dataproc_conn = runner.make_dataproc_conn()
+        actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
 
         self.assertEqual(len(actions), 3)
 
@@ -1033,8 +1021,8 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
         cluster_id = runner.make_persistent_cluster()
 
-        emr_conn = runner.make_emr_conn()
-        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        dataproc_conn = runner.make_dataproc_conn()
+        actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
 
         self.assertEqual(len(actions), 2)
 
@@ -1054,7 +1042,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         self.assertTrue(runner.fs.exists(actions[1].scriptpath))
 
 
-class DataprocNoMapperTestCase(MockBotoTestCase):
+class DataprocNoMapperTestCase(MockGoogleAPITestCase):
 
     def test_no_mapper(self):
         # read from STDIN, a local file, and a remote file
@@ -1065,10 +1053,10 @@ class DataprocNoMapperTestCase(MockBotoTestCase):
             local_input_file.write(b'one fish two fish\nred fish blue fish\n')
 
         remote_input_path = 'gs://walrus/data/foo'
-        self.add_mock_gcs_data({'walrus': {'data/foo': b'foo\n'}})
+        self.put_gcs_data({'walrus': {'data/foo': b'foo\n'}})
 
         # setup fake output
-        self.mock_emr_output = {('j-MOCKCLUSTER0', 1): [
+        self.mock_dataproc_output = {('j-MOCKCLUSTER0', 1): [
             b'1\t["blue", "one", "red", "two"]\n',
             b'4\t["fish"]\n']}
 
@@ -1090,13 +1078,13 @@ class DataprocNoMapperTestCase(MockBotoTestCase):
                            (4, ['fish'])])
 
 
-class MaxHoursIdleTestCase(MockBotoTestCase):
+class MaxHoursIdleTestCase(MockGoogleAPITestCase):
 
     def assertRanIdleTimeoutScriptWith(self, runner, args):
-        emr_conn = runner.make_emr_conn()
+        dataproc_conn = runner.make_dataproc_conn()
         cluster_id = runner.get_cluster_id()
 
-        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
         action = actions[-1]
 
         self.assertEqual(action.name, 'idle timeout')
@@ -1106,10 +1094,10 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
         self.assertEqual([arg.value for arg in action.args], args)
 
     def assertDidNotUseIdleTimeoutScript(self, runner):
-        emr_conn = runner.make_emr_conn()
+        dataproc_conn = runner.make_dataproc_conn()
         cluster_id = runner.get_cluster_id()
 
-        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
         action_names = [a.name for a in actions]
 
         self.assertNotIn('idle timeout', action_names)
@@ -1179,10 +1167,10 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
     def test_bootstrap_script_is_actually_installed(self):
         self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
 
-class TestCatFallback(MockBotoTestCase):
+class TestCatFallback(MockGoogleAPITestCase):
 
     def test_gcs_cat(self):
-        self.add_mock_gcs_data(
+        self.put_gcs_data(
             {'walrus': {'one': b'one_text',
                         'two': b'two_text',
                         'three': b'three_text'}})
@@ -1192,7 +1180,7 @@ class TestCatFallback(MockBotoTestCase):
 
         self.assertEqual(list(runner.fs.cat('gs://walrus/one')), [b'one_text'])
 
-class CleanUpJobTestCase(MockBotoTestCase):
+class CleanUpJobTestCase(MockGoogleAPITestCase):
 
     @contextmanager
     def _test_mode(self, mode):
@@ -1290,7 +1278,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
     def test_kill_cluster(self):
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner, 'make_emr_conn') as m:
+            with patch.object(mrjob.dataproc.DataprocJobRunner, 'make_dataproc_conn') as m:
                 r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
@@ -1299,7 +1287,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
         # kill the cluster independent of job success.
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner, 'make_emr_conn') as m:
+            with patch.object(mrjob.dataproc.DataprocJobRunner, 'make_dataproc_conn') as m:
                 r._ran_job = True
                 r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
@@ -1307,13 +1295,13 @@ class CleanUpJobTestCase(MockBotoTestCase):
     def test_kill_persistent_cluster(self):
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
-            with patch.object(mrjob.dataproc.DataprocJobRunner, 'make_emr_conn') as m:
+            with patch.object(mrjob.dataproc.DataprocJobRunner, 'make_dataproc_conn') as m:
                 r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
                 r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
 
-class BootstrapPythonTestCase(MockBotoTestCase):
+class BootstrapPythonTestCase(MockGoogleAPITestCase):
 
     if PY2:
         EXPECTED_BOOTSTRAP = [

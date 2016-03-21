@@ -21,9 +21,17 @@ from mrjob.parse import urlparse
 from mrjob.runner import GLOB_RE
 from mrjob.util import read_file
 
-from apiclient import discovery
-from oauth2client.client import GoogleCredentials
-from apiclient import http
+try:
+    from oauth2client.client import GoogleCredentials
+    from googleapiclient import discovery
+    from googleapiclient import http
+except ImportError:
+    # don't require googleapiclient; MRJobs don't actually need it when running
+    # inside hadoop streaming
+    GoogleCredentials = None
+    discovery = None
+    http = None
+
 import io
 import os
 import tempfile
@@ -31,6 +39,9 @@ import base64
 import binascii
 
 log = logging.getLogger(__name__)
+
+_GCS_API_ENDPOINT = 'storage'
+_GCS_API_VERSION = 'v1'
 
 _BINARY_MIMETYPE = 'application/octet-stream'
 _LS_FIELDS_TO_RETURN = 'nextPageToken,items(id,size,name,md5Hash)'
@@ -69,7 +80,7 @@ class GCSFilesystem(Filesystem):
     def api_client(self):
         if not self._api_client:
             credentials = GoogleCredentials.get_application_default()
-            self._api_client = discovery.build('storage', 'v1', credentials=credentials)
+            self._api_client = discovery.build(_GCS_API_ENDPOINT, _GCS_API_VERSION, credentials=credentials)
 
         return self._api_client
 
@@ -140,7 +151,7 @@ class GCSFilesystem(Filesystem):
         tmp_fd, tmp_path = tempfile.mkstemp()
         tmp_fileobj = os.fdopen(tmp_fd, 'w+b')
 
-        self._download_io(tmp_fileobj, gcs_uri)
+        self._download_io(gcs_uri, tmp_fileobj)
 
         tmp_fileobj.seek(0)
 
@@ -183,7 +194,7 @@ class GCSFilesystem(Filesystem):
         io_obj = io.FileIO(src_path)
         return self._upload_io(io_obj, dest_uri)
 
-    def _download_io(self, io_obj, src_uri):
+    def _download_io(self, src_uri, io_obj):
         bucket_name, object_name = parse_gcs_uri(src_uri)
 
         # Chunked file download
@@ -221,7 +232,7 @@ class GCSFilesystem(Filesystem):
         """List buckets on GCS."""
         list_kwargs = dict(project=project)
         if prefix:
-            list_kwargsp['prefix'] = prefix
+            list_kwarg['prefix'] = prefix
 
         req = self.api_client.buckets().list(**list_kwargs)
         resp = req.execute()
@@ -248,6 +259,10 @@ class GCSFilesystem(Filesystem):
             insert_kwargs['lifecycle'] = dict(rule=[lifecycle_rule])
 
         req = self.api_client.buckets().insert(**insert_kwargs)
+        return req.execute()
+
+    def bucket_delete(self, bucket):
+        req = self.api_client.buckets().delete(bucket=bucket)
         return req.execute()
 
 def is_gcs_uri(uri):

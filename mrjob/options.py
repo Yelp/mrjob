@@ -312,15 +312,15 @@ def add_dataproc_opts(opt_group):
 
         # TODO - mtai @ davidmarin - adopt below suggested varnames for Dataproc / EMR
         opt_group.add_option(
-            '--cloud-region', dest='cloud_region', default='global',
+            '--region', dest='region', default='global',
             help='Region to run Dataproc/EMR jobs in. Default is global'),
 
         opt_group.add_option(
-            '--cloud-zone', dest='cloud_zone', default=None,
+            '--zone', dest='zone', default=None,
             help='Zone to run Dataproc/EMR jobs in.  '),
 
         opt_group.add_option(
-            '--cloud-image', dest='cloud_image', default=None,
+            '--image-version', dest='image_version', default=None,
             help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
 
         opt_group.add_option(
@@ -329,22 +329,22 @@ def add_dataproc_opts(opt_group):
 
         # instance types
         opt_group.add_option(
-            '--vm-type', dest='vm_type', default=None,
+            '--instance-type', dest='instance_type', default=None,
             help=('Type of GCE/EC2 instance(s) to launch \n'
                   ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4 - See https://cloud.google.com/compute/docs/machine-types\n'
                   ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge - See http://aws.amazon.com/ec2/instance-types/'
                   )),
 
         opt_group.add_option(
-            '--vm-type-master', dest='vm_type_master', default=None,
+            '--instance-type-master', dest='instance_type_master', default=None,
             help='Type of GCE/EC2 master instance(s) to launch'),
 
         opt_group.add_option(
-            '--vm-type-worker', dest='vm_type_worker', default=None,
+            '--instance-type-worker', dest='instance_type_worker', default=None,
             help='Type of GCE/EC2 worker instance(s) to launch'),
 
         opt_group.add_option(
-            '--vm-type-preemptible', dest='vm_type_preemptible', default=None,
+            '--instance-type-preemptible', dest='instance_type_preemptible', default=None,
             help='Type of GCE/EC2 preemptible worker instance(s) to launch'),
 
 

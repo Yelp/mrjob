@@ -236,9 +236,9 @@ Job execution context
     where it will be either ``'python2.6'`` or ``'python2.7'``.
 
     Generally, :py:class:`~mrjob.emr.EMRJobRunner` just matches whichever
-    version of Python you're running, but if you're on a (deprecated) 2.x AMI,
-    it defaults to ``python2.7`` if you're on AMI version 2.4.3 or later
-    (because it comes with :command:`pip`) and to ``python2.6``
+    minor version of Python 2 you're running, but if you're on a (deprecated)
+    2.x AMI, it defaults to ``'python2.7'`` if you're on AMI version 2.4.3 or
+    later (because it comes with :command:`pip`) and to ``'python2.6'``
     otherwise (because Python 2.7 is unavailable).
 
     This option also affects which Python binary is used for file locking in

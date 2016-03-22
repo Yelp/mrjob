@@ -9,12 +9,14 @@ For a complete list of changes, see `CHANGES.txt
 0.5.0
 -----
 
-Python 3
-^^^^^^^^
+Python versions
+^^^^^^^^^^^^^^^
 
 mrjob now fully supports Python 3.3+ in a way that should be transparent to existing Python 2 users (you don't have to suddenly start handling ``unicode`` instead of ``str``). For more information, see :doc:`guides/py2-vs-py3`.
 
 If you run a job with Python 3, mrjob will automatically install Python 3 on ElasticMapreduce AMIs (see :mrjob-opt:`bootstrap_python`).
+
+When you run jobs on EMR in Python 2, mrjob attempts to match your minor version of Python as well (either :command:`python2.6` or :command:`python2.7`); see :mrjob-opt:`python_bin` for details.
 
 The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. :command:`mrjob3`, :command:`mrjob3.4`), in case you install mrjob for multiple versions of Python.
 

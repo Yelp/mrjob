@@ -264,7 +264,7 @@ def _add_hadoop_opts(opt_group):
 
         opt_group.add_option(
             '--hadoop-log-dir', dest='hadoop_log_dir', default=[],
-            action='append', help='Hard-coded directory to search for'
+            action='append', help='Directory to search for'
             ' hadoop logs in. You can use --hadoop-log-dir multiple times.'),
 
         opt_group.add_option(

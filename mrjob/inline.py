@@ -51,10 +51,6 @@ class InlineMRJobRunner(SimMRJobRunner):
 
     OPTION_STORE_CLASS = SimRunnerOptionStore
 
-    # stick to a single split for efficiency
-    _DEFAULT_MAP_TASKS = 1
-    _DEFAULT_REDUCE_TASKS = 1
-
     def __init__(self, mrjob_cls=None, **kwargs):
         """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
         args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:

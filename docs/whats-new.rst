@@ -83,8 +83,12 @@ why this is a bad idea.
 
 Protocols will now use the much faster :py:mod:`ujson` library, if installed,
 to encode and decode JSON. This is especially recommended for simple jobs that
-spend a significant fraction of their time encoding and data (if
-you're using EMR, see :ref:`Installing ujson <installing-ujson>`).
+spend a significant fraction of their time encoding and data.
+
+.. note::
+
+   If you're using EMR, try out
+   :ref:`this bootstrap recipe <installing-ujson>` to install :py:mod:`ujson`.
 
 mrjob will fall back to the :py:mod:`simplejson` library if :py:mod:`ujson`
 is not installed, and use the built-in ``json`` module if neither is installed.

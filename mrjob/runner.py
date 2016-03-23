@@ -459,7 +459,10 @@ class MRJobRunner(object):
     def run(self):
         """Run the job, and block until it finishes.
 
-        Raise an exception if there are any problems.
+        Raise :py:class:`~mrjob.step.StepFailedException` if there
+        are any problems (except on
+        :py:class:`~mrjob.inline.InlineMRJobRunner`, where we raise the
+        actual exception that caused the step to fail).
         """
         if not self._script_path:
             raise AssertionError("No script to run!")

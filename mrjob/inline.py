@@ -39,6 +39,10 @@ class InlineMRJobRunner(SimMRJobRunner):
     This is the default way to run jobs (we assume you'll spend some time
     debugging your job before you're ready to run it on EMR or Hadoop).
 
+    Unlike other runners, ``InlineMRJobRunner``\ 's ``run()`` method
+    raises the actual exception that caused a step to fail (rather than
+    :py:class:`~mrjob.step.StepFailedException`).
+
     To more accurately simulate your environment prior to running on
     Hadoop/EMR, use ``-r local`` (see
     :py:class:`~mrjob.local.LocalMRJobRunner`).
@@ -55,8 +59,8 @@ class InlineMRJobRunner(SimMRJobRunner):
         """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
         args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
-        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
-          and *hadoop_streaming_jar*, and *partitioner* are ignored
+        * *hadoop_input_format*, *hadoop_output_format*, and *partitioner*
+          are ignored
           because they require Java. If you need to test these, consider
           starting up a standalone Hadoop instance and running your job with
           ``-r hadoop``.

@@ -127,8 +127,9 @@ instance to parse each line with its output protocol.
 Further reference:
 
 * :py:meth:`~mrjob.job.MRJob.make_runner`
-* :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
 * :py:meth:`~mrjob.job.MRJob.parse_output_line`
+* :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
+* :py:meth:`~mrjob.runner.MRJobRunner.run`
 
 Limitations
 ^^^^^^^^^^^

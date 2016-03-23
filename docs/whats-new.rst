@@ -38,7 +38,7 @@ The default :mrjob-opt:`ec2_instance_type` is now ``m1.medium`` (``m1.small`` is
 
 You can specify 4.x AMIs with either the new :mrjob-opt:`release_label` option, or continue using :mrjob-opt:`ami_version`; both work.
 
-mrjob continues to support 2.x AMIs, however:
+mrjob continues to support 2.x AMIs. However:
 
 .. warning::
 
@@ -58,7 +58,7 @@ S3
 
 mrjob is much smarter about the way it interacts with S3:
  - automatically creates temp bucket in the same region as jobs
- - connects to S3 buckets on the endpoint matching their region (no more 307 erros)
+ - connects to S3 buckets on the endpoint matching their region (no more 307 errors)
 
    - :py:class:`~mrjob.emr.EMRJobRunner` and :py:class:`~mrjob.fs.s3.S3Filesystem` methods no longer take ``s3_conn`` args (passing around a single S3 connection no longer makes sense)
 

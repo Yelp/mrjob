@@ -135,31 +135,7 @@ same price or lower.
 Custom Python packages
 ----------------------
 
-There are a couple of ways to install Python packages that are not in the
-standard library. If there is a Debian package and you are running on AMI 2.x, you can add a call to
-``apt-get`` as a ``bootstrap_cmd``::
-
-    runners:
-      emr:
-        bootstrap_cmds:
-        - sudo apt-get install -y python-dateutil
-
-Otherwise, if you are running on AMI 3.x and have an RPM package you would like to install you can use
-``yum`` as a ``bootstrap_cmd``::
-
-    runners:
-      emr:
-        bootstrap_cmds:
-        - sudo yum install -y python-dateutil
-
-If there is no Debian or RPM package or you prefer to use your own tarballs for some
-other reason, you can specify tarballs in ``bootstrap_python_packages``, which
-supports glob syntax::
-
-    runners:
-      emr:
-        bootstrap_python_packages:
-        - $MY_SOURCE_TREE/emr_packages/*.tar.gz
+See :ref:`using-pip` and :ref:`installing-packages`.
 
 .. _bootstrap-time-configuration:
 
@@ -175,6 +151,10 @@ number of mappers and reducers to one per node::
     -m mapred.tasktracker.map.tasks.maximum=1 \
     -m mapred.tasktracker.reduce.tasks.maximum=1"
 
+.. note::
+
+   This doesn't work on AMI version 4.0.0 and later.
+
 Setting up Ganglia
 ------------------
 
@@ -186,54 +166,6 @@ EMR cluster with Amazon's `install-ganglia`_ bootstrap action::
 
 .. _install-ganglia: http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/UsingEMR_Ganglia.html
 
-Enabling Python core dumps
---------------------------
+.. note::
 
-Particularly bad errors may leave no traceback in the logs. To enable core
-dumps on your EMR instances, put this script in ``core_dump_bootstrap.sh``::
-
-    #!/bin/sh
-
-    chk_root () {
-        if [ ! $( id -u ) -eq 0 ]; then
-            exec sudo sh ${0}
-            exit ${?}
-        fi
-    }
-
-    chk_root
-
-    mkdir /tmp/cores
-    chmod -R 1777 /tmp/cores
-    echo "\n* soft core unlimited" >> /etc/security/limits.conf
-    echo "ulimit -c unlimited" >> /etc/profile
-    echo "/tmp/cores/core.%e.%p.%h.%t" > /proc/sys/kernel/core_pattern
-
-Use the script as a bootstrap action in your job::
-
-    --bootstrap-action=core_dump_setup.sh
-
-You'll probably want to use a version of Python with debugging symbols, so
-install it and use it as ``python_bin``::
-
-    --bootstrap-cmd="sudo apt-get install -y python2.6-dbg" \
-    --python-bin=python2.6-dbg
-
-Run your job in a persistent cluster. When it fails, you can SSH to your nodes
-to inspect the core dump files::
-
-    you@local: emr --ssh j-MYCLUSTERID
-
-    hadoop@ip-10-160-75-214:~$ gdb `which python` /tmp/cores/core.python.blah
-
-If you have multiple nodes, you may have to :command:`scp` your identity file
-to the master node and use it to SSH to the slave nodes, where the core dumps
-are located::
-
-    hadoop@ip-10-160-75-214:~$ hadoop dfsadmin -report | grep ^Name
-    Name: 10.166.50.85:9200
-    Name: 10.177.63.114:9200
-
-    hadoop@ip-10-160-75-214:~$ ssh -i uploaded_key.pem 10.166.50.85
-
-    hadoop@ip-10-166-50-85:~$ gdb `which python2.6-dbg` /tmp/cores/core.python.blah
+   This doesn't work on AMI version 4.0.0 and later.

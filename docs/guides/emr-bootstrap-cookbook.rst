@@ -32,7 +32,7 @@ version of Python.
 Figure out which Python binary you're using on EMR (it defaults to one
 of :command:`python2.6`, :command:`python2.7`, or :command:`python3`; see
 :mrjob-opt:`python_bin`), and then use
-``sudo <python binary> -m pip <packages>``.
+``sudo <python binary> -m pip install <packages>``.
 
 For example, to install :py:mod:`ujson` on Python 2.7:
 
@@ -41,7 +41,7 @@ For example, to install :py:mod:`ujson` on Python 2.7:
     runners:
       emr:
         bootstrap:
-        - sudo python2.7 -m pip ujson
+        - sudo python2.7 -m pip install ujson
 
 See `PyPI <https://pypi.python.org/pypi>`_ for a the full list of available
 Python packages.
@@ -77,6 +77,8 @@ Or a tarball:
    certificate information.
 
 
+.. _installing-packages:
+
 Installing System Packages
 --------------------------
 
@@ -102,7 +104,7 @@ Here are the package lists for all the various versions of Amazon Linux used
 by EMR:
 
  * `2015.09 <http://aws.amazon.com/amazon-linux-ami/2015.09-packages/>`__ (3.11.0 and 4.2.0-4.4.0)
- * `2015.03 <http://aws.amazon.com/amazon-linux-ami/2015.03-packages/>`__ (3.7.90-3.10.0 and 4.0.0-4.1.0)
+ * `2015.03 <http://aws.amazon.com/amazon-linux-ami/2015.03-packages/>`__ (3.7.0-3.10.0 and 4.0.0-4.1.0)
  * `2014.09 <http://aws.amazon.com/amazon-linux-ami/2014.09-packages/>`__ (3.4.0-3.6.0)
  * `2014.03 <http://aws.amazon.com/amazon-linux-ami/2014.03-packages/>`__ (3.1.0-3.3.2)
  * `2013.09 <http://aws.amazon.com/amazon-linux-ami/2014.09-packages/>`__ (3.0.0-3.0.4)
@@ -187,4 +189,4 @@ you just compiled will work for any version of Python:
       emr:
         bootstrap:
         ...
-        - sudo /usr/local/bin/python -m pip ...
+        - sudo /usr/local/bin/python -m pip install ...

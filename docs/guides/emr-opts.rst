@@ -426,7 +426,7 @@ and install another Python binary.
     .. deprecated:: 0.4.2
 
     Paths of python modules tarballs to install on EMR. Pass
-    ``sudo pip-x.y install path/to/package.tar.gz#`` to
+    ``sudo <python binary> -m pip install path/to/package.tar.gz#`` to
     :mrjob-opt:`bootstrap` instead.
 
     Also, please consider installing packages directly from

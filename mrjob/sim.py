@@ -77,6 +77,8 @@ class SimMRJobRunner(MRJobRunner):
     version.
 
     """
+    # TODO: docstring is out-of-date; we're now version agnostic
+
     # try to run at least two tasks to catch bugs
     _DEFAULT_MAP_TASKS = 2
     _DEFAULT_REDUCE_TASKS = 2

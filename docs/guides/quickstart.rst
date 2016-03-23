@@ -20,7 +20,7 @@ or from a `git`_ clone of the `source code`_::
 Writing your first job
 ----------------------
 
-Open a file called :file:`word_count.py` and type this into it::
+Open a file called :file:`mr_word_count.py` and type this into it::
 
     from mrjob.job import MRJob
 
@@ -40,10 +40,10 @@ Open a file called :file:`word_count.py` and type this into it::
         MRWordFrequencyCount.run()
 
 Now go back to the command line, find your favorite body of text (such mrjob's
-:file:`README.rst`, or even your new file :file:`word_count.py`), and try
+:file:`README.rst`, or even your new file :file:`mr_word_count.py`), and try
 this::
 
-  $ python word_count.py my_file.txt
+  $ python mr_word_count.py my_file.txt
 
 You should see something like this::
 

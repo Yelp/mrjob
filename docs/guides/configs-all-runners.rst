@@ -63,6 +63,7 @@ options related to file uploading.
         upload_files:
           - file_1.txt
           - file_2.sqlite
+
     On the command line::
 
         --file file_1.txt --file file_2.sqlite
@@ -229,16 +230,17 @@ Job execution context
     Name/path of alternate Python binary for wrapper scripts and
     mappers/reducers (e.g. ``'python -v'``).
 
-    If you're on Python 3, this defaults to ``'python3'``.
+    If you're on Python 3, this always defaults to ``'python3'``.
 
     If you're on Python 2, this defaults to ``'python'``, except on EMR,
     where it will be either ``'python2.6'`` or ``'python2.7'``.
 
     Generally, :py:class:`~mrjob.emr.EMRJobRunner` just matches whichever
-    minor version of Python 2 you're running, but if you're on a (deprecated)
-    2.x AMI, it defaults to ``'python2.7'`` if you're on AMI version 2.4.3 or
-    later (because it comes with :command:`pip`) and to ``'python2.6'``
-    otherwise (because Python 2.7 is unavailable).
+    minor version of Python 2 you're running. However, if you're on a
+    (deprecated) 2.x AMI, it'll instead default to ``'python2.6'`` on AMI
+    version 2.4.2 and earlier (because Python 2.7 is unavailable) and
+    ``'python2.7'`` on later 2.x AMI versions (because they have
+    :command:`pip-2.7` but not :command:`pip-2.6`).
 
     This option also affects which Python binary is used for file locking in
     :mrjob-opt:`setup` scripts, so it might be useful to set even if you're

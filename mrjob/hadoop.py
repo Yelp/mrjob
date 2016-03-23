@@ -110,8 +110,6 @@ def fully_qualify_hdfs_path(path):
 
 class HadoopRunnerOptionStore(RunnerOptionStore):
 
-    # TODO: deprecate hadoop_home
-
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
         'hadoop_home',
@@ -154,6 +152,13 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
+
+        if self._opts['hadoop_home']:
+            log.warning(
+                'hadoop_home is deprecated since 0.5.0 and will be removed'
+                ' in v0.6.0. In most cases, mrjob will now find the hadoop'
+                ' binary and streaming jar without help. If not, use the'
+                ' hadoop_bin and hadoop_streaming_jar options.')
 
         self._hadoop_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(

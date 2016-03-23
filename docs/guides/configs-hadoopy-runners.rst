@@ -75,7 +75,7 @@ Options available to hadoop and emr runners
     searching these directories (recursively) for a ``.jar`` file with
     ``hadoop`` followed by ``streaming`` in its name:
 
-    * :mrjob-opt:`hadoop_home` (the runner option)
+    * :mrjob-opt:`hadoop_home` (the deprecated runner option)
     * ``$HADOOP_PREFIX``
     * ``$HADOOP_HOME``
     * ``$HADOOP_INSTALL``
@@ -148,7 +148,7 @@ Options available to hadoop runner only
     mrjob tries its best to find your hadoop binary, checking all of the
     following places for an executable file named ``hadoop``:
 
-    * :mrjob-opt:`hadoop_home`/``bin``
+    * :mrjob-opt:`hadoop_home`/``bin`` (deprecated)
     * ``$HADOOP_PREFIX/bin``
     * ``$HADOOP_HOME/bin``
     * ``$HADOOP_INSTALL/bin``
@@ -165,11 +165,12 @@ Options available to hadoop runner only
     :set: hadoop
     :default: ``None``
 
-    Hint about where to find the hadoop binary and streaming jar. Instead, just
-    set :mrjob-opt:`hadoop_bin` and/or :mrjob-opt:`hadoop_streaming_jar` as
-    needed.
+    .. deprecated:: 0.5.0
 
-    .. deprecated: 0.5.0
+    Hint about where to find the hadoop binary and streaming jar. In most
+    cases, mrjob will now find these on its own. If not, set
+    :mrjob-opt:`hadoop_bin` and/or :mrjob-opt:`hadoop_streaming_jar` as
+    needed.
 
 .. mrjob-opt::
    :config: hadoop_log_dirs

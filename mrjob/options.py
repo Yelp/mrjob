@@ -271,8 +271,9 @@ def _add_hadoop_opts(opt_group):
             '--hadoop-home', dest='hadoop_home',
             default=None,
             help='Deprecated hint about where to find hadoop binary and'
-                 ' streaming jar. Just set $HADOOP_HOME or use the'
-                 ' --hadoop-bin and --hadoop-streaming-jar switches.'),
+                 ' streaming jar. In most cases mrjob will now find these on'
+                 ' its own. If not, use the --hadoop-bin and'
+                 ' --hadoop-streaming-jar switches.'),
 
         opt_group.add_option(
             '--hadoop-tmp-dir', dest='hadoop_tmp_dir',

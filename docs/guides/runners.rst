@@ -72,7 +72,7 @@ Running on your own Hadoop cluster
 ----------------------------------
 
 * Set up a hadoop cluster (see http://hadoop.apache.org/common/docs/current/)
-* Make sure :envvar:`HADOOP_HOME` is set
+* Make sure :envvar:`$HADOOP_PREFIX` is set
 * Run your job with ``-r hadoop``::
 
     python your_mr_job_sub_class.py -r hadoop < input > output
@@ -120,9 +120,9 @@ This pattern can also be used to write integration tests (see :doc:`testing`).
             key, value = mr_job.parse_output_line(line)
             ... # do something with the parsed output
 
-You the :py:class:`~mrjob.job.MRJob`, use a context manager to create the
-runner, run the job, iterate over the output lines, and use the job instance to
-parse each line with its output protocol.
+You instantiate the :py:class:`~mrjob.job.MRJob`, use a context manager to
+create the runner, run the job, iterate over the output lines, and use the job
+instance to parse each line with its output protocol.
 
 Further reference:
 

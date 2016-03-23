@@ -31,6 +31,7 @@ from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
+from mrjob.conf import combine_lists
 from mrjob.conf import combine_path_lists
 from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem

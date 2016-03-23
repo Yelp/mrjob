@@ -70,7 +70,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         self._mrjob_cls = mrjob_cls
 
     # options that we ignore because they involve running subprocesses
-    IGNORED_LOCAL_OPTS = [
+    _IGNORED_LOCAL_OPTS = [
         'bootstrap_mrjob',
         'python_bin',
         'setup',
@@ -99,7 +99,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         """ Warn the user of opts being ignored by this runner.
         """
         super(InlineMRJobRunner, self)._warn_ignored_opts()
-        for ignored_opt in self.IGNORED_LOCAL_OPTS:
+        for ignored_opt in self._IGNORED_LOCAL_OPTS:
             if ((not self._opts.is_default(ignored_opt)) and
                     self._opts[ignored_opt]):
                 log.warning('ignoring %s option (use -r local instead): %r' %

@@ -112,13 +112,16 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
 
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
+        'hadoop_extra_args',
         'hadoop_home',
         'hadoop_log_dirs',
+        'hadoop_streaming_jar',
         'hadoop_tmp_dir',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'hadoop_bin': combine_cmds,
+        'hadoop_extra_args': combine_lists,
         'hadoop_home': combine_paths,
         'hadoop_log_dirs': combine_path_lists,
         'Hadoop_tmp_dir': combine_paths,

@@ -116,8 +116,6 @@ class RunnerOptionStore(OptionStore):
         'cleanup',
         'cleanup_on_failure',
         'cmdenv',
-        'hadoop_extra_args',
-        'hadoop_streaming_jar',
         'hadoop_version',
         'interpreter',
         'jobconf',
@@ -139,7 +137,6 @@ class RunnerOptionStore(OptionStore):
 
     COMBINERS = combine_dicts(OptionStore.COMBINERS, {
         'cmdenv': combine_envs,
-        'hadoop_extra_args': combine_lists,
         'interpreter': combine_cmds,
         'jobconf': combine_dicts,
         'local_tmp_dir': combine_paths,

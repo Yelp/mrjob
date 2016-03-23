@@ -63,7 +63,6 @@ options related to file uploading.
         upload_files:
           - file_1.txt
           - file_2.sqlite
-
     On the command line::
 
         --file file_1.txt --file file_2.sqlite
@@ -410,11 +409,9 @@ Options ignored by the local and inline runners
 
 These options are ignored because they require a real instance of Hadoop:
 
-* :mrjob-opt:`hadoop_extra_args`
 * :py:meth:`hadoop_input_format <mrjob.runner.MRJobRunner.__init__>`
 * :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`
-* :mrjob-opt:`hadoop_streaming_jar`
-* :mrjob-opt:`partitioner`
+* :py:meth:`partitioner <mrjob.runner.MRJobRunner.__init__>`
 
 
 Options ignored by the inline runner

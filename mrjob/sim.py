@@ -83,16 +83,10 @@ class SimMRJobRunner(MRJobRunner):
     _DEFAULT_MAP_TASKS = 2
     _DEFAULT_REDUCE_TASKS = 2
 
-    # options that we ignore because they require real Hadoop
-    IGNORED_HADOOP_OPTS = [
-        'hadoop_extra_args',
-        'hadoop_streaming_jar',
-    ]
-
     # keyword arguments that we ignore that are stored directly in
     # self._<kwarg_name> because they aren't configurable from mrjob.conf
     # use the version with the underscore to better support grepping our code
-    IGNORED_HADOOP_ATTRS = [
+    _IGNORED_HADOOP_ATTRS = [
         '_hadoop_input_format',
         '_hadoop_output_format',
         '_partitioner',
@@ -107,12 +101,7 @@ class SimMRJobRunner(MRJobRunner):
         """ If the user has provided options that are not supported
         by the dev runners log warnings for each of the ignored options
         """
-        for ignored_opt in self.IGNORED_HADOOP_OPTS:
-            if self._opts[ignored_opt]:
-                log.warning('ignoring %s option (requires real Hadoop): %r' %
-                            (ignored_opt, self._opts[ignored_opt]))
-
-        for ignored_attr in self.IGNORED_HADOOP_ATTRS:
+        for ignored_attr in self._IGNORED_HADOOP_ATTRS:
             value = getattr(self, ignored_attr)
             if value is not None:
                 log.warning(

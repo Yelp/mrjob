@@ -77,6 +77,12 @@ Running on your own Hadoop cluster
 
     python your_mr_job_sub_class.py -r hadoop < input > output
 
+.. note::
+
+   You don't need to install ``mrjob`` or any other libraries on the nodes
+   of your Hadoop cluster, but they *do* at least need a version of Python
+   that's compatible with your job.
+
 Running on EMR
 --------------
 

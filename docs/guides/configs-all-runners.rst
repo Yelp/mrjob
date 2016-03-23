@@ -109,7 +109,7 @@ Temp files and cleanup
     * ``'ALL'``: delete logs and local and remote temp files; stop cluster
         if on EMR and the job is not done when cleanup is run.
     * ``'CLUSTER'``: terminate EMR cluster if job not done when cleanup is run
-    * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
+    * ``'JOB'``: stop job if not done when cleanup runs (temporarily disabled)
     * ``'LOCAL_TMP'``: delete local temp files only
     * ``'LOGS'``: delete logs only
     * ``'NONE'``: delete nothing

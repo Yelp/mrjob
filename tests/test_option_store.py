@@ -100,15 +100,16 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                     'A_PATH': 'A',
                     'SOMETHING': 'X',
                 },
-                'hadoop_extra_args': [
-                    'thing1',
-                ],
                 'hadoop_streaming_jar': 'monkey.jar',
                 'jobconf': {
                     'lorax_speaks_for': 'trees',
                 },
+                'label': 'organic',
                 'local_tmp_dir': '/tmp',
                 'python_bin': 'py3k',
+                'setup': [
+                    ['thing1'],
+                ],
                 'setup_scripts': ['/myscript.py'],
             }
         }
@@ -125,16 +126,18 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                         'SOMETHING': 'Y',
                         'SOMETHING_ELSE': 'Z',
                     },
-                    'hadoop_extra_args': [
-                        'thing2',
-                    ],
+
                     'hadoop_streaming_jar': 'banana.jar',
                     'jobconf': {
                         'lorax_speaks_for': 'mazda',
                         'dr_seuss_is': 'awesome',
                     },
+                    'label': 'usda_organic',
                     'local_tmp_dir': '/var/tmp',
                     'python_bin': 'py4k',
+                    'setup': [
+                        ['thing2'],
+                    ],
                     'setup_scripts': ['/yourscript.py'],
                 }
             }
@@ -172,9 +175,9 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
         })
 
     def test_combine_lists(self):
-        self.assertEqual(self.opts_1['hadoop_extra_args'], ['thing1'])
-        self.assertEqual(self.opts_2['hadoop_extra_args'],
-                         ['thing1', 'thing2'])
+        self.assertEqual(self.opts_1['setup'], [['thing1']])
+        self.assertEqual(self.opts_2['setup'],
+                         [['thing1'], ['thing2']])
 
     def test_combine_paths(self):
         self.assertEqual(self.opts_1['local_tmp_dir'], '/tmp')
@@ -186,8 +189,8 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                          ['/myscript.py', '/yourscript.py'])
 
     def test_combine_values(self):
-        self.assertEqual(self.opts_1['hadoop_streaming_jar'], 'monkey.jar')
-        self.assertEqual(self.opts_2['hadoop_streaming_jar'], 'banana.jar')
+        self.assertEqual(self.opts_1['label'], 'organic')
+        self.assertEqual(self.opts_2['label'], 'usda_organic')
 
 
 class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):

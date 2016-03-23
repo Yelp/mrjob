@@ -72,6 +72,7 @@ from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import patch_fs_s3
+from tests.test_hadoop import HadoopExtraArgsTestCase
 
 try:
     import boto
@@ -3670,3 +3671,9 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._ls_step_logs.called)
         self.assertFalse(self._interpret_emr_step_logs.called)
+
+
+# this basically just checks that hadoop_extra_args is an option
+# for the EMR runner
+class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
+    pass

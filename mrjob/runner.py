@@ -297,7 +297,7 @@ class MRJobRunner(object):
                                     option. Note that if you write your own
                                     class, you'll need to include it in your
                                     own custom streaming jar (see
-                                    *hadoop_streaming_jar*).
+                                    :mrjob-opt:`hadoop_streaming_jar`).
         :type hadoop_output_format: str
         :param hadoop_output_format: name of an optional Hadoop
                                      ``OutputFormat`` class. Passed to Hadoop
@@ -305,7 +305,8 @@ class MRJobRunner(object):
                                      ``-outputformat`` option. Note that if you
                                      write your own class, you'll need to
                                      include it in your own custom streaming
-                                     jar (see *hadoop_streaming_jar*).
+                                     jar (see
+                                     :mrjob-opt:`hadoop_streaming_jar`).
         :type input_paths: list of str
         :param input_paths: Input files for your job. Supports globs and
                             recursively walks directories (e.g.
@@ -1181,6 +1182,8 @@ class MRJobRunner(object):
                     "%s: %s" % (key, new_key) for key, new_key
                     in sorted(translations.items())]))
 
+    # TODO: this is only used by non-local runners, and could
+    # conceivably be moved to some intermediary class (RealMRJobRunner?)
     def _hadoop_args_for_step(self, step_num):
         """Build a list of extra arguments to the hadoop binary.
 
@@ -1194,8 +1197,8 @@ class MRJobRunner(object):
 
         args = []
 
-        # hadoop_extra_args
-        args.extend(self._opts['hadoop_extra_args'])
+        # hadoop_extra_args isn't defined for sim runners
+        args.extend(self._opts.get('hadoop_extra_args', ()))
 
         # translate the jobconf configuration names to match
         # the hadoop version

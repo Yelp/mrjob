@@ -136,8 +136,8 @@ Writing your second job
 -----------------------
 
 Most of the time, you'll need more than one step in your job. To define
-multiple steps, override :py:meth:`~mrjob.job.MRJob.steps` and return a list of
-:py:class:`mrjob.step.MRStep`.
+multiple steps, override :py:meth:`~mrjob.job.MRJob.steps` to return a list of
+:py:class:`~mrjob.step.MRStep`\ s.
 
 Here's a job that finds the most commonly used word in the input::
 

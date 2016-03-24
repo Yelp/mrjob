@@ -239,6 +239,7 @@ example below demonstrates the use of counters in a test case.
 
 ``test_counters.py``
 ::
+
     from io import BytesIO
     from unittest import TestCase
 

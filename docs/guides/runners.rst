@@ -239,7 +239,7 @@ example below demonstrates the use of counters in a test case.
 
 ``test_counters.py``
 ::
-
+    from io import BytesIO
     from unittest import TestCase
 
     from tests.mr_counting_job import MRCountingJob
@@ -248,7 +248,7 @@ example below demonstrates the use of counters in a test case.
     class CounterTestCase(TestCase):
 
         def test_counters(self):
-            stdin = StringIO('foo\nbar\n')
+            stdin = BytesIO(b'foo\nbar\n')
 
             mr_job = MRCountingJob(['--no-conf', '-'])
             mr_job.sandbox(stdin=stdin)

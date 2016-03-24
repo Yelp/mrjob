@@ -440,7 +440,8 @@ class MRJobLauncher(object):
             sys.exit(0)
 
         if self.options.help_hadoop:
-            _print_help_for_groups(self.hadoop_emr_opt_group)
+            _print_help_for_groups(self.hadoop_emr_opt_group,
+                                   self.hadoop_opt_group)
             sys.exit(0)
 
         if self.options.help_local:
@@ -535,6 +536,7 @@ class MRJobLauncher(object):
         """
         return combine_dicts(
             self.job_runner_kwargs(),
+            self._get_kwargs_from_opt_group(self.hadoop_emr_opt_group),
             self._get_kwargs_from_opt_group(self.emr_opt_group))
 
     def hadoop_job_runner_kwargs(self):
@@ -548,6 +550,7 @@ class MRJobLauncher(object):
         """
         return combine_dicts(
             self.job_runner_kwargs(),
+            self._get_kwargs_from_opt_group(self.hadoop_emr_opt_group),
             self._get_kwargs_from_opt_group(self.hadoop_opt_group))
 
     ### Default values for Hadoop stuff ###

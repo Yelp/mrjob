@@ -14,9 +14,9 @@ running a job. For example, this command will create a cluster with 12 EC2
 instances (1 master and 11 slaves), taking all other options from
 :py:mod:`mrjob.conf`::
 
-    $ mrjob create-cluster --num-ec2-instances=12
+    $ mrjob create-cluster --num-ec2-instances=12 --max-hours-idle 1
     ...
-    Cluster created with ID: j-CLUSTERID
+    j-CLUSTERID
 
 
 You can then add jobs to the cluster with the :option:`--emr-cluster-id`
@@ -25,7 +25,7 @@ switch or the `emr_cluster_id` variable in `mrjob.conf` (see
 
     $ python mr_my_job.py -r emr --emr-cluster-id=j-CLUSTERID input_file.txt > out
     ...
-    Adding our job to cluster j-CLUSTERID
+    Adding our job to existing cluster j-CLUSTERID
     ...
 
 Debugging will be difficult unless you complete SSH setup (see
@@ -51,7 +51,7 @@ cluster and add the job to it rather than creating a new one.
 .. warning::
 
     If you use cluster pools, keep
-    :py:mod:`~mrjob.tools.emr.terminate_clusters` in your crontab!
+    :command:`mrjob terminate-idle-clusters` in your crontab!
     Otherwise you may forget to terminate your clusters and waste a lot of
     money.
 
@@ -128,7 +128,7 @@ your job to finish but you'd like to save time and money if you can, in which
 case you want to run task instances on the spot market and purchase master and
 core instances the regular way.
 
-cluster pooling interacts with bid prices more or less how you'd expect; a job
+Cluster pooling interacts with bid prices more or less how you'd expect; a job
 will join a pool with spot instances only if it requested spot instances at the
 same price or lower.
 

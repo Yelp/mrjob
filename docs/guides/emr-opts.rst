@@ -426,12 +426,14 @@ and install another Python binary.
     .. deprecated:: 0.4.2
 
     Paths of python modules tarballs to install on EMR. Pass
-    ``sudo <python binary> -m pip install path/to/package.tar.gz#`` to
+    :command:`sudo` :mrjob-opt:`python_bin`
+    :command:`-m pip install path/to/package.tar.gz#` to
     :mrjob-opt:`bootstrap` instead.
 
     Also, please consider installing packages directly from
     `PyPI <https://pypi.python.org/pypi>`_ instead (
-    ``sudo pip-x.y install package-name``); PyPI is much more
+    :command:`sudo` :mrjob-opt:`python_bin`
+    :command:`-m pip install package1 package2`); PyPI is much, much more
     robust/production-ready than when this option was first created.
 
 .. mrjob-opt::

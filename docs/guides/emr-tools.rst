@@ -5,43 +5,43 @@ These tools are generally invoked via the :doc:`mrjob command <cmd>`, but you
 can also run ``python -m <module>`` directly.
 
 
-audit_usage
+audit-usage
 -----------
 
 .. automodule:: mrjob.tools.emr.audit_usage
 
 
-create_cluster
+create-cluster
 ---------------
 
 .. automodule:: mrjob.tools.emr.create_cluster
 
 
-mrboss
+boss
 ------
 
 .. automodule:: mrjob.tools.emr.mrboss
 
 
-report_long_jobs
+report-long-jobs
 ----------------
 
 .. automodule:: mrjob.tools.emr.report_long_jobs
 
 
-s3_tmpwatch
+s3-tmpwatch
 -----------
 
 .. automodule:: mrjob.tools.emr.s3_tmpwatch
 
 
-terminate_cluster
+terminate-cluster
 ------------------
 
 .. automodule:: mrjob.tools.emr.terminate_cluster
 
 
-terminate_idle_clusters
+terminate-idle-clusters
 ------------------------
 
 .. automodule:: mrjob.tools.emr.terminate_idle_clusters

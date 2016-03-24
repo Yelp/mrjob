@@ -125,6 +125,7 @@ Many things that were deprecated in 0.4.6 have been removed:
    - :py:meth:`mrjob.job.MRJob.parse_counters`
    - :py:meth:`mrjob.job.MRJob.parse_output`
    - :py:func:`mrjob.conf.combine_cmd_lists`
+   - :py:meth:`mrjob.fs.s3.S3Filesystem.get_s3_folder_keys`
 
 :py:mod:`mrjob.compat` functions :py:func:`~mrjob.compat.supports_combiners_in_hadoop_streaming`, :py:func:`~mrjob.compat.supports_new_distributed_cache_options`, and :py:func:`~mrjob.compat.uses_generic_jobconf`, which only existed to support very old versions of Hadoop, were removed without deprecation warnings (sorry!).
 

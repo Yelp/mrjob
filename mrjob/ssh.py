@@ -19,7 +19,6 @@
 
 import logging
 import os
-import re
 from subprocess import Popen
 from subprocess import PIPE
 

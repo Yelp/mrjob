@@ -20,7 +20,6 @@ import os.path
 import posixpath
 import sys
 import time
-from contextlib import contextmanager
 from datetime import datetime
 from datetime import timedelta
 from io import BytesIO
@@ -65,7 +64,6 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import call
-from tests.py2 import mock
 from tests.py2 import patch
 from tests.py2 import skipIf
 from tests.quiet import logger_disabled

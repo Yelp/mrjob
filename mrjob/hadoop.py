@@ -31,6 +31,7 @@ from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
+from mrjob.conf import combine_lists
 from mrjob.conf import combine_path_lists
 from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
@@ -110,17 +111,18 @@ def fully_qualify_hdfs_path(path):
 
 class HadoopRunnerOptionStore(RunnerOptionStore):
 
-    # TODO: deprecate hadoop_home
-
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'hadoop_bin',
+        'hadoop_extra_args',
         'hadoop_home',
         'hadoop_log_dirs',
+        'hadoop_streaming_jar',
         'hadoop_tmp_dir',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'hadoop_bin': combine_cmds,
+        'hadoop_extra_args': combine_lists,
         'hadoop_home': combine_paths,
         'hadoop_log_dirs': combine_path_lists,
         'Hadoop_tmp_dir': combine_paths,
@@ -154,6 +156,13 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
+
+        if self._opts['hadoop_home']:
+            log.warning(
+                'hadoop_home is deprecated since 0.5.0 and will be removed'
+                ' in v0.6.0. In most cases, mrjob will now find the hadoop'
+                ' binary and streaming jar without help. If not, use the'
+                ' hadoop_bin and hadoop_streaming_jar options.')
 
         self._hadoop_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(

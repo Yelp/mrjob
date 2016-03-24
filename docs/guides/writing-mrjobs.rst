@@ -77,8 +77,8 @@ explain them over the course of this document.
 Multi-step jobs
 ^^^^^^^^^^^^^^^
 
-To define multiple steps, override the :py:meth:`~mrjob.job.MRJob.steps`
-method to return a list of :py:meth:`~mrjob.job.MRJob.mr` calls::
+To define multiple steps, override :py:meth:`~mrjob.job.MRJob.steps`
+to return a list of :py:class:`~mrjob.step.MRStep`\ s::
 
     from mrjob.job import MRJob
     from mrjob.step import MRStep
@@ -123,7 +123,7 @@ method to return a list of :py:meth:`~mrjob.job.MRJob.mr` calls::
 
 (This example is explained further in :ref:`job-protocols`.)
 
-The keyword arguments accepted by :py:meth:`~mrjob.job.MRJob.mr` are the same
+The keyword arguments accepted by :py:class:`~mrjob.step.MRStep` are the same
 as the
 :ref:`method names listed in the previous section <single-step-method-names>`,
 plus a ``jobconf`` argument which takes a
@@ -149,7 +149,7 @@ end of this process: the :py:func:`*_init` and :py:func:`*_final` methods:
     * :py:meth:`~mrjob.job.MRJob.combiner_final`
     * :py:meth:`~mrjob.job.MRJob.reducer_final`
 
-(And the corresponding keyword arguments to :py:meth:`~mrjob.job.MRJob.mr`.)
+(And the corresponding keyword arguments to :py:class:`~mrjob.step.MRStep`.)
 
 If you need to load some kind of support file, like a :py:mod:`sqlite3`
 database, or perhaps create a temporary file, you can use these methods to do

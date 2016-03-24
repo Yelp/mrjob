@@ -55,42 +55,37 @@ class SimMRJobRunner(MRJobRunner):
     by classes that extend SimMRJobRunner
 
     :py:class:`LocalMRJobRunner` and :py:class:`InlineMRJobRunner` simulate
-    the following jobconf variables:
+    the following jobconf variables (and their Hadoop 1 equivalents):
 
-    * ``mapreduce.job.cache.archives``
-    * ``mapreduce.job.cache.files``
-    * ``mapreduce.job.cache.local.archives``
-    * ``mapreduce.job.cache.local.files``
-    * ``mapreduce.job.id``
-    * ``mapreduce.job.local.dir``
-    * ``mapreduce.map.input.file``
-    * ``mapreduce.map.input.length``
-    * ``mapreduce.map.input.start``
-    * ``mapreduce.task.attempt.id``
-    * ``mapreduce.task.id``
-    * ``mapreduce.task.ismap``
-    * ``mapreduce.task.output.dir``
-    * ``mapreduce.task.partition``
+    * ``mapreduce.job.cache.archives`` (``mapred.cache.archives``)
+    * ``mapreduce.job.cache.files`` (``mapred.cache.files``)
+    * ``mapreduce.job.cache.local.archives`` (``mapred.cache.localArchives``)
+    * ``mapreduce.job.cache.local.files`` (``mapred.cache.localFiles``)
+    * ``mapreduce.job.id`` (``mapred.job.id``)
+    * ``mapreduce.job.local.dir`` (``job.local.dir``)
+    * ``mapreduce.map.input.file`` (``map.input.file``)
+    * ``mapreduce.map.input.length`` (``map.input.length``)
+    * ``mapreduce.map.input.start`` (``map.input.start``)
+    * ``mapreduce.task.attempt.id`` (``mapred.task.id``)
+    * ``mapreduce.task.id`` (``mapred.tip.id``)
+    * ``mapreduce.task.ismap`` (``mapred.task.is.map``)
+    * ``mapreduce.task.output.dir`` (``mapred.work.output.dir``)
+    * ``mapreduce.task.partition`` (``mapred.task.partition``)
 
-    If you specify *hadoop_version* of 1.x (or 0.20), the simulated environment
-    variables will change to use the names corresponding with the older Hadoop
-    version.
+    Your job can read these from the environment using
+    :py:func:`~mrjob.compat.jobconf_from_env()`.
 
+    If you specify *hadoop_version*, we'll only simulate environment variables
+    for that version of Hadoop.
     """
     # try to run at least two tasks to catch bugs
     _DEFAULT_MAP_TASKS = 2
     _DEFAULT_REDUCE_TASKS = 2
 
-    # options that we ignore because they require real Hadoop
-    IGNORED_HADOOP_OPTS = [
-        'hadoop_extra_args',
-        'hadoop_streaming_jar',
-    ]
-
     # keyword arguments that we ignore that are stored directly in
     # self._<kwarg_name> because they aren't configurable from mrjob.conf
     # use the version with the underscore to better support grepping our code
-    IGNORED_HADOOP_ATTRS = [
+    _IGNORED_HADOOP_ATTRS = [
         '_hadoop_input_format',
         '_hadoop_output_format',
         '_partitioner',
@@ -105,12 +100,7 @@ class SimMRJobRunner(MRJobRunner):
         """ If the user has provided options that are not supported
         by the dev runners log warnings for each of the ignored options
         """
-        for ignored_opt in self.IGNORED_HADOOP_OPTS:
-            if self._opts[ignored_opt]:
-                log.warning('ignoring %s option (requires real Hadoop): %r' %
-                            (ignored_opt, self._opts[ignored_opt]))
-
-        for ignored_attr in self.IGNORED_HADOOP_ATTRS:
+        for ignored_attr in self._IGNORED_HADOOP_ATTRS:
             value = getattr(self, ignored_attr)
             if value is not None:
                 log.warning(

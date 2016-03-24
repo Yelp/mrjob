@@ -33,8 +33,6 @@ Things that will make your branch more likely to be pulled:
 
 If you add a new configuration option, please try to do all of these things:
 
-* Make its name unambiguous in the context of multiple runners (e.g.
-  ``ec2_task_instance_type`` instead of ``instance_type``)
 * Add command line switches that allow full control over the option
 * Document the option and its switches in the appropriate file under ``docs``
 
@@ -103,6 +101,9 @@ mrjob's modules can be put in four categories:
 
   * :py:mod:`mrjob.compat`: Transparently handle differences between Hadoop
     versions
+
+  * :py:mod:`mrjob.logs`: Log interpretation (counters, probable cause of
+    job failure)
 
   * :py:mod:`mrjob.parse`: Parsing utilities for URIs, command line
     options, etc.

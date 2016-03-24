@@ -9,12 +9,14 @@ For a complete list of changes, see `CHANGES.txt
 0.5.0
 -----
 
-Python 3
-^^^^^^^^
+Python versions
+^^^^^^^^^^^^^^^
 
 mrjob now fully supports Python 3.3+ in a way that should be transparent to existing Python 2 users (you don't have to suddenly start handling ``unicode`` instead of ``str``). For more information, see :doc:`guides/py2-vs-py3`.
 
 If you run a job with Python 3, mrjob will automatically install Python 3 on ElasticMapreduce AMIs (see :mrjob-opt:`bootstrap_python`).
+
+When you run jobs on EMR in Python 2, mrjob attempts to match your minor version of Python as well (either :command:`python2.6` or :command:`python2.7`); see :mrjob-opt:`python_bin` for details.
 
 The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. :command:`mrjob3`, :command:`mrjob3.4`), in case you install mrjob for multiple versions of Python.
 
@@ -81,8 +83,12 @@ why this is a bad idea.
 
 Protocols will now use the much faster :py:mod:`ujson` library, if installed,
 to encode and decode JSON. This is especially recommended for simple jobs that
-spend a significant fraction of their time encoding and data (if
-you're using EMR, see :ref:`Installing ujson <installing-ujson>`).
+spend a significant fraction of their time encoding and data.
+
+.. note::
+
+   If you're using EMR, try out
+   :ref:`this bootstrap recipe <installing-ujson>` to install :py:mod:`ujson`.
 
 mrjob will fall back to the :py:mod:`simplejson` library if :py:mod:`ujson`
 is not installed, and use the built-in ``json`` module if neither is installed.

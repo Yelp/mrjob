@@ -159,10 +159,10 @@ required arguments and two optional arguments.
 ::
 
     {
-        'name': 'step_name',
+        'type': 'jar',
         'jar': 'binks.jar.jar',
         'main_class': 'MyMainMan',      # optional
-        'step_args': ['argh', 'argh']   # optional
+        'args': ['argh', 'argh']   # optional
     }
 
 Further information on jar steps should be sought for in the Hadoop
@@ -192,7 +192,6 @@ the second step::
         },
         {
             'type': 'jar',
-            'name': 'my_cool_jar_step',
             'jar': 's3://bucket/jar_jar.jar'
         }
     ]

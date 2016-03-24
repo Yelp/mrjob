@@ -37,6 +37,7 @@ from tests.mockhadoop import get_mock_hdfs_root
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
+from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import call
@@ -1026,3 +1027,32 @@ class PickErrorTestCase(MockHadoopTestCase):
 
         self.assertEqual(error['hadoop_error']['path'], syslog_path)
         self.assertEqual(error['task_error']['path'], stderr_path)
+
+
+class HadoopExtraArgsTestCase(MockHadoopTestCase):
+
+    # moved from tests.test_runner.HadoopArgsForStepTestCase because
+    # hadoop_extra_args isn't defined in the base runner
+
+    RUNNER = 'hadoop'
+
+    def test_hadoop_extra_args(self):
+        # hadoop_extra_args doesn't exist in default runner
+        job = MRWordCount(['-r', self.RUNNER, '--hadoop-arg', '-foo'])
+        with job.make_runner() as runner:
+            self.assertEqual(runner._hadoop_args_for_step(0), ['-foo'])
+
+    def test_hadoop_extra_args_comes_first(self):
+        job = MRWordCount(
+            ['-r', self.RUNNER,
+             '--cmdenv', 'FOO=bar',
+             '--hadoop-arg', '-libjar', '--hadoop-arg', 'qux.jar',
+             '--jobconf', 'baz=qux',
+             '--partitioner', 'java.lang.Object'])
+        job.HADOOP_INPUT_FORMAT = 'FooInputFormat'
+        job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'
+
+        with job.make_runner() as runner:
+            hadoop_args = runner._hadoop_args_for_step(0)
+            self.assertEqual(hadoop_args[:2], ['-libjar', 'qux.jar'])
+            self.assertEqual(len(hadoop_args), 12)

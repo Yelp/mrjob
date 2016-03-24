@@ -415,17 +415,14 @@ sys.exit(13)
         self.environment_variable_checks(runner, ['TMP'])
 
 
-class HadoopArgsTestCase(EmptyMrjobConfTestCase):
+class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
+
+    # hadoop_extra_args is tested in tests.test_hadoop.HadoopExtraArgsTestCase
 
     def test_empty(self):
         job = MRWordCount()
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0), [])
-
-    def test_hadoop_extra_args(self):
-        job = MRWordCount(['--hadoop-arg', '-foo'])
-        with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0), ['-foo'])
 
     def test_cmdenv(self):
         job = MRWordCount(['--cmdenv', 'FOO=bar',
@@ -532,20 +529,6 @@ class HadoopArgsTestCase(EmptyMrjobConfTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-partitioner', partitioner])
-
-    def test_hadoop_extra_args_comes_first(self):
-        job = MRWordCount(
-            ['--cmdenv', 'FOO=bar',
-             '--hadoop-arg', '-libjar', '--hadoop-arg', 'qux.jar',
-             '--jobconf', 'baz=qux',
-             '--partitioner', 'java.lang.Object'])
-        job.HADOOP_INPUT_FORMAT = 'FooInputFormat'
-        job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'
-
-        with job.make_runner() as runner:
-            hadoop_args = runner._hadoop_args_for_step(0)
-            self.assertEqual(hadoop_args[:2], ['-libjar', 'qux.jar'])
-            self.assertEqual(len(hadoop_args), 12)
 
     def test_check_input_paths_enabled_by_default(self):
         job = MRWordCount()

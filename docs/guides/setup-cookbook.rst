@@ -118,8 +118,8 @@ machine, something like this:
         - . $VENV/bin/activate
         - pip install mr3po
 
-With older versions of Hadoop (0.20 and earlier, and the 1.x series), you'd
-want to use ``$mapred_job_id``.
+With Hadoop 1, you'd want to use ``$mapred_job_id`` instead of
+``$mapreduce_job_id``.
 
 Other ways to use pip to install Python packages
 ------------------------------------------------

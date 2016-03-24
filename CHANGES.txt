@@ -75,10 +75,13 @@ v0.5.0, 2016-03-?? -- the future is in the past
      * dropped support for Hadoop prior to 0.20.203 (#1208)
      * added hadoop_log_dirs option
      * hdfs_scratch_dir option is now hadoop_tmp_dir (#318)
+     * hadoop_home is deprecated
      * uses -D and correct property name when step has no reduces (#1213)
    * Inline/Local
      * runner.fs raises IOError if passed URIs (#1185)
      * version-agnostic by default (#735)
+     * removed ignored hadoop_extra_args and hadoop_streaming_jar opts (#1275)
+     * inline runner uses multiple splits by default (#1276)
  * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())
  * removed mrjob.compat methods to support Hadoop prior to 0.20.203:
    * supports_combiners_in_hadoop_streaming()

@@ -126,7 +126,7 @@ Here are some things to consider when tuning your instance settings:
   that make your job consistently run in a little less than an hour.
 * Your job will take much longer and may fail if any task (usually a reducer)
   runs out of memory and starts using swap. (You can verify this by using
-  :command:`vmstat` with :py:mod:`~mrjob.tools.emr.mrboss`.) Restructuring your
+  :command:`mrjob boss j-CLUSTERID vmstat`) Restructuring your
   job is often the best solution, but if you can't, consider using a high-memory
   instance type.
 * Larger instance types are usually a better deal if you have the workload

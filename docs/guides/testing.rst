@@ -23,7 +23,7 @@ does run at least two mappers and two reducers for each step. This can help
 catch bad assumptions about the MapReduce programming model.
 
 For example, say we wanted to write a simple script that counted the number
-of lines in a file:
+of lines of input:
 
 .. code-block:: python
 
@@ -44,7 +44,7 @@ of lines in a file:
     if __name__ == '__main__':
         MRCountLinesWrong.run()
 
-Looks good, but if we run it, we get two line counts:
+Looks good, but if we run it, we get more than one line count:
 
 .. code-block:: sh
 
@@ -90,7 +90,7 @@ Isolated working directories
 
 Just like Hadoop, the inline runner runs each mapper and reducer in its own
 (temporary) working directory. It *does* add the original working directory
-to :envvar:`$PYTHONPATH`.
+to :envvar:`$PYTHONPATH` so it can still access your local source tree.
 
 Simulating jobconf
 ^^^^^^^^^^^^^^^^^^
@@ -121,29 +121,26 @@ your job's environment. For example:
     from mrjob.compat import jobconf_from_env
     from mrjob.job import MRJob
 
-    class MRWhichFiles(MRJob):
-
-        def mapper_init(self):
-            yield jobconf_from_env('mapreduce.map.input.file'), None
+    class MRCountLinesByFile(MRJob):
 
         def mapper(self, _, line):
-            pass  # disable identity mapper
+            yield jobconf_from_env('mapreduce.map.input.file'), 1
 
-        def reducer(self, path, _):
-            yield None, path
+        def reducer(self, path, ones):
+            yield path, sum(ones)
 
 
     if __name__ == '__main__':
-        MRWhichFiles.run()
+        MRCountLinesByFile.run()
 
 .. code-block:: sh
 
-    $ python -m mrjob.examples.mr_which_files README.rst CHANGES.txt 2> /dev/null
-    null	"CHANGES.txt"
-    null	"README.rst"
+    $ python -m mrjob.examples.mr_count_lines_by_file README.rst CHANGES.txt 2> /dev/null
+    "CHANGES.txt"	564
+    "README.rst"	137
 
-If you only want to simulate jobconf variables from a single version of Hadoop,
-you can set :mrjob-opt:`hadoop_version`.
+If you only want to simulate jobconf variables from a single version of
+Hadoop (for more stringent testing), you can set :mrjob-opt:`hadoop_version`.
 
 Setting number of mappers and reducers
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -161,7 +158,7 @@ you'd tell hadoop, with the ``mapreduce.job.maps`` and
     null	30
     null	12
 
-local runnner
+Local runnner
 -------------
 
 The ``local`` runner (:py:class:`~mrjob.local.LocalMRJobRunner`;
@@ -176,7 +173,7 @@ single-process context, including:
  * :mrjob-opt:`steps_python_bin`
 
 The local runner *does* run multiple subprocesses concurrently, but it's
-not really meant as a poor man's Hadoop; it's just for testing!
+not really meant as a replacement for Hadoop; it's just for testing!
 
 Anatomy of a test case
 ----------------------

@@ -100,8 +100,8 @@ class LocalMRJobRunner(SimMRJobRunner):
         * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
         * *python_bin* defaults to ``sys.executable`` (the current python
           interpreter)
-        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
-          *hadoop_streaming_jar*, and *partitioner* are ignored because they
+        * *hadoop_input_format*, *hadoop_output_format*,
+          and *partitioner* are ignored because they
           require Java. If you need to test these, consider starting up a
           standalone Hadoop instance and running your job with ``-r hadoop``.
         """

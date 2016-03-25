@@ -2056,12 +2056,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 python_bin = cmd_line(self._python_bin())
 
                 if python_bin in ('python', 'python2.6'):
-                    # If using Python 2.6, we have to use the pip binary
+                    # Special case: in Python 2.6, we can't python -m pip
                     bootstrap.append(['sudo pip install ', path_dict])
                 else:
-                    # a little safer to use Python than pip binary; for
-                    # example, there is a python3 binary but no pip-3 (only
-                    # pip-3.4)
+                    # Otherwise a little more robust to use Python than pip
+                    # binary; for example, there is a python3 binary but no
+                    # pip-3 (only pip-3.4)
                     bootstrap.append(
                         ['sudo %s -m pip install ' % python_bin, path_dict])
 

@@ -9,6 +9,10 @@ The :command:`mrjob` command has two purposes:
 2. To eventually let you run Hadoop Streaming jobs written in languages other
    than Python
 
+The :command:`mrjob` command comes with Python-version-specific aliases (e.g.
+:command:`mrjob-3`, :command:`mrjob-3.4`), in case you choose to install
+``mrjob`` for multiple versions of Python.
+
 EMR tools
 ---------
 

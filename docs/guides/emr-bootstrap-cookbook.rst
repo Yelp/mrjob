@@ -30,10 +30,12 @@ version of Python.
 
 .. _installing-ujson:
 
-Figure out which Python binary you're using on EMR (it defaults to one
-of :command:`python2.6`, :command:`python2.7`, or :command:`python3`; see
-:mrjob-opt:`python_bin`), and then use
-``sudo <python binary> -m pip install <packages>``.
+Figure out which version of Python you'll be running on EMR (see
+:mrjob-opt:`python_bin` for defaults).
+
+ * If it's Python 2.6, use :command:`pip`
+ * If it's Python 2.7, use :command:`pip-2.7`
+ * If it's Python 3, use :command:`pip-3.4`
 
 For example, to install :py:mod:`ujson` on Python 2.7:
 
@@ -42,7 +44,7 @@ For example, to install :py:mod:`ujson` on Python 2.7:
     runners:
       emr:
         bootstrap:
-        - sudo python2.7 -m pip install ujson
+        - sudo pip-2.7 install ujson
 
 See `PyPI <https://pypi.python.org/pypi>`_ for a the full list of available
 Python packages.
@@ -54,7 +56,7 @@ You can also install packages from a `requirements <https://pip.pypa.io/en/stabl
     runners:
       emr:
         bootstrap:
-        - sudo python2.7 -m pip install -r /local/path/of/requirements.txt#
+        - sudo pip-2.7 install -r /local/path/of/requirements.txt#
 
 Or a tarball:
 
@@ -63,7 +65,7 @@ Or a tarball:
     runners:
       emr:
         bootstrap:
-        - sudo python2.7 -m pip install /local/path/of/tarball.tar.gz#
+        - sudo pip-2.7 install /local/path/of/tarball.tar.gz#
 
 .. note::
 
@@ -129,8 +131,9 @@ longer work out-of-the-box.
 .. _installing-pip-on-2.x-amis:
 
 If you *must* use the 2.x AMIs, you can get :command:`apt-get` working
-again by updating ``/etc/apt/sources.list``. For example, to
-install :command:`pip` for Python 2.6:
+again by fixing ``/etc/apt/sources.list`` and running
+:command:`apt-get update`. For example, to install :command:`pip` for Python
+2.6:
 
 .. code-block:: yaml
 
@@ -138,6 +141,7 @@ install :command:`pip` for Python 2.6:
       emr:
         bootstrap:
         - sudo echo "deb http://archive.debian.org/debian/ squeeze main contrib non-free" > /etc/apt/sources.list
+        - sudo apt-get update
         - sudo apt-get install -y python-pip
 
 .. note::
@@ -190,8 +194,7 @@ so you'll want to tack on ``get-pip.py``:
         - sudo /usr/local/bin/python get-pip.py
 
 Also, :command:`pip` will be installed in ``/usr/local/bin``, which is not in
-the path for :command:`sudo`. Running the :command:`python` binary
-you just compiled with ``-m pip`` will work for any version of Python:
+the path for :command:`sudo`, so use its full path:
 
 .. code-block:: yaml
 
@@ -199,4 +202,4 @@ you just compiled with ``-m pip`` will work for any version of Python:
       emr:
         bootstrap:
         ...
-        - sudo /usr/local/bin/python -m pip install ...
+        - sudo /usr/local/bin/pip install ...

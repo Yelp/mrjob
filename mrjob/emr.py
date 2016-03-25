@@ -2052,11 +2052,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             for path in self._opts['bootstrap_python_packages']:
                 path_dict = parse_legacy_hash_path('file', path)
-                # a little safer to use Python than pip binary; for example,
-                # there is a python3 binary but no pip-3 (only pip-3.4)
-                bootstrap.append(
-                    ['sudo %s -m pip install ' % cmd_line(self._python_bin()),
-                     path_dict])
+
+                python_bin = cmd_line(self._python_bin())
+
+                if python_bin in ('python', 'python2.6'):
+                    # If using Python 2.6, we have to use the pip binary
+                    bootstrap.append(['sudo pip install ', path_dict])
+                else:
+                    # a little safer to use Python than pip binary; for
+                    # example, there is a python3 binary but no pip-3 (only
+                    # pip-3.4)
+                    bootstrap.append(
+                        ['sudo %s -m pip install ' % python_bin, path_dict])
 
         # setup_cmds
         if self._opts['bootstrap_cmds']:

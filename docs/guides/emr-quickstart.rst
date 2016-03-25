@@ -125,10 +125,10 @@ Here are some things to consider when tuning your instance settings:
   jobs that you run repeatedly, it is a good strategy to pick instance settings
   that make your job consistently run in a little less than an hour.
 * Your job will take much longer and may fail if any task (usually a reducer)
-  runs out of memory and starts using swap. (You can verify this by using
-  :command:`mrjob boss j-CLUSTERID vmstat`) Restructuring your
-  job is often the best solution, but if you can't, consider using a high-memory
-  instance type.
+  runs out of memory and starts using swap. (You can verify this by running
+  :command:`mrjob boss j-CLUSTERID vmstat` and then looking in
+  ``j-CLUSTERID/*/stdout``.) Restructuring your job is often the best
+  solution, but if you can't, consider using a high-memory instance type.
 * Larger instance types are usually a better deal if you have the workload
   to justify them. For example, a ``c1.xlarge`` costs about 6 times as much
   as an ``m1.medium``, but it has about 8 times as much processing power

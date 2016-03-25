@@ -55,6 +55,7 @@ from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
 from mrjob.options import _add_emr_connect_opts
 from mrjob.options import _alphabetize_options
+from mrjob.py2 import to_string
 from mrjob.ssh import _ssh_copy_key
 from mrjob.ssh import _ssh_run_with_recursion
 from mrjob.util import random_identifier
@@ -63,7 +64,7 @@ from mrjob.util import shlex_split
 
 
 def main(cl_args=None):
-    usage = 'usage: %prog CLUSTER_ID OUTPUT_DIR [options] "command string"'
+    usage = 'usage: %prog CLUSTER_ID [options] "command string"'
     description = ('Run a command on the master and all slaves of an EMR'
                    ' cluster. Store stdout/stderr for results in OUTPUT_DIR.')
 
@@ -97,7 +98,6 @@ def main(cl_args=None):
     output_dir = os.path.abspath(options.output_dir or cluster_id)
 
     with EMRJobRunner(cluster_id=cluster_id, **runner_kwargs) as runner:
-        runner._enable_slave_ssh_access()
         _run_on_all_nodes(runner, output_dir, cmd_args)
 
 
@@ -116,9 +116,11 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     ec2_key_pair_file = runner._opts['ec2_key_pair_file']
 
     keyfile = None
-    if runner._opts['num_ec2_instances'] > 1:
+    slave_addrs = runner.fs.ssh_slave_hosts(master_addr)
+
+    if slave_addrs:
         addresses += ['%s!%s' % (master_addr, slave_addr)
-                      for slave_addr in runner._addresses_of_slaves()]
+                      for slave_addr in slave_addrs]
         # copying key file like a boss (name of keyfile doesn't really matter)
         keyfile = 'mrboss-%s.pem' % random_identifier()
         _ssh_copy_key(ssh_bin, master_addr, ec2_key_pair_file, keyfile)
@@ -136,7 +138,7 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
         if print_stderr:
             print('---')
             print('Command completed on %s.' % addr)
-            print(stderr, end=' ')
+            print(to_string(stderr), end=' ')
 
         if '!' in addr:
             base_dir = os.path.join(output_dir, 'slave ' + addr.split('!')[1])

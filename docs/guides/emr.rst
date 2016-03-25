@@ -10,4 +10,3 @@ Elastic MapReduce
     emr-troubleshooting.rst
     emr-advanced.rst
     cmd.rst
-    emr-tools.rst

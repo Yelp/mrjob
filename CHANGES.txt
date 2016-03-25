@@ -90,7 +90,7 @@ v0.5.0, 2016-03-?? -- the future is in the past
    * uses_generic_jobconf()
  * removed mrjob.conf.combine_cmd_lists()
  * removed fetch-logs tool (#1127)
- * Python-version-specific mrjobx and mrjobx.y commands (#1104)
+ * Python-version-specific mrjob-x and mrjob-x.y commands (#1104)
  * use followlinks=True with os.walk()
  * all internal constants/functions/methods explicitly start with _ (#681)
  * mrjob.util:

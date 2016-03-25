@@ -18,7 +18,14 @@ If you run a job with Python 3, mrjob will automatically install Python 3 on Ela
 
 When you run jobs on EMR in Python 2, mrjob attempts to match your minor version of Python as well (either :command:`python2.6` or :command:`python2.7`); see :mrjob-opt:`python_bin` for details.
 
-The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. :command:`mrjob3`, :command:`mrjob3.4`), in case you install mrjob for multiple versions of Python.
+.. note::
+
+   If you're currently running Python 2.7, and
+   :ref:`using yum to install python libraries <installing-packages>`, you'll
+   want to use the Python 2.7 version of the package (e.g.
+   ``python27-numpy`` rather than ``python-numpy``).
+
+The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. :command:`mrjob-3`, :command:`mrjob-3.4`), in case you install mrjob for multiple versions of Python.
 
 Hadoop
 ^^^^^^

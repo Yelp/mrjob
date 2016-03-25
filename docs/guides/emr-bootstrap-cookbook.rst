@@ -1,11 +1,12 @@
-EMR Bootstrapping Cookbook
-==========================
+============================
+ EMR Bootstrapping Cookbook
+============================
 
 Bootstrapping allows you to run commands to customize EMR machines, at the
 time the cluster is created.
 
 When to use bootstrap, and when to use setup
---------------------------------------------
+============================================
 
 You can use :mrjob-opt:`bootstrap` and :mrjob-opt:`setup` together.
 
@@ -22,7 +23,7 @@ tasks on EMR apparently have access to :command:`sudo`).
 .. _using-pip:
 
 Installing Python packages with pip
------------------------------------
+===================================
 
 The only tricky thing is making sure you install packages for the correct
 version of Python.
@@ -80,13 +81,13 @@ Or a tarball:
 .. _installing-packages:
 
 Installing System Packages
---------------------------
+==========================
 
 EMR gives you access to a variety of different Amazon Machine Images, or AMIs
 for short (see :mrjob-opt:`ami_version`).
 
 3.x and 4.x AMIs
-^^^^^^^^^^^^^^^^
+----------------
 
 Starting with 3.0.0, EMR AMIs use Amazon Linux, which uses :command:`yum` to
 install packages. For example, to install NumPy:
@@ -96,9 +97,12 @@ install packages. For example, to install NumPy:
     runners:
       emr:
         bootstrap:
-        - sudo yum install -y python-numpy
+        - sudo yum install -y python27-numpy
 
 (Don't forget the ``-y``!)
+
+Amazon Linux currently has few packages for Python 3 libraries; if you're
+on Python 3, just :ref:`use pip <using-pip>`.
 
 Here are the package lists for all the various versions of Amazon Linux used
 by EMR:
@@ -107,10 +111,16 @@ by EMR:
  * `2015.03 <http://aws.amazon.com/amazon-linux-ami/2015.03-packages/>`__ (3.7.0-3.10.0 and 4.0.0-4.1.0)
  * `2014.09 <http://aws.amazon.com/amazon-linux-ami/2014.09-packages/>`__ (3.4.0-3.6.0)
  * `2014.03 <http://aws.amazon.com/amazon-linux-ami/2014.03-packages/>`__ (3.1.0-3.3.2)
- * `2013.09 <http://aws.amazon.com/amazon-linux-ami/2014.09-packages/>`__ (3.0.0-3.0.4)
+ * `2013.09 <http://aws.amazon.com/amazon-linux-ami/2013.09-packages/>`__ (3.0.0-3.0.4)
+
+.. note::
+
+   The package lists gloss over Python versions; wherever you see a package
+   named ``python-<lib name>``, you'll want to install ``python26-<lib name>``
+   or ``python27-<lib name>`` instead.
 
 2.x AMIs
-^^^^^^^^
+--------
 
 The 2.x AMIs are based on a version of Debian that is so old it has been
 "archived," which makes their package installer, :command:`apt-get`, no
@@ -142,7 +152,7 @@ software you can install.
 .. _installing-python-from-source:
 
 Installing Python from source
------------------------------
+=============================
 
 If you really must use a version of Python that's not available on EMR
 (e.g. Python 3.5 or a very specific patch version), you can
@@ -180,8 +190,8 @@ so you'll want to tack on ``get-pip.py``:
         - sudo /usr/local/bin/python get-pip.py
 
 Also, :command:`pip` will be installed in ``/usr/local/bin``, which is not in
-the path for :command:`sudo`. Running pip with the :command:`python` binary
-you just compiled will work for any version of Python:
+the path for :command:`sudo`. Running the :command:`python` binary
+you just compiled with ``-m pip`` will work for any version of Python:
 
 .. code-block:: yaml
 

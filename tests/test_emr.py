@@ -1294,7 +1294,11 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def _test_create_master_bootstrap_script(
             self, ami_version=None, expected_python_bin=PYTHON_BIN,
-            expect_pip_binary=False):
+            expect_pip_binary=None):
+
+        if expect_pip_binary is None:
+            expect_pip_binary = (PYTHON_BIN == 'python2.6')
+
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
         with open(foo_py_path, 'w'):
@@ -1385,13 +1389,14 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
             ami_version='2.4.11',
-            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN))
+            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
+            expect_pip_binary=False)
 
     def test_create_master_bootstrap_script_on_2_4_2_ami(self):
         self._test_create_master_bootstrap_script(
             ami_version='2.4.2',
             expected_python_bin=('python2.6' if PY2 else PYTHON_BIN),
-            expect_pip_binary=True)
+            expect_pip_binary=PY2)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,

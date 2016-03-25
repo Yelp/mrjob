@@ -2583,15 +2583,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if cluster.status.state in ('RUNNING', 'WAITING'):
             self._address = cluster.masterpublicdnsname
 
-    # TODO: this is only used by mrboss; otherwise we do this through fs
-    def _addresses_of_slaves(self):
-        if not self._ssh_slave_addrs:
-            self._ssh_slave_addrs = _ssh_slave_addresses(
-                self._opts['ssh_bin'],
-                self._address_of_master(),
-                self._opts['ec2_key_pair_file'])
-        return self._ssh_slave_addrs
-
     def make_iam_conn(self):
         """Create a connection to S3.
 

@@ -97,7 +97,6 @@ def main(cl_args=None):
     output_dir = os.path.abspath(options.output_dir or cluster_id)
 
     with EMRJobRunner(cluster_id=cluster_id, **runner_kwargs) as runner:
-        runner._enable_slave_ssh_access()
         _run_on_all_nodes(runner, output_dir, cmd_args)
 
 

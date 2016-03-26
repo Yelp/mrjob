@@ -316,7 +316,7 @@ Cluster creation and configuration
         You should almost certainly not set this to ``False`` if you are
         :ref:`pooling-clusters` with other users; other users will
         not be able to reuse your clusters, and
-        :py:mod:`~mrjob.tools.emr.terminate_idle_clusters` won't be
+        :command:`mrjob terminate-idle-clusters` won't be
         able to shut them down when they become idle.
 
     .. versionadded:: 0.4.1
@@ -655,7 +655,7 @@ Choosing/creating a cluster to join
 
     .. warning:: Do not run this without either setting
         :mrjob-opt:`max_hours_idle` or putting
-        :py:mod:`mrjob.tools.emr.terminate_idle_clusters` in your crontab;
+        :command:`mrjob terminate-idle-clusters` in your crontab;
         clusters left idle can quickly become expensive!
 
 .. mrjob-opt::

@@ -1,11 +1,12 @@
-EMR Bootstrapping Cookbook
-==========================
+============================
+ EMR Bootstrapping Cookbook
+============================
 
 Bootstrapping allows you to run commands to customize EMR machines, at the
 time the cluster is created.
 
 When to use bootstrap, and when to use setup
---------------------------------------------
+============================================
 
 You can use :mrjob-opt:`bootstrap` and :mrjob-opt:`setup` together.
 
@@ -22,17 +23,19 @@ tasks on EMR apparently have access to :command:`sudo`).
 .. _using-pip:
 
 Installing Python packages with pip
------------------------------------
+===================================
 
 The only tricky thing is making sure you install packages for the correct
 version of Python.
 
 .. _installing-ujson:
 
-Figure out which Python binary you're using on EMR (it defaults to one
-of :command:`python2.6`, :command:`python2.7`, or :command:`python3`; see
-:mrjob-opt:`python_bin`), and then use
-``sudo <python binary> -m pip install <packages>``.
+Figure out which version of Python you'll be running on EMR (see
+:mrjob-opt:`python_bin` for defaults).
+
+ * If it's Python 2.6, use :command:`pip`
+ * If it's Python 2.7, use :command:`pip-2.7`
+ * If it's Python 3, use :command:`pip-3.4`
 
 For example, to install :py:mod:`ujson` on Python 2.7:
 
@@ -41,7 +44,7 @@ For example, to install :py:mod:`ujson` on Python 2.7:
     runners:
       emr:
         bootstrap:
-        - sudo python2.7 -m pip install ujson
+        - sudo pip-2.7 install ujson
 
 See `PyPI <https://pypi.python.org/pypi>`_ for a the full list of available
 Python packages.
@@ -53,7 +56,7 @@ You can also install packages from a `requirements <https://pip.pypa.io/en/stabl
     runners:
       emr:
         bootstrap:
-        - sudo python2.7 -m pip install -r /local/path/of/requirements.txt#
+        - sudo pip-2.7 install -r /local/path/of/requirements.txt#
 
 Or a tarball:
 
@@ -62,7 +65,7 @@ Or a tarball:
     runners:
       emr:
         bootstrap:
-        - sudo python2.7 -m pip install /local/path/of/tarball.tar.gz#
+        - sudo pip-2.7 install /local/path/of/tarball.tar.gz#
 
 .. note::
 
@@ -80,13 +83,13 @@ Or a tarball:
 .. _installing-packages:
 
 Installing System Packages
---------------------------
+==========================
 
 EMR gives you access to a variety of different Amazon Machine Images, or AMIs
 for short (see :mrjob-opt:`ami_version`).
 
 3.x and 4.x AMIs
-^^^^^^^^^^^^^^^^
+----------------
 
 Starting with 3.0.0, EMR AMIs use Amazon Linux, which uses :command:`yum` to
 install packages. For example, to install NumPy:
@@ -96,9 +99,12 @@ install packages. For example, to install NumPy:
     runners:
       emr:
         bootstrap:
-        - sudo yum install -y python-numpy
+        - sudo yum install -y python27-numpy
 
 (Don't forget the ``-y``!)
+
+Amazon Linux currently has few packages for Python 3 libraries; if you're
+on Python 3, just :ref:`use pip <using-pip>`.
 
 Here are the package lists for all the various versions of Amazon Linux used
 by EMR:
@@ -107,10 +113,16 @@ by EMR:
  * `2015.03 <http://aws.amazon.com/amazon-linux-ami/2015.03-packages/>`__ (3.7.0-3.10.0 and 4.0.0-4.1.0)
  * `2014.09 <http://aws.amazon.com/amazon-linux-ami/2014.09-packages/>`__ (3.4.0-3.6.0)
  * `2014.03 <http://aws.amazon.com/amazon-linux-ami/2014.03-packages/>`__ (3.1.0-3.3.2)
- * `2013.09 <http://aws.amazon.com/amazon-linux-ami/2014.09-packages/>`__ (3.0.0-3.0.4)
+ * `2013.09 <http://aws.amazon.com/amazon-linux-ami/2013.09-packages/>`__ (3.0.0-3.0.4)
+
+.. note::
+
+   The package lists gloss over Python versions; wherever you see a package
+   named ``python-<lib name>``, you'll want to install ``python26-<lib name>``
+   or ``python27-<lib name>`` instead.
 
 2.x AMIs
-^^^^^^^^
+--------
 
 The 2.x AMIs are based on a version of Debian that is so old it has been
 "archived," which makes their package installer, :command:`apt-get`, no
@@ -119,8 +131,9 @@ longer work out-of-the-box.
 .. _installing-pip-on-2.x-amis:
 
 If you *must* use the 2.x AMIs, you can get :command:`apt-get` working
-again by updating ``/etc/apt/sources.list``. For example, to
-install :command:`pip` for Python 2.6:
+again by fixing ``/etc/apt/sources.list`` and running
+:command:`apt-get update`. For example, to install :command:`pip` for Python
+2.6:
 
 .. code-block:: yaml
 
@@ -128,6 +141,7 @@ install :command:`pip` for Python 2.6:
       emr:
         bootstrap:
         - sudo echo "deb http://archive.debian.org/debian/ squeeze main contrib non-free" > /etc/apt/sources.list
+        - sudo apt-get update
         - sudo apt-get install -y python-pip
 
 .. note::
@@ -142,7 +156,7 @@ software you can install.
 .. _installing-python-from-source:
 
 Installing Python from source
------------------------------
+=============================
 
 If you really must use a version of Python that's not available on EMR
 (e.g. Python 3.5 or a very specific patch version), you can
@@ -180,8 +194,7 @@ so you'll want to tack on ``get-pip.py``:
         - sudo /usr/local/bin/python get-pip.py
 
 Also, :command:`pip` will be installed in ``/usr/local/bin``, which is not in
-the path for :command:`sudo`. Running pip with the :command:`python` binary
-you just compiled will work for any version of Python:
+the path for :command:`sudo`, so use its full path:
 
 .. code-block:: yaml
 
@@ -189,4 +202,4 @@ you just compiled will work for any version of Python:
       emr:
         bootstrap:
         ...
-        - sudo /usr/local/bin/python -m pip install ...
+        - sudo /usr/local/bin/pip install ...

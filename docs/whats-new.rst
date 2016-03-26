@@ -18,7 +18,14 @@ If you run a job with Python 3, mrjob will automatically install Python 3 on Ela
 
 When you run jobs on EMR in Python 2, mrjob attempts to match your minor version of Python as well (either :command:`python2.6` or :command:`python2.7`); see :mrjob-opt:`python_bin` for details.
 
-The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. :command:`mrjob3`, :command:`mrjob3.4`), in case you install mrjob for multiple versions of Python.
+.. note::
+
+   If you're currently running Python 2.7, and
+   :ref:`using yum to install python libraries <installing-packages>`, you'll
+   want to use the Python 2.7 version of the package (e.g.
+   ``python27-numpy`` rather than ``python-numpy``).
+
+The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. :command:`mrjob-3`, :command:`mrjob-3.4`), in case you install mrjob for multiple versions of Python.
 
 Hadoop
 ^^^^^^
@@ -125,6 +132,7 @@ Many things that were deprecated in 0.4.6 have been removed:
    - :py:meth:`mrjob.job.MRJob.parse_counters`
    - :py:meth:`mrjob.job.MRJob.parse_output`
    - :py:func:`mrjob.conf.combine_cmd_lists`
+   - :py:meth:`mrjob.fs.s3.S3Filesystem.get_s3_folder_keys`
 
 :py:mod:`mrjob.compat` functions :py:func:`~mrjob.compat.supports_combiners_in_hadoop_streaming`, :py:func:`~mrjob.compat.supports_new_distributed_cache_options`, and :py:func:`~mrjob.compat.uses_generic_jobconf`, which only existed to support very old versions of Hadoop, were removed without deprecation warnings (sorry!).
 
@@ -136,7 +144,10 @@ If you want to get ahead of the game, here is a list of things that are deprecat
 
     - *base_tmp_dir* is now :mrjob-opt:`local_tmp_dir`
     - :mrjob-opt:`cleanup` options :py:data:`~mrjob.runner.LOCAL_SCRATCH` and :py:data:`~mrjob.runner.REMOTE_SCRATCH` are now :py:data:`~mrjob.runner.LOCAL_TMP` and :py:data:`~mrjob.runner.REMOTE_TMP`
+    - *emr_job_flow_id* is now :mrjob-opt:`cluster_id`
+    - *emr_job_flow_pool_name* is now :mrjob-opt:`pool_name`
     - *hdfs_scratch_dir* is now :mrjob-opt:`hadoop_tmp_dir`
+    - *pool_emr_job_flows* is now :mrjob-opt:`pool_clusters`
     - *s3_scratch_uri* is now :mrjob-opt:`s3_tmp_dir`
     - *ssh_tunnel_to_job_tracker* is now simply :mrjob-opt:`ssh_tunnel`
 
@@ -146,6 +157,11 @@ If you want to get ahead of the game, here is a list of things that are deprecat
     - :py:class:`~mrjob.fs.base.Filesystem` method ``path_exists()`` is now simply :py:meth:`~mrjob.fs.base.Filesystem.exists`
     - :py:class:`~mrjob.fs.base.Filesystem` method ``path_join()`` is now simply :py:meth:`~mrjob.fs.base.Filesystem.join`
     - Use ``runner.fs`` explicitly when accessing filesystem methods (e.g. ``runner.fs.ls()``, not ``runner.ls()``)
+
+   - :command:`mrjob` subcommands
+     - :command:`mrjob create-job-flow` is now :command:`mrjob create-cluster`
+     - :command:`mrjob terminate-idle-job-flows` is now :command:`mrjob terminate-idle-clusters`
+     - :command:`mrjob terminate-job-flow` is now :command:`mrjob temrinate-cluster`
 
 Other changes
 ^^^^^^^^^^^^^

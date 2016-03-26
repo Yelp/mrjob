@@ -263,7 +263,7 @@ def _add_hadoop_opts(opt_group):
             help='path to hadoop binary'),
 
         opt_group.add_option(
-            '--hadoop-log-dir', dest='hadoop_log_dir', default=[],
+            '--hadoop-log-dir', dest='hadoop_log_dirs', default=[],
             action='append', help='Directory to search for'
             ' hadoop logs in. You can use --hadoop-log-dir multiple times.'),
 

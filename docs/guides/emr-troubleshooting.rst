@@ -4,137 +4,133 @@ Troubleshooting
 Many things can go wrong in an EMR job, and the system's distributed nature
 can make it difficult to find the source of a problem. :py:mod:`mrjob` attempts to
 simplify the debugging process by automatically scanning logs for probable
-causes of failure. Specifically, it looks at logs relevant to your job for
-these errors:
+causes of failure.
 
-* Python tracebacks and Java stack traces in ``$S3_LOG_URI/task-attempts/*``
-* Hadoop Streaming errors in ``$S3_LOG_URI/steps/*``
-* Timeout errors in ``$S3_LOG_URI/jobs/*``
-
-As mentioned above, in addition to looking at S3, :py:mod:`mrjob` can be configured to
+In addition to looking at S3, :py:mod:`mrjob` can be configured to
 also use SSH to fetch error logs directly from the master and slave nodes.
-This can speed up debugging significantly, because logs are only available on
-S3 five minutes after the job completes, or immediately after the cluster
-terminates.
+This can speed up debugging significantly (EMR only transfers logs to S3
+every five minutes).
 
 Using persistent clusters
 --------------------------
 
 When troubleshooting a job, it can be convenient to use a persistent cluster
-to avoid having to wait for bootstrapping every run. **If you decide to use
-persistent clusters, add** :py:mod:`mrjob.tools.emr.terminate_idle_clusters`
-**to your crontab or you will be billed for unused CPU time if you forget to
-explicitly terminate clusters.**
+to avoid having to wait for bootstrapping every run.
 
-First, use the :py:mod:`mrjob.tools.emr.create_cluster` tool to create a
+.. warning::
+
+   Make sure you either use the ``--max-hours-idle`` option or have
+   :command:`mrjob terminate-idle-clusters` in your crontab, or you will
+   billed for unused CPU time on any clusters you forget to terminate.
+
+First, use the :command:`mrjob create-cluster` to create a
 persistent cluster::
 
-    $ mrjob create-cluster
-    using configs in /etc/mrjob.conf
+    $ mrjob create-cluster --max-hours-idle 1
+    Using configs in /Users/davidmarin/.mrjob.conf
+    Using s3://mrjob-35cdec11663cb1cb/tmp/ as our temp dir on S3
     Creating persistent cluster to run several jobs in...
-    creating tmp directory /scratch/username/no_script.username.20110811.185141.422311
-    writing master bootstrap script to /scratch/username/no_script.username.20110811.185141.422311/b.py
-    Copying non-input files into s3://scratch-bucket/tmp/no_script.username.20110811.185141.422311/files/
-    Waiting 5.0s for S3 eventual consistency
-    Creating Elastic MapReduce cluster
-    Cluster created with ID: j-1NXMMBNEQHAFT
-    j-1NXMMBNEQHAFT
+    Creating temp directory /var/folders/zv/jmtt5bxs6xl3kzt38470hcxm0000gn/T/no_script.davidmarin.20160324.231018.720057
+    Copying local files to s3://mrjob-35cdec11663cb1cb/tmp/no_script.davidmarin.20160324.231018.720057/files/...
+    j-3BYHP30KB81XE
 
 Now you can use the cluster ID to start the troublesome job::
 
-    $ python mrjob/buggy_job.py -r emr --cluster-id=j-1NXMMBNEQHAFT input/* > out
-    using configs in /etc/mrjob.conf
-    Uploading input to s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/input/
-    creating tmp directory /scratch/username/buggy_job.username.20110811.185410.536519
-    writing wrapper script to /scratch/username/buggy_job.username.20110811.185410.536519/wrapper.py
-    Copying non-input files into s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/files/
-    Adding our job to cluster j-1NXMMBNEQHAFT
-    Job launched 30.1s ago, status BOOTSTRAPPING: Running bootstrap actions
-    Job launched 60.1s ago, status BOOTSTRAPPING: Running bootstrap actions
-    Job launched 90.2s ago, status BOOTSTRAPPING: Running bootstrap actions
-    Job launched 120.3s ago, status BOOTSTRAPPING: Running bootstrap actions
-    Job launched 150.3s ago, status BOOTSTRAPPING: Running bootstrap actions
-    Job launched 180.4s ago, status RUNNING: Running step (buggy_job.username.20110811.185410.536519: Step 1 of 1)
-    Opening ssh tunnel to Hadoop job tracker
-    Connect to job tracker at: http://dev5sj.sjc.yelpcorp.com:40753/jobtracker.jsp
-    Job launched 211.5s ago, status RUNNING: Running step (buggy_job.username.20110811.185410.536519: Step 1 of 1)
-     map 100% reduce   0%
-    Job launched 241.8s ago, status RUNNING: Running step (buggy_job.username.20110811.185410.536519: Step 1 of 1)
-     map   0% reduce   0%
-    Job launched 271.9s ago, status RUNNING: Running step (buggy_job.username.20110811.185410.536519: Step 1 of 1)
-     map 100% reduce 100%
-    Job failed with status WAITING: Waiting after step failed
-    Logs are in s3://scratch-bucket/tmp/logs/j-1NXMMBNEQHAFT/
-    Scanning SSH logs for probable cause of failure
-    Probable cause of failure (from ssh://ec2-50-18-136-229.us-west-1.compute.amazonaws.com/mnt/var/log/hadoop/userlogs/attempt_201108111855_0001_m_000001_3/stderr):
+    $ python mrjob/examples/mr_boom.py README.rst -r emr --cluster-id j-3BYHP30KB81XE
+    Using configs in /Users/davidmarin/.mrjob.conf
+    Using s3://mrjob-35cdec11663cb1cb/tmp/ as our temp dir on S3
+    Creating temp directory /var/folders/zv/jmtt5bxs6xl3kzt38470hcxm0000gn/T/mr_boom.davidmarin.20160324.231045.501027
+    Copying local files to s3://mrjob-35cdec11663cb1cb/tmp/mr_boom.davidmarin.20160324.231045.501027/files/...
+    Adding our job to existing cluster j-3BYHP30KB81XE
+    Waiting for step 1 of 1 (s-SGVW9B5LEXF5) to complete...
+      PENDING (cluster is STARTING: Provisioning Amazon EC2 capacity)
+      PENDING (cluster is STARTING: Provisioning Amazon EC2 capacity)
+      PENDING (cluster is STARTING: Provisioning Amazon EC2 capacity)
+      PENDING (cluster is STARTING: Provisioning Amazon EC2 capacity)
+      PENDING (cluster is STARTING: Provisioning Amazon EC2 capacity)
+      PENDING (cluster is BOOTSTRAPPING: Running bootstrap actions)
+      PENDING (cluster is BOOTSTRAPPING: Running bootstrap actions)
+      PENDING (cluster is BOOTSTRAPPING: Running bootstrap actions)
+      PENDING (cluster is BOOTSTRAPPING: Running bootstrap actions)
+      PENDING (cluster is BOOTSTRAPPING: Running bootstrap actions)
+      Opening ssh tunnel to resource manager...
+      Connect to resource manager at: http://localhost:40069/cluster
+      RUNNING for 9.2s
+      RUNNING for 42.3s
+         0.0% complete
+      RUNNING for 72.6s
+         5.0% complete
+      RUNNING for 102.9s
+         5.0% complete
+      RUNNING for 133.4s
+       100.0% complete
+      FAILED
+    Cluster j-3BYHP30KB81XE is WAITING: Cluster ready after last step failed.
+    Attempting to fetch counters from logs...
+    Looking for step log in /mnt/var/log/hadoop/steps/s-SGVW9B5LEXF5 on ec2-52-37-112-240.us-west-2.compute.amazonaws.com...
+      Parsing step log: ssh://ec2-52-37-112-240.us-west-2.compute.amazonaws.com/mnt/var/log/hadoop/steps/s-SGVW9B5LEXF5/syslog
+    Counters: 9
+    	Job Counters
+    		Data-local map tasks=1
+    		Failed map tasks=4
+    		Launched map tasks=4
+    		Other local map tasks=3
+    		Total megabyte-seconds taken by all map tasks=58125312
+    		Total time spent by all map tasks (ms)=75684
+    		Total time spent by all maps in occupied slots (ms)=227052
+    		Total time spent by all reduces in occupied slots (ms)=0
+    		Total vcore-seconds taken by all map tasks=75684
+    Scanning logs for probable cause of failure...
+    Looking for task logs in /mnt/var/log/hadoop/userlogs/application_1458861299388_0001 on ec2-52-37-112-240.us-west-2.compute.amazonaws.com and task/core nodes...
+      Parsing task syslog: ssh://ec2-52-37-112-240.us-west-2.compute.amazonaws.com/mnt/var/log/hadoop/userlogs/application_1458861299388_0001/container_1458861299388_0001_01_000005/syslog
+      Parsing task stderr: ssh://ec2-52-37-112-240.us-west-2.compute.amazonaws.com/mnt/var/log/hadoop/userlogs/application_1458861299388_0001/container_1458861299388_0001_01_000005/stderr
+    Probable cause of failure:
+
+    PipeMapRed failed!
+    java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed with code 1
+    	at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads(PipeMapRed.java:330)
+    	at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished(PipeMapRed.java:543)
+    	at org.apache.hadoop.streaming.PipeMapper.close(PipeMapper.java:130)
+    	at org.apache.hadoop.mapred.MapRunner.run(MapRunner.java:81)
+    	at org.apache.hadoop.streaming.PipeMapRunner.run(PipeMapRunner.java:34)
+    	at org.apache.hadoop.mapred.MapTask.runOldMapper(MapTask.java:432)
+    	at org.apache.hadoop.mapred.MapTask.run(MapTask.java:343)
+    	at org.apache.hadoop.mapred.YarnChild$2.run(YarnChild.java:175)
+    	at java.security.AccessController.doPrivileged(Native Method)
+    	at javax.security.auth.Subject.doAs(Subject.java:415)
+    	at org.apache.hadoop.security.UserGroupInformation.doAs(UserGroupInformation.java:1548)
+    	at org.apache.hadoop.mapred.YarnChild.main(YarnChild.java:170)
+
+    (from lines 37-50 of ssh://ec2-52-37-112-240.us-west-2.compute.amazonaws.com/mnt/var/log/hadoop/userlogs/application_1458861299388_0001/container_1458861299388_0001_01_000005/syslog)
+
+    caused by:
+
     Traceback (most recent call last):
-      File "buggy_job.py", line 36, in <module>
-        MRWordFreqCount.run()
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 448, in run
+      File "mr_boom.py", line 10, in <module>
+        MRBoom.run()
+      File "/usr/lib/python3.4/dist-packages/mrjob/job.py", line 430, in run
         mr_job.execute()
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 455, in execute
+      File "/usr/lib/python3.4/dist-packages/mrjob/job.py", line 439, in execute
         self.run_mapper(self.options.step_num)
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 548, in run_mapper
-        for out_key, out_value in mapper(key, value) or ():
-      File "buggy_job.py", line 24, in mapper
-        raise IndexError
-    IndexError
-    Traceback (most recent call last):
-      File "wrapper.py", line 16, in <module>
-        check_call(sys.argv[1:])
-      File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
-        raise CalledProcessError(retcode, cmd)
-    subprocess.CalledProcessError: Command '['python', 'buggy_job.py', '--step-num=0', '--mapper']' returned non-zero exit status 1
-    (while reading from s3://scratch-bucket/tmp/buggy_job.username.20110811.185410.536519/input/00000-README.rst)
-    Killing our SSH tunnel (pid 988)
-    ...
+      File "/usr/lib/python3.4/dist-packages/mrjob/job.py", line 499, in run_mapper
+        for out_key, out_value in mapper_init() or ():
+      File "mr_boom.py", line 7, in mapper_init
+        raise Exception('BOOM')
+    Exception: BOOM
+
+    (from lines 1-12 of ssh://ec2-52-37-112-240.us-west-2.compute.amazonaws.com/mnt/var/log/hadoop/userlogs/application_1458861299388_0001/container_1458861299388_0001_01_000005/stderr)
+
+    while reading input from s3://mrjob-35cdec11663cb1cb/tmp/mr_boom.davidmarin.20160324.231045.501027/files/README.rst
 
 
-The same cluster ID can be used to start new jobs without waiting for a new
+    Step 1 of 1 failed
+    Killing our SSH tunnel (pid 52847)
+
+Now you can fix the bug and try again, without having to wait for a new
 cluster to bootstrap.
 
-Note that SSH must be set up for logs to be scanned from persistent jobs.
+.. note::
 
-Determining cause of failure when mrjob can't
----------------------------------------------
-
-In some cases, :py:mod:`mrjob` will be unable to find the reason your job
-failed, or it will report an error that was merely a symptom of a larger
-problem. You can look at the logs yourself by using the `AWS Command Line
-Interface <https://aws.amazon.com/cli/>`_ to SSH to the master node::
-
-    > aws emr ssh --cluster-id j-1NXMMBNEQHAFT --key-pair-file /nail/etc/EMR.pem.dev
-    ssh -i /nail/etc/EMR.pem.dev hadoop@ec2-50-18-136-229.us-west-1.compute.amazonaws.com
-    ...
-    hadoop@ip-10-172-51-151:~$ grep --recursive 'Traceback' /mnt/var/log/hadoop
-    /mnt/var/log/hadoop/userlogs/attempt_201108111855_0001_m_000000_0/stderr:Traceback (most recent call last):
-    ...
-    hadoop@ip-10-172-51-151:~$ cat /mnt/var/log/hadoop/userlogs/attempt_201108111855_0001_m_000000_0/stderr
-    Exception exceptions.RuntimeError: 'generator ignored GeneratorExit' in <generator object at 0x94d57cc> ignored
-    Traceback (most recent call last):
-      File "mr_word_freq_count.py", line 36, in <module>
-        MRWordFreqCount.run()
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 448, in run
-        mr_job.execute()
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 455, in execute
-        self.run_mapper(self.options.step_num)
-      File "/usr/lib/python2.7/site-packages/mrjob/job.py", line 548, in run_mapper
-        for out_key, out_value in mapper(key, value) or ():
-      File "mr_word_freq_count.py", line 24, in mapper
-        raise IndexError
-    IndexError
-    Traceback (most recent call last):
-      File "wrapper.py", line 16, in <module>
-        check_call(sys.argv[1:])
-      File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
-        raise CalledProcessError(retcode, cmd)
-    subprocess.CalledProcessError: Command '['python', 'mr_word_freq_count.py', '--step-num=0', '--mapper']' returned non-zero exit status 1
-    java.lang.RuntimeException: PipeMapRed.waitOutputThreads(): subprocess failed with code 1
-        at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads(PipeMapRed.java:372)
-        at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished(PipeMapRed.java:582)
-        at org.apache.hadoop.streaming.PipeMapper.close(PipeMapper.java:135)
-        at org.apache.hadoop.mapred.MapRunner.run(MapRunner.java:57)
-        at org.apache.hadoop.streaming.PipeMapRunner.run(PipeMapRunner.java:36)
-        at org.apache.hadoop.mapred.MapTask.runOldMapper(MapTask.java:363)
-        at org.apache.hadoop.mapred.MapTask.run(MapTask.java:312)
-        at org.apache.hadoop.mapred.Child.main(Child.java:170)
+   mrjob *can* fetch logs from persistent jobs even without SSH set up, but
+   it has to pause 10 minutes to wait for EMR to transfer logs to S3, which
+   defeats the purpose of rapid iteration.

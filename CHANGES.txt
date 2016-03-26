@@ -53,6 +53,7 @@ v0.5.0, 2016-03-?? -- the future is in the past
        * connect to each S3 bucket on appropriate endpoint (#1028)
          * fall back to default if we can't get bucket location (#1170)
        * removed special treatment of _$folder$ keys
+         * removed deprecated S3Filesystem method get_s3_folder_keys()
        * recurse "subdirectories" even if uri lacks trailing / (#1183)
      * removed iam_job_flow_role option (use iam_instance_profile)
      * custom hadoop_streaming_jar gets properly uploaded
@@ -60,6 +61,9 @@ v0.5.0, 2016-03-?? -- the future is in the past
      * pooling respects key pair (#1230)
      * idle cluster self-termination respects non-streaming jobs (#1145)
      * deprecated "latest" AMI version not passed through to EMR (#1269)
+     * emr_job_flow_id option is now cluster_id (#1082)
+     * emr_job_flow_pool_name is now pool_name (#1082)
+     * pool_emr_job_flows is now pool_clusters (#1082)
    * Hadoop
      * works out-of the-box on most Hadoop setups (#1160)
      * works out-of the box inside EMR (2.x, 3.x, and 4.x AMIs)
@@ -89,7 +93,11 @@ v0.5.0, 2016-03-?? -- the future is in the past
    * uses_generic_jobconf()
  * removed mrjob.conf.combine_cmd_lists()
  * removed fetch-logs tool (#1127)
- * Python-version-specific mrjobx and mrjobx.y commands (#1104)
+ * mrjob subcommands use "cluster" rather than "job-flow" (#1082)
+   * create-job-flow is now create-cluster
+   * terminate-idle-job-flows is now terminate-idle-clusters
+   * terminate-job-flow is now terminate-cluster
+ * Python-version-specific mrjob-x and mrjob-x.y commands (#1104)
  * use followlinks=True with os.walk()
  * all internal constants/functions/methods explicitly start with _ (#681)
  * mrjob.util:

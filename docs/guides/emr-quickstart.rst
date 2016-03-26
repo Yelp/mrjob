@@ -10,8 +10,10 @@ Configuring your AWS credentials allows mrjob to run your jobs on Elastic
 MapReduce and use S3.
 
 * Create an `Amazon Web Services account <http://aws.amazon.com/>`_
-* Go to the `Your Security Credentials
-  <https://console.aws.amazon.com/iam/home?#security_credential>`__, click
+* Go to `Security Credentials
+  <https://console.aws.amazon.com/iam/home?#security_credential>`__ in the
+  login menu (upper right, third from the right), say yes, you want to
+  proceed, click
   on **Access Keys**, and then **Create New Access Key**. Make sure to copy the
   secret access key, as there is no way to recover it after creation.
 

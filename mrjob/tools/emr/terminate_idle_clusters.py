@@ -57,8 +57,6 @@ Options::
                         Host to connect to when communicating with S3 (e.g. s3
                         -us-west-1.amazonaws.com). Default is to infer this
                         from region (see --aws-region).
-  -t, --test            Don't actually delete any files; just log that we
-                        would
   --unpooled-only       Only terminate un-pooled clusters
   -v, --verbose         print more messages to stderr
 """
@@ -112,7 +110,7 @@ def main(cl_args=None):
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
-        quiet=(options.quiet > 1),
+        quiet=options.quiet,
         **_runner_kwargs(options)
     )
 
@@ -122,8 +120,7 @@ def _runner_kwargs(options):
     for unused_arg in ('quiet', 'verbose', 'max_hours_idle',
                        'max_mins_locked',
                        'mins_to_end_of_hour', 'unpooled_only',
-                       'pooled_only', 'pool_name', 'dry_run',
-                       'test'):
+                       'pooled_only', 'pool_name', 'dry_run'):
         del kwargs[unused_arg]
 
     return kwargs
@@ -415,11 +412,6 @@ def _make_option_parser():
         '--dry-run', dest='dry_run', default=False,
         action='store_true',
         help="Don't actually kill idle jobs; just log that we would")
-
-    option_parser.add_option(
-        '-t', '--test', dest='test', default=False,
-        action='store_true',
-        help="Don't actually delete any files; just log that we would")
 
     _add_basic_opts(option_parser)
     _add_emr_connect_opts(option_parser)

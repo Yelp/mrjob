@@ -75,7 +75,7 @@ def main(cl_args=None):
 
     for path in args[1:]:
         _s3_cleanup(path, time_old,
-                    dry_run=options.text,
+                    dry_run=options.test,
                     **_runner_kwargs(options))
 
 

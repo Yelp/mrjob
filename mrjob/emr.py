@@ -104,7 +104,6 @@ from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
-from mrjob.ssh import _ssh_slave_addresses
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
@@ -752,7 +751,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         tmp_bucket_name = 'mrjob-' + random_identifier()
         self._s3_tmp_bucket_to_create = tmp_bucket_name
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
-        log.info('Auto-created temp bucket %s' % tmp_bucket_name)
+        log.info('Auto-created temp S3 bucket %s' % tmp_bucket_name)
+        self._wait_for_s3_eventual_consistency()
 
     def _s3_log_dir(self):
         """Get the URI of the log directory for this job's cluster."""

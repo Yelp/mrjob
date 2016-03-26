@@ -2541,7 +2541,8 @@ class JobWaitTestCase(MockBotoTestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
-        self.assertEqual(self.sleep_counter, 0)
+        # sleep once after creating temp bucket
+        self.assertEqual(self.sleep_counter, 1)
 
     def test_no_waiting_for_job_pool_success(self):
         self.mock_cluster_ids.append('j-fail-lock')
@@ -2556,7 +2557,7 @@ class JobWaitTestCase(MockBotoTestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
-        self.assertEqual(self.sleep_counter, 0)
+        self.assertEqual(self.sleep_counter, 1)
 
     def test_sleep_then_acquire_lock(self):
         self.mock_cluster_ids.append('j-fail-lock')
@@ -2574,7 +2575,7 @@ class JobWaitTestCase(MockBotoTestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
-        self.assertEqual(self.sleep_counter, 2)
+        self.assertEqual(self.sleep_counter, 3)
 
 
 class PoolWaitMinutesOptionTestCase(MockBotoTestCase):

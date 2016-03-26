@@ -751,8 +751,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # That may have all failed. If so, pick a name.
         tmp_bucket_name = 'mrjob-' + random_identifier()
         self._s3_tmp_bucket_to_create = tmp_bucket_name
-        log.debug("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
+        log.info('Auto-created temp bucket %s' % tmp_bucket_name)
 
     def _s3_log_dir(self):
         """Get the URI of the log directory for this job's cluster."""

@@ -13,6 +13,8 @@
 # limitations under the License.
 
 import itertools
+import datetime
+import collections
 import os
 import tempfile
 import time
@@ -38,6 +40,8 @@ except ImportError:
 from mrjob.conf import combine_values
 from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _DATAPROC_API_REGION, _DATAPROC_IMAGE_TO_HADOOP_VERSION
+from mrjob.dataproc import DATAPROC_CLUSTER_STATES_ERROR, DATAPROC_CLUSTER_STATES_READY
+from mrjob.dataproc import DATAPROC_JOB_STATES_ACTIVE, DATAPROC_JOB_STATES_INACTIVE
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
@@ -109,7 +113,15 @@ def _set_deep(data_structure, dot_path_or_list, value_to_set):
     current_item[search_path[-1]] = value_to_set
     return data_structure
 
-
+def _dict_deep_update(d, u):
+    """ http://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth """
+    for k, v in u.iteritems():
+        if isinstance(v, collections.Mapping):
+            r = _dict_deep_update(d.get(k, {}), v)
+            d[k] = r
+        else:
+            d[k] = u[k]
+    return d
 
 ### Test Case ###
 
@@ -323,126 +335,117 @@ class MockDataprocClient(object):
         :type now: py:class:`datetime.datetime`
         :param now: alternate time to use as the current time (should be UTC)
         """
-        if now is None:
-            now = datetime.utcnow()
+        raise NotImplementedError
 
-        cluster = self._get_mock_cluster(cluster_id)
+################################################################################
+################################################################################
+################################################################################
 
-        # allow clusters to get stuck
-        if getattr(cluster, 'delay_progress_simulation', 0) > 0:
-            cluster.delay_progress_simulation -= 1
-            return
+_DATAPROC_PROJECT = 'test-project-test'
+_DATAPROC_CLUSTER = 'test-cluster-test'
+_CLUSTER_REGION = _DATAPROC_API_REGION
+_CLUSTER_ZONE = None
+_CLUSTER_IMAGE_VERSION = '1.0'
+_CLUSTER_STATE = ''
+_CLUSTER_MACHINE_TYPE = 'n1-standard-1'
+_CLUSTER_NUM_WORKERS = 2
 
-        # this code is pretty loose about updating statechangereason
-        # (for the cluster, instance groups, and steps). Add this as needed.
+def _datetime_to_dataproc_zulu(in_datetime=None):
+    in_datetime = in_datetime or datetime.datetime.utcnow()
+    return in_datetime.isoformat() + 'Z'
 
-        # if job is STARTING, move it along to BOOTSTRAPPING
-        if cluster.status.state == 'STARTING':
-            cluster.status.state = 'BOOTSTRAPPING'
-            # instances are now provisioned
-            for ig in cluster._instancegroups:
-                ig.runninginstancecount = ig.requestedinstancecount,
-                ig.status.state = 'BOOTSTRAPPING'
+def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=None, machine_type=None, machine_type_master=None, num_workers=None, now=None):
+    project = project or _DATAPROC_PROJECT
+    zone = zone or _CLUSTER_ZONE
+    cluster = cluster or _DATAPROC_CLUSTER
+    image_version = image_version or _CLUSTER_IMAGE_VERSION
+    machine_type_master = machine_type_master or _CLUSTER_MACHINE_TYPE
+    machine_type = machine_type or _CLUSTER_MACHINE_TYPE
+    num_workers = num_workers or _CLUSTER_NUM_WORKERS
 
-            return
+    gce_cluster_conf = {
+      "zoneUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s" % locals(),
+      "networkUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/global/networks/default" % locals(),
+      "serviceAccountScopes": [
+        "https://www.googleapis.com/auth/bigquery",
+        "https://www.googleapis.com/auth/bigtable.admin.table",
+        "https://www.googleapis.com/auth/bigtable.data",
+        "https://www.googleapis.com/auth/cloud.useraccounts.readonly",
+        "https://www.googleapis.com/auth/devstorage.full_control",
+        "https://www.googleapis.com/auth/devstorage.read_write",
+        "https://www.googleapis.com/auth/logging.write"
+      ]
+    }
 
-        # if job is BOOTSTRAPPING, move it along to RUNNING
-        if cluster.status.state == 'BOOTSTRAPPING':
-            cluster.status.state = 'RUNNING'
-            for ig in cluster._instancegroups:
-                ig.status.state = 'RUNNING'
+    master_conf = {
+      "numInstances": 1,
+      "instanceNames": [
+        "%(cluster)s-m" % locals()
+      ],
+      "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
+      "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type_master)s" % locals(),
+      "diskConfiguration": {
+        "bootDiskSizeGb": 500
+      }
+    }
 
-            return
+    worker_conf = {
+      "numInstances": num_workers,
+      "instanceNames": ['%s-w-%d' % (cluster, num) for num in xrange(num_workers)],
+      "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
+      "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type)s" % locals(),
+      "diskConfiguration": {
+        "bootDiskSizeGb": 500
+      }
+    }
 
-        # if job is TERMINATING, move along to terminated
-        if cluster.status.state == 'TERMINATING':
-            code = getattr(getattr(cluster.status, 'statechangereason', None),
-                'code', None)
+    software_conf = {
+      "imageVersion": image_version,
+      "properties": {
+        "yarn:yarn.nodemanager.resource.memory-mb": "3072",
+        "yarn:yarn.scheduler.minimum-allocation-mb": "256",
+        "yarn:yarn.scheduler.maximum-allocation-mb": "3072",
+        "mapred:mapreduce.map.memory.mb": "3072",
+        "mapred:mapreduce.map.java.opts": "-Xmx2457m",
+        "mapred:mapreduce.map.cpu.vcores": "1",
+        "mapred:mapreduce.reduce.memory.mb": "3072",
+        "mapred:mapreduce.reduce.java.opts": "-Xmx2457m",
+        "mapred:mapreduce.reduce.cpu.vcores": "1",
+        "mapred:yarn.app.mapreduce.am.resource.mb": "3072",
+        "mapred:yarn.app.mapreduce.am.command-opts": "-Xmx2457m",
+        "mapred:yarn.app.mapreduce.am.resource.cpu-vcores": "1",
+        "distcp:mapreduce.map.memory.mb": "3072",
+        "distcp:mapreduce.reduce.memory.mb": "3072",
+        "distcp:mapreduce.map.java.opts": "-Xmx2457m",
+        "distcp:mapreduce.reduce.java.opts": "-Xmx2457m",
+        "spark:spark.executor.cores": "1",
+        "spark:spark.executor.memory": "1152m",
+        "spark:spark.yarn.executor.memoryOverhead": "384",
+        "spark:spark.yarn.am.memory": "1152m",
+        "spark:spark.yarn.am.memoryOverhead": "384",
+        "spark:spark.driver.memory": "960m",
+        "spark:spark.driver.maxResultSize": "480m"
+      }
+    }
 
-            if code == 'STEP_FAILURE':
-                cluster.status.state = 'TERMINATED_WITH_ERRORS'
-            else:
-                cluster.status.state = 'TERMINATED'
+    mock_response = {
+      "projectId": project,
+      "clusterName": cluster,
+      "configuration": {
+        "configurationBucket": "dataproc-801485be-0997-40e7-84a7-00926031747c-us",
+        "gceClusterConfiguration": gce_cluster_conf,
+        "masterConfiguration": master_conf,
+        "workerConfiguration": worker_conf,
+        "softwareConfiguration": software_conf
+      },
+      "status": {
+        "state": "CREATING",
+        "stateStartTime": _datetime_to_dataproc_zulu(now)
+      },
+      "clusterUuid": "adb4dc59-d109-4af9-badb-0d8e17e028e1"
+    }
+    return mock_response
 
-            return
-
-        # if job is done, nothing to do
-        if cluster.status.state in ('TERMINATED', 'TERMINATED_WITH_ERRORS'):
-            return
-
-        # at this point, should be RUNNING or WAITING
-        assert cluster.status.state in ('RUNNING', 'WAITING')
-
-        # try to find the next step, and advance it
-
-        for step_num, step in enumerate(cluster._steps):
-            # skip steps that are already done
-            if step.status.state in (
-                    'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED'):
-                continue
-
-            # found currently running step! handle it, then exit
-
-            # start PENDING step
-            if step.status.state == 'PENDING':
-                step.status.state = 'RUNNING'
-                step.status.timeline.startdatetime = to_iso8601(now)
-                return
-
-            assert step.status.state == 'RUNNING'
-
-            # check if we're supposed to have an error
-            if (cluster_id, step_num) in self.mock_dataproc_failures:
-                step.status.state = 'FAILED'
-
-                if step.actiononfailure in (
-                    'TERMINATE_CLUSTER', 'TERMINATE_JOB_FLOW'):
-
-                    cluster.status.state = 'TERMINATING'
-                    cluster.status.statechangereason.code = 'STEP_FAILURE'
-                    cluster.status.statechangereason.message = (
-                        'Shut down as step failed')
-
-                return
-
-            # complete step
-            step.status.state = 'COMPLETED'
-            step.status.timeline.enddatetime = to_iso8601(now)
-
-            # create fake output if we're supposed to write to GCS
-            output_uri = self._get_step_output_uri(step.config.args)
-            if output_uri and is_gcs_uri(output_uri):
-                mock_output = self.mock_dataproc_output.get(
-                    (cluster_id, step_num)) or [b'']
-
-                bucket_name, key_name = parse_gcs_uri(output_uri)
-
-                # write output to GCS
-                for i, part in enumerate(mock_output):
-                    add_mock_gcs_data(self.mock_gcs_fs, {
-                        bucket_name: {key_name + 'part-%05d' % i: part}})
-            elif (cluster_id, step_num) in self.mock_dataproc_output:
-                raise AssertionError(
-                    "can't use output for cluster ID %s, step %d "
-                    "(it doesn't output to GCS)" %
-                    (cluster_id, step_num))
-
-            # done!
-            # if this is the last step, continue to autotermination code, below
-            if step_num < len(cluster._steps) - 1:
-                return
-
-        # no pending steps. should we wait, or shut down?
-        if cluster.autoterminate == 'true':
-            cluster.status.state = 'TERMINATING'
-            cluster.status.statechangereason.code = 'ALL_STEPS_COMPLETED'
-            cluster.status.statechangereason.message = (
-                'Steps Completed')
-        else:
-            # just wait
-            cluster.status.state = 'WAITING'
-
-        return
 
 class MockDataprocClientClusters(object):
     def __init__(self, client):
@@ -450,23 +453,31 @@ class MockDataprocClientClusters(object):
         self._client = client
         self._clusters = self._client._cache_clusters
 
-
     def create(self, projectId=None, region=None, body=None):
         """Mock of run_jobflow().
         """
-        if now is None:
-            now = datetime.utcnow()
+        assert projectId is not None
+        assert region == _DATAPROC_API_REGION
 
+        body = body or dict()
 
-        return cluster_id
+        # Create an empty cluster
+        cluster = _create_cluster_resp()
+
+        # Then do a deep-update as to what was requested
+        _dict_deep_update(cluster, body)
+
+        _set_deep(self._clusters, [projectId, cluster['clusterName']], cluster)
+
+        return cluster
 
     def get(self, projectId=None, region=None, clusterName=None):
-        cluster = self._client.get_mock_cluster(cluster_id)
+        assert projectId is not None
+        assert region == _DATAPROC_API_REGION
 
-        if cluster.status.state == 'TERMINATING':
-            # simulate progress, to support
-            # _wait_for_logs_on_s3()
-            self._client.simulate_progress(clusterName)
+        cluster = _get_deep(self._clusters, [projectId, clusterName])
+        if not cluster:
+            raise mock_google_error(httplib.NOT_FOUND)
 
         return cluster
 
@@ -474,26 +485,109 @@ class MockDataprocClientClusters(object):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        cluster = self._client.get_mock_cluster(clusterName)
+        return self.update_state(projectId, clusterName, 'DELETING')
 
-        # already terminated
-        if cluster.status.state in (
-                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
-            return
+    def get_state(self, projectId, clusterName):
+        cluster = self.get(projectId=projectId, region=_DATAPROC_API_REGION, clusterName=clusterName)
+        return cluster['status']['state']
 
-        # mark cluster as shutting down
-        cluster.status.state = 'TERMINATING'
-        cluster.status.statechangereason = MockDataprocObject(
-            code='USER_REQUEST',
-            message='Terminated by user request',
-        )
+    def update_state(self, projectId=None, clusterName=None, state=None, prev_state=None):
+        assert state
+        cluster = self.get(projectId=projectId, region=_DATAPROC_API_REGION, clusterName=clusterName)
 
-        for step in cluster._steps:
-            if step.status.state == 'PENDING':
-                step.status.state = 'CANCELLED'
-            elif step.status.state == 'RUNNING':
-                # pretty sure this is what INTERRUPTED is for
-                step.status.state = 'INTERRUPTED'
+        old_state = cluster['status']['state']
+        assert old_state != state
+        if prev_state:
+            assert old_state == prev_state
+
+        new_status = {
+            "state": state,
+            "stateStartTime": _datetime_to_dataproc_zulu()
+        }
+
+        old_status = cluster.pop('status')
+        cluster['status'] = new_status
+
+        cluster.setdefault('statusHistory', [])
+        cluster['statusHistory'].append(old_status)
+
+        return cluster
+################################################################################
+################################################################################
+################################################################################
+_JOB_STATE_MATCHER_ACTIVE = frozenset(['PENDING', 'RUNNING', 'CANCEL_PENDING'])
+_JOB_STATE_MATCHER_NON_ACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
+_JOB_STATE_MATCHERS = {
+    'ALL': _JOB_STATE_MATCHER_ACTIVE | _JOB_STATE_MATCHER_NON_ACTIVE,
+    'ACTIVE': _JOB_STATE_MATCHER_ACTIVE,
+    'NON_ACTIVE': _JOB_STATE_MATCHER_NON_ACTIVE
+}
+
+_SCRIPT_NAME = 'mr_test_mockgoogleapiclient'
+_USER_NAME = 'testuser'
+_INPUT_DIR = ''
+_OUTPUT_DIR = ''
+
+def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, input_dir=None, output_dir=None, now=None):
+    project = project or _DATAPROC_PROJECT
+    cluster = cluster or _DATAPROC_CLUSTER
+    script_name = script_name or _SCRIPT_NAME
+    now = now or datetime.datetime.utcnow()
+
+    assert input_dir and output_dir
+
+    job_elements = [script_name, _USER_NAME, now.strftime('%Y%m%d'), now.strftime('%H%M%S'), now.strftime('%f')]
+
+    job_id = '-'.join(job_elements + ['-', 'Step', '1', 'of', '1'])
+    dir_name = '.'.join(job_elements)
+
+    mock_response = {
+      "reference": {
+        "projectId": project,
+        "jobId": job_id
+      },
+      "placement": {
+        "clusterName": cluster,
+        "clusterUuid": "8b76d95e-ebdc-4b81-896d-b2c5009b3560"
+      },
+      "hadoopJob": {
+        "mainJarFileUri": "file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar",
+        "args": [
+          "-files",
+          "gs://boulder-input-data/tmp/mrjob-77657375140ce2a1/%(dir_name)s/files/%(script_name)s.py#%(script_name)s.py" % locals(),
+          "-mapper",
+          "python %(script_name)s.py --step-num=0 --mapper" % locals(),
+          "-reducer",
+          "python %(script_name)s.py --step-num=0 --reducer" % locals(),
+          "-input",
+          input_dir,
+          "-output",
+          output_dir
+        ],
+        "loggingConfiguration": {}
+      },
+      "status": {
+        "state": "PENDING",
+        "stateStartTime": _datetime_to_dataproc_zulu(now)
+      },
+      "driverControlFilesUri": "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/" % locals(),
+      "driverOutputResourceUri": "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/driveroutput" % locals()
+    }
+    return mock_response
+
+def _update_job_state(job_resp, state=None):
+    assert state
+    old_status = job_resp.pop('status')
+
+    job_resp['status'] = {
+        "state": state,
+        "stateStartTime": _datetime_to_dataproc_zulu()
+    }
+
+    job_resp.setdefault('statusHistory', [])
+    job_resp['statusHistory'].append(old_status)
+
+    return job_resp
 
 class MockDataprocClientJobs(object):
     def __init__(self, client):
@@ -502,44 +596,96 @@ class MockDataprocClientJobs(object):
         self._jobs = self._client._cache_jobs
 
     def list(self, **kwargs):
+        projectId = kwargs['projectId']
         region = kwargs['region']
+        clusterName = kwargs.get('clusterName')
+        jobStateMatcher = kwargs.get('jobStateMatcher') or 'ALL'
+
+        assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        return None
+        valid_job_states = _JOB_STATE_MATCHERS[jobStateMatcher]
+
+        item_list = []
+
+        job_map = _get_deep(self._jobs, [projectId], dict())
+        for current_job_id, current_job in job_map.iteritems():
+            job_cluster = current_job['placement']['clusterName']
+            job_state = current_job['status']['state']
+
+            # If we are searching for a specific clusterName and it doesn't match...
+            if clusterName and job_cluster != clusterName:
+                continue
+            elif job_state not in valid_job_states:
+                continue
+
+            item_list.append(job_state)
+
+        return dict(items=item_list, kwargs=kwargs)
 
     def list_next(self, list_request, resp):
-        pass
+        return list()
 
     def get(self, projectId=None, region=None, jobId=None):
+        assert projectId is not None
         assert region == _DATAPROC_API_REGION
-        current_job = _get_deep(self._jobs, [projectId, jobId])
 
+        current_job = _get_deep(self._jobs, [projectId, jobId])
         if not current_job:
             raise mock_google_error(httplib.NOT_FOUND)
 
         return current_job
 
     def cancel(self, projectId=None, region=None, jobId=None):
+        assert projectId is not None
         assert region == _DATAPROC_API_REGION
-        current_job = self.get(projectId=projectId, region=region, jobId=jobId)
 
-        # TODO - Implement CANCEL behavior
-
-        return current_job
+        return self.update_state(projectId=projectId, jobId=jobId, state='CANCEL_PENDING')
 
     def delete(self, projectId=None, region=None, jobId=None):
+        assert projectId is not None
         assert region == _DATAPROC_API_REGION
-        current_job = self.get(projectId=projectId, region=region, jobId=jobId)
 
-        # TODO - Implement DELETE behavior
-
-        return current_job
-
-
+        return self.update_state(projectId=projectId, jobId=jobId, state='DELETING')
 
     def submit(self, projectId=None, region=None, body=None):
+        assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        # TODO - Implement SUBMIT behavior
+        body = body or dict()
 
-        return current_job
+        # Create an empty cluster
+        job = _submit_hadoop_job_resp()
+
+        # Then do a deep-update as to what was requested
+        _dict_deep_update(job, body)
+
+        _set_deep(self._jobs, [projectId, job['reference']['jobId']], job)
+
+        return job
+
+    def get_state(self, projectId=None, jobId=None):
+        job = self.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
+        return job['status']['state']
+
+    def update_state(self, projectId=None, jobId=None, state=None, prev_state=None):
+        assert state
+        job = self.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
+
+        old_state = job['status']['state']
+        assert old_state != state
+        if prev_state:
+            assert old_state == prev_state
+
+        new_status = {
+            "state": state,
+            "stateStartTime": _datetime_to_dataproc_zulu()
+        }
+
+        old_status = job.pop('status')
+        job['status'] = new_status
+
+        job.setdefault('statusHistory', [])
+        job['statusHistory'].append(old_status)
+
+        return job

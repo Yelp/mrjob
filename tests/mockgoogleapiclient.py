@@ -12,13 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import itertools
-import datetime
+import re
 import collections
 import os
 import tempfile
 import time
-import mock
+import hashlib
 import httplib
 import httplib2
 from datetime import datetime
@@ -37,7 +36,6 @@ except ImportError:
     google_errors = None
     google_http = None
 
-from mrjob.conf import combine_values
 from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _DATAPROC_API_REGION, _DATAPROC_IMAGE_TO_HADOOP_VERSION
 from mrjob.dataproc import DATAPROC_CLUSTER_STATES_ERROR, DATAPROC_CLUSTER_STATES_READY
@@ -45,13 +43,27 @@ from mrjob.dataproc import DATAPROC_JOB_STATES_ACTIVE, DATAPROC_JOB_STATES_INACT
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
+from mrjob.fs.gcs import _hex_to_base64
+from mrjob.fs.gcs import _LS_FIELDS_TO_RETURN
 
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import patch
+from tests.py2 import mock
 from tests.sandbox import SandboxedTestCase
 
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
+
+def mock_api(fxn):
+    def req_wrapper(*args, **kwargs):
+        actual_resp = fxn(*args, **kwargs)
+
+        mocked_req = mock.MagicMock(google_http.HttpRequest)
+        mocked_req.execute.return_value = actual_resp
+
+        return mocked_req
+
+    return req_wrapper
 
 def mock_google_error(status):
     mock_resp = mock.Mock(spec=httplib2.Response)
@@ -153,6 +165,15 @@ class MockGoogleAPITestCase(SandboxedTestCase):
         self.start(patch.object(GCSFilesystem, '_download_io', self._gcs_client.download_io))
         self.start(patch.object(GCSFilesystem, '_upload_io', self._gcs_client.upload_io))
 
+        mock_gcloud_config = {
+            'compute.region': 'us-central1',
+            'compute.zone': 'us-central1-b',
+            'core.account': 'no@where.com',
+            'core.disable_usage_reporting': 'False',
+            'core.project': 'test-mrjob:test-project'
+        }
+        self.start(patch('mrjob.dataproc._read_gcloud_config', lambda: mock_gcloud_config))
+
         super(MockGoogleAPITestCase, self).setUp()
 
         # patch slow things
@@ -165,12 +186,6 @@ class MockGoogleAPITestCase(SandboxedTestCase):
             fake_create_mrjob_tar_gz))
 
         self.start(patch.object(time, 'sleep'))
-
-    def put_gcs_data(self, data, time_modified=None, location=None):
-        """Update self.mock_gcs_fs with a map from bucket name
-            to key name to data."""
-        self._gcs_client.put_data(data, time_modified=time_modified, location=location)
-
 
     def make_runner(self, *args):
         """create a dummy job, and call make_runner() on it.
@@ -186,7 +201,9 @@ class MockGoogleAPITestCase(SandboxedTestCase):
         return mr_job.make_runner()
 
 
-### GCS ###
+############################# BEGIN BEGIN BEGIN ################################
+########################### GCS Client - OVERALL ###############################
+############################# BEGIN BEGIN BEGIN ################################
 
 
 class MockGCSClient(object):
@@ -196,8 +213,10 @@ class MockGCSClient(object):
     def __init__(self, test_case):
         assert isinstance(test_case, MockGoogleAPITestCase)
         self._test_case = test_case
+        self._fs = GCSFilesystem()
 
-        self._cache_fs = dict()
+        self._cache_objects = dict()
+        self._cache_buckets = dict()
 
         self._client_objects = MockGCSClientObjects(self)
         self._client_buckets = MockGCSClientBuckets(self)
@@ -209,91 +228,197 @@ class MockGCSClient(object):
     def buckets(self):
         return self._client_buckets
 
-    def put_data(self, data, time_modified=None, location=None):
-        if time_modified is None:
-            time_modified = datetime.utcnow()
-        for bucket_name, key_name_to_bytes in data.items():
-            bucket = self._cache_fs.setdefault(bucket_name,
-                                           {'keys': {}, 'location': ''})
+    def put_gcs(self, gcs_uri, data, make_bucket=True):
+        bucket, name = parse_gcs_uri(gcs_uri)
 
-            for key_name, key_data in key_name_to_bytes.items():
-                if not isinstance(key_data, bytes):
-                    raise TypeError('mock gcs data must be bytes')
-                bucket['keys'][key_name] = (key_data, time_modified)
+        try:
+            self._fs.bucket_get(bucket)
+        except google_errors.HttpError:
+            self._fs.bucket_create(project=_TEST_PROJECT, name=bucket)
 
-            if location is not None:
-                bucket['location'] = location
+        bytes_io_obj = BytesIO(data)
+        self.upload_io(bytes_io_obj, gcs_uri)
+
+    def put_gcs_multi(self, gcs_uri_to_data_map, make_bucket=True):
+        for gcs_uri, data in gcs_uri_to_data_map.iteritems():
+            self.put_gcs(gcs_uri, data, make_bucket=make_bucket)
 
     def download_io(self, src_uri, io_obj):
-        bucket_name, object_name = parse_gcs_uri(src_uri)
+        """
+        Clobber GCSFilesystem._download_io
+        """
+        bucket, name = parse_gcs_uri(src_uri)
 
-        key_details = _get_deep(self._cache_fs, [bucket_name, 'keys', object_name])
+        object_dict = _get_deep(self._cache_objects, [bucket, name])
 
-        if not key_details:
+        if not object_dict:
             raise Exception
 
-        key_data, time_modified = key_details
-        io_obj.write(key_data)
+        object_data = object_dict['_data']
+        io_obj.write(object_data)
         return io_obj
 
     def upload_io(self, io_obj, dest_uri):
-        bucket_name, object_name = parse_gcs_uri(dest_uri)
+        """
+        Clobber GCSFilesystem._upload_io
+        """
+        bucket, name = parse_gcs_uri(dest_uri)
 
-        bytes_array = io_obj.readall()
-        output_data = {
-            bucket_name: {
-                object_name: bytes_array
-            }
-        }
+        assert bucket in self._cache_buckets
 
-        self.put_data(output_data)
+        io_obj.seek(0)
+
+        data = io_obj.read()
+
+        object_resp = _insert_object_resp(bucket=bucket, name=name, data=data)
+
+        _set_deep(self._cache_objects, [bucket, name], object_resp)
+
+        return object_resp
 
 
 class MockGCSClientObjects(object):
     def __init__(self, client):
         assert isinstance(client, MockGCSClient)
         self._client = client
-        self._cache_fs = self._client._cache_fs
+        self._objects = self._client._cache_objects
 
-    def list(self, bucket=None, fields=None):
-        pass
+    @mock_api
+    def list(self, **kwargs):
+        bucket = kwargs.get('bucket')
+        prefix = kwargs.get('prefix') or ''
+        fields = kwargs.get('fields') or _LS_FIELDS_TO_RETURN
+        assert bucket is not None
+
+        field_match = re.findall('items\((.*?)\)', fields)[0]
+        actual_fields = set(field_match.split(','))
+
+        object_map = _get_deep(self._objects, [bucket], dict())
+
+        item_list = []
+        for object_name, current_object in object_map.iteritems():
+            if not object_name.startswith(prefix):
+                continue
+
+            output_item = dict()
+            for current_field in actual_fields:
+                output_item[current_field] = current_object[current_field]
+
+            item_list.append(output_item)
+
+        return dict(items=item_list, kwargs=kwargs)
 
     def list_next(self, list_request, resp):
-        pass
+        return None
 
+    @mock_api
     def delete(self, bucket=None, object=None):
-        pass
+        bucket_dict = self._objects[bucket]
+        del bucket_dict[object]
 
+    @mock_api
     def get_media(self, bucket=None, object=None):
-        pass
+        raise NotImplementedError('See MockGCSClient.download_io')
 
+    @mock_api
     def insert(self, bucket=None, name=None, media_body=None):
-        pass
+        raise NotImplementedError('See MockGCSClient.upload_io')
 
 
 class MockGCSClientBuckets(object):
     def __init__(self, client):
         assert isinstance(client, MockGCSClient)
         self._client = client
-        self._cache_fs = self._client._cache_fs
+        self._buckets = self._client._cache_buckets
 
-    def list(self, bucket=None, fields=None):
-        pass
+    @mock_api
+    def list(self, **kwargs):
+        project = kwarsg.get('project')
+        prefix = kwargs.get('prefix') or ''
 
-    def list_next(self, list_request, resp):
-        pass
+        item_list = []
+        for bucket_name, current_bucket in self._buckets.iteritems():
+            if not bucket_name.startswith(prefix):
+                continue
 
+            if project and project != current_bucket['_projectName']:
+                continue
+
+            item_list.append(current_bucket)
+
+        return dict(items=item_list, kwargs=kwargs)
+
+    @mock_api
     def get(self, bucket=None):
-        pass
+        try:
+            return self._buckets[bucket]
+        except KeyError:
+            raise mock_google_error(httplib.NOT_FOUND)
 
+    @mock_api
     def delete(self, bucket=None):
-        pass
+        del self._buckets[bucket]
 
-    def insert(self, **kwargs):
-        pass
-### EMR ###
+    @mock_api
+    def insert(self, project=None, body=None):
+        assert project is not None
+        body = body or dict()
+
+        bucket_name = body['name']
+        assert bucket_name not in self._buckets
+
+        # Create an empty cluster
+        bucket = _make_bucket_resp()
+
+        # Then do a deep-update as to what was requested
+        _dict_deep_update(bucket, body)
+
+        self._buckets[bucket_name] = bucket
+
+        return bucket
 
 
+def _insert_object_resp(bucket=None, name=None, data=None):
+    assert type(data) is bytes
+
+    hasher = hashlib.md5()
+    hasher.update(data)
+    md5_hex_hash = hasher.hexdigest()
+
+    return {
+        u'bucket': bucket,
+        u'name': name,
+        u'md5Hash': _hex_to_base64(md5_hex_hash),
+        u'timeCreated': _datetime_to_gcptime(),
+        u'size': str(len(data)),
+        u'_data': data
+    }
+
+
+def _make_bucket_resp(project=None, now=None):
+    now_time = _datetime_to_gcptime(now)
+
+    return {
+        u'etag': u'CAE=',
+        u'kind': u'storage#bucket',
+        u'location': u'US',
+        u'metageneration': u'1',
+        u'owner': {u'entity': u'project-owners-1234567890'},
+        u'projectNumber': u'1234567890',
+        u'storageClass': u'STANDARD',
+        u'timeCreated': now_time,
+        u'updated': now_time,
+        u'_projectName': project
+    }
+
+#############################  END   END   END  ################################
+########################### GCS Client - OVERALL ###############################
+#############################  END   END   END  ################################
+
+
+############################# BEGIN BEGIN BEGIN ################################
+######################### Dataproc Client - OVERALL ############################
+############################# BEGIN BEGIN BEGIN ################################
 class MockDataprocClient(object):
     """Mock out DataprocJobRunner.api_client. This actually handles a small
     state machine that simulates Dataproc clusters."""
@@ -308,40 +433,61 @@ class MockDataprocClient(object):
         self._client_clusters = MockDataprocClientClusters(self)
         self._client_jobs = MockDataprocClientJobs(self)
 
-
     def clusters(self):
         return self._client_clusters
 
     def jobs(self):
         return self._client_jobs
 
-    def _get_step_output_uri(self, step_args):
-        """Figure out the output dir for a step by parsing step.args
-        and looking for an -output argument."""
-        # parse in reverse order, in case there are multiple -output args
-        for i, arg in reversed(list(enumerate(step_args[:-1]))):
-            if arg.value == '-output':
-                return step_args[i + 1].value
-        else:
-            return None
+    def cluster_get_state(self, projectId=None, clusterName=None):
+        cluster = self._client_clusters.get(projectId=projectId, region=_DATAPROC_API_REGION, clusterName=clusterName)
+        return self._get_state(cluster)
 
-    def simulate_progress(self, cluster_id, now=None):
-        """Simulate progress on the given cluster. This is automatically
-        run when we call :py:meth:`describe_step`, and, when the cluster is
-        ``TERMINATING``, :py:meth:`describe_cluster`.
+    def cluster_update_state(self, projectId=None, clusterName=None, state=None, prev_state=None):
+        assert state
+        cluster = self._client_clusters.get(projectId=projectId, region=_DATAPROC_API_REGION, clusterName=clusterName)
+        return self._update_state(cluster, state=state, prev_state=prev_state)
 
-        :type cluster_id: str
-        :param cluster_id: fake cluster ID
-        :type now: py:class:`datetime.datetime`
-        :param now: alternate time to use as the current time (should be UTC)
-        """
-        raise NotImplementedError
+    def job_get_state(self, projectId=None, jobId=None):
+        job = self._client_jobs.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
+        return self._get_state(job)
 
-################################################################################
-################################################################################
-################################################################################
+    def job_update_state(self, projectId=None, jobId=None, state=None, prev_state=None):
+        assert state
+        job = self._client_jobs.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
+        return self._update_state(job, state=state, prev_state=prev_state)
 
-_DATAPROC_PROJECT = 'test-project-test'
+    def _get_state(self, cluster_or_job):
+        return cluster_or_job['status']['state']
+
+    def _update_state(self, cluster_or_job, state=None, prev_state=None):
+        old_state = cluster_or_job['status']['state']
+        assert old_state != state
+        if prev_state:
+            assert old_state == prev_state
+
+        new_status = {
+            "state": state,
+            "stateStartTime": _datetime_to_gcptime()
+        }
+
+        old_status = cluster_or_job.pop('status')
+        cluster_or_job['status'] = new_status
+
+        cluster_or_job.setdefault('statusHistory', [])
+        cluster_or_job['statusHistory'].append(old_status)
+
+        return cluster_or_job
+#############################  END   END   END  ################################
+######################### Dataproc Client - OVERALL ############################
+#############################  END   END   END  ################################
+
+
+############################# BEGIN BEGIN BEGIN ################################
+######################### Dataproc Client - Clusters ###########################
+############################# BEGIN BEGIN BEGIN ################################
+
+_TEST_PROJECT = 'test-project-test'
 _DATAPROC_CLUSTER = 'test-cluster-test'
 _CLUSTER_REGION = _DATAPROC_API_REGION
 _CLUSTER_ZONE = None
@@ -350,12 +496,14 @@ _CLUSTER_STATE = ''
 _CLUSTER_MACHINE_TYPE = 'n1-standard-1'
 _CLUSTER_NUM_WORKERS = 2
 
-def _datetime_to_dataproc_zulu(in_datetime=None):
-    in_datetime = in_datetime or datetime.datetime.utcnow()
+
+def _datetime_to_gcptime(in_datetime=None):
+    in_datetime = in_datetime or datetime.utcnow()
     return in_datetime.isoformat() + 'Z'
 
+
 def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=None, machine_type=None, machine_type_master=None, num_workers=None, now=None):
-    project = project or _DATAPROC_PROJECT
+    project = project or _TEST_PROJECT
     zone = zone or _CLUSTER_ZONE
     cluster = cluster or _DATAPROC_CLUSTER
     image_version = image_version or _CLUSTER_IMAGE_VERSION
@@ -440,7 +588,7 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
       },
       "status": {
         "state": "CREATING",
-        "stateStartTime": _datetime_to_dataproc_zulu(now)
+        "stateStartTime": _datetime_to_gcptime(now)
       },
       "clusterUuid": "adb4dc59-d109-4af9-badb-0d8e17e028e1"
     }
@@ -453,13 +601,17 @@ class MockDataprocClientClusters(object):
         self._client = client
         self._clusters = self._client._cache_clusters
 
+    @mock_api
     def create(self, projectId=None, region=None, body=None):
-        """Mock of run_jobflow().
-        """
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
         body = body or dict()
+
+        cluster_name = cluster['clusterName']
+
+        existing_cluster = _get_deep(self._clusters, [projectId, cluster_name])
+        assert not existing_cluster
 
         # Create an empty cluster
         cluster = _create_cluster_resp()
@@ -467,10 +619,11 @@ class MockDataprocClientClusters(object):
         # Then do a deep-update as to what was requested
         _dict_deep_update(cluster, body)
 
-        _set_deep(self._clusters, [projectId, cluster['clusterName']], cluster)
+        _set_deep(self._clusters, [projectId, cluster_name], cluster)
 
         return cluster
 
+    @mock_api
     def get(self, projectId=None, region=None, clusterName=None):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
@@ -481,40 +634,21 @@ class MockDataprocClientClusters(object):
 
         return cluster
 
+    @mock_api
     def delete(self, projectId=None, region=None, clusterName=None):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        return self.update_state(projectId, clusterName, 'DELETING')
+        return self._client.cluster_update_state(projectId, clusterName, 'DELETING')
+#############################  END   END   END  ################################
+######################### Dataproc Client - Clusters ###########################
+#############################  END   END   END  ################################
 
-    def get_state(self, projectId, clusterName):
-        cluster = self.get(projectId=projectId, region=_DATAPROC_API_REGION, clusterName=clusterName)
-        return cluster['status']['state']
 
-    def update_state(self, projectId=None, clusterName=None, state=None, prev_state=None):
-        assert state
-        cluster = self.get(projectId=projectId, region=_DATAPROC_API_REGION, clusterName=clusterName)
+############################# BEGIN BEGIN BEGIN ################################
+########################### Dataproc Client - Jobs #############################
+############################# BEGIN BEGIN BEGIN ################################
 
-        old_state = cluster['status']['state']
-        assert old_state != state
-        if prev_state:
-            assert old_state == prev_state
-
-        new_status = {
-            "state": state,
-            "stateStartTime": _datetime_to_dataproc_zulu()
-        }
-
-        old_status = cluster.pop('status')
-        cluster['status'] = new_status
-
-        cluster.setdefault('statusHistory', [])
-        cluster['statusHistory'].append(old_status)
-
-        return cluster
-################################################################################
-################################################################################
-################################################################################
 _JOB_STATE_MATCHER_ACTIVE = frozenset(['PENDING', 'RUNNING', 'CANCEL_PENDING'])
 _JOB_STATE_MATCHER_NON_ACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
 _JOB_STATE_MATCHERS = {
@@ -529,7 +663,7 @@ _INPUT_DIR = ''
 _OUTPUT_DIR = ''
 
 def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, input_dir=None, output_dir=None, now=None):
-    project = project or _DATAPROC_PROJECT
+    project = project or _TEST_PROJECT
     cluster = cluster or _DATAPROC_CLUSTER
     script_name = script_name or _SCRIPT_NAME
     now = now or datetime.datetime.utcnow()
@@ -568,26 +702,12 @@ def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, input_
       },
       "status": {
         "state": "PENDING",
-        "stateStartTime": _datetime_to_dataproc_zulu(now)
+        "stateStartTime": _datetime_to_gcptime(now)
       },
       "driverControlFilesUri": "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/" % locals(),
       "driverOutputResourceUri": "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/driveroutput" % locals()
     }
     return mock_response
-
-def _update_job_state(job_resp, state=None):
-    assert state
-    old_status = job_resp.pop('status')
-
-    job_resp['status'] = {
-        "state": state,
-        "stateStartTime": _datetime_to_dataproc_zulu()
-    }
-
-    job_resp.setdefault('statusHistory', [])
-    job_resp['statusHistory'].append(old_status)
-
-    return job_resp
 
 class MockDataprocClientJobs(object):
     def __init__(self, client):
@@ -595,26 +715,27 @@ class MockDataprocClientJobs(object):
         self._client = client
         self._jobs = self._client._cache_jobs
 
+    @mock_api
     def list(self, **kwargs):
-        projectId = kwargs['projectId']
+        project_id = kwargs['projectId']
         region = kwargs['region']
-        clusterName = kwargs.get('clusterName')
-        jobStateMatcher = kwargs.get('jobStateMatcher') or 'ALL'
+        cluster_name = kwargs.get('clusterName')
+        job_state_matcher = kwargs.get('jobStateMatcher') or 'ALL'
 
-        assert projectId is not None
+        assert project_id is not None
         assert region == _DATAPROC_API_REGION
 
-        valid_job_states = _JOB_STATE_MATCHERS[jobStateMatcher]
+        valid_job_states = _JOB_STATE_MATCHERS[job_state_matcher]
 
         item_list = []
 
-        job_map = _get_deep(self._jobs, [projectId], dict())
+        job_map = _get_deep(self._jobs, [project_id], dict())
         for current_job_id, current_job in job_map.iteritems():
             job_cluster = current_job['placement']['clusterName']
             job_state = current_job['status']['state']
 
-            # If we are searching for a specific clusterName and it doesn't match...
-            if clusterName and job_cluster != clusterName:
+            # If we are searching for a specific cluster_name and it doesn't match...
+            if cluster_name and job_cluster != cluster_name:
                 continue
             elif job_state not in valid_job_states:
                 continue
@@ -624,8 +745,9 @@ class MockDataprocClientJobs(object):
         return dict(items=item_list, kwargs=kwargs)
 
     def list_next(self, list_request, resp):
-        return list()
+        return None
 
+    @mock_api
     def get(self, projectId=None, region=None, jobId=None):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
@@ -636,18 +758,21 @@ class MockDataprocClientJobs(object):
 
         return current_job
 
+    @mock_api
     def cancel(self, projectId=None, region=None, jobId=None):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        return self.update_state(projectId=projectId, jobId=jobId, state='CANCEL_PENDING')
+        return self._client.job_update_state(projectId=projectId, jobId=jobId, state='CANCEL_PENDING')
 
+    @mock_api
     def delete(self, projectId=None, region=None, jobId=None):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        return self.update_state(projectId=projectId, jobId=jobId, state='DELETING')
+        return self._client.job_update_state(projectId=projectId, jobId=jobId, state='DELETING')
 
+    @mock_api
     def submit(self, projectId=None, region=None, body=None):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
@@ -664,28 +789,6 @@ class MockDataprocClientJobs(object):
 
         return job
 
-    def get_state(self, projectId=None, jobId=None):
-        job = self.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
-        return job['status']['state']
-
-    def update_state(self, projectId=None, jobId=None, state=None, prev_state=None):
-        assert state
-        job = self.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
-
-        old_state = job['status']['state']
-        assert old_state != state
-        if prev_state:
-            assert old_state == prev_state
-
-        new_status = {
-            "state": state,
-            "stateStartTime": _datetime_to_dataproc_zulu()
-        }
-
-        old_status = job.pop('status')
-        job['status'] = new_status
-
-        job.setdefault('statusHistory', [])
-        job['statusHistory'].append(old_status)
-
-        return job
+#############################  END   END   END  ################################
+########################### Dataproc Client - Jobs #############################
+#############################  END   END   END  ################################

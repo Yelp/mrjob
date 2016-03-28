@@ -14,6 +14,7 @@
 # limitations under the License.
 import fnmatch
 import logging
+import mimetypes
 
 # from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
@@ -44,13 +45,16 @@ _GCS_API_ENDPOINT = 'storage'
 _GCS_API_VERSION = 'v1'
 
 _BINARY_MIMETYPE = 'application/octet-stream'
-_LS_FIELDS_TO_RETURN = 'nextPageToken,items(id,size,name,md5Hash)'
+_LS_FIELDS_TO_RETURN = 'nextPageToken,items(name,size,timeCreated,md5Hash)'
 
 
 def _base64_to_hex(base64_encoded):
     base64_decoded = base64.decodestring(base64_encoded)
     return binascii.hexlify(base64_decoded)
 
+def _hex_to_base64(hex_encoded):
+    hex_decoded = binascii.unhexlify(hex_encoded)
+    return base64.encodestring(hex_decoded)
 
 def _path_glob_to_parsed_gcs_uri(path_glob):
     # support globs
@@ -97,12 +101,10 @@ class GCSFilesystem(Filesystem):
 
     def _ls_detailed(self, path_glob):
         """Recursively list files on GCS and includes some metadata about them:
-        - uri
-        - size
-        - bucket name
         - object name
+        - size
         - md5 hash
-        - etag
+        - _uri
 
         *path_glob* can include ``?`` to match single characters or
         ``*`` to match 0 or more characters. Both ``?`` and ``*`` can match
@@ -111,7 +113,7 @@ class GCSFilesystem(Filesystem):
 
         scheme = urlparse(path_glob).scheme
 
-        bucket_name, _ = _path_glob_to_parsed_gcs_uri(path_glob)
+        bucket_name, base_name = _path_glob_to_parsed_gcs_uri(path_glob)
 
         # allow subdirectories of the path/glob
         if path_glob and not path_glob.endswith('/'):
@@ -119,21 +121,21 @@ class GCSFilesystem(Filesystem):
         else:
             dir_glob = path_glob + '*'
 
-        list_request = self.api_client.objects().list(bucket=bucket_name, fields=_LS_FIELDS_TO_RETURN)
+        list_request = self.api_client.objects().list(bucket=bucket_name, prefix=base_name, fields=_LS_FIELDS_TO_RETURN)
 
+        uri_prefix = '%s://%s' % (scheme, bucket_name)
         while list_request:
             resp = list_request.execute()
             for item in resp['items']:
-                # We generate the item URI by adding the "gs://" prefix and snipping the "/generation"
-                # number which is at the end of the id that we retrieved.
-                file_path, _, generation = item['id'].rpartition('/')
-                uri = "%s://%s" % (scheme, file_path)
+                # We generate the item URI by adding the "gs://" prefix
+                uri = "%s/%s" % (uri_prefix, item['name'])
 
                 # enforce globbing
                 if not (fnmatch.fnmatchcase(uri, path_glob) or fnmatch.fnmatchcase(uri, dir_glob)):
                     continue
 
                 item['_uri'] = uri
+                item['bucket'] = bucket_name
                 item['size'] = int(item['size'])
                 yield item
 
@@ -212,12 +214,13 @@ class GCSFilesystem(Filesystem):
 
     def _upload_io(self, io_obj, dest_uri):
         bucket, name = parse_gcs_uri(dest_uri)
-
         if self.exists(dest_uri):
             raise Exception("File already exists: " + dest_uri)
 
+        mimetype, _ = mimetypes.guess_type(src_path)
+
         # Chunked file upload
-        media = http.MediaIoBaseUpload(io_obj, _BINARY_MIMETYPE, resumable=True)
+        media = http.MediaIoBaseUpload(io_obj, mimetype, resumable=True)
         upload_req = self.api_client.objects().insert(bucket=bucket, name=name, media_body=media)
 
         upload_resp = None
@@ -232,7 +235,7 @@ class GCSFilesystem(Filesystem):
         """List buckets on GCS."""
         list_kwargs = dict(project=project)
         if prefix:
-            list_kwarg['prefix'] = prefix
+            list_kwargs['prefix'] = prefix
 
         req = self.api_client.buckets().list(**list_kwargs)
         resp = req.execute()
@@ -243,22 +246,22 @@ class GCSFilesystem(Filesystem):
         req = self.api_client.buckets().get(bucket=bucket)
         return req.execute()
 
-    def bucket_create(self, project, bucket, location='', object_ttl_days=None):
+    def bucket_create(self, project, name, location=None, object_ttl_days=None):
         """Create a bucket on GCS, optionally setting location constraint."""
         # https://cloud.google.com/storage/docs/lifecycle
-        insert_kwargs = dict(project=project, name=bucket)
+        body = dict(name=name)
 
         if location:
-            insert_kwargs['location'] = location
+            body['location'] = location
 
         if object_ttl_days is not None:
             lifecycle_rule = dict(
                 action=dict(type='Delete'),
                 condition=dict(age=object_ttl_days)
             )
-            insert_kwargs['lifecycle'] = dict(rule=[lifecycle_rule])
+            body['lifecycle'] = dict(rule=[lifecycle_rule])
 
-        req = self.api_client.buckets().insert(**insert_kwargs)
+        req = self.api_client.buckets().insert(project=project, body=body)
         return req.execute()
 
     def bucket_delete(self, bucket):

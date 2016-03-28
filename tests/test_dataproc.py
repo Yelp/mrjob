@@ -27,9 +27,9 @@ from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 
 from mrjob.fs.gcs import GCSFilesystem
+from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.job import MRJob
 from mrjob.parse import JOB_KEY_RE
-from mrjob.parse import parse_gcs_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
@@ -48,7 +48,6 @@ from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
-from tests.sandbox import patch_fs_gcs
 
 try:
     from oauth2client.client import GoogleCredentials

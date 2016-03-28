@@ -38,40 +38,48 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         super(GCSFSTestCase, self).setUp()
         self.fs = GCSFilesystem()
 
+    def _put_multi(self, gcs_uri_to_data_map):
+        self._gcs_client.put_gcs_multi(gcs_uri_to_data_map)
+
     def test_cat_uncompressed(self):
-        self.put_gcs_data(
-            {'walrus': {'data/foo': b'foo\nfoo\n'}})
+        self._put_multi({
+            'gs://walrus/data/foo': b'foo\nfoo\n'
+        })
 
         self.assertEqual(list(self.fs._cat_file('gs://walrus/data/foo')),
                          [b'foo\n', b'foo\n'])
 
     def test_cat_bz2(self):
-        self.put_gcs_data(
-            {'walrus': {'data/foo.bz2': bz2.compress(b'foo\n' * 1000)}})
+        self._put_multi({
+            'gs://walrus/data/foo.bz2': bz2.compress(b'foo\n' * 1000)
+        })
 
         self.assertEqual(list(self.fs._cat_file('gs://walrus/data/foo.bz2')),
                          [b'foo\n'] * 1000)
 
     def test_cat_gz(self):
-        self.put_gcs_data(
-            {'walrus': {'data/foo.gz': gzip_compress(b'foo\n' * 10000)}})
+        self._put_multi({
+            'gs://walrus/data/foo.gz': gzip_compress(b'foo\n' * 10000)
+        })
 
         self.assertEqual(list(self.fs._cat_file('gs://walrus/data/foo.gz')),
                          [b'foo\n'] * 10000)
 
     def test_ls_key(self):
-        self.put_gcs_data(
-            {'walrus': {'data/foo': b''}})
+        self._put_multi({
+            'gs://walrus/data/foo': b''
+        })
 
         self.assertEqual(list(self.fs.ls('gs://walrus/data/foo')),
                          ['gs://walrus/data/foo'])
 
     def test_ls_recursively(self):
-        self.put_gcs_data(
-            {'walrus': {'data/bar': b'',
-                        'data/bar/baz': b'',
-                        'data/foo': b'',
-                        'qux': b''}})
+        self._put_multi({
+            'gs://walrus/data/bar': b'',
+            'gs://walrus/data/bar/baz': b'',
+            'gs://walrus/data/foo': b'',
+            'gs://walrus/qux': b'',
+        })
 
         uris = [
             'gs://walrus/data/bar',
@@ -80,24 +88,25 @@ class GCSFSTestCase(MockGoogleAPITestCase):
             'gs://walrus/qux',
         ]
 
-        self.assertEqual(list(self.fs.ls('gs://walrus/')), uris)
-        self.assertEqual(list(self.fs.ls('gs://walrus/*')), uris)
+        self.assertEqual(set(self.fs.ls('gs://walrus/')), set(uris))
+        self.assertEqual(set(self.fs.ls('gs://walrus/*')), set(uris))
 
-        self.assertEqual(list(self.fs.ls('gs://walrus/data')), uris[:-1])
-        self.assertEqual(list(self.fs.ls('gs://walrus/data/')), uris[:-1])
-        self.assertEqual(list(self.fs.ls('gs://walrus/data/*')), uris[:-1])
+        self.assertEqual(set(self.fs.ls('gs://walrus/data')), set(uris[:-1]))
+        self.assertEqual(set(self.fs.ls('gs://walrus/data/')), set(uris[:-1]))
+        self.assertEqual(set(self.fs.ls('gs://walrus/data/*')), set(uris[:-1]))
 
     def test_ls_globs(self):
-        self.put_gcs_data(
-            {'w': {'a': b'',
-                   'a/b': b'',
-                   'ab': b'',
-                   'b': b''}})
+        self._put_multi({
+            'gs://w/a': b'',
+            'gs://w/a/b': b'',
+            'gs://w/ab': b'',
+            'gs://w/b': b'',
+        })
 
-        self.assertEqual(list(self.fs.ls('gs://w/')),
-                         ['gs://w/a', 'gs://w/a/b', 'gs://w/ab', 'gs://w/b'])
-        self.assertEqual(list(self.fs.ls('gs://w/*')),
-                         ['gs://w/a', 'gs://w/a/b', 'gs://w/ab', 'gs://w/b'])
+        self.assertEqual(set(self.fs.ls('gs://w/')),
+                         set(['gs://w/a', 'gs://w/a/b', 'gs://w/ab', 'gs://w/b']))
+        self.assertEqual(set(self.fs.ls('gs://w/*')),
+                         set(['gs://w/a', 'gs://w/a/b', 'gs://w/ab', 'gs://w/b']))
         self.assertEqual(list(self.fs.ls('gs://w/*/')),
                          ['gs://w/a/b'])
         self.assertEqual(list(self.fs.ls('gs://w/*/*')),
@@ -105,39 +114,43 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         self.assertEqual(list(self.fs.ls('gs://w/a?')),
                          ['gs://w/ab'])
         # * can match /
-        self.assertEqual(list(self.fs.ls('gs://w/a*')),
-                         ['gs://w/a', 'gs://w/a/b', 'gs://w/ab'])
-        self.assertEqual(list(self.fs.ls('gs://w/*b')),
-                         ['gs://w/a/b', 'gs://w/ab', 'gs://w/b'])
+        self.assertEqual(set(self.fs.ls('gs://w/a*')),
+                         set(['gs://w/a', 'gs://w/a/b', 'gs://w/ab']))
+        self.assertEqual(set(self.fs.ls('gs://w/*b')),
+                         set(['gs://w/a/b', 'gs://w/ab', 'gs://w/b']))
 
 
     def test_du(self):
-        self.put_gcs_data({
-            'walrus': {'data/foo': b'abcde',
-                       'data/bar/baz': b'fgh'}})
+        self._put_multi({
+            'gs://walrus/data/foo': b'abcde',
+            'gs://walrus/data/bar/baz': b'fgh'
+        })
 
         self.assertEqual(self.fs.du('gs://walrus/'), 8)
         self.assertEqual(self.fs.du('gs://walrus/data/foo'), 5)
         self.assertEqual(self.fs.du('gs://walrus/data/bar/baz'), 3)
 
     def test_exists(self):
-        self.put_gcs_data({
-            'walrus': {'data/foo': b'abcd'}})
+        self._put_multi({
+            'gs://walrus/data/foo': b'abcd'
+        })
         self.assertEqual(self.fs.exists('gs://walrus/data/foo'), True)
         self.assertEqual(self.fs.exists('gs://walrus/data/bar'), False)
 
     def test_rm(self):
-        self.put_gcs_data({
-            'walrus': {'foo': b''}})
+        self._put_multi({
+            'gs://walrus/foo': b''
+        })
 
         self.assertEqual(self.fs.exists('gs://walrus/foo'), True)
         self.fs.rm('gs://walrus/foo')
         self.assertEqual(self.fs.exists('gs://walrus/foo'), False)
 
     def test_rm_dir(self):
-        self.put_gcs_data({
-            'walrus': {'data/foo': b'',
-                       'data/bar/baz': b''}})
+        self._put_multi({
+            'gs://walrus/data/foo': b'',
+            'gs://walrus/data/bar/baz': b'',
+        })
 
         self.assertEqual(self.fs.exists('gs://walrus/data/foo'), True)
         self.assertEqual(self.fs.exists('gs://walrus/data/bar/baz'), True)

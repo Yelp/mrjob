@@ -21,7 +21,7 @@ To get started, install with ``pip``::
 
 and begin reading the tutorial below.
 
-.. ifconfig:: release.endswith('-dev')
+.. ifconfig:: 'dev' in release
 
     .. note::
 

@@ -1,4 +1,4 @@
-v0.5.0, 2016-03-?? -- the future is in the past
+v0.5.0, 2016-03-28 -- the future is in the past
  * supports Python 3 (#989)
  * requires boto 2.35.0 or newer (#980)
    * removed many workarounds for S3 and EMR (#980), IAM (#1062)

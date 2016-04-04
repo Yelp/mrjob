@@ -38,11 +38,10 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         super(GCSFSTestCase, self).setUp()
         self.fs = GCSFilesystem()
 
-    def _put_multi(self, gcs_uri_to_data_map):
-        self._gcs_client.put_gcs_multi(gcs_uri_to_data_map)
+
 
     def test_cat_uncompressed(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/data/foo': b'foo\nfoo\n'
         })
 
@@ -50,7 +49,7 @@ class GCSFSTestCase(MockGoogleAPITestCase):
                          [b'foo\n', b'foo\n'])
 
     def test_cat_bz2(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/data/foo.bz2': bz2.compress(b'foo\n' * 1000)
         })
 
@@ -58,7 +57,7 @@ class GCSFSTestCase(MockGoogleAPITestCase):
                          [b'foo\n'] * 1000)
 
     def test_cat_gz(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/data/foo.gz': gzip_compress(b'foo\n' * 10000)
         })
 
@@ -66,7 +65,7 @@ class GCSFSTestCase(MockGoogleAPITestCase):
                          [b'foo\n'] * 10000)
 
     def test_ls_key(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/data/foo': b''
         })
 
@@ -74,7 +73,7 @@ class GCSFSTestCase(MockGoogleAPITestCase):
                          ['gs://walrus/data/foo'])
 
     def test_ls_recursively(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/data/bar': b'',
             'gs://walrus/data/bar/baz': b'',
             'gs://walrus/data/foo': b'',
@@ -96,7 +95,7 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         self.assertEqual(set(self.fs.ls('gs://walrus/data/*')), set(uris[:-1]))
 
     def test_ls_globs(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://w/a': b'',
             'gs://w/a/b': b'',
             'gs://w/ab': b'',
@@ -121,7 +120,7 @@ class GCSFSTestCase(MockGoogleAPITestCase):
 
 
     def test_du(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/data/foo': b'abcde',
             'gs://walrus/data/bar/baz': b'fgh'
         })
@@ -131,14 +130,14 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         self.assertEqual(self.fs.du('gs://walrus/data/bar/baz'), 3)
 
     def test_exists(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/data/foo': b'abcd'
         })
         self.assertEqual(self.fs.exists('gs://walrus/data/foo'), True)
         self.assertEqual(self.fs.exists('gs://walrus/data/bar'), False)
 
     def test_rm(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/foo': b''
         })
 
@@ -147,7 +146,7 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         self.assertEqual(self.fs.exists('gs://walrus/foo'), False)
 
     def test_rm_dir(self):
-        self._put_multi({
+        self.put_gcs_multi({
             'gs://walrus/data/foo': b'',
             'gs://walrus/data/bar/baz': b'',
         })

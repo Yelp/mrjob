@@ -158,6 +158,7 @@ class MockGoogleAPITestCase(SandboxedTestCase):
 
         self._dataproc_client = MockDataprocClient(self)
         self._gcs_client = MockGCSClient(self)
+        self._gcs_fs = self._gcs_client._fs
 
         self.start(patch.object(DataprocJobRunner, 'api_client', self._dataproc_client))
 
@@ -200,6 +201,9 @@ class MockGoogleAPITestCase(SandboxedTestCase):
 
         return mr_job.make_runner()
 
+    def put_gcs_multi(self, gcs_uri_to_data_map):
+        """Convenience method"""
+        self._gcs_client.put_gcs_multi(gcs_uri_to_data_map)
 
 ############################# BEGIN BEGIN BEGIN ################################
 ########################### GCS Client - OVERALL ###############################
@@ -333,7 +337,7 @@ class MockGCSClientBuckets(object):
 
     @mock_api
     def list(self, **kwargs):
-        project = kwarsg.get('project')
+        project = kwargs.get('project')
         prefix = kwargs.get('prefix') or ''
 
         item_list = []
@@ -371,7 +375,7 @@ class MockGCSClientBuckets(object):
         bucket = _make_bucket_resp()
 
         # Then do a deep-update as to what was requested
-        _dict_deep_update(bucket, body)
+        bucket = _dict_deep_update(bucket, body)
 
         self._buckets[bucket_name] = bucket
 
@@ -439,22 +443,29 @@ class MockDataprocClient(object):
     def jobs(self):
         return self._client_jobs
 
-    def cluster_get_state(self, projectId=None, clusterName=None):
-        cluster = self._client_clusters.get(projectId=projectId, region=_DATAPROC_API_REGION, clusterName=clusterName)
+    def cluster_create(self, project=None, cluster=None):
+        cluster_body = _create_cluster_resp(project=project, cluster=cluster)
+        cluster_resp = self._client_clusters.create(projectId=cluster_body['projectId'],
+                                                   region=_DATAPROC_API_REGION,
+                                                   body=cluster_body).execute()
+        return cluster_resp
+
+    def cluster_get_state(self, project=None, cluster=None):
+        cluster = self._client_clusters.get(projectId=project, region=_DATAPROC_API_REGION, clusterName=cluster)
         return self._get_state(cluster)
 
-    def cluster_update_state(self, projectId=None, clusterName=None, state=None, prev_state=None):
+    def cluster_update_state(self, project=None, cluster=None, state=None, prev_state=None):
         assert state
-        cluster = self._client_clusters.get(projectId=projectId, region=_DATAPROC_API_REGION, clusterName=clusterName)
+        cluster = self._client_clusters.get(projectId=project, region=_DATAPROC_API_REGION, clusterName=cluster)
         return self._update_state(cluster, state=state, prev_state=prev_state)
 
-    def job_get_state(self, projectId=None, jobId=None):
-        job = self._client_jobs.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
+    def job_get_state(self, project=None, job=None):
+        job = self._client_jobs.get(projectId=project, region=_DATAPROC_API_REGION, jobId=job)
         return self._get_state(job)
 
-    def job_update_state(self, projectId=None, jobId=None, state=None, prev_state=None):
+    def job_update_state(self, project=None, job=None, state=None, prev_state=None):
         assert state
-        job = self._client_jobs.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
+        job = self._client_jobs.get(projectId=project, region=_DATAPROC_API_REGION, jobId=job)
         return self._update_state(job, state=state, prev_state=prev_state)
 
     def _get_state(self, cluster_or_job):
@@ -532,7 +543,7 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
       ],
       "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
       "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type_master)s" % locals(),
-      "diskConfiguration": {
+      "diskConfig": {
         "bootDiskSizeGb": 500
       }
     }
@@ -542,7 +553,7 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
       "instanceNames": ['%s-w-%d' % (cluster, num) for num in xrange(num_workers)],
       "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
       "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type)s" % locals(),
-      "diskConfiguration": {
+      "diskConfig": {
         "bootDiskSizeGb": 500
       }
     }
@@ -579,12 +590,12 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
     mock_response = {
       "projectId": project,
       "clusterName": cluster,
-      "configuration": {
-        "configurationBucket": "dataproc-801485be-0997-40e7-84a7-00926031747c-us",
-        "gceClusterConfiguration": gce_cluster_conf,
-        "masterConfiguration": master_conf,
-        "workerConfiguration": worker_conf,
-        "softwareConfiguration": software_conf
+      "config": {
+        "configBucket": "dataproc-801485be-0997-40e7-84a7-00926031747c-us",
+        "gceClusterConfig": gce_cluster_conf,
+        "masterConfig": master_conf,
+        "workerConfig": worker_conf,
+        "softwareConfig": software_conf
       },
       "status": {
         "state": "CREATING",
@@ -608,7 +619,7 @@ class MockDataprocClientClusters(object):
 
         body = body or dict()
 
-        cluster_name = cluster['clusterName']
+        cluster_name = body['clusterName']
 
         existing_cluster = _get_deep(self._clusters, [projectId, cluster_name])
         assert not existing_cluster
@@ -617,7 +628,7 @@ class MockDataprocClientClusters(object):
         cluster = _create_cluster_resp()
 
         # Then do a deep-update as to what was requested
-        _dict_deep_update(cluster, body)
+        cluster = _dict_deep_update(cluster, body)
 
         _set_deep(self._clusters, [projectId, cluster_name], cluster)
 
@@ -698,7 +709,7 @@ def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, input_
           "-output",
           output_dir
         ],
-        "loggingConfiguration": {}
+        "loggingConfig": {}
       },
       "status": {
         "state": "PENDING",

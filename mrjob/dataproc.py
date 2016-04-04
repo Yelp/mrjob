@@ -30,6 +30,7 @@ except ImportError:
     # inside hadoop streaming
     GoogleCredentials = None
     discovery = None
+    google_errors = None
 
 try:
     # Python 2
@@ -371,6 +372,8 @@ class DataprocJobRunner(MRJobRunner):
         mrjob_buckets = self.fs.buckets_list(self._gcp_project, prefix='mrjob-')
 
         # Loop over buckets until we find one that matches region
+        # NOTE - because we this is a fs_tmpdir, we look for a GCS bucket in the same GCE region
+        # NOTE - As of Apr 1, 2016 - GCS buckets should typically be at the multi-region level but we special case it here
         chosen_bucket_name = None
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket['name']
@@ -383,7 +386,7 @@ class DataprocJobRunner(MRJobRunner):
 
         # Example default - "mrjob-us-central1-RANDOMHEX
         if not chosen_bucket_name:
-            chosen_bucket_name = '-'.join(['mrjob', self._gce_region, random_identifier()])
+            chosen_bucket_name = '-'.join(['mrjob', random_identifier()])
 
         return 'gs://%s/tmp/' % chosen_bucket_name
 
@@ -498,7 +501,7 @@ class DataprocJobRunner(MRJobRunner):
             self.fs.bucket_get(bucket_name)
             return
         except google_errors.HttpError as e:
-            if not e.resp['status'] == httplib.NOT_FOUND:
+            if not e.resp.status == httplib.NOT_FOUND:
                 raise
 
         log.info('creating FS bucket %r' % bucket_name)
@@ -513,11 +516,6 @@ class DataprocJobRunner(MRJobRunner):
         self._wait_for_fs_sync()
 
     ### Running the job ###
-
-    def cleanup(self, mode=None):
-        super(DataprocJobRunner, self).cleanup(mode=mode)
-
-        self._cleanup_cluster()
 
     def _cleanup_remote_tmp(self):
         # delete all the files we created
@@ -634,7 +632,7 @@ class DataprocJobRunner(MRJobRunner):
             self._api_cluster_get(self._cluster_id)
             log.info('Adding our job to existing cluster %s' % self._cluster_id)
         except google_errors.HttpError as e:
-            if not e.resp['status'] == httplib.NOT_FOUND:
+            if not e.resp.status == httplib.NOT_FOUND:
                 raise
 
             cluster_data = self._cluster_args()
@@ -643,6 +641,7 @@ class DataprocJobRunner(MRJobRunner):
 
         # keep track of when we launched our job
         self._dataproc_job_start = time.time()
+        return self._cluster_id
 
     def _dataproc_job_prefix(self):
         return _cleanse_gcp_job_id(self._job_key)

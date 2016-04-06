@@ -802,3 +802,12 @@ SSH access and tunneling
     if True, any host can connect to the job tracker through the SSH tunnel
     you open.  Mostly useful if your browser is running on a different machine
     from your job runner.
+
+.. mrjob-opt::
+    :config: ssh_socks_proxy
+    :switch: --ssh-socks-proxy
+    :type: boolean
+    :set: emr
+    :default: ``False``
+
+    if True, mrjob will setup another SSH tunnel with dynamic forwarding.

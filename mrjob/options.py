@@ -392,6 +392,11 @@ def _add_emr_run_opts(opt_group):
                   ' localhost).')),
 
         opt_group.add_option(
+            '--ssh-socks-proxy', dest='ssh_socks_proxy',
+            default=None, action='store_true',
+            help=('Use DynamicForward to create a SOCKS proxy.')),
+
+        opt_group.add_option(
             '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
             default=None, action='store_true',
             help='Deprecated alias for --ssh-tunnel'),

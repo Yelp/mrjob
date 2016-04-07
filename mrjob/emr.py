@@ -985,12 +985,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _set_up_ssh_socks_proxy(self):
         """set up a SOCKS proxy to the job tracker, if it's not currently running.
         """
-        pname = 'dynamic-forward'
+        host = self._address_of_master()
+        if not host:
+            return
+
+        pname = 'dynamic-forward SOCKS proxy'
 
         # look up what we're supposed to do on this AMI version
         tunnel_config = self._ssh_tunnel_config()
-        ssh_args = ['-D', '%d']
-        log.info('  Opening ssh SOCKS proxy through %s...' % tunnel_config['name'])
+        ssh_args = ['-D', '{bind}', '-g', '-4']
 
         bind_port = self._setup_ssh(pname, ssh_args)
         if not bind_port:
@@ -1000,14 +1003,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.warning(
                 '  Failed to open ssh SOCKS proxy to %s' % tunnel_config['name'])
         else:
-            log.info('  Connect to %s using SOCKS proxy at :%d' % (
-                tunnel_config['name'], bind_port))
+            log.info(
+                '  Connect to %s using SOCKS proxy at :%d, and navigate to http://%s:8088/cluster' % (
+                tunnel_config['name'], bind_port, host))
 
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
         """
-        pname = 'local-forward'
+        pname = 'local-forward tunnel'
 
         host = self._address_of_master()
         if not host:
@@ -1015,8 +1019,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # look up what we're supposed to do on this AMI version
         tunnel_config = self._ssh_tunnel_config()
-        ssh_args = ['-L', '%d' + ':%s:%d' % (host, tunnel_config['port'])]
-        log.info('  Opening ssh tunnel to %s...' % tunnel_config['name'])
+        ssh_args = ['-L', '{bind}:%s:%d' % (host, tunnel_config['port'])]
+        if self._opts['ssh_tunnel_is_open']:
+            ssh_args.extend(['-g', '-4'])  # -4: listen on IPv4 only
 
         bind_port = self._setup_ssh(pname, ssh_args)
         if not bind_port:
@@ -1076,8 +1081,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('Created empty ssh known-hosts file: %s' % (
             fake_known_hosts_file,))
 
+        log.info('  Opening ssh %s ...' % pname)
         bind_port = None
-        for bind_port in self._pick_ssh_bind_ports():
+        for bind_port in self._pick_ssh_bind_ports(pname):
             args = self._opts['ssh_bin'] + [
                 '-o', 'VerifyHostKeyDNS=no',
                 '-o', 'StrictHostKeyChecking=no',
@@ -1085,9 +1091,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
                 '-N', '-q',  # no shell, no output
                 '-i', self._opts['ec2_key_pair_file'],
-            ] + ssh_args
-            if self._opts['ssh_tunnel_is_open']:
-                args.extend(['-g', '-4'])  # -4: listen on IPv4 only
+            ]
+            args.extend(arg.format(bind=bind_port) for arg in ssh_args)
             args.append('hadoop@' + host)
             log.debug('> %s' % cmd_line(args))
 
@@ -1097,7 +1102,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # still running. We are golden
             if ssh_proc.returncode is None:
                 self._ssh_procs[pname] = ssh_proc
-                break
             else:
                 ssh_proc.stdin.close()
                 ssh_proc.stdout.close()
@@ -1105,7 +1109,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return bind_port
 
-    def _pick_ssh_bind_ports(self):
+    def _pick_ssh_bind_ports(self, pname):
         """Pick a list of ports to try binding our SSH tunnel to.
 
         We will try to bind the same port for any given cluster (Issue #67)
@@ -1114,7 +1118,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         random_state = random.getstate()
         try:
             # seed random port selection on cluster ID
-            random.seed(self._cluster_id)
+            random.seed(self._cluster_id + pname)
             num_picks = min(_MAX_SSH_RETRIES,
                             len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
@@ -1140,9 +1144,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
                     try:
                         os.kill(ssh_proc.pid, signal.SIGKILL)
-                        del self._ssh_procs[pname]
                     except Exception as e:
                         log.exception(e)
+            self._ssh_procs = {}
 
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)

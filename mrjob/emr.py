@@ -350,6 +350,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_bind_ports',
         'ssh_tunnel',
         'ssh_tunnel_is_open',
+        'ssh_socks_proxy',
         'visible_to_all_users',
     ]))
 
@@ -411,6 +412,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_bind_ports': list(range(40001, 40841)),
             'ssh_tunnel': False,
             'ssh_tunnel_is_open': False,
+            'ssh_socks_proxy': False,
             'visible_to_all_users': True,
         })
 

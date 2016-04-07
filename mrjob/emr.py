@@ -1004,8 +1004,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '  Failed to open ssh SOCKS proxy to %s' % tunnel_config['name'])
         else:
             log.info(
-                '  Connect to %s using SOCKS proxy at :%d, and navigate to http://%s:8088/cluster' % (
-                tunnel_config['name'], bind_port, host))
+                '  Connect to %s using SOCKS proxy at :%d, and navigate to http://%s:%d/cluster' % (
+                    tunnel_config['name'], bind_port, host, tunnel_config['port']))
 
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
@@ -1102,6 +1102,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # still running. We are golden
             if ssh_proc.returncode is None:
                 self._ssh_procs[pname] = ssh_proc
+                break
             else:
                 ssh_proc.stdin.close()
                 ssh_proc.stdout.close()

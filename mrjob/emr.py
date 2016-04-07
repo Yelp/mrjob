@@ -350,6 +350,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_bind_ports',
         'ssh_tunnel',
         'ssh_tunnel_is_open',
+        'ssh_socks_proxy',
         'visible_to_all_users',
     ]))
 
@@ -411,6 +412,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_bind_ports': list(range(40001, 40841)),
             'ssh_tunnel': False,
             'ssh_tunnel_is_open': False,
+            'ssh_socks_proxy': False,
             'visible_to_all_users': True,
         })
 
@@ -644,7 +646,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._emr_job_start = None
 
         # ssh state
-        self._ssh_proc = None
+        self._ssh_procs = {}
         self._gave_cant_ssh_warning = False
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
@@ -980,83 +982,52 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return map_version(self.get_ami_version(),
                            _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
 
+    def _set_up_ssh_socks_proxy(self):
+        """set up a SOCKS proxy to the job tracker, if it's not currently running.
+        """
+        host = self._address_of_master()
+        if not host:
+            return
+
+        pname = 'dynamic-forward SOCKS proxy'
+
+        # look up what we're supposed to do on this AMI version
+        tunnel_config = self._ssh_tunnel_config()
+        ssh_args = ['-D', '{bind}', '-g', '-4']
+
+        bind_port = self._setup_ssh(pname, ssh_args)
+        if not bind_port:
+            return
+
+        if pname not in self._ssh_procs:
+            log.warning(
+                '  Failed to open ssh SOCKS proxy to %s' % tunnel_config['name'])
+        else:
+            log.info(
+                '  Connect to %s using SOCKS proxy at :%d, and navigate to http://%s:%d/cluster' % (
+                    tunnel_config['name'], bind_port, host, tunnel_config['port']))
+
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
         """
-        if not self._opts['ssh_tunnel']:
-            return
+        pname = 'local-forward tunnel'
 
         host = self._address_of_master()
         if not host:
             return
 
-        REQUIRED_OPTS = ['ec2_key_pair', 'ec2_key_pair_file', 'ssh_bind_ports']
-        for opt_name in REQUIRED_OPTS:
-            if not self._opts[opt_name]:
-                if not self._gave_cant_ssh_warning:
-                    log.warning(
-                        "  You must set %s in order to set up the SSH tunnel!"
-                        % opt_name)
-                    self._gave_cant_ssh_warning = True
-                return
-
-        # if there was already a tunnel, make sure it's still up
-        if self._ssh_proc:
-            self._ssh_proc.poll()
-            if self._ssh_proc.returncode is None:
-                return
-            else:
-                log.warning('  Oops, ssh subprocess exited with return code'
-                            ' %d, restarting...' % self._ssh_proc.returncode)
-                self._ssh_proc = None
-
         # look up what we're supposed to do on this AMI version
         tunnel_config = self._ssh_tunnel_config()
+        ssh_args = ['-L', '{bind}:%s:%d' % (host, tunnel_config['port'])]
+        if self._opts['ssh_tunnel_is_open']:
+            ssh_args.extend(['-g', '-4'])  # -4: listen on IPv4 only
 
-        log.info('  Opening ssh tunnel to %s...' % tunnel_config['name'])
+        bind_port = self._setup_ssh(pname, ssh_args)
+        if not bind_port:
+            return
 
-        # if ssh detects that a host key has changed, it will silently not
-        # open the tunnel, so make a fake empty known_hosts file and use that.
-        # (you can actually use /dev/null as your known hosts file, but
-        # that's UNIX-specific)
-        fake_known_hosts_file = os.path.join(
-            self._get_local_tmp_dir(), 'fake_ssh_known_hosts')
-        # blank out the file, if it exists
-        f = open(fake_known_hosts_file, 'w')
-        f.close()
-        log.debug('Created empty ssh known-hosts file: %s' % (
-            fake_known_hosts_file,))
-
-        bind_port = None
-        for bind_port in self._pick_ssh_bind_ports():
-            args = self._opts['ssh_bin'] + [
-                '-o', 'VerifyHostKeyDNS=no',
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'ExitOnForwardFailure=yes',
-                '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
-                '-L', '%d:%s:%d' % (bind_port, host, tunnel_config['port']),
-                '-N', '-q',  # no shell, no output
-                '-i', self._opts['ec2_key_pair_file'],
-            ]
-            if self._opts['ssh_tunnel_is_open']:
-                args.extend(['-g', '-4'])  # -4: listen on IPv4 only
-            args.append('hadoop@' + host)
-            log.debug('> %s' % cmd_line(args))
-
-            ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            time.sleep(_WAIT_FOR_SSH_TO_FAIL)
-            ssh_proc.poll()
-            # still running. We are golden
-            if ssh_proc.returncode is None:
-                self._ssh_proc = ssh_proc
-                break
-            else:
-                ssh_proc.stdin.close()
-                ssh_proc.stdout.close()
-                ssh_proc.stderr.close()
-
-        if not self._ssh_proc:
+        if pname not in self._ssh_procs:
             log.warning(
                 '  Failed to open ssh tunnel to %s' % tunnel_config['name'])
         else:
@@ -1070,7 +1041,76 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('  Connect to %s at: %s' % (
                 tunnel_config['name'], self._tunnel_url))
 
-    def _pick_ssh_bind_ports(self):
+    def _setup_ssh(self, pname, ssh_args):
+        if not self._opts['ssh_tunnel']:
+            return
+
+        host = self._address_of_master()
+        if not host:
+            return
+
+        REQUIRED_OPTS = ['ec2_key_pair', 'ec2_key_pair_file', 'ssh_bind_ports']
+        for opt_name in REQUIRED_OPTS:
+            if not self._opts[opt_name]:
+                if not self._gave_cant_ssh_warning:
+                    log.warning(
+                        "  You must set %s in order to set up the SSH tunnel/proxy!"
+                        % opt_name)
+                    self._gave_cant_ssh_warning = True
+                return
+
+        # if there was already a tunnel, make sure it's still up
+        if pname in self._ssh_procs:
+            self._ssh_procs[pname].poll()
+            if self._ssh_procs[pname].returncode is None:
+                return
+            else:
+                log.warning('  Oops, ssh subprocess exited with return code'
+                            ' %d, restarting...' % self._ssh_procs[pname].returncode)
+                del self._ssh_procs[pname]
+
+        # if ssh detects that a host key has changed, it will silently not
+        # open the tunnel, so make a fake empty known_hosts file and use that.
+        # (you can actually use /dev/null as your known hosts file, but
+        # that's UNIX-specific)
+        fake_known_hosts_file = os.path.join(
+            self._get_local_tmp_dir(), 'fake_ssh_known_hosts')
+        # blank out the file, if it exists
+        f = open(fake_known_hosts_file, 'w')
+        f.close()
+        log.debug('Created empty ssh known-hosts file: %s' % (
+            fake_known_hosts_file,))
+
+        log.info('  Opening ssh %s ...' % pname)
+        bind_port = None
+        for bind_port in self._pick_ssh_bind_ports(pname):
+            args = self._opts['ssh_bin'] + [
+                '-o', 'VerifyHostKeyDNS=no',
+                '-o', 'StrictHostKeyChecking=no',
+                '-o', 'ExitOnForwardFailure=yes',
+                '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
+                '-N', '-q',  # no shell, no output
+                '-i', self._opts['ec2_key_pair_file'],
+            ]
+            args.extend(arg.format(bind=bind_port) for arg in ssh_args)
+            args.append('hadoop@' + host)
+            log.debug('> %s' % cmd_line(args))
+
+            ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            time.sleep(_WAIT_FOR_SSH_TO_FAIL)
+            ssh_proc.poll()
+            # still running. We are golden
+            if ssh_proc.returncode is None:
+                self._ssh_procs[pname] = ssh_proc
+                break
+            else:
+                ssh_proc.stdin.close()
+                ssh_proc.stdout.close()
+                ssh_proc.stderr.close()
+
+        return bind_port
+
+    def _pick_ssh_bind_ports(self, pname):
         """Pick a list of ports to try binding our SSH tunnel to.
 
         We will try to bind the same port for any given cluster (Issue #67)
@@ -1079,7 +1119,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         random_state = random.getstate()
         try:
             # seed random port selection on cluster ID
-            random.seed(self._cluster_id)
+            random.seed(self._cluster_id + pname)
             num_picks = min(_MAX_SSH_RETRIES,
                             len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
@@ -1092,21 +1132,22 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         super(EMRJobRunner, self).cleanup(mode=mode)
 
         # always stop our SSH tunnel if it's still running
-        if self._ssh_proc:
-            self._ssh_proc.poll()
-            if self._ssh_proc.returncode is None:
-                log.info('Killing our SSH tunnel (pid %d)' %
-                         self._ssh_proc.pid)
+        if self._ssh_procs:
+            for pname, ssh_proc in self._ssh_procs.iteritems():
+                ssh_proc.poll()
+                if ssh_proc.returncode is None:
+                    log.info('Killing our SSH tunnel (pid %d)' %
+                             ssh_proc.pid)
 
-                self._ssh_proc.stdin.close()
-                self._ssh_proc.stdout.close()
-                self._ssh_proc.stderr.close()
+                    ssh_proc.stdin.close()
+                    ssh_proc.stdout.close()
+                    ssh_proc.stderr.close()
 
-                try:
-                    os.kill(self._ssh_proc.pid, signal.SIGKILL)
-                    self._ssh_proc = None
-                except Exception as e:
-                    log.exception(e)
+                    try:
+                        os.kill(ssh_proc.pid, signal.SIGKILL)
+                    except Exception as e:
+                        log.exception(e)
+            self._ssh_procs = {}
 
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)
@@ -1240,7 +1281,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         cluster_id = emr_conn.run_jobflow(
             self._job_key, self._opts['s3_log_uri'], **args)
 
-         # keep track of when we started our job
+        # keep track of when we started our job
         self._emr_job_start = time.time()
 
         log.debug('Cluster created with ID: %s' % cluster_id)
@@ -1604,6 +1645,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
                 # now is the time to tunnel if, if we haven't already
                 self._set_up_ssh_tunnel()
+                self._set_up_ssh_socks_proxy()
                 log.info('  RUNNING%s' % time_running_desc)
                 self._log_step_progress()
 

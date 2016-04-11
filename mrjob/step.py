@@ -99,7 +99,7 @@ class MRStep(object):
     Used by :py:meth:`MRJob.steps <mrjob.job.MRJob.steps>`.
     See :ref:`writing-multi-step-jobs` for sample usage.
 
-    Accepts the following keyword arguments.
+    Accepts the following keyword arguments:
 
     :param mapper: function with same function signature as
                    :py:meth:`mapper`, or ``None`` for an identity mapper.
@@ -129,8 +129,6 @@ class MRStep(object):
                     hadoop.
     """
     def __init__(self, **kwargs):
-        """See :py:meth:`mrjob.job.MRJob.mr` for details."""
-
         # limit which keyword args can be specified
         bad_kwargs = sorted(set(kwargs) - set(_JOB_STEP_PARAMS))
         if bad_kwargs:
@@ -283,6 +281,19 @@ class MRStep(object):
 class JarStep(object):
     """Represents a running a custom Jar as a step.
 
+    Accepts the following keyword arguments:
+
+    :param jar: The local path to the Jar. On EMR, this can also be an
+                ``s3://`` URI, or ``file://`` to reference a jar on
+                the local filesystem of your EMR instance(s).
+    :param main_class: (optional) The main class to run from the jar. If
+                       not specified, Hadoop will use the main class
+                       in the jar's manifest file.
+    :param args: (optional) A list of arguments to the jar
+
+    *jar* can also be passed as a positional argument
+
+    See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
     """
     #: If this is passed as one of the step's arguments, it'll be replaced
     #: with the step's input paths (if there are multiple paths, they'll
@@ -293,22 +304,6 @@ class JarStep(object):
     OUTPUT = '<output>'
 
     def __init__(self, jar, **kwargs):
-        """Define a Java JAR step.
-
-        Accepts the following keyword arguments:
-
-        :param jar: The local path to the Jar. On EMR, this can also be an
-                   ``s3://`` URI, or ``file://`` to reference a jar on
-                   the local filesystem of your EMR instance(s).
-        :param main_class: (optional) The main class to run from the jar. If
-                           not specified, Hadoop will use the main class
-                           in the jar's manifest file.
-        :param args: (optional) A list of arguments to the jar
-
-        *jar* can also be passed as a positional argument
-
-        See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
-        """
         bad_kwargs = sorted(set(kwargs) - set(_JAR_STEP_KWARGS))
         if bad_kwargs:
             raise TypeError('JarStep() got an unexpected keyword argument %r' %

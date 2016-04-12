@@ -1,5 +1,6 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 David Marin
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +15,6 @@
 # limitations under the License.
 import logging
 import os.path
-import posixpath
 import re
 from io import BytesIO
 from subprocess import Popen
@@ -45,7 +45,6 @@ _HADOOP_RM_NO_SUCH_FILE = re.compile(br'^rmr?: .*No such file.*$')
 
 # find version string in "Hadoop 0.20.203" etc.
 _HADOOP_VERSION_RE = re.compile(br'^.*?(?P<version>(\d|\.)+).*?$')
-
 
 
 class HadoopFilesystem(Filesystem):
@@ -107,11 +106,12 @@ class HadoopFilesystem(Filesystem):
                     yield os.path.join(path, 'bin')
 
         for path in unique(yield_paths()):
-            log.info('Looking for hadoop binary in %s' % (path or '$PATH'))
+            log.info('Looking for hadoop binary in %s...' % (path or '$PATH'))
 
             hadoop_bin = which('hadoop', path=path)
 
             if hadoop_bin:
+                log.info('Found hadoop binary: %s' % hadoop_bin)
                 return [hadoop_bin]
         else:
             log.info("Falling back to 'hadoop'")

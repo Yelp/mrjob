@@ -1,4 +1,5 @@
 # Copyright 2009-2012 Yelp and Contributors
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,19 +13,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import logging
-import posixpath
+import re
 
 from io import BytesIO
 from mrjob.fs.base import Filesystem
-from mrjob.ssh import ssh_cat
-from mrjob.ssh import ssh_copy_key
-from mrjob.ssh import ssh_ls
-from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import SSH_PREFIX
-from mrjob.ssh import SSH_URI_RE
+from mrjob.ssh import _ssh_cat
+from mrjob.ssh import _ssh_copy_key
+from mrjob.ssh import _ssh_ls
+from mrjob.ssh import _ssh_slave_addresses
 from mrjob.util import random_identifier
 from mrjob.util import read_file
 
+
+_SSH_URI_RE = re.compile(
+    r'^ssh://(?P<hostname>[^/]+)?(?P<filesystem_path>/.*)$')
 
 log = logging.getLogger(__name__)
 
@@ -55,13 +57,13 @@ class SSHFilesystem(Filesystem):
         self._host_to_slave_hosts = {}
 
     def can_handle_path(self, path):
-        return SSH_URI_RE.match(path) is not None
+        return _SSH_URI_RE.match(path) is not None
 
     def du(self, path_glob):
         raise IOError()  # not implemented
 
     def ls(self, path_glob):
-        if SSH_URI_RE.match(path_glob):
+        if _SSH_URI_RE.match(path_glob):
             for item in self._ssh_ls(path_glob):
                 yield item
             return
@@ -81,22 +83,23 @@ class SSHFilesystem(Filesystem):
         if host not in self._host_to_key_filename:
             # copy the key if we haven't already
             keyfile = 'mrjob-%s.pem' % random_identifier()
-            ssh_copy_key(self._ssh_bin, host, self._ec2_key_pair_file, keyfile)
-            # don't set above; ssh_copy_key() may throw an IOError
+            _ssh_copy_key(
+                self._ssh_bin, host, self._ec2_key_pair_file, keyfile)
+            # don't set above; _ssh_copy_key() may throw an IOError
             self._host_to_key_filename[host] = keyfile
 
         return self._host_to_key_filename[host]
 
     def _ssh_ls(self, uri):
         """Helper for ls(); obeys globbing"""
-        m = SSH_URI_RE.match(uri)
+        m = _SSH_URI_RE.match(uri)
         addr = m.group('hostname')
         if not addr:
             raise ValueError
 
         keyfile = self._key_filename_for(addr)
 
-        output = ssh_ls(
+        output = _ssh_ls(
             self._ssh_bin,
             addr,
             self._ec2_key_pair_file,
@@ -107,18 +110,18 @@ class SSHFilesystem(Filesystem):
         for line in output:
             # skip directories, we only want to return downloadable files
             if line and not line.endswith('/'):
-                yield SSH_PREFIX + addr + line
+                yield 'ssh://' + addr + line
 
     def md5sum(self, path):
         raise IOError()  # not implemented
 
     def _cat_file(self, filename):
-        ssh_match = SSH_URI_RE.match(filename)
+        ssh_match = _SSH_URI_RE.match(filename)
         addr = ssh_match.group('hostname') or self._address_of_master()
 
         keyfile = self._key_filename_for(addr)
 
-        output = ssh_cat(
+        output = _ssh_cat(
             self._ssh_bin,
             addr,
             self._ec2_key_pair_file,
@@ -146,7 +149,7 @@ class SSHFilesystem(Filesystem):
     def ssh_slave_hosts(self, host, force=False):
         """Get a list of the slave hosts reachable through *hosts*"""
         if force or host not in self._host_to_slave_hosts:
-            self._host_to_slave_hosts[host] = ssh_slave_addresses(
+            self._host_to_slave_hosts[host] = _ssh_slave_addresses(
                 self._ssh_bin, host, self._ec2_key_pair_file)
 
         return self._host_to_slave_hosts[host]

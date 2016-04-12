@@ -21,7 +21,7 @@ from .create_cluster import main as real_main
 
 def main(args):
     print('create-job-flow is a deprecated alias for create-cluster'
-          ' and will be removed in v0.6.0')
+          ' and will be removed in v0.6.0', file=stderr)
     real_main(args)
 
 

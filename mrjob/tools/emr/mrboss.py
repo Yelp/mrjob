@@ -1,5 +1,5 @@
 # Copyright 2009-2012 Yelp
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -52,18 +52,19 @@ import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import add_basic_opts
-from mrjob.options import add_emr_connect_opts
-from mrjob.options import alphabetize_options
-from mrjob.ssh import ssh_copy_key
-from mrjob.ssh import ssh_run_with_recursion
+from mrjob.options import _add_basic_opts
+from mrjob.options import _add_emr_connect_opts
+from mrjob.options import _alphabetize_options
+from mrjob.py2 import to_string
+from mrjob.ssh import _ssh_copy_key
+from mrjob.ssh import _ssh_run_with_recursion
 from mrjob.util import random_identifier
 from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import shlex_split
 
 
 def main(cl_args=None):
-    usage = 'usage: %prog CLUSTER_ID OUTPUT_DIR [options] "command string"'
+    usage = 'usage: %prog CLUSTER_ID [options] "command string"'
     description = ('Run a command on the master and all slaves of an EMR'
                    ' cluster. Store stdout/stderr for results in OUTPUT_DIR.')
 
@@ -72,12 +73,12 @@ def main(cl_args=None):
                              default=None,
                              help="Specify an output directory (default:"
                              " CLUSTER_ID)")
-    add_basic_opts(option_parser)
-    add_emr_connect_opts(option_parser)
+    _add_basic_opts(option_parser)
+    _add_emr_connect_opts(option_parser)
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
         option_parser: ('ec2_key_pair_file', 'ssh_bin'),
     })
-    alphabetize_options(option_parser)
+    _alphabetize_options(option_parser)
 
     options, args = option_parser.parse_args(cl_args)
 
@@ -97,11 +98,10 @@ def main(cl_args=None):
     output_dir = os.path.abspath(options.output_dir or cluster_id)
 
     with EMRJobRunner(cluster_id=cluster_id, **runner_kwargs) as runner:
-        runner._enable_slave_ssh_access()
-        run_on_all_nodes(runner, output_dir, cmd_args)
+        _run_on_all_nodes(runner, output_dir, cmd_args)
 
 
-def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
+def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     """Given an :py:class:`EMRJobRunner`, run the command specified by
     *cmd_args* on all nodes in the cluster and save the stdout and stderr of
     each run to subdirectories of *output_dir*.
@@ -116,16 +116,18 @@ def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     ec2_key_pair_file = runner._opts['ec2_key_pair_file']
 
     keyfile = None
-    if runner._opts['num_ec2_instances'] > 1:
+    slave_addrs = runner.fs.ssh_slave_hosts(master_addr)
+
+    if slave_addrs:
         addresses += ['%s!%s' % (master_addr, slave_addr)
-                      for slave_addr in runner._addresses_of_slaves()]
+                      for slave_addr in slave_addrs]
         # copying key file like a boss (name of keyfile doesn't really matter)
         keyfile = 'mrboss-%s.pem' % random_identifier()
-        ssh_copy_key(ssh_bin, master_addr, ec2_key_pair_file, keyfile)
+        _ssh_copy_key(ssh_bin, master_addr, ec2_key_pair_file, keyfile)
 
     for addr in addresses:
 
-        stdout, stderr = ssh_run_with_recursion(
+        stdout, stderr = _ssh_run_with_recursion(
             ssh_bin,
             addr,
             ec2_key_pair_file,
@@ -136,7 +138,7 @@ def run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
         if print_stderr:
             print('---')
             print('Command completed on %s.' % addr)
-            print(stderr, end=' ')
+            print(to_string(stderr), end=' ')
 
         if '!' in addr:
             base_dir = os.path.join(output_dir, 'slave ' + addr.split('!')[1])

@@ -4,6 +4,188 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.0:
+
+0.5.0
+-----
+
+Python versions
+^^^^^^^^^^^^^^^
+
+mrjob now fully supports Python 3.3+ in a way that should be transparent to existing Python 2 users (you don't have to suddenly start handling ``unicode`` instead of ``str``). For more information, see :doc:`guides/py2-vs-py3`.
+
+If you run a job with Python 3, mrjob will automatically install Python 3 on ElasticMapreduce AMIs (see :mrjob-opt:`bootstrap_python`).
+
+When you run jobs on EMR in Python 2, mrjob attempts to match your minor version of Python as well (either :command:`python2.6` or :command:`python2.7`); see :mrjob-opt:`python_bin` for details.
+
+.. note::
+
+   If you're currently running Python 2.7, and
+   :ref:`using yum to install python libraries <installing-packages>`, you'll
+   want to use the Python 2.7 version of the package (e.g.
+   ``python27-numpy`` rather than ``python-numpy``).
+
+The :command:`mrjob` command is now installed with Python-version-specific aliases (e.g. :command:`mrjob-3`, :command:`mrjob-3.4`), in case you install mrjob for multiple versions of Python.
+
+Hadoop
+^^^^^^
+
+mrjob should now work out-of-the box on almost any Hadoop setup. If :command:`hadoop` is in your path, or you set any commonly-used :envvar:`$HADOOP_*` environment variable, mrjob will find the Hadoop binary, the streaming jar, and your logs, without any help on your part (see :mrjob-opt:`hadoop_bin`, :mrjob-opt:`hadoop_log_dirs`, :mrjob-opt:`hadoop_streaming_jar`).
+
+mrjob has been updated to fully support Hadoop 2 (YARN), including many updates to :py:class:`~mrjob.fs.hadoop.HadoopFilesystem`. Hadoop 1 is still supported, though anything prior to Hadoop 0.20.203 is not (mrjob is actually a few months older than Hadoop 0.20.203, so this used to matter).
+
+3.x and 4.x AMIs
+^^^^^^^^^^^^^^^^
+
+mrjob now fully supports the 3.x and 4.x Elastic MapReduce AMIs, including SSH tunneling to the resource mananager, fetching counters and finding probable cause of job failure.
+
+The default :mrjob-opt:`ami_version` is now ``3.11.0``. Our plan is to continue updating this to the lastest (non-broken) 3.x AMI for each 0.5.x release of mrjob.
+
+The default :mrjob-opt:`ec2_instance_type` is now ``m1.medium`` (``m1.small`` is too small for the 3.x and 4.x AMIs)
+
+You can specify 4.x AMIs with either the new :mrjob-opt:`release_label` option, or continue using :mrjob-opt:`ami_version`; both work.
+
+mrjob continues to support 2.x AMIs. However:
+
+.. warning::
+
+   2.x AMIs are deprecated by AWS, and based on a very old version of Debian (squeeze), which breaks :command:`apt-get` and exposes you to security holes.
+
+Please, please switch if you haven't already.
+
+AWS Regions
+^^^^^^^^^^^
+
+The new default :mrjob-opt:`aws_region` is ``us-west-2`` (Oregon). This both matches the default in the EMR console and, according to Amazon, is `carbon neutral <https://aws.amazon.com/about-aws/sustainability/>`__.
+
+An edge case that might affect you: EC2 key pairs (i.e. SSH credentials) are region-specific, so if you've set up SSH but not explicitly specified a region, you may get an error saying your key pair is invalid. The fix is simply to :ref:`create new SSH keys <ssh-tunneling>` for the ``us-west-2`` (Oregon) region.
+
+S3
+^^^
+
+mrjob is much smarter about the way it interacts with S3:
+ - automatically creates temp bucket in the same region as jobs
+ - connects to S3 buckets on the endpoint matching their region (no more 307 errors)
+
+   - :py:class:`~mrjob.emr.EMRJobRunner` and :py:class:`~mrjob.fs.s3.S3Filesystem` methods no longer take ``s3_conn`` args (passing around a single S3 connection no longer makes sense)
+
+ - no longer uses the temp bucket's location to choose where you run your job
+ - :py:meth:`~mrjob.fs.s3.S3Filesystem.rm` no longer has special logic for ``*_$folder$`` keys
+ - :py:meth:`~mrjob.fs.s3.S3Filesystem.ls` recurses "subdirectories" even if you pass it a URI without a trailing slash
+
+Log interpretation
+^^^^^^^^^^^^^^^^^^
+
+The part of mrjob that fetches counters and tells you what probably caused your job to fail was basically unmaintainable and has been totally rewritten. Not only do we now have solid support across Hadoop and EMR AMI versions, but if we missed anything, it should be straightforward to add it.
+
+Once casualty of this change was the :command:`mrjob fetch-logs` command, which means mrjob no longer offers a way to fetch or interpret logs from a *past* job. We do plan to re-introduce this functionality.
+
+Protocols
+^^^^^^^^^
+
+Protocols are now strict by default (they simply raise an exception on
+unencodable data). "Loose" protocols can be re-enabled with the
+``--no-strict-protocols`` switch; see :mrjob-opt:`strict_protocols` for
+why this is a bad idea.
+
+Protocols will now use the much faster :py:mod:`ujson` library, if installed,
+to encode and decode JSON. This is especially recommended for simple jobs that
+spend a significant fraction of their time encoding and data.
+
+.. note::
+
+   If you're using EMR, try out
+   :ref:`this bootstrap recipe <installing-ujson>` to install :py:mod:`ujson`.
+
+mrjob will fall back to the :py:mod:`simplejson` library if :py:mod:`ujson`
+is not installed, and use the built-in ``json`` module if neither is installed.
+
+You can now explicitly specify which JSON implementation you wish to use
+(e.g. :py:class:`~mrjob.protocol.StandardJSONProtocol`, :py:class:`~mrjob.protocol.SimpleJSONProtocol`, :py:class:`~mrjob.protocol.UltraJSONProtocol`).
+
+Status messages
+^^^^^^^^^^^^^^^
+
+We've tried to cut the logging messages that your job prints as it runs down to the basics (either useful info, like where a temp directory is, or something that tells you why you're waiting). If there are any messages you miss, try running your job with ``-v``.
+
+When a step in your job fails, mrjob no longer prints a useless stacktrace telling you where in the code the runner raised an exception about your step failing. This is thanks to :py:class:`~mrjob.step.StepFailedException`, which you can also catch and interpret if you're :ref:`running jobs programmatically <runners-programmatically>`.
+
+.. _v0.5.0-deprecation:
+
+Deprecation
+^^^^^^^^^^^
+
+Many things that were deprecated in 0.4.6 have been removed:
+
+ - options:
+
+   - :py:data:`~mrjob.runner.IF_SUCCESSFUL` :mrjob-opt:`cleanup` option (use :py:data:`~mrjob.runner.ALL`)
+   - *iam_job_flow_role* (use :mrjob-opt:`iam_instance_profile`)
+
+ - functions and methods:
+
+   - positional arguments to :py:meth:`mrjob.job.MRJob.mr()` (don't even use :py:meth:`~mrjob.job.MRJob.mr()`; use :py:class:`mrjob.step.MRStep`)
+   - ``mrjob.job.MRJob.jar()`` (use :py:class:`mrjob.step.JarStep`)
+   - *step_args* and *name* arguments to :py:class:`mrjob.step.JarStep` (use *args* instead of *step_args*, and don't use *name* at all)
+   - :py:class:`mrjob.step.MRJobStep` (use :py:class:`mrjob.step.MRStep`)
+   - :py:func:`mrjob.compat.get_jobconf_value` (use to :py:func:`~mrjob.compat.jobconf_from_env`)
+   - :py:meth:`mrjob.job.MRJob.parse_counters`
+   - :py:meth:`mrjob.job.MRJob.parse_output`
+   - :py:func:`mrjob.conf.combine_cmd_lists`
+   - :py:meth:`mrjob.fs.s3.S3Filesystem.get_s3_folder_keys`
+
+:py:mod:`mrjob.compat` functions :py:func:`~mrjob.compat.supports_combiners_in_hadoop_streaming`, :py:func:`~mrjob.compat.supports_new_distributed_cache_options`, and :py:func:`~mrjob.compat.uses_generic_jobconf`, which only existed to support very old versions of Hadoop, were removed without deprecation warnings (sorry!).
+
+To avoid a similar wave of deprecation warnings in the future, the name of every part of mrjob that isn't meant to be a stable interface provided by the library now starts with an underscore. You can still use these things (or copy them; it's Open Source), but there's no guarantee they'll exist in the next release.
+
+If you want to get ahead of the game, here is a list of things that are deprecated starting in mrjob 0.5.0 (do these *after* upgrading mrjob):
+
+  - options:
+
+    - *base_tmp_dir* is now :mrjob-opt:`local_tmp_dir`
+    - :mrjob-opt:`cleanup` options :py:data:`~mrjob.runner.LOCAL_SCRATCH` and :py:data:`~mrjob.runner.REMOTE_SCRATCH` are now :py:data:`~mrjob.runner.LOCAL_TMP` and :py:data:`~mrjob.runner.REMOTE_TMP`
+    - *emr_job_flow_id* is now :mrjob-opt:`cluster_id`
+    - *emr_job_flow_pool_name* is now :mrjob-opt:`pool_name`
+    - *hdfs_scratch_dir* is now :mrjob-opt:`hadoop_tmp_dir`
+    - *pool_emr_job_flows* is now :mrjob-opt:`pool_clusters`
+    - *s3_scratch_uri* is now :mrjob-opt:`s3_tmp_dir`
+    - *ssh_tunnel_to_job_tracker* is now simply :mrjob-opt:`ssh_tunnel`
+
+  - functions and methods:
+
+    - :py:meth:`mrjob.job.MRJob.is_mapper_or_reducer` is now :py:meth:`~mrjob.job.MRJob.is_task`
+    - :py:class:`~mrjob.fs.base.Filesystem` method ``path_exists()`` is now simply :py:meth:`~mrjob.fs.base.Filesystem.exists`
+    - :py:class:`~mrjob.fs.base.Filesystem` method ``path_join()`` is now simply :py:meth:`~mrjob.fs.base.Filesystem.join`
+    - Use ``runner.fs`` explicitly when accessing filesystem methods (e.g. ``runner.fs.ls()``, not ``runner.ls()``)
+
+   - :command:`mrjob` subcommands
+     - :command:`mrjob create-job-flow` is now :command:`mrjob create-cluster`
+     - :command:`mrjob terminate-idle-job-flows` is now :command:`mrjob terminate-idle-clusters`
+     - :command:`mrjob terminate-job-flow` is now :command:`mrjob temrinate-cluster`
+
+Other changes
+^^^^^^^^^^^^^
+
+ - mrjob now requires ``boto`` 2.35.0 or newer (chances are you're already doing this). Later 0.5.x releases of mrjob may require newer versions of ``boto``.
+ - :mrjob-opt:`visible_to_all_users` now defaults to ``True``
+ - ``HadoopFilesystem.rm()`` uses ``-skipTrash``
+ - new :mrjob-opt:`iam_endpoint` option
+ - custom :mrjob-opt:`hadoop_streaming_jar`\ s are properly uploaded
+ - :py:data:`~mrjob.runner.JOB` :mrjob-opt:`cleanup` on EMR is temporarily disabled
+ - mrjob now follows symlinks when :py:meth:`~mrjob.fs.local.LocalFileSystem.ls`\ ing the local filesystem (beware recursive symlinks!)
+ - The :mrjob-opt:`interpreter` option disables :mrjob-opt:`bootstrap_mrjob` by default (:mrjob-opt:`interpreter` is meant for non-Python jobs)
+ - :ref:`cluster pooling <pooling-clusters>` now respects :mrjob-opt:`ec2_key_pair`
+ - cluster self-termination (see :mrjob-opt:`max_hours_idle`) now respects non-streaming jobs
+ - :py:class:`~mrjob.fs.local.LocalFilesystem` now rejects URIs rather than interpreting them as local paths
+ - ``local`` and ``inline`` runners no longer have a default :mrjob-opt:`hadoop_version`, instead handling :mrjob-opt:`jobconf` in a version-agnostic way
+ - :mrjob-opt:`steps_python_bin` now defaults to the current Python interpreter.
+ - minor changes to :py:mod:`mrjob.util`:
+
+   - :py:func:`~mrjob.util.file_ext` takes filename, not path
+   - :py:func:`~mrjob.util.gunzip_stream` now yields chunks of bytes, not lines
+   - moved :py:func:`~mrjob.util.random_identifier` method here from :py:mod:`mrjob.aws`
+   - ``buffer_iterator_to_line_iterator()`` is now named :py:func:`~mrjob.util.to_lines`, and no longer appends a trailing newline to data.
+
 
 0.4.6
 -----

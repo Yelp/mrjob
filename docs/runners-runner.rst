@@ -33,5 +33,5 @@ File management
 
 .. py:module:: mrjob.fs.base
 
-.. autoclass:: Filesystem
+.. autoclass:: mrjob.fs.base.Filesystem
     :members:

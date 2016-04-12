@@ -3,7 +3,7 @@
 # Copyright 2012 Yelp
 # Copyright 2013 Yelp and Lyft
 # Copyright 2014 Marc Abramowitz
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -203,7 +203,9 @@ class MRJobFileOptionsTestCase(TestCase):
 class NoMRJobConfTestCase(TestCase):
 
     def test_no_mrjob_confs(self):
-        with patch.object(conf, 'real_mrjob_conf_path', return_value=None):
+        with patch.object(
+                conf, '_expanded_mrjob_conf_path', return_value=None):
+
             mr_job = MRIncrementerJob(['-r', 'inline', '--times', '2'])
             mr_job.sandbox(stdin=BytesIO(b'0\n1\n2\n'))
 
@@ -311,9 +313,9 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         self.assertEqual(results['mapreduce.map.input.length'], '4')
         self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_mapper_000000_0' % runner._job_key)
+                       'attempt_%s_mapper_00000_0' % runner._job_key)
         self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_mapper_000000' % runner._job_key)
+                       'task_%s_mapper_00000' % runner._job_key)
         self.assertEqual(results['mapreduce.task.ismap'], 'true')
         self.assertEqual(results['mapreduce.task.output.dir'],
                          runner._output_dir)

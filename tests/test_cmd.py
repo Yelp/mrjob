@@ -1,5 +1,6 @@
 # Copyright 2012 Yelp
 # Copyright 2013 David Marin
+# Copyright 2014-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +38,7 @@ class CommandTestCase(TestCase):
             else:
                 raise ValueError
 
-        p = patch.object(cmd, 'error', side_effect=error)
+        p = patch.object(cmd, '_error', side_effect=error)
         p.start()
         self.addCleanup(p.stop)
 

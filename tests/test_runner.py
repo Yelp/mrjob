@@ -1,4 +1,4 @@
-# Copyright 2009-2013 Yelp and Contributors
+# Copyright 2009-2016
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -29,10 +29,10 @@ from mrjob.conf import combine_dicts
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
-from mrjob.parse import JOB_KEY_RE
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.runner import MRJobRunner
+from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
@@ -74,8 +74,8 @@ class WithStatementTestCase(TestCase):
     def test_cleanup_local_tmp(self):
         self._test_cleanup_after_with_statement(['LOCAL_TMP'], False)
 
-    def test_cleanup_remote_tmp(self):
-        self._test_cleanup_after_with_statement(['REMOTE_TMP'], True)
+    def test_cleanup_cloud_tmp(self):
+        self._test_cleanup_after_with_statement(['CLOUD_TMP'], True)
 
     def test_cleanup_none(self):
         self._test_cleanup_after_with_statement(['NONE'], True)
@@ -127,7 +127,7 @@ class TestJobName(TestCase):
 
     def test_empty(self):
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), getpass.getuser())
@@ -135,14 +135,14 @@ class TestJobName(TestCase):
     def test_empty_no_user(self):
         self.getuser_should_fail = True
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), 'no_user')
 
     def test_auto_label(self):
         runner = MRTwoStepJob(['--no-conf']).make_runner()
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'mr_two_step_job')
         self.assertEqual(match.group(2), getpass.getuser())
@@ -150,7 +150,7 @@ class TestJobName(TestCase):
     def test_auto_owner(self):
         os.environ['USER'] = 'mcp'
         runner = InlineMRJobRunner(conf_paths=[])
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'no_script')
         self.assertEqual(match.group(2), 'mcp')
@@ -160,7 +160,7 @@ class TestJobName(TestCase):
 
         os.environ['USER'] = 'mcp'
         runner = MRTwoStepJob(['--no-conf']).make_runner()
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'mr_two_step_job')
         self.assertEqual(match.group(2), 'mcp')
@@ -175,7 +175,7 @@ class TestJobName(TestCase):
     def test_owner_and_label_switches(self):
         runner_opts = ['--no-conf', '--owner=ads', '--label=ads_chain']
         runner = MRTwoStepJob(runner_opts).make_runner()
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'ads_chain')
         self.assertEqual(match.group(2), 'ads')
@@ -183,7 +183,7 @@ class TestJobName(TestCase):
     def test_owner_and_label_kwargs(self):
         runner = InlineMRJobRunner(conf_paths=[],
                                    owner='ads', label='ads_chain')
-        match = JOB_KEY_RE.match(runner.get_job_key())
+        match = _JOB_KEY_RE.match(runner.get_job_key())
 
         self.assertEqual(match.group(1), 'ads_chain')
         self.assertEqual(match.group(2), 'ads')
@@ -415,17 +415,14 @@ sys.exit(13)
         self.environment_variable_checks(runner, ['TMP'])
 
 
-class HadoopArgsTestCase(EmptyMrjobConfTestCase):
+class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
+
+    # hadoop_extra_args is tested in tests.test_hadoop.HadoopExtraArgsTestCase
 
     def test_empty(self):
         job = MRWordCount()
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0), [])
-
-    def test_hadoop_extra_args(self):
-        job = MRWordCount(['--hadoop-arg', '-foo'])
-        with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0), ['-foo'])
 
     def test_cmdenv(self):
         job = MRWordCount(['--cmdenv', 'FOO=bar',
@@ -532,20 +529,6 @@ class HadoopArgsTestCase(EmptyMrjobConfTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-partitioner', partitioner])
-
-    def test_hadoop_extra_args_comes_first(self):
-        job = MRWordCount(
-            ['--cmdenv', 'FOO=bar',
-             '--hadoop-arg', '-libjar', '--hadoop-arg', 'qux.jar',
-             '--jobconf', 'baz=qux',
-             '--partitioner', 'java.lang.Object'])
-        job.HADOOP_INPUT_FORMAT = 'FooInputFormat'
-        job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'
-
-        with job.make_runner() as runner:
-            hadoop_args = runner._hadoop_args_for_step(0)
-            self.assertEqual(hadoop_args[:2], ['-libjar', 'qux.jar'])
-            self.assertEqual(len(hadoop_args), 12)
 
     def test_check_input_paths_enabled_by_default(self):
         job = MRWordCount()
@@ -833,7 +816,7 @@ class SetupTestCase(SandboxedTestCase):
 
         with no_handlers_for_logger('mrjob.local'):
             stderr = StringIO()
-            log_to_stream('mrjob.local', stderr)
+            log_to_stream('mrjob.local', stderr, debug=True)
 
             with job.make_runner() as r:
                 r.run()

@@ -1,7 +1,7 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 Tom Arnfeld and David Marin
 # Copyright 2014 Contributors
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ import stat
 import sys
 
 from mrjob.compat import uses_yarn
-from mrjob.parse import HADOOP_STREAMING_JAR_RE
+from mrjob.hadoop import _HADOOP_STREAMING_JAR_RE
 from mrjob.parse import urlparse
 from mrjob.util import shlex_split
 
@@ -677,7 +677,7 @@ def hadoop_jar(stdout, stderr, environ, *args):
                 print(('\t\t%s=%d' % (counter, amount)), file=stderr)
 
     # simulate output for streaming steps
-    if HADOOP_STREAMING_JAR_RE.match(os.path.basename(jar_path)):
+    if _HADOOP_STREAMING_JAR_RE.match(os.path.basename(jar_path)):
         streaming_args = args[1:]
         output_idx = list(streaming_args).index('-output')
         assert output_idx != -1

@@ -1,5 +1,8 @@
 # -*- encoding: utf-8 -*-
 # Copyright 2009-2012 Yelp
+# Copyright 2013 Steve Johnson
+# Copyright 2014 Phil Swanson and Marc Abramowitz
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +15,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import logging
 import sys
 from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
 
-from mrjob.parse import find_python_traceback
+from mrjob.parse import _find_python_traceback
 from mrjob.parse import is_windows_path
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
@@ -28,11 +30,8 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.py2 import StringIO
-from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
-from tests.quiet import no_handlers_for_logger
 
 
 
@@ -81,7 +80,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         # sanity-check normal operations
         ok_stdout, ok_stderr = run('python', '-c', "print(sorted('321'))")
         self.assertEqual(ok_stdout.rstrip(), b"['1', '2', '3']")
-        self.assertEqual(find_python_traceback(BytesIO(ok_stderr)), None)
+        self.assertEqual(_find_python_traceback(BytesIO(ok_stderr)), None)
 
         # Oops, can't sort a number.
         stdout, stderr = run('python', '-c', "print(sorted(321))")
@@ -93,7 +92,7 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
         # TypeError: 'int' object is not iterable
         self.assertEqual(stdout, b'')
         # save the traceback for the next step
-        tb = find_python_traceback(BytesIO(stderr))
+        tb = _find_python_traceback(BytesIO(stderr))
         self.assertNotEqual(tb, None)
         assert isinstance(tb, list)
         # The first line ("Traceback...") is not skipped
@@ -109,24 +108,24 @@ subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readli
             'python', '-v', '-c', "print(sorted(321))")
         self.assertEqual(verbose_stdout, b'')
         self.assertNotEqual(verbose_stderr, stderr)
-        verbose_tb = find_python_traceback(BytesIO(verbose_stderr))
+        verbose_tb = _find_python_traceback(BytesIO(verbose_stderr))
         self.assertEqual(verbose_tb, tb)
 
     def test_find_multiple_python_tracebacks(self):
         total_traceback = self.EXAMPLE_TRACEBACK + b'junk\n'
-        tb = find_python_traceback(BytesIO(total_traceback))
+        tb = _find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb),
                          self.EXAMPLE_TRACEBACK.decode('ascii'))
 
     def test_find_python_traceback_with_more_stderr(self):
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_1 + b'junk\n'
-        tb = find_python_traceback(BytesIO(total_traceback))
+        tb = _find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb),
                          self.EXAMPLE_STDERR_TRACEBACK_1.decode('ascii'))
 
     def test_find_python_traceback_with_more_stderr_2(self):
         total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + b'junk\n'
-        tb = find_python_traceback(BytesIO(total_traceback))
+        tb = _find_python_traceback(BytesIO(total_traceback))
         self.assertEqual(''.join(tb),
                          self.EXAMPLE_STDERR_TRACEBACK_2.decode('ascii'))
 

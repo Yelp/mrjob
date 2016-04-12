@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2013 Yelp and Contributors
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,42 +55,37 @@ class SimMRJobRunner(MRJobRunner):
     by classes that extend SimMRJobRunner
 
     :py:class:`LocalMRJobRunner` and :py:class:`InlineMRJobRunner` simulate
-    the following jobconf variables:
+    the following jobconf variables (and their Hadoop 1 equivalents):
 
-    * ``mapreduce.job.cache.archives``
-    * ``mapreduce.job.cache.files``
-    * ``mapreduce.job.cache.local.archives``
-    * ``mapreduce.job.cache.local.files``
-    * ``mapreduce.job.id``
-    * ``mapreduce.job.local.dir``
-    * ``mapreduce.map.input.file``
-    * ``mapreduce.map.input.length``
-    * ``mapreduce.map.input.start``
-    * ``mapreduce.task.attempt.id``
-    * ``mapreduce.task.id``
-    * ``mapreduce.task.ismap``
-    * ``mapreduce.task.output.dir``
-    * ``mapreduce.task.partition``
+    * ``mapreduce.job.cache.archives`` (``mapred.cache.archives``)
+    * ``mapreduce.job.cache.files`` (``mapred.cache.files``)
+    * ``mapreduce.job.cache.local.archives`` (``mapred.cache.localArchives``)
+    * ``mapreduce.job.cache.local.files`` (``mapred.cache.localFiles``)
+    * ``mapreduce.job.id`` (``mapred.job.id``)
+    * ``mapreduce.job.local.dir`` (``job.local.dir``)
+    * ``mapreduce.map.input.file`` (``map.input.file``)
+    * ``mapreduce.map.input.length`` (``map.input.length``)
+    * ``mapreduce.map.input.start`` (``map.input.start``)
+    * ``mapreduce.task.attempt.id`` (``mapred.task.id``)
+    * ``mapreduce.task.id`` (``mapred.tip.id``)
+    * ``mapreduce.task.ismap`` (``mapred.task.is.map``)
+    * ``mapreduce.task.output.dir`` (``mapred.work.output.dir``)
+    * ``mapreduce.task.partition`` (``mapred.task.partition``)
 
-    If you specify *hadoop_version* of 1.x (or 0.20), the simulated environment
-    variables will change to use the names corresponding with the older Hadoop
-    version.
+    Your job can read these from the environment using
+    :py:func:`~mrjob.compat.jobconf_from_env()`.
 
+    If you specify *hadoop_version*, we'll only simulate environment variables
+    for that version of Hadoop.
     """
     # try to run at least two tasks to catch bugs
     _DEFAULT_MAP_TASKS = 2
     _DEFAULT_REDUCE_TASKS = 2
 
-    # options that we ignore because they require real Hadoop
-    IGNORED_HADOOP_OPTS = [
-        'hadoop_extra_args',
-        'hadoop_streaming_jar',
-    ]
-
     # keyword arguments that we ignore that are stored directly in
     # self._<kwarg_name> because they aren't configurable from mrjob.conf
     # use the version with the underscore to better support grepping our code
-    IGNORED_HADOOP_ATTRS = [
+    _IGNORED_HADOOP_ATTRS = [
         '_hadoop_input_format',
         '_hadoop_output_format',
         '_partitioner',
@@ -100,16 +96,11 @@ class SimMRJobRunner(MRJobRunner):
         self._prev_outfiles = []
         self._counters = []
 
-    def warn_ignored_opts(self):
+    def _warn_ignored_opts(self):
         """ If the user has provided options that are not supported
         by the dev runners log warnings for each of the ignored options
         """
-        for ignored_opt in self.IGNORED_HADOOP_OPTS:
-            if self._opts[ignored_opt]:
-                log.warning('ignoring %s option (requires real Hadoop): %r' %
-                            (ignored_opt, self._opts[ignored_opt]))
-
-        for ignored_attr in self.IGNORED_HADOOP_ATTRS:
+        for ignored_attr in self._IGNORED_HADOOP_ATTRS:
             value = getattr(self, ignored_attr)
             if value is not None:
                 log.warning(
@@ -165,13 +156,16 @@ class SimMRJobRunner(MRJobRunner):
         pass
 
     def _run(self):
-        self.warn_ignored_opts()
+        self._warn_ignored_opts()
         _error_on_bad_paths(self.fs, self._input_paths)
         self._create_setup_wrapper_script(local=True)
         self._setup_output_dir()
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
+            log.info('Running step %d of %d...' % (
+                step_num + 1, self._num_steps()))
+
             self._check_step_works_with_runner(step)
             self._counters.append({})
 
@@ -182,7 +176,7 @@ class SimMRJobRunner(MRJobRunner):
                 # of self._prev_outfiles
                 sort_output_path = os.path.join(
                     self._get_local_tmp_dir(),
-                    'step-%d-mapper-sorted' % step_num)
+                    'step-%04d-mapper-sorted' % step_num)
 
                 self._invoke_sort(self._step_input_paths(), sort_output_path)
                 self._prev_outfiles = [sort_output_path]
@@ -193,7 +187,7 @@ class SimMRJobRunner(MRJobRunner):
         # move final output to output directory
         for i, outfile in enumerate(self._prev_outfiles):
             final_outfile = os.path.join(self._output_dir, 'part-%05d' % i)
-            log.info('Moving %s -> %s' % (outfile, final_outfile))
+            log.debug('Moving %s -> %s' % (outfile, final_outfile))
             shutil.move(outfile, final_outfile)
 
     def _invoke_step(self, step_num, step_type):
@@ -207,7 +201,7 @@ class SimMRJobRunner(MRJobRunner):
 
         jobconf = self._jobconf_for_step(step_num)
 
-        outfile_prefix = 'step-%d-%s' % (step_num, step_type)
+        outfile_prefix = 'step-%04d-%s' % (step_num, step_type)
 
         # allow setting number of tasks from jobconf
         if step_type == 'reducer':
@@ -259,14 +253,14 @@ class SimMRJobRunner(MRJobRunner):
             output_path = os.path.join(
                 self._get_local_tmp_dir(),
                 outfile_prefix + '_part-%05d' % task_num)
-            log.info('writing to %s' % output_path)
+            log.debug('Writing to %s' % output_path)
 
             self._run_step(step_num, step_type, input_path, output_path,
                            working_dir, env)
 
             self._prev_outfiles.append(output_path)
 
-        self.per_step_runner_finish(step_num)
+        self._per_step_runner_finish(step_num)
         counters = self._counters[step_num]
         if counters:
             log.info(_format_counters(counters))
@@ -278,7 +272,7 @@ class SimMRJobRunner(MRJobRunner):
         """
         raise NotImplementedError("Subclass must implement this method")
 
-    def per_step_runner_finish(self, step_num):
+    def _per_step_runner_finish(self, step_num):
         """ Runner specific method to be executed to mark the step completion.
         Only the local runner implements this method
         """
@@ -433,8 +427,6 @@ class SimMRJobRunner(MRJobRunner):
         We use :py:func:`~mrjob.conf.combine_local_envs`, so ``PATH``
         environment variables are handled specially.
         """
-        version = self.get_hadoop_version()
-
         user_jobconf = self._jobconf_for_step(step_num)
 
         simulated_jobconf = self._simulate_jobconf_for_step(
@@ -493,10 +485,11 @@ class SimMRJobRunner(MRJobRunner):
             ','.join(cache_local_archives))
 
         # task and attempt IDs
-        j['mapreduce.task.id'] = 'task_%s_%s_%05d%d' % (
+        # TODO: these are a crappy imitation of task/attempt IDs (see #1254)
+        j['mapreduce.task.id'] = 'task_%s_%s_%04d%d' % (
             self._job_key, step_type.lower(), step_num, task_num)
         # (we only have one attempt)
-        j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%05d%d_0' % (
+        j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%04d%d_0' % (
             self._job_key, step_type.lower(), step_num, task_num)
 
         # not actually sure what's correct for combiners here. It'll definitely

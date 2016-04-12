@@ -1,5 +1,5 @@
 # Copyright 2012-2013 Yelp
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -37,7 +37,6 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
-from tests.py2 import patch
 from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
@@ -101,15 +100,16 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                     'A_PATH': 'A',
                     'SOMETHING': 'X',
                 },
-                'hadoop_extra_args': [
-                    'thing1',
-                ],
                 'hadoop_streaming_jar': 'monkey.jar',
                 'jobconf': {
                     'lorax_speaks_for': 'trees',
                 },
+                'label': 'organic',
                 'local_tmp_dir': '/tmp',
                 'python_bin': 'py3k',
+                'setup': [
+                    ['thing1'],
+                ],
                 'setup_scripts': ['/myscript.py'],
             }
         }
@@ -126,16 +126,18 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                         'SOMETHING': 'Y',
                         'SOMETHING_ELSE': 'Z',
                     },
-                    'hadoop_extra_args': [
-                        'thing2',
-                    ],
+
                     'hadoop_streaming_jar': 'banana.jar',
                     'jobconf': {
                         'lorax_speaks_for': 'mazda',
                         'dr_seuss_is': 'awesome',
                     },
+                    'label': 'usda_organic',
                     'local_tmp_dir': '/var/tmp',
                     'python_bin': 'py4k',
+                    'setup': [
+                        ['thing2'],
+                    ],
                     'setup_scripts': ['/yourscript.py'],
                 }
             }
@@ -173,9 +175,9 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
         })
 
     def test_combine_lists(self):
-        self.assertEqual(self.opts_1['hadoop_extra_args'], ['thing1'])
-        self.assertEqual(self.opts_2['hadoop_extra_args'],
-                         ['thing1', 'thing2'])
+        self.assertEqual(self.opts_1['setup'], [['thing1']])
+        self.assertEqual(self.opts_2['setup'],
+                         [['thing1'], ['thing2']])
 
     def test_combine_paths(self):
         self.assertEqual(self.opts_1['local_tmp_dir'], '/tmp')
@@ -187,8 +189,8 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                          ['/myscript.py', '/yourscript.py'])
 
     def test_combine_values(self):
-        self.assertEqual(self.opts_1['hadoop_streaming_jar'], 'monkey.jar')
-        self.assertEqual(self.opts_2['hadoop_streaming_jar'], 'banana.jar')
+        self.assertEqual(self.opts_1['label'], 'organic')
+        self.assertEqual(self.opts_2['label'], 'usda_organic')
 
 
 class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
@@ -480,13 +482,13 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
                      cleanup_on_failure=['JOB_FLOW', 'SCRATCH']),
                 [])
 
-            self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'REMOTE_TMP'])
+            self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'CLOUD_TMP'])
             self.assertIn(
                 'Deprecated cleanup option LOCAL_SCRATCH has been renamed'
                 ' to LOCAL_TMP', stderr.getvalue())
             self.assertIn(
                 'Deprecated cleanup option REMOTE_SCRATCH has been renamed'
-                ' to REMOTE_TMP', stderr.getvalue())
+                ' to CLOUD_TMP', stderr.getvalue())
 
             self.assertEqual(opts['cleanup_on_failure'], ['CLUSTER', 'TMP'])
             self.assertIn(

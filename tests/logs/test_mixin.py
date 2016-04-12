@@ -503,7 +503,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
     def test_step_log_only(self):
         self._test_interpret_all_logs(dict(step={}))
 
-    def test_step_and_task_logs_only(self):
+    def test_step_and_history_logs_only(self):
         self._test_interpret_all_logs(dict(step={}, history={}))
 
     def test_step_and_task_logs_only(self):

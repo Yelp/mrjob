@@ -28,7 +28,6 @@ mockssh.
 """
 from __future__ import print_function
 
-import io
 import os
 import pipes
 import posixpath
@@ -137,7 +136,7 @@ def main(stdin, stdout, stderr, args, environ):
 
 
     def ls(host, args):
-        """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_ls()`"""
+        """Mock SSH behavior for :py:func:`~mrjob.ssh._ssh_ls()`"""
         dest = args[1]
         if dest == '-L':
             dest = args[2]
@@ -160,7 +159,7 @@ def main(stdin, stdout, stderr, args, environ):
 
 
     def cat(host, args):
-        """Mock SSH behavior for :py:func:`~mrjob.ssh.ssh_cat()`"""
+        """Mock SSH behavior for :py:func:`~mrjob.ssh._ssh_cat()`"""
         local_dest = rel_posix_to_abs_local(host, args[1], environ)
         if not os.path.exists(local_dest):
             print('No such file or directory:', local_dest, file=stderr)

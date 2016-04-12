@@ -73,10 +73,16 @@ Running on your own Hadoop cluster
 ----------------------------------
 
 * Set up a hadoop cluster (see http://hadoop.apache.org/common/docs/current/)
-* Make sure :envvar:`HADOOP_HOME` is set
+* Make sure :envvar:`$HADOOP_PREFIX` is set
 * Run your job with ``-r hadoop``::
 
     python your_mr_job_sub_class.py -r hadoop < input > output
+
+.. note::
+
+   You don't need to install ``mrjob`` or any other libraries on the nodes
+   of your Hadoop cluster, but they *do* at least need a version of Python
+   that's compatible with your job.
 
 Running on Dataproc
 -------------------
@@ -129,15 +135,16 @@ This pattern can also be used to write integration tests (see :doc:`testing`).
             key, value = mr_job.parse_output_line(line)
             ... # do something with the parsed output
 
-You the :py:class:`~mrjob.job.MRJob`, use a context manager to create the
-runner, run the job, iterate over the output lines, and use the job instance to
-parse each line with its output protocol.
+You instantiate the :py:class:`~mrjob.job.MRJob`, use a context manager to
+create the runner, run the job, iterate over the output lines, and use the job
+instance to parse each line with its output protocol.
 
 Further reference:
 
 * :py:meth:`~mrjob.job.MRJob.make_runner`
-* :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
 * :py:meth:`~mrjob.job.MRJob.parse_output_line`
+* :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
+* :py:meth:`~mrjob.runner.MRJobRunner.run`
 
 Limitations
 ^^^^^^^^^^^
@@ -242,6 +249,7 @@ example below demonstrates the use of counters in a test case.
 ``test_counters.py``
 ::
 
+    from io import BytesIO
     from unittest import TestCase
 
     from tests.mr_counting_job import MRCountingJob
@@ -250,7 +258,7 @@ example below demonstrates the use of counters in a test case.
     class CounterTestCase(TestCase):
 
         def test_counters(self):
-            stdin = StringIO('foo\nbar\n')
+            stdin = BytesIO(b'foo\nbar\n')
 
             mr_job = MRCountingJob(['--no-conf', '-'])
             mr_job.sandbox(stdin=stdin)

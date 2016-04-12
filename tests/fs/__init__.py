@@ -12,11 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import codecs
 from io import BytesIO
-
-from mrjob.py2 import PY2
-from mrjob.py2 import StringIO
 
 from tests.py2 import mock_stdout_or_stderr
 from tests.sandbox import SandboxedTestCase

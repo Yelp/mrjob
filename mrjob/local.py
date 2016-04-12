@@ -20,11 +20,10 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.logs.counters import _format_counters
-from mrjob.parse import find_python_traceback
+from mrjob.parse import _find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.py2 import string_types
 from mrjob.sim import SimMRJobRunner
-from mrjob.sim import SimRunnerOptionStore
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
@@ -101,8 +100,8 @@ class LocalMRJobRunner(SimMRJobRunner):
         * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
         * *python_bin* defaults to ``sys.executable`` (the current python
           interpreter)
-        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
-          *hadoop_streaming_jar*, and *partitioner* are ignored because they
+        * *hadoop_input_format*, *hadoop_output_format*,
+          and *partitioner* are ignored because they
           require Java. If you need to test these, consider starting up a
           standalone Hadoop instance and running your job with ``-r hadoop``.
         """
@@ -132,7 +131,7 @@ class LocalMRJobRunner(SimMRJobRunner):
             procs_args, output_path, working_dir, env)
         self._all_proc_dicts.extend(proc_dicts)
 
-    def per_step_runner_finish(self, step_num):
+    def _per_step_runner_finish(self, step_num):
         for proc_dict in self._all_proc_dicts:
             self._wait_for_process(proc_dict, step_num)
 
@@ -226,7 +225,7 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         :return: dict(proc=Popen, args=[process args], write_to=file)
         """
-        log.info('> %s > %s' % (' | '.join(
+        log.debug('> %s > %s' % (' | '.join(
             args if isinstance(args, string_types) else cmd_line(args)
             for args in procs_args), output_path))
 
@@ -242,7 +241,7 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         stderr_lines = self._process_stderr_from_script(
             proc.stderr, step_num=step_num)
-        tb_lines = find_python_traceback(stderr_lines)
+        tb_lines = _find_python_traceback(stderr_lines)
 
         # proc.stdout isn't always defined
         if proc.stdout:
@@ -284,10 +283,10 @@ class LocalMRJobRunner(SimMRJobRunner):
             # in practice there's only going to be at most one line in
             # one of these lists, but the code is cleaner this way
             for status in parsed['statuses']:
-                log.info('status: %s' % status)
+                log.info('Status: %s' % status)
 
             for line in parsed['other']:
-                log.error('STDERR: %s' % line.rstrip('\r\n'))
+                log.debug('STDERR: %s' % line.rstrip('\r\n'))
                 yield line
 
     def _default_python_bin(self, local=False):

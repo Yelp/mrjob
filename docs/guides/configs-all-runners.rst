@@ -110,7 +110,7 @@ Temp files and cleanup
     * ``'ALL'``: delete logs and local and remote temp files; stop cluster
         if on EMR and the job is not done when cleanup is run.
     * ``'CLUSTER'``: terminate EMR cluster if job not done when cleanup is run
-    * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
+    * ``'JOB'``: stop job if not done when cleanup runs (temporarily disabled)
     * ``'LOCAL_TMP'``: delete local temp files only
     * ``'LOGS'``: delete logs only
     * ``'NONE'``: delete nothing
@@ -228,8 +228,19 @@ Job execution context
     :default: (automatic)
 
     Name/path of alternate Python binary for wrapper scripts and
-    mappers/reducers (e.g. ``'python -v'``). This defaults to ``'python'`` if
-    you're in Python 2 and ``'python3'`` if you're in Python 3.
+    mappers/reducers (e.g. ``'python -v'``).
+
+    If you're on Python 3, this always defaults to ``'python3'``.
+
+    If you're on Python 2, this defaults to ``'python'``, except on EMR,
+    where it will be either ``'python2.6'`` or ``'python2.7'``.
+
+    Generally, :py:class:`~mrjob.emr.EMRJobRunner` just matches whichever
+    minor version of Python 2 you're running. However, if you're on a
+    (deprecated) 2.x AMI, it'll instead default to ``'python2.6'`` on AMI
+    version 2.4.2 and earlier (because Python 2.7 is unavailable) and
+    ``'python2.7'`` on later 2.x AMI versions (because they have
+    :command:`pip-2.7` but not :command:`pip-2.6`).
 
     This option also affects which Python binary is used for file locking in
     :mrjob-opt:`setup` scripts, so it might be useful to set even if you're
@@ -353,7 +364,11 @@ Job execution context
 
     .. warning::
 
-        "Loose" protocols are going away in v0.6.0.
+       Non-strict protocols are going away in v0.6.0. There is no limit on
+       how much data on-strict protocols can silently swallow (potentially
+       *all* of it). If you have a problem caused by character encoding in
+       log files, consider using
+       :py:class:`~mrjob.protocol.TextValueProtocol` instead.
 
 Other
 =====
@@ -396,11 +411,9 @@ Options ignored by the local and inline runners
 
 These options are ignored because they require a real instance of Hadoop:
 
-* :mrjob-opt:`hadoop_extra_args`
 * :py:meth:`hadoop_input_format <mrjob.runner.MRJobRunner.__init__>`
 * :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`
-* :mrjob-opt:`hadoop_streaming_jar`
-* :mrjob-opt:`partitioner`
+* :py:meth:`partitioner <mrjob.runner.MRJobRunner.__init__>`
 
 
 Options ignored by the inline runner

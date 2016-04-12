@@ -316,7 +316,7 @@ Cluster creation and configuration
         You should almost certainly not set this to ``False`` if you are
         :ref:`pooling-clusters` with other users; other users will
         not be able to reuse your clusters, and
-        :py:mod:`~mrjob.tools.emr.terminate_idle_clusters` won't be
+        :command:`mrjob terminate-idle-clusters` won't be
         able to shut them down when they become idle.
 
     .. versionadded:: 0.4.1
@@ -344,7 +344,9 @@ and install another Python binary.
     Passing expressions like ``path#name`` will cause
     *path* to be automatically uploaded to the task's working directory
     with the filename *name*, marked as executable, and interpolated into the
-    script by their absolute path on the machine running the script. *path*
+    script by their absolute path on the machine running the script.
+
+    *path*
     may also be a URI, and ``~`` and environment variables within *path*
     will be resolved based on the local environment. *name* is optional.
     For details of parsing, see :py:func:`~mrjob.setup.parse_setup_cmd`.
@@ -402,24 +404,15 @@ and install another Python binary.
    :set: emr
    :default: ``True``
 
-   Attempt to install a compatible version of Python at bootstrap time.
+   Attempt to install a compatible (major) version of Python at bootstrap time,
+   including header files and :command:`pip` (see :ref:`using-pip`).
 
-   Python 2 is already installed on all AMIs, but if you're in Python 2,
-   this will also install :command:`pip` and the ``ujson`` library.
+   In Python 2, this currently does nothing (no need).
 
-   In Python 3 this option attempts to install Python 3.4 from a package
-   (``sudo yum install -y python34``), which will work unless you've set
-   :mrjob-opt:`ami_version` to something earlier than 3.7.0.
-
-   Unfortunately, there is not a simple, highly reliable way to install
-   :command:`pip` *or* ``ujson`` by default on Python 3.
-
-   If you just need pure
-   Python packages, see :ref:`Installing pip on Python 3 <using-pip-py3>`.
-   If you'd like ``ujson`` or other C packages as well, see
-   :ref:`Installing ujson on Python 3 <using-ujson-py3>`. (The latter
-   will also support Python 3 on any AMI because it compiles Python from
-   source.)
+   In Python 3, this runs
+   :command:`sudo yum install -y python34 python34-devel python34-pip`, which
+   will work unless you've set :mrjob-opt:`ami_version` to something earlier
+   than 3.7.0.
 
    .. versionadded:: 0.5.0
 
@@ -433,12 +426,15 @@ and install another Python binary.
     .. deprecated:: 0.4.2
 
     Paths of python modules tarballs to install on EMR. Pass
-    ``pip install path/to/tarballs/*.tar.gz#`` to :mrjob-opt:`bootstrap`
-    instead.
+    :command:`sudo` :mrjob-opt:`python_bin`
+    :command:`-m pip install path/to/package.tar.gz#` to
+    :mrjob-opt:`bootstrap` instead.
 
-    In addition to being deprecated, this option only works in Python 2.
-    See :ref:`Installing packages with pip on Python 3 <using-pip-py3>`
-    to see how to do this on Python 3.
+    Also, please consider installing packages directly from
+    `PyPI <https://pypi.python.org/pypi>`_ instead (
+    :command:`sudo` :mrjob-opt:`python_bin`
+    :command:`-m pip install package1 package2`); PyPI is much, much more
+    robust/production-ready than when this option was first created.
 
 .. mrjob-opt::
     :config: bootstrap_scripts
@@ -659,7 +655,7 @@ Choosing/creating a cluster to join
 
     .. warning:: Do not run this without either setting
         :mrjob-opt:`max_hours_idle` or putting
-        :py:mod:`mrjob.tools.emr.terminate_idle_clusters` in your crontab;
+        :command:`mrjob terminate-idle-clusters` in your crontab;
         clusters left idle can quickly become expensive!
 
 .. mrjob-opt::

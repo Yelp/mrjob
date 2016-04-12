@@ -1,6 +1,6 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +20,8 @@ import os.path
 
 import mrjob.conf
 from mrjob.conf import ClearedValue
+from mrjob.conf import _conf_object_at_path
+from mrjob.conf import _expanded_mrjob_conf_path
 from mrjob.conf import _fix_clear_tags
 from mrjob.conf import _load_yaml_with_clear_tag
 from mrjob.conf import combine_cmds
@@ -31,13 +33,11 @@ from mrjob.conf import combine_opts
 from mrjob.conf import combine_path_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_values
-from mrjob.conf import conf_object_at_path
 from mrjob.conf import dump_mrjob_conf
 from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_confs
-from mrjob.conf import real_mrjob_conf_path
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
@@ -51,8 +51,8 @@ def load_mrjob_conf(conf_path=None):
     """Shortcut for automatically loading mrjob.conf from one of the predefined
     locations and returning the de-YAMLed object
     """
-    conf_path = real_mrjob_conf_path(conf_path)
-    return conf_object_at_path(conf_path)
+    conf_path = _expanded_mrjob_conf_path(conf_path)
+    return _conf_object_at_path(conf_path)
 
 
 class MRJobConfTestCase(SandboxedTestCase):

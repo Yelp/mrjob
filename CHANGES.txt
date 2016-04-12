@@ -1,60 +1,109 @@
-v0.5.0, 2015-??-?? -- ???
+v0.5.0, 2016-03-28 -- the future is in the past
+ * supports Python 3 (#989)
  * requires boto 2.35.0 or newer (#980)
+   * removed many workarounds for S3 and EMR (#980), IAM (#1062)
  * jobs:
-   * is_mapper_or_reducer() renamed to is_task() (#1072)
+   * is_mapper_or_reducer() is now is_task() (#1072)
    * mr() no longer takes positional arguments (#814)
    * removed jar() (use mrjob.step.JarStep)
    * removed testing methods parse_counters() and parse_output()
+   * protocols:
+     * protocols are strict by default (#724)
+     * JSON protocols use ujson when available, then simplejson (#1002, #1266)
+       * can explicitly choose Standard, Simple or Ultra JSON protocol
+     * raw protocols handle bytes or unicode depending on Python version
+       * can explicitly choose Text or Bytes protocol
    * mrjob.step:
       * JarStep only takes "args" and "main_class" keyword args
       * removed MRJobStep (use MRStep)
  * runners:
    * All runners:
-     * removed IS_SUCCESSFUL cleanup option (use ALL)
-     * *SCRATCH cleanup options renamed to *TMP (#318)
-     * base_tmp_dir option has been renamed to local_tmp_dir (#318)
-     * deprecation warning: use runner.fs explicitly (#1146)
+     * totally revamped log handling (#1123)
+     * runner status/log messages are less noisy (#1044)
+     * don't bootstrap mrjob if interpreter is set (#1041)
      * fs methods path_exists() and path_join() are now exists() and join()
+     * deprecation warning: use runner.fs explicitly (#1146)
+     * changes to cleanup options:
+       * removed IS_SUCCESSFUL (use ALL)
+       * LOCAL_SCRATCH is now LOCAL_TMP (#318)
+       * new HADOOP_TMP option handles HDFS cleanup (#1261)
+       * REMOTE_SCRATCH is now CLOUD_TMP (#1261)
+     * base_tmp_dir option is now local_tmp_dir (#318)
+     * non-inline runners raise StepFailedException on step failure (#1219)
+     * steps_python_bin defaults to current python interpreter (#1038)
+     * _job_name is now _job_key (#982)
    * EMR:
      * default AWS region is us-west-2 (#1025)
+     * default instance type is m1.medium (#992)
+     * visible_to_all_users defaults to true (#1016)
+     * matches your minor version of Python 2 on 3.x and 4.x AMIs (#1265)
+     * 4.x AMIs are supported (#1105)
+       * added --release-label switch (--ami-version 4.x.y also works)
+     * can fetch counters and probable cause of failure on 3.x and 4.x AMIs
+     * SSH tunnel now works on 3.x and 4.x AMIs (#1013)
+       * ssh_tunnel_to_job_tracker option is now ssh_tunnel
+     * correctly fetch step logs by step ID (#1117)
+     * bootstrap_python option
      * s3_scratch_uri option is now s3_tmp_dir (#318)
      * aws_region is no longer inferred from s3_tmp_dir
      * create/select temp bucket in same region as EMR jobs (#687)
      * added iam_endpoint option (#1067)
-     * SSH tunnel now works on 3.x and 4.x AMIs (#1013)
-       * renamed ssh_tunnel_to_job_tracker option to ssh_tunnel
      * removed s3_conn args from methods in EMRJobRunner and S3Filesystem
      * S3 Filesystem:
        * connect to each S3 bucket on appropriate endpoint (#1028)
          * fall back to default if we can't get bucket location (#1170)
-       * removed support for _$folder$ keys
+       * removed special treatment of _$folder$ keys
+         * removed deprecated S3Filesystem method get_s3_folder_keys()
        * recurse "subdirectories" even if uri lacks trailing / (#1183)
      * removed iam_job_flow_role option (use iam_instance_profile)
      * custom hadoop_streaming_jar gets properly uploaded
-     * 4.x AMIs are supported (#1105)
-       * added --release-label switch (--ami-version 4.0.0 also works)
-     * don't try to clean up job when there's no cluster ID (#1170)
+     * job cleanup temporarily disabled (#1241)
+     * pooling respects key pair (#1230)
+     * idle cluster self-termination respects non-streaming jobs (#1145)
+     * deprecated "latest" AMI version not passed through to EMR (#1269)
+     * emr_job_flow_id option is now cluster_id (#1082)
+     * emr_job_flow_pool_name is now pool_name (#1082)
+     * pool_emr_job_flows is now pool_clusters (#1082)
    * Hadoop
+     * works out-of the-box on most Hadoop setups (#1160)
+     * works out-of the box inside EMR (2.x, 3.x, and 4.x AMIs)
      * counters are parsed from Hadoop binary stderr in YARN (#1153)
      * can find logs and probable cause of failure in YARN (#1195)
        * will search in <output dir>/_logs, to support Cloudera (#565)
+     * HDFS Filesystem:
+       * use fs -ls -R and fs -rm -R in YARN (#1152)
+       * mkdir() now uses -p on YARN (#991)
+       * fs.du() now works on YARN (#1155)
+       * fs.du() now returns 0 for nonexistent files instead of erroring
+       * fs.rm() now uses -skipTrash
+     * dropped support for Hadoop prior to 0.20.203 (#1208)
      * added hadoop_log_dirs option
      * hdfs_scratch_dir option is now hadoop_tmp_dir (#318)
-     * use fs -ls -R and fs -rm -R in YARN (#1152)
-     * fs.du() now works on YARN (#1155)
-     * fs.du() now returns 0 for nonexistent files instead of erroring
-     * fs.rm() now uses -skipTrash
+     * hadoop_home is deprecated
+     * uses -D and correct property name when step has no reduces (#1213)
    * Inline/Local
      * runner.fs raises IOError if passed URIs (#1185)
+     * version-agnostic by default (#735)
+     * removed ignored hadoop_extra_args and hadoop_streaming_jar opts (#1275)
+     * inline runner uses multiple splits by default (#1276)
  * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())
+ * removed mrjob.compat methods to support Hadoop prior to 0.20.203:
+   * supports_combiners_in_hadoop_streaming()
+   * supports_new_distributed_cache_options()
+   * uses_generic_jobconf()
  * removed mrjob.conf.combine_cmd_lists()
  * removed fetch-logs tool (#1127)
- * Python-version-specific mrjob commands (#1104)
+ * mrjob subcommands use "cluster" rather than "job-flow" (#1082)
+   * create-job-flow is now create-cluster
+   * terminate-idle-job-flows is now terminate-idle-clusters
+   * terminate-job-flow is now terminate-cluster
+ * Python-version-specific mrjob-x and mrjob-x.y commands (#1104)
  * use followlinks=True with os.walk()
+ * all internal constants/functions/methods explicitly start with _ (#681)
  * mrjob.util:
    * file_ext() takes filename, not path
    * random_identifier() moved here from mrjob.aws
-   * renamed buffer_iterator_to_line_iterator() to to_lines()
+   * buffer_iterator_to_line_iterator() is now to_lines()
      * to_lines() no longer appends a newline to data (#819)
    * removed extract_dir_for_tar()
    * gunzip_stream() now yields chunks, not lines

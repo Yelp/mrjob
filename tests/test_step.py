@@ -1,5 +1,6 @@
 # Copyright 2012 Yelp and Contributors
 # Copyright 2013 David Marin
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,7 +20,6 @@ from mrjob.step import MRStep
 from mrjob.step import StepFailedException
 
 from tests.py2 import TestCase
-from tests.quiet import logger_disabled
 
 
 # functions we don't really care about the values of

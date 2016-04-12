@@ -1,5 +1,5 @@
 # Copyright 2011-2012 Yelp
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ except ImportError:
 
 from mrjob.emr import EMRJobRunner
 from mrjob.parse import parse_s3_uri
-from mrjob.tools.emr.s3_tmpwatch import s3_cleanup
+from mrjob.tools.emr.s3_tmpwatch import _s3_cleanup
 from tests.mockboto import MockKey
 from tests.mockboto import MockBotoTestCase
 
@@ -72,7 +72,7 @@ class S3TmpWatchTestCase(MockBotoTestCase):
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
 
-        s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True,
+        _s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True,
                    conf_paths=[])
 
         # dry-run shouldn't delete anything
@@ -80,7 +80,7 @@ class S3TmpWatchTestCase(MockBotoTestCase):
         assert isinstance(key_bar, MockKey)
         assert isinstance(key_qux, MockKey)
 
-        s3_cleanup(remote_input_path, timedelta(days=30), conf_paths=[])
+        _s3_cleanup(remote_input_path, timedelta(days=30), conf_paths=[])
 
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')
@@ -91,7 +91,7 @@ class S3TmpWatchTestCase(MockBotoTestCase):
         self.assertEqual(key_bar, None)
         assert isinstance(key_qux, MockKey)
 
-        s3_cleanup(remote_input_path, timedelta(hours=48), conf_paths=[])
+        _s3_cleanup(remote_input_path, timedelta(hours=48), conf_paths=[])
 
         key_foo = bucket.get_key('data/foo')
         key_bar = bucket.get_key('data/bar')

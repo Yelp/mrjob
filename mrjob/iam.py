@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ from mrjob.util import random_identifier
 # http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles-defaultroles.html  # noqa
 
 # use this for service_role
-MRJOB_SERVICE_ROLE = {
+_MRJOB_SERVICE_ROLE = {
     "Version": "2008-10-17",
     "Statement": [{
         "Sid": "",
@@ -52,7 +52,7 @@ MRJOB_SERVICE_ROLE = {
 }
 
 # Role to wrap in an instance profile
-MRJOB_INSTANCE_PROFILE_ROLE = {
+_MRJOB_INSTANCE_PROFILE_ROLE = {
     "Version": "2008-10-17",
     "Statement": [{
         "Sid": "",
@@ -64,21 +64,21 @@ MRJOB_INSTANCE_PROFILE_ROLE = {
     }]
 }
 
-# the built-in, managed policy to attach to MRJOB_SERVICE_ROLE
-EMR_SERVICE_ROLE_POLICY_ARN = (
+# the built-in, managed policy to attach to _MRJOB_SERVICE_ROLE
+_EMR_SERVICE_ROLE_POLICY_ARN = (
     'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceRole')
 
-# the built-in, managed policy to attach to MRJOB_INSTANCE_PROFILE_ROLE
-EMR_INSTANCE_PROFILE_POLICY_ARN = (
+# the built-in, managed policy to attach to _MRJOB_INSTANCE_PROFILE_ROLE
+_EMR_INSTANCE_PROFILE_POLICY_ARN = (
     'arn:aws:iam::aws:policy/service-role/AmazonElasticMapReduceforEC2Role')
 
 # if we can't create or find our own service role, use the one
 # created by the AWS console and CLI
-FALLBACK_SERVICE_ROLE = 'EMR_DefaultRole'
+_FALLBACK_SERVICE_ROLE = 'EMR_DefaultRole'
 
 # if we can't create or find our own instance profile, use the one
 # created by the AWS console and CLI
-FALLBACK_INSTANCE_PROFILE = 'EMR_EC2_DefaultRole'
+_FALLBACK_INSTANCE_PROFILE = 'EMR_EC2_DefaultRole'
 
 
 log = getLogger(__name__)
@@ -131,15 +131,15 @@ def get_or_create_mrjob_service_role(conn):
     create one."""
 
     for role_name, role_document in _yield_roles(conn):
-        if role_document != MRJOB_SERVICE_ROLE:
+        if role_document != _MRJOB_SERVICE_ROLE:
             continue
 
         policy_arns = list(_yield_attached_role_policies(conn, role_name))
-        if policy_arns == [EMR_SERVICE_ROLE_POLICY_ARN]:
+        if policy_arns == [_EMR_SERVICE_ROLE_POLICY_ARN]:
             return role_name
 
     name = _create_mrjob_role_with_attached_policy(
-        conn, MRJOB_SERVICE_ROLE, EMR_SERVICE_ROLE_POLICY_ARN)
+        conn, _MRJOB_SERVICE_ROLE, _EMR_SERVICE_ROLE_POLICY_ARN)
 
     log.info('Auto-created service role %s' % name)
 
@@ -152,15 +152,15 @@ def get_or_create_mrjob_instance_profile(conn):
     for profile_name, role_name, role_document in (
             _yield_instance_profiles(conn)):
 
-        if role_document != MRJOB_INSTANCE_PROFILE_ROLE:
+        if role_document != _MRJOB_INSTANCE_PROFILE_ROLE:
             continue
 
         policy_arns = list(_yield_attached_role_policies(conn, role_name))
-        if policy_arns == [EMR_INSTANCE_PROFILE_POLICY_ARN]:
+        if policy_arns == [_EMR_INSTANCE_PROFILE_POLICY_ARN]:
             return role_name
 
     name = _create_mrjob_role_with_attached_policy(
-        conn, MRJOB_INSTANCE_PROFILE_ROLE, EMR_INSTANCE_PROFILE_POLICY_ARN)
+        conn, _MRJOB_INSTANCE_PROFILE_ROLE, _EMR_INSTANCE_PROFILE_POLICY_ARN)
 
     # create an instance profile with the same name as the role
     conn.create_instance_profile(name)
@@ -236,6 +236,7 @@ def _list_attached_role_policies(conn, role_name, marker=None, max_items=None):
         params['MaxItems'] = max_items
     return conn.get_response('ListAttachedRolePolicies', params,
                              list_marker='AttachedPolicies')
+
 
 def _attach_role_policy(conn, role_name, policy_arn):
     params = {'PolicyArn': policy_arn,

@@ -1,5 +1,5 @@
 # Copyright 2011-2012 Yelp
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@ from datetime import datetime
 from datetime import timedelta
 
 from mrjob.py2 import StringIO
-from mrjob.tools.emr.report_long_jobs import find_long_running_jobs
+from mrjob.tools.emr.report_long_jobs import _find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
 
 from tests.mockboto import MockEmrObject
@@ -264,10 +264,10 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
         for cluster in CLUSTERS:
             self.add_mock_emr_cluster(cluster)
 
-    def find_long_running_jobs(self, cluster_summaries, min_time, now):
+    def _find_long_running_jobs(self, cluster_summaries, min_time, now):
         emr_conn = self.connect_emr()
 
-        return find_long_running_jobs(
+        return _find_long_running_jobs(
             emr_conn,
             cluster_summaries,
             min_time=min_time,
@@ -275,7 +275,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_starting(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-STARTING']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
@@ -287,7 +287,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_bootstrapping(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-BOOTSTRAPPING']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
@@ -299,7 +299,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_running_one_step(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNING1STEP']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
@@ -311,7 +311,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNING1STEP']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
@@ -320,7 +320,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_running_two_steps(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNING2STEPS']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
@@ -332,7 +332,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNING2STEPS']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
@@ -341,7 +341,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_running_and_pending(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNINGANDPENDING']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
@@ -353,7 +353,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNINGANDPENDING']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
@@ -362,7 +362,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_pending_one_step(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-PENDING1STEP']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
@@ -374,7 +374,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-PENDING1STEP']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
@@ -383,7 +383,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_pending_two_steps(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-PENDING2STEPS']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
@@ -395,7 +395,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
         # job hasn't been running for 1 day
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-PENDING2STEPS']],
                 min_time=timedelta(days=1),
                 now=datetime(2010, 6, 6, 4)
@@ -404,7 +404,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_completed(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-COMPLETED']],
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)
@@ -414,7 +414,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     def test_all_together(self):
         self.assertEqual(
-            list(self.find_long_running_jobs(
+            list(self._find_long_running_jobs(
                 CLUSTERS,
                 min_time=timedelta(hours=1),
                 now=datetime(2010, 6, 6, 4)

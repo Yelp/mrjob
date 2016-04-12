@@ -1,6 +1,6 @@
 # Copyright 2012 Yelp
 # Copyright 2014 Yelp and Contributors
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ usage = """usage: mrjob {subcommand|--help}"
 subcommands:"""
 
 
-def error(msg=None):
+def _error(msg=None):
     if msg:
         print(msg, file=stderr)
 
@@ -45,7 +45,7 @@ def error(msg=None):
         subcommand_line(name) for name in sorted(descriptions)), file=stderr)
 
 
-def command(name, description=None):
+def _command(name, description=None):
     """Decorate a function used to call a command.
 
     If you don't set *description*, it won't be included in help
@@ -61,79 +61,79 @@ def command(name, description=None):
 def main(args=None):
     args = args or argv
     if not args[1:] or args[1] in ('-h', '--help'):
-        error()
+        _error()
     elif args[1] not in commands:
-        error('"%s" is not a command' % args[1])
+        _error('"%s" is not a command' % args[1])
     else:
         commands[args[1]](args[2:])
 
 
-@command('run', 'Run a job')
-def run(args):
+@_command('run', 'Run a job')
+def _run(args):
     from mrjob.launch import MRJobLauncher
     MRJobLauncher(args=args, from_cl=True).run_job()
 
 
-@command('audit-emr-usage', 'Audit EMR usage')
-def audit_usage(args):
+@_command('audit-emr-usage', 'Audit EMR usage')
+def _audit_usage(args):
     from mrjob.tools.emr.audit_usage import main
     main(args)
 
 
-@command('create-cluster', 'Create a persistent EMR cluster')
-def create_cluster(args):
+@_command('create-cluster', 'Create a persistent EMR cluster')
+def _create_cluster(args):
     from mrjob.tools.emr.create_cluster import main
     main(args)
 
 
 # deprecated alias for create-cluster, delete in v0.6.0
-@command('create-job-flow')
-def create_jf(args):
+@_command('create-job-flow')
+def _create_jf(args):
     from mrjob.tools.emr.create_job_flow import main
     main(args)
 
 
-@command('boss', 'Run a command on every node of a cluster.')
-def mrboss(args):
+@_command('boss', 'Run a command on every node of a cluster.')
+def _mrboss(args):
     from mrjob.tools.emr.mrboss import main
     main(args)
 
 
-@command('report-long-jobs', 'Report EMR jobs which have been running for a'
-         ' long time')
-def report_long_jobs(args):
+@_command('report-long-jobs', 'Report EMR jobs which have been running for a'
+          ' long time')
+def _report_long_jobs(args):
     from mrjob.tools.emr.report_long_jobs import main
     main(args)
 
 
-@command('s3-tmpwatch', 'Delete S3 keys older than a specified time')
-def s3_tmpwatch(args):
+@_command('s3-tmpwatch', 'Delete S3 keys older than a specified time')
+def _s3_tmpwatch(args):
     from mrjob.tools.emr.s3_tmpwatch import main
     main(args)
 
 
-@command('terminate-idle-clusters', 'Terminate idle EMR clusters')
-def terminate_idle_clusters(args):
+@_command('terminate-idle-clusters', 'Terminate idle EMR clusters')
+def _terminate_idle_clusters(args):
     from mrjob.tools.emr.terminate_idle_clusters import main
     main(args)
 
 
 # deprecated alias for terminate-idle-clusters, delete in v0.6.0
-@command('terminate-idle-job-flows')
-def terminate_idle_jfs(args):
+@_command('terminate-idle-job-flows')
+def _terminate_idle_jfs(args):
     from mrjob.tools.emr.terminate_idle_job_flows import main
     main(args)
 
 
-@command('terminate-cluster', 'Terminate a single EMR cluster')
-def terminate_cluster(args):
+@_command('terminate-cluster', 'Terminate a single EMR cluster')
+def _terminate_cluster(args):
     from mrjob.tools.emr.terminate_cluster import main
     main(args)
 
 
 # deprecated alias for terminate-cluster, delete in v0.6.0
-@command('terminate-job-flow')
-def terminate_jf(args):
+@_command('terminate-job-flow')
+def _terminate_jf(args):
     from mrjob.tools.emr.terminate_job_flow import main
     main(args)
 

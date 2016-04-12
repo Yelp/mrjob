@@ -22,6 +22,7 @@ import posixpath
 import random
 import signal
 import socket
+import sys
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -56,12 +57,10 @@ import mrjob
 import mrjob.step
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
-from mrjob.aws import _MAX_STEPS_PER_CLUSTER
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import map_version
-from mrjob.compat import uses_yarn
 from mrjob.compat import version_gte
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -73,8 +72,8 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.ssh import SSHFilesystem
-from mrjob.iam import FALLBACK_INSTANCE_PROFILE
-from mrjob.iam import FALLBACK_SERVICE_ROLE
+from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
+from mrjob.iam import _FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.counters import _format_counters
@@ -90,9 +89,9 @@ from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.patched_boto import patched_describe_cluster
-from mrjob.patched_boto import patched_describe_step
-from mrjob.patched_boto import patched_list_steps
+from mrjob.patched_boto import _patched_describe_cluster
+from mrjob.patched_boto import _patched_describe_step
+from mrjob.patched_boto import _patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
@@ -105,13 +104,10 @@ from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
-from mrjob.ssh import ssh_slave_addresses
-from mrjob.ssh import ssh_terminate_single_job
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 from mrjob.util import random_identifier
-
 
 
 log = logging.getLogger(__name__)
@@ -123,14 +119,16 @@ _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '4': dict(name='resource manager', path='/cluster', port=8088),
 }
 
-# if we SSH into a node, default place to look for Hadoop logs
-_EMR_HADOOP_LOG_DIR = '/mnt/var/log/hadoop'
+# if we SSH into a node, default place to look for logs
+_EMR_LOG_DIR = '/mnt/var/log'
 
+# EMR's hard limit on number of steps in a cluster
+_MAX_STEPS_PER_CLUSTER = 256
 
-MAX_SSH_RETRIES = 20
+_MAX_SSH_RETRIES = 20
 
 # ssh should fail right away if it can't bind a port
-WAIT_FOR_SSH_TO_FAIL = 1.0
+_WAIT_FOR_SSH_TO_FAIL = 1.0
 
 # amount of time to wait between checks for available pooled clusters
 _POOLING_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
@@ -148,6 +146,10 @@ _DEFAULT_AWS_REGION = 'us-west-2'
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_AMI_VERSION = '3.11.0'
 
+# EMR translates the dead/deprecated "latest" AMI version to 2.4.2
+# (2.4.2 isn't actually the latest version by a long shot)
+_AMI_VERSION_LATEST = '2.4.2'
+
 # Hadoop streaming jar on 1-3.x AMIs
 _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 
@@ -155,8 +157,10 @@ _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
 # we have to wait this many minutes for logs to transfer to S3 (or wait
-# for the cluster to terminate)
-_S3_LOG_WAIT_MINUTES = 5
+# for the cluster to terminate). Docs say logs are transferred every 5
+# minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
+# 5 minutes plus time to copy the logs, or something like that.
+_S3_LOG_WAIT_MINUTES = 10
 
 
 def s3_key_to_uri(s3_key):
@@ -207,10 +211,10 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
     """Get all steps for the cluster, making successive API calls
     if necessary.
 
-    Calls :py:func:`~mrjob.patched_boto.patched_list_steps`, to work around
+    Calls :py:func:`~mrjob.patched_boto._patched_list_steps`, to work around
     `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
     """
-    for resp in _repeat(patched_list_steps, emr_conn, cluster_id,
+    for resp in _repeat(_patched_list_steps, emr_conn, cluster_id,
                         *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
@@ -230,7 +234,7 @@ def _step_ids_for_job(steps, job_key):
     return step_ids
 
 
-def make_lock_uri(s3_tmp_dir, cluster_id, step_num):
+def _make_lock_uri(s3_tmp_dir, cluster_id, step_num):
     """Generate the URI to lock the cluster ``cluster_id``"""
     return s3_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
 
@@ -263,8 +267,8 @@ def _lock_acquire_step_2(key, job_key):
     return (key_value == job_key.encode('utf_8'))
 
 
-def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
-                            mins_to_expiration=None):
+def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
+                             mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
@@ -275,6 +279,7 @@ def attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
     time.sleep(sync_wait_time)
     return _lock_acquire_step_2(key, job_key)
 
+
 def _get_reason(cluster_or_step):
     """Extract statechangereason.message from a boto Cluster or Step.
 
@@ -282,7 +287,6 @@ def _get_reason(cluster_or_step):
     return getattr(
         getattr(cluster_or_step.status, 'statechangereason', ''),
         'message', '').rstrip()
-
 
 
 class EMRRunnerOptionStore(RunnerOptionStore):
@@ -321,6 +325,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_endpoint',
         'emr_tags',
         'enable_emr_debugging',
+        'hadoop_extra_args',
+        'hadoop_streaming_jar',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
         'iam_instance_profile',
@@ -357,6 +363,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ec2_key_pair_file': combine_paths,
         'emr_api_params': combine_dicts,
         'emr_tags': combine_dicts,
+        'hadoop_extra_args': combine_lists,
         's3_log_uri': combine_paths,
         's3_tmp_dir': combine_paths,
         'ssh_bin': combine_cmds,
@@ -378,6 +385,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['aws_region'] = _DEFAULT_AWS_REGION
 
         self._fix_ec2_instance_opts()
+        self._fix_ami_version_latest()
         self._fix_release_label_opt()
 
     def default_options(self):
@@ -454,8 +462,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 max(self._opt_priority['num_ec2_core_instances'],
                     self._opt_priority['num_ec2_task_instances'])):
                 log.warning('Mixing num_ec2_instances and'
-                         ' num_ec2_{core,task}_instances does not make sense;'
-                         ' ignoring num_ec2_instances')
+                            ' num_ec2_{core,task}_instances does not make'
+                            ' sense; ignoring num_ec2_instances')
             # recalculate number of EC2 instances
             self['num_ec2_instances'] = (
                 1 +
@@ -498,14 +506,20 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 except ValueError:
                     pass  # maybe EMR will accept non-floats?
 
+    def _fix_ami_version_latest(self):
+        """Translate the dead/deprecated *ami_version* value ``latest``
+        to ``2.4.2`` up-front, so our code doesn't have to deal with
+        non-numeric AMI versions."""
+        if self['ami_version'] == 'latest':
+            self['ami_version'] = _AMI_VERSION_LATEST
+
     def _fix_release_label_opt(self):
         """If *release_label* is not set and *ami_version* is set to version
         4 or higher (which the EMR API won't accept), set *release_label*
         to "emr-" plus *ami_version*. (Leave *ami_version* as-is;
         *release_label* overrides it anyway.)"""
-        if (not self['release_label'] and
-            self['ami_version'] != 'latest' and
-            version_gte(self['ami_version'], '4')):
+        if (version_gte(self['ami_version'], '4') and
+                not self['release_label']):
             self['release_label'] = 'emr-' + self['ami_version']
 
 
@@ -660,6 +674,36 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # transfer to S3 (so we don't do it twice)
         self._waited_for_logs_on_s3 = set()
 
+    def _default_python_bin(self, local=False):
+        """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,
+        except we explicitly pick a minor version of Python 2
+        (``python2.6`` or ``python2.7``).
+
+        On 3.x and later, we just try to match the current minor
+        version of Python. On the 2.x AMIs, we try to use ``python2.7``
+        on 2.4.3 and later (because it comes with a working :command:`pip`),
+        and ``python2.6`` otherwise (because Python 2.7 isn't installed).
+        """
+        if local or not PY2:
+            return super(EMRJobRunner, self)._default_python_bin(local=local)
+
+        if self._opts['release_label'] or version_gte(
+                self._opts['ami_version'], '3'):
+            # on 3.x and 4.x AMIs, both versions of Python work, so just
+            # match whatever version we're using locally
+            if sys.version_info >= (2, 7):
+                return ['python2.7']
+            else:
+                return ['python2.6']
+        elif version_gte(self._opts['ami_version'], '2.4.3'):
+            # on 2.4.3+, use python2.7 because the default python
+            # doesn't have a working pip
+            return ['python2.7']
+        else:
+            # prior to 2.4.3, Python 2.6 is the only version installed.
+            # Use "python2.6" and not "python" for consistency
+            return ['python2.6']
+
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
         aren't already set.
@@ -669,7 +713,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # set s3_tmp_dir by checking for existing buckets
         if not self._opts['s3_tmp_dir']:
             self._set_s3_tmp_dir()
-            log.info('using %s as our temp dir on S3' %
+            log.info('Using %s as our temp dir on S3' %
                      self._opts['s3_tmp_dir'])
 
         self._opts['s3_tmp_dir'] = self._check_and_fix_s3_dir(
@@ -693,21 +737,22 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket.name
 
-            if (tmp_bucket.get_location() ==
-                s3_location_constraint_for_region(self._opts['aws_region'])):
+            if (tmp_bucket.get_location() == s3_location_constraint_for_region(
+                    self._opts['aws_region'])):
 
                 # Regions are both specified and match
-                log.info("using existing temp bucket %s" %
-                         tmp_bucket_name)
+                log.debug("using existing temp bucket %s" %
+                          tmp_bucket_name)
                 self._opts['s3_tmp_dir'] = ('s3://%s/tmp/' %
-                                                tmp_bucket_name)
+                                            tmp_bucket_name)
                 return
 
         # That may have all failed. If so, pick a name.
         tmp_bucket_name = 'mrjob-' + random_identifier()
         self._s3_tmp_bucket_to_create = tmp_bucket_name
-        log.info("creating new temp bucket %s" % tmp_bucket_name)
         self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
+        log.info('Auto-created temp S3 bucket %s' % tmp_bucket_name)
+        self._wait_for_s3_eventual_consistency()
 
     def _s3_log_dir(self):
         """Get the URI of the log directory for this job's cluster."""
@@ -723,8 +768,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _create_s3_tmp_bucket_if_needed(self):
         """Make sure temp bucket exists"""
         if self._s3_tmp_bucket_to_create:
-            log.info('creating S3 bucket %r to use as temp space' %
-                     self._s3_tmp_bucket_to_create)
+            log.debug('creating S3 bucket %r to use as temp space' %
+                      self._s3_tmp_bucket_to_create)
             location = s3_location_constraint_for_region(
                 self._opts['aws_region'])
             self.fs.create_bucket(
@@ -860,10 +905,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Copy local files tracked by self._upload_mgr to S3."""
         self._create_s3_tmp_bucket_if_needed()
 
-        log.info('Copying non-input files into %s' % self._upload_mgr.prefix)
+        log.info('Copying local files to %s...' % self._upload_mgr.prefix)
 
         for path, s3_uri in self._upload_mgr.path_to_uri().items():
-            log.debug('uploading %s -> %s' % (path, s3_uri))
+            log.debug('  %s -> %s' % (path, s3_uri))
             self._upload_contents(s3_uri, path)
 
     def _upload_contents(self, s3_uri, path):
@@ -1000,7 +1045,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.debug('> %s' % cmd_line(args))
 
             ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            time.sleep(WAIT_FOR_SSH_TO_FAIL)
+            time.sleep(_WAIT_FOR_SSH_TO_FAIL)
             ssh_proc.poll()
             # still running. We are golden
             if ssh_proc.returncode is None:
@@ -1035,7 +1080,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         try:
             # seed random port selection on cluster ID
             random.seed(self._cluster_id)
-            num_picks = min(MAX_SSH_RETRIES, len(self._opts['ssh_bind_ports']))
+            num_picks = min(_MAX_SSH_RETRIES,
+                            len(self._opts['ssh_bind_ports']))
             return random.sample(self._opts['ssh_bind_ports'], num_picks)
         finally:
             random.setstate(random_state)
@@ -1074,11 +1120,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             except Exception as e:
                 log.exception(e)
 
-    def _cleanup_remote_tmp(self):
-        # delete all the files we created
+    def _cleanup_cloud_tmp(self):
+        # delete all the files we created on S3
         if self._s3_tmp_dir:
             try:
-                log.info('Removing all files in %s' % self._s3_tmp_dir)
+                log.info('Removing s3 temp directory %s...' % self._s3_tmp_dir)
                 self.fs.rm(self._s3_tmp_dir)
                 self._s3_tmp_dir = None
             except Exception as e:
@@ -1092,49 +1138,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._s3_log_dir() and not self._opts['cluster_id'] \
                 and not self._opts['pool_clusters']:
             try:
-                log.info('Removing all files in %s' % self._s3_log_dir())
+                log.info('Removing log files in %s...' % self._s3_log_dir())
                 self.fs.rm(self._s3_log_dir())
             except Exception as e:
                 log.exception(e)
-
-    def _cleanup_job(self):
-        # kill the job if we won't be taking down the whole cluster
-        if not self._cluster_id:
-            # Nothing we can do.
-            return
-
-        if not (self._opts['cluster_id'] or
-                self._opts['pool_clusters']):
-            # we're taking down the cluster, don't bother
-            return
-
-        try:
-            addr = self._address_of_master()
-        except IOError:
-            # if we can't get the address of the master node, job probably
-            # isn't running
-            return
-
-        if not self._ran_job:
-            if self._opts['ec2_key_pair_file']:
-                try:
-                    log.info("Attempting to terminate job...")
-                    had_job = ssh_terminate_single_job(
-                        self._opts['ssh_bin'],
-                        addr,
-                        self._opts['ec2_key_pair_file'])
-                    if had_job:
-                        log.info("Succeeded in terminating job")
-                    else:
-                        log.info("Job appears to have already been terminated")
-                    return
-                except IOError:
-                    pass
-
-            log.info('Unable to kill job without terminating cluster and'
-                     ' job is still running. You may wish to terminate it'
-                     ' yourself with "python -m mrjob.tools.emr.terminate'
-                     '_cluster %s".' % self._cluster_id)
 
     def _cleanup_cluster(self):
         if not self._cluster_id:
@@ -1149,13 +1156,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # Something happened with boto and the user should know.
             log.exception(e)
             return
-        log.info('cluster %s successfully terminated' % self._cluster_id)
+        log.info('Cluster %s successfully terminated' % self._cluster_id)
 
     def _wait_for_s3_eventual_consistency(self):
         """Sleep for a little while, to give S3 a chance to sync up.
         """
-        log.info('Waiting %.1fs for S3 eventual consistency' %
-                 self._opts['s3_sync_wait_time'])
+        log.debug('Waiting %.1fs for S3 eventual consistency...' %
+                  self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
     def _cluster_is_done(self, cluster):
@@ -1223,7 +1230,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # make sure we can see the files we copied to S3
         self._wait_for_s3_eventual_consistency()
 
-        log.info('Creating Elastic MapReduce cluster')
+        log.debug('Creating Elastic MapReduce cluster')
         args = self._cluster_args(persistent, steps)
 
         emr_conn = self.make_emr_conn()
@@ -1236,7 +1243,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
          # keep track of when we started our job
         self._emr_job_start = time.time()
 
-        log.info('Cluster created with ID: %s' % cluster_id)
+        log.debug('Cluster created with ID: %s' % cluster_id)
 
         # set EMR tags for the cluster, if any
         tags = self._opts['emr_tags']
@@ -1375,8 +1382,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 raise
             log.warning(
                 "Can't access IAM API, trying default instance profile: %s" %
-                FALLBACK_INSTANCE_PROFILE)
-            return FALLBACK_INSTANCE_PROFILE
+                _FALLBACK_INSTANCE_PROFILE)
+            return _FALLBACK_INSTANCE_PROFILE
 
     def _service_role(self):
         try:
@@ -1387,8 +1394,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 raise
             log.warning(
                 "Can't access IAM API, trying default service role: %s" %
-                FALLBACK_SERVICE_ROLE)
-            return FALLBACK_SERVICE_ROLE
+                _FALLBACK_SERVICE_ROLE)
+            return _FALLBACK_SERVICE_ROLE
 
     @property
     def _action_on_failure(self):
@@ -1504,8 +1511,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._cluster_id:
             self._cluster_id = self._create_cluster(
                 persistent=False)
-            log.info('Created new cluster %s' %
-                     self._cluster_id)
+            log.info('Created new cluster %s' % self._cluster_id)
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
@@ -1523,8 +1529,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         tags = self._opts['emr_tags']
         if tags:
             log.info('Setting EMR tags: %s' %
-                    ', '.join('%s=%s' % (tag, value)
-                              for tag, value in tags.items()))
+                     ', '.join('%s=%s' % (tag, value)
+                               for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
     def _wait_for_steps_to_complete(self):
@@ -1575,7 +1581,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                       self._opts['check_emr_status_every'])
             time.sleep(self._opts['check_emr_status_every'])
 
-            step = patched_describe_step(emr_conn, self._cluster_id, step_id)
+            step = _patched_describe_step(emr_conn, self._cluster_id, step_id)
 
             if step.status.state == 'PENDING':
                 cluster = self._describe_cluster()
@@ -1591,7 +1597,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 time_running_desc = ''
 
                 startdatetime = getattr(
-                    getattr(step.status, 'timeline', ''), 'startdatetime' ,'')
+                    getattr(step.status, 'timeline', ''), 'startdatetime', '')
                 if startdatetime:
                     start = iso8601_to_timestamp(startdatetime)
                     time_running_desc = ' for %.1fs' % (time.time() - start)
@@ -1614,7 +1620,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 reason_desc = (' (%s)' % reason) if reason else ''
 
                 log.info('  %s%s' % (
-                   step.status.state, reason_desc))
+                    step.status.state, reason_desc))
 
                 # print cluster status; this might give more context
                 # why step didn't succeed
@@ -1698,8 +1704,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         reason = _get_reason(cluster)
         if any(reason.endswith('/%s is invalid' % role)
-               for role in (FALLBACK_INSTANCE_PROFILE,
-                            FALLBACK_SERVICE_ROLE)):
+               for role in (_FALLBACK_INSTANCE_PROFILE,
+                            _FALLBACK_SERVICE_ROLE)):
             log.warning(
                 '\n'
                 'Ask your admin to create the default EMR roles'
@@ -1731,44 +1737,67 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     for path in self._get_input_paths()]
         else:
             # put intermediate data in HDFS
-            return ['hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_key, step_num)]
+            return ['hdfs:///tmp/mrjob/%s/step-output/%04d/' % (
+                self._job_key, step_num - 1)]
 
     def _step_output_uri(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:
             # put intermediate data in HDFS
-            return 'hdfs:///tmp/mrjob/%s/step-output/%s/' % (
-                self._job_key, step_num + 1)
+            return 'hdfs:///tmp/mrjob/%s/step-output/%04d/' % (
+                self._job_key, step_num)
 
     ### LOG PARSING (implementation of LogInterpretationMixin) ###
 
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
-        # in YARN, the history log lives on HDFS, which we currently
-        # don't have a way to access (see #990 for a possible solution), and
-        # isn't copied to S3
+        # History logs have different paths on the 4.x AMIs.
         #
-        # Fortunately, in YARN, everything we want is in the step
-        # log anyway.
-        if uses_yarn(self.get_hadoop_version()):
-            return []
+        # Disabling until we can effectively fetch these logs over SSH;
+        # on 4.3.0 there are permissions issues (see #1244), and
+        # on 4.0.0 the logs aren't on the filesystem at all (see #1253).
+        #
+        # Unlike on 3.x, the history logs *are* available on S3, but they're
+        # not useful enough to justify the wait when SSH is set up
+
+        # if version_gte(self.get_ami_version(), '4'):
+        #     # denied access on some 4.x AMIs by the yarn user, see #1244
+        #     dir_name = 'hadoop-mapreduce/history'
+        #     s3_dir_name = 'hadoop-mapreduce/history'
+        if version_gte(self.get_ami_version(), '3'):
+            # on the 3.x AMIs, the history log lives inside HDFS and isn't
+            # copied to S3. We don't need it anyway; everything relevant
+            # is in the step log
+            return iter([])
+        else:
+            dir_name = 'hadoop/history'
+            s3_dir_name = 'jobs'
 
         return self._stream_log_dirs(
-            'history log', dir_name='history', s3_dir_name='jobs')
+            'history log',
+            dir_name=dir_name,
+            s3_dir_name=s3_dir_name)
 
     def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Get lists of directories to look for the task logs in."""
-        if application_id:
-            dir_name = posixpath.join('userlogs', application_id)
-            s3_dir_name = posixpath.join('task-attempts', application_id)
+        if version_gte(self.get_ami_version(), '4'):
+            # denied access on some 4.x AMIs by the yarn user, see #1244
+            dir_name = 'hadoop-yarn/containers'
+            s3_dir_name = 'containers'
         else:
-            dir_name = 'userlogs'
+            dir_name = 'hadoop/userlogs'
             s3_dir_name = 'task-attempts'
 
+        if application_id:
+            dir_name = posixpath.join(dir_name, application_id)
+            s3_dir_name = posixpath.join(s3_dir_name, application_id)
+
         return self._stream_log_dirs(
-            'task logs', dir_name, s3_dir_name=s3_dir_name, ssh_to_slaves=True)
+            'task logs',
+            dir_name=dir_name,
+            s3_dir_name=s3_dir_name,
+            ssh_to_slaves=True)  # TODO: does this make sense on YARN?
 
     def _get_step_log_interpretation(self, log_interpretation):
         """Fetch and interpret the step log."""
@@ -1790,10 +1819,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _stream_step_log_dirs(self, step_id):
         """Get lists of directories to look for the step log in."""
-        dir_name = posixpath.join('steps', step_id)
-        return self._stream_log_dirs('step log', dir_name)
+        return self._stream_log_dirs(
+            'step log',
+            dir_name=posixpath.join('hadoop', 'steps', step_id),
+            s3_dir_name=posixpath.join('steps', step_id))
 
-    def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name=None,
+    def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name,
                          ssh_to_slaves=False):
         """Stream log dirs for any kind of log.
 
@@ -1817,7 +1848,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         log.warning('Could not get slave addresses for %s' %
                                     ssh_host)
 
-                path = posixpath.join(_EMR_HADOOP_LOG_DIR, dir_name)
+                path = posixpath.join(_EMR_LOG_DIR, dir_name)
                 log.info('Looking for %s in %s on %s...' % (
                     log_desc, path, host_desc))
                 yield ['ssh://%s%s%s' % (
@@ -1854,13 +1885,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             try:
-                log.info(
-                    'Waiting %d minutes for logs to transfer to S3...'
-                    ' (ctrl-c to skip)\n\n'
-                    'To fetch logs immediately next time, set up SSH. See:\n'
-                    'https://pythonhosted.org/mrjob/guides'
-                    '/emr-quickstart.html#configuring-ssh-credentials\n' %
-                    _S3_LOG_WAIT_MINUTES)
+                log.info('Waiting %d minutes for logs to transfer to S3...'
+                         ' (ctrl-c to skip)' % _S3_LOG_WAIT_MINUTES)
+
+                if not self.fs.can_handle_path('ssh:///'):
+                    log.info(
+                        '\n'
+                        'To fetch logs immediately next time, set up SSH.'
+                        ' See:\n'
+                        'https://pythonhosted.org/mrjob/guides'
+                        '/emr-quickstart.html#configuring-ssh-credentials\n')
 
                 time.sleep(60 * _S3_LOG_WAIT_MINUTES)
             except KeyboardInterrupt:
@@ -1885,7 +1919,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('  %s%s' % (cluster.status.state, reason_desc))
 
             if cluster.status.state in (
-                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                    'TERMINATED', 'TERMINATED_WITH_ERRORS'):
                 return
 
             time.sleep(self._opts['check_emr_status_every'])
@@ -1949,7 +1983,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
         path = os.path.join(self._get_local_tmp_dir(), 'b.py')
-        log.info('writing master bootstrap script to %s' % path)
+        log.debug('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
@@ -1969,33 +2003,22 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return []
 
         if PY2:
-            # Python 2 is already installed; install pip and ujson
+            # Python 2 and pip are basically already installed everywhere
+            # (Okay, there's no pip on AMIs prior to 2.4.3, but there's no
+            # longer an easy way to get it now that apt-get is broken.)
+            return []
 
-            # (We also install python-pip for bootstrap_python_packages,
-            # but there's no harm in running these commands twice, and
-            # bootstrap_python_packages is deprecated anyway.)
-            return [
-                ['sudo apt-get install -y python-pip || '
-                 'sudo yum install -y python-pip'],
-                ['sudo pip install --upgrade ujson'],
-            ]
-        else:
-            # the best we can do is install the Python 3.4 package
-            # (getting pip and ujson on Python 3 is much harder on EMR;
-            # see docs/guides/emr-bootstrap-cookbook.rst)
+        # we have to have at least on AMI 3.7.0. But give it a shot
+        if not (self._opts['release_label'] or
+                version_gte(self._opts['ami_version'], '3.7.0')):
+            log.warning(
+                'bootstrapping Python 3 will probably not work on'
+                ' AMIs prior to 3.7.0. For an alternative, see:'
+                ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                '-cookbook.html#installing-python-from-source')
 
-            # we have to have at least on AMI 3.7.0
-            if (self._opts['ami_version'] == 'latest' or
-                not version_gte(self._opts['ami_version'], '3.7.0')):
-                log.warning(
-                    'bootstrapping Python 3 will probably not work on'
-                    ' AMIs prior to 3.7.0. For an alternative, see:'
-                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                    '-cookbook.html#installing-python-from-source')
-
-            return [['sudo yum install -y python34']]
-
-        return []
+        return [
+            ['sudo yum install -y python34 python34-devel python34-pip']]
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with
@@ -2014,30 +2037,33 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         bootstrap = []
 
-        # bootstrap_python_packages
+        # bootstrap_python_packages. Deprecated but still works, except
         if self._opts['bootstrap_python_packages']:
-            if PY2:
-                log.warning(
-                    "bootstrap_python_packages is deprecated since v0.4.2 and"
-                    " will be removed in v0.6.0. Consider using bootstrap"
-                    " instead.")
+            log.warning(
+                'bootstrap_python_packages is deprecated since v0.4.2'
+                ' and will be removed in v0.6.0. Consider using'
+                ' bootstrap instead.')
 
-                # this works on any AMI version
-                bootstrap.append(['sudo apt-get install -y python-pip || '
-                                  'sudo yum install -y python-pip'])
+            # bootstrap_python_packages won't work on AMI 3.0.0 (out-of-date
+            # SSL keys) and AMI 2.4.2 and earlier (no pip, and have to fix
+            # sources.list to apt-get it). These AMIs are so old it's probably
+            # not worth dedicating code to this, but can add a warning if
+            # need be.
 
-                for path in self._opts['bootstrap_python_packages']:
-                    path_dict = parse_legacy_hash_path('file', path)
-                    # don't worry about inspecting the tarball; pip is smart
-                    # enough to deal with that
+            for path in self._opts['bootstrap_python_packages']:
+                path_dict = parse_legacy_hash_path('file', path)
+
+                python_bin = cmd_line(self._python_bin())
+
+                if python_bin in ('python', 'python2.6'):
+                    # Special case: in Python 2.6, we can't python -m pip
                     bootstrap.append(['sudo pip install ', path_dict])
-
-            else:
-                log.warning(
-                    'bootstrap_python_packages is deprecated and is not'
-                    ' supported on Python 3. See'
-                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                    '-cookbook.html#using-pip for an alternative.')
+                else:
+                    # Otherwise a little more robust to use Python than pip
+                    # binary; for example, there is a python3 binary but no
+                    # pip-3 (only pip-3.4)
+                    bootstrap.append(
+                        ['sudo %s -m pip install ' % python_bin, path_dict])
 
         # setup_cmds
         if self._opts['bootstrap_cmds']:
@@ -2227,6 +2253,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         key_cluster_steps_list = []
 
         def add_if_match(cluster):
+            # skip if user specified a key pair and it doesn't match
+            if (self._opts['ec2_key_pair'] and
+                self._opts['ec2_key_pair'] !=
+                getattr(getattr(cluster,
+                                'ec2instanceattributes', None),
+                        'ec2keyname', None)):
+                return
+
             # this may be a retry due to locked clusters
             if cluster.id in exclude:
                 return
@@ -2249,12 +2283,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if self._opts['release_label']:
                 # just check for exact match. EMR doesn't have a concept
                 # of partial release labels like it does for AMI versions.
-                if (getattr(cluster, 'releaselabel', '') !=
-                    self._opts['release_label']):
-                    return
-            elif self._opts['ami_version'] == 'latest':
-                # look for other clusters where "latest" was requested
-                if getattr(cluster, 'requestedamiversion', '') != 'latest':
+                release_label = getattr(cluster, 'releaselabel', '')
+
+                if release_label != self._opts['release_label']:
                     return
             else:
                 # match actual AMI version
@@ -2360,7 +2391,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         for cluster_summary in _yield_all_clusters(
                 emr_conn, cluster_states=['WAITING']):
-            cluster = patched_describe_cluster(emr_conn, cluster_summary.id)
+            cluster = _patched_describe_cluster(emr_conn, cluster_summary.id)
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for
@@ -2379,7 +2410,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         end_time = now + timedelta(minutes=max_wait_time)
         time_sleep = timedelta(seconds=_POOLING_SLEEP_INTERVAL)
 
-        log.info("Attempting to find an available cluster...")
+        log.info('Attempting to find an available cluster...')
         while now <= end_time:
             cluster_info_list = self._usable_clusters(
                 emr_conn=emr_conn,
@@ -2387,7 +2418,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 num_steps=num_steps)
             if cluster_info_list:
                 cluster_id, num_steps = cluster_info_list[-1]
-                status = attempt_to_acquire_lock(
+                status = _attempt_to_acquire_lock(
                     self.fs, self._lock_uri(cluster_id, num_steps),
                     self._opts['s3_sync_wait_time'], self._job_key)
                 if status:
@@ -2400,8 +2431,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # Reset the exclusion set since it is possible to reclaim a
                 # lock that was previously unavailable.
                 exclude = set()
-                log.info("No clusters available in pool '%s'. Checking again"
-                         " in %d seconds." % (
+                log.info('No clusters available in pool %r. Checking again'
+                         ' in %d seconds.' % (
                              self._opts['pool_name'],
                              int(_POOLING_SLEEP_INTERVAL)))
                 time.sleep(_POOLING_SLEEP_INTERVAL)
@@ -2409,9 +2440,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return None
 
     def _lock_uri(self, cluster_id, num_steps):
-        return make_lock_uri(self._opts['s3_tmp_dir'],
-                             cluster_id,
-                             num_steps + 1)
+        return _make_lock_uri(self._opts['s3_tmp_dir'],
+                              cluster_id,
+                              num_steps + 1)
 
     def _pool_hash(self):
         """Generate a hash of the bootstrap configuration so it can be used to
@@ -2500,7 +2531,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
-        return patched_describe_cluster(emr_conn, self._cluster_id)
+        return _patched_describe_cluster(emr_conn, self._cluster_id)
 
     def _list_steps_for_cluster(self):
         """Get all steps for our cluster, potentially making multiple API calls
@@ -2513,8 +2544,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return {}
 
         return dict((step_num, step.id)
-            for step_num, step in
-            enumerate(self._list_steps_for_cluster(), start=1))
+                    for step_num, step in
+                    enumerate(self._list_steps_for_cluster(), start=1))
 
     def get_hadoop_version(self):
         if self._hadoop_version is None:
@@ -2558,15 +2589,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         if cluster.status.state in ('RUNNING', 'WAITING'):
             self._address = cluster.masterpublicdnsname
-
-    # TODO: this is only used by mrboss; otherwise we do this through fs
-    def _addresses_of_slaves(self):
-        if not self._ssh_slave_addrs:
-            self._ssh_slave_addrs = ssh_slave_addresses(
-                self._opts['ssh_bin'],
-                self._address_of_master(),
-                self._opts['ec2_key_pair_file'])
-        return self._ssh_slave_addrs
 
     def make_iam_conn(self):
         """Create a connection to S3.

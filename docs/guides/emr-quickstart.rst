@@ -10,8 +10,10 @@ Configuring your AWS credentials allows mrjob to run your jobs on Elastic
 MapReduce and use S3.
 
 * Create an `Amazon Web Services account <http://aws.amazon.com/>`_
-* Go to the `Your Security Credentials
-  <https://console.aws.amazon.com/iam/home?#security_credential>`__, click
+* Go to `Security Credentials
+  <https://console.aws.amazon.com/iam/home?#security_credential>`__ in the
+  login menu (upper right, third from the right), say yes, you want to
+  proceed, click
   on **Access Keys**, and then **Create New Access Key**. Make sure to copy the
   secret access key, as there is no way to recover it after creation.
 
@@ -125,10 +127,10 @@ Here are some things to consider when tuning your instance settings:
   jobs that you run repeatedly, it is a good strategy to pick instance settings
   that make your job consistently run in a little less than an hour.
 * Your job will take much longer and may fail if any task (usually a reducer)
-  runs out of memory and starts using swap. (You can verify this by using
-  :command:`vmstat` with :py:mod:`~mrjob.tools.emr.mrboss`.) Restructuring your
-  job is often the best solution, but if you can't, consider using a high-memory
-  instance type.
+  runs out of memory and starts using swap. (You can verify this by running
+  :command:`mrjob boss j-CLUSTERID vmstat` and then looking in
+  ``j-CLUSTERID/*/stdout``.) Restructuring your job is often the best
+  solution, but if you can't, consider using a high-memory instance type.
 * Larger instance types are usually a better deal if you have the workload
   to justify them. For example, a ``c1.xlarge`` costs about 6 times as much
   as an ``m1.medium``, but it has about 8 times as much processing power

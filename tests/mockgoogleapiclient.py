@@ -53,6 +53,13 @@ from tests.sandbox import SandboxedTestCase
 
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
+_GCLOUD_CONFIG = {
+    'compute.region': 'us-central1',
+    'compute.zone': 'us-central1-b',
+    'core.account': 'no@where.com',
+    'core.disable_usage_reporting': 'False',
+    'core.project': 'test-mrjob:test-project'
+}
 
 def mock_api(fxn):
     def req_wrapper(*args, **kwargs):
@@ -154,7 +161,6 @@ class MockGoogleAPITestCase(SandboxedTestCase):
     def setUp(self):
         self.mock_dataproc_failures = {}
         self.mock_dataproc_clusters = {}
-        self.mock_dataproc_output = {}
 
         self._dataproc_client = MockDataprocClient(self)
         self._gcs_client = MockGCSClient(self)
@@ -166,14 +172,8 @@ class MockGoogleAPITestCase(SandboxedTestCase):
         self.start(patch.object(GCSFilesystem, '_download_io', self._gcs_client.download_io))
         self.start(patch.object(GCSFilesystem, '_upload_io', self._gcs_client.upload_io))
 
-        mock_gcloud_config = {
-            'compute.region': 'us-central1',
-            'compute.zone': 'us-central1-b',
-            'core.account': 'no@where.com',
-            'core.disable_usage_reporting': 'False',
-            'core.project': 'test-mrjob:test-project'
-        }
-        self.start(patch('mrjob.dataproc._read_gcloud_config', lambda: mock_gcloud_config))
+
+        self.start(patch('mrjob.dataproc._read_gcloud_config', lambda: _GCLOUD_CONFIG))
 
         super(MockGoogleAPITestCase, self).setUp()
 
@@ -204,6 +204,17 @@ class MockGoogleAPITestCase(SandboxedTestCase):
     def put_gcs_multi(self, gcs_uri_to_data_map):
         """Convenience method"""
         self._gcs_client.put_gcs_multi(gcs_uri_to_data_map)
+
+    def put_job_output_parts(self, dataproc_runner, raw_parts):
+        assert type(raw_parts) is list
+
+        base_uri = dataproc_runner.get_output_dir()
+        gcs_multi_dict = dict()
+        for part_num, part_data in enumerate(raw_parts):
+            gcs_uri = base_uri + 'part-%05d' % part_num
+            gcs_multi_dict[gcs_uri] = part_data
+
+        self.put_gcs_multi(gcs_multi_dict)
 
 ############################# BEGIN BEGIN BEGIN ################################
 ########################### GCS Client - OVERALL ###############################
@@ -427,6 +438,7 @@ class MockDataprocClient(object):
     """Mock out DataprocJobRunner.api_client. This actually handles a small
     state machine that simulates Dataproc clusters."""
 
+
     def __init__(self, test_case):
         assert isinstance(test_case, MockGoogleAPITestCase)
         self._test_case = test_case
@@ -436,6 +448,9 @@ class MockDataprocClient(object):
 
         self._client_clusters = MockDataprocClientClusters(self)
         self._client_jobs = MockDataprocClientJobs(self)
+
+        self.cluster_get_advances_to_state = None
+        self.job_get_advances_to_state = None
 
     def clusters(self):
         return self._client_clusters
@@ -450,32 +465,16 @@ class MockDataprocClient(object):
                                                    body=cluster_body).execute()
         return cluster_resp
 
-    def cluster_get_state(self, project=None, cluster=None):
-        cluster = self._client_clusters.get(projectId=project, region=_DATAPROC_API_REGION, clusterName=cluster)
-        return self._get_state(cluster)
-
-    def cluster_update_state(self, project=None, cluster=None, state=None, prev_state=None):
-        assert state
-        cluster = self._client_clusters.get(projectId=project, region=_DATAPROC_API_REGION, clusterName=cluster)
-        return self._update_state(cluster, state=state, prev_state=prev_state)
-
-    def job_get_state(self, project=None, job=None):
-        job = self._client_jobs.get(projectId=project, region=_DATAPROC_API_REGION, jobId=job)
-        return self._get_state(job)
-
-    def job_update_state(self, project=None, job=None, state=None, prev_state=None):
-        assert state
-        job = self._client_jobs.get(projectId=project, region=_DATAPROC_API_REGION, jobId=job)
-        return self._update_state(job, state=state, prev_state=prev_state)
-
-    def _get_state(self, cluster_or_job):
+    def get_state(self, cluster_or_job):
         return cluster_or_job['status']['state']
 
-    def _update_state(self, cluster_or_job, state=None, prev_state=None):
+    def update_state(self, cluster_or_job, state=None, prev_state=None):
         old_state = cluster_or_job['status']['state']
-        assert old_state != state
         if prev_state:
             assert old_state == prev_state
+
+        if old_state == state:
+            return cluster_or_job
 
         new_status = {
             "state": state,
@@ -643,6 +642,10 @@ class MockDataprocClientClusters(object):
         if not cluster:
             raise mock_google_error(httplib.NOT_FOUND)
 
+        # NOTE - Side effect is to advance the state
+        if self._client.cluster_get_advances_to_state:
+            self._client.update_state(cluster, state=self._client.cluster_get_advances_to_state)
+
         return cluster
 
     @mock_api
@@ -673,13 +676,11 @@ _USER_NAME = 'testuser'
 _INPUT_DIR = ''
 _OUTPUT_DIR = ''
 
-def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, input_dir=None, output_dir=None, now=None):
+def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, now=None):
     project = project or _TEST_PROJECT
     cluster = cluster or _DATAPROC_CLUSTER
     script_name = script_name or _SCRIPT_NAME
-    now = now or datetime.datetime.utcnow()
-
-    assert input_dir and output_dir
+    now = now or datetime.utcnow()
 
     job_elements = [script_name, _USER_NAME, now.strftime('%Y%m%d'), now.strftime('%H%M%S'), now.strftime('%f')]
 
@@ -697,18 +698,7 @@ def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, input_
       },
       "hadoopJob": {
         "mainJarFileUri": "file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar",
-        "args": [
-          "-files",
-          "gs://boulder-input-data/tmp/mrjob-77657375140ce2a1/%(dir_name)s/files/%(script_name)s.py#%(script_name)s.py" % locals(),
-          "-mapper",
-          "python %(script_name)s.py --step-num=0 --mapper" % locals(),
-          "-reducer",
-          "python %(script_name)s.py --step-num=0 --reducer" % locals(),
-          "-input",
-          input_dir,
-          "-output",
-          output_dir
-        ],
+        "args": [],
         "loggingConfig": {}
       },
       "status": {
@@ -751,7 +741,7 @@ class MockDataprocClientJobs(object):
             elif job_state not in valid_job_states:
                 continue
 
-            item_list.append(job_state)
+            item_list.append(current_job)
 
         return dict(items=item_list, kwargs=kwargs)
 
@@ -767,6 +757,10 @@ class MockDataprocClientJobs(object):
         if not current_job:
             raise mock_google_error(httplib.NOT_FOUND)
 
+        # NOTE - Side effect is to advance the state
+        if self._client.job_get_advances_to_state:
+            self._client.update_state(current_job, state=self._client.job_get_advances_to_state)
+
         return current_job
 
     @mock_api
@@ -774,14 +768,17 @@ class MockDataprocClientJobs(object):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        return self._client.job_update_state(projectId=projectId, jobId=jobId, state='CANCEL_PENDING')
+        job = self.get(projectId=project, region=_DATAPROC_API_REGION, jobId=jobId)
+        return self._client.update_state(job, state='CANCEL_PENDING')
 
     @mock_api
     def delete(self, projectId=None, region=None, jobId=None):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        return self._client.job_update_state(projectId=projectId, jobId=jobId, state='DELETING')
+
+        job = self.get(projectId=project, region=_DATAPROC_API_REGION, jobId=jobId)
+        return self._client.update_state(job, state='DELETING')
 
     @mock_api
     def submit(self, projectId=None, region=None, body=None):
@@ -793,8 +790,10 @@ class MockDataprocClientJobs(object):
         # Create an empty cluster
         job = _submit_hadoop_job_resp()
 
+        body_job = body.get('job') or dict()
+
         # Then do a deep-update as to what was requested
-        _dict_deep_update(job, body)
+        _dict_deep_update(job, body_job)
 
         _set_deep(self._jobs, [projectId, job['reference']['jobId']], job)
 

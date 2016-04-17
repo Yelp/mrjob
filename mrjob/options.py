@@ -312,12 +312,12 @@ def add_dataproc_opts(opt_group):
 
         # TODO - mtai @ davidmarin - adopt below suggested varnames for Dataproc / EMR
         opt_group.add_option(
-            '--region', dest='region', default='global',
-            help='Region to run Dataproc/EMR jobs in. Default is global'),
+            '--region', dest='region',
+            help='GCE region to run Dataproc/EMR jobs in.'),
 
         opt_group.add_option(
             '--zone', dest='zone', default=None,
-            help='Zone to run Dataproc/EMR jobs in.  '),
+            help='GCE zone to run Dataproc/EMR jobs in.'),
 
         opt_group.add_option(
             '--image-version', dest='image_version', default=None,

@@ -53,12 +53,14 @@ from tests.sandbox import SandboxedTestCase
 
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
+_TEST_PROJECT = 'test-mrjob:test-project'
+
 _GCLOUD_CONFIG = {
     'compute.region': 'us-central1',
     'compute.zone': 'us-central1-b',
     'core.account': 'no@where.com',
     'core.disable_usage_reporting': 'False',
-    'core.project': 'test-mrjob:test-project'
+    'core.project': _TEST_PROJECT
 }
 
 def mock_api(fxn):
@@ -159,9 +161,6 @@ class MockGoogleAPITestCase(SandboxedTestCase):
             os.remove(cls.fake_mrjob_tgz_path)
 
     def setUp(self):
-        self.mock_dataproc_failures = {}
-        self.mock_dataproc_clusters = {}
-
         self._dataproc_client = MockDataprocClient(self)
         self._gcs_client = MockGCSClient(self)
         self._gcs_fs = self._gcs_client._fs
@@ -243,7 +242,7 @@ class MockGCSClient(object):
     def buckets(self):
         return self._client_buckets
 
-    def put_gcs(self, gcs_uri, data, make_bucket=True):
+    def put_gcs(self, gcs_uri, data):
         bucket, name = parse_gcs_uri(gcs_uri)
 
         try:
@@ -254,9 +253,9 @@ class MockGCSClient(object):
         bytes_io_obj = BytesIO(data)
         self.upload_io(bytes_io_obj, gcs_uri)
 
-    def put_gcs_multi(self, gcs_uri_to_data_map, make_bucket=True):
+    def put_gcs_multi(self, gcs_uri_to_data_map):
         for gcs_uri, data in gcs_uri_to_data_map.iteritems():
-            self.put_gcs(gcs_uri, data, make_bucket=make_bucket)
+            self.put_gcs(gcs_uri, data)
 
     def download_io(self, src_uri, io_obj):
         """
@@ -383,7 +382,7 @@ class MockGCSClientBuckets(object):
         assert bucket_name not in self._buckets
 
         # Create an empty cluster
-        bucket = _make_bucket_resp()
+        bucket = _make_bucket_resp(project=project)
 
         # Then do a deep-update as to what was requested
         bucket = _dict_deep_update(bucket, body)
@@ -449,8 +448,9 @@ class MockDataprocClient(object):
         self._client_clusters = MockDataprocClientClusters(self)
         self._client_jobs = MockDataprocClientJobs(self)
 
-        self.cluster_get_advances_to_state = None
-        self.job_get_advances_to_state = None
+        # By default - we always resolve our infinite loops by default to state RUNNING / DONE
+        self.cluster_get_advances_to_state = 'RUNNING'
+        self.job_get_advances_to_state = 'DONE'
 
     def clusters(self):
         return self._client_clusters
@@ -497,7 +497,6 @@ class MockDataprocClient(object):
 ######################### Dataproc Client - Clusters ###########################
 ############################# BEGIN BEGIN BEGIN ################################
 
-_TEST_PROJECT = 'test-project-test'
 _DATAPROC_CLUSTER = 'test-cluster-test'
 _CLUSTER_REGION = _DATAPROC_API_REGION
 _CLUSTER_ZONE = None
@@ -731,7 +730,9 @@ class MockDataprocClientJobs(object):
         item_list = []
 
         job_map = _get_deep(self._jobs, [project_id], dict())
-        for current_job_id, current_job in job_map.iteritems():
+
+        jobs_sorted_by_time = sorted(job_map.itervalues(), key=lambda j: j['status']['stateStartTime'])
+        for current_job in jobs_sorted_by_time:
             job_cluster = current_job['placement']['clusterName']
             job_state = current_job['status']['state']
 

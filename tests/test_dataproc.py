@@ -115,9 +115,6 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             self.assertEqual(gcs_buckets_snapshot, self._gcs_client._cache_buckets)
             self.assertEqual(gcs_objects_snapshot, self._gcs_client._cache_objects)
 
-            runner.api_client.cluster_get_advances_to_state = 'RUNNING'
-            runner.api_client.job_get_advances_to_state = 'DONE'
-
             runner.run()
 
             # setup fake output
@@ -175,23 +172,12 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
         self.assertFalse(any(runner.fs.ls(runner.get_output_dir())))
 
         # # job should get terminated
-        # dataproc_conn = runner.make_dataproc_conn()
-        # cluster_id = runner.get_cluster_id()
-        # for _ in range(10):
-        #     dataproc_conn.simulate_progress(cluster_id)
-        #
         # cluster = runner._describe_cluster()
         # self.assertEqual(cluster.status.state, 'TERMINATED')
 
     def test_failed_job(self):
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v'])
         mr_job.sandbox()
-
-        # TODO - Verify
-        self.put_gcs_multi({
-            'gs://walrus': b''
-        })
-        self.mock_dataproc_failures = {('j-MOCKCLUSTER0', 0): None}
 
         with no_handlers_for_logger('mrjob.dataproc'):
             stderr = StringIO()
@@ -200,80 +186,60 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             with mr_job.make_runner() as runner:
                 self.assertIsInstance(runner, DataprocJobRunner)
 
+                runner.api_client.job_get_advances_to_state = 'ERROR'
+
                 self.assertRaises(StepFailedException, runner.run)
-                self.assertIn('\n  FAILED\n',
-                              stderr.getvalue())
 
-                dataproc_conn = runner.make_dataproc_conn()
-                cluster_id = runner.get_cluster_id()
-                for _ in range(10):
-                    dataproc_conn.simulate_progress(cluster_id)
+                self.assertIn('Z - ERROR\n', stderr.getvalue())
 
-                cluster = runner._describe_cluster()
-                self.assertEqual(cluster.status.state,
-                                 'TERMINATED_WITH_ERRORS')
+        # cluster = runner._describe_cluster()
+        # self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
-            # job should get terminated on cleanup
-            cluster_id = runner.get_cluster_id()
-            for _ in range(10):
-                dataproc_conn.simulate_progress(cluster_id)
-
-        cluster = runner._describe_cluster()
-        self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
-
-    def _test_remote_tmp_cleanup(self, mode, tmp_len, log_len):
-        self.put_gcs_multi({'gs://walrus/logs/j-MOCKCLUSTER0/1': b'1\n'})
+    def _test_remote_tmp_cleanup(self, mode, tmp_len):
         stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v',
-                               '--s3-log-uri', 'gs://walrus/logs',
                                '-', '--cleanup', mode])
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
-            fs_tmpdir = runner._opts['fs_tmpdir']
-            tmp_bucket, _ = parse_gcs_uri(fs_tmpdir)
+            tmp_bucket, _ = parse_gcs_uri(runner._fs_tmpdir)
 
             runner.run()
 
             # this is set and unset before we can get at it unless we do this
-            log_bucket, _ = parse_gcs_uri(runner._gcs_log_dir())
-
             list(runner.stream_output())
 
-        conn = runner.fs.make_gcs_conn()
-        bucket = conn.get_bucket(tmp_bucket)
-        self.assertEqual(len(list(bucket.list())), tmp_len)
+        objects_in_bucket = self._gcs_fs.api_client._cache_objects[tmp_bucket]
+        self.assertEqual(len(objects_in_bucket), tmp_len)
 
-        bucket = conn.get_bucket(log_bucket)
-        self.assertEqual(len(list(bucket.list())), log_len)
 
     def test_cleanup_all(self):
-        self._test_remote_tmp_cleanup('ALL', 0, 0)
+        self._test_remote_tmp_cleanup('ALL', 0)
 
     def test_cleanup_tmp(self):
-        self._test_remote_tmp_cleanup('TMP', 0, 1)
+        self._test_remote_tmp_cleanup('TMP', 0)
 
     def test_cleanup_remote(self):
-        self._test_remote_tmp_cleanup('REMOTE_TMP', 0, 1)
+        self._test_remote_tmp_cleanup('REMOTE_TMP', 0)
 
     def test_cleanup_local(self):
-        self._test_remote_tmp_cleanup('LOCAL_TMP', 5, 1)
+        self._test_remote_tmp_cleanup('LOCAL_TMP', 4)
 
     def test_cleanup_logs(self):
-        self._test_remote_tmp_cleanup('LOGS', 5, 0)
+        self._test_remote_tmp_cleanup('LOGS', 4)
 
     def test_cleanup_none(self):
-        self._test_remote_tmp_cleanup('NONE', 5, 1)
+        self._test_remote_tmp_cleanup('NONE', 4)
 
     def test_cleanup_combine(self):
-        self._test_remote_tmp_cleanup('LOGS,REMOTE_TMP', 0, 0)
+        self._test_remote_tmp_cleanup('LOGS,REMOTE_TMP', 0)
 
     def test_cleanup_error(self):
         self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
-                          'NONE,LOGS,REMOTE_TMP', 0, 0)
+                          'NONE,LOGS,REMOTE_TMP', 0)
         self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
-                          'GARBAGE', 0, 0)
+                          'GARBAGE', 0)
 
 
 class ExistingClusterTestCase(MockGoogleAPITestCase):
@@ -293,9 +259,6 @@ class ExistingClusterTestCase(MockGoogleAPITestCase):
         results = []
 
         with mr_job.make_runner() as runner:
-            runner.api_client.cluster_get_advances_to_state = 'RUNNING'
-            runner.api_client.job_get_advances_to_state = 'DONE'
-
             runner.run()
 
             # Generate fake output
@@ -356,7 +319,7 @@ class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
     def test_default(self):
         with self.make_runner() as runner:
             runner.run()
-            self.assertEqual(runner.get_cloud_version(), _DEFAULT_IMAGE_VERSION)
+            self.assertEqual(runner.get_image_version(), _DEFAULT_IMAGE_VERSION)
             self.assertEqual(runner.get_hadoop_version(), '2.7.2')
 
     def test_image_0_1(self):
@@ -368,18 +331,18 @@ class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
     def test_image_1_0(self):
         self._assert_cloud_hadoop_version('1.0', '2.7.2')
 
-    def _assert_cloud_hadoop_version(self, cloud_version, hadoop_version):
+    def _assert_cloud_hadoop_version(self, image_version, hadoop_version):
         args = []
-        with self.make_runner('--image-version', cloud_version) as runner:
+        with self.make_runner('--image-version', image_version) as runner:
             runner.run()
-            self.assertEqual(runner.get_cloud_version(), cloud_version)
+            self.assertEqual(runner.get_image_version(), image_version)
             self.assertEqual(runner.get_hadoop_version(), hadoop_version)
 
     def test_hadoop_version_option_does_nothing(self):
         with logger_disabled('mrjob.dataproc'):
             with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
                 runner.run()
-                self.assertEqual(runner.get_cloud_version(),
+                self.assertEqual(runner.get_image_version(),
                                  _DEFAULT_IMAGE_VERSION)
                 self.assertEqual(runner.get_hadoop_version(), '2.7.2')
 
@@ -399,23 +362,23 @@ class ZoneTestCase(MockGoogleAPITestCase):
             runner.run()
 
             cluster = runner._api_cluster_get(runner._cluster_id)
-            self.assertIn(EXPECTED_ZONE, cluster['gceClusterConfig']['gceClusterConfig']['zoneUri'])
-            self.assertIn(EXPECTED_ZONE, cluster['masterConfig']['machineTypeUri'])
-            self.assertIn(EXPECTED_ZONE, cluster['workerConfig']['machineTypeUri'])
+            self.assertIn(EXPECTED_ZONE, cluster['config']['gceClusterConfig']['zoneUri'])
+            self.assertIn(EXPECTED_ZONE, cluster['config']['masterConfig']['machineTypeUri'])
+            self.assertIn(EXPECTED_ZONE, cluster['config']['workerConfig']['machineTypeUri'])
 
 class RegionTestCase(MockGoogleAPITestCase):
 
     def test_default(self):
         runner = DataprocJobRunner()
-        self.assertEqual(runner._opts['region'], 'us-west-2')
+        self.assertEqual(runner._gce_region, 'us-central1')
 
     def test_explicit_region(self):
         runner = DataprocJobRunner(region='europe-west1')
-        self.assertEqual(runner._opts['region'], 'us-east-1')
+        self.assertEqual(runner._gce_region, 'europe-west1')
 
     def test_cannot_be_empty(self):
         runner = DataprocJobRunner(region='')
-        self.assertEqual(runner._opts['region'], 'us-west-2')
+        self.assertEqual(runner._gce_region, 'us-central1')
 
 
 class TmpBucketTestCase(MockGoogleAPITestCase):
@@ -429,9 +392,9 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         existing_buckets = set(bucket_cache.keys())
 
         runner = DataprocJobRunner(conf_paths=[], **runner_kwargs)
-        runner._create_gcs_tmp_bucket_if_needed()
 
-        bucket_name, path = parse_gcs_uri(runner._opts['fs_tmpdir'])
+        bucket_name, path = parse_gcs_uri(runner._fs_tmpdir)
+        runner._create_fs_tmp_bucket(bucket_name, location=location)
 
         self.assertTrue(bucket_name.startswith('mrjob-'))
         self.assertNotIn(bucket_name, existing_buckets)
@@ -457,7 +420,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         self._make_bucket('mrjob-1', DEFAULT_GCE_REGION)
 
         runner = DataprocJobRunner()
-        self.assertEqual(runner._opts['fs_tmpdir'], 'gs://mrjob-1/tmp/')
+        self.assertEqual(runner._fs_tmpdir, 'gs://mrjob-1/tmp/')
 
     def test_ignore_mrjob_bucket_in_different_region(self):
         # this tests 687
@@ -475,7 +438,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
 
         runner = DataprocJobRunner(fs_tmpdir='gs://walrus/tmp/')
 
-        self.assertEqual(runner._opts['fs_tmpdir'], 'gs://walrus/tmp/')
+        self.assertEqual(runner._fs_tmpdir, 'gs://walrus/tmp/')
 
     def test_cross_region_explicit_tmp_uri(self):
         self._make_bucket('walrus',  EU_WEST_GCE_REGION)
@@ -486,7 +449,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         self.assertEqual(runner._opts['fs_tmpdir'], 'gs://walrus/tmp/')
 
         # tmp bucket shouldn't influence region (it did in 0.4.x)
-        self.assertEqual(runner._opts['region'], self.US_EAST_GCE_REGION)
+        self.assertEqual(runner._gce_region, US_EAST_GCE_REGION)
 
 
 class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
@@ -513,8 +476,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
 
         # cluster_body = runner.api_client.cluster_create()
         runner._master_bootstrap_script_path = 'gs://fake-bucket/fake-script.sh'
-        with patch('mrjob.dataproc.DATAPROC_CLUSTER_STATES_READY', new={'CREATING'}):
-            cluster_id = runner._launch_cluster()
+        cluster_id = runner._launch_cluster()
 
         cluster_body = runner._api_cluster_get(cluster_id)
 
@@ -697,20 +659,21 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
         with open(foo_py_path, 'w'):
             pass
 
-        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
-        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
-
         # use all the bootstrap options
         runner = DataprocJobRunner(conf_paths=[],
                               bootstrap=[
                                   PYTHON_BIN + ' ' +
                                   foo_py_path + '#bar.py',
-                                  'gs://walrus/scripts/ohnoes.sh#'],
-                              bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
-                              bootstrap_files=['/tmp/quz'],
-                              bootstrap_mrjob=True,
-                              bootstrap_python_packages=[yelpy_tar_gz_path],
-                              bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
+                                  'gs://walrus/scripts/ohnoes.sh#',
+                                  # bootstrap_cmds
+                                  'echo "Hi!"',
+                                  'true',
+                                  'ls',
+                                  # bootstrap_scripts
+                                  'speedups.sh',
+                                  '/tmp/s.sh'
+                              ],
+                              bootstrap_mrjob=True)
 
         runner._add_bootstrap_files_for_upload()
 
@@ -739,22 +702,21 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
         # check files get downloaded
         assertScriptDownloads(foo_py_path, 'bar.py')
         assertScriptDownloads('gs://walrus/scripts/ohnoes.sh')
-        assertScriptDownloads('/tmp/quz', 'quz')
         assertScriptDownloads(runner._mrjob_tar_gz_path)
-        assertScriptDownloads('speedups.sh')
-        assertScriptDownloads('/tmp/s.sh')
-        if PY2:
-            assertScriptDownloads(yelpy_tar_gz_path)
 
         # check scripts get run
 
         # bootstrap
         self.assertIn(PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
         self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
-        # bootstrap_cmds
+
         self.assertIn('echo "Hi!"', lines)
         self.assertIn('true', lines)
         self.assertIn('ls', lines)
+
+        self.assertIn('speedups.sh', lines)
+        self.assertIn('/tmp/s.sh', lines)
+
         # bootstrap_mrjob
         mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_tar_gz_path)
@@ -765,14 +727,13 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
                       ' -C $__mrjob_PYTHON_LIB', lines)
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
-        # bootstrap_python_packages
+        # bootstrap_python
         if PY2:
-            self.assertIn('sudo apt-get install -y python-pip || '
-                          'sudo yum install -y python-pip', lines)
-            self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
-        # bootstrap_scripts
-        self.assertIn('$__mrjob_PWD/speedups.sh', lines)
-        self.assertIn('$__mrjob_PWD/s.sh', lines)
+            self.assertIn('sudo apt-get install -y python-pip python-dev', lines)
+            self.assertIn('sudo pip install --upgrade ujson', lines)
+        else:
+            self.assertIn('sudo apt-get install -y python3 python3-pip python3-dev', lines)
+            self.assertIn('sudo pip3 install --upgrade ujson', lines)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = DataprocJobRunner(conf_paths=[], bootstrap_mrjob=False,
@@ -781,63 +742,6 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
 
-        # bootstrap actions don't figure into the master bootstrap script
-        runner = DataprocJobRunner(conf_paths=[],
-                              bootstrap_mrjob=False,
-                              bootstrap_actions=['foo', 'bar baz'],
-                              bootstrap_python=False,
-                              pool_clusters=False)
-
-        runner._add_bootstrap_files_for_upload()
-        self.assertIsNone(runner._master_bootstrap_script_path)
-
-        # using pooling doesn't require us to create a bootstrap script
-        runner = DataprocJobRunner(conf_paths=[],
-                              bootstrap_mrjob=False,
-                              bootstrap_python=False,
-                              pool_clusters=True)
-
-        runner._add_bootstrap_files_for_upload()
-        self.assertIsNone(runner._master_bootstrap_script_path)
-
-    def test_bootstrap_actions_get_added(self):
-        bootstrap_actions = [
-            ('gs://dataproc/bootstrap-actions/configure-hadoop'
-             ' -m,mapred.tasktracker.map.tasks.maximum=1'),
-            'gs://foo/bar',
-        ]
-
-        runner = DataprocJobRunner(conf_paths=[],
-                              bootstrap_actions=bootstrap_actions,
-                              fs_sync_secs=0.00)
-
-        cluster_id = runner.make_persistent_cluster()
-
-        dataproc_conn = runner.make_dataproc_conn()
-        actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
-
-        self.assertEqual(len(actions), 3)
-
-        self.assertEqual(
-            actions[0].scriptpath,
-            'gs://dataproc/bootstrap-actions/configure-hadoop')
-        self.assertEqual(
-            actions[0].args[0].value,
-            '-m,mapred.tasktracker.map.tasks.maximum=1')
-        self.assertEqual(actions[0].name, 'action 0')
-
-        self.assertEqual(actions[1].scriptpath, 'gs://foo/bar')
-        self.assertEqual(actions[1].args, [])
-        self.assertEqual(actions[1].name, 'action 1')
-
-        # check for master bootstrap script
-        self.assertTrue(actions[2].scriptpath.startswith('gs://mrjob-'))
-        self.assertTrue(actions[2].scriptpath.endswith('b.py'))
-        self.assertEqual(actions[2].args, [])
-        self.assertEqual(actions[2].name, 'master')
-
-        # make sure master bootstrap script is on S3
-        self.assertTrue(runner.fs.exists(actions[2].scriptpath))
 
     def test_bootstrap_mrjob_uses_python_bin(self):
         # use all the bootstrap options
@@ -851,41 +755,6 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
             content = f.read()
 
         self.assertIn('sudo anaconda -m compileall -f', content)
-
-    def test_local_bootstrap_action(self):
-        # make sure that local bootstrap action scripts get uploaded to S3
-        action_path = os.path.join(self.tmp_dir, 'apt-install.sh')
-        with open(action_path, 'w') as f:
-            f.write('for $pkg in $@; do sudo apt-get install $pkg; done\n')
-
-        bootstrap_actions = [
-            action_path + ' python-scipy mysql-server']
-
-        runner = DataprocJobRunner(conf_paths=[],
-                              bootstrap_actions=bootstrap_actions,
-                              fs_sync_secs=0.00)
-
-        cluster_id = runner.make_persistent_cluster()
-
-        dataproc_conn = runner.make_dataproc_conn()
-        actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
-
-        self.assertEqual(len(actions), 2)
-
-        self.assertTrue(actions[0].scriptpath.startswith('gs://mrjob-'))
-        self.assertTrue(actions[0].scriptpath.endswith('/apt-install.sh'))
-        self.assertEqual(actions[0].name, 'action 0')
-        self.assertEqual(actions[0].args[0].value, 'python-scipy')
-        self.assertEqual(actions[0].args[1].value, 'mysql-server')
-
-        # check for master boostrap script
-        self.assertTrue(actions[1].scriptpath.startswith('gs://mrjob-'))
-        self.assertTrue(actions[1].scriptpath.endswith('b.py'))
-        self.assertEqual(actions[1].args, [])
-        self.assertEqual(actions[1].name, 'master')
-
-        # make sure master bootstrap script is on S3
-        self.assertTrue(runner.fs.exists(actions[1].scriptpath))
 
 
 class DataprocNoMapperTestCase(MockGoogleAPITestCase):
@@ -925,60 +794,60 @@ class DataprocNoMapperTestCase(MockGoogleAPITestCase):
                           [(1, ['blue', 'one', 'red', 'two']),
                            (4, ['fish'])])
 
-
-class MaxHoursIdleTestCase(MockGoogleAPITestCase):
-
-    def assertRanIdleTimeoutScriptWith(self, runner, args):
-        dataproc_conn = runner.make_dataproc_conn()
-        cluster_id = runner.get_cluster_id()
-
-        actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
-        action = actions[-1]
-
-        self.assertEqual(action.name, 'idle timeout')
-        self.assertEqual(
-            action.scriptpath,
-            runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
-        self.assertEqual([arg.value for arg in action.args], args)
-
-    def assertDidNotUseIdleTimeoutScript(self, runner):
-        dataproc_conn = runner.make_dataproc_conn()
-        cluster_id = runner.get_cluster_id()
-
-        actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
-        action_names = [a.name for a in actions]
-
-        self.assertNotIn('idle timeout', action_names)
-        # idle timeout script should not even be uploaded
-        self.assertNotIn(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH,
-                         runner._upload_mgr.path_to_uri())
-
-    def test_default(self):
-        mr_job = MRWordCount(['-r', 'dataproc'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            self.assertDidNotUseIdleTimeoutScript(runner)
-
-    def test_non_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '1'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            self.assertDidNotUseIdleTimeoutScript(runner)
-
-    def test_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '0.01'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
-
-    def test_bootstrap_script_is_actually_installed(self):
-        self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+#
+# class MaxHoursIdleTestCase(MockGoogleAPITestCase):
+#
+#     def assertRanIdleTimeoutScriptWith(self, runner, args):
+#         dataproc_conn = runner.make_dataproc_conn()
+#         cluster_id = runner.get_cluster_id()
+#
+#         actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
+#         action = actions[-1]
+#
+#         self.assertEqual(action.name, 'idle timeout')
+#         self.assertEqual(
+#             action.scriptpath,
+#             runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+#         self.assertEqual([arg.value for arg in action.args], args)
+#
+#     def assertDidNotUseIdleTimeoutScript(self, runner):
+#         dataproc_conn = runner.make_dataproc_conn()
+#         cluster_id = runner.get_cluster_id()
+#
+#         actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
+#         action_names = [a.name for a in actions]
+#
+#         self.assertNotIn('idle timeout', action_names)
+#         # idle timeout script should not even be uploaded
+#         self.assertNotIn(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH,
+#                          runner._upload_mgr.path_to_uri())
+#
+#     def test_default(self):
+#         mr_job = MRWordCount(['-r', 'dataproc'])
+#         mr_job.sandbox()
+#
+#         with mr_job.make_runner() as runner:
+#             runner.run()
+#             self.assertDidNotUseIdleTimeoutScript(runner)
+#
+#     def test_non_persistent_cluster(self):
+#         mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '1'])
+#         mr_job.sandbox()
+#
+#         with mr_job.make_runner() as runner:
+#             runner.run()
+#             self.assertDidNotUseIdleTimeoutScript(runner)
+#
+#     def test_persistent_cluster(self):
+#         mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '0.01'])
+#         mr_job.sandbox()
+#
+#         with mr_job.make_runner() as runner:
+#             runner.make_persistent_cluster()
+#             self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
+#
+#     def test_bootstrap_script_is_actually_installed(self):
+#         self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
 
 class TestCatFallback(MockGoogleAPITestCase):
 

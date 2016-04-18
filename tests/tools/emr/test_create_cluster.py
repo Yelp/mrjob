@@ -44,6 +44,7 @@ class ClusterInspectionTestCase(ToolTestCase):
              'bootstrap_python_packages': [],
              'bootstrap_scripts': [],
              'conf_paths': None,
+             'cluster_id': None,
              'ec2_core_instance_bid_price': None,
              'ec2_core_instance_type': None,
              'ec2_instance_type': None,

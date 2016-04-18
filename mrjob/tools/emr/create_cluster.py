@@ -195,6 +195,7 @@ from mrjob.job import MRJob
 from mrjob.options import add_basic_opts
 from mrjob.options import add_emr_connect_opts
 from mrjob.options import add_emr_launch_opts
+from mrjob.options import add_dataproc_emr_opts
 from mrjob.options import alphabetize_options
 from mrjob.options import fix_custom_options
 from mrjob.util import scrape_options_into_new_groups
@@ -254,6 +255,7 @@ def make_option_parser():
     })
     add_emr_connect_opts(option_parser)
     add_emr_launch_opts(option_parser)
+    add_dataproc_emr_opts(option_parser)
 
     alphabetize_options(option_parser)
     return option_parser

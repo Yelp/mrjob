@@ -194,7 +194,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
         # cluster = runner._describe_cluster()
         # self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
-    def _test_remote_tmp_cleanup(self, mode, tmp_len):
+    def _test_cloud_tmp_cleanup(self, mode, tmp_len):
         stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v',
@@ -214,30 +214,30 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
 
     def test_cleanup_all(self):
-        self._test_remote_tmp_cleanup('ALL', 0)
+        self._test_cloud_tmp_cleanup('ALL', 0)
 
     def test_cleanup_tmp(self):
-        self._test_remote_tmp_cleanup('TMP', 0)
+        self._test_cloud_tmp_cleanup('TMP', 0)
 
     def test_cleanup_remote(self):
-        self._test_remote_tmp_cleanup('REMOTE_TMP', 0)
+        self._test_cloud_tmp_cleanup('CLOUD_TMP', 0)
 
     def test_cleanup_local(self):
-        self._test_remote_tmp_cleanup('LOCAL_TMP', 4)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 4)
 
     def test_cleanup_logs(self):
-        self._test_remote_tmp_cleanup('LOGS', 4)
+        self._test_cloud_tmp_cleanup('LOGS', 4)
 
     def test_cleanup_none(self):
-        self._test_remote_tmp_cleanup('NONE', 4)
+        self._test_cloud_tmp_cleanup('NONE', 4)
 
     def test_cleanup_combine(self):
-        self._test_remote_tmp_cleanup('LOGS,REMOTE_TMP', 0)
+        self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0)
 
     def test_cleanup_error(self):
-        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
-                          'NONE,LOGS,REMOTE_TMP', 0)
-        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
+        self.assertRaises(ValueError, self._test_cloud_tmp_cleanup,
+                          'NONE,LOGS,CLOUD_TMP', 0)
+        self.assertRaises(ValueError, self._test_cloud_tmp_cleanup,
                           'GARBAGE', 0)
 
 
@@ -872,7 +872,7 @@ class CleanUpJobTestCase(MockGoogleAPITestCase):
                             _cleanup_job=mock.DEFAULT,
                             _cleanup_local_tmp=mock.DEFAULT,
                             _cleanup_logs=mock.DEFAULT,
-                            _cleanup_remote_tmp=mock.DEFAULT) as mock_dict:
+                            _cleanup_cloud_tmp=mock.DEFAULT) as mock_dict:
             r.cleanup(mode=mode)
             yield mock_dict
 
@@ -887,14 +887,14 @@ class CleanUpJobTestCase(MockGoogleAPITestCase):
             self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_job'].called)
             self.assertTrue(m['_cleanup_local_tmp'].called)
-            self.assertTrue(m['_cleanup_remote_tmp'].called)
+            self.assertTrue(m['_cleanup_cloud_tmp'].called)
             self.assertTrue(m['_cleanup_logs'].called)
 
     def test_cleanup_job(self):
         with self._test_mode('JOB') as m:
             self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_local_tmp'].called)
-            self.assertFalse(m['_cleanup_remote_tmp'].called)
+            self.assertFalse(m['_cleanup_cloud_tmp'].called)
             self.assertFalse(m['_cleanup_logs'].called)
             self.assertFalse(m['_cleanup_job'].called)  # Only on failure
 
@@ -902,7 +902,7 @@ class CleanUpJobTestCase(MockGoogleAPITestCase):
         with self._test_mode('NONE') as m:
             self.assertFalse(m['_cleanup_cluster'].called)
             self.assertFalse(m['_cleanup_local_tmp'].called)
-            self.assertFalse(m['_cleanup_remote_tmp'].called)
+            self.assertFalse(m['_cleanup_cloud_tmp'].called)
             self.assertFalse(m['_cleanup_logs'].called)
             self.assertFalse(m['_cleanup_job'].called)
 

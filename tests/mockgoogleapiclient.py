@@ -19,6 +19,7 @@ import time
 import hashlib
 import sys
 from datetime import datetime
+from httplib2 import Response
 from io import BytesIO
 
 try:
@@ -26,13 +27,10 @@ try:
     from googleapiclient import discovery
     from googleapiclient import errors as google_errors
     from googleapiclient import http as google_http
-    # httplib2 is a dependency of googleapiclient
-    from httplib2 import Response
 except ImportError:
     # don't require googleapiclient; MRJobs don't actually need it when running
     # inside hadoop streaming
     GoogleCredentials = None
-    Response = None
     discovery = None
     google_errors = None
     google_http = None
@@ -151,7 +149,9 @@ def _dict_deep_update(d, u):
 # disable these tests until we figure out a way to get the google API client
 # to play well with PyPy 3 (which reports itself as Python 3.2, but has key
 # Python 3.3 features)
-@skipIf(sys.version_info == (3, 2), "can't install googleapiclient")
+@skipIf(
+    hasattr(sys, 'pypy_version_info') and (3, 0) <= sys.version_info < (3, 3),
+    "googleapiclient doesn't work with PyPy 3")
 class MockGoogleAPITestCase(SandboxedTestCase):
 
     @classmethod

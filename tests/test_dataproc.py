@@ -29,16 +29,15 @@ from mrjob.dataproc import _DEFAULT_IMAGE_VERSION, _DATAPROC_API_REGION
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.job import MRJob
-from mrjob.parse import JOB_KEY_RE
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
+from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
 from tests.mockgoogleapiclient import MockGoogleAPITestCase
 from tests.mockgoogleapiclient import _TEST_PROJECT
-
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
@@ -132,7 +131,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             self.assertTrue(os.path.exists(local_tmp_dir))
             self.assertTrue(any(runner.fs.ls(runner.get_output_dir())))
 
-            name_match = JOB_KEY_RE.match(runner._job_key)
+            name_match = _JOB_KEY_RE.match(runner._job_key)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
 

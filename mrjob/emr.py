@@ -97,6 +97,7 @@ from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
+from mrjob.py2 import xrange
 from mrjob.retry import RetryGoRound
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
@@ -408,7 +409,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             's3_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
-            'ssh_bind_ports': list(range(40001, 40841)),
+             # don't use a list because it makes it hard to read option values
+             # when running in verbose mode. See #1284
+            'ssh_bind_ports': xrange(40001, 40841),
             'ssh_tunnel': False,
             'ssh_tunnel_is_open': False,
             'visible_to_all_users': True,

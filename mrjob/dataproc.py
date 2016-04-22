@@ -12,7 +12,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import httplib
 import io
 import logging
 import os
@@ -497,7 +496,7 @@ class DataprocJobRunner(MRJobRunner):
             self.fs.bucket_get(bucket_name)
             return
         except google_errors.HttpError as e:
-            if not e.resp.status == httplib.NOT_FOUND:
+            if not e.resp.status == 404:
                 raise
 
         log.info('creating FS bucket %r' % bucket_name)
@@ -628,7 +627,7 @@ class DataprocJobRunner(MRJobRunner):
             self._api_cluster_get(self._cluster_id)
             log.info('Adding our job to existing cluster %s' % self._cluster_id)
         except google_errors.HttpError as e:
-            if not e.resp.status == httplib.NOT_FOUND:
+            if not e.resp.status == 404:
                 raise
 
             cluster_data = self._cluster_args()

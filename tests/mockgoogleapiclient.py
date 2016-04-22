@@ -11,14 +11,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import re
 import collections
 import os
 import tempfile
 import time
 import hashlib
-import httplib
 import httplib2
 from datetime import datetime
 from io import BytesIO
@@ -367,7 +365,7 @@ class MockGCSClientBuckets(object):
         try:
             return self._buckets[bucket]
         except KeyError:
-            raise mock_google_error(httplib.NOT_FOUND)
+            raise mock_google_error(404)
 
     @mock_api
     def delete(self, bucket=None):
@@ -639,7 +637,7 @@ class MockDataprocClientClusters(object):
 
         cluster = _get_deep(self._clusters, [projectId, clusterName])
         if not cluster:
-            raise mock_google_error(httplib.NOT_FOUND)
+            raise mock_google_error(404)
 
         # NOTE - Side effect is to advance the state
         if self._client.cluster_get_advances_to_state:
@@ -756,7 +754,7 @@ class MockDataprocClientJobs(object):
 
         current_job = _get_deep(self._jobs, [projectId, jobId])
         if not current_job:
-            raise mock_google_error(httplib.NOT_FOUND)
+            raise mock_google_error(404)
 
         # NOTE - Side effect is to advance the state
         if self._client.job_get_advances_to_state:

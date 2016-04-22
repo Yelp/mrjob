@@ -17,7 +17,6 @@ import os
 import tempfile
 import time
 import hashlib
-import httplib2
 import sys
 from datetime import datetime
 from io import BytesIO
@@ -27,10 +26,13 @@ try:
     from googleapiclient import discovery
     from googleapiclient import errors as google_errors
     from googleapiclient import http as google_http
+    # httplib2 is a dependency of googleapiclient
+    from httplib2 import Response
 except ImportError:
     # don't require googleapiclient; MRJobs don't actually need it when running
     # inside hadoop streaming
     GoogleCredentials = None
+    Response = None
     discovery = None
     google_errors = None
     google_http = None
@@ -75,7 +77,7 @@ def mock_api(fxn):
     return req_wrapper
 
 def mock_google_error(status):
-    mock_resp = mock.Mock(spec=httplib2.Response)
+    mock_resp = mock.Mock(spec=Response)
     mock_resp.status = status
     return google_errors.HttpError(mock_resp, b'')
 

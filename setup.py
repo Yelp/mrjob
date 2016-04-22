@@ -25,15 +25,21 @@ try:
             'ujson': ['ujson'],
         },
         'install_requires': [
-            'google-api-python-client>=1.5.0',
             'boto>=2.35.0',
             'filechunkio',
+            #'google-api-python-client>=1.5.0'  # see below
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
+
+    # mrjob doesn't actually support Python 3.2, but it tries to support
+    # PyPy3, which is currently Python 3.2 with some key 3.3 features
+    if sys.version_info < (3, 0) or sys.version_info >= (3, 3):
+        setuptools_kwargs['install_requires'].append(
+            'google-api-python-client>=1.5.0')
 
     # mock is included in Python 3.3 as unittest.mock
     if sys.version_info < (3, 3):

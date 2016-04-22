@@ -18,6 +18,7 @@ import tempfile
 import time
 import hashlib
 import httplib2
+import sys
 from datetime import datetime
 from io import BytesIO
 
@@ -47,6 +48,7 @@ from mrjob.fs.gcs import _LS_FIELDS_TO_RETURN
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import patch
 from tests.py2 import mock
+from tests.py2 import skipIf
 from tests.sandbox import SandboxedTestCase
 
 # list_clusters() only returns this many results at a time
@@ -144,6 +146,10 @@ def _dict_deep_update(d, u):
 
 ### Test Case ###
 
+# disable these tests until we figure out a way to get the google API client
+# to play well with PyPy 3 (which reports itself as Python 3.2, but has key
+# Python 3.3 features)
+@skipIf(sys.version_info == (3, 2), "can't install googleapiclient")
 class MockGoogleAPITestCase(SandboxedTestCase):
 
     @classmethod

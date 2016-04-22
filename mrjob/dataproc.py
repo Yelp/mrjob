@@ -85,12 +85,7 @@ _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '0.2': '2.7.1',
     '1.0': '2.7.2'
 }
-# XXX - don't hard-code the bucket
-# XXX - uniquely named cluster for each job
-# XXX - shut down cluster in finally: block after job completes/fails (i.e. implement _cleanup_cluster())
-# XXX - working _cat_file() =^.^=
-# XXX - step-by-step docs on how to create an account, enable Dataproc, and set up credentials, similar to the Configuring AWS Credentials section of the mrjob docs (https://pythonhosted.org/mrjob/guides/emr-quickstart.html#amazon-setup).
-#
+
 # Here is what I'd really consider a minimal implementation (though the above is enough to get checked into master):
 #
 # XXX run with -r dataproc and no additional switches. This would require:
@@ -918,7 +913,9 @@ class DataprocJobRunner(MRJobRunner):
         #     ])
         #
 
-        bootstrap_cmds = [self._upload_mgr.uri(self._master_bootstrap_script_path)]
+        bootstrap_cmds = []
+        if self._master_bootstrap_script_path:
+            bootstrap_cmds.append(self._upload_mgr.uri(self._master_bootstrap_script_path))
 
         cluster_config = dict(
             gceClusterConfig=dict(

@@ -289,9 +289,7 @@ def parse_gcs_uri(uri):
     The equivalent S3 method is in parse.py but it seemed cleaner to keep the GCS one in gcs.py
     """
     components = urlparse(uri)
-    if (components.scheme not in ("gs") or
-        '/' not in components.path):  # noqa
-
+    if components.scheme != "gs" or '/' not in components.path:
         raise ValueError('Invalid GCS URI: %s' % uri)
 
     return components.netloc, components.path[1:]

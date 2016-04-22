@@ -193,6 +193,7 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
+from mrjob.options import _add_dataproc_emr_opts
 from mrjob.options import _add_emr_connect_opts
 from mrjob.options import _add_emr_launch_opts
 from mrjob.options import _alphabetize_options
@@ -252,8 +253,10 @@ def _make_option_parser():
             'owner',
         ),
     })
+
     _add_emr_connect_opts(option_parser)
     _add_emr_launch_opts(option_parser)
+    _add_dataproc_emr_opts(option_parser)
 
     _alphabetize_options(option_parser)
     return option_parser

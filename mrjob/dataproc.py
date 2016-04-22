@@ -645,7 +645,7 @@ class DataprocJobRunner(MRJobRunner):
         """Wait for every step of the job to complete, one by one."""
         total_steps = self._num_steps()
         # define out steps
-        for step_num in xrange(total_steps):
+        for step_num in range(total_steps):
             job_id = self._launch_step(step_num)
 
             self._wait_for_step_to_complete(job_id, step_num=step_num, num_steps=total_steps)

@@ -75,7 +75,7 @@ def mock_api(fxn):
 def mock_google_error(status):
     mock_resp = mock.Mock(spec=httplib2.Response)
     mock_resp.status = status
-    return google_errors.HttpError(mock_resp, '')
+    return google_errors.HttpError(mock_resp, b'')
 
 # Addressable data structure specific
 def _get_deep(data_structure, dot_path_or_list, default_value=None):
@@ -546,7 +546,7 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
 
     worker_conf = {
       "numInstances": num_workers,
-      "instanceNames": ['%s-w-%d' % (cluster, num) for num in xrange(num_workers)],
+      "instanceNames": ['%s-w-%d' % (cluster, num) for num in range(num_workers)],
       "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
       "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type)s" % locals(),
       "diskConfig": {
@@ -729,7 +729,7 @@ class MockDataprocClientJobs(object):
 
         job_map = _get_deep(self._jobs, [project_id], dict())
 
-        jobs_sorted_by_time = sorted(job_map.itervalues(), key=lambda j: j['status']['stateStartTime'])
+        jobs_sorted_by_time = sorted(job_map.values(), key=lambda j: j['status']['stateStartTime'])
         for current_job in jobs_sorted_by_time:
             job_cluster = current_job['placement']['clusterName']
             job_state = current_job['status']['state']

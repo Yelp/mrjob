@@ -513,7 +513,7 @@ class DataprocJobRunner(MRJobRunner):
 
     ### Running the job ###
 
-    def _cleanup_remote_tmp(self):
+    def _cleanup_cloud_tmp(self):
         # delete all the files we created
         if not self._job_tmpdir:
             return

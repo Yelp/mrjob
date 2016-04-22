@@ -770,7 +770,7 @@ SSH access and tunneling
     :switch: --ssh-bind-ports
     :type: special
     :set: emr
-    :default: ``[40001, ..., 40840]``
+    :default: ``range(40001, 40841)``
 
     A list of ports that are safe to listen on. The command line syntax looks
     like ``2000[:2001][,2003,2005:2008,etc]``, where commas separate ranges and

@@ -134,7 +134,7 @@ def _set_deep(data_structure, dot_path_or_list, value_to_set):
 
 def _dict_deep_update(d, u):
     """ http://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth """
-    for k, v in u.iteritems():
+    for k, v in u.items():
         if isinstance(v, collections.Mapping):
             r = _dict_deep_update(d.get(k, {}), v)
             d[k] = r
@@ -252,7 +252,7 @@ class MockGCSClient(object):
         self.upload_io(bytes_io_obj, gcs_uri)
 
     def put_gcs_multi(self, gcs_uri_to_data_map):
-        for gcs_uri, data in gcs_uri_to_data_map.iteritems():
+        for gcs_uri, data in gcs_uri_to_data_map.items():
             self.put_gcs(gcs_uri, data)
 
     def download_io(self, src_uri, io_obj):
@@ -308,7 +308,7 @@ class MockGCSClientObjects(object):
         object_map = _get_deep(self._objects, [bucket], dict())
 
         item_list = []
-        for object_name, current_object in object_map.iteritems():
+        for object_name, current_object in object_map.items():
             if not object_name.startswith(prefix):
                 continue
 
@@ -349,7 +349,7 @@ class MockGCSClientBuckets(object):
         prefix = kwargs.get('prefix') or ''
 
         item_list = []
-        for bucket_name, current_bucket in self._buckets.iteritems():
+        for bucket_name, current_bucket in self._buckets.items():
             if not bucket_name.startswith(prefix):
                 continue
 

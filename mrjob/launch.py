@@ -573,8 +573,8 @@ class MRJobLauncher(object):
         return combine_dicts(
             self.job_runner_kwargs(),
             self._get_kwargs_from_opt_group(self.dataproc_emr_opt_group),
-            self._get_kwargs_from_opt_group(self.emr_opt_group))
-            self._get_kwargs_from_opt_group(self.hadoop_emr_opt_group),
+            self._get_kwargs_from_opt_group(self.emr_opt_group),
+            self._get_kwargs_from_opt_group(self.hadoop_emr_opt_group))
 
     def dataproc_job_runner_kwargs(self):
         """Keyword arguments to create create runners when

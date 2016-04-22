@@ -59,6 +59,7 @@ from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_no_mapper import MRNoMapper
+from tests.mr_sort_values import MRSortValues
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -71,6 +72,7 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import patch_fs_s3
 from tests.test_hadoop import HadoopExtraArgsTestCase
+from tests.test_job import MRSortValues
 
 try:
     import boto
@@ -3683,3 +3685,26 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 # for the EMR runner
 class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
     pass
+
+
+# make sure we don't override the partitioner on EMR (tests #1294)
+class SortValuesTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(SortValuesTestCase, self).setUp()
+        # _hadoop_args_for_step() needs this
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='2.4.0'))
+
+    def test_options(self):
+        job = MRSortValues(['-r', 'emr'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._hadoop_args_for_step(0), [
+                    '-D', 'mapred.text.key.partitioner.options=-k1,1',
+                    '-D', 'stream.num.map.output.key.fields=2',
+                    '-partitioner',
+                    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner',
+                ])

@@ -40,6 +40,7 @@ from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import TestCase
@@ -656,15 +657,7 @@ class JobConfTestCase(TestCase):
                          {'mapred.baz': 'bar'})
 
 
-class MRSortValuesJob(MRJob):
-    SORT_VALUES = True
-
-    # need to define a mapper or reducer
-    def mapper_init(self):
-        pass
-
-
-class MRSortValuesAndMoreJob(MRSortValuesJob):
+class MRSortValuesAndMore(MRSortValues):
     PARTITIONER = 'org.apache.hadoop.mapred.lib.HashPartitioner'
 
     JOBCONF = {
@@ -678,14 +671,14 @@ class MRSortValuesAndMoreJob(MRSortValuesJob):
 class SortValuesTestCase(TestCase):
 
     def test_sort_values_sets_partitioner(self):
-        mr_job = MRSortValuesJob()
+        mr_job = MRSortValues()
 
         self.assertEqual(
             mr_job.partitioner(),
             'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
 
     def test_sort_values_sets_jobconf(self):
-        mr_job = MRSortValuesJob()
+        mr_job = MRSortValues()
 
         self.assertEqual(
             mr_job.jobconf(),
@@ -695,7 +688,7 @@ class SortValuesTestCase(TestCase):
              'mapred.text.key.comparator.options': None})
 
     def test_can_override_sort_values_from_job(self):
-        mr_job = MRSortValuesAndMoreJob()
+        mr_job = MRSortValuesAndMore()
 
         self.assertEqual(
             mr_job.partitioner(),
@@ -710,7 +703,7 @@ class SortValuesTestCase(TestCase):
              'mapred.text.key.comparator.options': '-k1 -k2nr'})
 
     def test_can_override_sort_values_from_cmd_line(self):
-        mr_job = MRSortValuesJob(
+        mr_job = MRSortValues(
             ['--partitioner', 'org.pants.FancyPantsPartitioner',
              '--jobconf', 'stream.num.map.output.key.fields=lots'])
 
@@ -735,7 +728,7 @@ class SortValuesRunnerTestCase(SandboxedTestCase):
     }}}}
 
     def test_cant_override_sort_values_from_mrjob_conf(self):
-        runner = MRSortValuesJob().make_runner()
+        runner = MRSortValues().make_runner()
 
         self.assertEqual(
             runner._hadoop_args_for_step(0),

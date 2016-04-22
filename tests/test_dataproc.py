@@ -505,7 +505,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
 
         # cluster_body = runner.api_client.cluster_create()
         runner._master_bootstrap_script_path = 'gs://fake-bucket/fake-script.sh'
-        with patch('mrjob.dataproc.DATAPROC_CLUSTER_STATES_READY', new={'CREATING'}):
+        with patch('mrjob.dataproc.DATAPROC_CLUSTER_STATES_READY', new=set('CREATING')):
             cluster_id = runner._launch_cluster()
 
         cluster_body = runner._api_cluster_get(cluster_id)
@@ -1103,4 +1103,3 @@ class BootstrapPythonTestCase(MockGoogleAPITestCase):
             self.assertEqual(
                 runner._bootstrap,
                 self.EXPECTED_BOOTSTRAP + [['true']])
-

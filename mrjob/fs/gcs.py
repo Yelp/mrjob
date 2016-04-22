@@ -174,7 +174,7 @@ class GCSFilesystem(Filesystem):
         # TODO - mtai @ davidmarin - catch specific Exceptions, not sure what types of exceptions this can throw
         try:
             paths = self.ls(path_glob)
-        except Exception as e:
+        except:
             paths = []
         return any(paths)
 
@@ -217,6 +217,7 @@ class GCSFilesystem(Filesystem):
         if self.exists(dest_uri):
             raise Exception("File already exists: " + dest_uri)
 
+        # TODO: src_path is not defined!
         mimetype, _ = mimetypes.guess_type(src_path)
 
         # Chunked file upload

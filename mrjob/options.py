@@ -151,6 +151,11 @@ def _add_runner_opts(opt_group, default_runner='local'):
             'and must be empty'),
 
         opt_group.add_option(
+            '--partitioner', dest='partitioner', default=None,
+            help=('Hadoop partitioner class. Deprecated as of v0.5.1 and'
+                  ' will be removed in v0.6.0 (specify in your job instead)')),
+
+        opt_group.add_option(
             '--python-archive', dest='python_archives', default=[],
             action='append',
             help=('Archive to unpack and add to the PYTHONPATH of the mr_job'
@@ -236,12 +241,6 @@ def _add_hadoop_emr_opts(opt_group):
         opt_group.add_option(
             '--owner', dest='owner', default=None,
             help='user who ran the job (if different from the current user)'),
-
-        opt_group.add_option(
-            '--partitioner', dest='partitioner', default=None,
-            help=('Hadoop partitioner class to use to determine how mapper'
-                  ' output should be sorted and distributed to reducers. For'
-                  ' example: org.apache.hadoop.mapred.lib.HashPartitioner')),
 
         opt_group.add_option(
             '--check-input-paths', dest='check_input_paths',

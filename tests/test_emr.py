@@ -3688,16 +3688,16 @@ class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
 
 
 # make sure we don't override the partitioner on EMR (tests #1294)
-class SortValuesTestCase(MockBotoTestCase):
+class PartitionerTestCase(MockBotoTestCase):
 
     def setUp(self):
-        super(SortValuesTestCase, self).setUp()
+        super(PartitionerTestCase, self).setUp()
         # _hadoop_args_for_step() needs this
         self.start(patch(
             'mrjob.emr.EMRJobRunner.get_hadoop_version',
-            return_value='2.4.0'))
+            return_value='1.2.0'))
 
-    def test_options(self):
+    def test_sort_values(self):
         job = MRSortValues(['-r', 'emr'])
 
         with job.make_runner() as runner:
@@ -3707,4 +3707,15 @@ class SortValuesTestCase(MockBotoTestCase):
                     '-D', 'stream.num.map.output.key.fields=2',
                     '-partitioner',
                     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner',
+                ])
+
+    def test_switch_overrides_sort_values(self):
+        job = MRSortValues(['-r', 'emr', '--partitioner', 'java.lang.Object'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._hadoop_args_for_step(0), [
+                    '-D', 'mapred.text.key.partitioner.options=-k1,1',
+                    '-D', 'stream.num.map.output.key.fields=2',
+                    '-partitioner', 'java.lang.Object',
                 ])

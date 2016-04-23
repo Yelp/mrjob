@@ -500,6 +500,7 @@ class MRJobRunner(object):
 
                 path = base
 
+        # TODO - mtai @ davidmarin - why aren't we using self.fs.cat ?
         for filename in self.fs.ls(output_dir):
             subpath = filename[len(output_dir):]
             if not any(name.startswith('_') for name in split_path(subpath)):

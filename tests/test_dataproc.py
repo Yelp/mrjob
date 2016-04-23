@@ -445,7 +445,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         runner = DataprocJobRunner(region=US_EAST_GCE_REGION,
                               fs_tmpdir='gs://walrus/tmp/')
 
-        self.assertEqual(runner._opts['fs_tmpdir'], 'gs://walrus/tmp/')
+        self.assertEqual(runner._fs_tmpdir, 'gs://walrus/tmp/')
 
         # tmp bucket shouldn't influence region (it did in 0.4.x)
         self.assertEqual(runner._gce_region, US_EAST_GCE_REGION)

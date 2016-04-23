@@ -16,7 +16,6 @@ import fnmatch
 import logging
 import mimetypes
 
-# from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
 from mrjob.parse import urlparse
 from mrjob.runner import GLOB_RE
@@ -25,11 +24,13 @@ from mrjob.util import read_file
 try:
     from oauth2client.client import GoogleCredentials
     from googleapiclient import discovery
+    from googleapiclient import errors as google_errors
     from googleapiclient import http
 except ImportError:
     # don't require googleapiclient; MRJobs don't actually need it when running
     # inside hadoop streaming
     GoogleCredentials = None
+    google_errors = None
     discovery = None
     http = None
 
@@ -125,8 +126,16 @@ class GCSFilesystem(Filesystem):
 
         uri_prefix = '%s://%s' % (scheme, bucket_name)
         while list_request:
-            resp = list_request.execute()
-            for item in resp['items']:
+            try:
+                resp = list_request.execute()
+            except google_errors.HttpError as e:
+                if e.resp.status == 404:
+                    return
+
+                raise
+
+            resp_items = resp.get('items') or []
+            for item in resp_items:
                 # We generate the item URI by adding the "gs://" prefix
                 uri = "%s/%s" % (uri_prefix, item['name'])
 
@@ -153,6 +162,7 @@ class GCSFilesystem(Filesystem):
         tmp_fd, tmp_path = tempfile.mkstemp()
         tmp_fileobj = os.fdopen(tmp_fd, 'w+b')
 
+        # for item in self._ls_detailed(path_glob):
         self._download_io(gcs_uri, tmp_fileobj)
 
         tmp_fileobj.seek(0)
@@ -217,8 +227,8 @@ class GCSFilesystem(Filesystem):
         if self.exists(dest_uri):
             raise Exception("File already exists: " + dest_uri)
 
-        # TODO: src_path is not defined!
-        mimetype, _ = mimetypes.guess_type(src_path)
+        mimetype, _ = mimetypes.guess_type(dest_uri)
+        mimetype = mimetype or _BINARY_MIMETYPE
 
         # Chunked file upload
         media = http.MediaIoBaseUpload(io_obj, mimetype, resumable=True)
@@ -241,7 +251,8 @@ class GCSFilesystem(Filesystem):
         req = self.api_client.buckets().list(**list_kwargs)
         resp = req.execute()
 
-        return resp['items']
+        buckets_to_return = resp.get('items') or []
+        return buckets_to_return
 
     def bucket_get(self, bucket):
         req = self.api_client.buckets().get(bucket=bucket)

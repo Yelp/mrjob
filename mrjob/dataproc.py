@@ -39,6 +39,7 @@ except ImportError:
     # Python 3
     import configparser
 
+import mrjob
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
@@ -74,10 +75,22 @@ _DEFAULT_CLOUD_API_COOLDOWN_SECS = 10.0
 _DEFAULT_FS_SYNC_SECS = 5.0
 _DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS = 28
 
+# https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#GceClusterConfig
+_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
+    'https://www.googleapis.com/auth/cloud.useraccounts.readonly',
+    'https://www.googleapis.com/auth/devstorage.read_write',
+    'https://www.googleapis.com/auth/logging.write',
+    'https://www.googleapis.com/auth/bigquery',
+    'https://www.googleapis.com/auth/bigtable.admin.table',
+    'https://www.googleapis.com/auth/bigtable.data',
+    'https://www.googleapis.com/auth/devstorage.full_control',
+    'https://www.googleapis.com/auth/cloud-platform',
+]
+
 DATAPROC_CLUSTER_STATES_READY = frozenset(['UPDATING', 'RUNNING'])
 DATAPROC_CLUSTER_STATES_ERROR = frozenset(['ERROR', 'DELETING'])
 
-DATAPROC_JOB_STATES_ACTIVE = frozenset(['PENDING', 'RUNNING', 'CANCEL_PENDING'])
+DATAPROC_JOB_STATES_ACTIVE = frozenset(['PENDING', 'RUNNING', 'SETUP_DONE', 'CANCEL_PENDING'])
 DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
 
 _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
@@ -86,23 +99,11 @@ _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '1.0': '2.7.2'
 }
 
-# Here is what I'd really consider a minimal implementation (though the above is enough to get checked into master):
-#
-# XXX run with -r dataproc and no additional switches. This would require:
-# XXX auto-create bucket (if temp dir isn't specified)
-# XXX default region and zone if none specified
-# XXX read project name and credentials from environment ($GOOGLE_APPLICATION_CREDENTIALS?)
-# - auto-terminate clusters after idle for 5 minutes (using something like mrjob/bootstrap/terminate_idle_cluster.sh in an initialization action)
-#   - (and/or have Dataproc introduce this as a built-in feature, though I think it'll be faster to get it done in mrjob)
-# - complete unit tests
-#   - Recommend you just use mock/patch, and not write mock dataproc like we do for EMR and Hadoop. I'm pretty confident in my mocking skills at this point, so feel free to ask me questions if you get stuck. :)
-
-
 # bootstrap action which automatically terminates idle clusters
-# _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
-#     os.path.dirname(mrjob.__file__),
-#     'bootstrap',
-#     'terminate_idle_cluster.sh')
+_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
+    os.path.dirname(mrjob.__file__),
+    'bootstrap',
+    'terminate_idle_cluster_dataproc.sh')
 
 _HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar'
 
@@ -197,7 +198,9 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         'fs_tmpdir',
 
         'bootstrap',
-        'bootstrap_python'
+        'bootstrap_python',
+        'max_hours_idle',
+        'mins_to_end_of_hour'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -239,6 +242,7 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
             'num_preemptible': 0,
 
             'fs_sync_secs': _DEFAULT_FS_SYNC_SECS,
+            'mins_to_end_of_hour': 5.0,
             'sh_bin': ['/bin/sh', '-ex'],
         })
 
@@ -276,14 +280,14 @@ class DataprocJobRunner(MRJobRunner):
         super(DataprocJobRunner, self).__init__(**kwargs)
 
         # read gcloud SDK defaults
-        gcloud_config = _read_gcloud_config()
+        self._gcloud_config = None
 
         # Google Cloud Platform - project
-        self._gcp_project = self._opts['gcp_project'] or gcloud_config['core.project']
+        self._gcp_project = self._opts['gcp_project'] or self.gcloud_config['core.project']
 
         # Google Compute Engine - Region / Zone
-        self._gce_region = self._opts['region'] or gcloud_config['compute.region']
-        self._gce_zone = self._opts['zone'] or gcloud_config['compute.zone']
+        self._gce_region = self._opts['region'] or self.gcloud_config['compute.region']
+        self._gce_zone = self._opts['zone'] or self.gcloud_config['compute.zone']
 
         # cluster_id can be None here
         self._cluster_id = self._opts['cluster_id']
@@ -337,6 +341,13 @@ class DataprocJobRunner(MRJobRunner):
         self._log_interpretations = []
 
     @property
+    def gcloud_config(self):
+        if not self._gcloud_config:
+            self._gcloud_config = _read_gcloud_config()
+
+        return self._gcloud_config
+
+    @property
     def api_client(self):
         if not self._api_client:
             credentials = GoogleCredentials.get_application_default()
@@ -370,10 +381,13 @@ class DataprocJobRunner(MRJobRunner):
         # NOTE - because we this is a fs_tmpdir, we look for a GCS bucket in the same GCE region
         # NOTE - As of Apr 1, 2016 - GCS buckets should typically be at the multi-region level but we special case it here
         chosen_bucket_name = None
+        gce_lower_location = self._gce_region.lower()
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket['name']
 
-            if tmp_bucket['location'] == self._gce_region:
+            # NOTE - GCP Ambiguous Behavior - Bucket location is being returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs suggest lowercase
+            lower_location = tmp_bucket['location'].lower()
+            if lower_location == gce_lower_location:
                 # Regions are both specified and match
                 log.info("using existing temp bucket %s" % tmp_bucket_name)
                 chosen_bucket_name = tmp_bucket_name
@@ -450,9 +464,9 @@ class DataprocJobRunner(MRJobRunner):
         if self._master_bootstrap_script_path:
             self._upload_mgr.add(self._master_bootstrap_script_path)
 
-            # # Add max-hours-idle script if we need it
-            # if self._opts['max_hours_idle']:
-            #     self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+            # Add max-hours-idle script if we need it
+            if self._opts['max_hours_idle']:
+                self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -617,8 +631,6 @@ class DataprocJobRunner(MRJobRunner):
 
         self._cluster_id_start = time.time()
 
-        log.info('Creating Dataproc Hadoop cluster')
-
         # "clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'"
         self._cluster_id = self._cluster_id or "mrjob-%s" % random_identifier()
 
@@ -630,6 +642,7 @@ class DataprocJobRunner(MRJobRunner):
             if not e.resp.status == 404:
                 raise
 
+            log.info('Creating Dataproc Hadoop cluster')
             cluster_data = self._cluster_args()
             self._api_cluster_create(self._cluster_id, cluster_data)
             log.info('Created new cluster %s' % self._cluster_id)
@@ -651,6 +664,9 @@ class DataprocJobRunner(MRJobRunner):
             self._wait_for_step_to_complete(job_id, step_num=step_num, num_steps=total_steps)
 
             log.info('Completed Dataproc Hadoop Job - %s', job_id)
+
+        # After all steps completed, wait for the last output (which is usually written to GCS) to sync
+        self._wait_for_fs_sync()
 
     def _launch_step(self, step_num):
         # Build each step
@@ -683,11 +699,9 @@ class DataprocJobRunner(MRJobRunner):
         while True:
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus
             job_result = self._api_job_get(job_id)
-
-            job_start_time = job_result['status']['stateStartTime']
             job_state = job_result['status']['state']
 
-            log.info('%s  %s - %s' % (job_id, job_start_time, job_state))
+            log.info('%s => %s' % (job_id, job_state))
 
             # NOTE -  mtai @ davidmarin - https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State
             if job_state in DATAPROC_JOB_STATES_ACTIVE:
@@ -897,33 +911,30 @@ class DataprocJobRunner(MRJobRunner):
         return out
 
     def _cluster_args(self):
-        # TODO - add idle termination script to bootstrap actions
-        # TODO - investigate whether termination script will do the right thing WRT shutdown
-        # TODO - investigate whether termination script in bootstrap actions will timeout
-        # # only use idle termination script on persistent clusters
-        # # add it last, so that we don't count bootstrapping as idle time
-        # if self._opts['max_hours_idle']:
-        #     gcs_uri = self._upload_mgr.uri(
-        #         _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
-        #     # script takes args in (integer) seconds
-        #     mrjob_bootstrap.append([
-        #         gcs_uri,
-        #         int(self._opts['max_hours_idle'] * 3600),
-        #         int(self._opts['mins_to_end_of_hour'] * 60)
-        #     ])
-        #
-
-        bootstrap_cmds = []
+        gcs_init_script_uris = []
         if self._master_bootstrap_script_path:
-            bootstrap_cmds.append(self._upload_mgr.uri(self._master_bootstrap_script_path))
+            gcs_init_script_uris.append(self._upload_mgr.uri(self._master_bootstrap_script_path))
+
+        # only use idle termination script on persistent clusters
+        # add it last, so that we don't count bootstrapping as idle time
+        cluster_metadata = dict()
+        cluster_metadata['mrjob.version'] = mrjob.__version__
+
+        if self._opts['max_hours_idle']:
+            # Pass GCS init script args via cluster metadata
+            cluster_metadata['mrjob.max-hours-idle'] = int(self._opts['max_hours_idle'] * 3600)
+            cluster_metadata['mrjob.mins-to-end-of-hour'] = int(self._opts['mins_to_end_of_hour'] * 60)
+            gcs_init_script_uris.append(self._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
 
         cluster_config = dict(
             gceClusterConfig=dict(
-                zoneUri=_gcp_zone_uri(project=self._gcp_project, zone=self._gce_zone)
+                zoneUri=_gcp_zone_uri(project=self._gcp_project, zone=self._gce_zone),
+                serviceAccountScopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
+                metadata=cluster_metadata
             ),
             initializationActions=[
-                dict(executableFile=bootstrap_cmd) for bootstrap_cmd in bootstrap_cmds
-                ]
+                dict(executableFile=init_script_uri) for init_script_uri in gcs_init_script_uris
+            ]
         )
 
         # Task tracker
@@ -1014,7 +1025,12 @@ class DataprocJobRunner(MRJobRunner):
 
         list_request = self.api_client.jobs().list(**list_kwargs)
         while list_request:
-            resp = list_request.execute()
+            try:
+                resp = list_request.execute()
+            except google_errors.HttpError as e:
+                if e.resp.status == 404:
+                    return
+                raise
 
             for current_item in resp['items']:
                 yield current_item

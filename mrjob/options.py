@@ -305,6 +305,19 @@ def _add_dataproc_emr_opts(opt_group):
             help=('Attempt to install a compatible version of Python'
                   ' at boostrap time. Currently this only does anything'
                   ' for Python 3, for which it is enabled by default.')),
+
+        opt_group.add_option(
+            '--max-hours-idle', dest='max_hours_idle',
+            default=None, type='float',
+            help=("If we create a persistent cluster, have it automatically"
+                  " terminate itself after it's been idle this many hours.")),
+
+        opt_group.add_option(
+            '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
+            default=None, type='float',
+            help=("If --max-hours-idle is set, control how close to the end"
+                  " of an hour the cluster can automatically"
+                  " terminate itself (default is 5 minutes).")),
     ]
 
 def _add_dataproc_opts(opt_group):
@@ -531,19 +544,6 @@ def _add_emr_launch_opts(opt_group):
             default=None,
             help=('IAM service role to use for the EMR cluster -- see'
                   ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
-
-        opt_group.add_option(
-            '--max-hours-idle', dest='max_hours_idle',
-            default=None, type='float',
-            help=("If we create a persistent cluster, have it automatically"
-                  " terminate itself after it's been idle this many hours.")),
-
-        opt_group.add_option(
-            '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
-            default=None, type='float',
-            help=("If --max-hours-idle is set, control how close to the end"
-                  " of an EC2 billing hour the cluster can automatically"
-                  " terminate itself (default is 5 minutes).")),
 
         opt_group.add_option(
             '--no-bootstrap-python', dest='bootstrap_python',

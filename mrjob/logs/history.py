@@ -191,7 +191,7 @@ def _parse_yarn_history_log(lines):
         if record_type.endswith('_ATTEMPT_FAILED'):
             for event in events:
                 err_msg = event.get('error')
-                if not isinstance(err_msg, string_types):
+                if not (err_msg and isinstance(err_msg, string_types)):
                     continue
 
                 error = dict(
@@ -312,8 +312,11 @@ def _parse_pre_yarn_history_log(lines):
 
             task_to_counters[task_id] = counters
 
+        # only want FAILED (not KILLED) tasks with non-blank errors
         elif (record['type'] in ('MapAttempt', 'ReduceAttempt') and
-              'TASK_ATTEMPT_ID' in fields and 'ERROR' in fields):
+              'TASK_ATTEMPT_ID' in fields and
+              fields.get('TASK_STATUS') == 'FAILED' and
+              fields.get('ERROR')):
             result.setdefault('errors', [])
             result['errors'].append(dict(
                 hadoop_error=dict(

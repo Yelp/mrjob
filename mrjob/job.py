@@ -40,13 +40,17 @@ log = logging.getLogger(__name__)
 
 
 # jobconf options for implementing SORT_VALUES
+#
+# This includes both the Hadoop 1 and Hadoop 2 names of the options.
+# The options that are set to None exist to override mrjob.conf.
 _SORT_VALUES_JOBCONF = {
-    'stream.num.map.output.key.fields': 2,
     'mapred.text.key.partitioner.options': '-k1,1',
-    # Hadoop's defaults for these actually work fine; we just want to
-    # prevent interference from mrjob.conf.
     'mapred.output.key.comparator.class': None,
     'mapred.text.key.comparator.options': None,
+    'mapreduce.partition.keypartitioner.options': '-k1,1',
+    'mapreduce.job.output.key.comparator.class': None,
+    'mapreduce.partition.keycomparator.options': None,
+    'stream.num.map.output.key.fields': 2,
 }
 
 # partitioner for sort_values

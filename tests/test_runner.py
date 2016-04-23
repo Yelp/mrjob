@@ -25,7 +25,6 @@ import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
 
-from mrjob.conf import combine_dicts
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner
@@ -539,64 +538,6 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
         job = MRWordCount(['--no-check-input-paths'])
         with job.make_runner() as runner:
             self.assertFalse(runner._opts['check_input_paths'])
-
-
-class UpdateJobConfForHadoopVersionTestCase(TestCase):
-
-    # jobconf with strange mix of Hadoop 1 and Hadoop 2 variables
-    JOBCONF = {
-        'foo.bar': 'baz',                   # unknown jobconf
-        'mapred.jar': 'a.jar',              # Hadoop 1 jobconf
-        'mapreduce.job.user.name': 'dave',  # Hadoop 2 jobconf
-    }
-
-    def setUp(self):
-        self.runner = InlineMRJobRunner(conf_paths=[])
-
-    def updated_and_warnings(self, jobconf, hadoop_version):
-        jobconf = jobconf.copy()
-        with no_handlers_for_logger('mrjob.runner'):
-            stderr = StringIO()
-            log_to_stream('mrjob.runner', stderr)
-            self.runner._update_jobconf_for_hadoop_version(
-                jobconf, hadoop_version)
-
-        return jobconf, stderr.getvalue()
-
-    def test_no_version(self):
-        updated, warnings = self.updated_and_warnings(
-            self.JOBCONF, None)
-
-        self.assertEqual(updated, self.JOBCONF)
-        self.assertEqual(warnings, '')
-
-    def test_hadoop_1(self):
-        updated, warnings = self.updated_and_warnings(
-            self.JOBCONF, '1.0')
-
-        self.assertEqual(updated,
-                         combine_dicts(self.JOBCONF, {'user.name': 'dave'}))
-        self.assertIn('do not match hadoop version', warnings)
-        self.assertIn('mapreduce.job.user.name: user.name', warnings)
-
-    def test_hadoop_2(self):
-        updated, warnings = self.updated_and_warnings(
-            self.JOBCONF, '2.0')
-
-        self.assertEqual(updated,
-                         combine_dicts(self.JOBCONF,
-                                       {'mapreduce.job.jar': 'a.jar'}))
-        self.assertIn('do not match hadoop version', warnings)
-        self.assertIn('mapred.jar: mapreduce.job.jar', warnings)
-
-    def test_dont_overwrite(self):
-        # this jobconf contains two versions of the same variable
-        jobconf = {'mapred.jar': 'a.jar', 'mapreduce.job.jar': 'b.jar'}
-
-        updated, warnings = self.updated_and_warnings(jobconf, '1.0')
-
-        self.assertEqual(updated, jobconf)
-        self.assertEqual(warnings, '')
 
 
 class SetupTestCase(SandboxedTestCase):

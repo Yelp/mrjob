@@ -43,6 +43,25 @@ and ``inline`` runners to some degree.
     'KEY1=VALUE1', '-D', 'KEY2=VALUE2', ...]`` to
     :mrjob-opt:`hadoop_extra_args`
 
+.. mrjob-opt::
+    :config: partitioner
+    :switch: --partitioner
+    :type: :ref:`string <data-type-string>`
+    :set: no_mrjob_conf
+    :default: ``None``
+
+    .. deprecated:: 0.5.1
+
+    Name of a Hadoop partitioner class, e.g.
+    ``'org.apache.hadoop.mapred.lib.HashPartitioner'``. Hadoop Streaming will
+    use this to determine how mapper output should be sorted and distributed
+    to reducers.
+
+    The recommended way to specify partitioner is in your job, with the
+    :py:attr:`~mrjob.job.MRJob.PARTITIONER` attribute or the
+    :py:meth:`~mrjob.job.MRJob.partitioner` method.
+
+
 
 Options available to hadoop and emr runners
 -------------------------------------------
@@ -105,20 +124,6 @@ Options available to hadoop and emr runners
     :default: :py:func:`getpass.getuser`, or ``no_user`` if that fails
 
     Who is running this job (if different from the current user)
-
-.. mrjob-opt::
-    :config: partitioner
-    :switch: --partitioner
-    :type: :ref:`string <data-type-string>`
-    :set: no_mrjob_conf
-    :default: ``None``
-
-    Optional name of a Hadoop partitioner class, e.g.
-    ``'org.apache.hadoop.mapred.lib.HashPartitioner'``. Hadoop Streaming will
-    use this to determine how mapper output should be sorted and distributed
-    to reducers. You can also set this option on your job class with the
-    :py:attr:`~mrjob.job.MRJob.PARTITIONER` attribute or the
-    :py:meth:`~mrjob.job.MRJob.partitioner` method.
 
 .. mrjob-opt::
     :config: check_input_paths

@@ -312,8 +312,11 @@ def _parse_pre_yarn_history_log(lines):
 
             task_to_counters[task_id] = counters
 
+        # only want FAILED (not KILLED) tasks with non-blank errors
         elif (record['type'] in ('MapAttempt', 'ReduceAttempt') and
-              'TASK_ATTEMPT_ID' in fields and 'ERROR' in fields):
+              'TASK_ATTEMPT_ID' in fields and
+              fields.get('TASK_STATUS') == 'FAILED' and
+              fields.get('ERROR')):
             result.setdefault('errors', [])
             result['errors'].append(dict(
                 hadoop_error=dict(

@@ -242,7 +242,7 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
             'num_preemptible': 0,
 
             'fs_sync_secs': _DEFAULT_FS_SYNC_SECS,
-            'mins_to_end_of_hour': 5.0,
+            'mins_to_end_of_hour': 55.0, # EMR has 1-hr min billing (60 - 5).  Dataproc has 10-min min billing (60 - 55)
             'sh_bin': ['/bin/sh', '-ex'],
         })
 
@@ -525,6 +525,13 @@ class DataprocJobRunner(MRJobRunner):
         self._wait_for_fs_sync()
 
     ### Running the job ###
+    def cleanup(self, mode=None):
+        super(DataprocJobRunner, self).cleanup(mode=mode)
+
+        # stop the cluster if it belongs to us (it may have stopped on its
+        # own already, but that's fine)
+        if self._cluster_id and not self._opts['cluster_id']:
+            self._cleanup_cluster()
 
     def _cleanup_cloud_tmp(self):
         # delete all the files we created
@@ -554,6 +561,11 @@ class DataprocJobRunner(MRJobRunner):
             _wait_for('job cancellation', self._opts['cloud_api_cooldown_secs'])
 
     def _cleanup_cluster(self):
+        if not self._cluster_id:
+            # If we don't have a cluster, then we can't terminate it.
+            return
+
+
         try:
             log.info("Attempting to terminate cluster")
             self._api_cluster_delete(self._cluster_id)
@@ -637,15 +649,15 @@ class DataprocJobRunner(MRJobRunner):
         # Create the cluster if its missing, otherwise we join an existing one
         try:
             self._api_cluster_get(self._cluster_id)
-            log.info('Adding our job to existing cluster %s' % self._cluster_id)
+            log.info('Adding job to existing cluster - %s' % self._cluster_id)
         except google_errors.HttpError as e:
             if not e.resp.status == 404:
                 raise
 
-            log.info('Creating Dataproc Hadoop cluster')
+            log.info('Creating Dataproc Hadoop cluster - %s' % self._cluster_id)
             cluster_data = self._cluster_args()
             self._api_cluster_create(self._cluster_id, cluster_data)
-            log.info('Created new cluster %s' % self._cluster_id)
+            log.info('Created new cluster - %s' % self._cluster_id)
 
         # keep track of when we launched our job
         self._dataproc_job_start = time.time()
@@ -915,15 +927,15 @@ class DataprocJobRunner(MRJobRunner):
         if self._master_bootstrap_script_path:
             gcs_init_script_uris.append(self._upload_mgr.uri(self._master_bootstrap_script_path))
 
+        cluster_metadata = dict()
+        cluster_metadata['mrjob-version'] = mrjob.__version__
+
         # only use idle termination script on persistent clusters
         # add it last, so that we don't count bootstrapping as idle time
-        cluster_metadata = dict()
-        cluster_metadata['mrjob.version'] = mrjob.__version__
-
         if self._opts['max_hours_idle']:
-            # Pass GCS init script args via cluster metadata
-            cluster_metadata['mrjob.max-hours-idle'] = int(self._opts['max_hours_idle'] * 3600)
-            cluster_metadata['mrjob.mins-to-end-of-hour'] = int(self._opts['mins_to_end_of_hour'] * 60)
+            # NOTE - Pass GCS init script args via cluster metadata
+            cluster_metadata['mrjob-max-secs-idle'] = str(int(self._opts['max_hours_idle'] * 3600))
+            cluster_metadata['mrjob-min-secs-to-end-of-hour'] = str(int(self._opts['mins_to_end_of_hour'] * 60))
             gcs_init_script_uris.append(self._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
 
         cluster_config = dict(

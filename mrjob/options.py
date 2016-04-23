@@ -306,6 +306,7 @@ def _add_dataproc_emr_opts(opt_group):
                   ' at boostrap time. Currently this only does anything'
                   ' for Python 3, for which it is enabled by default.')),
 
+        # TODO - mtai @ davidmarin - generalize to --max-mins-idle - dataproc (minutes) vs EMR (hours)
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',

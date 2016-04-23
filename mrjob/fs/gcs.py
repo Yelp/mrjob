@@ -143,6 +143,10 @@ class GCSFilesystem(Filesystem):
                 if not (fnmatch.fnmatchcase(uri, path_glob) or fnmatch.fnmatchcase(uri, dir_glob)):
                     continue
 
+                # filter out folders
+                if uri.endswith('/'):
+                    continue
+
                 item['_uri'] = uri
                 item['bucket'] = bucket_name
                 item['size'] = int(item['size'])

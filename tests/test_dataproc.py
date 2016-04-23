@@ -189,7 +189,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
                 self.assertRaises(StepFailedException, runner.run)
 
-                self.assertIn('Z - ERROR\n', stderr.getvalue())
+                self.assertIn(' => ERROR\n', stderr.getvalue())
 
         # cluster = runner._describe_cluster()
         # self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')

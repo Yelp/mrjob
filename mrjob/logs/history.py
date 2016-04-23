@@ -191,7 +191,7 @@ def _parse_yarn_history_log(lines):
         if record_type.endswith('_ATTEMPT_FAILED'):
             for event in events:
                 err_msg = event.get('error')
-                if not isinstance(err_msg, string_types):
+                if not (err_msg and isinstance(err_msg, string_types)):
                     continue
 
                 error = dict(

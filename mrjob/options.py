@@ -244,12 +244,12 @@ def _add_hadoop_emr_opts(opt_group):
 
         opt_group.add_option(
             '--check-input-paths', dest='check_input_paths',
-            default=True, action='store_true',
+            default=None, action='store_true',
             help='Check input paths exist before running (the default)'),
 
         opt_group.add_option(
             '--no-check-input-paths', dest='check_input_paths',
-            default=True, action='store_false',
+            default=None, action='store_false',
             help='Skip the checks to ensure all input paths exist'),
     ]
 

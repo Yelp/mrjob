@@ -1,8 +1,8 @@
 mrjob
 =====
 
-**mrjob lets you write MapReduce jobs in Python 2.6+ and run them on several
-platforms.** You can:
+**mrjob lets you write MapReduce jobs in Python 2.6+/3.3+ and run them on
+several platforms.** You can:
 
 * Write multi-step MapReduce jobs in pure Python
 * Test on your local machine
@@ -26,7 +26,7 @@ To get started, install with ``pip``::
 
 and begin reading the tutorial below.
 
-.. ifconfig:: release.endswith('-dev')
+.. ifconfig:: 'dev' in release
 
     .. note::
 

@@ -12,7 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import httplib
+import io
 import logging
 import os
 import os.path
@@ -496,7 +496,7 @@ class DataprocJobRunner(MRJobRunner):
             self.fs.bucket_get(bucket_name)
             return
         except google_errors.HttpError as e:
-            if not e.resp.status == httplib.NOT_FOUND:
+            if not e.resp.status == 404:
                 raise
 
         log.info('creating FS bucket %r' % bucket_name)
@@ -512,7 +512,7 @@ class DataprocJobRunner(MRJobRunner):
 
     ### Running the job ###
 
-    def _cleanup_remote_tmp(self):
+    def _cleanup_cloud_tmp(self):
         # delete all the files we created
         if not self._job_tmpdir:
             return
@@ -627,7 +627,7 @@ class DataprocJobRunner(MRJobRunner):
             self._api_cluster_get(self._cluster_id)
             log.info('Adding our job to existing cluster %s' % self._cluster_id)
         except google_errors.HttpError as e:
-            if not e.resp.status == httplib.NOT_FOUND:
+            if not e.resp.status == 404:
                 raise
 
             cluster_data = self._cluster_args()
@@ -645,7 +645,7 @@ class DataprocJobRunner(MRJobRunner):
         """Wait for every step of the job to complete, one by one."""
         total_steps = self._num_steps()
         # define out steps
-        for step_num in xrange(total_steps):
+        for step_num in range(total_steps):
             job_id = self._launch_step(step_num)
 
             self._wait_for_step_to_complete(job_id, step_num=step_num, num_steps=total_steps)

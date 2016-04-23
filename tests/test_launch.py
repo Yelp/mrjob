@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
-# Copyright 2012 Yelp
+# Copyright 2012-2013 Yelp
+# Copyright 2014 Yelp and Contributors
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,10 +24,8 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.conf import combine_envs
-from mrjob.hadoop import HadoopJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
-from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 
@@ -34,9 +34,7 @@ from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
-from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
-from tests.sandbox import patch_fs_s3
 
 
 def _mock_context_mgr(m, return_value):

@@ -1,5 +1,5 @@
 # Copyright 2009-2013 Yelp and Contributors
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 import sys
 
 from mrjob.tools.emr.create_cluster import main as create_cluster_main
-from mrjob.tools.emr.create_cluster import runner_kwargs
+from mrjob.tools.emr.create_cluster import _runner_kwargs
 
 from tests.mockboto import MockEmrObject
 from tests.tools.emr import ToolTestCase
@@ -30,7 +30,7 @@ class ClusterInspectionTestCase(ToolTestCase):
         self.monkey_patch_argv('--quiet')
 
         self.assertEqual(
-            runner_kwargs(),
+            _runner_kwargs(),
             {'additional_emr_info': None,
              'ami_version': None,
              'aws_availability_zone': None,

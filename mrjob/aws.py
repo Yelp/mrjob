@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2013 Lyft
-# Copyright 2016 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -127,12 +127,6 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     't2.micro': 1,
     't2.small': 2,
 }
-
-
-### EMR ###
-
-# EMR's hard limit on number of steps in a cluster
-_MAX_STEPS_PER_CLUSTER = 256
 
 
 ### Regions ###

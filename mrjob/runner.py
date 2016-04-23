@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2015 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,33 +66,38 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 #:
 #: * ``'ALL'``: delete logs and local and remote temp files; stop cluster
 #:   if on EMR and the job is not done when cleanup is run.
+#: * ``'CLOUD_TMP'``: delete temp files on cloud storage (e.g. S3) only
 #: * ``'CLUSTER'``: terminate the cluster if on EMR and the job is not done
 #:    on cleanup
+#: * ``'HADOOP_TMP'``: delete temp files on HDFS only
 #: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
 #: * ``'LOCAL_TMP'``: delete local temp files only
 #: * ``'LOGS'``: delete logs only
 #: * ``'NONE'``: delete nothing
-#: * ``'REMOTE_TMP'``: delete remote temp files only
-#: * ``'TMP'``: delete local and remote temp files, but not logs
+#: * ``'TMP'``: delete local, HDFS, and cloud storage temp files, but not logs
 #:
 #: .. versionchanged:: 0.5.0
 #:
-#:     Options ending in ``TMP`` used to end in ``SCRATCH``.
+#:     - ``LOCAL_TMP`` used to be ``LOCAL_SCRATCH``
+#:     - ``HADOOP_TMP`` is new (and used to be covered by ``LOCAL_SCRATCH``)
+#:     - ``CLOUD_TMP`` used to be ``REMOTE_SCRATCH``
+#:
 CLEANUP_CHOICES = [
     'ALL',
+    'CLOUD_TMP',
     'CLUSTER',
+    'HADOOP_TMP',
     'JOB',
     'LOCAL_TMP',
     'LOGS',
     'NONE',
-    'REMOTE_TMP',
     'TMP',
 ]
 
 _CLEANUP_DEPRECATED_ALIASES = {
     'JOB_FLOW': 'CLUSTER',
     'LOCAL_SCRATCH': 'LOCAL_TMP',
-    'REMOTE_SCRATCH': 'REMOTE_TMP',
+    'REMOTE_SCRATCH': 'CLOUD_TMP',
     'SCRATCH': 'TMP',
 }
 
@@ -111,8 +116,6 @@ class RunnerOptionStore(OptionStore):
         'cleanup',
         'cleanup_on_failure',
         'cmdenv',
-        'hadoop_extra_args',
-        'hadoop_streaming_jar',
         'hadoop_version',
         'interpreter',
         'jobconf',
@@ -134,7 +137,6 @@ class RunnerOptionStore(OptionStore):
 
     COMBINERS = combine_dicts(OptionStore.COMBINERS, {
         'cmdenv': combine_envs,
-        'hadoop_extra_args': combine_lists,
         'interpreter': combine_cmds,
         'jobconf': combine_dicts,
         'local_tmp_dir': combine_paths,
@@ -245,7 +247,6 @@ class RunnerOptionStore(OptionStore):
         opts[opt_key] = opt_list
 
 
-
 class MRJobRunner(object):
     """Abstract base class for all runners"""
 
@@ -296,7 +297,7 @@ class MRJobRunner(object):
                                     option. Note that if you write your own
                                     class, you'll need to include it in your
                                     own custom streaming jar (see
-                                    *hadoop_streaming_jar*).
+                                    :mrjob-opt:`hadoop_streaming_jar`).
         :type hadoop_output_format: str
         :param hadoop_output_format: name of an optional Hadoop
                                      ``OutputFormat`` class. Passed to Hadoop
@@ -304,7 +305,8 @@ class MRJobRunner(object):
                                      ``-outputformat`` option. Note that if you
                                      write your own class, you'll need to
                                      include it in your own custom streaming
-                                     jar (see *hadoop_streaming_jar*).
+                                     jar (see
+                                     :mrjob-opt:`hadoop_streaming_jar`).
         :type input_paths: list of str
         :param input_paths: Input files for your job. Supports globs and
                             recursively walks directories (e.g.
@@ -457,7 +459,10 @@ class MRJobRunner(object):
     def run(self):
         """Run the job, and block until it finishes.
 
-        Raise an exception if there are any problems.
+        Raise :py:class:`~mrjob.step.StepFailedException` if there
+        are any problems (except on
+        :py:class:`~mrjob.inline.InlineMRJobRunner`, where we raise the
+        actual exception that caused the step to fail).
         """
         if not self._script_path:
             raise AssertionError("No script to run!")
@@ -481,7 +486,7 @@ class MRJobRunner(object):
                 'WARNING! Trying to stream output from a closed runner, output'
                 ' will probably be empty.')
 
-        log.info('Streaming final output from %s' % output_dir)
+        log.info('Streaming final output from %s...' % output_dir)
 
         def split_path(path):
             while True:
@@ -508,6 +513,20 @@ class MRJobRunner(object):
         else:
             return mode or self._opts['cleanup']
 
+    def _cleanup_cloud_tmp(self):
+        """Cleanup any files/directories on cloud storage (e.g. S3) we created
+        while running this job. Should be safe to run this at any time, or
+        multiple times.
+        """
+        pass  # only EMR runner does this
+
+    def _cleanup_hadoop_tmp(self):
+        """Cleanup any files/directories on HDFS we created
+        while running this job. Should be safe to run this at any time, or
+        multiple times.
+        """
+        pass  # only Hadoop runner does this
+
     def _cleanup_local_tmp(self):
         """Cleanup any files/directories on the local machine we created while
         running this job. Should be safe to run this at any time, or multiple
@@ -519,20 +538,13 @@ class MRJobRunner(object):
         This won't remove output_dir if it's outside of our tmp dir.
         """
         if self._local_tmp_dir:
-            log.info('removing tmp directory %s' % self._local_tmp_dir)
+            log.info('Removing temp directory %s...' % self._local_tmp_dir)
             try:
                 shutil.rmtree(self._local_tmp_dir)
             except OSError as e:
                 log.exception(e)
 
         self._local_tmp_dir = None
-
-    def _cleanup_remote_tmp(self):
-        """Cleanup any files/directories on the remote machine (S3) we created
-        while running this job. Should be safe to run this at any time, or
-        multiple times.
-        """
-        pass  # this only happens on EMR
 
     def _cleanup_cluster(self):
         """Terminate the cluster if there is one."""
@@ -545,7 +557,7 @@ class MRJobRunner(object):
 
     def _cleanup_job(self):
         """Stop any jobs that we created that are still running."""
-        pass  # this only happens on EMR
+        pass  # currently disabled (see #1241)
 
     def cleanup(self, mode=None):
         """Clean up running jobs, temp files, and logs, subject to the
@@ -574,11 +586,14 @@ class MRJobRunner(object):
             if mode_has('JOB', 'ALL'):
                 self._cleanup_job()
 
+        if mode_has('ALL', 'TMP', 'CLOUD_TMP'):
+            self._cleanup_cloud_tmp()
+
+        if mode_has('ALL', 'TMP', 'HADOOP_TMP'):
+            self._cleanup_hadoop_tmp()
+
         if mode_has('ALL', 'TMP', 'LOCAL_TMP'):
             self._cleanup_local_tmp()
-
-        if mode_has('ALL', 'TMP', 'REMOTE_TMP'):
-            self._cleanup_remote_tmp()
 
         if mode_has('ALL', 'LOGS'):
             self._cleanup_logs()
@@ -663,7 +678,7 @@ class MRJobRunner(object):
         cleaned up by self.cleanup()"""
         if not self._local_tmp_dir:
             path = os.path.join(self._opts['local_tmp_dir'], self._job_key)
-            log.info('creating tmp directory %s' % path)
+            log.info('Creating temp directory %s' % path)
             if os.path.isdir(path):
                 shutil.rmtree(path)
             os.makedirs(path)
@@ -834,8 +849,6 @@ class MRJobRunner(object):
                 return None, False
 
     def _hadoop_streaming_commands(self, step_num):
-        version = self.get_hadoop_version()
-
         # Hadoop streaming stuff
         mapper, bash_wrap_mapper = self._render_substep(
             step_num, 'mapper')
@@ -929,7 +942,7 @@ class MRJobRunner(object):
             return
 
         path = os.path.join(self._get_local_tmp_dir(), dest)
-        log.info('writing wrapper script to %s' % path)
+        log.debug('Writing wrapper script to %s' % path)
 
         contents = self._setup_wrapper_script_content(setup)
         for line in contents:
@@ -1172,6 +1185,8 @@ class MRJobRunner(object):
                     "%s: %s" % (key, new_key) for key, new_key
                     in sorted(translations.items())]))
 
+    # TODO: this is only used by non-local runners, and could
+    # conceivably be moved to some intermediary class (RealMRJobRunner?)
     def _hadoop_args_for_step(self, step_num):
         """Build a list of extra arguments to the hadoop binary.
 
@@ -1185,10 +1200,8 @@ class MRJobRunner(object):
 
         args = []
 
-        # hadoop_extra_args
-        args.extend(self._opts['hadoop_extra_args'])
-
-        version = self.get_hadoop_version()
+        # hadoop_extra_args isn't defined for sim runners
+        args.extend(self._opts.get('hadoop_extra_args', ()))
 
         # translate the jobconf configuration names to match
         # the hadoop version
@@ -1266,7 +1279,7 @@ class MRJobRunner(object):
         env['TMPDIR'] = self._opts['local_tmp_dir']
         env['TEMP'] = self._opts['local_tmp_dir']
 
-        log.info('writing to %s' % output_path)
+        log.debug('Writing to %s' % output_path)
 
         err_path = os.path.join(self._get_local_tmp_dir(), 'sort-stderr')
 
@@ -1275,7 +1288,7 @@ class MRJobRunner(object):
             with open(output_path, 'wb') as output:
                 with open(err_path, 'wb') as err:
                     args = ['sort'] + list(input_paths)
-                    log.info('> %s' % cmd_line(args))
+                    log.debug('> %s' % cmd_line(args))
                     try:
                         check_call(args, stdout=output, stderr=err, env=env)
                         return
@@ -1285,11 +1298,11 @@ class MRJobRunner(object):
         # Looks like we're using Windows sort
         self._sort_is_windows_sort = True
 
-        log.info('Piping files into sort for Windows compatibility')
+        log.debug('Piping files into sort for Windows compatibility')
         with open(output_path, 'wb') as output:
             with open(err_path, 'wb') as err:
                 args = ['sort']
-                log.info('> %s' % cmd_line(args))
+                log.debug('> %s' % cmd_line(args))
                 proc = Popen(args, stdin=PIPE, stdout=output, stderr=err,
                              env=env)
 

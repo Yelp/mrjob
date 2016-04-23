@@ -11,16 +11,15 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import re
 import collections
 import os
 import tempfile
 import time
 import hashlib
-import httplib
-import httplib2
+import sys
 from datetime import datetime
+from httplib2 import Response
 from io import BytesIO
 
 try:
@@ -49,6 +48,7 @@ from mrjob.fs.gcs import _LS_FIELDS_TO_RETURN
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import patch
 from tests.py2 import mock
+from tests.py2 import skipIf
 from tests.sandbox import SandboxedTestCase
 
 # list_clusters() only returns this many results at a time
@@ -75,9 +75,9 @@ def mock_api(fxn):
     return req_wrapper
 
 def mock_google_error(status):
-    mock_resp = mock.Mock(spec=httplib2.Response)
+    mock_resp = mock.Mock(spec=Response)
     mock_resp.status = status
-    return google_errors.HttpError(mock_resp, '')
+    return google_errors.HttpError(mock_resp, b'')
 
 # Addressable data structure specific
 def _get_deep(data_structure, dot_path_or_list, default_value=None):
@@ -136,7 +136,7 @@ def _set_deep(data_structure, dot_path_or_list, value_to_set):
 
 def _dict_deep_update(d, u):
     """ http://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth """
-    for k, v in u.iteritems():
+    for k, v in u.items():
         if isinstance(v, collections.Mapping):
             r = _dict_deep_update(d.get(k, {}), v)
             d[k] = r
@@ -146,6 +146,12 @@ def _dict_deep_update(d, u):
 
 ### Test Case ###
 
+# disable these tests until we figure out a way to get the google API client
+# to play well with PyPy 3 (which reports itself as Python 3.2, but has key
+# Python 3.3 features)
+@skipIf(
+    hasattr(sys, 'pypy_version_info') and (3, 0) <= sys.version_info < (3, 3),
+    "googleapiclient doesn't work with PyPy 3")
 class MockGoogleAPITestCase(SandboxedTestCase):
 
     @classmethod
@@ -254,7 +260,7 @@ class MockGCSClient(object):
         self.upload_io(bytes_io_obj, gcs_uri)
 
     def put_gcs_multi(self, gcs_uri_to_data_map):
-        for gcs_uri, data in gcs_uri_to_data_map.iteritems():
+        for gcs_uri, data in gcs_uri_to_data_map.items():
             self.put_gcs(gcs_uri, data)
 
     def download_io(self, src_uri, io_obj):
@@ -310,7 +316,7 @@ class MockGCSClientObjects(object):
         object_map = _get_deep(self._objects, [bucket], dict())
 
         item_list = []
-        for object_name, current_object in object_map.iteritems():
+        for object_name, current_object in object_map.items():
             if not object_name.startswith(prefix):
                 continue
 
@@ -351,7 +357,7 @@ class MockGCSClientBuckets(object):
         prefix = kwargs.get('prefix') or ''
 
         item_list = []
-        for bucket_name, current_bucket in self._buckets.iteritems():
+        for bucket_name, current_bucket in self._buckets.items():
             if not bucket_name.startswith(prefix):
                 continue
 
@@ -367,7 +373,7 @@ class MockGCSClientBuckets(object):
         try:
             return self._buckets[bucket]
         except KeyError:
-            raise mock_google_error(httplib.NOT_FOUND)
+            raise mock_google_error(404)
 
     @mock_api
     def delete(self, bucket=None):
@@ -548,7 +554,7 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
 
     worker_conf = {
       "numInstances": num_workers,
-      "instanceNames": ['%s-w-%d' % (cluster, num) for num in xrange(num_workers)],
+      "instanceNames": ['%s-w-%d' % (cluster, num) for num in range(num_workers)],
       "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
       "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type)s" % locals(),
       "diskConfig": {
@@ -639,7 +645,7 @@ class MockDataprocClientClusters(object):
 
         cluster = _get_deep(self._clusters, [projectId, clusterName])
         if not cluster:
-            raise mock_google_error(httplib.NOT_FOUND)
+            raise mock_google_error(404)
 
         # NOTE - Side effect is to advance the state
         if self._client.cluster_get_advances_to_state:
@@ -731,7 +737,7 @@ class MockDataprocClientJobs(object):
 
         job_map = _get_deep(self._jobs, [project_id], dict())
 
-        jobs_sorted_by_time = sorted(job_map.itervalues(), key=lambda j: j['status']['stateStartTime'])
+        jobs_sorted_by_time = sorted(job_map.values(), key=lambda j: j['status']['stateStartTime'])
         for current_job in jobs_sorted_by_time:
             job_cluster = current_job['placement']['clusterName']
             job_state = current_job['status']['state']
@@ -756,7 +762,7 @@ class MockDataprocClientJobs(object):
 
         current_job = _get_deep(self._jobs, [projectId, jobId])
         if not current_job:
-            raise mock_google_error(httplib.NOT_FOUND)
+            raise mock_google_error(404)
 
         # NOTE - Side effect is to advance the state
         if self._client.job_get_advances_to_state:

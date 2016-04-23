@@ -1,4 +1,4 @@
-# Copyright 2015 Yelp and Contributors
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ from boto.emr.emrobject import KeyValue
 from boto.resultset import ResultSet
 
 
-def patched_describe_cluster(emr_conn, *args, **kwargs):
+def _patched_describe_cluster(emr_conn, *args, **kwargs):
     """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
     that adds the ReleaseLabel and Configurations fields.
     """
@@ -33,13 +33,13 @@ def patched_describe_cluster(emr_conn, *args, **kwargs):
     # describe_cluster() references. Not using patch here because it's
     # an external dependency in Python 2
     try:
-        boto.emr.connection.Cluster = PatchedCluster
+        boto.emr.connection.Cluster = _PatchedCluster
         return emr_conn.describe_cluster(*args, **kwargs)
     finally:
         boto.emr.connection.Cluster = Cluster
 
 
-def patched_list_steps(emr_conn, *args, **kwargs):
+def _patched_list_steps(emr_conn, *args, **kwargs):
     """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
     that works around around `boto's startdatetime bug
     <https://github.com/boto/boto/issues/3268>`__.
@@ -53,26 +53,25 @@ def patched_list_steps(emr_conn, *args, **kwargs):
     # StepSummaryList references. Not using patch here because it's
     # an external dependency in Python 2
     try:
-        boto.emr.emrobject.ClusterTimeline = PatchedClusterTimeline
+        boto.emr.emrobject.ClusterTimeline = _PatchedClusterTimeline
         return emr_conn.list_steps(*args, **kwargs)
     finally:
         boto.emr.emrobject.ClusterTimeline = ClusterTimeline
 
 
-def patched_describe_step(emr_conn, *args, **kwargs):
+def _patched_describe_step(emr_conn, *args, **kwargs):
     """Wrapper for :py:meth:`boto.emr.EmrConnection.list_steps()`
     that works around around `boto's startdatetime bug
     <https://github.com/boto/boto/issues/3268>`__."""
-    # see comment in patched_list_steps() for details
+    # see comment in _patched_list_steps() for details
     try:
-        boto.emr.emrobject.ClusterTimeline = PatchedClusterTimeline
+        boto.emr.emrobject.ClusterTimeline = _PatchedClusterTimeline
         return emr_conn.describe_step(*args, **kwargs)
     finally:
         boto.emr.emrobject.ClusterTimeline = ClusterTimeline
 
 
-
-class Configuration(EmrObject):
+class _Configuration(EmrObject):
     """The Configuration class, per
     http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_Cluster.html.
 
@@ -81,21 +80,21 @@ class Configuration(EmrObject):
     Fields = set(['Classification'])
 
     def __init__(self, connection=None):
-        super(Configuration, self).__init__(connection=connection)
+        super(_Configuration, self).__init__(connection=connection)
         self.configurations = None
         self.properties = None
 
     def startElement(self, name, attrs, connection):
         if name == 'Configuration':
             # configurations can contain themselves
-            self.configurations = ResultSet([('member', Configuration)])
+            self.configurations = ResultSet([('member', _Configuration)])
             return self.configurations
         elif name == 'Properties':
             self.properties = ResultSet([('member', KeyValue)])
             return self.properties
 
 
-class PatchedCluster(Cluster):
+class _PatchedCluster(Cluster):
     """Cluster class, plus the ReleaseLabel and Configurations fields."""
 
     # add ReleaseLabel parameter
@@ -103,19 +102,19 @@ class PatchedCluster(Cluster):
 
     # add configurations list
     def __init__(self, connection=None):
-        super(PatchedCluster, self).__init__(connection=connection)
+        super(_PatchedCluster, self).__init__(connection=connection)
         self.configurations = None
 
     def startElement(self, name, attrs, connection):
         if name == 'Configurations':
-            self.configurations = ResultSet([('member', Configuration)])
+            self.configurations = ResultSet([('member', _Configuration)])
             return self.configurations
 
-        return super(PatchedCluster, self).startElement(
+        return super(_PatchedCluster, self).startElement(
             name, attrs, connection)
 
 
-class PatchedClusterTimeline(ClusterTimeline):
+class _PatchedClusterTimeline(ClusterTimeline):
     """ClusterTimeline, plus the StartDateTime field."""
 
     Fields = ClusterTimeline.Fields | set(['StartDateTime'])

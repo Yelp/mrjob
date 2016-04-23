@@ -1,6 +1,6 @@
 # Copyright 2012 Yelp and Contributors
 # Copyright 2013 David Marin and Lyft
-# Copyright 2014-2015 Yelp and Contributors
+# Copyright 2014-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ log = logging.getLogger(__name__)
 _SUPPORTED_TYPES = ('archive', 'file')
 
 
-SETUP_CMD_RE = re.compile(
+_SETUP_CMD_RE = re.compile(
     r"((?P<single_quoted>'[^']*')|"
     r'(?P<double_quoted>"([^"\\]|\\.)*")|'
     r'(?P<hash_path>'
@@ -64,7 +64,7 @@ SETUP_CMD_RE = re.compile(
     r'(?P<error>.+))')
 
 
-ESCAPE_RE = re.compile(
+_ESCAPE_RE = re.compile(
     r'(\\(?P<escaped>.)|(?P<unescaped>[^\\]+)|(?P<error>.+))')
 
 
@@ -114,7 +114,7 @@ def parse_setup_cmd(cmd):
     """
     tokens = []
 
-    for m in SETUP_CMD_RE.finditer(cmd):
+    for m in _SETUP_CMD_RE.finditer(cmd):
         keep_as_is = (m.group('single_quoted') or
                       m.group('double_quoted') or
                       m.group('unquoted') or
@@ -150,7 +150,7 @@ def _resolve_path(path):
     given path, and unescape backslashes."""
     result = ''
 
-    for m in ESCAPE_RE.finditer(path):
+    for m in _ESCAPE_RE.finditer(path):
         if m.group('escaped'):
             result += m.group('escaped')
         elif m.group('unescaped'):

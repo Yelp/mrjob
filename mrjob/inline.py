@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2011 Matthew Tai and Yelp
-# Copyright 2012-2015 Yelp and Contributors
+# Copyright 2012-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ from mrjob.sim import SimRunnerOptionStore
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 
-__author__ = 'Matthew Tai <mtai@adku.com>'
+__author__ = 'Matthew Tai <taim@google.com>'
 
 log = logging.getLogger(__name__)
 
@@ -39,6 +39,10 @@ class InlineMRJobRunner(SimMRJobRunner):
     This is the default way to run jobs (we assume you'll spend some time
     debugging your job before you're ready to run it on EMR or Hadoop).
 
+    Unlike other runners, ``InlineMRJobRunner``\ 's ``run()`` method
+    raises the actual exception that caused a step to fail (rather than
+    :py:class:`~mrjob.step.StepFailedException`).
+
     To more accurately simulate your environment prior to running on
     Hadoop/EMR, use ``-r local`` (see
     :py:class:`~mrjob.local.LocalMRJobRunner`).
@@ -47,16 +51,12 @@ class InlineMRJobRunner(SimMRJobRunner):
 
     OPTION_STORE_CLASS = SimRunnerOptionStore
 
-    # stick to a single split for efficiency
-    _DEFAULT_MAP_TASKS = 1
-    _DEFAULT_REDUCE_TASKS = 1
-
     def __init__(self, mrjob_cls=None, **kwargs):
         """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
         args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
-        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*,
-          and *hadoop_streaming_jar*, and *partitioner* are ignored
+        * *hadoop_input_format*, *hadoop_output_format*, and *partitioner*
+          are ignored
           because they require Java. If you need to test these, consider
           starting up a standalone Hadoop instance and running your job with
           ``-r hadoop``.
@@ -70,7 +70,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         self._mrjob_cls = mrjob_cls
 
     # options that we ignore because they involve running subprocesses
-    IGNORED_LOCAL_OPTS = [
+    _IGNORED_LOCAL_OPTS = [
         'bootstrap_mrjob',
         'python_bin',
         'setup',
@@ -95,11 +95,11 @@ class InlineMRJobRunner(SimMRJobRunner):
         # Inline mode does not use a wrapper script (no subprocesses)
         pass
 
-    def warn_ignored_opts(self):
+    def _warn_ignored_opts(self):
         """ Warn the user of opts being ignored by this runner.
         """
-        super(InlineMRJobRunner, self).warn_ignored_opts()
-        for ignored_opt in self.IGNORED_LOCAL_OPTS:
+        super(InlineMRJobRunner, self)._warn_ignored_opts()
+        for ignored_opt in self._IGNORED_LOCAL_OPTS:
             if ((not self._opts.is_default(ignored_opt)) and
                     self._opts[ignored_opt]):
                 log.warning('ignoring %s option (use -r local instead): %r' %

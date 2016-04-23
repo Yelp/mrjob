@@ -1,5 +1,5 @@
 # -*- encoding: utf-8 -*-
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -426,8 +426,6 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
             '\\.mapRedFinished(PipeMapRed\\.java:586)\n',
             '" .\n',
         ]
-
-        path = '/history/history.jar'
 
         self.assertEqual(
             _parse_pre_yarn_history_log(lines),

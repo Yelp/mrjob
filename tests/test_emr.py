@@ -18,10 +18,8 @@ import getpass
 import os
 import os.path
 import posixpath
-import shutil
-import tempfile
+import sys
 import time
-from contextlib import contextmanager
 from datetime import datetime
 from datetime import timedelta
 from io import BytesIO
@@ -33,24 +31,21 @@ from mrjob.emr import _4_X_INTERMEDIARY_JAR
 from mrjob.emr import _DEFAULT_AMI_VERSION
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
+from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
 from mrjob.emr import _yield_all_steps
-from mrjob.emr import attempt_to_acquire_lock
 from mrjob.emr import filechunkio
-from mrjob.fs.s3 import S3Filesystem
 from mrjob.job import MRJob
-from mrjob.parse import JOB_KEY_RE
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
-from mrjob.ssh import SSH_LOG_ROOT
-from mrjob.ssh import SSH_PREFIX
 from mrjob.step import StepFailedException
+from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
@@ -69,13 +64,13 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import call
-from tests.py2 import mock
 from tests.py2 import patch
 from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import patch_fs_s3
+from tests.test_hadoop import HadoopExtraArgsTestCase
 
 try:
     import boto
@@ -88,7 +83,10 @@ except ImportError:
 
 # used to match command lines
 if PY2:
-    PYTHON_BIN = 'python'
+    if sys.version_info < (2, 7):
+        PYTHON_BIN = 'python2.6'
+    else:
+        PYTHON_BIN = 'python2.7'
 else:
     PYTHON_BIN = 'python3'
 
@@ -150,7 +148,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             self.assertTrue(any(runner.fs.ls(runner.get_output_dir())))
 
             cluster = runner._describe_cluster()
-            name_match = JOB_KEY_RE.match(cluster.name)
+            name_match = _JOB_KEY_RE.match(cluster.name)
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
 
@@ -233,7 +231,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
 
-    def _test_remote_tmp_cleanup(self, mode, tmp_len, log_len):
+    def _test_cloud_tmp_cleanup(self, mode, tmp_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})
         stdin = BytesIO(b'foo\nbar\n')
 
@@ -261,30 +259,30 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         self.assertEqual(len(list(bucket.list())), log_len)
 
     def test_cleanup_all(self):
-        self._test_remote_tmp_cleanup('ALL', 0, 0)
+        self._test_cloud_tmp_cleanup('ALL', 0, 0)
 
     def test_cleanup_tmp(self):
-        self._test_remote_tmp_cleanup('TMP', 0, 1)
+        self._test_cloud_tmp_cleanup('TMP', 0, 1)
 
     def test_cleanup_remote(self):
-        self._test_remote_tmp_cleanup('REMOTE_TMP', 0, 1)
+        self._test_cloud_tmp_cleanup('CLOUD_TMP', 0, 1)
 
     def test_cleanup_local(self):
-        self._test_remote_tmp_cleanup('LOCAL_TMP', 5, 1)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5, 1)
 
     def test_cleanup_logs(self):
-        self._test_remote_tmp_cleanup('LOGS', 5, 0)
+        self._test_cloud_tmp_cleanup('LOGS', 5, 0)
 
     def test_cleanup_none(self):
-        self._test_remote_tmp_cleanup('NONE', 5, 1)
+        self._test_cloud_tmp_cleanup('NONE', 5, 1)
 
     def test_cleanup_combine(self):
-        self._test_remote_tmp_cleanup('LOGS,REMOTE_TMP', 0, 0)
+        self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0, 0)
 
     def test_cleanup_error(self):
-        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
-                          'NONE,LOGS,REMOTE_TMP', 0, 0)
-        self.assertRaises(ValueError, self._test_remote_tmp_cleanup,
+        self.assertRaises(ValueError, self._test_cloud_tmp_cleanup,
+                          'NONE,LOGS,CLOUD_TMP', 0, 0)
+        self.assertRaises(ValueError, self._test_cloud_tmp_cleanup,
                           'GARBAGE', 0, 0)
 
 
@@ -582,6 +580,8 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
     def test_latest_ami_version(self):
         # "latest" is no longer actually the latest version
         with self.make_runner('--ami-version', 'latest') as runner:
+            # we should translate "latest" ourselves (see #1269)
+            self.assertEqual(runner._opts['ami_version'], '2.4.2')
             runner.run()
             self.assertEqual(runner.get_ami_version(), '2.4.2')
             self.assertEqual(runner.get_hadoop_version(), '1.0.3')
@@ -1274,7 +1274,7 @@ class TestNoBoto(TestCase):
         self.assertRaises(ImportError, EMRJobRunner, conf_paths=[])
 
 
-class TestMasterBootstrapScript(MockBotoTestCase):
+class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_usr_bin_env(self):
         runner = EMRJobRunner(conf_paths=[],
@@ -1291,7 +1291,14 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
-    def test_create_master_bootstrap_script(self):
+
+    def _test_create_master_bootstrap_script(
+            self, ami_version=None, expected_python_bin=PYTHON_BIN,
+            expect_pip_binary=None):
+
+        if expect_pip_binary is None:
+            expect_pip_binary = (PYTHON_BIN == 'python2.6')
+
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
         with open(foo_py_path, 'w'):
@@ -1302,8 +1309,9 @@ class TestMasterBootstrapScript(MockBotoTestCase):
 
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
+                              ami_version=ami_version,
                               bootstrap=[
-                                  PYTHON_BIN + ' ' +
+                                  expected_python_bin + ' ' +
                                   foo_py_path + '#bar.py',
                                   's3://walrus/scripts/ohnoes.sh#'],
                               bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
@@ -1349,7 +1357,7 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         # check scripts get run
 
         # bootstrap
-        self.assertIn(PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
+        self.assertIn(expected_python_bin + ' $__mrjob_PWD/bar.py', lines)
         self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
         # bootstrap_cmds
         self.assertIn('echo "Hi!"', lines)
@@ -1358,21 +1366,37 @@ class TestMasterBootstrapScript(MockBotoTestCase):
         # bootstrap_mrjob
         mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_tar_gz_path)
-        self.assertIn("__mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
-                      " distutils.sysconfig import get_python_lib;"
+        self.assertIn("__mrjob_PYTHON_LIB=$(" + expected_python_bin +
+                      " -c 'from distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
         self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
                       ' -C $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
+        self.assertIn('sudo ' + expected_python_bin + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
-        if PY2:
-            self.assertIn('sudo apt-get install -y python-pip || '
-                          'sudo yum install -y python-pip', lines)
+        if expect_pip_binary:
             self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
+        else:
+            self.assertIn(('sudo ' + expected_python_bin +
+                           ' -m pip install $__mrjob_PWD/yelpy.tar.gz'), lines)
         # bootstrap_scripts
         self.assertIn('$__mrjob_PWD/speedups.sh', lines)
         self.assertIn('$__mrjob_PWD/s.sh', lines)
+
+    def test_create_master_bootstrap_script(self):
+        self._test_create_master_bootstrap_script()
+
+    def test_create_master_bootstrap_script_on_2_4_11_ami(self):
+        self._test_create_master_bootstrap_script(
+            ami_version='2.4.11',
+            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
+            expect_pip_binary=False)
+
+    def test_create_master_bootstrap_script_on_2_4_2_ami(self):
+        self._test_create_master_bootstrap_script(
+            ami_version='2.4.2',
+            expected_python_bin=('python2.6' if PY2 else PYTHON_BIN),
+            expect_pip_binary=PY2)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
@@ -2142,6 +2166,34 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         self.assertJoins(cluster_id, ['-r', 'emr', '--pool-clusters'])
 
+    def test_can_join_cluster_with_same_key_pair(self):
+        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+
+        self.assertJoins(
+            cluster_id,
+            ['-r', 'emr', '--ec2-key-pair', 'EMR', '--pool-clusters'])
+
+    def test_cant_join_cluster_with_different_key_pair(self):
+        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--ec2-key-pair', 'EMR2', '--pool-clusters'])
+
+    def test_cant_join_cluster_with_missing_key_pair(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--ec2-key-pair', 'EMR2', '--pool-clusters'])
+
+    def test_ignore_key_pair_if_we_have_none(self):
+        _, cluster_id = self.make_pooled_cluster(ec2_key_pair='EMR')
+
+        self.assertJoins(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters'])
+
 
 class PoolingDisablingTestCase(MockBotoTestCase):
 
@@ -2181,15 +2233,17 @@ class S3LockTestCase(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[])
 
         self.assertEqual(
-            True, attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
+            True,
+            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
 
         self.assertEqual(
-            False, attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
+            False,
+            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
 
     def test_lock_expiration(self):
         runner = EMRJobRunner(conf_paths=[])
 
-        did_lock = attempt_to_acquire_lock(
+        did_lock = _attempt_to_acquire_lock(
             runner.fs, self.expired_lock_uri, 0, 'jf1',
             mins_to_expiration=5)
         self.assertEqual(True, did_lock)
@@ -2330,11 +2384,11 @@ class TestCatFallback(MockBotoTestCase):
         mock_ssh_file('testmaster', 'etc/init.d', b'meow')
 
         ssh_cat_gen = runner.fs.cat(
-            SSH_PREFIX + runner._address + '/etc/init.d')
+            'ssh://' + runner._address + '/etc/init.d')
         self.assertEqual(list(ssh_cat_gen)[0].rstrip(), b'meow')
         self.assertRaises(
             IOError, list,
-            runner.fs.cat(SSH_PREFIX + runner._address + '/does_not_exist'))
+            runner.fs.cat('ssh://' + runner._address + '/does_not_exist'))
 
     def test_ssh_cat_errlog(self):
         # A file *containing* an error message shouldn't cause an error.
@@ -2344,23 +2398,57 @@ class TestCatFallback(MockBotoTestCase):
         error_message = b'cat: logs/err.log: No such file or directory\n'
         mock_ssh_file('testmaster', 'logs/err.log', error_message)
         self.assertEqual(
-            list(runner.fs.cat(SSH_PREFIX + runner._address + '/logs/err.log')),
+            list(runner.fs.cat('ssh://' + runner._address + '/logs/err.log')),
             [error_message])
 
 
-class CleanUpJobTestCase(MockBotoTestCase):
+class CleanupOptionsTestCase(MockBotoTestCase):
 
-    @contextmanager
-    def _test_mode(self, mode):
+    def setUp(self):
+        super(CleanupOptionsTestCase, self).setUp()
+
+        self.start(patch.object(EMRJobRunner, '_cleanup_cloud_tmp'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_cluster'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_hadoop_tmp'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_job'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_local_tmp'))
+        self.start(patch.object(EMRJobRunner, '_cleanup_logs'))
+
+    def test_cleanup_all(self):
         r = EMRJobRunner(conf_paths=[])
-        with patch.multiple(r,
-                            _cleanup_cluster=mock.DEFAULT,
-                            _cleanup_job=mock.DEFAULT,
-                            _cleanup_local_tmp=mock.DEFAULT,
-                            _cleanup_logs=mock.DEFAULT,
-                            _cleanup_remote_tmp=mock.DEFAULT) as mock_dict:
-            r.cleanup(mode=mode)
-            yield mock_dict
+        r.cleanup(mode='ALL')
+
+        self.assertTrue(EMRJobRunner._cleanup_cloud_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_cluster.called)
+        self.assertTrue(EMRJobRunner._cleanup_hadoop_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_job.called)
+        self.assertTrue(EMRJobRunner._cleanup_local_tmp.called)
+        self.assertTrue(EMRJobRunner._cleanup_logs.called)
+
+    def test_cleanup_job(self):
+        r = EMRJobRunner(conf_paths=[])
+        r.cleanup(mode='JOB')
+
+        self.assertFalse(EMRJobRunner._cleanup_cloud_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_cluster.called)
+        self.assertFalse(EMRJobRunner._cleanup_hadoop_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_job.called)  # only on failure
+        self.assertFalse(EMRJobRunner._cleanup_local_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_logs.called)
+
+    def test_cleanup_none(self):
+        r = EMRJobRunner(conf_paths=[])
+        r.cleanup(mode='NONE')
+
+        self.assertFalse(EMRJobRunner._cleanup_cloud_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_cluster.called)
+        self.assertFalse(EMRJobRunner._cleanup_hadoop_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_job.called)  # only on failure
+        self.assertFalse(EMRJobRunner._cleanup_local_tmp.called)
+        self.assertFalse(EMRJobRunner._cleanup_logs.called)
+
+
+class CleanupClusterTestCase(MockBotoTestCase):
 
     def _quick_runner(self):
         r = EMRJobRunner(conf_paths=[], ec2_key_pair_file='fake.pem',
@@ -2370,83 +2458,10 @@ class CleanUpJobTestCase(MockBotoTestCase):
         r._ran_job = False
         return r
 
-    def test_cleanup_all(self):
-        with self._test_mode('ALL') as m:
-            self.assertFalse(m['_cleanup_cluster'].called)
-            self.assertFalse(m['_cleanup_job'].called)
-            self.assertTrue(m['_cleanup_local_tmp'].called)
-            self.assertTrue(m['_cleanup_remote_tmp'].called)
-            self.assertTrue(m['_cleanup_logs'].called)
-
-    def test_cleanup_job(self):
-        with self._test_mode('JOB') as m:
-            self.assertFalse(m['_cleanup_cluster'].called)
-            self.assertFalse(m['_cleanup_local_tmp'].called)
-            self.assertFalse(m['_cleanup_remote_tmp'].called)
-            self.assertFalse(m['_cleanup_logs'].called)
-            self.assertFalse(m['_cleanup_job'].called)  # Only on failure
-
-    def test_cleanup_none(self):
-        with self._test_mode('NONE') as m:
-            self.assertFalse(m['_cleanup_cluster'].called)
-            self.assertFalse(m['_cleanup_local_tmp'].called)
-            self.assertFalse(m['_cleanup_remote_tmp'].called)
-            self.assertFalse(m['_cleanup_logs'].called)
-            self.assertFalse(m['_cleanup_job'].called)
-
-    def test_job_cleanup_mechanics_succeed(self):
-        with no_handlers_for_logger():
-            r = self._quick_runner()
-            with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
-                r._cleanup_job()
-            self.assertTrue(m.called)
-            m.assert_any_call(['ssh'], 'Albuquerque, NM', 'fake.pem')
-
-    def test_job_cleanup_mechanics_ssh_fail(self):
-        def die_ssh(*args, **kwargs):
-            raise IOError
-
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            stderr = StringIO()
-            log_to_stream('mrjob.emr', stderr)
-            with patch.object(mrjob.emr, 'ssh_terminate_single_job',
-                              side_effect=die_ssh):
-                r._cleanup_job()
-                self.assertIn('Unable to kill job', stderr.getvalue())
-
-    def test_job_cleanup_mechanics_not_started(self):
-        r = self._quick_runner()
-        r._cluster_id = None
-        with patch.object(mrjob.emr, 'ssh_terminate_single_job') as p:
-            r._cleanup_job()
-            p.assert_not_called()
-
-    def test_job_cleanup_mechanics_io_fail(self):
-        def die_io(*args, **kwargs):
-            raise IOError
-
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            with patch.object(mrjob.emr, 'ssh_terminate_single_job',
-                              side_effect=die_io):
-                stderr = StringIO()
-                log_to_stream('mrjob.emr', stderr)
-                r._cleanup_job()
-                self.assertIn('Unable to kill job', stderr.getvalue())
-
-    def test_dont_kill_if_successful(self):
-        with no_handlers_for_logger('mrjob.emr'):
-            r = self._quick_runner()
-            with patch.object(mrjob.emr, 'ssh_terminate_single_job') as m:
-                r._ran_job = True
-                r._cleanup_job()
-                m.assert_not_called()
-
     def test_kill_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
-            with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
+            with patch.object(EMRJobRunner, 'make_emr_conn') as m:
                 r._cleanup_cluster()
                 self.assertTrue(m().terminate_jobflow.called)
 
@@ -2472,7 +2487,7 @@ class CleanUpJobTestCase(MockBotoTestCase):
 class JobWaitTestCase(MockBotoTestCase):
 
     # A list of job ids that hold booleans of whether or not the job can
-    # acquire a lock. Helps simulate mrjob.emr.attempt_to_acquire_lock.
+    # acquire a lock. Helps simulate mrjob.emr._attempt_to_acquire_lock.
     JOB_ID_LOCKS = {
         'j-fail-lock': False,
         'j-successful-lock': True,
@@ -2509,7 +2524,7 @@ class JobWaitTestCase(MockBotoTestCase):
                                 side_effect=side_effect_usable_clusters))
         self.start(patch.object(EMRJobRunner, '_lock_uri',
                                 side_effect=side_effect_lock_uri))
-        self.start(patch.object(mrjob.emr, 'attempt_to_acquire_lock',
+        self.start(patch.object(mrjob.emr, '_attempt_to_acquire_lock',
                                 side_effect=side_effect_acquire_lock))
         self.start(patch.object(time, 'sleep',
                                 side_effect=side_effect_time_sleep))
@@ -2526,7 +2541,8 @@ class JobWaitTestCase(MockBotoTestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
-        self.assertEqual(self.sleep_counter, 0)
+        # sleep once after creating temp bucket
+        self.assertEqual(self.sleep_counter, 1)
 
     def test_no_waiting_for_job_pool_success(self):
         self.mock_cluster_ids.append('j-fail-lock')
@@ -2541,7 +2557,7 @@ class JobWaitTestCase(MockBotoTestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, 'j-successful-lock')
-        self.assertEqual(self.sleep_counter, 0)
+        self.assertEqual(self.sleep_counter, 1)
 
     def test_sleep_then_acquire_lock(self):
         self.mock_cluster_ids.append('j-fail-lock')
@@ -2559,7 +2575,7 @@ class JobWaitTestCase(MockBotoTestCase):
         cluster_id = runner._find_cluster()
 
         self.assertEqual(cluster_id, None)
-        self.assertEqual(self.sleep_counter, 2)
+        self.assertEqual(self.sleep_counter, 3)
 
 
 class PoolWaitMinutesOptionTestCase(MockBotoTestCase):
@@ -2704,6 +2720,39 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.assertEqual(ss['step_args'][:2], ['streaming', '-v'])
         self.assertEqual(ss['step_args'][2], '-files')
         self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
+
+
+class DefaultPythonBinTestCase(MockBotoTestCase):
+
+    def test_default_ami(self):
+        # this tests 3.x AMIs
+        runner = EMRJobRunner()
+        self.assertTrue(runner._opts['ami_version'].startswith('3.'))
+        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+
+    def test_4_x_release_label(self):
+        runner = EMRJobRunner(release_label='emr-4.0.0')
+        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+
+    def test_2_4_3_ami(self):
+        runner = EMRJobRunner(ami_version='2.4.3')
+        if PY2:
+            self.assertEqual(runner._default_python_bin(), ['python2.7'])
+        else:
+            self.assertEqual(runner._default_python_bin(), ['python3'])
+
+    def test_2_4_2_ami(self):
+        runner = EMRJobRunner(ami_version='2.4.3')
+        if PY2:
+            self.assertEqual(runner._default_python_bin(), ['python2.7'])
+        else:
+            self.assertEqual(runner._default_python_bin(), ['python3'])
+
+    def test_local_python_bin(self):
+        # just make sure we don't break this
+        runner = EMRJobRunner()
+        self.assertEqual(runner._default_python_bin(local=True),
+                         [sys.executable])
 
 
 class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
@@ -3049,12 +3098,10 @@ class SecurityTokenTestCase(MockBotoTestCase):
 class BootstrapPythonTestCase(MockBotoTestCase):
 
     if PY2:
-        EXPECTED_BOOTSTRAP = [
-            ['sudo apt-get install -y python-pip || '
-             'sudo yum install -y python-pip'],
-             ['sudo pip install --upgrade ujson']]
+        EXPECTED_BOOTSTRAP = []
     else:
-        EXPECTED_BOOTSTRAP = [['sudo yum install -y python34']]
+        EXPECTED_BOOTSTRAP = [
+            ['sudo yum install -y python34 python34-devel python34-pip']]
 
     def test_default(self):
         mr_job = MRTwoStepJob(['-r', 'emr'])
@@ -3082,7 +3129,7 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             self.assertEqual(runner._bootstrap_python(), [])
             self.assertEqual(runner._bootstrap, [])
 
-    def _test_old_ami_version(self, ami_version):
+    def _test_pre_python3_ami_version(self, ami_version):
         mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', ami_version])
 
         with no_handlers_for_logger('mrjob.emr'):
@@ -3100,10 +3147,11 @@ class BootstrapPythonTestCase(MockBotoTestCase):
                     self.assertIn('will probably not work', stderr.getvalue())
 
     def test_ami_version_3_6_0(self):
-        self._test_old_ami_version('3.6.0')
+        self._test_pre_python3_ami_version(ami_version='3.6.0')
 
-    def test_ami_version_latest(self):
-        self._test_old_ami_version('latest')
+    def test_ami_version_2_4_11(self):
+        # this *really, really* probably won't work, but what can we do?
+        self._test_pre_python3_ami_version(ami_version='2.4.11')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])
@@ -3249,14 +3297,14 @@ class WaitForLogsOnS3TestCase(MockBotoTestCase):
 
         self.mock_sleep = self.start(patch('time.sleep'))
 
-    def assert_waits_five_minutes(self):
+    def assert_waits_ten_minutes(self):
         waited = set(self.runner._waited_for_logs_on_s3)
         step_num = len(self.runner._log_interpretations)
 
         self.runner._wait_for_logs_on_s3()
 
         self.assertTrue(self.mock_log.info.called)
-        self.mock_sleep.assert_called_once_with(300)
+        self.mock_sleep.assert_called_once_with(600)
 
         self.assertEqual(
             self.runner._waited_for_logs_on_s3,
@@ -3274,19 +3322,19 @@ class WaitForLogsOnS3TestCase(MockBotoTestCase):
 
     def test_starting(self):
         self.cluster.status.state = 'STARTING'
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
     def test_bootstrapping(self):
         self.cluster.status.state = 'BOOTSTRAPPING'
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
     def test_running(self):
         self.cluster.status.state = 'RUNNING'
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
     def test_waiting(self):
         self.cluster.status.state = 'WAITING'
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
     def test_terminating(self):
         self.cluster.status.state = 'TERMINATING'
@@ -3314,12 +3362,12 @@ class WaitForLogsOnS3TestCase(MockBotoTestCase):
         self.runner._wait_for_logs_on_s3()
 
         self.assertTrue(self.mock_log.info.called)
-        self.mock_sleep.assert_called_once_with(300)
+        self.mock_sleep.assert_called_once_with(600)
 
         # still shouldn't make user ctrl-c again
         self.assertEqual(self.runner._waited_for_logs_on_s3, set([0]))
 
-    def test_already_waited_five_minutes(self):
+    def test_already_waited_ten_minutes(self):
         self.runner._waited_for_logs_on_s3.add(0)
         self.assert_silently_exits()
 
@@ -3327,7 +3375,7 @@ class WaitForLogsOnS3TestCase(MockBotoTestCase):
         self.runner._waited_for_logs_on_s3.add(0)
         self.runner._log_interpretations.append({})
 
-        self.assert_waits_five_minutes()
+        self.assert_waits_ten_minutes()
 
 
 class StreamLogDirsTestCase(MockBotoTestCase):
@@ -3340,6 +3388,10 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self._address_of_master = self.start(patch(
             'mrjob.emr.EMRJobRunner._address_of_master',
             return_value='master'))
+
+        self.get_ami_version = self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_ami_version',
+            return_value=_DEFAULT_AMI_VERSION))
 
         self.get_hadoop_version = self.start(patch(
             'mrjob.emr.EMRJobRunner.get_hadoop_version',
@@ -3357,15 +3409,13 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner'
             '._wait_for_logs_on_s3'))
 
-    def test_cant_stream_history_log_dirs_in_yarn(self):
-        runner = EMRJobRunner()
-
-        self.assertEqual(runner._stream_history_log_dirs(), [])
-
-    def _test_stream_history_log_dirs(self, ssh):
+    def _test_stream_history_log_dirs(
+            self, ssh, ami_version=_DEFAULT_AMI_VERSION,
+            expected_dir_name='hadoop/history',
+            expected_s3_dir_name='jobs'):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
-        self.get_hadoop_version.return_value = '1.0.3'
+        self.get_ami_version.return_value = ami_version
 
         results = runner._stream_history_log_dirs()
 
@@ -3373,32 +3423,51 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             self.log.info.reset_mock()
 
             self.assertEqual(next(results), [
-                'ssh://master/mnt/var/log/hadoop/history',
+                'ssh://master/mnt/var/log/' + expected_dir_name,
             ])
             self.assertFalse(
                 self._wait_for_logs_on_s3.called)
             self.log.info.assert_called_once_with(
-                'Looking for history log in /mnt/var/log/hadoop/history'
-                ' on master...')
+                'Looking for history log in /mnt/var/log/' +
+                expected_dir_name + ' on master...')
 
         self.log.info.reset_mock()
 
         self.assertEqual(next(results), [
-            's3://bucket/logs/j-CLUSTERID/jobs',
+            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
         ])
         self.assertTrue(
             self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
             'Looking for history log in'
-            ' s3://bucket/logs/j-CLUSTERID/jobs...')
+            ' s3://bucket/logs/j-CLUSTERID/' +
+            expected_s3_dir_name + '...')
 
         self.assertRaises(StopIteration, next, results)
 
-    def test_stream_history_log_dirs_with_ssh(self):
-        self._test_stream_history_log_dirs(ssh=True)
+    def test_stream_history_log_dirs_from_2_x_amis_with_ssh(self):
+        self._test_stream_history_log_dirs(
+            ami_version='2.4.11', ssh=True)
 
-    def test_stream_history_log_dirs_without_ssh(self):
-        self._test_stream_history_log_dirs(ssh=False)
+    def test_stream_history_log_dirs_from_2_x_amis_without_ssh(self):
+        self._test_stream_history_log_dirs(
+            ami_version='2.4.11', ssh=False)
+
+    def test_cant_stream_history_log_dirs_from_3_x_amis(self):
+        runner = EMRJobRunner()
+        results = runner._stream_history_log_dirs()
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_history_log_dirs_from_4_x_amis(self):
+        # history log fetching is disabled until we fix
+        # #1244 and #1253
+        runner = EMRJobRunner(ami_version='4.3.0')
+        results = runner._stream_history_log_dirs()
+        self.assertRaises(StopIteration, next, results)
+        #self._test_stream_history_log_dirs(
+        #    ssh=True, ami_version='4.3.0',
+        #    expected_dir_name='hadoop-mapreduce/history',
+        #    expected_s3_dir_name='hadoop-mapreduce/history')
 
     def _test_stream_step_log_dirs(self, ssh):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
@@ -3438,37 +3507,48 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def test_stream_step_log_dirs_without_ssh(self):
         self._test_stream_step_log_dirs(ssh=False)
 
-    def _test_stream_task_log_dirs(self, ssh, bad_ssh_slave_hosts=False):
+    def _test_stream_task_log_dirs(
+            self, ssh, bad_ssh_slave_hosts=False, application_id=None,
+            ami_version=_DEFAULT_AMI_VERSION,
+            expected_local_path='/mnt/var/log/hadoop/userlogs',
+            expected_dir_name='hadoop/userlogs',
+            expected_s3_dir_name='task-attempts'
+        ):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
         self.get_hadoop_version.return_value = '1.0.3'
+        self.get_ami_version.return_value = ami_version
 
         if bad_ssh_slave_hosts:
             self.ssh_slave_hosts.side_effect=IOError
 
-        results = runner._stream_task_log_dirs()
+        results = runner._stream_task_log_dirs(application_id=application_id)
 
         if ssh:
             self.log.reset_mock()
 
+            local_path = '/mnt/var/log/hadoop/userlogs'
+            if application_id:
+                local_path = posixpath.join(local_path, application_id)
+
             if bad_ssh_slave_hosts:
                 self.assertEqual(next(results), [
-                    'ssh://master/mnt/var/log/hadoop/userlogs',
+                    'ssh://master/mnt/var/log/' + expected_dir_name,
                 ])
                 self.assertTrue(self.log.warning.called)
                 self.log.info.assert_called_once_with(
-                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
-                    ' on master...')
+                    'Looking for task logs in /mnt/var/log/' +
+                    expected_dir_name + ' on master...')
             else:
                 self.assertEqual(next(results), [
-                    'ssh://master/mnt/var/log/hadoop/userlogs',
-                    'ssh://master!slave1/mnt/var/log/hadoop/userlogs',
-                    'ssh://master!slave2/mnt/var/log/hadoop/userlogs',
+                    'ssh://master/mnt/var/log/' + expected_dir_name,
+                    'ssh://master!slave1/mnt/var/log/' + expected_dir_name,
+                    'ssh://master!slave2/mnt/var/log/' + expected_dir_name,
                 ])
                 self.assertFalse(self.log.warning.called)
                 self.log.info.assert_called_once_with(
-                    'Looking for task logs in /mnt/var/log/hadoop/userlogs'
-                    ' on master and task/core nodes...')
+                    'Looking for task logs in /mnt/var/log/' +
+                    expected_dir_name + ' on master and task/core nodes...')
 
             self.assertFalse(
                 self._wait_for_logs_on_s3.called)
@@ -3476,13 +3556,14 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self.log.reset_mock()
 
         self.assertEqual(next(results), [
-            's3://bucket/logs/j-CLUSTERID/task-attempts',
+            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
         ])
         self.assertTrue(
             self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
             'Looking for task logs in'
-            ' s3://bucket/logs/j-CLUSTERID/task-attempts...')
+            ' s3://bucket/logs/j-CLUSTERID/' +
+            expected_s3_dir_name + '...')
 
         self.assertRaises(StopIteration, next, results)
 
@@ -3494,6 +3575,20 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def test_stream_task_log_dirs_without_ssh(self):
         self._test_stream_task_log_dirs(ssh=False)
+
+    def test_stream_task_log_dirs_with_application_id(self):
+        self._test_stream_task_log_dirs(
+            ssh=True, application_id='application_1',
+            expected_dir_name='hadoop/userlogs/application_1',
+            expected_s3_dir_name='task-attempts/application_1')
+
+    def test_stream_task_log_dirs_from_4_x_amis(self):
+        self._test_stream_task_log_dirs(
+            ssh=True, application_id='application_1',
+            ami_version='4.3.0',
+            expected_dir_name='hadoop-yarn/containers/application_1',
+            expected_s3_dir_name='containers/application_1')
+
 
 
 class LsStepLogsTestCase(MockBotoTestCase):
@@ -3582,3 +3677,9 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._ls_step_logs.called)
         self.assertFalse(self._interpret_emr_step_logs.called)
+
+
+# this basically just checks that hadoop_extra_args is an option
+# for the EMR runner
+class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
+    pass

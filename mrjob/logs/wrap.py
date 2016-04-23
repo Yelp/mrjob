@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015 Yelp and Contributors
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -57,8 +57,9 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
     # wrapper for fs.ls() that turns IOErrors into warnings
     def _fs_ls(path):
         try:
-            for path in fs.ls(log_dir):
-                yield path
+            if fs.exists(log_dir):
+                for path in fs.ls(log_dir):
+                    yield path
         except IOError as e:
             log.warning("couldn't ls() %s: %r" % (log_dir, e))
 

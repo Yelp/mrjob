@@ -1,6 +1,6 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin and Steve Johnson
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,16 +47,16 @@ from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import add_basic_opts
-from mrjob.options import add_emr_connect_opts
-from mrjob.options import alphabetize_options
+from mrjob.options import _add_basic_opts
+from mrjob.options import _add_emr_connect_opts
+from mrjob.options import _alphabetize_options
 
 log = logging.getLogger(__name__)
 
 
 def main(cl_args=None):
     # parser command-line args
-    option_parser = make_option_parser()
+    option_parser = _make_option_parser()
     options, args = option_parser.parse_args(cl_args)
 
     if len(args) != 1:
@@ -66,13 +66,13 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
-    runner = EMRJobRunner(**runner_kwargs(options))
+    runner = EMRJobRunner(**_runner_kwargs(options))
     log.debug('Terminating cluster %s' % cluster_id)
     runner.make_emr_conn().terminate_jobflow(cluster_id)
     log.info('Terminated cluster %s' % cluster_id)
 
 
-def make_option_parser():
+def _make_option_parser():
     usage = '%prog [options] cluster-id'
     description = 'Terminate an existing EMR cluster.'
 
@@ -83,14 +83,14 @@ def make_option_parser():
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
-    add_basic_opts(option_parser)
-    add_emr_connect_opts(option_parser)
-    alphabetize_options(option_parser)
+    _add_basic_opts(option_parser)
+    _add_emr_connect_opts(option_parser)
+    _alphabetize_options(option_parser)
 
     return option_parser
 
 
-def runner_kwargs(options):
+def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'test'):
         del kwargs[unused_arg]

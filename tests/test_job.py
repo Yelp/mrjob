@@ -1,6 +1,6 @@
 # -*- encoding: utf-8 -*-
 # Copyright 2009-2013 Yelp and Contributors
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
-from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol

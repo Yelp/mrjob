@@ -22,14 +22,14 @@ from datetime import timedelta
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
-from mrjob.tools.emr.terminate_idle_clusters import maybe_terminate_clusters
-from mrjob.tools.emr.terminate_idle_clusters import is_cluster_bootstrapping
-from mrjob.tools.emr.terminate_idle_clusters import is_cluster_done
-from mrjob.tools.emr.terminate_idle_clusters import is_cluster_running
-from mrjob.tools.emr.terminate_idle_clusters import is_cluster_starting
-from mrjob.tools.emr.terminate_idle_clusters import is_cluster_non_streaming
-from mrjob.tools.emr.terminate_idle_clusters import cluster_has_pending_steps
-from mrjob.tools.emr.terminate_idle_clusters import time_last_active
+from mrjob.tools.emr.terminate_idle_clusters import _maybe_terminate_clusters
+from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_bootstrapping
+from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_done
+from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_running
+from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_starting
+from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_non_streaming
+from mrjob.tools.emr.terminate_idle_clusters import _cluster_has_pending_steps
+from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 
 from tests.mockboto import MockBotoTestCase
 from tests.mockboto import MockEmrObject
@@ -365,18 +365,18 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         real_stdout = sys.stdout
         sys.stdout = stdout or StringIO()
         try:
-            return maybe_terminate_clusters(**kwargs)
+            return _maybe_terminate_clusters(**kwargs)
         finally:
             sys.stdout = real_stdout
 
     def time_mock_cluster_idle(self, mock_cluster):
-        if (is_cluster_starting(mock_cluster) or
-            is_cluster_bootstrapping(mock_cluster) or
-            is_cluster_running(mock_cluster._steps) or
-            is_cluster_done(mock_cluster)):
+        if (_is_cluster_starting(mock_cluster) or
+            _is_cluster_bootstrapping(mock_cluster) or
+            _is_cluster_running(mock_cluster._steps) or
+            _is_cluster_done(mock_cluster)):
             return timedelta(0)
         else:
-            return self.now - time_last_active(
+            return self.now - _time_last_active(
                 mock_cluster, mock_cluster._steps)
 
     def assert_mock_cluster_is(
@@ -393,23 +393,23 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         non_streaming=False):
 
         self.assertEqual(starting,
-                         is_cluster_starting(mock_cluster))
+                         _is_cluster_starting(mock_cluster))
         self.assertEqual(bootstrapping,
-                         is_cluster_bootstrapping(mock_cluster))
+                         _is_cluster_bootstrapping(mock_cluster))
         self.assertEqual(done,
-                         is_cluster_done(mock_cluster))
+                         _is_cluster_done(mock_cluster))
         self.assertEqual(from_end_of_hour,
                          _est_time_to_hour(mock_cluster, self.now))
         self.assertEqual(has_pending_steps,
-                         cluster_has_pending_steps(mock_cluster._steps))
+                         _cluster_has_pending_steps(mock_cluster._steps))
         self.assertEqual(idle_for,
                          self.time_mock_cluster_idle(mock_cluster))
         self.assertEqual((pool_hash, pool_name),
                          _pool_hash_and_name(mock_cluster._bootstrapactions))
         self.assertEqual(running,
-                         is_cluster_running(mock_cluster._steps))
+                         _is_cluster_running(mock_cluster._steps))
         self.assertEqual(non_streaming,
-                         is_cluster_non_streaming(mock_cluster._steps))
+                         _is_cluster_non_streaming(mock_cluster._steps))
 
     def _lock_contents(self, mock_cluster, steps_ahead=0):
         conn = self.connect_s3()

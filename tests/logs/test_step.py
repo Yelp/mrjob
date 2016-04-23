@@ -1,4 +1,4 @@
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +17,6 @@ from mrjob.logs.step import _interpret_emr_step_logs
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _ls_emr_step_logs
 from mrjob.logs.step import _match_emr_step_log_path
-from mrjob.logs.step import _parse_hadoop_log4j_records
 from mrjob.logs.step import _parse_indented_counters
 from mrjob.logs.step import _parse_step_log
 from mrjob.py2 import StringIO
@@ -212,7 +211,6 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
             dict(job_id='job_1449857544442_0002'))
 
     def test_record_callback(self):
-        lines_seen = []
         records = []
 
         def record_callback(record):

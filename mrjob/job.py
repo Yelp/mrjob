@@ -1,4 +1,4 @@
-# Copyright 2009-2014 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,17 +21,14 @@ import itertools
 import json
 import logging
 import sys
-from io import BytesIO
 from optparse import OptionGroup
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
-from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.py2 import integer_types
@@ -861,7 +858,7 @@ class MRJob(MRJobLauncher):
         """
         if not isinstance(self.INPUT_PROTOCOL, type):
             log.warning('INPUT_PROTOCOL should be a class, not %s' %
-                     self.INPUT_PROTOCOL)
+                        self.INPUT_PROTOCOL)
         return self.INPUT_PROTOCOL()
 
     def internal_protocol(self):
@@ -871,7 +868,7 @@ class MRJob(MRJobLauncher):
         """
         if not isinstance(self.INTERNAL_PROTOCOL, type):
             log.warning('INTERNAL_PROTOCOL should be a class, not %s' %
-                     self.INTERNAL_PROTOCOL)
+                        self.INTERNAL_PROTOCOL)
         return self.INTERNAL_PROTOCOL()
 
     def output_protocol(self):
@@ -881,7 +878,7 @@ class MRJob(MRJobLauncher):
         """
         if not isinstance(self.OUTPUT_PROTOCOL, type):
             log.warning('OUTPUT_PROTOCOL should be a class, not %s' %
-                     self.OUTPUT_PROTOCOL)
+                        self.OUTPUT_PROTOCOL)
         return self.OUTPUT_PROTOCOL()
 
     #: Protocol for reading input to the first mapper in your job.
@@ -1080,7 +1077,7 @@ class MRJob(MRJobLauncher):
             elif (key == 'hadoop_version' and
                     isinstance(unfiltered_val, float)):
                 log.warning('hadoop_version should be a string, not %s' %
-                         unfiltered_val)
+                            unfiltered_val)
                 filtered_val = format_hadoop_version(unfiltered_val)
             filtered_jobconf[key] = filtered_val
 

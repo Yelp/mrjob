@@ -17,7 +17,6 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 import contextlib
 import glob
-import hashlib
 import itertools
 import logging
 import os

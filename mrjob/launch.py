@@ -1,6 +1,6 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 David Marin
-# Copyright 2014-2015 Yelp and Contributors
+# Copyright 2014-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,22 +25,19 @@ from optparse import OptionGroup
 from optparse import OptionParser
 
 from mrjob.conf import combine_dicts
-from mrjob.options import add_basic_opts
-from mrjob.options import add_dataproc_emr_opts
-from mrjob.options import add_dataproc_opts
-from mrjob.options import add_emr_opts
-from mrjob.options import add_hadoop_emr_opts
-from mrjob.options import add_hadoop_opts
-from mrjob.options import add_local_opts
-from mrjob.options import add_protocol_opts
-from mrjob.options import add_runner_opts
-from mrjob.options import alphabetize_options
-from mrjob.options import fix_custom_options
-from mrjob.options import print_help_for_groups
-from mrjob.parse import parse_key_value_list
-from mrjob.parse import parse_port_range_list
+from mrjob.options import _add_basic_opts
+from mrjob.options import _add_dataproc_emr_opts
+from mrjob.options import _add_dataproc_opts
+from mrjob.options import _add_emr_opts
+from mrjob.options import _add_hadoop_emr_opts
+from mrjob.options import _add_hadoop_opts
+from mrjob.options import _add_local_opts
+from mrjob.options import _add_protocol_opts
+from mrjob.options import _add_runner_opts
+from mrjob.options import _alphabetize_options
+from mrjob.options import _fix_custom_options
+from mrjob.options import _print_help_for_groups
 from mrjob.py2 import PY2
-from mrjob.runner import CLEANUP_CHOICES
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
@@ -100,7 +97,7 @@ class MRJobLauncher(object):
         self.configure_options()
 
         for opt_group in self.all_option_groups():
-            alphabetize_options(opt_group)
+            _alphabetize_options(opt_group)
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script
@@ -290,15 +287,15 @@ class MRJobLauncher(object):
             self.option_parser, 'Protocols')
         self.option_parser.add_option_group(self.proto_opt_group)
 
-        add_protocol_opts(self.proto_opt_group)
+        _add_protocol_opts(self.proto_opt_group)
 
         # options for running the entire job
         self.runner_opt_group = OptionGroup(
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
-        add_basic_opts(self.runner_opt_group)
+        _add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
+        _add_basic_opts(self.runner_opt_group)
 
         # options for inline/local runners
         self.local_opt_group = OptionGroup(
@@ -306,7 +303,7 @@ class MRJobLauncher(object):
             'Running locally (these apply when you set -r inline or -r local)')
         self.option_parser.add_option_group(self.local_opt_group)
 
-        add_local_opts(self.local_opt_group)
+        _add_local_opts(self.local_opt_group)
 
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
@@ -315,7 +312,7 @@ class MRJobLauncher(object):
             ' -r emr)')
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
 
-        add_hadoop_emr_opts(self.hadoop_emr_opt_group)
+        _add_hadoop_emr_opts(self.hadoop_emr_opt_group)
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
@@ -323,7 +320,7 @@ class MRJobLauncher(object):
             'Running on Hadoop (these apply when you set -r hadoop)')
         self.option_parser.add_option_group(self.hadoop_opt_group)
 
-        add_hadoop_opts(self.hadoop_opt_group)
+        _add_hadoop_opts(self.hadoop_opt_group)
 
         # options for running the job on Dataproc or EMR
         self.dataproc_emr_opt_group = OptionGroup(
@@ -332,7 +329,7 @@ class MRJobLauncher(object):
             ' -r emr)')
         self.option_parser.add_option_group(self.dataproc_emr_opt_group)
 
-        add_dataproc_emr_opts(self.dataproc_emr_opt_group)
+        _add_dataproc_emr_opts(self.dataproc_emr_opt_group)
 
         # options for running the job on Dataproc
         self.dataproc_opt_group = OptionGroup(
@@ -340,7 +337,7 @@ class MRJobLauncher(object):
             'Running on Dataproc (these apply when you set -r dataproc)')
         self.option_parser.add_option_group(self.dataproc_opt_group)
 
-        add_dataproc_opts(self.dataproc_opt_group)
+        _add_dataproc_opts(self.dataproc_opt_group)
 
 
         # options for running the job on EMR
@@ -349,7 +346,7 @@ class MRJobLauncher(object):
             'Running on EMR (these apply when you set -r emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
 
-        add_emr_opts(self.emr_opt_group)
+        _add_emr_opts(self.emr_opt_group)
 
 
     def all_option_groups(self):
@@ -468,31 +465,32 @@ class MRJobLauncher(object):
             self._help_main()
 
         if self.options.help_dataproc:
-            print_help_for_groups(self.dataproc_emr_opt_group,
+            _print_help_for_groups(self.dataproc_emr_opt_group,
                                   self.dataproc_opt_group)
             sys.exit(0)
 
         if self.options.help_emr:
-            print_help_for_groups(self.dataproc_emr_opt_group,
+            _print_help_for_groups(self.dataproc_emr_opt_group,
                                   self.hadoop_emr_opt_group,
                                   self.emr_opt_group)
             sys.exit(0)
 
         if self.options.help_hadoop:
-            print_help_for_groups(self.hadoop_emr_opt_group)
+            _print_help_for_groups(self.hadoop_emr_opt_group,
+                                   self.hadoop_opt_group)
             sys.exit(0)
 
         if self.options.help_local:
-            print_help_for_groups(self.local_opt_group)
+            _print_help_for_groups(self.local_opt_group)
             sys.exit(0)
 
         if self.options.help_runner:
-            print_help_for_groups(self.runner_opt_group)
+            _print_help_for_groups(self.runner_opt_group)
             sys.exit(0)
 
         self._process_args(args)
 
-        fix_custom_options(self.options, self.option_parser)
+        _fix_custom_options(self.options, self.option_parser)
 
     def job_runner_kwargs(self):
         """Keyword arguments used to create runners when
@@ -514,10 +512,8 @@ class MRJobLauncher(object):
             'conf_paths': self.options.conf_paths,
             'extra_args': self.generate_passthrough_arguments(),
             'file_upload_args': self.generate_file_upload_args(),
-            'hadoop_extra_args': self.options.hadoop_extra_args,
             'hadoop_input_format': self.hadoop_input_format(),
             'hadoop_output_format': self.hadoop_output_format(),
-            'hadoop_streaming_jar': self.options.hadoop_streaming_jar,
             'input_paths': self.args,
             'interpreter': self.options.interpreter,
             'jobconf': self.jobconf(),
@@ -577,7 +573,8 @@ class MRJobLauncher(object):
         return combine_dicts(
             self.job_runner_kwargs(),
             self._get_kwargs_from_opt_group(self.dataproc_emr_opt_group),
-            self._get_kwargs_from_opt_group(self.emr_opt_group))
+            self._get_kwargs_from_opt_group(self.emr_opt_group),
+            self._get_kwargs_from_opt_group(self.hadoop_emr_opt_group))
 
     def dataproc_job_runner_kwargs(self):
         """Keyword arguments to create create runners when

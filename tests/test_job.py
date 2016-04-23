@@ -328,7 +328,9 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                               b'set()\n' +
                               b"'bar'\n")
 
-    STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
+    STRICT_MRJOB_CONF = {'runners': {'inline': {'strict_protocols': True}}}
+
+    LOOSE_MRJOB_CONF = {'runners': {'inline': {'strict_protocols': False}}}
 
     def assertJobHandlesUndecodableInput(self, job_args):
         job = self.MRBoringJSONJob(job_args)
@@ -412,6 +414,12 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
         with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
             self.assertJobHandlesUnencodableOutput(
                 job_args=['--no-strict-protocols'])
+
+    def test_loose_protocols_in_conf(self):
+        # regression test for #1302; config file was being overriden
+        # by option default of True
+        with mrjob_conf_patcher(self.LOOSE_MRJOB_CONF):
+            self.assertJobHandlesUndecodableInput([])
 
 
 class PickProtocolsTestCase(TestCase):

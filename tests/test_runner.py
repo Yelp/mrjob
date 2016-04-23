@@ -27,6 +27,7 @@ from subprocess import CalledProcessError
 
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.inline import InlineMRJobRunner
+from mrjob.job import MRJob
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
@@ -43,6 +44,7 @@ from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import mrjob_conf_patcher
 
 
 class WithStatementTestCase(TestCase):
@@ -529,6 +531,35 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-partitioner', partitioner])
 
+
+class StrictProtocolsInConfTestCase(TestCase):
+    # regression tests for #1302, where command-line option's default
+    # overrode configs
+
+    STRICT_MRJOB_CONF = {'runners': {'inline': {'strict_protocols': True}}}
+
+    LOOSE_MRJOB_CONF = {'runners': {'inline': {'strict_protocols': False}}}
+
+    def test_default(self):
+        job = MRJob()
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['strict_protocols'], True)
+
+    def test_strict_mrjob_conf(self):
+        job = MRJob()
+        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
+            with job.make_runner() as runner:
+                self.assertEqual(runner._opts['strict_protocols'], True)
+
+    def test_loose_mrjob_conf(self):
+        job = MRJob()
+        with mrjob_conf_patcher(self.LOOSE_MRJOB_CONF):
+            with job.make_runner() as runner:
+                self.assertEqual(runner._opts['strict_protocols'], False)
+
+
+class CheckInputPathsTestCase(TestCase):
+
     def test_check_input_paths_enabled_by_default(self):
         job = MRWordCount()
         with job.make_runner() as runner:
@@ -538,6 +569,13 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
         job = MRWordCount(['--no-check-input-paths'])
         with job.make_runner() as runner:
             self.assertFalse(runner._opts['check_input_paths'])
+
+    def test_can_disable_check_input_paths_in_config(self):
+        job = MRWordCount()
+        with mrjob_conf_patcher(
+                {'runners': {'inline': {'check_input_paths': False}}}):
+            with job.make_runner() as runner:
+                self.assertFalse(runner._opts['check_input_paths'])
 
 
 class SetupTestCase(SandboxedTestCase):

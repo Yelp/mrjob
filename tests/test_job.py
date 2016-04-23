@@ -400,33 +400,6 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             ['--no-strict-protocols'])
 
 
-class StrictProtocolsInConfTestCase(TestCase):
-    # regression tests for #1302, where command-line option's default
-    # overrode configs
-
-    STRICT_MRJOB_CONF = {'runners': {'inline': {'strict_protocols': True}}}
-
-    LOOSE_MRJOB_CONF = {'runners': {'inline': {'strict_protocols': False}}}
-
-    def test_default(self):
-        job = MRJob()
-        with job.make_runner() as runner:
-            self.assertEqual(runner._opts['strict_protocols'], True)
-
-    def test_strict_mrjob_conf(self):
-        job = MRJob()
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            with job.make_runner() as runner:
-                self.assertEqual(runner._opts['strict_protocols'], True)
-
-    def test_loose_mrjob_conf(self):
-        job = MRJob()
-        with mrjob_conf_patcher(self.LOOSE_MRJOB_CONF):
-            with job.make_runner() as runner:
-                self.assertEqual(runner._opts['strict_protocols'], False)
-
-
-
 class PickProtocolsTestCase(TestCase):
 
     def _yield_none(self, *args, **kwargs):

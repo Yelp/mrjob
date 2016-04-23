@@ -44,11 +44,11 @@ def _add_protocol_opts(opt_group):
     """
     return [
         opt_group.add_option(
-            '--strict-protocols', dest='strict_protocols', default=True,
+            '--strict-protocols', dest='strict_protocols', default=None,
             action='store_true', help='If something violates an input/output '
             'protocol then raise an exception (the default)'),
         opt_group.add_option(
-            '--no-strict-protocols', dest='strict_protocols', default=True,
+            '--no-strict-protocols', dest='strict_protocols', default=None,
             action='store_false', help='If something violates an input/output '
             'protocol then increment a counter and continue'),
     ]
@@ -244,12 +244,12 @@ def _add_hadoop_emr_opts(opt_group):
 
         opt_group.add_option(
             '--check-input-paths', dest='check_input_paths',
-            default=True, action='store_true',
+            default=None, action='store_true',
             help='Check input paths exist before running (the default)'),
 
         opt_group.add_option(
             '--no-check-input-paths', dest='check_input_paths',
-            default=True, action='store_false',
+            default=None, action='store_false',
             help='Skip the checks to ensure all input paths exist'),
     ]
 

@@ -328,9 +328,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                               b'set()\n' +
                               b"'bar'\n")
 
-    STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
-
-    def assertJobHandlesUndecodableInput(self, job_args):
+    def assertJobHandlesUndecodableInput(self, job_args=()):
         job = self.MRBoringJSONJob(job_args)
         job.sandbox(stdin=BytesIO(self.BAD_JSON_INPUT))
 
@@ -347,14 +345,14 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(
                 sum(counters['Undecodable input'].values()), 3)
 
-    def assertJobRaisesExceptionOnUndecodableInput(self, job_args):
+    def assertJobRaisesExceptionOnUndecodableInput(self, job_args=()):
         job = self.MRBoringJSONJob(job_args)
         job.sandbox(stdin=BytesIO(self.BAD_JSON_INPUT))
 
         with job.make_runner() as r:
             self.assertRaises(Exception, r.run)
 
-    def assertJobHandlesUnencodableOutput(self, job_args):
+    def assertJobHandlesUnencodableOutput(self, job_args=()):
         job = self.MRBoringReprAndJSONJob(job_args)
         job.sandbox(stdin=BytesIO(self.UNENCODABLE_REPR_INPUT))
 
@@ -372,7 +370,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(list(counters), ['Unencodable output'])
             self.assertEqual(list(counters['Unencodable output'].values()), [1])
 
-    def assertJobRaisesExceptionOnUnencodableOutput(self, job_args):
+    def assertJobRaisesExceptionOnUnencodableOutput(self, job_args=()):
         job = self.MRBoringReprAndJSONJob(job_args)
         job.sandbox(stdin=BytesIO(self.UNENCODABLE_REPR_INPUT))
 
@@ -380,38 +378,26 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertRaises(Exception, r.run)
 
     def test_undecodable_input(self):
-        self.assertJobRaisesExceptionOnUndecodableInput(job_args=[])
+        self.assertJobRaisesExceptionOnUndecodableInput()
 
-    def test_undecodable_input_strict(self):
+    def test_undecodable_input_strict_protocols(self):
         self.assertJobRaisesExceptionOnUndecodableInput(
-            job_args=['--strict-protocols'])
-
-    def test_undecodable_input_strict_in_mrjob_conf(self):
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            self.assertJobRaisesExceptionOnUndecodableInput(
-                job_args=['--strict-protocols'])
+            ['--strict-protocols'])
 
     def test_undecodable_input_no_strict_protocols(self):
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            self.assertJobHandlesUndecodableInput(
-                job_args=['--no-strict-protocols'])
+        self.assertJobHandlesUndecodableInput(
+            ['--no-strict-protocols'])
 
     def test_unencodable_output(self):
-        self.assertJobRaisesExceptionOnUnencodableOutput(job_args=[])
+        self.assertJobRaisesExceptionOnUnencodableOutput()
 
     def test_unencodable_output_strict(self):
         self.assertJobRaisesExceptionOnUnencodableOutput(
-            job_args=['--strict-protocols'])
-
-    def test_unencodable_output_strict_in_mrjob_conf(self):
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            self.assertJobRaisesExceptionOnUnencodableOutput(
-                job_args=['--strict-protocols'])
+            ['--strict-protocols'])
 
     def test_unencodable_output_no_strict_protocols(self):
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            self.assertJobHandlesUnencodableOutput(
-                job_args=['--no-strict-protocols'])
+        self.assertJobHandlesUnencodableOutput(
+            ['--no-strict-protocols'])
 
 
 class PickProtocolsTestCase(TestCase):

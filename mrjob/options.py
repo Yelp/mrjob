@@ -44,11 +44,11 @@ def _add_protocol_opts(opt_group):
     """
     return [
         opt_group.add_option(
-            '--strict-protocols', dest='strict_protocols', default=True,
+            '--strict-protocols', dest='strict_protocols', default=None,
             action='store_true', help='If something violates an input/output '
             'protocol then raise an exception (the default)'),
         opt_group.add_option(
-            '--no-strict-protocols', dest='strict_protocols', default=True,
+            '--no-strict-protocols', dest='strict_protocols', default=None,
             action='store_false', help='If something violates an input/output '
             'protocol then increment a counter and continue'),
     ]

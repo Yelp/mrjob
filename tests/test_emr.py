@@ -72,7 +72,6 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import patch_fs_s3
 from tests.test_hadoop import HadoopExtraArgsTestCase
-from tests.test_job import MRSortValues
 
 try:
     import boto

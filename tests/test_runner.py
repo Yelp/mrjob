@@ -25,7 +25,6 @@ import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
 
-from mrjob.conf import combine_dicts
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.inline import InlineMRJobRunner
 from mrjob.local import LocalMRJobRunner

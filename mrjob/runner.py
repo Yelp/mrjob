@@ -33,7 +33,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 
-from mrjob.compat import translate_jobconf
+from mrjob.compat import translate_jobconf_dict
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs

@@ -802,7 +802,7 @@ class MockDataprocClientJobs(object):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        job = self.get(projectId=project, region=_DATAPROC_API_REGION, jobId=jobId)
+        job = self.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
         return self._client.update_state(job, state='CANCEL_PENDING')
 
     @mock_api
@@ -811,7 +811,7 @@ class MockDataprocClientJobs(object):
         assert region == _DATAPROC_API_REGION
 
 
-        job = self.get(projectId=project, region=_DATAPROC_API_REGION, jobId=jobId)
+        job = self.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
         return self._client.update_state(job, state='DELETING')
 
     @mock_api

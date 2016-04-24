@@ -48,7 +48,6 @@ from tests.sandbox import mrjob_conf_patcher
 try:
     from oauth2client.client import GoogleCredentials
     from googleapiclient import discovery
-    from googleapiclient import errors as google_errors
 except ImportError:
     # don't require googleapiclient; MRJobs don't actually need it when running
     # inside hadoop streaming
@@ -324,7 +323,6 @@ class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
         self._assert_cloud_hadoop_version('1.0', '2.7.2')
 
     def _assert_cloud_hadoop_version(self, image_version, hadoop_version):
-        args = []
         with self.make_runner('--image-version', image_version) as runner:
             runner.run()
             self.assertEqual(runner.get_image_version(), image_version)

@@ -323,6 +323,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ec2_task_instance_type',
         'emr_action_on_failure',
         'emr_api_params',
+        'emr_applications',
         'emr_endpoint',
         'emr_tags',
         'enable_emr_debugging',
@@ -363,6 +364,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_scripts': combine_path_lists,
         'ec2_key_pair_file': combine_paths,
         'emr_api_params': combine_dicts,
+        'emr_applications': combine_lists,
         'emr_tags': combine_dicts,
         'hadoop_extra_args': combine_lists,
         's3_log_uri': combine_paths,
@@ -385,6 +387,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         if not self['aws_region']:
             self['aws_region'] = _DEFAULT_AWS_REGION
 
+        self._fix_emr_applications_opt()
         self._fix_ec2_instance_opts()
         self._fix_ami_version_latest()
         self._fix_release_label_opt()
@@ -416,6 +419,13 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_tunnel_is_open': False,
             'visible_to_all_users': True,
         })
+
+    def _fix_emr_applications_opt(self):
+        """Convert emr_applications to a set. If it's set, make sure that
+        Hadoop is included."""
+        self['emr_applications'] = set(self['emr_applications'])
+        if self['emr_applications']:
+            self['emr_applications'].add('Hadoop')
 
     def _fix_ec2_instance_opts(self):
         """If the *ec2_instance_type* option is set, override instance
@@ -1257,6 +1267,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return cluster_id
 
+    # TODO: could break this into sub-methods for clarity
     def _cluster_args(self, persistent=False, steps=None):
         """Build kwargs for emr_conn.run_jobflow()"""
         args = {}
@@ -1366,10 +1377,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         api_params['JobFlowRole'] = self._instance_profile()
         api_params['ServiceRole'] = self._service_role()
 
+        if self._opts['emr_applications']:
+            api_params['Applications'] = [
+                dict(Name=a) for a in sorted(self._opts['emr_applications'])]
+
         if self._opts['emr_api_params']:
             api_params.update(self._opts['emr_api_params'])
 
-        args['api_params'] = api_params
+        args['api_params'] = _unpack_emr_api_params(api_params)
 
         if steps:
             args['steps'] = steps
@@ -2614,3 +2629,45 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             security_token=self._opts['aws_security_token'])
 
         return wrap_aws_conn(raw_iam_conn)
+
+
+def _unpack_emr_api_params(x):
+    """Recursively unpack parameters to the EMR API."""
+    # recursively unpack values, and flatten into main dict
+    if isinstance(x, dict):
+        result = {}
+
+        for key, value in x.items():
+            unpacked_value = _unpack_emr_api_params(value)
+            if isinstance(unpacked_value, dict):
+                for subkey, subvalue in unpacked_value.items():
+                    result['%s.%s' % (key, subkey)] = subvalue
+            else:
+                result[key] = unpacked_value
+
+        return result
+
+    # treat lists like dicts mapping "member.N" (1-indexed) to value
+    if isinstance(x, (list, tuple)):
+        return _unpack_emr_api_params(dict(
+            ('member.%d' % (i + 1), item)
+            for i, item in enumerate(x)))
+
+    # base case, not a dict or list
+    return x
+
+
+# not currently used; should use in mrjob.options to unpack --emr-api-param
+def _maybe_unpack_json(x):
+    """If *x* is a string starting with ``{`` or ``[``,
+    try to JSON-decode it. Otherwise, return *x* as-is.
+
+    This allows us to read in JSON from the command line.
+    """
+    if isinstance(x, string_types) and x[:1] in ('{', '['):
+        try:
+            return json.loads(x)
+        except:
+            log.warning("tried to decode %r but it isn't valid JSON" % x)
+
+    return x

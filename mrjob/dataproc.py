@@ -66,6 +66,7 @@ _DATAPROC_API_ENDPOINT = 'dataproc'
 _DATAPROC_API_VERSION = 'v1'
 _DATAPROC_API_REGION = 'global'
 _DATAPROC_MIN_WORKERS = 2
+_GCE_API_VERSION = 'v1'
 
 DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 
@@ -76,6 +77,7 @@ _DEFAULT_FS_SYNC_SECS = 5.0
 _DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS = 28
 
 # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#GceClusterConfig
+# NOTE - added cloud-platform so we can invoke gcloud commands from the cluster master (used for auto termination script)
 _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
     'https://www.googleapis.com/auth/cloud.useraccounts.readonly',
     'https://www.googleapis.com/auth/devstorage.read_write',
@@ -107,9 +109,6 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 
 _HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar'
 
-# TODO - mtai @ davidmarin - Re-implement SSH tunneling? - Content pulled from job run output
-# The url to track the job: http://default-taim-m:8088/proxy/application_1456679373146_0002/
-
 # TODO - mtai @ davidmarin - Re-implement logs parsing?  See dataproc metainfo and driver output - ask Dennis Huo for more details
 # 'gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/mr_most_used_word-taim-20160228-172000-034993---Step-2-of-2/driveroutput'
 
@@ -118,8 +117,8 @@ _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
 #################### BEGIN - Helper fxns for _cluster_args ####################
 def _gcp_zone_uri(project, zone):
-    return 'https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s' % dict(project=project,
-                                                                                              zone=zone)
+    return 'https://www.googleapis.com/compute/%(gce_api_version)s/projects/%(project)s/zones/%(zone)s' % dict(
+        gce_api_version=_GCE_API_VERSION, project=project, zone=zone)
 
 
 def _gcp_instance_group_config(project, zone, count, instance_type, is_preemptible=False):
@@ -155,6 +154,9 @@ def _check_and_fix_fs_dir(gcs_uri):
 
 
 def _read_gcloud_config():
+    """
+    Read in gcloud SDK config defaults
+    """
     gcloud_output = subprocess.check_output('gcloud config list', shell=True)
     gcloud_output_as_unicode = gcloud_output.decode('utf-8')
 
@@ -242,7 +244,7 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
             'num_preemptible': 0,
 
             'fs_sync_secs': _DEFAULT_FS_SYNC_SECS,
-            'mins_to_end_of_hour': 55.0, # EMR has 1-hr min billing (60 - 5).  Dataproc has 10-min min billing (60 - 55)
+            'mins_to_end_of_hour': 55.0,  # EMR => 1-hr min billing (60 - 5),  Dataproc => 10-min min billing (10 - 5)
             'sh_bin': ['/bin/sh', '-ex'],
         })
 
@@ -279,7 +281,7 @@ class DataprocJobRunner(MRJobRunner):
         """
         super(DataprocJobRunner, self).__init__(**kwargs)
 
-        # read gcloud SDK defaults
+        # read gcloud SDK defaults if needed
         self._gcloud_config = None
 
         # Google Cloud Platform - project
@@ -342,6 +344,7 @@ class DataprocJobRunner(MRJobRunner):
 
     @property
     def gcloud_config(self):
+        """Lazy load gcloud SDK configs"""
         if not self._gcloud_config:
             self._gcloud_config = _read_gcloud_config()
 
@@ -378,14 +381,13 @@ class DataprocJobRunner(MRJobRunner):
         mrjob_buckets = self.fs.buckets_list(self._gcp_project, prefix='mrjob-')
 
         # Loop over buckets until we find one that matches region
-        # NOTE - because we this is a fs_tmpdir, we look for a GCS bucket in the same GCE region
-        # NOTE - As of Apr 1, 2016 - GCS buckets should typically be at the multi-region level but we special case it here
+        # NOTE - because this is a tmpdir, we look for a GCS bucket in the same GCE region
         chosen_bucket_name = None
         gce_lower_location = self._gce_region.lower()
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket['name']
 
-            # NOTE - GCP Ambiguous Behavior - Bucket location is being returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs suggest lowercase
+            # NOTE - GCP ambiguous Behavior - Bucket location is being returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs suggest lowercase
             lower_location = tmp_bucket['location'].lower()
             if lower_location == gce_lower_location:
                 # Regions are both specified and match
@@ -393,9 +395,9 @@ class DataprocJobRunner(MRJobRunner):
                 chosen_bucket_name = tmp_bucket_name
                 break
 
-        # Example default - "mrjob-us-central1-RANDOMHEX
+        # Example default - "mrjob-us-central1-RANDOMHEX"
         if not chosen_bucket_name:
-            chosen_bucket_name = '-'.join(['mrjob', random_identifier()])
+            chosen_bucket_name = '-'.join(['mrjob', gce_lower_location, random_identifier()])
 
         return 'gs://%s/tmp/' % chosen_bucket_name
 
@@ -495,7 +497,7 @@ class DataprocJobRunner(MRJobRunner):
         for path, gcs_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, gcs_uri))
 
-            # TODO - mtai @ davidmarin - Implement upload function for other FSs
+            # TODO - mtai @ davidmarin - Implement put function for other FSs
             self.fs.put(path, gcs_uri)
 
         self._wait_for_fs_sync()
@@ -517,7 +519,7 @@ class DataprocJobRunner(MRJobRunner):
 
         location = location or self._gce_region
 
-        # NOTE - By default, we create a bucket in the same GCE region as our job
+        # NOTE - By default, we create a bucket in the same GCE region as our job (tmp buckets ONLY)
         # https://cloud.google.com/storage/docs/bucket-locations
         self.fs.bucket_create(self._gcp_project, bucket_name,
                               location=location, object_ttl_days=_DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS)
@@ -552,6 +554,7 @@ class DataprocJobRunner(MRJobRunner):
     def _cleanup_job(self):
         job_prefix = self._dataproc_job_prefix()
         for current_job in self._api_job_list(cluster_name=self._cluster_id, state_matcher='ACTIVE'):
+            # Kill all active jobs with the same job_prefix as this job
             current_job_id = current_job['reference']['jobId']
 
             if not current_job_id.startswith(job_prefix):
@@ -644,7 +647,8 @@ class DataprocJobRunner(MRJobRunner):
         self._cluster_id_start = time.time()
 
         # "clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'"
-        self._cluster_id = self._cluster_id or "mrjob-%s" % random_identifier()
+        if not self._cluster_id:
+            self._cluster_id = '-'.join(['mrjob', self._gce_zone.lower(), random_identifier()])
 
         # Create the cluster if its missing, otherwise we join an existing one
         try:
@@ -715,7 +719,7 @@ class DataprocJobRunner(MRJobRunner):
 
             log.info('%s => %s' % (job_id, job_state))
 
-            # NOTE -  mtai @ davidmarin - https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State
+            # NOTE - mtai @ davidmarin - https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State
             if job_state in DATAPROC_JOB_STATES_ACTIVE:
                 _wait_for('job completion', self._opts['cloud_api_cooldown_secs'])
                 continue
@@ -922,6 +926,9 @@ class DataprocJobRunner(MRJobRunner):
 
         return out
 
+    def get_cluster_id(self):
+        return self._cluster_id
+
     def _cluster_args(self):
         gcs_init_script_uris = []
         if self._master_bootstrap_script_path:
@@ -930,7 +937,7 @@ class DataprocJobRunner(MRJobRunner):
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
 
-        # only use idle termination script on persistent clusters
+        # add idle termination script whenever max_hours_idle specified
         # add it last, so that we don't count bootstrapping as idle time
         if self._opts['max_hours_idle']:
             # NOTE - Pass GCS init script args via cluster metadata
@@ -1001,6 +1008,8 @@ class DataprocJobRunner(MRJobRunner):
 
         # See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State
         cluster_state = None
+
+        # Poll until cluster is ready
         while cluster_state not in DATAPROC_CLUSTER_STATES_READY:
             result_describe = self.api_client.clusters().get(
                 projectId=self._gcp_project,

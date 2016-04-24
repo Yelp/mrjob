@@ -52,14 +52,14 @@ If you'd rather have your output go to somewhere deterministic on GCS, which you
 probably do, use :option:`--output-dir`::
 
     > python word_count.py -r dataproc README.rst \
-    >   --output-dir=gcs://my-bucket/wc_out/
+    >   --output-dir=gs://my-bucket/wc_out/
 
 It's also likely that since you know where your output is on GCS, you don't want
 output streamed back to your local machine. For that, use
 :option:`-no-output`::
 
     > python word_count.py -r dataproc README.rst \
-    >   --output-dir=gcs://my-bucket/wc_out/ \
+    >   --output-dir=gs://my-bucket/wc_out/ \
     >   --no-output
 
 There are many other ins and outs of effectively using mrjob with Dataproc.

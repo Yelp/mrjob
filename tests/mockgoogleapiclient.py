@@ -36,11 +36,8 @@ except ImportError:
     google_http = None
 
 from mrjob.dataproc import DataprocJobRunner
-from mrjob.dataproc import _DATAPROC_API_REGION, _DATAPROC_IMAGE_TO_HADOOP_VERSION
-from mrjob.dataproc import DATAPROC_CLUSTER_STATES_ERROR, DATAPROC_CLUSTER_STATES_READY
-from mrjob.dataproc import DATAPROC_JOB_STATES_ACTIVE, DATAPROC_JOB_STATES_INACTIVE
+from mrjob.dataproc import _DATAPROC_API_REGION
 from mrjob.fs.gcs import GCSFilesystem
-from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.gcs import _hex_to_base64
 from mrjob.fs.gcs import _LS_FIELDS_TO_RETURN
@@ -221,13 +218,24 @@ class MockGoogleAPITestCase(SandboxedTestCase):
 
         self.put_gcs_multi(gcs_multi_dict)
 
+    def get_cluster_from_runner(self, runner, cluster_id):
+        cluster = runner.api_client.clusters().get(
+            projectId=_TEST_PROJECT, region=_DATAPROC_API_REGION, clusterName=cluster_id
+        ).execute()
+        return cluster
+
 ############################# BEGIN BEGIN BEGIN ################################
 ########################### GCS Client - OVERALL ###############################
 ############################# BEGIN BEGIN BEGIN ################################
 
 
 class MockGCSClient(object):
-    """Mock outMockGCSClient
+    """Mock out GCSClient...
+
+    TARGET API VERSION - Storage API v1
+
+    Emulates GCS metadata and stores raw bytes
+    Contains convenience functions for initializing items in GCS
     """
 
     def __init__(self, test_case):
@@ -241,7 +249,6 @@ class MockGCSClient(object):
         self._client_objects = MockGCSClientObjects(self)
         self._client_buckets = MockGCSClientBuckets(self)
 
-
     def objects(self):
         return self._client_objects
 
@@ -249,6 +256,7 @@ class MockGCSClient(object):
         return self._client_buckets
 
     def put_gcs(self, gcs_uri, data):
+        """Put data at gcs_uri, creating a bucket if necessary"""
         bucket, name = parse_gcs_uri(gcs_uri)
 
         try:
@@ -260,6 +268,7 @@ class MockGCSClient(object):
         self.upload_io(bytes_io_obj, gcs_uri)
 
     def put_gcs_multi(self, gcs_uri_to_data_map):
+        """Bulk put data at gcs_uris"""
         for gcs_uri, data in gcs_uri_to_data_map.items():
             self.put_gcs(gcs_uri, data)
 
@@ -290,6 +299,8 @@ class MockGCSClient(object):
 
         data = io_obj.read()
 
+        # TODO - io_obj.close() ?  Not sure if callers of this function would expect their io_objs to be closed
+
         object_resp = _insert_object_resp(bucket=bucket, name=name, data=data)
 
         _set_deep(self._cache_objects, [bucket, name], object_resp)
@@ -305,11 +316,13 @@ class MockGCSClientObjects(object):
 
     @mock_api
     def list(self, **kwargs):
+        """Emulate objects().list - fields supported - bucket, prefix, fields"""
         bucket = kwargs.get('bucket')
         prefix = kwargs.get('prefix') or ''
         fields = kwargs.get('fields') or _LS_FIELDS_TO_RETURN
         assert bucket is not None
 
+        # Return only the fields that were requested
         field_match = re.findall('items\((.*?)\)', fields)[0]
         actual_fields = set(field_match.split(','))
 
@@ -317,9 +330,11 @@ class MockGCSClientObjects(object):
 
         item_list = []
         for object_name, current_object in object_map.items():
+            # Filter out on prefix match
             if not object_name.startswith(prefix):
                 continue
 
+            # Copy output fields for the requestor
             output_item = dict()
             for current_field in actual_fields:
                 output_item[current_field] = current_object[current_field]
@@ -329,6 +344,7 @@ class MockGCSClientObjects(object):
         return dict(items=item_list, kwargs=kwargs)
 
     def list_next(self, list_request, resp):
+        """list always returns all results in a single shot"""
         return None
 
     @mock_api
@@ -353,6 +369,7 @@ class MockGCSClientBuckets(object):
 
     @mock_api
     def list(self, **kwargs):
+        """Emulate buckets().list - fields supported - project, prefix"""
         project = kwargs.get('project')
         prefix = kwargs.get('prefix') or ''
 
@@ -399,6 +416,7 @@ class MockGCSClientBuckets(object):
 
 
 def _insert_object_resp(bucket=None, name=None, data=None):
+    """Fake GCS object metadata"""
     assert type(data) is bytes
 
     hasher = hashlib.md5()
@@ -416,6 +434,7 @@ def _insert_object_resp(bucket=None, name=None, data=None):
 
 
 def _make_bucket_resp(project=None, now=None):
+    """Fake GCS bucket metadata"""
     now_time = _datetime_to_gcptime(now)
 
     return {
@@ -440,9 +459,13 @@ def _make_bucket_resp(project=None, now=None):
 ######################### Dataproc Client - OVERALL ############################
 ############################# BEGIN BEGIN BEGIN ################################
 class MockDataprocClient(object):
-    """Mock out DataprocJobRunner.api_client. This actually handles a small
-    state machine that simulates Dataproc clusters."""
+    """Mock out DataprocJobRunner.api_client...
 
+    TARGET API VERSION - Dataproc API v1
+
+    Emulates Dataproc cluster / job metadata
+    Convenience functions for cluster/job state and updating
+    """
 
     def __init__(self, test_case):
         assert isinstance(test_case, MockGoogleAPITestCase)
@@ -518,6 +541,7 @@ def _datetime_to_gcptime(in_datetime=None):
 
 
 def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=None, machine_type=None, machine_type_master=None, num_workers=None, now=None):
+    """Fake Dataproc Cluster metadata"""
     project = project or _TEST_PROJECT
     zone = zone or _CLUSTER_ZONE
     cluster = cluster or _DATAPROC_CLUSTER
@@ -647,7 +671,7 @@ class MockDataprocClientClusters(object):
         if not cluster:
             raise mock_google_error(404)
 
-        # NOTE - Side effect is to advance the state
+        # NOTE - TESTING ONLY - Side effect is to advance the state
         if self._client.cluster_get_advances_to_state:
             self._client.update_state(cluster, state=self._client.cluster_get_advances_to_state)
 
@@ -655,10 +679,10 @@ class MockDataprocClientClusters(object):
 
     @mock_api
     def delete(self, projectId=None, region=None, clusterName=None):
-        assert projectId is not None
-        assert region == _DATAPROC_API_REGION
+        cluster = self.get(projectId=projectId, region=region, clusterName=clusterName).execute()
 
-        return self._client.cluster_update_state(projectId, clusterName, 'DELETING')
+        return self._client.update_state(cluster, state='DELETING')
+
 #############################  END   END   END  ################################
 ######################### Dataproc Client - Clusters ###########################
 #############################  END   END   END  ################################
@@ -682,6 +706,7 @@ _INPUT_DIR = ''
 _OUTPUT_DIR = ''
 
 def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, now=None):
+    """Fake Dataproc Job metadata"""
     project = project or _TEST_PROJECT
     cluster = cluster or _DATAPROC_CLUSTER
     script_name = script_name or _SCRIPT_NAME
@@ -723,6 +748,7 @@ class MockDataprocClientJobs(object):
 
     @mock_api
     def list(self, **kwargs):
+        """Emulate jobs().list - fields supported - projectId, region, clusterName, jobStateMatcher"""
         project_id = kwargs['projectId']
         region = kwargs['region']
         cluster_name = kwargs.get('clusterName')
@@ -737,12 +763,13 @@ class MockDataprocClientJobs(object):
 
         job_map = _get_deep(self._jobs, [project_id], dict())
 
+        # Sort all jobs by latest status update time
         jobs_sorted_by_time = sorted(job_map.values(), key=lambda j: j['status']['stateStartTime'])
         for current_job in jobs_sorted_by_time:
             job_cluster = current_job['placement']['clusterName']
             job_state = current_job['status']['state']
 
-            # If we are searching for a specific cluster_name and it doesn't match...
+            # Filter out non-matching clusters and job-states
             if cluster_name and job_cluster != cluster_name:
                 continue
             elif job_state not in valid_job_states:
@@ -764,7 +791,7 @@ class MockDataprocClientJobs(object):
         if not current_job:
             raise mock_google_error(404)
 
-        # NOTE - Side effect is to advance the state
+        # NOTE - TESTING ONLY - Side effect is to advance the state
         if self._client.job_get_advances_to_state:
             self._client.update_state(current_job, state=self._client.job_get_advances_to_state)
 
@@ -794,7 +821,7 @@ class MockDataprocClientJobs(object):
 
         body = body or dict()
 
-        # Create an empty cluster
+        # Create an empty job
         job = _submit_hadoop_job_resp()
 
         body_job = body.get('job') or dict()

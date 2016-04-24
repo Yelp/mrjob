@@ -166,11 +166,12 @@ class GCSFilesystem(Filesystem):
         tmp_fd, tmp_path = tempfile.mkstemp()
         tmp_fileobj = os.fdopen(tmp_fd, 'w+b')
 
-        # for item in self._ls_detailed(path_glob):
         self._download_io(gcs_uri, tmp_fileobj)
 
         tmp_fileobj.seek(0)
 
+        # TODO - tmp_fileobj.close() ?  Unfortunately this gets passed to a generator...
+        # with os.fdopen(tmp_fd, 'w+b') as tmp_fileobj:  prematurely closes the fileobj in python 2.7
         return read_file(gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
 
     def mkdir(self, dest):
@@ -270,6 +271,7 @@ class GCSFilesystem(Filesystem):
         if location:
             body['location'] = location
 
+        # Lifecycle management
         if object_ttl_days is not None:
             lifecycle_rule = dict(
                 action=dict(type='Delete'),

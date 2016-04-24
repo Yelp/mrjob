@@ -24,17 +24,14 @@ from io import BytesIO
 import mrjob
 import mrjob.dataproc
 from mrjob.dataproc import DataprocJobRunner
-from mrjob.dataproc import _DEFAULT_IMAGE_VERSION, _DATAPROC_API_REGION
+from mrjob.dataproc import _DEFAULT_IMAGE_VERSION, _DATAPROC_API_REGION, _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 
-from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
-from mrjob.job import MRJob
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
-from mrjob.util import tar_and_gzip
 
 from tests.mockgoogleapiclient import MockGoogleAPITestCase
 from tests.mockgoogleapiclient import _TEST_PROJECT
@@ -42,7 +39,6 @@ from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
-from tests.py2 import TestCase
 from tests.py2 import mock
 from tests.py2 import patch
 from tests.quiet import logger_disabled
@@ -100,7 +96,6 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
                                     '--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
-        local_tmp_dir = None
         results = []
 
         gcs_buckets_snapshot = copy.deepcopy(self._gcs_client._cache_buckets)
@@ -163,6 +158,8 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             self.assertIn(runner._mrjob_tar_gz_path,
                           runner._bootstrap_dir_mgr.paths())
 
+            cluster_id = runner.get_cluster_id()
+
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
@@ -170,9 +167,10 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
         self.assertFalse(os.path.exists(local_tmp_dir))
         self.assertFalse(any(runner.fs.ls(runner.get_output_dir())))
 
-        # # job should get terminated
-        # cluster = runner._describe_cluster()
-        # self.assertEqual(cluster.status.state, 'TERMINATED')
+        # job should get terminated
+        cluster = self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id]
+        cluster_state = self._dataproc_client.get_state(cluster)
+        self.assertEqual(cluster_state, 'DELETING')
 
     def test_failed_job(self):
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v'])
@@ -191,8 +189,12 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
                 self.assertIn(' => ERROR\n', stderr.getvalue())
 
-        # cluster = runner._describe_cluster()
-        # self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
+                cluster_id = runner.get_cluster_id()
+
+        # job should get terminated
+        cluster = self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id]
+        cluster_state = self._dataproc_client.get_state(cluster)
+        self.assertEqual(cluster_state, 'DELETING')
 
     def _test_cloud_tmp_cleanup(self, mode, tmp_len):
         stdin = BytesIO(b'foo\nbar\n')
@@ -276,41 +278,32 @@ class ExistingClusterTestCase(MockGoogleAPITestCase):
         self.assertEqual(sorted(results),
                          [(1, 'bar'), (1, 'foo'), (2, None)])
 
-    # def test_dont_take_down_cluster_on_failure(self):
-    #     runner = DataprocJobRunner(conf_paths=[])
-    #
-    #     cluster_body = runner.api_client.cluster_create()
-    #     cluster_id = cluster_body['clusterName']
-    #
-    #     mr_job = MRTwoStepJob(['-r', 'dataproc', '-v',
-    #                            '--cluster-id', cluster_id])
-    #     mr_job.sandbox()
-    #
-    #     self.put_gcs_multi({'walrus': {}})
-    #     self.mock_dataproc_failures = set([('j-MOCKCLUSTER0', 0)])
-    #
-    #     with mr_job.make_runner() as runner:
-    #         self.assertIsInstance(runner, DataprocJobRunner)
-    #         self.prepare_runner_for_ssh(runner)
-    #         with logger_disabled('mrjob.dataproc'):
-    #             self.assertRaises(StepFailedException, runner.run)
-    #
-    #         dataproc_conn = runner.make_dataproc_conn()
-    #         cluster_id = runner.get_cluster_id()
-    #         for _ in range(10):
-    #             dataproc_conn.simulate_progress(cluster_id)
-    #
-    #         cluster = runner._describe_cluster()
-    #         self.assertEqual(cluster.status.state, 'WAITING')
-    #
-    #     # job shouldn't get terminated by cleanup
-    #     dataproc_conn = runner.make_dataproc_conn()
-    #     cluster_id = runner.get_cluster_id()
-    #     for _ in range(10):
-    #         dataproc_conn.simulate_progress(cluster_id)
-    #
-    #     cluster = runner._describe_cluster()
-    #     self.assertEqual(cluster.status.state, 'WAITING')
+    def test_dont_take_down_cluster_on_failure(self):
+        runner = DataprocJobRunner(conf_paths=[])
+
+        cluster_body = runner.api_client.cluster_create()
+        cluster_id = cluster_body['clusterName']
+
+        mr_job = MRTwoStepJob(['-r', 'dataproc', '-v',
+                               '--cluster-id', cluster_id])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            self.assertIsInstance(runner, DataprocJobRunner)
+
+            runner.api_client.job_get_advances_to_state = 'ERROR'
+
+            with logger_disabled('mrjob.dataproc'):
+                self.assertRaises(StepFailedException, runner.run)
+
+            cluster = self.get_cluster_from_runner(runner, cluster_id)
+            cluster_state = self._dataproc_client.get_state(cluster)
+            self.assertEqual(cluster_state, 'RUNNING')
+
+        # job shouldn't get terminated by cleanup
+        cluster = self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id]
+        cluster_state = self._dataproc_client.get_state(cluster)
+        self.assertEqual(cluster_state, 'RUNNING')
 
 
 class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
@@ -399,7 +392,13 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         self.assertNotIn(bucket_name, existing_buckets)
         self.assertEqual(path, 'tmp/')
 
-        self.assertEqual(bucket_cache[bucket_name]['location'], location)
+        current_bucket = bucket_cache[bucket_name]
+        self.assertEqual(current_bucket['location'], location)
+
+        # Verify that we setup bucket lifecycle rules of 28-day retention
+        first_lifecycle_rule = current_bucket['lifecycle']['rule'][0]
+        self.assertEqual(first_lifecycle_rule['action'], dict(type='Delete'))
+        self.assertEqual(first_lifecycle_rule['condition'], dict(age=28))
 
     def _make_bucket(self, name, location=None):
         self._gcs_fs.bucket_create(project=_TEST_PROJECT, name=name, location=location)
@@ -793,60 +792,62 @@ class DataprocNoMapperTestCase(MockGoogleAPITestCase):
                           [(1, ['blue', 'one', 'red', 'two']),
                            (4, ['fish'])])
 
-#
-# class MaxHoursIdleTestCase(MockGoogleAPITestCase):
-#
-#     def assertRanIdleTimeoutScriptWith(self, runner, args):
-#         dataproc_conn = runner.make_dataproc_conn()
-#         cluster_id = runner.get_cluster_id()
-#
-#         actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
-#         action = actions[-1]
-#
-#         self.assertEqual(action.name, 'idle timeout')
-#         self.assertEqual(
-#             action.scriptpath,
-#             runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
-#         self.assertEqual([arg.value for arg in action.args], args)
-#
-#     def assertDidNotUseIdleTimeoutScript(self, runner):
-#         dataproc_conn = runner.make_dataproc_conn()
-#         cluster_id = runner.get_cluster_id()
-#
-#         actions = list(_yield_all_bootstrap_actions(dataproc_conn, cluster_id))
-#         action_names = [a.name for a in actions]
-#
-#         self.assertNotIn('idle timeout', action_names)
-#         # idle timeout script should not even be uploaded
-#         self.assertNotIn(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH,
-#                          runner._upload_mgr.path_to_uri())
-#
-#     def test_default(self):
-#         mr_job = MRWordCount(['-r', 'dataproc'])
-#         mr_job.sandbox()
-#
-#         with mr_job.make_runner() as runner:
-#             runner.run()
-#             self.assertDidNotUseIdleTimeoutScript(runner)
-#
-#     def test_non_persistent_cluster(self):
-#         mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '1'])
-#         mr_job.sandbox()
-#
-#         with mr_job.make_runner() as runner:
-#             runner.run()
-#             self.assertDidNotUseIdleTimeoutScript(runner)
-#
-#     def test_persistent_cluster(self):
-#         mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '0.01'])
-#         mr_job.sandbox()
-#
-#         with mr_job.make_runner() as runner:
-#             runner.make_persistent_cluster()
-#             self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
-#
-#     def test_bootstrap_script_is_actually_installed(self):
-#         self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+
+class MaxHoursIdleTestCase(MockGoogleAPITestCase):
+
+    def assertRanIdleTimeoutScriptWith(self, runner, expected_metadata):
+        cluster_metadata, last_init_exec = self._cluster_metadata_and_last_init_exec(runner)
+
+        # Verify args
+        for key in expected_metadata.keys():
+            self.assertEqual(cluster_metadata[key], expected_metadata[key])
+
+        expected_uri = runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+        self.assertEqual(last_init_exec, expected_uri)
+
+    def assertDidNotUseIdleTimeoutScript(self, runner):
+        cluster_metadata, last_init_exec = self._cluster_metadata_and_last_init_exec(runner)
+
+        self.assertNotIn('mrjob-max-secs-idle', cluster_metadata)
+        self.assertNotIn('mrjob-min-secs-to-end-of-hour', cluster_metadata)
+
+        expected_uri = runner._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+        self.assertNotEqual(last_init_exec, expected_uri)
+
+    def _cluster_metadata_and_last_init_exec(self, runner):
+        cluster_id = runner.get_cluster_id()
+
+        cluster = self.get_cluster_from_runner(runner, cluster_id)
+
+        # Verify last arg
+        cluster_config = cluster['config']
+        last_init_action = cluster_config['initializationActions'][-1]
+        last_init_exec = last_init_action['executableFile']
+
+        cluster_metadata = cluster_config['gceClusterConfig']['metadata']
+        return cluster_metadata, last_init_exec
+
+    def test_default(self):
+        mr_job = MRWordCount(['-r', 'dataproc'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            self.assertDidNotUseIdleTimeoutScript(runner)
+
+    def test_persistent_cluster(self):
+        mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '0.01'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+            self.assertRanIdleTimeoutScriptWith(runner, {
+                'mrjob-max-secs-idle': '36',
+                'mrjob-min-secs-to-end-of-hour': '3300'
+            })
+
+    def test_bootstrap_script_is_actually_installed(self):
+        self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
 
 class TestCatFallback(MockGoogleAPITestCase):
 

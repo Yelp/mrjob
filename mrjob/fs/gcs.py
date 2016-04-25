@@ -220,7 +220,15 @@ class GCSFilesystem(Filesystem):
 
         done = False
         while not done:
-            status, done = downloader.next_chunk()
+            try:
+                status, done = downloader.next_chunk()
+            except google_errors.HttpError as e:
+                # If error code 416, request range not satisfiable => implies we're trying to download a file of size 0
+                if e.resp.status == 416:
+                    break
+
+                raise
+
             if status:
                 log.debug("Download %d%%." % int(status.progress() * 100))
 

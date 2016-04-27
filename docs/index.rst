@@ -1,23 +1,46 @@
-.. mrjob documentation master file, created by
-   sphinx-quickstart on Thu Oct 14 10:13:34 2010.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
-
 mrjob
-=================================
+=====
 
-mrjob - Run Hadoop Streaming jobs on Amazon Elastic MapReduce or your
-own Hadoop cluster
+**mrjob lets you write MapReduce jobs in Python 2.6+/3.3+ and run them on
+several platforms.** You can:
+
+* Write multi-step MapReduce jobs in pure Python
+* Test on your local machine
+* Run on a Hadoop cluster
+* Run in the cloud using `Amazon Elastic MapReduce (EMR)`_
+
+.. _Amazon Elastic MapReduce (EMR): http://aws.amazon.com/documentation/elasticmapreduce/
+
+mrjob is licensed under the `Apache License, Version 2.0.`_
+
+.. _Apache License, Version 2.0.: https://raw.github.com/Yelp/mrjob/master/LICENSE.txt
+
+To get started, install with ``pip``::
+
+    pip install mrjob
+
+and begin reading the tutorial below.
+
+.. ifconfig:: 'dev' in release
+
+    .. note::
+
+        This documentation is for |release|, which is currently in
+        development. Documentation for the stable version of mrjob is hosted
+        at `http://pythonhosted.org/mrjob <http://pythonhosted.org/mrjob>`_.
 
 .. toctree::
-   :maxdepth: 3
-   :numbered:
+    :maxdepth: 3
 
-   writing-and-running.rst
-   library.rst
-   amazon.rst
+    guides.rst
+    reference.rst
+    whats-new.rst
+    glossary.rst
 
-Indices and tables
-==================
+.. rubric:: Appendices
 
-* :ref:`search`
+:ref:`genindex`
+
+:ref:`modindex`
+
+:ref:`search`

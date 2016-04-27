@@ -5,8 +5,7 @@ mrjob.runner - base class for all runners
 
 .. autoclass:: MRJobRunner
 
-Runners' constructors take a bewildering array of keyword arguments; we'll
-get to that in :doc:`configs-runners`
+.. automethod:: mrjob.runner.MRJobRunner.__init__
 
 Running your job
 ----------------
@@ -15,25 +14,24 @@ Running your job
 .. automethod:: MRJobRunner.stream_output
 .. automethod:: MRJobRunner.cleanup
 .. autodata:: mrjob.runner.CLEANUP_CHOICES
-.. autodata:: mrjob.runner.CLEANUP_DEFAULT
+
+Run Information
+---------------
+
+.. automethod:: MRJobRunner.counters
+.. automethod:: MRJobRunner.get_hadoop_version
+
+Configuration
+-------------
+
+.. automethod:: mrjob.runner.MRJobRunner.get_opts
 
 File management
 ---------------
 
-Some simple filesystem operations that work on both the local filesystem and
-HDFS (when running :py:class:`~mrjob.hadoop.HadoopJobRunner`) or
-S3 (when running :py:class:`~mrjob.emr.EMRJobRunner`).
+.. autoattribute:: MRJobRunner.fs
 
-Use ``hdfs://`` and ``s3://`` URIs to refer to remote files.
+.. py:module:: mrjob.fs.base
 
-We don't currently support ``mv()`` and ``cp()`` because S3 doesn't really
-have directories, so the semantics get a little weird.
-
-.. automethod:: MRJobRunner.get_output_dir
-.. automethod:: MRJobRunner.du
-.. automethod:: MRJobRunner.ls
-.. automethod:: MRJobRunner.mkdir
-.. automethod:: MRJobRunner.path_exists
-.. automethod:: MRJobRunner.path_join
-.. automethod:: MRJobRunner.rm
-.. automethod:: MRJobRunner.touchz
+.. autoclass:: mrjob.fs.base.Filesystem
+    :members:

@@ -1,4 +1,5 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2011 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,18 +14,20 @@
 # limitations under the License.
 """Trivial multi-step job for testing counter behavior"""
 from mrjob.job import MRJob
+from mrjob.step import MRStep
+
 
 class MRCountingJob(MRJob):
 
     def steps(self):
-        return [self.mr(self.mapper),
-                self.mr(self.mapper),
-                self.mr(self.mapper)]
+        return [MRStep(mapper=self.mapper),
+                MRStep(mapper=self.mapper),
+                MRStep(mapper=self.mapper)]
 
     def mapper(self, _, value):
         self.increment_counter('group', 'counter_name', 1)
         yield _, value
 
+
 if __name__ == '__main__':
     MRCountingJob.run()
-

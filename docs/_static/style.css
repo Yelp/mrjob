@@ -1,0 +1,39 @@
+/* make links red instead of blue */
+
+a { color: #a00; }
+a:visited { color: #800; }
+
+#mrjob .toctree-wrapper > ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+#mrjob li.toctree-l1 > a {
+  font-size: 1.5rem;
+  color: black;
+  display: block;
+  margin-top: 1em;
+  margin-bottom: 1em;
+}
+
+#mrjob li.toctree-l1 > ul {
+  list-style-type: none;
+  padding: 0;
+}
+
+#mrjob li.toctree-l1 > ul > li {
+  margin-top: 1em;
+}
+
+#mrjob li.toctree-l1 > ul > li > a {
+  color: #600;
+  font-size: 1.25rem;
+  display: block;
+  margin-bottom: 0.5em;
+}
+
+/* changes to be propagated up to sphinx-better-theme */
+
+tt {
+  font-size: 1rem;
+}

@@ -1,4 +1,6 @@
-# Copyright 2009-2010 Yelp
+# Copyright 2009-2012 Yelp
+# Copyright 2013 David Marin
+# Copyright 2015 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,12 +15,20 @@
 # limitations under the License.
 """Trivial multi-step job, useful for testing runners."""
 from mrjob.job import MRJob
+from mrjob.step import MRStep
+
 
 class MRTwoStepJob(MRJob):
 
     def mapper(self, key, value):
         yield key, value
         yield value, key
+
+    def combiner(self, key, values):
+        # just pass through and make note that this was run
+        self.increment_counter('count', 'combiners', 1)
+        for value in values:
+            yield key, value
 
     def reducer(self, key, values):
         yield key, len(list(values))
@@ -27,8 +37,10 @@ class MRTwoStepJob(MRJob):
         yield value, key
 
     def steps(self):
-        return [self.mr(self.mapper, self.reducer),
-                self.mr(self.mapper2)]
+        return [MRStep(mapper=self.mapper, reducer=self.reducer,
+                       combiner=self.combiner),
+                MRStep(mapper=self.mapper2)]
+
 
 if __name__ == '__main__':
     MRTwoStepJob.run()

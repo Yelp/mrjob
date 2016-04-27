@@ -1,3 +1,7 @@
 include *.rst
 include *.txt
 prune docs
+recursive-include bootstrap *.sh
+recursive-include examples *.json
+recursive-include examples *.rst
+recursive-include examples *.sh

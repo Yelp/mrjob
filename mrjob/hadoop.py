@@ -1,4 +1,4 @@
-# Copyright 2009-2011 Yelp and Contributors
+# Copyright 2009-2015 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,56 +11,97 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 import getpass
 import logging
 import os
 import posixpath
 import re
-from subprocess import Popen, PIPE, CalledProcessError
+from subprocess import CalledProcessError
+from subprocess import Popen
+from subprocess import PIPE
 
 try:
-    from cStringIO import StringIO
+    import pty
+    pty  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    from StringIO import StringIO
+    pty = None
 
-from mrjob.conf import combine_dicts, combine_paths
-from mrjob.parse import HADOOP_STREAMING_JAR_RE
+import mrjob.step
+from mrjob.compat import translate_jobconf
+from mrjob.compat import uses_yarn
+from mrjob.conf import combine_cmds
+from mrjob.conf import combine_dicts
+from mrjob.conf import combine_lists
+from mrjob.conf import combine_path_lists
+from mrjob.conf import combine_paths
+from mrjob.fs.composite import CompositeFilesystem
+from mrjob.fs.hadoop import HadoopFilesystem
+from mrjob.fs.local import LocalFilesystem
+from mrjob.logs.counters import _format_counters
+from mrjob.logs.counters import _pick_counters
+from mrjob.logs.errors import _format_error
+from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
+from mrjob.logs.step import _is_counter_log4j_record
+from mrjob.parse import is_uri
+from mrjob.py2 import to_string
 from mrjob.runner import MRJobRunner
+from mrjob.runner import RunnerOptionStore
+from mrjob.setup import UploadDirManager
+from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
+from mrjob.util import unique
+from mrjob.util import which
 
 
-log = logging.getLogger('mrjob.hadoop')
+log = logging.getLogger(__name__)
 
-HDFS_URI_RE = re.compile(r'^s3n:/|hdfs://(.*?)(/.*?)$')
+# don't look for the hadoop streaming jar here!
+_BAD_HADOOP_HOMES = ['/', '/usr', '/usr/local']
 
-# to filter out the log4j stuff that hadoop streaming prints out
-HADOOP_STREAMING_OUTPUT_RE = re.compile(r'^(\S+ \S+ \S+ \S+: )?(.*)$')
+# where YARN stores history logs, etc. on HDFS by default
+_DEFAULT_YARN_HDFS_LOG_DIR = 'hdfs:///tmp/hadoop-yarn/staging'
 
-# used by mkdir()
-HADOOP_FILE_EXISTS_RE = re.compile(r'.*File exists.*')
+# places to look for the Hadoop streaming jar if we're inside EMR
+_EMR_HADOOP_STREAMING_JAR_DIRS = [
+    # for the 2.x and 3.x AMIs (the 2.x AMIs also set $HADOOP_HOME properly)
+    '/home/hadoop/contrib',
+    # for the 4.x AMIs
+    '/usr/lib/hadoop-mapreduce',
+]
 
-# used by ls()
-HADOOP_LSR_NO_SUCH_FILE = re.compile(r'^lsr: Cannot access .*: No such file or directory.')
+# places to look for logs if we're inside EMR.
+_EMR_HADOOP_LOG_DIRS = [
+    # for the 2.x and 3.x AMIs
+    '/mnt/var/log/hadoop',
 
-# used by rm() (see below)
-HADOOP_RMR_NO_SUCH_FILE = re.compile(r'^rmr: hdfs://.*$')
+]
 
+# start of Counters printed by Hadoop
+_HADOOP_COUNTERS_START_RE = re.compile(b'^Counters: (?P<amount>\d+)\s*$')
 
-def find_hadoop_streaming_jar(path):
-    """Return the path of the hadoop streaming jar inside the given
-    directory tree, or None if we can't find it."""
-    for (dirpath, _, filenames) in os.walk(path):
-        for filename in filenames:
-            if HADOOP_STREAMING_JAR_RE.match(filename):
-                return os.path.join(dirpath, filename)
-    else:
-        return None
+# header for a group of counters
+_HADOOP_COUNTER_GROUP_RE = re.compile(b'^(?P<indent>\s+)(?P<group>.*)$')
+
+# line for a counter
+_HADOOP_COUNTER_RE = re.compile(
+    b'^(?P<indent>\s+)(?P<counter>.*)=(?P<amount>\d+)\s*$')
+
+# the one thing Hadoop streaming prints to stderr not in log format
+_HADOOP_NON_LOG_LINE_RE = re.compile(r'^Streaming Command Failed!')
+
+# if we see this from Hadoop, it actually came from stdout and shouldn't
+# be logged
+_HADOOP_STDOUT_RE = re.compile(br'^packageJobJar: ')
+
+# match the filename of a hadoop streaming jar
+_HADOOP_STREAMING_JAR_RE = re.compile(
+    r'^hadoop.*streaming.*(?<!-sources)\.jar$')
 
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
-    if path.startswith('hdfs://') or path.startswith('s3n:/'):
+    if is_uri(path):
         return path
     elif path.startswith('/'):
         return 'hdfs://' + path
@@ -68,489 +109,528 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
 
 
-class HadoopJobRunner(MRJobRunner):
+class HadoopRunnerOptionStore(RunnerOptionStore):
+
+    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
+        'hadoop_bin',
+        'hadoop_extra_args',
+        'hadoop_home',
+        'hadoop_log_dirs',
+        'hadoop_streaming_jar',
+        'hadoop_tmp_dir',
+    ]))
+
+    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
+        'hadoop_bin': combine_cmds,
+        'hadoop_extra_args': combine_lists,
+        'hadoop_home': combine_paths,
+        'hadoop_log_dirs': combine_path_lists,
+        'Hadoop_tmp_dir': combine_paths,
+    })
+
+    DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
+        'hdfs_scratch_dir': 'hadoop_tmp_dir',
+    })
+
+    def default_options(self):
+        super_opts = super(HadoopRunnerOptionStore, self).default_options()
+        return combine_dicts(super_opts, {
+            'hadoop_tmp_dir': 'tmp/mrjob',
+        })
+
+
+class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
+    Invoked when you run your job with ``-r hadoop``.
 
     Input and support files can be either local or on HDFS; use ``hdfs://...``
     URLs to refer to files on HDFS.
-
-    It's rare to need to instantiate this class directly (see
-    :py:meth:`~HadoopJobRunner.__init__` for details).
     """
     alias = 'hadoop'
 
+    OPTION_STORE_CLASS = HadoopRunnerOptionStore
+
     def __init__(self, **kwargs):
-        """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments as
-        :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
-        which can be defaulted in :py:mod:`mrjob.conf`.
-
-        *output_dir* and *hdfs_scratch_dir* need not be fully qualified
-        ``hdfs://`` URIs because it's understood that they have to be on
-        HDFS (e.g. ``tmp/mrjob/`` would be okay)
-
-        Additional options:
-
-        :type hadoop_bin: str
-        :param hadoop_bin: name/path of your hadoop program. Defaults to *hadoop_home* plus ``bin/hadoop``
-        :type hadoop_home: str
-        :param hadoop_home: alternative to setting :envvar:`HADOOP_HOME` variable.
-        :type hdfs_scratch_dir: str
-        :param hdfs_scratch_dir: temp directory on HDFS. Default is ``tmp/mrjob``
-
-        *hadoop_streaming_jar* is optional; by default, we'll search for it inside :envvar:`HADOOP_HOME`
+        """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
+        as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
+        which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
-        # fix hadoop_home
-        if not self._opts['hadoop_home']:
-            raise Exception('you must set $HADOOP_HOME, or pass in hadoop_home explicitly')
-        self._opts['hadoop_home'] = os.path.abspath(self._opts['hadoop_home'])
+        if self._opts['hadoop_home']:
+            log.warning(
+                'hadoop_home is deprecated since 0.5.0 and will be removed'
+                ' in v0.6.0. In most cases, mrjob will now find the hadoop'
+                ' binary and streaming jar without help. If not, use the'
+                ' hadoop_bin and hadoop_streaming_jar options.')
 
-        # fix hadoop_bin
-        if not self._opts['hadoop_bin']:
-            self._opts['hadoop_bin'] = os.path.join(
-                self._opts['hadoop_home'], 'bin/hadoop')
-
-        # fix hadoop_streaming_jar
-        if not self._opts['hadoop_streaming_jar']:
-            log.debug('Looking for hadoop streaming jar in %s' %
-                      self._opts['hadoop_home'])
-            self._opts['hadoop_streaming_jar'] = find_hadoop_streaming_jar(
-                self._opts['hadoop_home'])
-
-            if not self._opts['hadoop_streaming_jar']:
-                raise Exception(
-                    "Couldn't find streaming jar in %s, bailing out" %
-                    self._opts['hadoop_home'])
-
-        log.debug('Hadoop streaming jar is %s' %
-                  self._opts['hadoop_streaming_jar'])
-
-        self._hdfs_tmp_dir = fully_qualify_hdfs_path(
+        self._hadoop_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(
-            self._opts['hdfs_scratch_dir'], self._job_name))
+                self._opts['hadoop_tmp_dir'], self._job_key))
+
+        # Keep track of local files to upload to HDFS. We'll add them
+        # to this manager just before we need them.
+        hdfs_files_dir = posixpath.join(self._hadoop_tmp_dir, 'files', '')
+        self._upload_mgr = UploadDirManager(hdfs_files_dir)
 
         # Set output dir if it wasn't set explicitly
         self._output_dir = fully_qualify_hdfs_path(
             self._output_dir or
-            posixpath.join(self._hdfs_tmp_dir, 'output'))
+            posixpath.join(self._hadoop_tmp_dir, 'output'))
 
-        # we'll set this up later
-        self._hdfs_input_files = None
-        # temp dir for input
-        self._hdfs_input_dir = None
+        # Track job and (YARN) application ID to enable log parsing
+        self._application_id = None
+        self._job_id = None
 
-    @classmethod
-    def _allowed_opts(cls):
-        """A list of which keyword args we can pass to __init__()"""
-        return super(HadoopJobRunner, cls)._allowed_opts() + [
-            'hadoop_bin',
-            'hadoop_home',
-            'hdfs_scratch_dir',
-        ]
+        # Keep track of where the hadoop streaming jar is
+        self._hadoop_streaming_jar = self._opts['hadoop_streaming_jar']
+        self._searched_for_hadoop_streaming_jar = False
 
-    @classmethod
-    def _default_opts(cls):
-        """A dictionary giving the default value of options."""
-        return combine_dicts(super(HadoopJobRunner, cls)._default_opts(), {
-            'hadoop_home': os.environ.get('HADOOP_HOME'),
-            'hdfs_scratch_dir': 'tmp/mrjob',
-        })
+        # List of dicts (one for each step) potentially containing
+        # the keys 'history', 'step', and 'task' ('step' will always
+        # be filled because it comes from the hadoop jar command output,
+        # others will be filled as needed)
+        self._log_interpretations = []
 
-    @classmethod
-    def _opts_combiners(cls):
-        """Map from option name to a combine_*() function used to combine
-        values for that option. This allows us to specify that some options
-        are lists, or contain environment variables, or whatever."""
-        return combine_dicts(super(HadoopJobRunner, cls)._opts_combiners(), {
-            'hadoop_bin': combine_paths,
-            'hadoop_home': combine_paths,
-            'hdfs_scratch_dir': combine_paths,
-        })
+    @property
+    def fs(self):
+        """:py:class:`mrjob.fs.base.Filesystem` object for HDFS and the local
+        filesystem.
+        """
+        if self._fs is None:
+            self._fs = CompositeFilesystem(
+                HadoopFilesystem(self._opts['hadoop_bin']),
+                LocalFilesystem())
+        return self._fs
+
+    def get_hadoop_version(self):
+        """Invoke the hadoop executable to determine its version"""
+        return self.fs.get_hadoop_version()
+
+    def get_hadoop_bin(self):
+        """Find the hadoop binary. A list: binary followed by arguments."""
+        return self.fs.get_hadoop_bin()
+
+    def get_hadoop_streaming_jar(self):
+        """Find the path of the hadoop streaming jar, or None if not found."""
+        if not (self._hadoop_streaming_jar or
+                self._searched_for_hadoop_streaming_jar):
+
+            self._hadoop_streaming_jar = self._find_hadoop_streaming_jar()
+
+            if self._hadoop_streaming_jar:
+                log.info('Found Hadoop streaming jar: %s' %
+                         self._hadoop_streaming_jar)
+            else:
+                log.warning('Hadoop streaming jar not found. Use'
+                            ' --hadoop-streaming-jar')
+
+            self._searched_for_hadoop_streaming_jar = True
+
+        return self._hadoop_streaming_jar
+
+    def _find_hadoop_streaming_jar(self):
+        """Search for the hadoop streaming jar. See
+        :py:meth:`_hadoop_streaming_jar_dirs` for where we search."""
+        for path in unique(self._hadoop_streaming_jar_dirs()):
+            log.info('Looking for Hadoop streaming jar in %s...' % path)
+
+            streaming_jars = []
+            for path in self.fs.ls(path):
+                if _HADOOP_STREAMING_JAR_RE.match(posixpath.basename(path)):
+                    streaming_jars.append(path)
+
+            if streaming_jars:
+                # prefer shorter names and shallower paths
+                def sort_key(p):
+                    return (len(p.split('/')),
+                            len(posixpath.basename(p)),
+                            p)
+
+                streaming_jars.sort(key=sort_key)
+
+                return streaming_jars[0]
+
+        return None
+
+    def _hadoop_dirs(self):
+        """Yield all possible hadoop directories (used for streaming jar
+        and logs). May yield duplicates"""
+        if self._opts['hadoop_home']:
+            yield self._opts['hadoop_home']
+
+        for name in ('HADOOP_PREFIX', 'HADOOP_HOME', 'HADOOP_INSTALL',
+                     'HADOOP_MAPRED_HOME'):
+            path = os.environ.get(name)
+            if path:
+                yield path
+
+        # guess it from the path of the Hadoop binary
+        hadoop_home = _hadoop_prefix_from_bin(self.get_hadoop_bin()[0])
+        if hadoop_home:
+            yield hadoop_home
+
+        # try HADOOP_*_HOME
+        for name, path in sorted(os.environ.items()):
+            if name.startswith('HADOOP_') and name.endswith('_HOME'):
+                yield path
+
+    def _hadoop_streaming_jar_dirs(self):
+        """Yield all possible places to look for the Hadoop streaming jar.
+        May yield duplicates.
+        """
+        for hadoop_dir in self._hadoop_dirs():
+            yield hadoop_dir
+
+        # use hard-coded paths to work out-of-the-box on EMR
+        for path in _EMR_HADOOP_STREAMING_JAR_DIRS:
+            yield path
+
+    def _hadoop_log_dirs(self, output_dir=None):
+        """Yield all possible places to look for hadoop logs."""
+        # hadoop_log_dirs opt overrides all this
+        if self._opts['hadoop_log_dirs']:
+            for path in self._opts['hadoop_log_dirs']:
+                yield path
+            return
+
+        hadoop_log_dir = os.environ.get('HADOOP_LOG_DIR')
+        if hadoop_log_dir:
+            yield hadoop_log_dir
+
+        if uses_yarn(self.get_hadoop_version()):
+            yarn_log_dir = os.environ.get('YARN_LOG_DIR')
+            if yarn_log_dir:
+                yield yarn_log_dir
+
+            yield _DEFAULT_YARN_HDFS_LOG_DIR
+
+        if output_dir:
+            # Cloudera style of logging
+            yield posixpath.join(output_dir, '_logs')
+
+        for hadoop_dir in self._hadoop_dirs():
+            yield posixpath.join(hadoop_dir, 'logs')
+
+        # hard-coded log paths for EMR, so this can work out-of-the-box
+        for path in _EMR_HADOOP_LOG_DIRS:
+            yield path
 
     def _run(self):
-        if self._opts['bootstrap_mrjob']:
-            self._add_python_archive(self._create_mrjob_tar_gz() + '#')
-
-        self._setup_input()
-        self._upload_non_input_files()
+        self._check_input_exists()
+        self._create_setup_wrapper_script()
+        self._add_job_files_for_upload()
+        self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()
 
-    def _setup_input(self):
-        """Copy local input files (if any) to a special directory on HDFS.
-
-        Set self._hdfs_input_files
+    def _check_input_exists(self):
+        """Make sure all input exists before continuing with our job.
         """
-        # winnow out HDFS files from local ones
-        self._hdfs_input_files = []
-        local_input_files = []
-
         for path in self._input_paths:
-            if HDFS_URI_RE.match(path):
-                # Don't even bother running the job if the input isn't there.
-                if not self.ls(path):
+            if path == '-':
+                continue  # STDIN always exists
+
+            if self._opts['check_input_paths']:
+                if not self.fs.exists(path):
                     raise AssertionError(
                         'Input path %s does not exist!' % (path,))
-                self._hdfs_input_files.append(path)
-            else:
-                local_input_files.append(path)
 
-        # copy local files into an input directory, with names like
-        # 00000-actual_name.ext
-        if local_input_files:
-            hdfs_input_dir = posixpath.join(self._hdfs_tmp_dir, 'input')
-            log.info('Uploading input to %s' % hdfs_input_dir)
-            self._mkdir_on_hdfs(hdfs_input_dir)
+    def _add_job_files_for_upload(self):
+        """Add files needed for running the job (setup and input)
+        to self._upload_mgr."""
+        for path in self._get_input_paths():
+            self._upload_mgr.add(path)
 
-            for i, path in enumerate(local_input_files):
-                if path == '-':
-                    path = self._dump_stdin_to_local_file()
+        for path in self._working_dir_mgr.paths():
+            self._upload_mgr.add(path)
 
-                target = '%s/%05i-%s' % (
-                    hdfs_input_dir, i, os.path.basename(path))
-                self._upload_to_hdfs(path, target)
-
-            self._hdfs_input_files.append(hdfs_input_dir)
-
-    def _pick_hdfs_uris_for_files(self):
-        """Decide where each file will be uploaded on S3.
-
-        Okay to call this multiple times.
+    def _upload_local_files_to_hdfs(self):
+        """Copy files managed by self._upload_mgr to HDFS
         """
-        hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
-        self._assign_unique_names_to_files(
-            'hdfs_uri', prefix=hdfs_files_dir, match=HDFS_URI_RE.match)
+        self.fs.mkdir(self._upload_mgr.prefix)
 
-    def _upload_non_input_files(self):
-        """Copy files to HDFS, and set the 'hdfs_uri' field for each file.
-        """
-        self._pick_hdfs_uris_for_files()
-
-        hdfs_files_dir = posixpath.join(self._hdfs_tmp_dir, 'files', '')
-        self._mkdir_on_hdfs(hdfs_files_dir)
-        log.info('Copying non-input files into %s' % hdfs_files_dir)
-
-        for file_dict in self._files:
-            path = file_dict['path']
-
-            # don't bother with files already in HDFS
-            if HDFS_URI_RE.match(path):
-                continue
-
-            self._upload_to_hdfs(path, file_dict['hdfs_uri'])
-
-    def _mkdir_on_hdfs(self, path):
-        log.debug('Making directory %s on HDFS' % path)
-        self._invoke_hadoop(['fs', '-mkdir', path])
+        log.info('Copying local files to %s...' % self._upload_mgr.prefix)
+        for path, uri in self._upload_mgr.path_to_uri().items():
+            self._upload_to_hdfs(path, uri)
 
     def _upload_to_hdfs(self, path, target):
-        log.debug('Uploading %s -> %s on HDFS' % (path, target))
-        self._invoke_hadoop(['fs', '-put', path, target])
+        log.debug('  %s -> %s' % (path, target))
+        self.fs._put(path, target)
 
     def _dump_stdin_to_local_file(self):
         """Dump sys.stdin to a local file, and return the path to it."""
-        stdin_path = os.path.join(self._get_local_tmp_dir(), 'STDIN')
+        stdin_path = posixpath.join(self._get_local_tmp_dir(), 'STDIN')
          # prompt user, so they don't think the process has stalled
         log.info('reading from STDIN')
 
-        log.debug('dumping stdin to local file %s' % stdin_path)
-        stdin_file = open(stdin_path, 'w')
+        log.debug('dumping stdin to local file %s...' % stdin_path)
+        stdin_file = open(stdin_path, 'wb')
         for line in self._stdin:
             stdin_file.write(line)
 
         return stdin_path
 
     def _run_job_in_hadoop(self):
-        # figure out local names for our files
-        self._name_files()
+        for step_num in range(self._num_steps()):
+            step_args = self._args_for_step(step_num)
 
-        # send script and wrapper script (if any) to working dir
-        assert self._script # shouldn't be able to run if no script
-        self._script['upload'] = 'file'
-        if self._wrapper_script:
-            self._wrapper_script['upload'] = 'file'
+            # log this *after* _args_for_step(), which can start a search
+            # for the Hadoop streaming jar
+            log.info('Running step %d of %d...' %
+                     (step_num + 1, self._num_steps()))
+            log.debug('> %s' % cmd_line(step_args))
 
-        steps = self._get_steps()
+            log_interpretation = {}
+            self._log_interpretations.append(log_interpretation)
 
-        for step_num, step in enumerate(steps):
-            log.debug('running step %d of %d' % (step_num+1, len(steps)))
+            # try to use a PTY if it's available
+            try:
+                pid, master_fd = pty.fork()
+            except (AttributeError, OSError):
+                # no PTYs, just use Popen
 
-            streaming_args = [self._opts['hadoop_bin'], 'jar', self._opts['hadoop_streaming_jar']]
+                # user won't get much feedback for a while, so tell them
+                # Hadoop is running
+                log.debug('No PTY available, using Popen() to invoke Hadoop')
 
-            # Add extra hadoop args first as hadoop args could be a hadoop
-            # specific argument (e.g. -libjar) which must come before job
-            # specific args.
-            streaming_args.extend(
-                self._hadoop_conf_args(step_num, len(steps)))
+                step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)
 
-            # setup input
-            for input_uri in self._hdfs_step_input_files(step_num):
-                streaming_args.extend(['-input', input_uri])
+                step_interpretation = _interpret_hadoop_jar_command_stderr(
+                    step_proc.stderr,
+                    record_callback=_log_record_from_hadoop)
 
-            # setup output
-            streaming_args.append('-output')
-            streaming_args.append(self._hdfs_step_output_dir(step_num))
+                # there shouldn't be much output to STDOUT
+                for line in step_proc.stdout:
+                    _log_line_from_hadoop(to_string(line).strip('\r\n'))
 
-            # set up uploading from HDFS to the working dir
-            streaming_args.extend(self._upload_args())
+                step_proc.stdout.close()
+                step_proc.stderr.close()
 
-            # set up mapper and reducer
-            streaming_args.append('-mapper')
-            streaming_args.append(cmd_line(self._mapper_args(step_num)))
-            if 'R' in step:
-                streaming_args.append('-reducer')
-                streaming_args.append(cmd_line(self._reducer_args(step_num)))
+                returncode = step_proc.wait()
             else:
-                streaming_args.extend(['-jobconf', 'mapred.reduce.tasks=0'])
+                # we have PTYs
+                if pid == 0:  # we are the child process
+                    os.execvp(step_args[0], step_args)
+                else:
+                    log.debug('Invoking Hadoop via PTY')
 
-            log.debug('> %s' % cmd_line(streaming_args))
-            step_proc = Popen(streaming_args, stdout=PIPE, stderr=PIPE)
+                    with os.fdopen(master_fd, 'rb') as master:
+                        # reading from master gives us the subprocess's
+                        # stderr and stdout (it's a fake terminal)
+                        step_interpretation = (
+                            _interpret_hadoop_jar_command_stderr(
+                                master,
+                                record_callback=_log_record_from_hadoop))
+                        _, returncode = os.waitpid(pid, 0)
 
-            # TODO: use a pty or something so that the hadoop binary
-            # won't buffer the status messages
-            self._process_stderr_from_streaming(step_proc.stderr)
+            # make sure output_dir is filled
+            if 'output_dir' not in step_interpretation:
+                step_interpretation['output_dir'] = (
+                    self._hdfs_step_output_dir(step_num))
 
-            # there shouldn't be much output to STDOUT
-            for line in step_proc.stdout:
-                log.error('STDOUT: ' + line.strip('\n'))
+            log_interpretation['step'] = step_interpretation
 
-            returncode = step_proc.wait()
-            if returncode != 0:
-                raise CalledProcessError(step_proc.returncode, streaming_args)
+            counters = self._pick_counters(log_interpretation)
+            if counters:
+                log.info(_format_counters(counters))
+            else:
+                log.warning('No counters found')
 
-    def _process_stderr_from_streaming(self, stderr):
-        for line in stderr:
-            line = HADOOP_STREAMING_OUTPUT_RE.match(line).group(2)
-            log.info('HADOOP: ' + line)
+            if returncode:
+                error = self._pick_error(log_interpretation)
+                if error:
+                    log.error('Probable cause of failure:\n\n%s\n' %
+                              _format_error(error))
+
+                # use CalledProcessError's well-known message format
+                reason = str(CalledProcessError(returncode, step_args))
+                raise StepFailedException(
+                    reason=reason, step_num=step_num,
+                    num_steps=self._num_steps())
+
+    def _args_for_step(self, step_num):
+        step = self._get_step(step_num)
+
+        if step['type'] == 'streaming':
+            return self._args_for_streaming_step(step_num)
+        elif step['type'] == 'jar':
+            return self._args_for_jar_step(step_num)
+        else:
+            raise AssertionError('Bad step type: %r' % (step['type'],))
+
+    def _args_for_streaming_step(self, step_num):
+        hadoop_streaming_jar = self.get_hadoop_streaming_jar()
+        if not hadoop_streaming_jar:
+            raise Exception('no Hadoop streaming jar')
+
+        args = self.get_hadoop_bin() + ['jar', hadoop_streaming_jar]
+
+        # set up uploading from HDFS to the working dir
+        args.extend(
+            self._upload_args(self._upload_mgr))
+
+        # Add extra hadoop args first as hadoop args could be a hadoop
+        # specific argument (e.g. -libjar) which must come before job
+        # specific args.
+        args.extend(self._hadoop_args_for_step(step_num))
+
+        mapper, combiner, reducer = (
+            self._hadoop_streaming_commands(step_num))
+
+        # if no reducer, shut off reducer tasks
+        if not reducer:
+            args.extend(['-D', ('%s=0' % translate_jobconf(
+                'mapreduce.job.reduces', self.get_hadoop_version()))])
+
+        # set up input
+        for input_uri in self._hdfs_step_input_files(step_num):
+            args.extend(['-input', input_uri])
+
+        # set up output
+        args.append('-output')
+        args.append(self._hdfs_step_output_dir(step_num))
+
+        args.append('-mapper')
+        args.append(mapper)
+
+        if combiner:
+            args.append('-combiner')
+            args.append(combiner)
+
+        if reducer:
+            args.append('-reducer')
+            args.append(reducer)
+
+        return args
+
+    def _args_for_jar_step(self, step_num):
+        step = self._get_step(step_num)
+
+        # special case for consistency with EMR runner.
+        #
+        # This might look less like duplicated code if we ever
+        # implement #780 (fetching jars from URIs)
+        if step['jar'].startswith('file:///'):
+            jar = step['jar'][7:]  # keep leading slash
+        else:
+            jar = step['jar']
+
+        args = self.get_hadoop_bin() + ['jar', jar]
+
+        if step.get('main_class'):
+            args.append(step['main_class'])
+
+        # TODO: merge with logic in mrjob/emr.py
+        def interpolate(arg):
+            if arg == mrjob.step.JarStep.INPUT:
+                return ','.join(self._hdfs_step_input_files(step_num))
+            elif arg == mrjob.step.JarStep.OUTPUT:
+                return self._hdfs_step_output_dir(step_num)
+            else:
+                return arg
+
+        if step.get('args'):
+            args.extend(interpolate(arg) for arg in step['args'])
+
+        return args
 
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""
         if step_num == 0:
-            return self._hdfs_input_files
+            return [self._upload_mgr.uri(p)
+                    for p in self._get_input_paths()]
         else:
             return [posixpath.join(
-                self._hdfs_tmp_dir, 'step-output', str(step_num))]
+                self._hadoop_tmp_dir,
+                'step-output/%04d' % (step_num - 1)
+            )]
 
     def _hdfs_step_output_dir(self, step_num):
         if step_num == len(self._get_steps()) - 1:
             return self._output_dir
         else:
             return posixpath.join(
-                self._hdfs_tmp_dir, 'step-output', str(step_num+1))
+                self._hadoop_tmp_dir,
+                'step-output/%04d' % step_num
+            )
 
-    def _script_args(self):
-        """How to invoke the script inside Hadoop"""
-        assert self._script # shouldn't be able to run if no script
-
-        args = [self._opts['python_bin'], self._script['name']]
-        if self._wrapper_script:
-            args = [self._opts['python_bin'],
-                    self._wrapper_script['name']] + args
-
-        return args
-
-    def _mapper_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--mapper'] +
-                self._mr_job_extra_args())
-
-    def _reducer_args(self, step_num):
-        return (self._script_args() +
-                ['--step-num=%d' % step_num, '--reducer'] +
-                self._mr_job_extra_args())
-
-    def _upload_args(self):
-        """Args to upload files from HDFS to the hadoop nodes."""
-        args = []
-        for file_dict in self._files:
-            if file_dict.get('upload') == 'file':
-                args.append('-cacheFile')
-                args.append(
-                    '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
-
-            elif file_dict.get('upload') == 'archive':
-                args.append('-cacheArchive')
-                args.append(
-                    '%s#%s' % (file_dict['hdfs_uri'], file_dict['name']))
-
-        return args
-
-    def _invoke_hadoop(self, args, ok_returncodes=None, ok_stderr=None,
-                       return_stdout=False):
-        """Run the given hadoop command, raising an exception on non-zero
-        return code. This only works for commands whose output we don't
-        care about.
-
-        Args:
-        ok_returncodes -- a list/tuple/set of return codes we expect to
-            get back from hadoop (e.g. [0,1]). By default, we only expect 0.
-            If we get an unexpected return code, we raise a CalledProcessError.
-        ok_stderr -- don't log STDERR or raise CalledProcessError if stderr
-            matches a regex in this list (even if the returncode is bad)
-        return_stdout -- return the stdout from the hadoop command rather
-            than logging it. If this is False, we return the returncode
-            instead.
-        """
-        args = [self._opts['hadoop_bin']] + args
-
-        log.debug('> %s' % cmd_line(args))
-
-        proc = Popen(args, stdout=PIPE, stderr=PIPE)
-        stdout, stderr = proc.communicate()
-
-        log_func = log.debug if proc.returncode == 0 else log.error
-        if not return_stdout:
-            for line in StringIO(stdout):
-                log_func('STDOUT: ' + line.rstrip('\n'))
-
-        # check if STDERR is okay
-        stderr_is_ok = False
-        if ok_stderr:
-            for stderr_re in ok_stderr:
-                if stderr_re.match(stderr):
-                    stderr_is_ok = True
-                    break
-
-        if not stderr_is_ok:
-            for line in StringIO(stderr):
-                log_func('STDERR: ' + line.rstrip('\n'))
-
-        ok_returncodes = ok_returncodes or [0]
-
-        if not stderr_is_ok and proc.returncode not in ok_returncodes:
-            raise CalledProcessError(proc.returncode, args)
-
-        if return_stdout:
-            return stdout
-        else:
-            return proc.returncode
-
-    def _process_stderr_from_hadoop(self, stderr):
-        for line in stderr:
-            log.info('HADOOP: %s' % line.rstrip('\n'))
-
-    def _stream_output(self):
-        output_dir = posixpath.join(self._output_dir, 'part-*')
-        log.info('Streaming output from %s from HDFS' % output_dir)
-
-        cat_args = [self._opts['hadoop_bin'], 'fs', '-cat', output_dir]
-        log.debug('> %s' % cmd_line(cat_args))
-
-        cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
-
-        for line in cat_proc.stdout:
-            yield line
-
-        # there shouldn't be any stderr
-        for line in cat_proc.stderr:
-            log.error('STDERR: ' + line)
-
-        returncode = cat_proc.wait()
-
-        if returncode != 0:
-            raise CalledProcessError(returncode, cat_args)
-
-    def _cleanup_scratch(self):
-        super(HadoopJobRunner, self)._cleanup_scratch()
-
-        if self._hdfs_tmp_dir:
-            log.info('deleting %s from HDFS' % self._hdfs_tmp_dir)
-
+    def _cleanup_hadoop_tmp(self):
+        if self._hadoop_tmp_dir:
+            log.info('Removing HDFS temp directory %s...' %
+                     self._hadoop_tmp_dir)
             try:
-                self._invoke_hadoop(['fs', '-rmr', self._hdfs_tmp_dir])
-            except Exception, e:
+                self.fs.rm(self._hadoop_tmp_dir)
+            except Exception as e:
                 log.exception(e)
 
-    ### FILESYSTEM STUFF ###
+    ### LOG (implementation of LogInterpretationMixin) ###
 
-    def du(self, path_glob):
-        """Get the size of a file, or None if it's not a file or doesn't
-        exist."""
-        if not HDFS_URI_RE.match(path_glob):
-            return super(HadoopJobRunner, self).dus(path_glob)
+    def _stream_history_log_dirs(self, output_dir=None):
+        """Yield lists of directories to look for the history log in."""
+        for log_dir in unique(self._hadoop_log_dirs(output_dir=output_dir)):
+            if self.fs.exists(log_dir):
+                log.info('Looking for history log in %s...' % log_dir)
+                # logs aren't always in a subdir named history/
+                yield [log_dir]
 
-        stdout = self._invoke_hadoop(['fs', '-du', path_glob],
-                                     return_stdout=True)
+    def _stream_task_log_dirs(self, application_id=None, output_dir=None):
+        """Yield lists of directories to look for the task logs in."""
+        # Note: this is unlikely to be super-helpful on "real" (multi-node)
+        # pre-YARN Hadoop because task logs aren't generally shipped to a
+        # local directory. It's a start, anyways. See #1201.
+        for log_dir in unique(self._hadoop_log_dirs(output_dir=output_dir)):
+            if application_id:
+                path = self.fs.join(log_dir, 'userlogs', application_id)
+            else:
+                path = self.fs.join(log_dir, 'userlogs')
 
-        try:
-            return int(stdout.split()[1])
-        except (ValueError, TypeError, IndexError):
-            raise Exception('Unexpected output from hadoop fs -du: %r' % stdout)
+            if self.fs.exists(path):
+                log.info('Looking for task syslogs in %s...' % path)
+                yield [path]
 
-    def ls(self, path_glob):
-        hdfs_match = HDFS_URI_RE.match(path_glob)
-
-        if not hdfs_match:
-            for path in super(HadoopJobRunner, self).ls(path_glob):
-                yield path
-            return
-
-        hdfs_prefix = hdfs_match.group(1)
-
-        stdout = self._invoke_hadoop(
-            ['fs', '-lsr', path_glob],
-            return_stdout=True,
-            ok_stderr=[HADOOP_LSR_NO_SUCH_FILE])
-
-        for line in StringIO(stdout):
-            fields = line.rstrip('\n').split()
-            # expect lines like:
-            # -rw-r--r--   3 dave users       3276 2010-01-13 14:00 /user/dave/foox
-            if len(fields) < 8:
-                raise Exception('unexpected ls line from hadoop: %r' % line)
-            # ignore directories
-            if fields[0].startswith('d'):
-                continue
-            # not sure if you can have spaces in filenames; just to be safe
-            path = ' '.join(fields[7:])
-            yield hdfs_prefix + path
-
-    def mkdir(self, path):
-        self._invoke_hadoop(
-            ['fs', '-mkdir', path], ok_stderr=[HADOOP_FILE_EXISTS_RE])
-
-    def path_exists(self, path_glob):
-        """Does the given path exist?
-
-        If dest is a directory (ends with a "/"), we check if there are
-        any files starting with that path.
-        """
-        if not HDFS_URI_RE.match(path_glob):
-            return super(HadoopJobRunner, self).path_exists(path_glob)
-
-        return bool(self._invoke_hadoop(['fs', '-test', '-e', path_glob],
-                                        ok_returncodes=(0,1)))
-
-    def path_join(self, dirname, filename):
-        if HDFS_URI_RE.match(dirname):
-            return posixpath.join(dirname, filename)
-        else:
-            return os.path.join(dirname, filename)
-
-    def rm(self, path_glob):
-        if not HDFS_URI_RE.match(path_glob):
-            super(HadoopJobRunner, self).rm(path_glob)
-
-        if self.path_exists(path_glob):
-            # hadoop fs -rmr will print something like:
-            # Moved to trash: hdfs://hdnamenode:54310/user/dave/asdf
-            # to STDOUT, which we don't care about.
-            #
-            # if we ask to delete a path that doesn't exist, it prints
-            # to STDERR something like:
-            # rmr: <path>
-            # which we can safely ignore
-            self._invoke_hadoop(
-                ['fs', '-rmr', path_glob],
-                return_stdout=True, ok_stderr=[HADOOP_RMR_NO_SUCH_FILE])
-
-    def touchz(self, dest):
-        if not HDFS_URI_RE.match(dest):
-            super(HadoopJobRunner, self).touchz(dest)
-
-        self._invoke_hadoop(['fs', '-touchz', dest])
+    def counters(self):
+        return [_pick_counters(log_interpretation)
+                for log_interpretation in self._log_interpretations]
 
 
+# These don't require state from HadoopJobRunner, so making them functions.
+# Feel free to convert them back into methods as need be
 
 
+def _hadoop_prefix_from_bin(hadoop_bin):
+    """Given a path to the hadoop binary, return the path of the implied
+    hadoop home, or None if we don't know.
 
+    Don't return the parent directory of directories in the default
+    path (not ``/``, ``/usr``, or ``/usr/local``).
+    """
+    # resolve unqualified binary name (relative paths are okay)
+    if '/' not in hadoop_bin:
+        hadoop_bin = which(hadoop_bin)
+        if not hadoop_bin:
+            return None
+
+    # use parent of hadoop_bin's directory
+    hadoop_home = posixpath.abspath(
+        posixpath.join(posixpath.realpath(posixpath.dirname(hadoop_bin)), '..')
+    )
+
+    if hadoop_home in _BAD_HADOOP_HOMES:
+        return None
+
+    return hadoop_home
+
+
+def _log_line_from_hadoop(line, level=None):
+    """Log ``'  <line>'``. *line* should be a string.
+
+    Optionally specify a logging level (default is logging.INFO).
+    """
+    log.log(level or logging.INFO, '  %s' % line)
+
+
+def _log_record_from_hadoop(record):
+    """Log log4j record parsed from hadoop stderr."""
+    if not _is_counter_log4j_record(record):  # counters are printed separately
+        level = getattr(logging, record.get('level') or '', None)
+        _log_line_from_hadoop(record['message'], level=level)

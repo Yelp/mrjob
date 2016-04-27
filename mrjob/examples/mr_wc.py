@@ -17,6 +17,7 @@
 This is meant as an example of why mapper_final is useful."""
 from mrjob.job import MRJob
 
+
 class MRWordCountUtility(MRJob):
 
     def __init__(self, *args, **kwargs):
@@ -26,9 +27,10 @@ class MRWordCountUtility(MRJob):
         self.lines = 0
 
     def mapper(self, _, line):
-        if False: yield # I'm a generator!
-
-        self.chars += len(line) + 1 # +1 for newline
+        # Don't actually yield anything for each line. Instead, collect them
+        # and yield the sums when all lines have been processed. The results
+        # will be collected by the reducer.
+        self.chars += len(line) + 1  # +1 for newline
         self.words += sum(1 for word in line.split() if word.strip())
         self.lines += 1
 
@@ -40,7 +42,6 @@ class MRWordCountUtility(MRJob):
     def reducer(self, key, values):
         yield(key, sum(values))
 
+
 if __name__ == '__main__':
     MRWordCountUtility.run()
-
-

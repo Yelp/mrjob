@@ -1,4 +1,5 @@
-# Copyright 2009-2011 Yelp and Contributors
+# -*- coding: utf-8 -*-
+# Copyright 2009-2013 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,271 +12,283 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
-
 import logging
-import os
-import pprint
-import shutil
-from subprocess import Popen, PIPE
-import sys
+from subprocess import CalledProcessError
+from subprocess import Popen
+from subprocess import PIPE
 
-from mrjob.conf import combine_dicts, combine_local_envs
-from mrjob.parse import find_python_traceback, parse_mr_job_stderr
-from mrjob.runner import MRJobRunner
-from mrjob.util import cmd_line, unarchive
+from mrjob.logs.counters import _format_counters
+from mrjob.parse import _find_python_traceback
+from mrjob.parse import parse_mr_job_stderr
+from mrjob.py2 import string_types
+from mrjob.sim import SimMRJobRunner
+from mrjob.step import StepFailedException
+from mrjob.util import cmd_line
+from mrjob.util import shlex_split
 
 
-log = logging.getLogger('mrjob.local')
+log = logging.getLogger(__name__)
 
 
-class LocalMRJobRunner(MRJobRunner):
-    """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing
-    purposes.
+def _chain_procs(procs_args, **kwargs):
+    """Input: List of lists of command line arguments.
 
-    This is the default way of running jobs; we assume you'll spend some
-    time debugging your job before you're ready to run it on EMR or
-    Hadoop.
+    These arg lists will be turned into Popen objects with the keyword
+    arguments specified as kwargs to this function. For procs X, Y, and Z, X
+    stdout will go to Y stdin and Y stdout will go to Z stdin. So for
+    P[i < |procs|-1], stdout is replaced with a pipe to the next process. For
+    P[i > 0], stdin is replaced with a pipe from the previous process.
+    Otherwise, the kwargs are passed through to the Popen constructor without
+    modification, so you can specify stdin/stdout/stderr file objects and have
+    them behave as expected.
+
+    The return value is a list of Popen objects created, in the same order as
+    *procs_args*.
+
+    In most ways, this function makes several processes that act as one in
+    terms of input and output.
+    """
+    last_stdout = None
+
+    procs = []
+    for i, args in enumerate(procs_args):
+        proc_kwargs = kwargs.copy()
+
+        # first proc shouldn't override any kwargs
+        # other procs should get stdin from last proc's stdout
+        if i > 0:
+            proc_kwargs['stdin'] = last_stdout
+
+        # last proc shouldn't override stdout
+        # other procs should have stdout sent to next proc
+        if i < len(procs_args) - 1:
+            proc_kwargs['stdout'] = PIPE
+
+        proc = Popen(args, **proc_kwargs)
+        last_stdout = proc.stdout
+        procs.append(proc)
+
+    return procs
+
+
+class LocalMRJobRunner(SimMRJobRunner):
+    """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing purposes.
+    Invoked when you run your job with ``-r local``.
+
+    Unlike :py:class:`~mrjob.job.InlineMRJobRunner`, this actually spawns
+    multiple subprocesses for each task.
+
+    This is fairly inefficient and *not* a substitute for Hadoop; it's
+    main purpose is to help you test out :mrjob-opt:`setup` commands.
 
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
-    """
 
+    """
     alias = 'local'
 
     def __init__(self, **kwargs):
-        """:py:class:`~mrjob.local.LocalMRJobRunner` takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
+        """Arguments to this constructor may also appear in :file:`mrjob.conf`
+        under ``runners/local``.
+
+        :py:class:`~mrjob.local.LocalMRJobRunner`'s constructor takes the
+        same keyword args as
+        :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
 
         * *cmdenv* is combined with :py:func:`~mrjob.conf.combine_local_envs`
-        * *python_bin* defaults to ``sys.executable`` (the current python interpreter)
-        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*, and *hadoop_streaming_jar*, and *jobconf* are ignored because they require Java. If you need to test these, consider starting up a standalone Hadoop instance and running your job with ``-r hadoop``.
+        * *python_bin* defaults to ``sys.executable`` (the current python
+          interpreter)
+        * *hadoop_input_format*, *hadoop_output_format*,
+          and *partitioner* are ignored because they
+          require Java. If you need to test these, consider starting up a
+          standalone Hadoop instance and running your job with ``-r hadoop``.
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 
-        self._working_dir = None
-        self._prev_outfile = None
-        self._final_outfile = None
-        self._counters = []
+        self._all_proc_dicts = []
 
-    @classmethod
-    def _default_opts(cls):
-        """A dictionary giving the default value of options."""
-        return combine_dicts(super(LocalMRJobRunner, cls)._default_opts(), {
-            # prefer whatever interpreter we're currently using
-            'python_bin': sys.executable or 'python',
-        })
+        # jobconf variables set by our own job (e.g. files "uploaded")
+        #
+        # By convention, we use the Hadoop 2 versions of the
+        # jobconf variables internally (they get auto-translated before
+        # running the job)
+        self._internal_jobconf = {}
 
-    @classmethod
-    def _opts_combiners(cls):
-        # on windows, PYTHONPATH should use ;, not :
-        return combine_dicts(
-            super(LocalMRJobRunner, cls)._opts_combiners(),
-            {'cmdenv': combine_local_envs})
+    def _run_step(self, step_num, step_type, input_path, output_path,
+                  working_dir, env):
+        step = self._get_step(step_num)
 
-    # options that we ignore because they require real Hadoop
-    IGNORED_OPTS = [
-        'hadoop_extra_args',
-        'hadoop_input_format',
-        'hadoop_output_format',
-        'hadoop_streaming_jar',
-        'jobconf',
-    ]
+        if step_type == 'mapper':
+            procs_args = self._mapper_arg_chain(
+                step, step_num, input_path)
+        elif step_type == 'reducer':
+            procs_args = self._reducer_arg_chain(
+                step, step_num, input_path)
 
-    def _run(self):
-        if self._opts['bootstrap_mrjob']:
-            self._add_python_archive(self._create_mrjob_tar_gz() + '#')
+        proc_dicts = self._invoke_processes(
+            procs_args, output_path, working_dir, env)
+        self._all_proc_dicts.extend(proc_dicts)
 
-        self._create_wrapper_script()
-        self._setup_working_dir()
-        self._setup_output_dir()
+    def _per_step_runner_finish(self, step_num):
+        for proc_dict in self._all_proc_dicts:
+            self._wait_for_process(proc_dict, step_num)
 
-        assert self._script # shouldn't be able to run if no script
+        self._all_proc_dicts = []
 
-        for ignored_opt in self.IGNORED_OPTS:
-            if self._opts[ignored_opt]:
-                log.warning('ignoring %s option (requires real Hadoop): %r' %
-                            (ignored_opt, self._opts[ignored_opt]))
+    def _filter_if_any(self, substep_dict):
+        if substep_dict['type'] == 'script':
+            if 'pre_filter' in substep_dict:
+                return shlex_split(substep_dict['pre_filter'])
+        return None
 
-        wrapper_args = [self._opts['python_bin']]
-        if self._wrapper_script:
-            wrapper_args = [self._opts['python_bin'],
-                            self._wrapper_script['name']] + wrapper_args
+    def _substep_args(self, step_dict, step_num, mrc, input_path=None):
+        if step_dict['type'] != 'streaming':
+            raise Exception("LocalMRJobRunner cannot run %s steps." %
+                            step_dict['type'])
+        if step_dict[mrc]['type'] == 'command':
+            if input_path is None:
+                return [shlex_split(step_dict[mrc]['command'])]
+            else:
+                return [
+                    ['cat', input_path],
+                    shlex_split(step_dict[mrc]['command'])]
+        if step_dict[mrc]['type'] == 'script':
+            args = self._script_args_for_step(step_num, mrc)
+            if input_path is None:
+                return [args]
+            else:
+                return [args + [input_path]]
 
-        # run mapper, sort, reducer for each step
-        for i, step in enumerate(self._get_steps()):
-            self._counters.append({})
-            # run the mapper
-            mapper_args = (wrapper_args + [self._script['name'],
-                            '--step-num=%d' % i, '--mapper'] +
-                           self._mr_job_extra_args())
-            self._invoke_step(mapper_args, 'step-%d-mapper' % i, step_num=i)
+    def _substep_arg_chain(self, mrc, step_dict, step_num, input_path):
+        procs_args = []
 
-            if 'R' in step:
-                # sort the output
-                self._invoke_step(['sort'], 'step-%d-mapper-sorted' % i,
-                       env={'LC_ALL': 'C'}, step_num=i) # ignore locale
-
-                # run the reducer
-                reducer_args = (wrapper_args + [self._script['name'],
-                                 '--step-num=%d' % i, '--reducer'] +
-                                self._mr_job_extra_args())
-                self._invoke_step(reducer_args, 'step-%d-reducer' % i, step_num=i)
-
-        # move final output to output directory
-        self._final_outfile = os.path.join(self._output_dir, 'part-00000')
-        log.info('Moving %s -> %s' % (self._prev_outfile, self._final_outfile))
-        shutil.move(self._prev_outfile, self._final_outfile)
-
-    def _setup_working_dir(self):
-        """Make a working directory with symlinks to our script and
-        external files. Return name of the script"""
-        # specify that we want to upload our script along with other files
-        if self._script:
-            self._script['upload'] = 'file'
-        if self._wrapper_script:
-            self._wrapper_script['upload'] = 'file'
-
-        # create the working directory
-        self._working_dir = os.path.join(self._get_local_tmp_dir(), 'working_dir')
-        self.mkdir(self._working_dir)
-
-        # give all our files names, and symlink or unarchive them
-        self._name_files()
-        for file_dict in self._files:
-            path = file_dict['path']
-            dest = os.path.join(self._working_dir, file_dict['name'])
-
-            if file_dict.get('upload') == 'file':
-                self._symlink_to_file_or_copy(path, dest)
-            elif file_dict.get('upload') == 'archive':
-                log.debug('unarchiving %s -> %s' % (path, dest))
-                unarchive(path, dest)
-
-    def _setup_output_dir(self):
-        if not self._output_dir:
-            self._output_dir = os.path.join(self._get_local_tmp_dir(), 'output')
-
-        if not os.path.isdir(self._output_dir):
-            log.debug('Creating output directory %s' % self._output_dir)
-            self.mkdir(self._output_dir)
-
-    def _symlink_to_file_or_copy(self, path, dest):
-        """Symlink from *dest* to the absolute version of *path*.
-
-        If symlinks aren't available, copy *path* to *dest* instead."""
-        if hasattr(os, 'symlink'):
-            path = os.path.abspath(path)
-            log.debug('creating symlink %s <- %s' % (path, dest))
-            os.symlink(path, dest)
+        filter_args = self._filter_if_any(step_dict[mrc])
+        if filter_args:
+            procs_args.append(['cat', input_path])
+            procs_args.append(filter_args)
+            # _substep_args may return more than one process
+            procs_args.extend(
+                self._substep_args(step_dict, step_num, mrc))
         else:
-            log.debug('copying %s -> %s' % (path, dest))
-            shutil.copyfile(path, dest)
+            # _substep_args may return more than one process
+            procs_args.extend(
+                self._substep_args(step_dict, step_num, mrc, input_path))
+        return procs_args
 
-    def _stream_output(self):
-        """Read output from the final outfile."""
-        if self._final_outfile:
-            output_file = self._final_outfile
-        else:
-            output_file = os.path.join(self._output_dir, 'part-00000')
-        log.info('streaming final output from %s' % output_file)
+    def _mapper_arg_chain(self, step_dict, step_num, input_path):
+        # sometimes the mapper isn't actually there, so if it isn't, use cat
+        if 'mapper' not in step_dict:
+            new_step_dict = {
+                'mapper': {
+                    'type': 'command',
+                    'command': 'cat',
+                }
+            }
+            new_step_dict.update(step_dict)
+            step_dict = new_step_dict
 
-        for line in open(output_file):
-            yield line
+        procs_args = self._substep_arg_chain(
+            'mapper', step_dict, step_num, input_path)
 
-    def _invoke_step(self, args, outfile_name, env=None, step_num=0):
-        """Run the given command, outputting into outfile, and reading
-        from the previous outfile (or, for the first step, from our
-        original output files).
+        if 'combiner' in step_dict:
+            procs_args.append(['sort'])
+            # _substep_args may return more than one process
+            procs_args.extend(self._combiner_arg_chain(step_dict, step_num))
 
-        outfile is a path relative to our local tmp dir. commands are run
-        inside self._working_dir
+        return procs_args
 
-        We'll intelligently handle stderr from the process.
+    def _combiner_arg_chain(self, step_dict, step_num):
+        # simpler than mapper or reducer arg logic because it never takes an
+        # input file, always reads from stdin
+        procs_args = []
+
+        filter_args = self._filter_if_any(step_dict['combiner'])
+        if filter_args:
+            procs_args.append(filter_args)
+        # _substep_args may return more than one process
+        procs_args.extend(
+            self._substep_args(step_dict, step_num, 'combiner'))
+        return procs_args
+
+    def _reducer_arg_chain(self, step_dict, step_num, input_path):
+        return self._substep_arg_chain(
+            'reducer', step_dict, step_num, input_path)
+
+    def _invoke_processes(self, procs_args, output_path, working_dir, env):
+        """invoke the process described by *args* and write to *output_path*
+
+        :param combiner_args: If this mapper has a combiner, we need to do
+                              some extra shell wrangling, so pass the combiner
+                              arguments in separately.
+
+        :return: dict(proc=Popen, args=[process args], write_to=file)
         """
-        # keep the current environment because we need PATH to find binaries
-        # and make PYTHONPATH work
-        env = combine_local_envs(
-            {'PYTHONPATH': os.getcwd()},
-            os.environ,
-            self._get_cmdenv(),
-            env or {})
+        log.debug('> %s > %s' % (' | '.join(
+            args if isinstance(args, string_types) else cmd_line(args)
+            for args in procs_args), output_path))
 
-        # decide where to get input
-        if self._prev_outfile is not None:
-            input_paths = [self._prev_outfile]
-        else:
-            input_paths = []
-            for path in self._input_paths:
-                if path == '-':
-                    input_paths.append(self._dump_stdin_to_local_file())
-                else:
-                    input_paths.append(path)
+        with open(output_path, 'wb') as write_to:
+            procs = _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
+                                 cwd=working_dir, env=env)
+            return [{'args': a, 'proc': proc, 'write_to': write_to}
+                    for a, proc in zip(procs_args, procs)]
 
-        # add input to the command line
-        for path in input_paths:
-            args.append(os.path.abspath(path))
-
-        log.info('> %s' % cmd_line(args))
-
-        # set up outfile
-        outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
-        log.info('writing to %s' % outfile)
-        log.debug('')
-
-        self._prev_outfile = outfile
-        write_to = open(outfile, 'w')
-
-        # run the process
-        proc = Popen(args, stdout=write_to, stderr=PIPE,
-                     cwd=self._working_dir, env=env)
-
+    def _wait_for_process(self, proc_dict, step_num):
         # handle counters, status msgs, and other stuff on stderr
-        stderr_lines = self._process_stderr_from_script(proc.stderr, step_num=step_num)
-        tb_lines = find_python_traceback(stderr_lines)
+        proc = proc_dict['proc']
 
-        self._print_counters()
+        stderr_lines = self._process_stderr_from_script(
+            proc.stderr, step_num=step_num)
+        tb_lines = _find_python_traceback(stderr_lines)
+
+        # proc.stdout isn't always defined
+        if proc.stdout:
+            proc.stdout.close()
+        proc.stderr.close()
 
         returncode = proc.wait()
+
         if returncode != 0:
+            # show counters before raising exception
+            counters = self._counters[step_num]
+            if counters:
+                log.info(_format_counters(counters))
+
             # try to throw a useful exception
             if tb_lines:
-                raise Exception(
-                    'Command %r returned non-zero exit status %d:\n%s' %
-                    (args, returncode, ''.join(tb_lines)))
-            else:
-                raise Exception(
-                    'Command %r returned non-zero exit status %d: %s' %
-                    (args, returncode))
+                for line in tb_lines:
+                    log.error(line.rstrip('\r\n'))
 
-        # flush file descriptors
-        write_to.flush()
+            reason = str(
+                CalledProcessError(returncode, proc_dict['args']))
+            raise StepFailedException(
+                reason=reason, step_num=step_num,
+                num_steps=len(self._get_steps()))
 
     def _process_stderr_from_script(self, stderr, step_num=0):
         """Handle stderr a line at time:
 
-        - for counter lines, store counters
-        - for status message, log the status change
-        - for all other lines, log an error, and yield the lines
+        * for counter lines, store counters
+        * for status message, log the status change
+        * for all other lines, log an error, and yield the lines
         """
         for line in stderr:
             # just pass one line at a time to parse_mr_job_stderr(),
             # so we can print error and status messages in realtime
-            parsed = parse_mr_job_stderr([line], counters=self._counters[step_num])
+            parsed = parse_mr_job_stderr(
+                [line], counters=self._counters[step_num])
 
             # in practice there's only going to be at most one line in
             # one of these lists, but the code is cleaner this way
             for status in parsed['statuses']:
-                log.info('status: %s' % status)
+                log.info('Status: %s' % status)
 
             for line in parsed['other']:
-                log.error('STDERR: %s' % line.rstrip('\n'))
+                log.debug('STDERR: %s' % line.rstrip('\r\n'))
                 yield line
 
-    def _print_counters(self):
-        """Log the current value of counters (if any)"""
-        if not self._counters:
-            return
-
-        log.info('counters: %s' % pprint.pformat(self._counters))
+    def _default_python_bin(self, local=False):
+        return super(LocalMRJobRunner, self)._default_python_bin(
+            local=True)

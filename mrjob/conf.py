@@ -1,4 +1,6 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
+# Copyright 2013 David Marin
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,190 +13,425 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 """"mrjob.conf" is the name of both this module, and the global config file
 for :py:mod:`mrjob`.
-
-We look for :file:`mrjob.conf` in these locations:
-
-- :file:`~/.mrjob`
-- :file:`mrjob.conf` anywhere in your :envvar:`PYTHONPATH`
-- :file:`/etc/mrjob.conf`
-
-The point of :file:`mrjob.conf` is to let you set up things you want every
-job to have access to so that you don't have to think about it. For example:
-
-- libraries and source code you want to be available for your jobs
-- where temp directories and logs should go
-- security credentials
-
-:file:`mrjob.conf` is just a `YAML <http://www.yaml.org>`_-encoded dictionary
-containing default values to pass in to the constructors of the various runner
-classes. Here's a minimal :file:`mrjob.conf`:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        cmdenv:
-          TZ: America/Los_Angeles
-
-Now whenever you run ``mr_your_script.py -r emr``,
-:py:class:`~mrjob.emr.EMRJobRunner` will automatically set :envvar:`TZ` to
-``America/Los_Angeles`` in your job's environment when it runs on EMR.
-
-Options specified on the command-line take precedence over
-:file:`mrjob.conf`. Usually this means simply overriding the option in
-:file:`mrjob.conf`. However, we know that *cmdenv*, contains environment
-variables, so we do the right thing. For example, if your :file:`mrjob.conf`
-contained:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        cmdenv:
-          PATH: /usr/local/bin
-          TZ: America/Los_Angeles
-
-and you ran your job as::
-
-    mr_your_script.py -r emr --cmdenv TZ=Europe/Paris --cmdenv PATH=/usr/sbin
-
-We'd automatically handle the :envvar:`PATH`
-variables and your job's environment would be::
-
-    {'TZ': 'Europe/Paris', 'PATH': '/usr/sbin:/usr/local/bin'}
-
-What's going on here is that *cmdenv* is associated with
-:py:func:`combine_envs`. Each option is associated with an appropriate
-combiner function that that combines options in an appropriate way.
-
-Combiners can also do useful things like expanding environment variables and
-globs in paths. For example, you could set:
-
-.. code-block:: yaml
-
-    runners:
-      local:
-        upload_files: &upload_files
-        - $DATA_DIR/*.db
-      hadoop:
-        upload_files: *upload_files
-      emr:
-        upload_files: *upload_files
-
-and every time you ran a job, every job in your ``.db`` file in ``$DATA_DIR``
-would automatically be loaded into your job's current working directory.
-
-Also, if you specified additional files to upload with :option:`--file`, those
-files would be uploaded in addition to the ``.db`` files, rather than instead
-of them.
-
-See :doc:`configs-runners` for the entire dizzying array of configurable
-options.
 """
-
-from __future__ import with_statement
-
 import glob
+import json
 import logging
 import os
-
-from mrjob.util import expand_path
-
-try:
-    import simplejson as json # preferred because of C speedups
-except ImportError:
-    import json # built in to Python 2.6 and later
+import os.path
 
 # yaml is nice to have, but we can fall back on JSON if need be
 try:
     import yaml
+    yaml  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     yaml = None
 
-log = logging.getLogger('mrjob.conf')
+from mrjob.py2 import string_types
+from mrjob.util import expand_path
+from mrjob.util import shlex_split
 
 
-### READING AND WRITING mrjob.conf ###
+log = logging.getLogger(__name__)
+
+
+class OptionStore(dict):
+    """Encapsulates logic about a configuration. With the exception of the
+    constructor, it can be accessed like a dictionary."""
+
+    #: Set of valid keys for this type of configuration
+    ALLOWED_KEYS = set()
+
+    #: Mapping of key to function used to combine multiple values to override,
+    #: augment, etc. Leave blank for :py:func:`combine_values()`.
+    COMBINERS = {}
+
+    #: Mapping from old name for an option to its new name
+    DEPRECATED_ALIASES = {}
+
+    def __init__(self):
+        super(OptionStore, self).__init__()
+        self.cascading_dicts = [
+            dict((key, None) for key in self.ALLOWED_KEYS),
+            self.default_options(),
+        ]
+
+    def default_options(self):
+        """Default options for this :py:class:`OptionStore`"""
+        return {}
+
+    def validated_options(self, opts, from_where=''):
+        results = {}
+
+        for k, v in sorted(opts.items()):
+            if k in self.DEPRECATED_ALIASES:
+                if v is None:
+                    continue
+
+                aliased_opt = self.DEPRECATED_ALIASES[k]
+
+                log.warning('Deprecated option %s%s has been renamed to %s'
+                            ' and will be removed in v0.6.0' % (
+                                k, from_where, aliased_opt))
+
+                if opts.get(aliased_opt) is None:
+                    results[aliased_opt] = v
+
+            elif k in self.ALLOWED_KEYS:
+                results[k] = v
+
+            else:
+                log.warning('Unexpected option %s%s' % (k, from_where))
+
+        return results
+
+    def populate_values_from_cascading_dicts(self):
+        """When ``cascading_dicts`` has been built, use it to populate the
+        dictionary with the ultimate values.
+        """
+        self.update(combine_opts(self.COMBINERS, *self.cascading_dicts))
+        self._opt_priority = self._calculate_opt_priority()
+
+    def is_default(self, key):
+        return self._opt_priority[key] < 2
+
+    def __getitem__(self, key):
+        if key in self.ALLOWED_KEYS:
+            return super(OptionStore, self).__getitem__(key)
+        else:
+            raise KeyError(key)
+
+    def __setitem__(self, key, value):
+        if key in self.ALLOWED_KEYS:
+            return super(OptionStore, self).__setitem__(key, value)
+        else:
+            raise KeyError(key)
+
+    def _calculate_opt_priority(self):
+        """Keep track of where in the order opts were specified,
+        to handle opts that affect the same thing (e.g. ec2_*instance_type).
+
+        Here is a rough guide to the values set by this function. They are
+
+            Where specified     Priority
+            unset everywhere    -1
+            blank               0
+            non-blank default   1
+            base conf file      2
+            inheriting conf     [3-n]
+            command line        n+1
+        """
+        opt_priority = dict((opt, -1) for opt in self)
+        for priority, opt_dict in enumerate(self.cascading_dicts):
+            if opt_dict:
+                for opt, value in opt_dict.items():
+                    if value is not None:
+                        opt_priority[opt] = priority
+        return opt_priority
+
+
+### finding config files ###
 
 def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
 
-    - :file:`~/.mrjob`
-    - :file:`mrjob.conf` in any directory in :envvar:`PYTHONPATH`
+    - The location specified by :envvar:`MRJOB_CONF`
+    - :file:`~/.mrjob.conf`
     - :file:`/etc/mrjob.conf`
 
     Return ``None`` if we can't find it.
     """
     def candidates():
+        if 'MRJOB_CONF' in os.environ:
+            yield expand_path(os.environ['MRJOB_CONF'])
+
         # $HOME isn't necessarily set on Windows, but ~ works
-        yield expand_path('~/.mrjob')
+        # use os.path.join() so we don't end up mixing \ and /
+        yield expand_path(os.path.join('~', '.mrjob.conf'))
 
-        if os.environ.get('PYTHONPATH'):
-            for dirname in os.environ['PYTHONPATH'].split(os.pathsep):
-                yield os.path.join(dirname, 'mrjob.conf')
-
+        # this only really makes sense on Unix, so no os.path.join()
         yield '/etc/mrjob.conf'
 
     for path in candidates():
-        log.debug('looking for configs in %s' % path)
+        log.debug('Looking for configs in %s' % path)
         if os.path.exists(path):
-            log.info('using configs in %s' % path)
+            log.info('Using configs in %s' % path)
             return path
     else:
-        log.info("no configs found; falling back on auto-configuration")
+        log.info('No configs found; falling back on auto-configuration')
         return None
 
 
-def load_mrjob_conf(conf_path=None):
-    """Load the entire data structure in :file:`mrjob.conf`, which should
-    look something like this::
+def _expanded_mrjob_conf_path(conf_path=None):
+    """Return the path of a single conf file. If *conf_path* is ``False``,
+    return ``None``, and if it's ``None``, return :py:func:`find_mrjob_conf`.
+    Otherwise, expand environment variables and ``~`` in *conf_path* and
+    return it.
 
-        {'runners':
-            'local': {'OPTION': VALUE, ...}
-            'emr': {'OPTION': VALUE, ...}
-            'hadoop: {'OPTION': VALUE, ...}
-        }
-
-    Returns ``None`` if we can't find :file:`mrjob.conf`.
-
-    :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is ``False``, we'll always return ``None``.
+    Confusingly, this function doesn't actually return a "real" path according
+    to ``os.path.realpath()``; it just resolves environment variables and
+    ``~``.
     """
     if conf_path is False:
         return None
     elif conf_path is None:
-        conf_path = find_mrjob_conf()
-        if conf_path is None:
-            return None
+        return find_mrjob_conf()
+    else:
+        return expand_path(conf_path)
+
+
+### !clear tag ###
+
+class ClearedValue(object):
+    """Wrap a value tagged with !clear in mrjob.conf"""
+
+    def __init__(self, value):
+        self.value = value
+
+    def __eq__(self, other):
+        if isinstance(other, ClearedValue):
+            return self.value == other.value
+        else:
+            return False
+
+    def __hash__(self):
+        return hash(self.value)
+
+    def __repr__(self):
+        return '%s(%s)' % (self.__class__.__name__, repr(self.value))
+
+
+def _cleared_value_constructor(loader, node):
+    # tried construct_object(), got an unconstructable recursive node warning
+    if isinstance(node, yaml.MappingNode):
+        value = loader.construct_mapping(node)
+    elif isinstance(node, yaml.ScalarNode):
+        # resolve null as None, not u'null'
+        value = yaml.safe_load(node.value)
+    elif isinstance(node, yaml.SequenceNode):
+        value = loader.construct_sequence(node)
+    else:
+        raise TypeError
+
+    return ClearedValue(value)
+
+
+def _load_yaml_with_clear_tag(stream):
+    """Like yaml.safe_load(), but everything with a !clear tag before it
+    will be wrapped in ClearedValue()."""
+    loader = yaml.SafeLoader(stream)
+    loader.add_constructor('!clear', _cleared_value_constructor)
+    try:
+        return loader.get_single_data()
+    finally:
+        if hasattr(loader, 'dispose'):  # it doesn't in PyYAML 3.09
+            loader.dispose()
+
+
+def _cleared_value_representer(dumper, data):
+    if not isinstance(data, ClearedValue):
+        raise TypeError
+    node = dumper.represent_data(data.value)
+    node.tag = '!clear'
+    return node
+
+
+def _dump_yaml_with_clear_tags(data, stream=None, **kwds):
+    class ClearedValueSafeDumper(yaml.SafeDumper):
+        pass
+
+    ClearedValueSafeDumper.add_representer(
+        ClearedValue, _cleared_value_representer)
+
+    return yaml.dump_all([data], stream, Dumper=ClearedValueSafeDumper, **kwds)
+
+
+def _fix_clear_tags(x):
+    """Recursively resolve :py:class:`ClearedValue` wrappers so that
+    ``ClearedValue(...)`` can only wrap values in dicts (and in the top-level
+    value we return).
+
+    In dicts, we treat ``ClearedValue(k): v`` or
+    ``ClearedValue(k): ClearedValue(v)`` as equivalent to
+    ``k: ClearedValue(v)``. ``ClearedValue(k): v1`` overrides ``k: v2``.
+
+    In lists, any ClearedValue wrappers are simply stripped.
+    """
+    _fix = _fix_clear_tags
+
+    if isinstance(x, list):
+        return [_fix(_strip_clear_tag(item)) for item in x]
+
+    elif isinstance(x, dict):
+        d = dict((_fix(k), _fix(v)) for k, v in x.items())
+
+        # handle cleared keys
+        for k, v in list(d.items()):
+            if isinstance(k, ClearedValue):
+                del d[k]
+                d[_strip_clear_tag(k)] = ClearedValue(_strip_clear_tag(v))
+
+        return d
+
+    elif isinstance(x, ClearedValue):
+        return ClearedValue(_fix(x.value))
+
+    else:
+        return x
+
+
+def _resolve_clear_tags_in_list(items):
+    """Create a list from *items*. If we encounter a :py:class:`ClearedValue`,
+    unwrap it and ignore previous values. Used by ``combine_*()`` functions
+    to combine lists of values.
+    """
+    result = []
+
+    for item in items:
+        if isinstance(item, ClearedValue):
+            result = [item.value]
+        else:
+            result.append(item)
+
+    return result
+
+
+def _strip_clear_tag(v):
+    """remove the clear tag from the given value."""
+    if isinstance(v, ClearedValue):
+        return v.value
+    else:
+        return v
+
+
+### reading mrjob.conf ###
+
+def _conf_object_at_path(conf_path):
+    if conf_path is None:
+        return None
 
     with open(conf_path) as f:
         if yaml:
-            return yaml.safe_load(f)
+            return _fix_clear_tags(_load_yaml_with_clear_tag(f))
         else:
-            return json.load(f)
+            try:
+                return json.load(f)
+            except ValueError as e:
+                msg = ('If your mrjob.conf is in YAML, you need to install'
+                       ' yaml; see http://pypi.python.org/pypi/PyYAML/')
+                # Use msg attr if it's set
+                if hasattr(e, 'msg'):
+                    e.msg = '%s (%s)' % (e.msg, msg)
+                else:
+                    e.msg = msg
+                raise e
 
 
-def load_opts_from_mrjob_conf(runner_alias, conf_path=None):
-    """Load the options to initialize a runner from mrjob.conf, or return
-    ``{}`` if we can't find them.
+def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
+                              already_loaded=None):
+    """Load a list of dictionaries representing the options in a given
+    mrjob.conf for a specific runner, resolving includes. Returns
+    ``[(path, values)]``. If *conf_path* is not found, return ``[(None, {})]``.
 
+    :type runner_alias: str
+    :param runner_alias: String identifier of the runner type, e.g. ``emr``,
+                         ``local``, etc.
     :type conf_path: str
-    :param conf_path: an alternate place to look for mrjob.conf. If this is ``False``, we'll always return ``{}``.
+    :param conf_path: location of the file to load
+    :type already_loaded: list
+    :param already_loaded: list of real (according to ``os.path.realpath()``)
+                           conf paths that have already
+                           been loaded (used by
+                           :py:func:`load_opts_from_mrjob_confs`).
+
+    .. versionchanged:: 0.4.6
+        Relative ``include:`` paths are relative to the real (after resolving
+        symlinks) path of the including conf file
+
+    .. versionchanged:: 0.4.6
+        This will only load each config file once, even if it's referenced
+        from multiple paths due to symlinks.
     """
-    conf = load_mrjob_conf(conf_path=conf_path)
+    conf_path = _expanded_mrjob_conf_path(conf_path)
+    conf = _conf_object_at_path(conf_path)
+
     if conf is None:
-        return {}
+        return [(None, {})]
 
+    if already_loaded is None:
+        already_loaded = []
+
+    # don't load same conf file twice
+    real_conf_path = os.path.realpath(conf_path)
+
+    if real_conf_path in already_loaded:
+        return []
+    else:
+        already_loaded.append(real_conf_path)
+
+    # get configs for our runner out of conf file
     try:
-        return conf['runners'][runner_alias] or {}
+        values = conf['runners'][runner_alias] or {}
     except (KeyError, TypeError, ValueError):
-        log.warning('no configs for runner type %r; returning {}' %
-                    runner_alias)
-        return {}
+        values = {}
 
+    inherited = []
+    if conf.get('include', None):
+        includes = conf['include']
+        if isinstance(includes, string_types):
+            includes = [includes]
+
+        # handle includes in reverse order so that include order takes
+        # precedence over inheritance
+        for include in reversed(includes):
+            # make include relative to (real) conf_path (see #1166)
+            include = os.path.join(os.path.dirname(real_conf_path), include)
+
+            inherited = load_opts_from_mrjob_conf(
+                runner_alias, include, already_loaded) + inherited
+
+    return inherited + [(conf_path, values)]
+
+
+def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
+    """Load a list of dictionaries representing the options in a given
+    list of mrjob config files for a specific runner. Returns
+    ``[(path, values), ...]``. If a path is not found, use ``(None, {})`` as
+    its value.
+
+    If *conf_paths* is ``None``, look for a config file in the default
+    locations (see :py:func:`find_mrjob_conf`).
+
+    :type runner_alias: str
+    :param runner_alias: String identifier of the runner type, e.g. ``emr``,
+                         ``local``, etc.
+    :type conf_paths: list or ``None``
+    :param conf_path: locations of the files to load
+
+    .. versionchanged:: 0.4.6
+        This will only load each config file once, even if it's referenced
+        from multiple paths due to symlinks.
+    """
+    if conf_paths is None:
+        return load_opts_from_mrjob_conf(runner_alias)
+    else:
+        # don't include conf files that were loaded earlier in conf_paths
+        already_loaded = []
+
+        # load configs in reversed order so that order of conf paths takes
+        # precedence over inheritance
+        results = []
+
+        for path in reversed(conf_paths):
+            results = load_opts_from_mrjob_conf(
+                runner_alias, path, already_loaded=already_loaded) + results
+
+        return results
+
+
+### writing mrjob.conf ###
 
 def dump_mrjob_conf(conf, f):
     """Write out configuration options to a file.
@@ -212,7 +449,7 @@ def dump_mrjob_conf(conf, f):
     :param f: a file object to write to (e.g. ``open('mrjob.conf', 'w')``)
     """
     if yaml:
-        yaml.safe_dump(conf, f, default_flow_style=False)
+        _dump_yaml_with_clear_tags(conf, f, default_flow_style=False)
     else:
         json.dump(conf, f, indent=2)
     f.flush()
@@ -223,10 +460,15 @@ def dump_mrjob_conf(conf, f):
 # combiners generally consider earlier values to be defaults, and later
 # options to override or add on to them.
 
+# combiners assume that the list of values passed to them has already been
+# passed through _fix_clear_tags() (that is, the only place ClearedValue
+# appears is values in dicts).
+
+
 def combine_values(*values):
     """Return the last value in *values* that is not ``None``.
 
-    The default combiner; useful for simple values (booleans, strings, numbers).
+    The default combiner; good for simple values (booleans, strings, numbers).
     """
     for v in reversed(values):
         if v is not None:
@@ -240,14 +482,45 @@ def combine_lists(*seqs):
 
     Generally this is used for a list of commands we want to run; the
     "default" commands get run before any commands specific to your job.
+
+    .. versionchanged:: 0.4.6
+       Strings, bytes, and non-sequence objects (e.g. numbers) are treated as
+       single-item lists.
     """
     result = []
 
     for seq in seqs:
-        if seq:
-            result.extend(seq)
+        if seq is None:
+            continue
+
+        if isinstance(seq, (bytes, string_types)):
+            result.append(seq)
+        else:
+            try:
+                result.extend(seq)
+            except:
+                result.append(seq)
 
     return result
+
+
+def combine_cmds(*cmds):
+    """Take zero or more commands to run on the command line, and return
+    the last one that is not ``None``. Each command should either be a list
+    containing the command plus switches, or a string, which will be parsed
+    with :py:func:`shlex.split`. The string must either be a byte string or a
+    unicode string containing no non-ASCII characters.
+
+    Returns either ``None`` or a list containing the command plus arguments.
+    """
+    cmd = combine_values(*cmds)
+
+    if cmd is None:
+        return None
+    elif isinstance(cmd, string_types):
+        return shlex_split(cmd)
+    else:
+        return list(cmd)
 
 
 def combine_dicts(*dicts):
@@ -260,19 +533,34 @@ def combine_dicts(*dicts):
 
     for d in dicts:
         if d:
-            result.update(d)
+            for k, v in d.items():
+                # delete cleared key
+                if isinstance(v, ClearedValue) and v.value is None:
+                    result.pop(k, None)
+
+                # just set the value
+                else:
+                    result[k] = _strip_clear_tag(v)
 
     return result
 
 
 def combine_envs(*envs):
     """Combine zero or more dictionaries containing environment variables.
+    Environment variable values may be wrapped in :py:class:`ClearedValue`.
 
     Environment variables later from dictionaries later in the list take
-    priority over those earlier in the list. For variables ending with
-    ``PATH``, we prepend (and add a colon) rather than overwriting.
+    priority over those earlier in the list.
 
-    If you pass in ``None`` in place of a dictionary, it will be ignored.
+    For variables ending with ``PATH``, we prepend (and add a colon) rather
+    than overwriting. Wrapping a path value in :py:class:`ClearedValue`
+    disables this behavior.
+
+    Environment set to ``ClearedValue(None)`` will *delete* environment
+    variables earlier in the list, rather than setting them to ``None``.
+
+    If you pass in ``None`` in place of a dictionary in **envs**, it will be
+    ignored.
     """
     return _combine_envs_helper(envs, local=False)
 
@@ -293,11 +581,19 @@ def _combine_envs_helper(envs, local):
     result = {}
     for env in envs:
         if env:
-            for key, value in env.iteritems():
-                if key.endswith('PATH') and result.get(key):
-                    result[key] = value + pathsep + result[key]
+            for k, v in env.items():
+                # delete cleared keys
+                if isinstance(v, ClearedValue) and v.value is None:
+                    result.pop(k, None)
+
+                # append paths
+                elif (k.endswith('PATH') and result.get(k) and
+                      not isinstance(v, ClearedValue)):
+                    result[k] = v + pathsep + result[k]
+
+                # just set the value
                 else:
-                    result[key] = value
+                    result[k] = _strip_clear_tag(v)
 
     return result
 
@@ -311,7 +607,11 @@ def combine_paths(*paths):
 def combine_path_lists(*path_seqs):
     """Concatenate the given sequences into a list. Ignore None values.
     Resolve ``~`` (home dir) and environment variables, and expand globs
-    that refer to the local filesystem."""
+    that refer to the local filesystem.
+
+    .. versionchanged:: 0.4.6
+       Can take single strings as well as lists.
+    """
     results = []
 
     for path in combine_lists(*path_seqs):
@@ -329,21 +629,27 @@ def combine_opts(combiners, *opts_list):
     """The master combiner, used to combine dictionaries of options with
     appropriate sub-combiners.
 
-    :param combiners: a map from option name to a combine_*() function to combine options by that name. By default, we combine options using :py:func:`combine_values`.
+    :param combiners: a map from option name to a combine_*() function to
+                      combine options by that name. By default, we combine
+                      options using :py:func:`combine_values`.
     :param opts_list: one or more dictionaries to combine
+
+    The dict in *opts_list* may not be wrapped in :py:class:`ClearedValue`,
+    but their values may, in which case values of that key from previous
+    opt dicts will be ignored.
     """
     final_opts = {}
 
     keys = set()
     for opts in opts_list:
-        if opts:
+        if isinstance(opts, ClearedValue):
+            raise TypeError
+        elif opts:
             keys.update(opts)
 
     for key in keys:
-        values = []
-        for opts in opts_list:
-            if opts and key in opts:
-                values.append(opts[key])
+        values = _resolve_clear_tags_in_list(
+            opts[key] for opts in opts_list if opts and key in opts)
 
         combine_func = combiners.get(key) or combine_values
         final_opts[key] = combine_func(*values)

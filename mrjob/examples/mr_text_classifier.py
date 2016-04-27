@@ -1,4 +1,5 @@
 # Copyright 2009-2010 Yelp
+# Copyright 2013 David Marin
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,6 +52,8 @@ import re
 
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
+from mrjob.step import MRStep
+
 
 def encode_document(text, cats=None, id=None):
     """Encode a document as a JSON so that MRTextClassifier can read it.
@@ -58,10 +61,10 @@ def encode_document(text, cats=None, id=None):
     Args:
     text -- the text of the document (as a unicode)
     cats -- a dictionary mapping a category name (e.g. 'sports') to True if
-    	the document is in the category, and False if it's not. None indicates
+        the document is in the category, and False if it's not. None indicates
         that we have no information about this documents' categories
     id -- a unique ID for the document (any kind of JSON-able value should
-    	work). If not specified, we'll auto-generate one.
+        work). If not specified, we'll auto-generate one.
     """
     text = unicode(text)
     cats = dict((unicode(cat), bool(is_in_cat))
@@ -71,19 +74,20 @@ def encode_document(text, cats=None, id=None):
     return JSONValueProtocol.write(
         None, {'text': text, 'cats': cats, 'id': id}) + '\n'
 
+
 def count_ngrams(text, max_ngram_size, stop_words):
     """Break text down into ngrams, and return a dictionary mapping
     (n, ngram) to number of times that ngram occurs.
 
     n: ngram size ("foo" is a 1-gram, "foo bar baz" is a 3-gram)
     ngram: the ngram, as a space-separated string or None to indicate the
-    	ANY ngram (basically the number of words in the document).
+        ANY ngram (basically the number of words in the document).
 
     Args:
     text -- text, as a unicode
     max_ngram_size -- maximum size of ngrams to consider
     stop_words -- a collection of words (in lowercase) to remove before
-    	parsing out ngrams (e.g. "the", "and")
+        parsing out ngrams (e.g. "the", "and")
     """
     if not isinstance(stop_words, set):
         stop_words = set(stop_words)
@@ -96,23 +100,36 @@ def count_ngrams(text, max_ngram_size, stop_words):
     for i in range(len(words)):
         for n in range(1, max_ngram_size + 1):
             if i + n <= len(words):
-                ngram = ' '.join(words[i:i+n])
+                ngram = ' '.join(words[i:i + n])
                 ngram_counts[(n, ngram)] += 1
 
     # add counts for ANY ngram
     for n in range(1, max_ngram_size + 1):
-        ngram_counts[(n, None)] = len(words)-n+1
+        ngram_counts[(n, None)] = len(words) - n + 1
 
     return ngram_counts
+
 
 WORD_RE = re.compile(r"[\w']+", re.UNICODE)
 
 DEFAULT_MAX_NGRAM_SIZE = 4
 
-DEFAULT_STOP_WORDS = ['a', 'about', 'also', 'am', 'an', 'and', 'any', 'are', 'as', 'at', 'be', 'but', 'by', 'can', 'com', 'did', 'do', 'does', 'for', 'from', 'had', 'has', 'have', 'he', "he'd", "he'll", "he's", 'her', 'here', 'hers', 'him', 'his', 'i', "i'd", "i'll", "i'm", "i've", 'if', 'in', 'into', 'is', 'it', "it's", 'its', 'just', 'me', 'mine', 'my', 'of', 'on', 'or', 'org', 'our', 'ours', 'she', "she'd", "she'll", "she's", 'some', 'than', 'that', 'the', 'their', 'them', 'then', 'there', 'these', 'they', "they'd", "they'll", "they're", 'this', 'those', 'to', 'us', 'was', 'we', "we'd", "we'll", "we're", 'were', 'what', 'where', 'which', 'who', 'will', 'with', 'would', 'you', 'your', 'yours']
+DEFAULT_STOP_WORDS = [
+    'a', 'about', 'also', 'am', 'an', 'and', 'any', 'are', 'as', 'at', 'be',
+    'but', 'by', 'can', 'com', 'did', 'do', 'does', 'for', 'from', 'had',
+    'has', 'have', 'he', "he'd", "he'll", "he's", 'her', 'here', 'hers',
+    'him', 'his', 'i', "i'd", "i'll", "i'm", "i've", 'if', 'in', 'into', 'is',
+    'it', "it's", 'its', 'just', 'me', 'mine', 'my', 'of', 'on', 'or', 'org',
+    'our', 'ours', 'she', "she'd", "she'll", "she's", 'some', 'than', 'that',
+    'the', 'their', 'them', 'then', 'there', 'these', 'they', "they'd",
+    "they'll", "they're", 'this', 'those', 'to', 'us', 'was', 'we', "we'd",
+    "we'll", "we're", 'were', 'what', 'where', 'which', 'who', 'will', 'with',
+    'would', 'you', 'your', 'yours',
+]
+
 
 class MRTextClassifier(MRJob):
-    DEFAULT_INPUT_PROTOCOL = 'json_value'
+    INPUT_PROTOCOL = JSONValueProtocol
 
     def steps(self):
         """Conceptually, the steps are:
@@ -129,10 +146,11 @@ class MRTextClassifier(MRJob):
         The documents themselves are passed through from step 1 to step 5.
         Ngram scoring information is passed through from step 4 to step 5.
         """
-        return [self.mr(self.parse_doc, self.count_ngram_freq),
-                self.mr(reducer=self.score_ngrams),
-                self.mr(reducer=self.score_documents_by_ngram),
-                self.mr(reducer=self.score_documents)]
+        return [MRStep(mapper=self.parse_doc,
+                       reducer=self.count_ngram_freq),
+                MRStep(reducer=self.score_ngrams),
+                MRStep(reducer=self.score_documents_by_ngram),
+                MRStep(reducer=self.score_documents)]
 
     def configure_options(self):
         """Add command-line options specific to this script."""
@@ -140,10 +158,13 @@ class MRTextClassifier(MRJob):
 
         self.add_passthrough_option(
             '--min-df', dest='min_df', default=2, type='int',
-            help='min number of documents an n-gram must appear in for us to count it. Default: %default')
+            help=('min number of documents an n-gram must appear in for us to'
+                  ' count it. Default: %default'))
         self.add_passthrough_option(
             '--max-df', dest='max_df', default=10000000, type='int',
-            help='max number of documents an n-gram may appear in for us to count it (this keeps reducers from running out of memory). Default: %default')
+            help=('max number of documents an n-gram may appear in for us to'
+                  ' count it (this keeps reducers from running out of memory).'
+                  ' Default: %default'))
         self.add_passthrough_option(
             '--max-ngram-size', dest='max_ngram_size',
             default=DEFAULT_MAX_NGRAM_SIZE, type='int',
@@ -151,15 +172,22 @@ class MRTextClassifier(MRJob):
         self.add_passthrough_option(
             '--stop-words', dest='stop_words',
             default=', '.join(DEFAULT_STOP_WORDS),
-            help="comma-separated list of words to ignore. For example, --stop-words 'in, the' would cause 'hole in the wall' to be parsed as ['hole', 'wall']. Default: %default")
+            help=("comma-separated list of words to ignore. For example, "
+                  "--stop-words 'in, the' would cause 'hole in the wall' to be"
+                  " parsed as ['hole', 'wall']. Default: %default"))
         self.add_passthrough_option(
             '--short-doc-threshold', dest='short_doc_threshold',
             type='int', default=None,
-            help='Normally, for each n-gram size, we take the average score over all n-grams that appear. This allows us to penalize short documents by using this threshold as the denominator rather than the actual number of n-grams.')
+            help=('Normally, for each n-gram size, we take the average score'
+                  ' over all n-grams that appear. This allows us to penalize'
+                  ' short documents by using this threshold as the denominator'
+                  ' rather than the actual number of n-grams.'))
         self.add_passthrough_option(
             '--no-test-set', dest='no_test_set',
             action='store_true', default=False,
-            help="Choose about half of the documents to be the testing set (don't use them to train the classifier) based on a SHA1 hash of their text")
+            help=("Choose about half of the documents to be the testing set"
+                  " (don't use them to train the classifier) based on a SHA1"
+                  " hash of their text"))
 
     def load_options(self, args):
         """Parse stop_words option."""
@@ -182,14 +210,14 @@ class MRTextClassifier(MRJob):
         n: ngram length
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
-        count: # of times an ngram appears in the document
+        count:  # of times an ngram appears in the document
         cats: a map from category name to a boolean indicating whether it's
-        	this document is in the category
+            this document is in the category
 
         doc_id: (hopefully) unique document ID
         doc: the encoded document. We'll fill these fields:
-            ngram_counts: map from (n, ngram) to # of times ngram appears
-        	    in the document, using (n, None) to represent the total
+            ngram_counts: map from (n, ngram) to  # of times ngram appears
+                in the document, using (n, None) to represent the total
                 number of times ANY ngram of that size appears (essentially
                 number of words)
             in_test_set: boolean indicating if this doc is in the test set
@@ -197,7 +225,7 @@ class MRTextClassifier(MRJob):
         """
         # only compute doc hash if we need it
         if doc.get('id') is not None and self.options.no_test_set:
-            doc_hash = '0' # don't need doc hash
+            doc_hash = '0'  # don't need doc hash
         else:
             doc_hash = hashlib.sha1(doc['text'].encode('utf-8')).hexdigest()
 
@@ -243,9 +271,9 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_df: list of tuples of ((cat_name, is_in_category), df); df
-        	is # of documents of this type that the ngram appears in
+            is  # of documents of this type that the ngram appears in
         cat_to_tf: list of tuples of ((cat_name, is_in_category), df); tf
-        	is # of time the ngram appears in docs of this type
+            is  # of time the ngram appears in docs of this type
         doc_id: unique document ID
         doc: the encoded document
         """
@@ -310,7 +338,7 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_score: map from (cat_name, is_in_category) to score for
-        	this ngram
+            this ngram
         doc_id: unique document ID
         doc: the encoded document
         """
@@ -359,13 +387,13 @@ class MRTextClassifier(MRJob):
                 tf = cat_to_tf.get(cat) or 0
                 # use Laplace's rule of succession to estimate p. See:
                 # http://en.wikipedia.org/wiki/Rule_of_succession#Generalization_to_any_number_of_possibilities
-                cat_to_p[cat] = (tf + (2.0/m))/(t+2)
+                cat_to_p[cat] = (tf + (2.0 / m)) / (t + 2)
 
             cats = set(cat for cat, in_cat in cat_to_t)
             cat_to_score = {}
             for cat in cats:
-                p_if_in = cat_to_p.get((cat, True), 1.0/m)
-                p_if_out = cat_to_p.get((cat, False), 1.0/m)
+                p_if_in = cat_to_p.get((cat, True), 1.0 / m)
+                p_if_out = cat_to_p.get((cat, False), 1.0 / m)
                 # take the log difference of probabilities
                 score = math.log(p_if_in) - math.log(p_if_out)
                 cat_to_score[cat] = score
@@ -392,7 +420,7 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_score: map from (cat_name, is_in_category) to score for
-        	this ngram
+            this ngram
         doc_id: unique document ID
         doc: the encoded document
         """
@@ -458,10 +486,10 @@ class MRTextClassifier(MRJob):
         ngram: ngram encoded encoded as a string (e.g. "pad thai")
             or None to indicate ANY ngram.
         cat_to_score: map from (cat_name, is_in_category) to score for
-        	this ngram
+            this ngram
         doc_id: unique document ID
         doc: the encoded document. this will contain an extra field
-        	'cat_to_score', and will no longer have the 'ngram_counts' field.
+            'cat_to_score', and will no longer have the 'ngram_counts' field.
         """
         key_type, key = type_and_key
 
@@ -517,4 +545,3 @@ class MRTextClassifier(MRJob):
 
 if __name__ == '__main__':
     MRTextClassifier.run()
-

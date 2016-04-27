@@ -1,5 +1,6 @@
-# Copyright 2011 Matthew Tai
-# Copyright 2011 Yelp
+# -*- coding: utf-8 -*-
+# Copyright 2011 Matthew Tai and Yelp
+# Copyright 2012-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,185 +13,164 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run an MRJob inline by running all mappers and reducers through the same process.  Useful for debugging."""
-from __future__ import with_statement
-
-__author__ = 'Matthew Tai <mtai@adku.com>'
-
+"""Run an MRJob inline by running all mappers and reducers through the same
+process. Useful for debugging."""
 import logging
 import os
-import pprint
-import shutil
-import subprocess
-import sys
+from io import BytesIO
+from shutil import copyfile
 
-from mrjob.conf import combine_dicts, combine_local_envs
-from mrjob.runner import MRJobRunner
 from mrjob.job import MRJob
+from mrjob.parse import parse_mr_job_stderr
+from mrjob.sim import SimMRJobRunner
+from mrjob.sim import SimRunnerOptionStore
+from mrjob.util import save_current_environment
+from mrjob.util import save_cwd
 
-log = logging.getLogger('mrjob.inline')
+__author__ = 'Matthew Tai <taim@google.com>'
+
+log = logging.getLogger(__name__)
 
 
-class InlineMRJobRunner(MRJobRunner):
-    """Runs an :py:class:`~mrjob.job.MRJob` without invoking the job as
-    a subprocess, so it's easy to attach a debugger.
+class InlineMRJobRunner(SimMRJobRunner):
+    """Runs an :py:class:`~mrjob.job.MRJob` in the same process, so it's easy
+    to attach a debugger.
 
-    This is NOT the default way of testing jobs; to more accurately
-    simulate your environment prior to running on Hadoop/EMR, use ``-r local``.
+    This is the default way to run jobs (we assume you'll spend some time
+    debugging your job before you're ready to run it on EMR or Hadoop).
 
-    It's rare to need to instantiate this class directly (see
-    :py:meth:`~InlineMRJobRunner.__init__` for details).
+    Unlike other runners, ``InlineMRJobRunner``\ 's ``run()`` method
+    raises the actual exception that caused a step to fail (rather than
+    :py:class:`~mrjob.step.StepFailedException`).
+
+    To more accurately simulate your environment prior to running on
+    Hadoop/EMR, use ``-r local`` (see
+    :py:class:`~mrjob.local.LocalMRJobRunner`).
     """
-
     alias = 'inline'
 
-    def __init__(self, mrjob_cls=None, **kwargs):
-        """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
+    OPTION_STORE_CLASS = SimRunnerOptionStore
 
-        * *hadoop_extra_args*, *hadoop_input_format*, *hadoop_output_format*, and *hadoop_streaming_jar*, and *jobconf* are ignored because they require Java. If you need to test these, consider starting up a standalone Hadoop instance and running your job with ``-r hadoop``.
-        * *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*, *steps_python_bin*, *upload_archives*, and *upload_files* are ignored because we don't invoke the job as a subprocess or run it in its own directory.
+    def __init__(self, mrjob_cls=None, **kwargs):
+        """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
+        args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:
+
+        * *hadoop_input_format*, *hadoop_output_format*, and *partitioner*
+          are ignored
+          because they require Java. If you need to test these, consider
+          starting up a standalone Hadoop instance and running your job with
+          ``-r hadoop``.
+        * *python_bin*, *setup*, *setup_cmds*, *setup_scripts* and
+          *steps_python_bin* are ignored because we don't invoke
+          subprocesses.
         """
         super(InlineMRJobRunner, self).__init__(**kwargs)
-        assert issubclass(mrjob_cls, MRJob)
+        assert ((mrjob_cls) is None or issubclass(mrjob_cls, MRJob))
 
         self._mrjob_cls = mrjob_cls
-        self._prev_outfile = None
-        self._final_outfile = None
-
-    @classmethod
-    def _opts_combiners(cls):
-        # on windows, PYTHONPATH should use ;, not :
-        return combine_dicts(
-            super(InlineMRJobRunner, cls)._opts_combiners(),
-            {'cmdenv': combine_local_envs})
-
-    # options that we ignore because they require real Hadoop
-    IGNORED_HADOOP_OPTS = [
-        'hadoop_extra_args',
-        'hadoop_input_format',
-        'hadoop_output_format',
-        'hadoop_streaming_jar',
-        'jobconf',
-    ]
 
     # options that we ignore because they involve running subprocesses
-    IGNORED_LOCAL_OPTS = [
-        'cmdenv',
+    _IGNORED_LOCAL_OPTS = [
+        'bootstrap_mrjob',
         'python_bin',
+        'setup',
         'setup_cmds',
         'setup_scripts',
         'steps_python_bin',
-        'upload_archives',
-        'upload_files',
     ]
 
-    def _run(self):
-        self._setup_output_dir()
+    def _check_step_works_with_runner(self, step_dict):
+        for key in ('mapper', 'combiner', 'reducer'):
+            if key in step_dict:
+                substep = step_dict[key]
+                if substep['type'] != 'script':
+                    raise Exception(
+                        "InlineMRJobRunner cannot run %s steps." %
+                        substep['type'])
+                if 'pre_filter' in substep:
+                    raise Exception(
+                        "InlineMRJobRunner cannot run filters.")
 
-        assert self._script # shouldn't be able to run if no script
+    def _create_setup_wrapper_script(self, local=False):
+        # Inline mode does not use a wrapper script (no subprocesses)
+        pass
 
-        default_opts = self.get_default_opts()
-
-        for ignored_opt in self.IGNORED_HADOOP_OPTS:
-            if self._opts[ignored_opt] != default_opts[ignored_opt]:
-                log.warning('ignoring %s option (requires real Hadoop): %r' %
-                            (ignored_opt, self._opts[ignored_opt]))
-
-        for ignored_opt in self.IGNORED_LOCAL_OPTS:
-            if self._opts[ignored_opt] != default_opts[ignored_opt]:
+    def _warn_ignored_opts(self):
+        """ Warn the user of opts being ignored by this runner.
+        """
+        super(InlineMRJobRunner, self)._warn_ignored_opts()
+        for ignored_opt in self._IGNORED_LOCAL_OPTS:
+            if ((not self._opts.is_default(ignored_opt)) and
+                    self._opts[ignored_opt]):
                 log.warning('ignoring %s option (use -r local instead): %r' %
                             (ignored_opt, self._opts[ignored_opt]))
 
-        # run mapper, sort, reducer for each step
-        for step_number, step_name in enumerate(self._get_steps()):
-            self._invoke_inline_mrjob(step_number, 'step-%d-mapper' %
-                                      step_number, is_mapper=True)
-
-            if 'R' in step_name:
-                mapper_output_path = self._prev_outfile
-                sorted_mapper_output_path = self._decide_output_path(
-                    'step-%d-mapper-sorted' % step_number)
-                with open(sorted_mapper_output_path, 'w') as sort_out:
-                    proc = subprocess.Popen(
-                        ['sort', mapper_output_path],
-                        stdout=sort_out, env={'LC_ALL': 'C'})
-                proc.wait()
-
-                # This'll read from sorted_mapper_output_path
-                self._invoke_inline_mrjob(step_number, 'step-%d-reducer' %
-                                          step_number, is_reducer=True)
-
-        # move final output to output directory
-        self._final_outfile = os.path.join(self._output_dir, 'part-00000')
-        log.info('Moving %s -> %s' % (self._prev_outfile, self._final_outfile))
-        shutil.move(self._prev_outfile, self._final_outfile)
-
     def _get_steps(self):
-        return self._mrjob_cls()._steps_desc()
+        """Redefine this so that we can get step descriptions without
+        calling a subprocess."""
+        if self._steps is None:
+            job_args = ['--steps'] + self._mr_job_extra_args(local=True)
+            self._steps = self._mrjob_cls(args=job_args)._steps_desc()
 
-    def _invoke_inline_mrjob(self, step_number, outfile_name, is_mapper=False, is_reducer=False):
-        common_args = (['--step-num=%d' % step_number] +
-                       self._mr_job_extra_args(local=True) +
-                       self._decide_input_paths())
-        if is_mapper:
-            child_args = ['--mapper'] + common_args
-        elif is_reducer:
-            child_args = ['--reducer'] + common_args
+        return self._steps
 
-        outfile = self._decide_output_path(outfile_name)
+    def _run_step(self, step_num, step_type, input_path, output_path,
+                  working_dir, env, child_stdin=None):
+        step = self._get_step(step_num)
 
-        child_instance = self._mrjob_cls(args=child_args)
+        # if no mapper, just pass the data through (see #1141)
+        if step_type == 'mapper' and not step.get('mapper'):
+            copyfile(input_path, output_path)
+            return
 
-        # Tweak IO
-        child_stdout = open(outfile, 'w')
-        child_instance.sandbox(stdin=sys.stdin, stdout=child_stdout)
-        child_instance.execute()
-        child_stdout.flush()
-        child_stdout.close()
+        # Passing local=False ensures the job uses proper names for file
+        # options (see issue #851 on github)
+        common_args = (['--step-num=%d' % step_num] +
+                       self._mr_job_extra_args(local=False))
 
-        counters = child_instance.parse_counters()
-        if counters:
-            log.info('counters: ' + pprint.pformat(counters))
+        if step_type == 'mapper':
+            child_args = (
+                ['--mapper'] + [input_path] + common_args)
+        elif step_type == 'reducer':
+            child_args = (
+                ['--reducer'] + [input_path] + common_args)
+        elif step_type == 'combiner':
+            child_args = ['--combiner'] + common_args + ['-']
 
-    def _decide_input_paths(self):
-        # decide where to get input
-        if self._prev_outfile is not None:
-            input_paths = [self._prev_outfile]
-        else:
-            input_paths = []
-            for path in self._input_paths:
-                if path == '-':
-                    input_paths.append(self._dump_stdin_to_local_file())
-                else:
-                    input_paths.append(path)
+        has_combiner = (step_type == 'mapper' and 'combiner' in step)
 
-        return input_paths
+        try:
+            # Use custom stdout
+            if has_combiner:
+                child_stdout = BytesIO()
+            else:
+                child_stdout = open(output_path, 'wb')
 
-    def _decide_output_path(self, outfile_name):
-        # run the mapper
-        outfile = os.path.join(self._get_local_tmp_dir(), outfile_name)
-        log.info('writing to %s' % outfile)
-        log.debug('')
+            with save_current_environment():
+                with save_cwd():
+                    os.environ.update(env)
+                    os.chdir(working_dir)
 
-        self._prev_outfile = outfile
-        return outfile
+                    child_instance = self._mrjob_cls(args=child_args)
+                    child_instance.sandbox(stdin=child_stdin,
+                                           stdout=child_stdout)
+                    child_instance.execute()
 
-    def _setup_output_dir(self):
-        if not self._output_dir:
-            self._output_dir = os.path.join(
-                self._get_local_tmp_dir(), 'output')
+            if has_combiner:
+                sorted_lines = sorted(child_stdout.getvalue().splitlines())
+                combiner_stdin = BytesIO(b'\n'.join(sorted_lines))
+            else:
+                child_stdout.flush()
+        finally:
+            child_stdout.close()
 
-        if not os.path.isdir(self._output_dir):
-            log.debug('Creating output directory %s' % self._output_dir)
-            self.mkdir(self._output_dir)
+        while len(self._counters) <= step_num:
+            self._counters.append({})
+        parse_mr_job_stderr(child_instance.stderr.getvalue(),
+                            counters=self._counters[step_num])
 
-    def _stream_output(self):
-        """Read output from the final outfile."""
-        if self._final_outfile:
-            output_file = self._final_outfile
-        else:
-            output_file = os.path.join(self._output_dir, 'part-00000')
-        log.info('streaming final output from %s' % output_file)
+        if has_combiner:
+            self._run_step(step_num, 'combiner', None, output_path,
+                           working_dir, env, child_stdin=combiner_stdin)
 
-        for line in open(output_file):
-            yield line
+            combiner_stdin.close()

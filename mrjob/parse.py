@@ -1,4 +1,7 @@
-# Copyright 2009-2011 Yelp
+# Copyright 2009-2012 Yelp
+# Copyright 2013 Steve Johnson and David Marin
+# Copyright 2014 Yelp and Contributors
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,182 +15,168 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
+import calendar
 import logging
-from optparse import OptionValueError
 import re
+import time
+from datetime import datetime
+from functools import wraps
+from io import BytesIO
+
+from mrjob.py2 import ParseResult
+from mrjob.py2 import to_string
+from mrjob.py2 import urlparse as urlparse_buggy
 
 try:
-    from cStringIO import StringIO
+    import boto.utils
 except ImportError:
-    from StringIO import StringIO
+    # don't require boto; MRJobs don't actually need it when running
+    # inside hadoop streaming
+    boto = None
 
-# match the filename of a hadoop streaming jar
-HADOOP_STREAMING_JAR_RE = re.compile(r'^hadoop.*streaming.*\.jar$')
-
-# match an mrjob job name (these are used to name EMR job flows)
-JOB_NAME_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
+log = logging.getLogger(__name__)
 
 
-log = logging.getLogger('mrjob.parse')
+### URI PARSING ###
 
 
-_HADOOP_0_20_ESCAPED_CHARS_RE = re.compile(r'\\([.(){}[\]"\\])')
+# Used to parse the real netloc out of a malformed path from early Python 2.6
+# urlparse()
+_NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
-def counter_unescape(escaped_string):
-    """Fix names of counters and groups emitted by Hadoop 0.20+ logs, which
-    use escape sequences for more characters than most decoders know about
-    (e.g. ``().``).
-
-    :param escaped_string: string from a counter log line
-    :type escaped_string: str
-    """
-    escaped_string = escaped_string.decode('string_escape')
-    escaped_string = _HADOOP_0_20_ESCAPED_CHARS_RE.sub(r'\1', escaped_string)
-    return escaped_string
+# Used to check if the candidate uri is actually a local windows path.
+_WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
 
 
-def find_python_traceback(lines):
-    """Scan a log file or other iterable for a Python traceback,
-    and return it as a list of lines.
-
-    In logs from EMR, we find python tracebacks in ``task-attempts/*/stderr``
-    """
-    for line in lines:
-        if line.startswith('Traceback (most recent call last):'):
-            tb_lines = []
-            for line in lines:
-                tb_lines.append(line)
-                if not line.startswith(' '):
-                    break
-            return tb_lines
+def is_windows_path(uri):
+    """Return True if *uri* is a windows path."""
+    if _WINPATH_RE.match(uri):
+        return True
     else:
-        return None
+        return False
 
 
-def find_hadoop_java_stack_trace(lines):
-    """Scan a log file or other iterable for a java stack trace from Hadoop,
-    and return it as a list of lines.
+def is_uri(uri):
+    """Return True if *uri* is any sort of URI."""
+    if is_windows_path(uri):
+        return False
 
-    In logs from EMR, we find java stack traces in ``task-attempts/*/syslog``
+    return bool(urlparse(uri).scheme)
 
-    Sample stack trace::
 
-        2010-07-27 18:25:48,397 WARN org.apache.hadoop.mapred.TaskTracker (main): Error running child
-        java.lang.OutOfMemoryError: Java heap space
-                at org.apache.hadoop.mapred.IFile$Reader.readNextBlock(IFile.java:270)
-                at org.apache.hadoop.mapred.IFile$Reader.next(IFile.java:332)
-                at org.apache.hadoop.mapred.Merger$Segment.next(Merger.java:147)
-                at org.apache.hadoop.mapred.Merger$MergeQueue.adjustPriorityQueue(Merger.java:238)
-                at org.apache.hadoop.mapred.Merger$MergeQueue.next(Merger.java:255)
-                at org.apache.hadoop.mapred.Merger.writeFile(Merger.java:86)
-                at org.apache.hadoop.mapred.Merger$MergeQueue.merge(Merger.java:377)
-                at org.apache.hadoop.mapred.Merger.merge(Merger.java:58)
-                at org.apache.hadoop.mapred.ReduceTask.run(ReduceTask.java:277)
-                at org.apache.hadoop.mapred.TaskTracker$Child.main(TaskTracker.java:2216)
+def is_s3_uri(uri):
+    """Return True if *uri* can be parsed into an S3 URI, False otherwise."""
+    try:
+        parse_s3_uri(uri)
+        return True
+    except ValueError:
+        return False
 
-    (We omit the "Error running child" line from the results)
+
+def parse_s3_uri(uri):
+    """Parse an S3 URI into (bucket, key)
+
+    >>> parse_s3_uri('s3://walrus/tmp/')
+    ('walrus', 'tmp/')
+
+    If ``uri`` is not an S3 URI, raise a ValueError
     """
-    for line in lines:
-        if line.rstrip('\n').endswith("Error running child"):
-            st_lines = []
-            for line in lines:
-                st_lines.append(line)
-                for line in lines:
-                    if not line.startswith('        at '):
-                        break
-                    st_lines.append(line)
-                return st_lines
-    else:
-        return None
+    components = urlparse(uri)
+    if (components.scheme not in ('s3', 's3n') or
+        '/' not in components.path):  # noqa
 
-_OPENING_FOR_READING_RE = re.compile("^.*: Opening '(.*)' for reading$")
+        raise ValueError('Invalid S3 URI: %s' % uri)
 
-def find_input_uri_for_mapper(lines):
-    """Scan a log file or other iterable for the path of an input file
-    for the first mapper on Hadoop. Just returns the path, or None if
-    no match.
+    return components.netloc, components.path[1:]
 
-    In logs from EMR, we find python tracebacks in ``task-attempts/*/syslog``
 
-    Matching log lines look like::
+@wraps(urlparse_buggy)
+def urlparse(urlstring, scheme='', allow_fragments=True, *args, **kwargs):
+    """A wrapper for :py:func:`urlparse.urlparse` with the following
+    differences:
 
-        2010-07-27 17:54:54,344 INFO org.apache.hadoop.fs.s3native.NativeS3FileSystem (main): Opening 's3://yourbucket/logs/2010/07/23/log2-00077.gz' for reading
+    * Handles buckets in S3 URIs correctly. (:py:func:`~urlparse.urlparse`
+      does this correctly sometime after 2.6.1; this is just a patch for older
+      Python versions.)
+    * Splits the fragment correctly in all URIs, not just Web-related ones.
+      This behavior was fixed in the Python 2.7.4 standard library but we have
+      to back-port it for previous versions.
     """
-    for line in lines:
-        match = _OPENING_FOR_READING_RE.match(line)
-        if match:
-            return match.group(1)
-    else:
-        return None
+    # we're probably going to mess with at least one of these values and
+    # re-pack the whole thing before we return it.
+    # NB: urlparse_buggy()'s second argument changes names from
+    # 'default_scheme' to 'scheme' in Python 2.6, so urlparse_buggy() should
+    # be called with positional arguments.
+    (scheme, netloc, path, params, query, fragment) = (
+        urlparse_buggy(urlstring, scheme, allow_fragments, *args, **kwargs))
+    if netloc == '' and path.startswith('//'):
+        m = _NETLOC_RE.match(path)
+        netloc = m.group(1)
+        path = m.group(2)
+    if allow_fragments and '#' in path and not fragment:
+        path, fragment = path.split('#', 1)
+    return ParseResult(scheme, netloc, path, params, query, fragment)
 
 
-_HADOOP_STREAMING_ERROR_RE = re.compile(r'^.*ERROR org\.apache\.hadoop\.streaming\.StreamJob \(main\): (.*)$')
+### OPTION PARSING ###
 
-def find_interesting_hadoop_streaming_error(lines):
-    """Scan a log file or other iterable for a hadoop streaming error
-    other than "Job not Successful!". Return the error as a string, or None
-    if nothing found.
+def parse_port_range_list(range_list_str):
+    """Parse a port range list of the form (start[:end])(,(start[:end]))*"""
+    all_ranges = []
+    for range_str in range_list_str.split(','):
+        if ':' in range_str:
+            a, b = [int(x) for x in range_str.split(':')]
+            all_ranges.extend(range(a, b + 1))
+        else:
+            all_ranges.append(int(range_str))
+    return all_ranges
 
-    In logs from EMR, we find java stack traces in ``steps/*/syslog``
 
-    Example line::
+def parse_key_value_list(kv_string_list, error_fmt, error_func):
+    """Parse a list of strings like ``KEY=VALUE`` into a dictionary.
 
-        2010-07-27 19:53:35,451 ERROR org.apache.hadoop.streaming.StreamJob (main): Error launching job , Output path already exists : Output directory s3://yourbucket/logs/2010/07/23/ already exists and is not empty
+    :param kv_string_list: Parse a list of strings like ``KEY=VALUE`` into a
+                           dictionary.
+    :type kv_string_list: [str]
+    :param error_fmt: Format string accepting one ``%s`` argument which is the
+                      malformed (i.e. not ``KEY=VALUE``) string
+    :type error_fmt: str
+    :param error_func: Function to call when a malformed string is encountered.
+    :type error_func: function(str)
     """
-    for line in lines:
-        match = _HADOOP_STREAMING_ERROR_RE.match(line)
-        if match:
-            msg = match.group(1)
-            if msg != 'Job not Successful!':
-                return msg
-    else:
-        return None
+    ret = {}
+    for value in kv_string_list:
+        try:
+            k, v = value.split('=', 1)
+            ret[k] = v
+        except ValueError:
+            error_func(error_fmt % (value,))
+    return ret
 
 
-_TIMEOUT_ERROR_RE = re.compile(r'.*?TASK_STATUS="FAILED".*?ERROR=".*?failed to report status for (\d+) seconds. Killing!"')
+### parsing job output/stderr ###
 
-def find_timeout_error(lines):
-    """Scan a log file or other iterable for a timeout error from Hadoop.
-    Return the number of seconds the job ran for before timing out, or None if
-    nothing found.
+_COUNTER_RE = re.compile(br'^reporter:counter:([^,]*),([^,]*),(-?\d+)$')
+_STATUS_RE = re.compile(br'^reporter:status:(.*)$')
 
-    In logs from EMR, we find timeouterrors in ``jobs/*.jar``
-
-    Example line::
-
-        Task TASKID="task_201010202309_0001_m_000153" TASK_TYPE="MAP" TASK_STATUS="FAILED" FINISH_TIME="1287618918658" ERROR="Task attempt_201010202309_0001_m_000153_3 failed to report status for 602 seconds. Killing!"
-    """
-    result = None
-    for line in lines:
-        match = _TIMEOUT_ERROR_RE.match(line)
-        if match:
-            result = match.group(1)
-    if result is not None:
-        return int(result)
-    else:
-        return None
-
-
-# recognize hadoop streaming output
-_COUNTER_RE = re.compile(r'reporter:counter:([^,]*),([^,]*),(-?\d+)$')
-_STATUS_RE = re.compile(r'reporter:status:(.*)$')
 
 def parse_mr_job_stderr(stderr, counters=None):
     """Parse counters and status messages out of MRJob output.
 
-    :param data: a filehandle, a list of lines, or a str containing data
-    :type counters: Counters so far, to update; a map from group to counter name to count.
+    :param stderr: a filehandle, a list of lines (bytes), or bytes
+    :param counters: Counters so far, to update; a map from group (string to
+                     counter name (string) to count.
 
     Returns a dictionary with the keys *counters*, *statuses*, *other*:
 
     - *counters*: counters so far; same format as above
     - *statuses*: a list of status messages encountered
-    - *other*: lines that aren't either counters or status messages
+    - *other*: lines (strings) that aren't either counters or status messages
     """
     # For the corresponding code in Hadoop Streaming, see ``incrCounter()`` in
-    # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup
-    if isinstance(stderr, str):
-        stderr = StringIO(stderr)
+    # http://svn.apache.org/viewvc/hadoop/mapreduce/trunk/src/contrib/streaming/src/java/org/apache/hadoop/streaming/PipeMapRed.java?view=markup  # noqa
+    if isinstance(stderr, bytes):
+        stderr = BytesIO(stderr)
 
     if counters is None:
         counters = {}
@@ -195,163 +184,144 @@ def parse_mr_job_stderr(stderr, counters=None):
     other = []
 
     for line in stderr:
-        m = _COUNTER_RE.match(line)
+        m = _COUNTER_RE.match(line.rstrip(b'\r\n'))
         if m:
             group, counter, amount_str = m.groups()
+
+            # don't leave these as bytes on Python 3
+            group = to_string(group)
+            counter = to_string(counter)
+
             counters.setdefault(group, {})
             counters[group].setdefault(counter, 0)
             counters[group][counter] += int(amount_str)
             continue
 
-        m = _STATUS_RE.match(line)
+        m = _STATUS_RE.match(line.rstrip(b'\r\n'))
         if m:
-            statuses.append(m.group(1))
+            # don't leave as bytes on Python 3
+            statuses.append(to_string(m.group(1)))
             continue
 
-        other.append(line)
+        other.append(to_string(line))
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
 
-# Match a job output line containing counter data.
-# The line is of the form 
-# "Job KEY="value" KEY2="value2" ... COUNTERS="<counter_string>"
-# We just want to pull out the counter string, which varies between 
-# Hadoop versions.
-_KV_EXPR = r'\s+\w+=".*?"'  # this matches KEY="VALUE"
-_COUNTER_LINE_EXPR = r'Job(%s)*\s+COUNTERS="%s"' % (_KV_EXPR,
-                                                    r'(?P<counters>.*?)')
-_COUNTER_LINE_RE = re.compile(_COUNTER_LINE_EXPR)
+def _find_python_traceback(lines):
+    """Scan subprocess stderr for Python traceback."""
+    # Essentially, we detect the start of the traceback, and continue
+    # until we find a non-indented line, with some special rules for exceptions
+    # from subprocesses.
 
-# 0.18-specific
-# see _parse_counters_0_18 for format
-# A counter looks like this: groupname.countername:countervalue
-_COUNTER_EXPR_0_18 = r'(?P<group>[^,]+?)[.](?P<name>.+?):(?P<value>\d+)'
-_COUNTER_RE_0_18 = re.compile(_COUNTER_EXPR_0_18)
+    # Lines to pass back representing entire error found
+    all_tb_lines = []
 
-# aggregate 'is this 0.18?' expression
-# these are comma-separated counter expressions (see _COUNTER_EXPR_0_18)
-_ONE_0_18_COUNTER = r'[^,]+?[.].+?:\d+'
-_0_18_EXPR = r'(%s)(,%s)*' % (_ONE_0_18_COUNTER, _ONE_0_18_COUNTER)
-_COUNTER_FORMAT_IS_0_18 = re.compile(_0_18_EXPR)
+    # This is used to store a working list of lines in a single traceback
+    tb_lines = []
 
-# 0.20-specific
+    # This is used to store a working list of non-traceback lines between the
+    # current traceback and the previous one
+    non_tb_lines = []
 
-# capture one group including sub-counters
-# these look like: {(gid)(gname)[...][...][...]...}
-_COUNTER_LIST_EXPR = r'(?P<counter_list_str>\[.*?\])'
-_GROUP_RE_0_20 = re.compile(r'{\(%s\)\(%s\)%s}' % (r'(?P<group_id>.*?)',
-                                                   r'(?P<group_name>.*?)',
-                                                   _COUNTER_LIST_EXPR))
+    # Track whether or not we are in a traceback rather than consuming the
+    # iterator
+    in_traceback = False
 
-# capture a single counter from a group
-# this is what the ... is in _COUNTER_LIST_EXPR (incl. the brackets).
-# it looks like: [(cid)(cname)(value)]
-_COUNTER_VALUE_EXPR = r'(?P<counter_value>\d+)'
-_COUNTER_0_20_EXPR = r'\[\(%s\)\(%s\)\(%s\)\]' % (r'(?P<counter_id>.*?)',
-                                                  r'(?P<counter_name>.*?)',
-                                                  _COUNTER_VALUE_EXPR)
-_COUNTER_RE_0_20 = re.compile(_COUNTER_0_20_EXPR)
+    for line in lines:
+        # don't return bytes in Python 3
+        line = to_string(line)
 
-# aggregate 'is this 0.20?' expression
-# combines most of the rules from the capturing expressions above
-# should match strings like: {(gid)(gname)[(cid)(cname)(cvalue)][...]...}
-_0_20_EXPR = r'{\(%s\)\(%s\)(%s)*' % (r'.*?',
-                                      r'.*?',
-                                      _COUNTER_0_20_EXPR)
-_COUNTER_FORMAT_IS_0_20 = re.compile(_0_20_EXPR)
+        if in_traceback:
+            tb_lines.append(line)
 
-def _parse_counters_0_18(counter_string):
-    # 0.18 counters look like this:
-    # GroupName.CounterName:Value,GroupName.Crackers:3,AnotherGroup.Nerf:243,... 
-    matches = _COUNTER_RE_0_18.findall(counter_string)
-    for group, name, amount_str in matches:
-        yield group, name, int(amount_str)
+            # If no indentation, this is the last line of the traceback
+            if line.lstrip() == line:
+                in_traceback = False
 
+                if line.startswith('subprocess.CalledProcessError'):
+                    # CalledProcessError may mean that the subprocess printed
+                    # errors to stderr which we can show the user
+                    all_tb_lines += non_tb_lines
 
-def _parse_counters_0_20(group_string):
-    # 0.20 counters look like this:
-    # {(groupid)(groupname)[(counterid)(countername)(countervalue)][...]...} 
-    for group_id, group_name, counter_str in _GROUP_RE_0_20.findall(group_string):
-        matches = _COUNTER_RE_0_20.findall(counter_str)
-        for counter_id, counter_name, counter_value in matches:
-            try:
-                group_name = counter_unescape(group_name)
-            except ValueError:
-                log.warn("Could not decode group name %s" % group_name)
+                all_tb_lines += tb_lines
 
-            try:
-                counter_name = counter_unescape(counter_name)
-            except ValueError:
-                log.warn("Could not decode counter name %s" % counter_name)
-
-            yield group_name, counter_name, int(counter_value)
-
-
-def parse_hadoop_counters_from_line(line):
-    """Parse Hadoop counter values from a log line.
-
-    The counter log line format changed significantly between Hadoop 0.18 and
-    0.20, so this function switches between parsers for them.
-
-    :param line: log line containing counter data
-    :type line: str
-    :param hadoop_version: Version of Hadoop that produced the log files because they are formatted differently.
-    :type hadoop_version: str
-    """
-    m = _COUNTER_LINE_RE.match(line)
-    if not m:
-        return None
-
-    parser_switch = (
-        (_COUNTER_FORMAT_IS_0_18, _parse_counters_0_18),
-        (_COUNTER_FORMAT_IS_0_20, _parse_counters_0_20),
-    )
-
-    counter_substring = m.group('counters')
-
-    correct_func = None
-    for regex, func in parser_switch:
-        if regex.match(counter_substring):
-            correct_func = func
-            break
-
-    if correct_func is None:
-        log.warn('Cannot parse Hadoop counter line: %s' % line)
-        return None
-
-    counters = {}
-    for group, counter, value in correct_func(counter_substring):
-        counters.setdefault(group, {})
-        counters[group].setdefault(counter, 0)
-        counters[group][counter] += int(value)
-    return counters
-
-
-def parse_port_range_list(range_list_str):
-    all_ranges = []
-    for range_str in range_list_str.split(','):
-        if ':' in range_str:
-            a, b = [int(x) for x in range_str.split(':')]
-            all_ranges.extend(range(a, b+1))
+                # Reset all working lists
+                tb_lines = []
+                non_tb_lines = []
         else:
-            all_ranges.append(int(range_str))
-    return all_ranges
-
-
-def check_kv_pair(option, opt, value):
-    items = value.split('=', 1)
-    if len(items) == 2:
-        return items
+            if line.startswith('Traceback (most recent call last):'):
+                tb_lines.append(line)
+                in_traceback = True
+            else:
+                non_tb_lines.append(line)
+    if all_tb_lines:
+        return all_tb_lines
     else:
-        raise OptionValueError(
-            "option %s: value is not of the form KEY=VALUE: %r" % (opt, value))
+        return None
 
 
-def check_range_list(option, opt, value):
+### job tracker/resource manager ###
+
+_JOB_TRACKER_HTML_RE = re.compile(br'\b(\d{1,3}\.\d{2})%')
+_RESOURCE_MANAGER_JS_RE = re.compile(
+    br'.*(application_[_\d]+).*width:(\d{1,3}.\d)%')
+
+
+def _parse_progress_from_job_tracker(html_bytes):
+    """Pull (map_percent, reduce_percent) from job tracker HTML as floats,
+    or return (None, None)."""
+    matches = _JOB_TRACKER_HTML_RE.findall(html_bytes)
+    if len(matches) >= 2:
+        return float(matches[0]), float(matches[1])
+    else:
+        return None, None
+
+
+# TODO: this has two issues:
+# - reports progress of previous steps
+# - reports 100% progress for failed steps
+def _parse_progress_from_resource_manager(html_bytes):
+    """Pull progress_precent from job tracker HTML, as a float, or return
+    None."""
+    # actual data is in an out-of-order JS data structure; need to find
+    # progress for all job IDs and then pick last one
+    app_id_percent_tuples = []
+
+    for line in html_bytes.splitlines():
+        m = _RESOURCE_MANAGER_JS_RE.match(line)
+        if m:
+            app_id_percent_tuples.append((m.group(1), float(m.group(2))))
+
+    if app_id_percent_tuples:
+        return sorted(app_id_percent_tuples)[-1][1]
+    else:
+        return None
+
+
+### AWS Date-time parsing ###
+
+# sometimes AWS gives us seconds as a decimal, which we can't parse
+# with boto.utils.ISO8601
+_SUBSECOND_RE = re.compile('\.[0-9]+')
+
+
+# Thu, 29 Mar 2012 04:55:44 GMT
+_RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
+
+
+# TODO: test this, now that it uses UTC time
+def iso8601_to_timestamp(iso8601_time):
+    iso8601_time = _SUBSECOND_RE.sub('', iso8601_time)
     try:
-        ports = parse_port_range_list(value)
-        return ports
-    except ValueError, e:
-        raise OptionValueError('option %s: invalid port range list "%s": \n%s' % (opt, value, e.args[0]))
+        return calendar.timegm(time.strptime(iso8601_time, boto.utils.ISO8601))
+    except ValueError:
+        return calendar.timegm(time.strptime(iso8601_time, _RFC1123))
 
+
+def iso8601_to_datetime(iso8601_time):
+    iso8601_time = _SUBSECOND_RE.sub('', iso8601_time)
+    try:
+        return datetime.strptime(iso8601_time, boto.utils.ISO8601)
+    except ValueError:
+        return datetime.strptime(iso8601_time, _RFC1123)

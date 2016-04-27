@@ -1,3 +1,479 @@
+v0.5.1, 2016-05-?? -- ???
+ * strict_protocols in mrjob.conf is no longer ignored (#1302)
+ * check_input_paths in mrjob.conf is no longer ignored
+ * partitioner() is no longer ignored, fixing SORT_VALUES (#1294)
+ * improved probably cause of error from pre-YARN logs (#1288)
+ * ssh_bind_ports now defaults to (x)range, not list (#1284)
+
+v0.5.0, 2016-03-28 -- the future is in the past
+ * supports Python 3 (#989)
+ * requires boto 2.35.0 or newer (#980)
+   * removed many workarounds for S3 and EMR (#980), IAM (#1062)
+ * jobs:
+   * is_mapper_or_reducer() is now is_task() (#1072)
+   * mr() no longer takes positional arguments (#814)
+   * removed jar() (use mrjob.step.JarStep)
+   * removed testing methods parse_counters() and parse_output()
+   * protocols:
+     * protocols are strict by default (#724)
+     * JSON protocols use ujson when available, then simplejson (#1002, #1266)
+       * can explicitly choose Standard, Simple or Ultra JSON protocol
+     * raw protocols handle bytes or unicode depending on Python version
+       * can explicitly choose Text or Bytes protocol
+   * mrjob.step:
+      * JarStep only takes "args" and "main_class" keyword args
+      * removed MRJobStep (use MRStep)
+ * runners:
+   * All runners:
+     * totally revamped log handling (#1123)
+     * runner status/log messages are less noisy (#1044)
+     * don't bootstrap mrjob if interpreter is set (#1041)
+     * fs methods path_exists() and path_join() are now exists() and join()
+     * deprecation warning: use runner.fs explicitly (#1146)
+     * changes to cleanup options:
+       * removed IS_SUCCESSFUL (use ALL)
+       * LOCAL_SCRATCH is now LOCAL_TMP (#318)
+       * new HADOOP_TMP option handles HDFS cleanup (#1261)
+       * REMOTE_SCRATCH is now CLOUD_TMP (#1261)
+     * base_tmp_dir option is now local_tmp_dir (#318)
+     * non-inline runners raise StepFailedException on step failure (#1219)
+     * steps_python_bin defaults to current python interpreter (#1038)
+     * _job_name is now _job_key (#982)
+   * EMR:
+     * default AWS region is us-west-2 (#1025)
+     * default instance type is m1.medium (#992)
+     * visible_to_all_users defaults to true (#1016)
+     * matches your minor version of Python 2 on 3.x and 4.x AMIs (#1265)
+     * 4.x AMIs are supported (#1105)
+       * added --release-label switch (--ami-version 4.x.y also works)
+     * can fetch counters and probable cause of failure on 3.x and 4.x AMIs
+     * SSH tunnel now works on 3.x and 4.x AMIs (#1013)
+       * ssh_tunnel_to_job_tracker option is now ssh_tunnel
+     * correctly fetch step logs by step ID (#1117)
+     * bootstrap_python option
+     * s3_scratch_uri option is now s3_tmp_dir (#318)
+     * aws_region is no longer inferred from s3_tmp_dir
+     * create/select temp bucket in same region as EMR jobs (#687)
+     * added iam_endpoint option (#1067)
+     * removed s3_conn args from methods in EMRJobRunner and S3Filesystem
+     * S3 Filesystem:
+       * connect to each S3 bucket on appropriate endpoint (#1028)
+         * fall back to default if we can't get bucket location (#1170)
+       * removed special treatment of _$folder$ keys
+         * removed deprecated S3Filesystem method get_s3_folder_keys()
+       * recurse "subdirectories" even if uri lacks trailing / (#1183)
+     * removed iam_job_flow_role option (use iam_instance_profile)
+     * custom hadoop_streaming_jar gets properly uploaded
+     * job cleanup temporarily disabled (#1241)
+     * pooling respects key pair (#1230)
+     * idle cluster self-termination respects non-streaming jobs (#1145)
+     * deprecated "latest" AMI version not passed through to EMR (#1269)
+     * emr_job_flow_id option is now cluster_id (#1082)
+     * emr_job_flow_pool_name is now pool_name (#1082)
+     * pool_emr_job_flows is now pool_clusters (#1082)
+   * Hadoop
+     * works out-of the-box on most Hadoop setups (#1160)
+     * works out-of the box inside EMR (2.x, 3.x, and 4.x AMIs)
+     * counters are parsed from Hadoop binary stderr in YARN (#1153)
+     * can find logs and probable cause of failure in YARN (#1195)
+       * will search in <output dir>/_logs, to support Cloudera (#565)
+     * HDFS Filesystem:
+       * use fs -ls -R and fs -rm -R in YARN (#1152)
+       * mkdir() now uses -p on YARN (#991)
+       * fs.du() now works on YARN (#1155)
+       * fs.du() now returns 0 for nonexistent files instead of erroring
+       * fs.rm() now uses -skipTrash
+     * dropped support for Hadoop prior to 0.20.203 (#1208)
+     * added hadoop_log_dirs option
+     * hdfs_scratch_dir option is now hadoop_tmp_dir (#318)
+     * hadoop_home is deprecated
+     * uses -D and correct property name when step has no reduces (#1213)
+   * Inline/Local
+     * runner.fs raises IOError if passed URIs (#1185)
+     * version-agnostic by default (#735)
+     * removed ignored hadoop_extra_args and hadoop_streaming_jar opts (#1275)
+     * inline runner uses multiple splits by default (#1276)
+ * removed mrjob.compat.get_jobconf_value() (use jobconf_from_env())
+ * removed mrjob.compat methods to support Hadoop prior to 0.20.203:
+   * supports_combiners_in_hadoop_streaming()
+   * supports_new_distributed_cache_options()
+   * uses_generic_jobconf()
+ * removed mrjob.conf.combine_cmd_lists()
+ * removed fetch-logs tool (#1127)
+ * mrjob subcommands use "cluster" rather than "job-flow" (#1082)
+   * create-job-flow is now create-cluster
+   * terminate-idle-job-flows is now terminate-idle-clusters
+   * terminate-job-flow is now terminate-cluster
+ * Python-version-specific mrjob-x and mrjob-x.y commands (#1104)
+ * use followlinks=True with os.walk()
+ * all internal constants/functions/methods explicitly start with _ (#681)
+ * mrjob.util:
+   * file_ext() takes filename, not path
+   * random_identifier() moved here from mrjob.aws
+   * buffer_iterator_to_line_iterator() is now to_lines()
+     * to_lines() no longer appends a newline to data (#819)
+   * removed extract_dir_for_tar()
+   * gunzip_stream() now yields chunks, not lines
+   * removed hash_object()
+
+v0.4.6, 2015-11-09 -- config files
+ * PyYAML>=3.08 is required
+ * !clear tag in conf files (#1162)
+ * combine_lists() and combine_path_lists() can handle scalars (#1172)
+ * include: paths in conf files are relative to real path of conf file (#1166)
+ * mrjob.conf.combine_cmd_lists() is deprecated (#1168)
+ * EMR runner: pool_wait_minutes can now be loaded from mrjob.conf (#1070)
+ * support for wheel packaging format (#1140)
+
+v0.4.5, 2015-07-28 -- DescribeJobFlows begone
+ * boto>=2.6.0 is required (used to be 2.2.0)
+ * runners:
+   * EMR:
+     * moved off deprecated DescribeJobFlows API (#876)
+       * time-to-end-of-hour now uses creation time, not "start" time
+     * aws_security_token for temporary credentials (#1003)
+     * Use AWS managed policies when creating IAM objects (#1026)
+     * Fall back to default role/instance profile when no IAM access (#1008)
+     * added emr_tags option (#1058)
+     * added get_ami_version() method
+     * hadoop_version option no longer has any effect (#1017)
+   * Hadoop:
+     * --hadoop-home switch now works (#1037)
+ * EMR tools:
+   * added switches for AWS connection options etc. (#1087)
+   * mrboss is available from command line tool: mrjob boss [args]
+   * terminate_idle_job_flows:
+     * less prone to race condition (#910)
+     * prints results to stdout in dry_run mode (#1102)
+     * job flows stuck in STARTING state no longer considered idle
+   * report_long_jobs reports job flows stuck in STARTING state
+   * collect_emr_stats and job_flow_pool are deprecated
+ * more efficient decoding of bz2 files
+ * mrjob.retry.RetryWrapper raises exception when out of tries (#1093)
+
+v0.4.4, 2015-04-21 -- EMRgency!
+ * runners:
+   * EMR:
+     * Create IAM objects as needed (unbreaks mrjob for new accounts) (#999)
+     * --iam-job-flow-role renamed to --iam-instance-profile (#1001)
+     * new --iam-service-role option (#1005)
+
+v0.4.3, 2015-04-08 -- SO many bugfixes
+ * jobs:
+   * MRStep's constructor treats kwarg=None same as not setting it (#970)
+   * parse_counters() and parse_output() are deprecated (#829)
+   * self.mr is deprecated in favor of MRStep (#815)
+ * runners:
+   * All runners:
+     * You can now set strict_protocols from mrjob.conf (#726)
+       * new --no-strict-protocols command-line option
+     * streaming output from closed runner shows a warning (#853)
+   * EMR:
+     * --check-input-paths and --no-check-input-paths options (#864)
+     * skip (very slow) validation of s3 buckets if boto < 2.25.0 (#865)
+     * Fix for max_hours_idle bug that was terminating job flows early (#932)
+     * --emr-api-param allows users to pass additional parameters to boto's
+       EMR API (#879)
+       * unset paramaters with --no-emr-api-param
+     * bootstrap_python_packages (deprecated) now works on 3.x EMR AMIs (#863)
+     * Use TERMINATE_CLUSTER instead of deprecated TERMINATE_JOB_FLOW (#974)
+     * updated EC2 instance type data for pooling (#995)
+   * Hadoop:
+     * exclude hadoop source jars when looking for streaming jar (#861)
+     * Fixed mkdir_on_hdfs for Hadoop version 2.x (#923)
+     * Fixed hadoop_bin on Windows (#843)
+   * Local
+     * bootstrap mrjob by default (#984)
+   * Inline
+     * fix for add_file_option() (#851)
+     * cd to job's working directory before instantiating mrjob class (#988)
+ * Use pytest to run tests (#898)
+ * collect-emr-active-stats subcommand (#947)
+ * Using xtrace flag to get more output during bootstrap (#943)
+ * Fixed log printouts for command line tools (#901)
+ * Fix to avoid interpreting windows paths as URIs (#880)
+ * Better error message when ssh keyfile is missing (#858)
+ * Update EMR tool ISO8601 parsing to be consistent with EMR runner (#869)
+ * Dropped support for Python 2.5 (#713)
+   * Dropped support for the 1.x EMR AMI series, which uses Python 2.5
+
+v0.4.2, 2013-11-27 -- that's one small step for a JAR
+ * jobs:
+   * can interpolate input and output path(s) into arguments of JarSteps,
+     so they can be part of multi-step jobs (#773)
+     * see mrjob/examples/mr_jar_step_example.py
+   * JarStep now takes keyword arguments only (#769)
+     * removed useless "name" field; "step_args" is now just "args"
+   * MRJobStep (usually accessed via MRJob.mr()) is now MRStep
+ * runners:
+   * All runners:
+     * --setup is now fully functional (#206)
+       * --python-archive, --setup-cmd, and --setup-script are deprecated
+     * --bootstrap option works and uses sh (#206)
+       * --bootstrap-cmd, --bootstrap-file, --bootstrap-python-package,
+         --bootstrap-script are deprecated
+     * setup commands can no longer corrupt a task's input and output (#803)
+     * sh_bin is now "sh -e" by default so setup fails fast (#810)
+       * default is "/bin/sh -e" on EMR
+   * EMR:
+     * JarSteps work again (#763)
+     * auto-uploads jars for JarSteps (#772)
+       * JARs on the EMR instances can be accessed with file:/// URIs
+     * ssh_cat() no longer raises an error when catting a file
+       containing an error (#807)
+     * Fixed SignatureDoesNotMatchError that happens with boto 2.10.0+
+       with Python prior to 2.7.5 (#778)
+   * Hadoop:
+     * now handles JarSteps too (#770)
+ * Fix to mrjob.parse.urlparse() that was breaking Python 2.5
+ * mrjob.util.buffer_iterator_to_line_iterator() is now more efficient
+   and uses a bounded amount of memory
+ * bz2 decompression no longer discards data (#817)
+
+v0.4.1, 2013-09-16 -- secondary sort and self-terminating job flows
+ * jobs:
+   * SORT_VALUES: Secondary sort by value (#240)
+     * see mrjob/examples/
+   * can now override jobconf() again (#656)
+   * renamed mrjob.compat.get_jobconf_value() to jobconf_from_env()
+   * examples:
+     * bash_wrap/ (mapper/reducer_cmd() example)
+     * mr_most_used_word.py (two step job)
+     * mr_next_word_stats.py (SORT_VALUES example)
+ * runners:
+   * All runners:
+     * single setup option works but is not yet documented (#206)
+     * setup now uses sh rather than python internally
+   * EMR runner:
+     * max_hours_idle: self-terminating idle job flows (#628)
+       * mins_to_end_of_hour option gives finer control over self-termination.
+     * Can reuse pooled job flows where previous job failed (#633)
+     * Throws IOError if output path already exists (#634)
+     * Gracefully handles SSL cert issues (#621, #706)
+     * Automatically infers EMR/S3 endpoints from region (#658)
+     * ls() supports s3n:// schema (#672)
+     * Fixed log parsing crash on JarSteps (#645)
+     * visible_to_all_users works with boto <2.8.0 (#701)
+     * must use --interpreter with non-Python scripts (#683)
+     * cat() can decompress gzipped data (#601)
+   * Hadoop runner:
+     * check_input_paths: can disable input path checking (#583)
+     * cat() can decompress gzipped data (#601)
+   * Inline/Local runners:
+     * Fixed counter parsing for multi-step jobs in inline mode
+     * Supports per-step jobconf (#616)
+ * Documentation revamp
+ * mrjob.parse.urlparse() works consistently across Python versions (#686)
+ * deprecated:
+   * many constants in mrjob.emr replaced with functions in mrjob.aws
+ * removed deprecated features:
+   * old conf locations (~/.mrjob and in PYTHONPATH) (#747)
+   * built-in protocols must be instances (#488)
+
+v0.4.0, 2013-04-30 -- Slouching toward nirvana
+ * Changes:
+   * 'mrjob' command (#225)
+   * Changed default runner from 'local' to 'inline' (#423)
+   * Local runner no longer adds working directory to PYTHONPATH of
+     subprocesses; use inline runner instead (#424)
+   * Requires boto 2.2.0 or later
+   * Filesystem functionality moved out of MRJobRunner into into 'fs' objects
+     but forwarded from runners for backward compatibility
+   * Changed exception hierarchy of mrjob.ssh (which is private but
+     important)
+   * Inline and local runners now inherit from the SimMRJobRunner class and thus share most
+     of their implementation
+   * Internal data structure for representing a step is much richer, allowing
+     many cool future features (#479)
+   * mrjob detects Hadoop version from EMR based on API responses instead of
+     what's in the config (#611)
+ * New features:
+   * Support for non-Hadoop Streaming jar steps (#499)
+   * Support for arbitrary commands as Hadoop Streaming
+     mappers/combiners/reducers
+   * mapper_pre_filter, combiner_pre_filter, and reducer_pre_filter allow
+     running of a UNIX command in front of tasks to filter input outside of
+     the interpreter
+   * Hadoop runner uses PTY to print output from the Hadoop sub process to the
+     console (#580)
+   * mrjob knows how to terminate the job on cleanup (Ctrl+C closes the job).
+     (#353)
+   * Allow use of multiple -c flags on the command line (#420)
+ * Bug fixes:
+   * Silenced some incorrect warnings about ignored options in 'inline' runner
+   * terminate_idle_job_flows uses the default configuration to terminate idle jobs (#559)
+ * Removed deprecated functionality:
+   * --hadoop-*-format
+   * --*-protocol switches
+   * MRJob.DEFAULT_*_PROTOCOL
+   * MRJob.get_default_opts()
+   * MRJob.protocols()
+   * PROTOCOL_DICT
+   * IF_SUCCESSFUL
+   * DEFAULT_CLEANUP
+   * S3Filesystem.get_s3_folder_keys()
+
+v0.3.5, 2012-08-21 -- The Last Ride of v0.3.x[?]
+ * EMR:
+   * --pool-wait-minutes option lets you wait up to X minutes before creating a
+     job flow (#455)
+   * Job flow ID included in error messages on failure (#452)
+   * JOB and JOB_FLOW cleanup options (#485, #455)
+ * EMR and Hadoop:
+   * Compatibility fixes related to deprecated options and Hadoop's bizarre
+     non-sequential version numbers (#489, #534)
+ * Other:
+   * Warn when *_PROTOCOL is not a class (#490)
+ * Bug fixes:
+   * Unicode strings can be used when specifying interpreters (#431)
+   * --enable-emr-logging no longer causes the wrong counters/logs to be parsed
+     (#446)
+   * TMP_DIR inserted into 'sort' environment variables (#477)
+   * Setting hadoop_home in mrjob.conf works again
+   * Gzipped input files work when specified with relative paths (#494)
+   * Passthrough options are not re-ordered when sent to Hadoop Streaming
+     (#509)
+
+v0.3.4.1, 2012-06-12 -- The test suite doesn't catch everything...
+ * Local mode doesn't try to send multiple mappers to the same output file
+   when using multiple compressed files as input
+
+v0.3.4, 2012-06-11 -- We are friendly people.
+ * Experimental support for IronPython in the local and inline runners
+ * set_status() and increment_counter() will encode messages/names of type
+   'unicode' as UTF-8 when writing to Hadoop Streaming
+ * EMR and Hadoop counter parsing is more correct
+ * mrjob.tools.emr.fetch_logs fetches logs from S3 when asked instead of
+   incorrectly refusing to do so
+ * jobconf values can be booleans in mrjob.conf as well as 'true' and 'false'
+   strings
+ * hadoop_version can be a float in mrjob.conf, but a warning is printed to the
+   console
+ * Command line help is split across several --help-* commands
+ * Local runner sorts output consistently
+
+v0.3.3.2, 2012-04-10 -- It's a race [condition]!
+ * Option parsing no longer dies when -- is used as an argument (#435)
+ * Fixed race condition where two jobs can join same job flow thinking it is
+   idle, delaying one of the jobs (#438)
+ * Better error message when a config file contains no data for the current
+   runner (#433)
+
+v0.3.3.1, 2012-04-02 -- Hothothothothothothotfix
+ * Fixed S3 locking mechanism parsing of last modified time to work around an
+   inconsistency in the EMR API
+
+v0.3.3, 2012-03-29 -- Bug...bug...bug...bug...bug...FEATURE!
+ * EMR:
+   * Error detection code follows symlinks in Hadoop logs (#396)
+   * terminate_idle_job_flows locks job flows before terminating them (#391)
+   * terminate_idle_job_flows -qq silences all output (#380)
+ * Other fixes:
+   * mr_tower_of_powers test no longer requires Testify (#395)
+   * Various runner du() implementations no longer broken (#393, #394)
+   * Hadoop counter parser regex handles long lines better (#388)
+   * Hadoop counter parser regex is more correct (#305)
+   * Better error when trying to parse YAML without PyYAML (#348)
+
+v0.3.2, 2012-02-22 -- AMI versions, spot instances, and more
+ * Docs:
+   * 'Testing with mrjob' section in docs (includes #321)
+   * MRJobRunner.counters() included in docs (#321)
+   * terminate_idle_job_flows is spelled correctly in docs (#339)
+ * Running jobs:
+   * local mode:
+     * Allow non-string jobconf values again (this changed in v0.3.0)
+     * Don't split *.gz files (#333)
+   * emr mode:
+     * Spot instance support via ec2_*_instance_bid_price and renamed instance
+       type/number options (#219)
+     * ami_version option to allow switching between EMR AMIs (#306)
+     * 'Error while reading from input file' displays correct file (#358)
+     * python_bin used for bootstrap_python_packages instead of just 'python'
+       (#355)
+     * Pooling works with bootstrap_mrjob=False (#347)
+     * Pooling makes sure a job flow has space for the new job before joining
+       it (#324)
+ * EMR tools:
+   * create_job_flow no longer tries to use an option that does not exist
+     (#349)
+   * report_long_jobs tool alerts on jobs that have run for more than X hours
+     (#345)
+   * mrboss no longer spells stderr 'stsderr'
+   * terminate_idle_job_flows counts jobs with pending (but not running)
+     steps as idle (#365)
+   * terminate_idle_job_flows can terminate job flows near the end of a
+     billable hour (#319)
+   * audit_usage breaks down job flows by pool (#239)
+   * Various tools (e.g. audit_usage) get list of job flows correctly (#346)
+
+v0.3.1, 2011-12-20 -- Nooooo there were bugs!
+ * Instance-type command-line arguments always override mrjob.conf (Issue #311)
+ * Fixed crash in mrjob.tools.emr.audit_usage (Issue #315)
+ * Tests now use unittest; python setup.py test now works (Issue #292)
+
+v0.3.0, 2011-12-07 -- Worth the wait
+ * Configuration:
+   * Saner mrjob.conf locations (Issue #97):
+     * ~/.mrjob is deprecated in favor of ~/.mrjob.conf
+     * searching in PYTHONPATH is deprecated
+     * MRJOB_CONF environment variable for custom paths
+ * Defining Jobs (MRJob):
+   * Combiner support (Issue #74)
+   * *_init() and *_final() methods for mappers, combiners, and reducers
+     (Issue #124)
+   * mapper/combiner/reducer methods no longer need to contain a yield
+     statement if they emit no data
+   * Protocols:
+     * Protocols can be anything with read() and write() methods, and are
+       instances by default (Issue #229)
+     * Set protocols with the *_PROTOCOL attributes or by re-defining the
+       *_protocol() methods
+     * Built-in protocol classes cache the encoded and decoded value of the
+       last key for faster decoding during reducing (Issue #230)
+     * --*protocol switches and aliases are deprecated (Issue #106)
+   * Set Hadoop formats with HADOOP_*_FORMAT attributes or the hadoop_*_format()
+     methods (Issue #241)
+     * --hadoop-*-format switches are deprecated
+     * Hadoop formats can no longer be set from mrjob.conf
+   * Set jobconf with JOBCONF attribute or the jobconf() method (in addition
+     to --jobconf)
+   * Set Hadoop partitioner class with --partitioner, PARTITIONER, or
+     partitioner() (Issue #6)
+   * Custom option parsing (Issue #172)
+   * Use mrjob.compat.get_jobconf_value() to get jobconf values from environment
+ * Running jobs:
+   * All modes:
+     * All runners are Hadoop-version aware and use the correct jobconf and
+       combiner invocation styles (Issue #111)
+     * All types of URIs can be passed through to Hadoop (Issue #53)
+     * Speed up steps with no mapper by using cat (Issue #5)
+     * Stream compressed files with cat() method (Issue #17)
+     * hadoop_bin, python_bin, and ssh_bin can now all take switches (Issue #96)
+     * job_name_prefix option is gone (was deprecated)
+     * Better cleanup (Issue #10):
+       * Separate cleanup_on_failure option
+       * More granular cleanup options
+     * Cleaner handling of passthrough options (Issue #32)
+   * emr mode:
+     * job flow pooling (Issue #26)
+     * vastly improved log fetching via SSH (Issue #2)
+       * New tool: mrjob.tools.emr.fetch_logs
+     * default Hadoop version on EMR is 0.20 (was 0.18)
+     * ec2_instance_type option now only sets instance type for slave nodes
+       when there are multiple EC2 instances (Issue #66)
+     * New tool: mrjob.tools.emr.mrboss for running commands on all nodes and
+       saving output locally
+   * inline mode:
+     * Supports cmdenv (Issue #136)
+     * Passthrough options can now affect steps list (Issue #301)
+   * local mode:
+     * Runs 2 mappers and 2 reducers in parallel by default (Issue #228)
+     * Preliminary Hadoop simulation for some jobconf variables (Issue #86)
+ * Misc:
+   * boto 2.0+ is now required (Issue #92)
+   * Removed debian packaging (should be handled separately)
+
 v0.2.8, 2011-09-07 -- Bugfixes and betas
  * Fix log parsing crash dealing with timeout errors
  * Make mr_travelling_salesman.py work with simplejson
@@ -25,12 +501,12 @@ v0.2.7, 2011-07-12 -- Hooray for interns!
  * Added mr_travelling_salesman example
 
 v0.2.6, 2011-05-24 -- Hadoop 0.20 in EMR, inline runner, and more
- * Set Hadoop to run on EMR with --hadoop-version (Issue #71).
+* Set Hadoop to run on EMR with --hadoop-version (Issue #71).
    * Default is still 0.18, but will change to 0.20 in mrjob v0.3.0.
  * New inline runner, for testing locally with a debugger
  * New --strict-protocols option, to catch unencodable data (Issue #76)
  * Added steps_python_bin option (for use with virtualenv)
- * mrjob no longer chokes when asked to run on an EMR job flow running 
+ * mrjob no longer chokes when asked to run on an EMR job flow running
    Hadoop 0.20 (Issue #110)
  * mrjob no longer chokes on job flows with no LogUri (Issue #112)
 
@@ -65,18 +541,18 @@ v0.2.1, 2010-11-17 -- laststatechangereason bugfix
 
 v0.2.0, 2010-11-15 -- Many bugfixes, Windows support
  * New Features/Changes:
-   * EMRJobRunner now prints % of mappers and reducers completed when you 
+   * EMRJobRunner now prints % of mappers and reducers completed when you
      enable the SSH tunnel.
    * Added mr_page_rank example
    * Added mrjob.tools.emr.audit_usage script (Issue #21)
-   * You can specify alternate job owners with the "owner" option. Useful for 
+   * You can specify alternate job owners with the "owner" option. Useful for
      auditing usage. (Issue #59)
-   * The job_name_prefix option has been renamed to label (the old name still 
+   * The job_name_prefix option has been renamed to label (the old name still
      works but is deprecated)
    * bootstrap_cmds and bootstrap_scripts no longer automatically invoke sudo
  * Bugs Fixed/Cleanup:
    * bootstrap files no longer get uploaded to S3 twice (Issue #8)
-   * When using add_file_option(), show_steps() can now see the local version 
+   * When using add_file_option(), show_steps() can now see the local version
      of the file (Issue #45)
    * Now works on Windows (Issue #46)
    * No longer requires external jar, tar, or zip binaries (Issue #47)

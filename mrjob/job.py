@@ -1032,7 +1032,7 @@ class MRJob(object):
             def load_options(self, args):
                 super(MRYourJob, self).load_options(args)
 
-                self.stop_words = self.options.stop_words.split(',')
+                self.stop_words = self.option.stop_words.split(',')
                 ...
         """
         # don't pass None to parse_args unless we're actually running

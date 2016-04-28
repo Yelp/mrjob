@@ -44,8 +44,21 @@ timeout, with ``jobconf`` and the appropriate environment variables:
 .. code-block:: yaml
 
     runners:
-      hadoop: # this will work for both hadoop and emr
+      hadoop: # this will work for old hadoop versions
         jobconf:
           # "true" must be a string argument, not a boolean! (#323)
           mapreduce.output.compress: "true"
           mapreduce.output.compression.codec: org.apache.hadoop.io.compress.BZip2Codec
+
+For Hadoop 2.0 and the current default EMR Hadoop version.
+
+.. code-block:: yaml
+
+    runners:
+      hadoop: # or emr if appropriate
+        jobconf:
+          # "true" must be a string argument, not a boolean! (#323)
+          mapreduce.output.fileoutputformat.compress: "true"
+          mapreduce.output.fileoutputformat.compress.codec: org.apache.hadoop.io.compress.BZip2Codec
+
+

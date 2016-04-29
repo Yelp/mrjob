@@ -726,10 +726,8 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
         # bootstrap_python
         if PY2:
             self.assertIn('sudo apt-get install -y python-pip python-dev', lines)
-            self.assertIn('sudo pip install --upgrade ujson', lines)
         else:
             self.assertIn('sudo apt-get install -y python3 python3-pip python3-dev', lines)
-            self.assertIn('sudo pip3 install --upgrade ujson', lines)
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = DataprocJobRunner(conf_paths=[], bootstrap_mrjob=False,
@@ -936,12 +934,10 @@ class BootstrapPythonTestCase(MockGoogleAPITestCase):
     if PY2:
         EXPECTED_BOOTSTRAP = [
             ['sudo apt-get install -y python-pip python-dev'],
-            ['sudo pip install --upgrade ujson'],
         ]
     else:
         EXPECTED_BOOTSTRAP = [
             ['sudo apt-get install -y python3 python3-pip python3-dev'],
-            ['sudo pip3 install --upgrade ujson'],
         ]
 
     def test_default(self):

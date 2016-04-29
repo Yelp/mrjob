@@ -843,20 +843,14 @@ class DataprocJobRunner(MRJobRunner):
             return []
 
         if PY2:
-            # Python 2 is already installed; install pip and ujson
-
-            # (We also install python-pip for bootstrap_python_packages,
-            # but there's no harm in running these commands twice, and
-            # bootstrap_python_packages is deprecated anyway.)
+            # Python 2 is already installed; install pip and dev packages
             return [
                 ['sudo apt-get install -y python-pip python-dev'],
-                ['sudo pip install --upgrade ujson'],
             ]
-
-        return [
-            ['sudo apt-get install -y python3 python3-pip python3-dev'],
-            ['sudo pip3 install --upgrade ujson'],
-        ]
+        else:
+            return [
+                ['sudo apt-get install -y python3 python3-pip python3-dev'],
+            ]
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with

@@ -21,11 +21,9 @@ from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
 
-from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.job import UsageError
-from mrjob.job import _SORT_VALUES_JOBCONF
 from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
@@ -667,7 +665,12 @@ class SortValuesTestCase(TestCase):
     def test_sort_values_sets_jobconf(self):
         mr_job = MRSortValues()
 
-        self.assertEqual(mr_job.jobconf(), _SORT_VALUES_JOBCONF)
+        self.assertEqual(
+            mr_job.jobconf(),
+            {'stream.num.map.output.key.fields': 2,
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class': None,
+             'mapred.text.key.comparator.options': None})
 
     def test_can_override_sort_values_from_job(self):
         mr_job = MRSortValuesAndMore()
@@ -678,7 +681,11 @@ class SortValuesTestCase(TestCase):
 
         self.assertEqual(
             mr_job.jobconf(),
-            combine_dicts(_SORT_VALUES_JOBCONF, MRSortValuesAndMore.JOBCONF))
+            {'stream.num.map.output.key.fields': 3,
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class':
+                'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+             'mapred.text.key.comparator.options': '-k1 -k2nr'})
 
     def test_can_override_sort_values_from_cmd_line(self):
         mr_job = MRSortValues(
@@ -691,8 +698,10 @@ class SortValuesTestCase(TestCase):
 
         self.assertEqual(
             mr_job.jobconf(),
-            combine_dicts(_SORT_VALUES_JOBCONF,
-                          {'stream.num.map.output.key.fields': 'lots'}))
+            {'stream.num.map.output.key.fields': 'lots',
+             'mapred.text.key.partitioner.options': '-k1,1',
+             'mapred.output.key.comparator.class': None,
+             'mapred.text.key.comparator.options': None})
 
 
 class SortValuesRunnerTestCase(SandboxedTestCase):
@@ -712,7 +721,6 @@ class SortValuesRunnerTestCase(SandboxedTestCase):
             # blanked out so as not to mess up SORT_VALUES
             ['-D', 'foo=bar',
              '-D', 'mapred.text.key.partitioner.options=-k1,1',
-             '-D', 'mapreduce.partition.keypartitioner.options=-k1,1',
              '-D', 'stream.num.map.output.key.fields=2',
              '-partitioner',
                 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])

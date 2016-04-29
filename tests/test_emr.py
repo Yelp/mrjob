@@ -3703,7 +3703,6 @@ class PartitionerTestCase(MockBotoTestCase):
             self.assertEqual(
                 runner._hadoop_args_for_step(0), [
                     '-D', 'mapred.text.key.partitioner.options=-k1,1',
-                    '-D', 'mapreduce.partition.keypartitioner.options=-k1,1',
                     '-D', 'stream.num.map.output.key.fields=2',
                     '-partitioner',
                     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner',
@@ -3716,7 +3715,6 @@ class PartitionerTestCase(MockBotoTestCase):
             self.assertEqual(
                 runner._hadoop_args_for_step(0), [
                     '-D', 'mapred.text.key.partitioner.options=-k1,1',
-                    '-D', 'mapreduce.partition.keypartitioner.options=-k1,1',
                     '-D', 'stream.num.map.output.key.fields=2',
                     '-partitioner', 'java.lang.Object',
                 ])

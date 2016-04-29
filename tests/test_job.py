@@ -21,9 +21,11 @@ from io import BytesIO
 from subprocess import Popen
 from subprocess import PIPE
 
+from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.job import UsageError
+from mrjob.job import _SORT_VALUES_JOBCONF
 from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.protocol import JSONProtocol
@@ -40,6 +42,7 @@ from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import TestCase
@@ -325,9 +328,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
                               b'set()\n' +
                               b"'bar'\n")
 
-    STRICT_MRJOB_CONF ={'runners': {'inline': {'strict_protocols': True}}}
-
-    def assertJobHandlesUndecodableInput(self, job_args):
+    def assertJobHandlesUndecodableInput(self, job_args=()):
         job = self.MRBoringJSONJob(job_args)
         job.sandbox(stdin=BytesIO(self.BAD_JSON_INPUT))
 
@@ -344,14 +345,14 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(
                 sum(counters['Undecodable input'].values()), 3)
 
-    def assertJobRaisesExceptionOnUndecodableInput(self, job_args):
+    def assertJobRaisesExceptionOnUndecodableInput(self, job_args=()):
         job = self.MRBoringJSONJob(job_args)
         job.sandbox(stdin=BytesIO(self.BAD_JSON_INPUT))
 
         with job.make_runner() as r:
             self.assertRaises(Exception, r.run)
 
-    def assertJobHandlesUnencodableOutput(self, job_args):
+    def assertJobHandlesUnencodableOutput(self, job_args=()):
         job = self.MRBoringReprAndJSONJob(job_args)
         job.sandbox(stdin=BytesIO(self.UNENCODABLE_REPR_INPUT))
 
@@ -369,7 +370,7 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(list(counters), ['Unencodable output'])
             self.assertEqual(list(counters['Unencodable output'].values()), [1])
 
-    def assertJobRaisesExceptionOnUnencodableOutput(self, job_args):
+    def assertJobRaisesExceptionOnUnencodableOutput(self, job_args=()):
         job = self.MRBoringReprAndJSONJob(job_args)
         job.sandbox(stdin=BytesIO(self.UNENCODABLE_REPR_INPUT))
 
@@ -377,38 +378,26 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
             self.assertRaises(Exception, r.run)
 
     def test_undecodable_input(self):
-        self.assertJobRaisesExceptionOnUndecodableInput(job_args=[])
+        self.assertJobRaisesExceptionOnUndecodableInput()
 
-    def test_undecodable_input_strict(self):
+    def test_undecodable_input_strict_protocols(self):
         self.assertJobRaisesExceptionOnUndecodableInput(
-            job_args=['--strict-protocols'])
-
-    def test_undecodable_input_strict_in_mrjob_conf(self):
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            self.assertJobRaisesExceptionOnUndecodableInput(
-                job_args=['--strict-protocols'])
+            ['--strict-protocols'])
 
     def test_undecodable_input_no_strict_protocols(self):
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            self.assertJobHandlesUndecodableInput(
-                job_args=['--no-strict-protocols'])
+        self.assertJobHandlesUndecodableInput(
+            ['--no-strict-protocols'])
 
     def test_unencodable_output(self):
-        self.assertJobRaisesExceptionOnUnencodableOutput(job_args=[])
+        self.assertJobRaisesExceptionOnUnencodableOutput()
 
     def test_unencodable_output_strict(self):
         self.assertJobRaisesExceptionOnUnencodableOutput(
-            job_args=['--strict-protocols'])
-
-    def test_unencodable_output_strict_in_mrjob_conf(self):
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            self.assertJobRaisesExceptionOnUnencodableOutput(
-                job_args=['--strict-protocols'])
+            ['--strict-protocols'])
 
     def test_unencodable_output_no_strict_protocols(self):
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            self.assertJobHandlesUnencodableOutput(
-                job_args=['--no-strict-protocols'])
+        self.assertJobHandlesUnencodableOutput(
+            ['--no-strict-protocols'])
 
 
 class PickProtocolsTestCase(TestCase):
@@ -656,15 +645,7 @@ class JobConfTestCase(TestCase):
                          {'mapred.baz': 'bar'})
 
 
-class MRSortValuesJob(MRJob):
-    SORT_VALUES = True
-
-    # need to define a mapper or reducer
-    def mapper_init(self):
-        pass
-
-
-class MRSortValuesAndMoreJob(MRSortValuesJob):
+class MRSortValuesAndMore(MRSortValues):
     PARTITIONER = 'org.apache.hadoop.mapred.lib.HashPartitioner'
 
     JOBCONF = {
@@ -678,24 +659,19 @@ class MRSortValuesAndMoreJob(MRSortValuesJob):
 class SortValuesTestCase(TestCase):
 
     def test_sort_values_sets_partitioner(self):
-        mr_job = MRSortValuesJob()
+        mr_job = MRSortValues()
 
         self.assertEqual(
             mr_job.partitioner(),
             'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
 
     def test_sort_values_sets_jobconf(self):
-        mr_job = MRSortValuesJob()
+        mr_job = MRSortValues()
 
-        self.assertEqual(
-            mr_job.jobconf(),
-            {'stream.num.map.output.key.fields': 2,
-             'mapred.text.key.partitioner.options': '-k1,1',
-             'mapred.output.key.comparator.class': None,
-             'mapred.text.key.comparator.options': None})
+        self.assertEqual(mr_job.jobconf(), _SORT_VALUES_JOBCONF)
 
     def test_can_override_sort_values_from_job(self):
-        mr_job = MRSortValuesAndMoreJob()
+        mr_job = MRSortValuesAndMore()
 
         self.assertEqual(
             mr_job.partitioner(),
@@ -703,14 +679,10 @@ class SortValuesTestCase(TestCase):
 
         self.assertEqual(
             mr_job.jobconf(),
-            {'stream.num.map.output.key.fields': 3,
-             'mapred.text.key.partitioner.options': '-k1,1',
-             'mapred.output.key.comparator.class':
-                'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
-             'mapred.text.key.comparator.options': '-k1 -k2nr'})
+            combine_dicts(_SORT_VALUES_JOBCONF, MRSortValuesAndMore.JOBCONF))
 
     def test_can_override_sort_values_from_cmd_line(self):
-        mr_job = MRSortValuesJob(
+        mr_job = MRSortValues(
             ['--partitioner', 'org.pants.FancyPantsPartitioner',
              '--jobconf', 'stream.num.map.output.key.fields=lots'])
 
@@ -720,10 +692,8 @@ class SortValuesTestCase(TestCase):
 
         self.assertEqual(
             mr_job.jobconf(),
-            {'stream.num.map.output.key.fields': 'lots',
-             'mapred.text.key.partitioner.options': '-k1,1',
-             'mapred.output.key.comparator.class': None,
-             'mapred.text.key.comparator.options': None})
+            combine_dicts(_SORT_VALUES_JOBCONF,
+                          {'stream.num.map.output.key.fields': 'lots'}))
 
 
 class SortValuesRunnerTestCase(SandboxedTestCase):
@@ -735,7 +705,7 @@ class SortValuesRunnerTestCase(SandboxedTestCase):
     }}}}
 
     def test_cant_override_sort_values_from_mrjob_conf(self):
-        runner = MRSortValuesJob().make_runner()
+        runner = MRSortValues().make_runner()
 
         self.assertEqual(
             runner._hadoop_args_for_step(0),
@@ -743,6 +713,7 @@ class SortValuesRunnerTestCase(SandboxedTestCase):
             # blanked out so as not to mess up SORT_VALUES
             ['-D', 'foo=bar',
              '-D', 'mapred.text.key.partitioner.options=-k1,1',
+             '-D', 'mapreduce.partition.keypartitioner.options=-k1,1',
              '-D', 'stream.num.map.output.key.fields=2',
              '-partitioner',
                 'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'])

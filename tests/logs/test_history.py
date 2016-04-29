@@ -450,6 +450,50 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
                     ),
                 ]))
 
+    def test_ignore_killed_task_with_empty_error(self):
+        # regression test for #1288
+        lines = [
+            'MapAttempt TASK_TYPE="MAP"'
+            ' TASKID="task_201603252302_0001_m_000003"'
+            ' TASK_ATTEMPT_ID="attempt_201603252302_0001_m_000003_3"'
+            ' TASK_STATUS="KILLED" FINISH_TIME="1458947137998"'
+            ' HOSTNAME="172\.31\.18\.180" ERROR="" .\n',
+        ]
+
+        self.assertEqual(_parse_pre_yarn_history_log(lines), {})
+
+    def test_ignore_killed_task(self):
+        # not sure if this actually happens, but just to be safe
+        lines = [
+            'MapAttempt TASK_TYPE="MAP"'
+            ' TASKID="task_201601081945_0005_m_000001"'
+            ' TASK_ATTEMPT_ID='
+            '"attempt_201601081945_0005_m_00000_2"'
+            ' TASK_STATUS="KILLED"'
+            ' ERROR="java\.lang\.RuntimeException:'
+            ' PipeMapRed\.waitOutputThreads():'
+            ' subprocess failed with code 1\n',
+            '        at org\\.apache\\.hadoop\\.streaming\\.PipeMapRed'
+            '\\.waitOutputThreads(PipeMapRed\\.java:372)\n',
+            '        at org\\.apache\\.hadoop\\.streaming\\.PipeMapRed'
+            '\\.mapRedFinished(PipeMapRed\\.java:586)\n',
+            '" .\n',
+        ]
+
+        self.assertEqual(_parse_pre_yarn_history_log(lines), {})
+
+    def test_ignore_blank_error(self):
+        lines = [
+            'MapAttempt TASK_TYPE="MAP"'
+            ' TASKID="task_201601081945_0005_m_000001"'
+            ' TASK_ATTEMPT_ID='
+            '"attempt_201601081945_0005_m_00000_2"'
+            ' TASK_STATUS="FAILED"'
+            ' ERROR="" .\n',
+        ]
+
+        self.assertEqual(_parse_pre_yarn_history_log(lines), {})
+
 
 # edge cases in pre-YARN history record parsing
 class ParsePreYARNHistoryRecordsTestCase(TestCase):

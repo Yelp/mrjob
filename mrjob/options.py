@@ -44,11 +44,11 @@ def _add_protocol_opts(opt_group):
     """
     return [
         opt_group.add_option(
-            '--strict-protocols', dest='strict_protocols', default=True,
+            '--strict-protocols', dest='strict_protocols', default=None,
             action='store_true', help='If something violates an input/output '
             'protocol then raise an exception (the default)'),
         opt_group.add_option(
-            '--no-strict-protocols', dest='strict_protocols', default=True,
+            '--no-strict-protocols', dest='strict_protocols', default=None,
             action='store_false', help='If something violates an input/output '
             'protocol then increment a counter and continue'),
     ]
@@ -151,6 +151,11 @@ def _add_runner_opts(opt_group, default_runner='local'):
             'and must be empty'),
 
         opt_group.add_option(
+            '--partitioner', dest='partitioner', default=None,
+            help=('Hadoop partitioner class. Deprecated as of v0.5.1 and'
+                  ' will be removed in v0.6.0 (specify in your job instead)')),
+
+        opt_group.add_option(
             '--python-archive', dest='python_archives', default=[],
             action='append',
             help=('Archive to unpack and add to the PYTHONPATH of the mr_job'
@@ -238,19 +243,13 @@ def _add_hadoop_emr_opts(opt_group):
             help='user who ran the job (if different from the current user)'),
 
         opt_group.add_option(
-            '--partitioner', dest='partitioner', default=None,
-            help=('Hadoop partitioner class to use to determine how mapper'
-                  ' output should be sorted and distributed to reducers. For'
-                  ' example: org.apache.hadoop.mapred.lib.HashPartitioner')),
-
-        opt_group.add_option(
             '--check-input-paths', dest='check_input_paths',
-            default=True, action='store_true',
+            default=None, action='store_true',
             help='Check input paths exist before running (the default)'),
 
         opt_group.add_option(
             '--no-check-input-paths', dest='check_input_paths',
-            default=True, action='store_false',
+            default=None, action='store_false',
             help='Skip the checks to ensure all input paths exist'),
     ]
 

@@ -521,7 +521,7 @@ class MRJobLauncher(object):
             'label': self.options.label,
             'output_dir': self.options.output_dir,
             'owner': self.options.owner,
-            'partitioner': self.partitioner(),
+            'partitioner': self.partitioner() or self.options.partitioner,
             'python_archives': self.options.python_archives,
             'python_bin': self.options.python_bin,
             'setup': self.options.setup,

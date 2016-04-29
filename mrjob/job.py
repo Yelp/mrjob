@@ -40,13 +40,17 @@ log = logging.getLogger(__name__)
 
 
 # jobconf options for implementing SORT_VALUES
+#
+# This includes both the Hadoop 1 and Hadoop 2 names of the options.
+# The options that are set to None exist to override mrjob.conf.
 _SORT_VALUES_JOBCONF = {
-    'stream.num.map.output.key.fields': 2,
     'mapred.text.key.partitioner.options': '-k1,1',
-    # Hadoop's defaults for these actually work fine; we just want to
-    # prevent interference from mrjob.conf.
     'mapred.output.key.comparator.class': None,
     'mapred.text.key.comparator.options': None,
+    'mapreduce.partition.keypartitioner.options': '-k1,1',
+    'mapreduce.job.output.key.comparator.class': None,
+    'mapreduce.partition.keycomparator.options': None,
+    'stream.num.map.output.key.fields': 2,
 }
 
 # partitioner for sort_values
@@ -672,7 +676,9 @@ class MRJob(MRJobLauncher):
                     key, value = read(line.rstrip(b'\r\n'))
                     yield key, value
                 except Exception as e:
-                    if self.options.strict_protocols:
+                    # the strict_protocols option has to default to None
+                    # because it's used by runners, so treat None as true
+                    if self.options.strict_protocols != False:
                         raise
                     else:
                         self.increment_counter(
@@ -683,7 +689,8 @@ class MRJob(MRJobLauncher):
                 self.stdout.write(write(key, value))
                 self.stdout.write(b'\n')
             except Exception as e:
-                if self.options.strict_protocols:
+                # None counts as true, see above
+                if self.options.strict_protocols != False:
                     raise
                 else:
                     self.increment_counter(

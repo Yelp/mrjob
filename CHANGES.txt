@@ -1,3 +1,10 @@
+v0.5.1, 2016-05-?? -- ???
+ * strict_protocols in mrjob.conf is no longer ignored (#1302)
+ * check_input_paths in mrjob.conf is no longer ignored
+ * partitioner() is no longer ignored, fixing SORT_VALUES (#1294)
+ * improved probably cause of error from pre-YARN logs (#1288)
+ * ssh_bind_ports now defaults to (x)range, not list (#1284)
+
 v0.5.0, 2016-03-28 -- the future is in the past
  * supports Python 3 (#989)
  * requires boto 2.35.0 or newer (#980)

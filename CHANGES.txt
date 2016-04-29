@@ -4,7 +4,6 @@ v0.5.1, 2016-04-29 -- post-release bugfixes
  * partitioner() is no longer ignored, fixing SORT_VALUES (#1294)
    * --partitioner switch is deprecated
  * improved probable cause of error from pre-YARN logs (#1288)
- * SORT_VALUES jobconf is Hadoop-version-agnostic (#1286)
  * ssh_bind_ports now defaults to (x)range, not list (#1284)
  * mrjob terminate-idle-clusters handles debugging jar from boto 2.40.0 (#1306)
 

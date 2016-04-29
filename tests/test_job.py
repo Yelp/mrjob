@@ -49,7 +49,6 @@ from tests.py2 import TestCase
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
-from tests.sandbox import mrjob_conf_patcher
 from tests.sandbox import SandboxedTestCase
 
 

@@ -151,8 +151,8 @@ class StandardJSONValueProtocol(object):
 
 
 class SimpleJSONProtocol(_KeyCachingProtocol):
-    """Implements :py:class:`JSONProtocol` using the :py:mod:`simplejson` library.
-    """
+    """Implements :py:class:`JSONProtocol` using the :py:mod:`simplejson`
+    library."""
     def _loads(self, value):
         # simplejson can handle bytes even in Python 3
         return simplejson.loads(value)

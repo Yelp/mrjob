@@ -25,7 +25,6 @@ from io import BytesIO
 
 try:
     import boto.emr.connection
-    from boto.emr.connection import EmrConnection
     from boto.emr.instance_group import InstanceGroup
     from boto.emr.step import JarStep
     import boto.exception

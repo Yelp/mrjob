@@ -678,7 +678,7 @@ class MRJob(MRJobLauncher):
                 except Exception as e:
                     # the strict_protocols option has to default to None
                     # because it's used by runners, so treat None as true
-                    if self.options.strict_protocols != False:
+                    if self.options.strict_protocols is not False:
                         raise
                     else:
                         self.increment_counter(
@@ -690,7 +690,7 @@ class MRJob(MRJobLauncher):
                 self.stdout.write(b'\n')
             except Exception as e:
                 # None counts as true, see above
-                if self.options.strict_protocols != False:
+                if self.options.strict_protocols is not False:
                     raise
                 else:
                     self.increment_counter(

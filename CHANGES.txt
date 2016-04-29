@@ -1,9 +1,12 @@
-v0.5.1, 2016-05-?? -- ???
+v0.5.1, 2016-04-29 -- post-release bugfixes
  * strict_protocols in mrjob.conf is no longer ignored (#1302)
  * check_input_paths in mrjob.conf is no longer ignored
  * partitioner() is no longer ignored, fixing SORT_VALUES (#1294)
- * improved probably cause of error from pre-YARN logs (#1288)
+   * --partitioner switch is deprecated
+ * improved probable cause of error from pre-YARN logs (#1288)
+ * SORT_VALUES jobconf is Hadoop-version-agnostic (#1286)
  * ssh_bind_ports now defaults to (x)range, not list (#1284)
+ * mrjob terminate-idle-clusters handles debugging jar from boto 2.40.0 (#1306)
 
 v0.5.0, 2016-03-28 -- the future is in the past
  * supports Python 3 (#989)

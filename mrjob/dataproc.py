@@ -284,6 +284,14 @@ class DataprocJobRunner(MRJobRunner):
         # read gcloud SDK defaults if needed
         self._gcloud_config = None
 
+        # REVIEW: self.gloud_config looks like it must be a typo; would
+        # be better to have this be an ordinary method (self.gcloud_config())
+
+        # REVIEW: also, how important is it to you to avoid calling gcloud?
+        # Seems like 99% of users are not going have gcp_project, region,
+        # and zone in their config file anyway. Might be better to just log a
+        # warning if calling gcloud fails.
+
         # Google Cloud Platform - project
         self._gcp_project = self._opts['gcp_project'] or self.gcloud_config['core.project']
 

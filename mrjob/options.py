@@ -586,7 +586,7 @@ def _add_emr_bootstrap_opts(opt_group):
             '--bootstrap-python', dest='bootstrap_python',
             action='store_true', default=None,
             help=('Attempt to install a compatible version of Python'
-                  ' at boostrap time. Currently this only does anything'
+                  ' at bootstrap time. Currently this only does anything'
                   ' for Python 3, for which it is enabled by default.')),
 
         opt_group.add_option(

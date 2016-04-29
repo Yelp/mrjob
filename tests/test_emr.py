@@ -1503,7 +1503,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertEqual(actions[0].args[0].value, 'python-scipy')
         self.assertEqual(actions[0].args[1].value, 'mysql-server')
 
-        # check for master boostrap script
+        # check for master bootstrap script
         self.assertTrue(actions[1].scriptpath.startswith('s3://mrjob-'))
         self.assertTrue(actions[1].scriptpath.endswith('b.py'))
         self.assertEqual(actions[1].args, [])

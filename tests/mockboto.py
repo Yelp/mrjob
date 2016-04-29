@@ -90,13 +90,27 @@ AMI_HADOOP_VERSION_UPDATES = {
     '4.3.0': '2.7.1',
 }
 
+
+# hard-coded EmrConnection.DebuggingJar from boto 2.39.0. boto 2.40.0 more
+# correctly uses a template with the correct region (see #1306), but
+# mockboto's EMR stuff doesn't have any other reason to be region-aware.
+DEBUGGING_JAR = (
+    's3n://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar')
+
+# likewise, this is EmrConnection.DebuggingArgs from boto 2.39.0
+DEBUGGING_ARGS = (
+    's3n://us-east-1.elasticmapreduce/libs/state-pusher/0.1/fetch')
+
 # extra step to use when debugging_step=True is passed to run_jobflow()
 DEBUGGING_STEP = JarStep(
     name='Setup Hadoop Debugging',
     action_on_failure='TERMINATE_CLUSTER',
     main_class=None,
-    jar=EmrConnection.DebuggingJar,
-    step_args=EmrConnection.DebuggingArgs)
+    jar=DEBUGGING_JAR,
+    step_args=DEBUGGING_ARGS)
+
+
+
 
 
 ### Errors ###

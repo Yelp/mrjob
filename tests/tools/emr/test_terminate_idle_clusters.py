@@ -22,6 +22,7 @@ from datetime import timedelta
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
+from mrjob.tools.emr.terminate_idle_clusters import _DEBUG_JAR_ARG_RE
 from mrjob.tools.emr.terminate_idle_clusters import _maybe_terminate_clusters
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_bootstrapping
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_done
@@ -34,6 +35,7 @@ from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 from tests.mockboto import MockBotoTestCase
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
+from tests.py2 import TestCase
 
 
 class ClusterTerminationTestCase(MockBotoTestCase):
@@ -756,3 +758,32 @@ class ClusterTerminationTestCase(MockBotoTestCase):
 
         # shouldn't *actually* terminate clusters
         self.assertEqual(self.ids_of_terminated_clusters(), [])
+
+
+# make sure _DEBUG_JAR_ARG_RE works correctly with boto 2.40.0 (tests #1306)
+class DebugJarArgRegexTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertFalse(_DEBUG_JAR_ARG_RE.match(''))
+
+    def test_boto_2_39_0_debugging_arg(self):
+        self.assertTrue(_DEBUG_JAR_ARG_RE.match(
+            's3n://us-east-1.elasticmapreduce/libs/state-pusher/0.1/fetch'))
+
+    def test_boto_2_39_0_debugging_jar(self):
+        # we don't actually look at the jar
+        self.assertFalse(_DEBUG_JAR_ARG_RE.match(
+            's3n://us-east-1.elasticmapreduce/libs/script-runner/'
+            'script-runner.jar'))
+
+    def test_boto_2_40_0_debugging_arg_us_east_1(self):
+        self.assertTrue(_DEBUG_JAR_ARG_RE.match(
+            's3://us-east-1.elasticmapreduce/libs/state-pusher/0.1/fetch'))
+
+    def test_boto_2_40_0_debugging_arg_us_west_1(self):
+        self.assertTrue(_DEBUG_JAR_ARG_RE.match(
+            's3://us-west-1.elasticmapreduce/libs/state-pusher/0.1/fetch'))
+
+    def test_different_state_pusher_version(self):
+        self.assertTrue(_DEBUG_JAR_ARG_RE.match(
+            's3://puppyland.elasticmapreduce/libs/state-pusher/3.14159/fetch'))

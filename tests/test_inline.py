@@ -193,7 +193,7 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
 
         self.input_file_path = os.path.join(self.tmp_dir, 'input_file.txt')
         with open(self.input_file_path, 'wb') as f:
-            f.write('2\n')
+            f.write(b'2\n')
 
     def test_with_input_file_option(self):
         mr_job = MRCustomFileOptionJob(

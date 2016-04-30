@@ -186,10 +186,18 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
 
             self.assertEqual(output, [2, 3, 4])
 
-class MRJobFileOptionsTestCase(TestCase):
+class MRJobFileOptionsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(MRJobFileOptionsTestCase, self).setUp()
+
+        self.input_file_path = os.path.join(self.tmp_dir, 'input_file.txt')
+        with open(self.input_file_path, 'wb') as f:
+            f.write('2\n')
 
     def test_with_input_file_option(self):
-        mr_job = MRCustomFileOptionJob(['-r', 'inline', '--platform_file=tests/input/test_input_file.txt'])
+        mr_job = MRCustomFileOptionJob(
+            ['-r', 'inline', '--platform_file', self.input_file_path])
         mr_job.sandbox(stdin=BytesIO(b'1\n'))
 
         with mr_job.make_runner() as runner:

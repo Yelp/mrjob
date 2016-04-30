@@ -172,6 +172,8 @@ class GCSFilesystem(Filesystem):
 
         # TODO - tmp_fileobj.close() ?  Unfortunately this gets passed to a generator...
         # with os.fdopen(tmp_fd, 'w+b') as tmp_fileobj:  prematurely closes the fileobj in python 2.7
+        # REVIEW: why not make your _cat_file() method a generator itself,
+        # rather than trying to return a generator?
         return read_file(gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
 
     def mkdir(self, dest):
@@ -254,6 +256,11 @@ class GCSFilesystem(Filesystem):
             log.debug("Uploaded %d%%." % int(status.progress() * 100))
 
         log.debug('Upload Complete! %s', dest_uri)
+
+    # REVIEW: there's nothing wrong with the noun_verb() naming convention
+    # (it's nice for alphabetization), but if you're going to expose a method
+    # name, you should do verb_noun() like the rest of mrjob (list_buckets(),
+    # get_bucket(), etc.)
 
     def buckets_list(self, project, prefix=None):
         """List buckets on GCS."""

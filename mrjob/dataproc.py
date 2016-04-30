@@ -74,6 +74,10 @@ _DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 _DEFAULT_IMAGE_VERSION = '1.0'
 _DEFAULT_CLOUD_API_COOLDOWN_SECS = 10.0
 _DEFAULT_FS_SYNC_SECS = 5.0
+# REVIEW: could you change this to 90? i can imagine feeling miffed about
+# not being able to read logs for a job a ran a month ago, whereas if I
+# ran something more than three months ago and the logs were deleted, I
+# couldn't really complain.
 _DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS = 28
 
 # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#GceClusterConfig
@@ -270,6 +274,11 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
             # is this really worth devoting code to?
             'mins_to_end_of_hour': 55.0,  # EMR => 1-hr min billing (60 - 5),  Dataproc => 10-min min billing (10 - 5)
             'sh_bin': ['/bin/sh', '-ex'],
+
+            # REVIEW: since you do lifecycle management on the temp buckets
+            # you create, I'd default *cleanup* to something less than ALL,
+            # probably ['CLUSTER', 'JOB', 'LOCAL_TMP']. That's my goal for
+            # EMR.
         })
 
 

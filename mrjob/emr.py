@@ -409,8 +409,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             's3_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
-             # don't use a list because it makes it hard to read option values
-             # when running in verbose mode. See #1284
+            # don't use a list because it makes it hard to read option values
+            # when running in verbose mode. See #1284
             'ssh_bind_ports': xrange(40001, 40841),
             'ssh_tunnel': False,
             'ssh_tunnel_is_open': False,

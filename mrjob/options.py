@@ -302,16 +302,26 @@ def _add_dataproc_emr_opts(opt_group):
             '--bootstrap-python', dest='bootstrap_python',
             action='store_true', default=None,
             help=('Attempt to install a compatible version of Python'
-                  ' at boostrap time. Currently this only does anything'
+                  ' at bootstrap time. Currently this only does anything'
                   ' for Python 3, for which it is enabled by default.')),
 
         # TODO - mtai @ davidmarin - generalize to --max-mins-idle - dataproc (minutes) vs EMR (hours)
+        # REVIEW: yeah... kind of depends on the use case, right? For basic
+        # operation, you just want to make sure this isn't so low that
+        # a cluster will terminate itself between steps of a job. The other
+        # case is firing off a cluster that you plan to develop on for the next
+        # few hours.
+        #
+        # The first case is the most common one, but I'm not sure you'd have
+        # any reason to mess with the default.
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',
             help=("If we create a persistent cluster, have it automatically"
                   " terminate itself after it's been idle this many hours.")),
 
+        # REVIEW: mins_to_end_of_hour makes no sense on Dataproc; it
+        # exists entirely to optimize EMR's weird billing by the full hour
         opt_group.add_option(
             '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
             default=None, type='float',
@@ -663,6 +673,7 @@ def _add_emr_bootstrap_opts(opt_group):
                   ' feature. You can use --bootstrap-file more than once.')),
 
         opt_group.add_option(
+
             '--bootstrap-python-package', dest='bootstrap_python_packages',
             action='append', default=[],
             help=('Path to a Python module to install on EMR. These should be'

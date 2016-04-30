@@ -244,6 +244,16 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
             'num_preemptible': 0,
 
             'fs_sync_secs': _DEFAULT_FS_SYNC_SECS,
+
+            # REVIEW: was expecting to see max_hours_idle here. Something
+            # like 0.1 (six minutes) seems safe. By default, we're just
+            # trying to make the cluster shut down after your job has run,
+            # right?
+
+            # REVIEW: mins_to_end_of_hour is really an EMR optimization.
+            # I guess I could see a case for not shutting down until
+            # the cluster's been running for at least 5 minutes, but
+            # is this really worth devoting code to?
             'mins_to_end_of_hour': 55.0,  # EMR => 1-hr min billing (60 - 5),  Dataproc => 10-min min billing (10 - 5)
             'sh_bin': ['/bin/sh', '-ex'],
         })
@@ -931,6 +941,7 @@ class DataprocJobRunner(MRJobRunner):
     def get_cluster_id(self):
         return self._cluster_id
 
+    # REVIEW: _cluster_create_args() would be a more clear name
     def _cluster_args(self):
         gcs_init_script_uris = []
         if self._master_bootstrap_script_path:

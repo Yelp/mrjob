@@ -133,6 +133,8 @@ def _gcp_instance_group_config(project, zone, count, instance_type, is_preemptib
 #################### END -  Helper fxns for _cluster_args ####################
 
 
+# REVIEW: This is always called with self._opts['cloud_api_cooldown_secs'],
+# so why not make it a method? Maybe call it _wait_for_api()?
 def _wait_for(msg, sleep_secs):
     log.info("Waiting for %s - sleeping %.1f second(s)", msg, sleep_secs)
     time.sleep(sleep_secs)
@@ -186,6 +188,14 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         'region',
         'zone',
         'image_version',
+
+
+        # REVIEW: please use the option names in
+        # https://github.com/Yelp/mrjob/issues/1247
+        # (check_cluster_every, core_instance_type, etc.)
+        #
+        # I don't think your names are bad names; just it's
+        # important to be consistent with the rest of the library. :)
         'cloud_api_cooldown_secs',
 
         'instance_type',
@@ -196,6 +206,9 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         'num_worker',
         'num_preemptible',
 
+        # REVIEW: I could be convinced that "cloud_fs_sync_secs" is a better
+        # name than "wait_for_eventual_consistency" (which is what I have in
+        # #1247). "fs_tmpdir" should definitely be "cloud_tmp_dir" though.
         'fs_sync_secs',
         'fs_tmpdir',
 
@@ -210,6 +223,7 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         'fs_tmpdir': combine_paths,
     })
 
+    # REVIEW: this does nothing :)
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
     })
 
@@ -315,6 +329,9 @@ class DataprocJobRunner(MRJobRunner):
         self._api_client = None
         self._gcs_fs = None
         self._fs = None
+
+        # REVIEW: I think you could say "BEGIN" and "END" with whitespace, but
+        # whatevs.
 
         # setup directories - BEGIN BEGIN BEGIN
         base_tmpdir = self._get_tmpdir(self._opts['fs_tmpdir'])
@@ -602,6 +619,7 @@ class DataprocJobRunner(MRJobRunner):
 
     def _build_dataproc_hadoop_job(self, step_num):
         """
+        REVIEW: cool, this NOTE should just be your docstring
         NOTE - mtai @ davidmarin - this function creates a "HadoopJob" to be passed to self._api_job_submit_hadoop
 
         Reference...
@@ -621,10 +639,15 @@ class DataprocJobRunner(MRJobRunner):
 
         # TODO - mtai @ davidmarin - Might be trivial to support jar running, see "mainJarFileUri" of variable "output_hadoop_job" in this function
         #         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob
+        # REVIEW: cool, yeah, better to leave this out for MVP. I'd leave the
+        # TODO comments in
         assert step['type'] == 'streaming', 'Jar not implemented'
         main_jar_uri = _HADOOP_STREAMING_JAR_URI
 
         # TODO - mtai @ davidmarin - Not clear if we should move _upload_args to file_uris, currently works fine as-is
+        # REVIEW: Yeah, i'd be inclined to leave it if it works as-is.
+        # The next step is going to be to generalize the common code between
+        # EMR and Dataproc, and that'll be easier if we don't
         args.extend(self._upload_args(self._upload_mgr))
 
         # TODO - mtai @ davidmarin - Not clear if we should move some of these to properties dict to file_uris, currently works fine as-is
@@ -662,13 +685,16 @@ class DataprocJobRunner(MRJobRunner):
         bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
         self._create_fs_tmp_bucket(bucket_name)
 
+        # REVIEW: what do we use this for? If we wanted to know, couldn't
+        # we just ask the API?
         self._cluster_id_start = time.time()
 
+        # REVIEW: can you point to the URL you got this from?
         # "clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'"
         if not self._cluster_id:
             self._cluster_id = '-'.join(['mrjob', self._gce_zone.lower(), random_identifier()])
 
-        # Create the cluster if its missing, otherwise we join an existing one
+        # Create the cluster if it's missing, otherwise join an existing one
         try:
             self._api_cluster_get(self._cluster_id)
             log.info('Adding job to existing cluster - %s' % self._cluster_id)
@@ -680,6 +706,10 @@ class DataprocJobRunner(MRJobRunner):
             cluster_data = self._cluster_args()
             self._api_cluster_create(self._cluster_id, cluster_data)
             log.info('Created new cluster - %s' % self._cluster_id)
+
+        # REVIEW: what do we use this for? If we wanted to know, couldn't
+        # we just ask the API?
+        self._cluster_id_start = time.time()
 
         # keep track of when we launched our job
         self._dataproc_job_start = time.time()

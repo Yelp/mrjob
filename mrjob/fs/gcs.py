@@ -225,6 +225,9 @@ class GCSFilesystem(Filesystem):
             try:
                 status, done = downloader.next_chunk()
             except google_errors.HttpError as e:
+                # REVIEW: this is the kind of weird edge case that demands
+                # a regression test, but I don't see one
+
                 # If error code 416, request range not satisfiable => implies we're trying to download a file of size 0
                 if e.resp.status == 416:
                     break

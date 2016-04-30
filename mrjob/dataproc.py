@@ -375,6 +375,8 @@ class DataprocJobRunner(MRJobRunner):
         self._hadoop_version = None
 
         # This will be filled by _run_steps()
+        # REVIEW: probably should note this doesn't contain anything
+        # except job_id right now
         self._log_interpretations = []
 
     @property
@@ -796,6 +798,8 @@ class DataprocJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
                 self._job_key, step_num + 1)
 
+    # REVIEW: should probably note that counters are currently
+    # always empty
     def counters(self):
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
@@ -926,6 +930,7 @@ class DataprocJobRunner(MRJobRunner):
         writeln('__mrjob_PWD=$PWD')
 
         # TODO - mtai @ davidmarin - begin section, investigate why mtai needed to add this
+        # REVIEW: yep, inquiring minds want to know
         writeln('if [ $__mrjob_PWD = "/" ]; then')
         writeln('  __mrjob_PWD=""')
         writeln('fi')
@@ -1031,7 +1036,6 @@ class DataprocJobRunner(MRJobRunner):
         return cluster_data
 
     ### Dataproc-specific Stuff ###
-    #
 
     def _api_cluster_get(self, cluster_id):
         return self.api_client.clusters().get(
@@ -1051,6 +1055,12 @@ class DataprocJobRunner(MRJobRunner):
 
         # See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State
         cluster_state = None
+
+        # REVIEW: everything from here on could be a separate method.
+        # Especially the way you use it; I'd expect to get one message
+        # when the cluster is created, updates every 30 seconds or so on
+        # the cluster's status, and another message when the cluster is
+        # ready.
 
         # Poll until cluster is ready
         while cluster_state not in DATAPROC_CLUSTER_STATES_READY:

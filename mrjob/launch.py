@@ -171,7 +171,6 @@ class MRJobLauncher(object):
             return EMRJobRunner(**self.emr_job_runner_kwargs())
 
         elif self.options.runner == 'dataproc':
-            # avoid requiring dependencies (such as boto) for other runners
             from mrjob.dataproc import DataprocJobRunner
             return DataprocJobRunner(**self.dataproc_job_runner_kwargs())
 

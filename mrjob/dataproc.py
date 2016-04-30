@@ -68,7 +68,7 @@ _DATAPROC_API_REGION = 'global'
 _DATAPROC_MIN_WORKERS = 2
 _GCE_API_VERSION = 'v1'
 
-DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
+_DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 
 # default imageVersion to use on Dataproc. This will be updated with each version
 _DEFAULT_IMAGE_VERSION = '1.0'
@@ -89,11 +89,11 @@ _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
     'https://www.googleapis.com/auth/cloud-platform',
 ]
 
-DATAPROC_CLUSTER_STATES_READY = frozenset(['UPDATING', 'RUNNING'])
-DATAPROC_CLUSTER_STATES_ERROR = frozenset(['ERROR', 'DELETING'])
+_DATAPROC_CLUSTER_STATES_READY = frozenset(['UPDATING', 'RUNNING'])
+_DATAPROC_CLUSTER_STATES_ERROR = frozenset(['ERROR', 'DELETING'])
 
-DATAPROC_JOB_STATES_ACTIVE = frozenset(['PENDING', 'RUNNING', 'SETUP_DONE', 'CANCEL_PENDING'])
-DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
+_DATAPROC_JOB_STATES_ACTIVE = frozenset(['PENDING', 'RUNNING', 'SETUP_DONE', 'CANCEL_PENDING'])
+_DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
 
 _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '0.1': '2.7.1',
@@ -251,8 +251,8 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
             'image_version': _DEFAULT_IMAGE_VERSION,
             'cloud_api_cooldown_secs': _DEFAULT_CLOUD_API_COOLDOWN_SECS,
 
-            'instance_type': DEFAULT_INSTANCE_TYPE,
-            'instance_type_master': DEFAULT_INSTANCE_TYPE,
+            'instance_type': _DEFAULT_INSTANCE_TYPE,
+            'instance_type_master': _DEFAULT_INSTANCE_TYPE,
 
             'num_worker': _DATAPROC_MIN_WORKERS,
             'num_preemptible': 0,
@@ -770,7 +770,7 @@ class DataprocJobRunner(MRJobRunner):
             log.info('%s => %s' % (job_id, job_state))
 
             # NOTE - mtai @ davidmarin - https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State
-            if job_state in DATAPROC_JOB_STATES_ACTIVE:
+            if job_state in _DATAPROC_JOB_STATES_ACTIVE:
                 _wait_for('job completion', self._opts['cloud_api_cooldown_secs'])
                 continue
 
@@ -1063,19 +1063,19 @@ class DataprocJobRunner(MRJobRunner):
         # ready.
 
         # Poll until cluster is ready
-        while cluster_state not in DATAPROC_CLUSTER_STATES_READY:
+        while cluster_state not in _DATAPROC_CLUSTER_STATES_READY:
             result_describe = self.api_client.clusters().get(
                 projectId=self._gcp_project,
                 region=_DATAPROC_API_REGION,
                 clusterName=cluster_id).execute()
 
             cluster_state = result_describe['status']['state']
-            if cluster_state in DATAPROC_CLUSTER_STATES_ERROR:
+            if cluster_state in _DATAPROC_CLUSTER_STATES_ERROR:
                 raise DataprocException(result_describe)
 
             _wait_for('cluster ready to accept jobs', self._opts['cloud_api_cooldown_secs'])
 
-        assert cluster_state in DATAPROC_CLUSTER_STATES_READY
+        assert cluster_state in _DATAPROC_CLUSTER_STATES_READY
         return cluster_id
 
     def _api_cluster_delete(self, cluster_id):

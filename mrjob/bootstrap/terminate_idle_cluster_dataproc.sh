@@ -3,7 +3,7 @@
 # Copyright 2013 Lyft
 # Copyright 2014 Alex Konradi
 # Copyright 2015 Yelp and Contributors
-# REVIEW: Copyright 2016 Google?
+# Copyright 2016 Google
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -19,60 +19,36 @@
 
 # Author: Matthew Tai <mtai84@gmail.com>
 
-# This script is part of mrjob, but can be run as a bootstrap action on
-# ANY GCP Dataproc cluster. Arguments are totally optional.
+# This script is part of mrjob, but can be run as an initializationAction on
+# ANY GCP Dataproc cluster.  Because initializationAction scripts cannot take args
+# this script reads MAX_SECS_IDLE from metadata attribute "mrjob-max-secs-idle"
 
-# This script runs `hadoop job -list` in a loop and considers the cluster
-# idle if no jobs are currently running. If the cluster stays idle long
-# enough AND we're close enough to the end of an EC2 billing hour, we
-# shut down the master node, which kills the cluster.
+# This script runs `yarn application -list` in a loop and considers the cluster
+# idle if no jobs are currently running.  If the cluster stays idle long
+# enough we explicitly delete ourselves (as this runs on a master node).
 
-# By default, we allow an idle time of 15 minutes, and shut down within
-# the last 5 minutes of the hour.
+# By default, we allow an idle time of 10 minutes.
 
 # Caveats:
 
 # Race conditions: this script can only see currently running jobs, not ones
 # pending in Dataproc, or ones that you're about to submit, or jobs that started
-# running since the last time we called `hadoop job -list`.
-
-# REVIEW: is the following true? it looks like the cluster terminates itself
-# through the dataproc API, not by the shutdown hack we use on EMR
-
-# This script will leave the cluster in the FAILED (not TERMINATED) state,
-# with LastStateChangeReason "The master node was terminated. ". It can
-# take Dataproc a minute or so to realize that master node has been shut down.
+# running since the last time we called `yarn application -list`.
 
 # full usage:
 #
 # ./terminate_idle_cluster_dataproc.sh
 
-
-# REVIEW: ah, clever, that's what you were doing with metadata. I think just
-# passing this in as an arg is more generalizable/robust, but I don't feel
-# strongly about it.
 MAX_SECS_IDLE=$(/usr/share/google/get_metadata_value attributes/mrjob-max-secs-idle)
-if [ -z "${MAX_SECS_IDLE}" ]; then MAX_SECS_IDLE=1800; fi
-
-# REVIEW: I think you can get rid of MIN_SECS_TO_END_OF_HOUR; doesn't really
-# make sense on Dataproc
-MIN_SECS_TO_END_OF_HOUR=$(/usr/share/google/get_metadata_value attributes/mrjob-min-secs-to-end-of-hour)
-if [ -z "${MIN_SECS_TO_END_OF_HOUR}" ]; then MIN_SECS_TO_END_OF_HOUR=300; fi
-
+if [ -z "${MAX_SECS_IDLE}" ]; then MAX_SECS_IDLE=600; fi
 
 (
 while true  # the only way out is to SHUT DOWN THE MACHINE
 do
     # get the uptime as an integer (expr can't handle decimals)
     UPTIME=$(cat /proc/uptime | cut -f 1 -d .)
-    SECS_TO_END_OF_HOUR=$(expr 3600 - $UPTIME % 3600)
 
-    # REVIEW: you can assume yarn is always available on Dataproc (the
-    # other stuff exists for Hadoop 1). You can just start with
-    # "nice yarn application..."
     if [ -z "${LAST_ACTIVE}" ] || \
-        ! which hadoop > /dev/null || \
-        nice hadoop job -list 2> /dev/null | grep -q '^\s*job_' || \
         (which yarn > /dev/null && \
             nice yarn application -list 2> /dev/null | \
             grep -v 'Total number' | grep -q RUNNING)
@@ -81,8 +57,7 @@ do
     else
 	# the cluster is idle! how long has this been going on?
         SECS_IDLE=$(expr ${UPTIME} - ${LAST_ACTIVE})
-        if expr ${SECS_IDLE} '>' ${MAX_SECS_IDLE} '&' \
-            ${SECS_TO_END_OF_HOUR} '<' ${MIN_SECS_TO_END_OF_HOUR} > /dev/null
+        if expr ${SECS_IDLE} '>' ${MAX_SECS_IDLE} > /dev/null
         then
             yes | gcloud dataproc clusters delete $(/usr/share/google/get_metadata_value attributes/dataproc-cluster-name) --async
             exit

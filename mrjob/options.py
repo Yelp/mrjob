@@ -305,29 +305,11 @@ def _add_dataproc_emr_opts(opt_group):
                   ' at bootstrap time. Currently this only does anything'
                   ' for Python 3, for which it is enabled by default.')),
 
-        # TODO - mtai @ davidmarin - generalize to --max-mins-idle - dataproc (minutes) vs EMR (hours)
-        # REVIEW: yeah... kind of depends on the use case, right? For basic
-        # operation, you just want to make sure this isn't so low that
-        # a cluster will terminate itself between steps of a job. The other
-        # case is firing off a cluster that you plan to develop on for the next
-        # few hours.
-        #
-        # The first case is the most common one, but I'm not sure you'd have
-        # any reason to mess with the default.
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',
-            help=("If we create a persistent cluster, have it automatically"
+            help=("If we create a cluster, have it automatically"
                   " terminate itself after it's been idle this many hours.")),
-
-        # REVIEW: mins_to_end_of_hour makes no sense on Dataproc; it
-        # exists entirely to optimize EMR's weird billing by the full hour
-        opt_group.add_option(
-            '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
-            default=None, type='float',
-            help=("If --max-hours-idle is set, control how close to the end"
-                  " of an hour the cluster can automatically"
-                  " terminate itself (default is 5 minutes).")),
     ]
 
 def _add_dataproc_opts(opt_group):
@@ -337,7 +319,6 @@ def _add_dataproc_opts(opt_group):
             '--gcp-project', dest='gcp_project', default=None,
             help='Project to run Dataproc jobs in.'),
 
-        # TODO - mtai @ davidmarin - adopt below suggested varnames for Dataproc / EMR
         opt_group.add_option(
             '--region', dest='region',
             help='GCE region to run Dataproc/EMR jobs in.'),
@@ -351,7 +332,7 @@ def _add_dataproc_opts(opt_group):
             help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
 
         opt_group.add_option(
-            '--cloud-api-cooldown-secs', dest='cloud_api_cooldown_secs', default=None,
+            '--check-cluster-every', dest='check_cluster_every', default=None,
             help='How often (in seconds) to check status of your job/cluster'),
 
         # instance types
@@ -363,38 +344,38 @@ def _add_dataproc_opts(opt_group):
                   )),
 
         opt_group.add_option(
-            '--instance-type-master', dest='instance_type_master', default=None,
+            '--master-instance-type', dest='master_instance_type', default=None,
             help='Type of GCE/EC2 master instance(s) to launch'),
 
         opt_group.add_option(
-            '--instance-type-worker', dest='instance_type_worker', default=None,
+            '--core-instance-type', dest='core_instance_type', default=None,
             help='Type of GCE/EC2 worker instance(s) to launch'),
 
         opt_group.add_option(
-            '--instance-type-preemptible', dest='instance_type_preemptible', default=None,
+            '--task-instance-type', dest='task_instance_type', default=None,
             help='Type of GCE/EC2 preemptible worker instance(s) to launch'),
 
 
         opt_group.add_option(
-            '--num-worker', dest='num_worker', default=None,
+            '--num-core-instances', dest='num_core_instances', default=None,
             type='int',
             help='Total number of Worker instances to launch '),
 
         opt_group.add_option(
-            '--num-preemptible', dest='num_preemptible', default=None,
+            '--num-task-instances', dest='num_task_instances', default=None,
             type='int',
             help='Total number of preemptible Worker instances to launch '),
 
 
         opt_group.add_option(
-            '--fs-sync-secs', dest='fs_sync_secs', default=None,
+            '--cloud-fs-sync-secs', dest='cloud_fs_sync_secs', default=None,
             type='float',
             help=('How long to wait for remote FS to reach eventual consistency. This'
                   ' is typically less than a second but the'
                   ' default is 5.0 to be safe.')),
 
         opt_group.add_option(
-            '--fs-tmpdir', dest='fs_tmpdir', default=None,
+            '--cloud-tmp-dir', dest='cloud_tmp_dir', default=None,
             help='URI on remote FS to use as our temp directory.'),
 
     ]
@@ -554,6 +535,13 @@ def _add_emr_launch_opts(opt_group):
             default=None,
             help=('IAM service role to use for the EMR cluster -- see'
                   ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
+
+        opt_group.add_option(
+            '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
+            default=None, type='float',
+            help=("If --max-hours-idle is set, control how close to the end"
+                  " of an hour the cluster can automatically"
+                  " terminate itself (default is 5 minutes).")),
 
         opt_group.add_option(
             '--no-bootstrap-python', dest='bootstrap_python',

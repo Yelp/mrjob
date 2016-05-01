@@ -25,14 +25,14 @@ try:
     from oauth2client.client import GoogleCredentials
     from googleapiclient import discovery
     from googleapiclient import errors as google_errors
-    from googleapiclient import http
+    from googleapiclient import http as google_http
 except ImportError:
     # don't require googleapiclient; MRJobs don't actually need it when running
     # inside hadoop streaming
     GoogleCredentials = None
-    google_errors = None
     discovery = None
-    http = None
+    google_errors = None
+    google_http = None
 
 import io
 import os
@@ -164,17 +164,19 @@ class GCSFilesystem(Filesystem):
 
     def _cat_file(self, gcs_uri):
         tmp_fd, tmp_path = tempfile.mkstemp()
-        tmp_fileobj = os.fdopen(tmp_fd, 'w+b')
 
-        self._download_io(gcs_uri, tmp_fileobj)
+        with os.fdopen(tmp_fd, 'w+b') as tmp_fileobj:
+            self._download_io(gcs_uri, tmp_fileobj)
 
-        tmp_fileobj.seek(0)
+            tmp_fileobj.seek(0)
 
-        # TODO - tmp_fileobj.close() ?  Unfortunately this gets passed to a generator...
-        # with os.fdopen(tmp_fd, 'w+b') as tmp_fileobj:  prematurely closes the fileobj in python 2.7
-        # REVIEW: why not make your _cat_file() method a generator itself,
-        # rather than trying to return a generator?
-        return read_file(gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
+            # TODO - mtai @ davidmarin - GCS / S3 _cat_file diverges
+            #     GCS._cat_file IS a generator
+            #     S3._cat_file RETURNS a generator
+
+            line_gen = read_file(gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
+            for current_line in line_gen:
+                yield current_line
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on GCS because there are
@@ -218,16 +220,13 @@ class GCSFilesystem(Filesystem):
 
         # Chunked file download
         req = self.api_client.objects().get_media(bucket=bucket_name, object=object_name)
-        downloader = http.MediaIoBaseDownload(io_obj, req)
+        downloader = google_http.MediaIoBaseDownload(io_obj, req)
 
         done = False
         while not done:
             try:
                 status, done = downloader.next_chunk()
             except google_errors.HttpError as e:
-                # REVIEW: this is the kind of weird edge case that demands
-                # a regression test, but I don't see one
-
                 # If error code 416, request range not satisfiable => implies we're trying to download a file of size 0
                 if e.resp.status == 416:
                     break
@@ -249,7 +248,7 @@ class GCSFilesystem(Filesystem):
         mimetype = mimetype or _BINARY_MIMETYPE
 
         # Chunked file upload
-        media = http.MediaIoBaseUpload(io_obj, mimetype, resumable=True)
+        media = google_http.MediaIoBaseUpload(io_obj, mimetype, resumable=True)
         upload_req = self.api_client.objects().insert(bucket=bucket, name=name, media_body=media)
 
         upload_resp = None
@@ -260,12 +259,7 @@ class GCSFilesystem(Filesystem):
 
         log.debug('Upload Complete! %s', dest_uri)
 
-    # REVIEW: there's nothing wrong with the noun_verb() naming convention
-    # (it's nice for alphabetization), but if you're going to expose a method
-    # name, you should do verb_noun() like the rest of mrjob (list_buckets(),
-    # get_bucket(), etc.)
-
-    def buckets_list(self, project, prefix=None):
+    def list_buckets(self, project, prefix=None):
         """List buckets on GCS."""
         list_kwargs = dict(project=project)
         if prefix:
@@ -277,11 +271,11 @@ class GCSFilesystem(Filesystem):
         buckets_to_return = resp.get('items') or []
         return buckets_to_return
 
-    def bucket_get(self, bucket):
+    def get_bucket(self, bucket):
         req = self.api_client.buckets().get(bucket=bucket)
         return req.execute()
 
-    def bucket_create(self, project, name, location=None, object_ttl_days=None):
+    def create_bucket(self, project, name, location=None, object_ttl_days=None):
         """Create a bucket on GCS, optionally setting location constraint."""
         # https://cloud.google.com/storage/docs/lifecycle
         body = dict(name=name)
@@ -300,7 +294,7 @@ class GCSFilesystem(Filesystem):
         req = self.api_client.buckets().insert(project=project, body=body)
         return req.execute()
 
-    def bucket_delete(self, bucket):
+    def delete_bucket(self, bucket):
         req = self.api_client.buckets().delete(bucket=bucket)
         return req.execute()
 

@@ -72,13 +72,10 @@ _DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 
 # default imageVersion to use on Dataproc. This will be updated with each version
 _DEFAULT_IMAGE_VERSION = '1.0'
-_DEFAULT_CLOUD_API_COOLDOWN_SECS = 10.0
-_DEFAULT_FS_SYNC_SECS = 5.0
-# REVIEW: could you change this to 90? i can imagine feeling miffed about
-# not being able to read logs for a job a ran a month ago, whereas if I
-# ran something more than three months ago and the logs were deleted, I
-# couldn't really complain.
-_DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS = 28
+_DEFAULT_CHECK_CLUSTER_EVERY = 10.0
+_DEFAULT_MAX_HOURS_IDLE = 0.1
+_DEFAULT_CLOUD_FS_SYNC_SECS = 5.0
+_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS = 90
 
 # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#GceClusterConfig
 # NOTE - added cloud-platform so we can invoke gcloud commands from the cluster master (used for auto termination script)
@@ -119,7 +116,7 @@ _HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.j
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
 
-#################### BEGIN - Helper fxns for _cluster_args ####################
+#################### BEGIN - Helper fxns for _cluster_create_args ####################
 def _gcp_zone_uri(project, zone):
     return 'https://www.googleapis.com/compute/%(gce_api_version)s/projects/%(project)s/zones/%(zone)s' % dict(
         gce_api_version=_GCE_API_VERSION, project=project, zone=zone)
@@ -134,15 +131,12 @@ def _gcp_instance_group_config(project, zone, count, instance_type, is_preemptib
         machineTypeUri=machine_uri,
         isPreemptible=is_preemptible
     )
-#################### END -  Helper fxns for _cluster_args ####################
+#################### END -  Helper fxns for _cluster_create_args ####################
 
 
-# REVIEW: This is always called with self._opts['cloud_api_cooldown_secs'],
-# so why not make it a method? Maybe call it _wait_for_api()?
 def _wait_for(msg, sleep_secs):
     log.info("Waiting for %s - sleeping %.1f second(s)", msg, sleep_secs)
     time.sleep(sleep_secs)
-
 
 def _cleanse_gcp_job_id(job_id):
     return re.sub('[^a-zA-Z0-9_\-]', '-', job_id)
@@ -192,48 +186,33 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         'region',
         'zone',
         'image_version',
-
-
-        # REVIEW: please use the option names in
-        # https://github.com/Yelp/mrjob/issues/1247
-        # (check_cluster_every, core_instance_type, etc.)
-        #
-        # I don't think your names are bad names; just it's
-        # important to be consistent with the rest of the library. :)
-        'cloud_api_cooldown_secs',
+        'check_cluster_every',
 
         'instance_type',
-        'instance_type_master',
-        'instance_type_worker',
-        'instance_type_preemptible',
+        'master_instance_type',
+        'core_instance_type',
+        'task_instance_type',
 
-        'num_worker',
-        'num_preemptible',
+        'num_core_instances',
+        'num_task_instances',
 
-        # REVIEW: I could be convinced that "cloud_fs_sync_secs" is a better
-        # name than "wait_for_eventual_consistency" (which is what I have in
-        # #1247). "fs_tmpdir" should definitely be "cloud_tmp_dir" though.
-        'fs_sync_secs',
-        'fs_tmpdir',
+        'cloud_fs_sync_secs',
+        'cloud_tmp_dir',
 
         'bootstrap',
         'bootstrap_python',
         'max_hours_idle',
-        'mins_to_end_of_hour'
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
         'bootstrap': combine_lists,
-        'fs_tmpdir': combine_paths,
+        'cloud_tmp_dir': combine_paths,
     })
 
-    # REVIEW: this does nothing :)
-    DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
-    })
 
     DEFAULT_FALLBACKS = {
-        'instance_type_worker': 'instance_type',
-        'instance_type_preemptible': 'instance_type'
+        'core_instance_type': 'instance_type',
+        'task_instance_type': 'instance_type'
     }
 
     def __init__(self, alias, opts, conf_paths):
@@ -242,7 +221,7 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         # Dataproc requires a master and >= 2 worker instances
         # gce_num_instances refers ONLY to number of WORKER instances and does NOT include the required 1 instance for master
         # In other words, minimum cluster size is 3 machines, 1 master and "gce_num_instances" workers
-        if self['num_worker'] < _DATAPROC_MIN_WORKERS:
+        if self['num_core_instances'] < _DATAPROC_MIN_WORKERS:
             raise DataprocException('Dataproc expects at LEAST %d workers' % _DATAPROC_MIN_WORKERS)
 
         for varname, fallback_varname in self.DEFAULT_FALLBACKS.items():
@@ -253,32 +232,20 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'bootstrap_python': True,
             'image_version': _DEFAULT_IMAGE_VERSION,
-            'cloud_api_cooldown_secs': _DEFAULT_CLOUD_API_COOLDOWN_SECS,
+            'check_cluster_every': _DEFAULT_CHECK_CLUSTER_EVERY,
 
             'instance_type': _DEFAULT_INSTANCE_TYPE,
-            'instance_type_master': _DEFAULT_INSTANCE_TYPE,
+            'master_instance_type': _DEFAULT_INSTANCE_TYPE,
 
-            'num_worker': _DATAPROC_MIN_WORKERS,
-            'num_preemptible': 0,
+            'num_core_instances': _DATAPROC_MIN_WORKERS,
+            'num_task_instances': 0,
 
-            'fs_sync_secs': _DEFAULT_FS_SYNC_SECS,
+            'cloud_fs_sync_secs': _DEFAULT_CLOUD_FS_SYNC_SECS,
 
-            # REVIEW: was expecting to see max_hours_idle here. Something
-            # like 0.1 (six minutes) seems safe. By default, we're just
-            # trying to make the cluster shut down after your job has run,
-            # right?
-
-            # REVIEW: mins_to_end_of_hour is really an EMR optimization.
-            # I guess I could see a case for not shutting down until
-            # the cluster's been running for at least 5 minutes, but
-            # is this really worth devoting code to?
-            'mins_to_end_of_hour': 55.0,  # EMR => 1-hr min billing (60 - 5),  Dataproc => 10-min min billing (10 - 5)
+            'max_hours_idle': _DEFAULT_MAX_HOURS_IDLE,
             'sh_bin': ['/bin/sh', '-ex'],
 
-            # REVIEW: since you do lifecycle management on the temp buckets
-            # you create, I'd default *cleanup* to something less than ALL,
-            # probably ['CLUSTER', 'JOB', 'LOCAL_TMP']. That's my goal for
-            # EMR.
+            'cleanup': ['CLUSTER', 'JOB', 'LOCAL_TMP']
         })
 
 
@@ -314,23 +281,15 @@ class DataprocJobRunner(MRJobRunner):
         """
         super(DataprocJobRunner, self).__init__(**kwargs)
 
-        # read gcloud SDK defaults if needed
+        # Lazy-load gcloud config as needed - invocations fail in PyCharm debugging
         self._gcloud_config = None
 
-        # REVIEW: self.gloud_config looks like it must be a typo; would
-        # be better to have this be an ordinary method (self.gcloud_config())
-
-        # REVIEW: also, how important is it to you to avoid calling gcloud?
-        # Seems like 99% of users are not going have gcp_project, region,
-        # and zone in their config file anyway. Might be better to just log a
-        # warning if calling gcloud fails.
-
         # Google Cloud Platform - project
-        self._gcp_project = self._opts['gcp_project'] or self.gcloud_config['core.project']
+        self._gcp_project = self._opts['gcp_project'] or self.gcloud_config()['core.project']
 
         # Google Compute Engine - Region / Zone
-        self._gce_region = self._opts['region'] or self.gcloud_config['compute.region']
-        self._gce_zone = self._opts['zone'] or self.gcloud_config['compute.zone']
+        self._gce_region = self._opts['region'] or self.gcloud_config()['compute.region']
+        self._gce_zone = self._opts['zone'] or self.gcloud_config()['compute.zone']
 
         # cluster_id can be None here
         self._cluster_id = self._opts['cluster_id']
@@ -339,24 +298,20 @@ class DataprocJobRunner(MRJobRunner):
         self._gcs_fs = None
         self._fs = None
 
-        # REVIEW: I think you could say "BEGIN" and "END" with whitespace, but
-        # whatevs.
+        # BEGIN - setup directories
+        base_tmpdir = self._get_tmpdir(self._opts['cloud_tmp_dir'])
 
-        # setup directories - BEGIN BEGIN BEGIN
-        base_tmpdir = self._get_tmpdir(self._opts['fs_tmpdir'])
-
-        self._fs_tmpdir = _check_and_fix_fs_dir(base_tmpdir)
+        self._cloud_tmp_dir = _check_and_fix_fs_dir(base_tmpdir)
 
         # use job key to make a unique tmp dir
-        self._job_tmpdir = self._fs_tmpdir + self._job_key + '/'
+        self._job_tmpdir = self._cloud_tmp_dir + self._job_key + '/'
 
         # pick/validate output dir
         if self._output_dir:
             self._output_dir = _check_and_fix_fs_dir(self._output_dir)
         else:
             self._output_dir = self._job_tmpdir + 'output/'
-        # setup directories - END END END
-
+        # END - setup directories
 
         # manage working dir for bootstrap script
         self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
@@ -384,11 +339,9 @@ class DataprocJobRunner(MRJobRunner):
         self._hadoop_version = None
 
         # This will be filled by _run_steps()
-        # REVIEW: probably should note this doesn't contain anything
-        # except job_id right now
+        # NOTE - log_interpretations will be empty except job_id until we parse task logs
         self._log_interpretations = []
 
-    @property
     def gcloud_config(self):
         """Lazy load gcloud SDK configs"""
         if not self._gcloud_config:
@@ -424,7 +377,7 @@ class DataprocJobRunner(MRJobRunner):
         if given_tmpdir:
             return given_tmpdir
 
-        mrjob_buckets = self.fs.buckets_list(self._gcp_project, prefix='mrjob-')
+        mrjob_buckets = self.fs.list_buckets(self._gcp_project, prefix='mrjob-')
 
         # Loop over buckets until we find one that matches region
         # NOTE - because this is a tmpdir, we look for a GCS bucket in the same GCE region
@@ -511,10 +464,7 @@ class DataprocJobRunner(MRJobRunner):
         self._create_master_bootstrap_script_if_needed()
         if self._master_bootstrap_script_path:
             self._upload_mgr.add(self._master_bootstrap_script_path)
-
-            # Add max-hours-idle script if we need it
-            if self._opts['max_hours_idle']:
-                self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+            self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -555,7 +505,7 @@ class DataprocJobRunner(MRJobRunner):
         """
         # Return early if our bucket already exists
         try:
-            self.fs.bucket_get(bucket_name)
+            self.fs.get_bucket(bucket_name)
             return
         except google_errors.HttpError as e:
             if not e.resp.status == 404:
@@ -567,8 +517,8 @@ class DataprocJobRunner(MRJobRunner):
 
         # NOTE - By default, we create a bucket in the same GCE region as our job (tmp buckets ONLY)
         # https://cloud.google.com/storage/docs/bucket-locations
-        self.fs.bucket_create(self._gcp_project, bucket_name,
-                              location=location, object_ttl_days=_DEFAULT_FS_TMPDIR_OBJECT_TTL_DAYS)
+        self.fs.create_bucket(self._gcp_project, bucket_name,
+                              location=location, object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
 
         self._wait_for_fs_sync()
 
@@ -607,7 +557,7 @@ class DataprocJobRunner(MRJobRunner):
                 continue
 
             self._api_job_cancel(current_job_id)
-            _wait_for('job cancellation', self._opts['cloud_api_cooldown_secs'])
+            self._wait_for_api('job cancellation')
 
     def _cleanup_cluster(self):
         if not self._cluster_id:
@@ -623,21 +573,22 @@ class DataprocJobRunner(MRJobRunner):
             return
         log.info('cluster %s successfully terminated' % self._cluster_id)
 
+    def _wait_for_api(self, msg):
+        _wait_for(msg, self._opts['check_cluster_every'])
+
     def _wait_for_fs_sync(self):
         """Sleep for a little while, to give FS a chance to sync up.
         """
-        _wait_for('GCS sync (eventual consistency)', self._opts['fs_sync_secs'])
+        _wait_for('GCS sync (eventual consistency)', self._opts['cloud_fs_sync_secs'])
 
     def _build_dataproc_hadoop_job(self, step_num):
-        """
-        REVIEW: cool, this NOTE should just be your docstring
-        NOTE - mtai @ davidmarin - this function creates a "HadoopJob" to be passed to self._api_job_submit_hadoop
+        """This function creates a "HadoopJob" to be passed to self._api_job_submit_hadoop
 
         Reference...
         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob
 
         :param step_num:
-        :return:
+        :return: output_hadoop_job
         """
         args = list()
         file_uris = list()
@@ -650,18 +601,13 @@ class DataprocJobRunner(MRJobRunner):
 
         # TODO - mtai @ davidmarin - Might be trivial to support jar running, see "mainJarFileUri" of variable "output_hadoop_job" in this function
         #         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob
-        # REVIEW: cool, yeah, better to leave this out for MVP. I'd leave the
-        # TODO comments in
+
         assert step['type'] == 'streaming', 'Jar not implemented'
         main_jar_uri = _HADOOP_STREAMING_JAR_URI
 
         # TODO - mtai @ davidmarin - Not clear if we should move _upload_args to file_uris, currently works fine as-is
-        # REVIEW: Yeah, i'd be inclined to leave it if it works as-is.
-        # The next step is going to be to generalize the common code between
-        # EMR and Dataproc, and that'll be easier if we don't
         args.extend(self._upload_args(self._upload_mgr))
 
-        # TODO - mtai @ davidmarin - Not clear if we should move some of these to properties dict to file_uris, currently works fine as-is
         args.extend(self._hadoop_args_for_step(step_num))
 
         mapper, combiner, reducer = (self._hadoop_streaming_commands(step_num))
@@ -680,7 +626,7 @@ class DataprocJobRunner(MRJobRunner):
 
         args += ['-output', self._step_output_uri(step_num)]
 
-        # TODO - mtai @ davidmarin - Add back support to specify a different jar URI
+        # TODO - mtai @ davidmarin - Add back support to specify a different mainJarFileURI
         output_hadoop_job = dict(
             args=args,
             fileUris=file_uris,
@@ -696,12 +642,9 @@ class DataprocJobRunner(MRJobRunner):
         bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
         self._create_fs_tmp_bucket(bucket_name)
 
-        # REVIEW: what do we use this for? If we wanted to know, couldn't
-        # we just ask the API?
-        self._cluster_id_start = time.time()
 
-        # REVIEW: can you point to the URL you got this from?
-        # "clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'"
+        # clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
+        # as documented in an API error message (not currently documented in the Dataproc docs)
         if not self._cluster_id:
             self._cluster_id = '-'.join(['mrjob', self._gce_zone.lower(), random_identifier()])
 
@@ -714,17 +657,38 @@ class DataprocJobRunner(MRJobRunner):
                 raise
 
             log.info('Creating Dataproc Hadoop cluster - %s' % self._cluster_id)
-            cluster_data = self._cluster_args()
-            self._api_cluster_create(self._cluster_id, cluster_data)
-            log.info('Created new cluster - %s' % self._cluster_id)
 
-        # REVIEW: what do we use this for? If we wanted to know, couldn't
-        # we just ask the API?
-        self._cluster_id_start = time.time()
+            cluster_data = self._cluster_create_args()
+
+            self._api_cluster_create(cluster_data)
+
+            self._wait_for_cluster_ready(self._cluster_id)
 
         # keep track of when we launched our job
         self._dataproc_job_start = time.time()
         return self._cluster_id
+
+    def _wait_for_cluster_ready(self, cluster_id):
+        # See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State
+        cluster_state = None
+
+        # Poll until cluster is ready
+        while cluster_state not in _DATAPROC_CLUSTER_STATES_READY:
+            result_describe = self.api_client.clusters().get(
+                projectId=self._gcp_project,
+                region=_DATAPROC_API_REGION,
+                clusterName=cluster_id).execute()
+
+            cluster_state = result_describe['status']['state']
+            if cluster_state in _DATAPROC_CLUSTER_STATES_ERROR:
+                raise DataprocException(result_describe)
+
+            self._wait_for_api('cluster to accept jobs')
+
+        assert cluster_state in _DATAPROC_CLUSTER_STATES_READY
+        log.info("Cluster %s ready", cluster_id)
+
+        return cluster_id
 
     def _dataproc_job_prefix(self):
         return _cleanse_gcp_job_id(self._job_key)
@@ -780,7 +744,7 @@ class DataprocJobRunner(MRJobRunner):
 
             # NOTE - mtai @ davidmarin - https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State
             if job_state in _DATAPROC_JOB_STATES_ACTIVE:
-                _wait_for('job completion', self._opts['cloud_api_cooldown_secs'])
+                self._wait_for_api('job completion')
                 continue
 
             # we're done, will return at the end of this
@@ -807,9 +771,8 @@ class DataprocJobRunner(MRJobRunner):
             return 'hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
                 self._job_key, step_num + 1)
 
-    # REVIEW: should probably note that counters are currently
-    # always empty
     def counters(self):
+        # TODO - mtai @ davidmarin - Counters are currently always empty as we are not processing task logs
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
 
@@ -938,12 +901,12 @@ class DataprocJobRunner(MRJobRunner):
         writeln('# store $PWD')
         writeln('__mrjob_PWD=$PWD')
 
-        # TODO - mtai @ davidmarin - begin section, investigate why mtai needed to add this
-        # REVIEW: yep, inquiring minds want to know
+        # FYI - mtai @ davidmarin - begin section, mtai had to add this otherwise initialization didn't work
+        # // kept blowing up in all subsequent invocations of $__mrjob_PWD/
         writeln('if [ $__mrjob_PWD = "/" ]; then')
         writeln('  __mrjob_PWD=""')
         writeln('fi')
-        # TODO - mtai @ davidmarin - end section
+        # FYI - mtai @ davidmarin - end section
 
         writeln()
 
@@ -985,22 +948,20 @@ class DataprocJobRunner(MRJobRunner):
     def get_cluster_id(self):
         return self._cluster_id
 
-    # REVIEW: _cluster_create_args() would be a more clear name
-    def _cluster_args(self):
+    def _cluster_create_args(self):
         gcs_init_script_uris = []
         if self._master_bootstrap_script_path:
             gcs_init_script_uris.append(self._upload_mgr.uri(self._master_bootstrap_script_path))
 
+            # always add idle termination script
+            # add it last, so that we don't count bootstrapping as idle time
+            gcs_init_script_uris.append(self._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+
+        # NOTE - Cluster initializationActions can only take scripts with no script args
+        # NOTE - Cluster auto-term script therefore receives 'mrjob-max-secs-idle' via metadata instead of as an arg
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
-
-        # add idle termination script whenever max_hours_idle specified
-        # add it last, so that we don't count bootstrapping as idle time
-        if self._opts['max_hours_idle']:
-            # NOTE - Pass GCS init script args via cluster metadata
-            cluster_metadata['mrjob-max-secs-idle'] = str(int(self._opts['max_hours_idle'] * 3600))
-            cluster_metadata['mrjob-min-secs-to-end-of-hour'] = str(int(self._opts['mins_to_end_of_hour'] * 60))
-            gcs_init_script_uris.append(self._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+        cluster_metadata['mrjob-max-secs-idle'] = str(int(self._opts['max_hours_idle'] * 3600))
 
         cluster_config = dict(
             gceClusterConfig=dict(
@@ -1016,25 +977,25 @@ class DataprocJobRunner(MRJobRunner):
         # Task tracker
         master_conf = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gce_zone,
-            count=1, instance_type=self._opts['instance_type_master']
+            count=1, instance_type=self._opts['master_instance_type']
         )
 
         # Compute + storage
         worker_conf = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gce_zone,
-            count=self._opts['num_worker'], instance_type=self._opts['instance_type_worker']
+            count=self._opts['num_core_instances'], instance_type=self._opts['core_instance_type']
         )
 
         # Compute ONLY
         secondary_worker_conf = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gce_zone,
-            count=self._opts['num_preemptible'], instance_type=self._opts['instance_type_preemptible'],
-            is_preemptible=True
+            count=self._opts['num_task_instances'], instance_type=self._opts['task_instance_type'],
+            # is_preemptible=True
         )
 
         cluster_config['masterConfig'] = master_conf
         cluster_config['workerConfig'] = worker_conf
-        if self._opts['num_preemptible']:
+        if self._opts['num_task_instances']:
             cluster_config['secondaryWorkerConfig'] = secondary_worker_conf
 
         # See - https://cloud.google.com/dataproc/dataproc-versions
@@ -1053,39 +1014,14 @@ class DataprocJobRunner(MRJobRunner):
             clusterName=cluster_id
         ).execute()
 
-    def _api_cluster_create(self, cluster_id, cluster_data):
+    def _api_cluster_create(self, cluster_data):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get
-        self.api_client.clusters().create(
+        return self.api_client.clusters().create(
             projectId=self._gcp_project,
             region=_DATAPROC_API_REGION,
             body=cluster_data
         ).execute()
-
-        # See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State
-        cluster_state = None
-
-        # REVIEW: everything from here on could be a separate method.
-        # Especially the way you use it; I'd expect to get one message
-        # when the cluster is created, updates every 30 seconds or so on
-        # the cluster's status, and another message when the cluster is
-        # ready.
-
-        # Poll until cluster is ready
-        while cluster_state not in _DATAPROC_CLUSTER_STATES_READY:
-            result_describe = self.api_client.clusters().get(
-                projectId=self._gcp_project,
-                region=_DATAPROC_API_REGION,
-                clusterName=cluster_id).execute()
-
-            cluster_state = result_describe['status']['state']
-            if cluster_state in _DATAPROC_CLUSTER_STATES_ERROR:
-                raise DataprocException(result_describe)
-
-            _wait_for('cluster ready to accept jobs', self._opts['cloud_api_cooldown_secs'])
-
-        assert cluster_state in _DATAPROC_CLUSTER_STATES_READY
-        return cluster_id
 
     def _api_cluster_delete(self, cluster_id):
         return self.api_client.clusters().delete(

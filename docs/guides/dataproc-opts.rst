@@ -45,7 +45,7 @@ Cluster creation and configuration
     :default: gcloud SDK default
 
     region to run Dataproc jobs on (e.g.  ``us-central-1``). Also used by mrjob
-    to create temporary buckets if you don't set :mrjob-opt:`fs_tmpdir`
+    to create temporary buckets if you don't set :mrjob-opt:`cloud_tmp_dir`
     explicitly.
 
 .. mrjob-opt::
@@ -112,8 +112,8 @@ Monitoring the cluster
 -----------------------
 
 .. mrjob-opt::
-    :config: cloud_api_cooldown_secs
-    :switch: --cloud-api-cooldown-secs
+    :config: check_cluster_every
+    :switch: --check-cluster-every
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: 10
@@ -138,8 +138,8 @@ Number and type of instances
     (``n1-standard-1``) is fine, and using larger instances is wasteful.
 
 .. mrjob-opt::
-    :config: instance_type_master
-    :switch: --instance-type-master
+    :config: master_instance_type
+    :switch: --master-instance-type
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: ``'n1-standard-1'``
@@ -149,8 +149,8 @@ Number and type of instances
     other nodes. Usually you just want to use :mrjob-opt:`instance_type`.
 
 .. mrjob-opt::
-    :config: instance_type_worker
-    :switch: --instance-type-worker
+    :config: core_instance_type
+    :switch: --core-instance-type
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: value of :mrjob-opt:`instance_type`
@@ -160,8 +160,8 @@ Number and type of instances
 
 
 .. mrjob-opt::
-    :config: instance_type_preemptible
-    :switch: --instance-type-preemptible
+    :config: task_instance_type
+    :switch: --task-instance-type
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: value of :mrjob-opt:`instance_type`
@@ -172,8 +172,8 @@ Number and type of instances
 
 
 .. mrjob-opt::
-    :config: num_worker
-    :switch: --num-worker
+    :config: num_core_instances
+    :switch: --num-core-instances
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: 2
@@ -182,14 +182,14 @@ Number and type of instances
     host HDFS.
 
 .. mrjob-opt::
-    :config: num_preemptible
-    :switch: --num-preemptible
+    :config: num_task_instances
+    :switch: --num-task-instances
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: 0
 
     Number of task instances to start up.  These run your job but do not host
-    HDFS. If you use this, you must set :mrjob-opt:`num_worker`; Dataproc does not allow you to
+    HDFS. If you use this, you must set :mrjob-opt:`num_core_instances`; Dataproc does not allow you to
     run task instances without core instances (because there's nowhere to host
     HDFS).
 
@@ -198,8 +198,8 @@ FS paths and options
 MRJob uses google-api-python-client to manipulate/access FS.
 
 .. mrjob-opt::
-    :config: fs_tmpdir
-    :switch: --fs-tmpdir
+    :config: cloud_tmp_dir
+    :switch: --cloud-tmp-dir
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: (automatic)
@@ -213,8 +213,8 @@ MRJob uses google-api-python-client to manipulate/access FS.
     in this bucket (e.g. ``gs://mrjob-01234567890abcdef/tmp/``).
 
 .. mrjob-opt::
-    :config: fs_sync_secs
-    :switch: --fs-sync-secs
+    :config: cloud_fs_sync_secs
+    :switch: --cloud-fs-sync-secs
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: 5.0

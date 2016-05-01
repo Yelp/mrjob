@@ -9,27 +9,15 @@ Configuring Google Cloud Platform (GCP) credentials
 Configuring your GCP credentials allows mrjob to run your jobs on
 Dataproc and use GCS.
 
-.. REVIEW: Some more hand-holding would be helpful here.
-
-   You don't talk explicitly about how to create a project. Also, would
-   be helpful to have some advice or reassurance about choosing a project name.
-
-   Google Cloud Storage is actually called "Cloud Storage Service" in the API
-   manager (it'd be also helpful to note that it's in the upper-left under
-   "Google Cloud APIs") and Cloud Dataproc isn't even on the page; it can only
-   be found by searching (which is a little odd; I'd expect to see it under
-   "Google Cloud APIs", but whatevs).
-
-   Some direct links don't work without a project, but you can direct-link
-   to the API Manager at least: https://console.cloud.google.com/apis
-
-* Create a `Google Cloud Platform account <http://cloud.google.com/>`_
-* Setup a Billing Account and associate Billing with your Project
-* Go to the API Manager and...
-
-  * Enable API: Google Cloud Storage
-  * Enable API: Google Cloud Dataproc API
-  * Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
+* `Create a Google Cloud Platform account <http://cloud.google.com/>`_, see top-right
+* `Learn about Google Cloud Platform "projects" <https://cloud.google.com/docs/overview/#projects>`_
+* `Select or create a Cloud Platform Console project <https://console.cloud.google.com/project>`_
+* `Enable billing for your project <https://console.cloud.google.com/billing>`_
+* Go to the `API Manager <https://console.cloud.google.com/apis>`_ and search for / enable the following APIs...
+  * Google Cloud Storage
+  * Google Cloud Storage JSON API
+  * Google Cloud Dataproc API
+* Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
 
 * Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`_
 
@@ -123,23 +111,23 @@ Here are some things to consider when tuning your instance settings:
   (and more memory).
 
 The basic way to control type and number of instances is with the
-:mrjob-opt:`instance_type` and :mrjob-opt:`num_worker` options, on the command line like
+:mrjob-opt:`instance_type` and :mrjob-opt:`num_core_instances` options, on the command line like
 this::
 
-    --instance-type n1-highcpu-8 --num-worker 4
+    --instance-type n1-highcpu-8 --num-core-instances 4
 
 or in :py:mod:`mrjob.conf`, like this::
 
     runners:
       dataproc:
         instance_type: n1-highcpu-8
-        num_worker: 4
+        num_core_instances: 4
 
 In most cases, your master instance type doesn't need to be larger
 than ``n1-standard-1`` to schedule tasks.  *instance_type* only applies to
 instances that actually run tasks. (In this example, there are 1 ``n1-standard-1``
 master instance, and 4 ``n1-highcpu-8`` worker instances.) You *will* need a larger
 master instance if you have a very large number of input files; in this case,
-use the :mrjob-opt:`instance_type_master` option.
+use the :mrjob-opt:`master_instance_type` option.
 
-If you want to run preemptible instances, use the :mrjob-opt:`instance_type_preemptible` and :mrjob-opt:`num_preemptible` options.
+If you want to run preemptible instances, use the :mrjob-opt:`task_instance_type` and :mrjob-opt:`num_task_instances` options.

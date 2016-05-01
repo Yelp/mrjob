@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import bz2
+import io
+from tests.py2 import patch
+from tests.py2 import mock
 
 try:
     from oauth2client.client import GoogleCredentials
@@ -30,14 +33,13 @@ from mrjob.fs.gcs import GCSFilesystem
 
 from tests.compress import gzip_compress
 from tests.mockgoogleapiclient import MockGoogleAPITestCase
-
+from tests.sandbox import PatcherTestCase
 
 class GCSFSTestCase(MockGoogleAPITestCase):
 
     def setUp(self):
         super(GCSFSTestCase, self).setUp()
         self.fs = GCSFilesystem()
-
 
 
     def test_cat_uncompressed(self):
@@ -157,3 +159,56 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         self.assertEqual(self.fs.exists('gs://walrus/data/foo'), False)
         self.assertEqual(self.fs.exists('gs://walrus/data/bar/baz'), False)
 
+
+def _http_exception(status_code):
+    mock_resp = mock.Mock()
+    mock_resp.status = status_code
+
+    return google_errors.HttpError(mock_resp, '')
+
+class GCSFSHTTPErrorTestCase(PatcherTestCase):
+
+    def setUp(self):
+        self.fs = GCSFilesystem()
+        self.gcs_path = 'gs://walrus/data'
+
+        self.list_req_mock = mock.MagicMock()
+
+        objects_ret = mock.MagicMock()
+        objects_ret.list.return_value = self.list_req_mock
+        objects_ret.get_media.return_value = google_http.HttpRequest(None, None, self.gcs_path)
+
+        api_client = mock.MagicMock()
+        api_client.objects.return_value = objects_ret
+
+        self.fs._api_client = api_client
+        self.next_chunk_patch = patch.object(google_http.MediaIoBaseDownload, 'next_chunk')
+
+    def test_list_missing(self):
+        self.list_req_mock.execute.side_effect = _http_exception(404)
+
+        list(self.fs._ls_detailed(self.gcs_path))
+
+    def test_list_actual_error(self):
+        self.list_req_mock.execute.side_effect = _http_exception(500)
+
+        with self.assertRaises(google_http.HttpError):
+            list(self.fs._ls_detailed(self.gcs_path))
+
+    def test_download_io_empty_file(self):
+        io_obj = io.BytesIO()
+
+        with self.next_chunk_patch as media_io_next_chunk:
+            media_io_next_chunk.side_effect = _http_exception(416)
+
+            self.fs._download_io(self.gcs_path, io_obj)
+            self.assertEqual(len(io_obj.getvalue()), 0)
+
+    def test_download_io_actual_error(self):
+        io_obj = io.BytesIO()
+
+        with self.next_chunk_patch as media_io_next_chunk:
+            media_io_next_chunk.side_effect = _http_exception(500)
+
+            with self.assertRaises(google_http.HttpError):
+                self.fs._download_io(self.gcs_path, io_obj)

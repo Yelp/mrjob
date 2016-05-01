@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for DataprocJobRunner"""
+import collections
 import copy
 import getpass
 import os
@@ -24,7 +25,7 @@ from io import BytesIO
 import mrjob
 import mrjob.dataproc
 from mrjob.dataproc import DataprocJobRunner
-from mrjob.dataproc import _DEFAULT_IMAGE_VERSION, _DATAPROC_API_REGION, _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.dataproc import _DEFAULT_IMAGE_VERSION, _DATAPROC_API_REGION, _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH, _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.py2 import PY2
@@ -73,8 +74,8 @@ MICRO_GCE_INSTANCE = 'f1-micro'
 class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
-        'cloud_api_cooldown_secs': 0.00,
-        'fs_sync_secs': 0.00,
+        'check_cluster_every': 0.00,
+        'cloud_fs_sync_secs': 0.00,
     }}}
 
     def test_end_to_end(self):
@@ -100,10 +101,15 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
         gcs_buckets_snapshot = copy.deepcopy(self._gcs_client._cache_buckets)
         gcs_objects_snapshot = copy.deepcopy(self._gcs_client._cache_objects)
 
+        fake_gcs_output = [
+            b'1\t"qux"\n2\t"bar"\n',
+            b'2\t"foo"\n5\tnull\n'
+        ]
+
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, DataprocJobRunner)
 
-            # make sure that initializing the runner doesn't affect S3
+            # make sure that initializing the runner doesn't affect GCS
             # (Issue #50)
             self.assertEqual(gcs_buckets_snapshot, self._gcs_client._cache_buckets)
             self.assertEqual(gcs_objects_snapshot, self._gcs_client._cache_objects)
@@ -111,10 +117,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             runner.run()
 
             # setup fake output
-            self.put_job_output_parts(runner, [
-                b'1\t"qux"\n2\t"bar"\n',
-                b'2\t"foo"\n5\tnull\n'
-            ])
+            self.put_job_output_parts(runner, fake_gcs_output)
 
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
@@ -164,7 +167,10 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
         # make sure cleanup happens
         self.assertFalse(os.path.exists(local_tmp_dir))
-        self.assertFalse(any(runner.fs.ls(runner.get_output_dir())))
+
+        # we don't clean-up the output dir as we're relying on lifecycle management
+        output_dirs = list(runner.fs.ls(runner.get_output_dir()))
+        self.assertEqual(len(fake_gcs_output), len(output_dirs))
 
         # job should get terminated
         cluster = self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id]
@@ -179,10 +185,10 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             stderr = StringIO()
             log_to_stream('mrjob.dataproc', stderr)
 
+            self._dataproc_client.job_get_advances_states = collections.deque(['SETUP_DONE', 'RUNNING', 'ERROR'])
+
             with mr_job.make_runner() as runner:
                 self.assertIsInstance(runner, DataprocJobRunner)
-
-                runner.api_client.job_get_advances_to_state = 'ERROR'
 
                 self.assertRaises(StepFailedException, runner.run)
 
@@ -203,7 +209,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
-            tmp_bucket, _ = parse_gcs_uri(runner._fs_tmpdir)
+            tmp_bucket, _ = parse_gcs_uri(runner._cloud_tmp_dir)
 
             runner.run()
 
@@ -224,13 +230,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
         self._test_cloud_tmp_cleanup('CLOUD_TMP', 0)
 
     def test_cleanup_local(self):
-        self._test_cloud_tmp_cleanup('LOCAL_TMP', 4)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5)
 
     def test_cleanup_logs(self):
-        self._test_cloud_tmp_cleanup('LOGS', 4)
+        self._test_cloud_tmp_cleanup('LOGS', 5)
 
     def test_cleanup_none(self):
-        self._test_cloud_tmp_cleanup('NONE', 4)
+        self._test_cloud_tmp_cleanup('NONE', 5)
 
     def test_cleanup_combine(self):
         self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0)
@@ -287,10 +293,10 @@ class ExistingClusterTestCase(MockGoogleAPITestCase):
                                '--cluster-id', cluster_id])
         mr_job.sandbox()
 
+        self._dataproc_client.job_get_advances_states = collections.deque(['SETUP_DONE', 'RUNNING', 'ERROR'])
+
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, DataprocJobRunner)
-
-            runner.api_client.job_get_advances_to_state = 'ERROR'
 
             with logger_disabled('mrjob.dataproc'):
                 self.assertRaises(StepFailedException, runner.run)
@@ -342,8 +348,8 @@ EXPECTED_ZONE = 'PUPPYLAND'
 class ZoneTestCase(MockGoogleAPITestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
-        'cloud_api_cooldown_secs': 0.00,
-        'fs_sync_secs': 0.00,
+        'check_cluster_every': 0.00,
+        'cloud_fs_sync_secs': 0.00,
         'zone': EXPECTED_ZONE,
     }}}
 
@@ -383,7 +389,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
 
         runner = DataprocJobRunner(conf_paths=[], **runner_kwargs)
 
-        bucket_name, path = parse_gcs_uri(runner._fs_tmpdir)
+        bucket_name, path = parse_gcs_uri(runner._cloud_tmp_dir)
         runner._create_fs_tmp_bucket(bucket_name, location=location)
 
         self.assertTrue(bucket_name.startswith('mrjob-'))
@@ -396,10 +402,10 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         # Verify that we setup bucket lifecycle rules of 28-day retention
         first_lifecycle_rule = current_bucket['lifecycle']['rule'][0]
         self.assertEqual(first_lifecycle_rule['action'], dict(type='Delete'))
-        self.assertEqual(first_lifecycle_rule['condition'], dict(age=28))
+        self.assertEqual(first_lifecycle_rule['condition'], dict(age=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS))
 
     def _make_bucket(self, name, location=None):
-        self._gcs_fs.bucket_create(project=_TEST_PROJECT, name=name, location=location)
+        self._gcs_fs.create_bucket(project=_TEST_PROJECT, name=name, location=location)
 
     def test_default(self):
         self.assert_new_tmp_bucket(DEFAULT_GCE_REGION)
@@ -416,7 +422,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         self._make_bucket('mrjob-1', DEFAULT_GCE_REGION)
 
         runner = DataprocJobRunner()
-        self.assertEqual(runner._fs_tmpdir, 'gs://mrjob-1/tmp/')
+        self.assertEqual(runner._cloud_tmp_dir, 'gs://mrjob-1/tmp/')
 
     def test_ignore_mrjob_bucket_in_different_region(self):
         # this tests 687
@@ -432,17 +438,17 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
     def test_explicit_tmp_uri(self):
         self._make_bucket('walrus', US_EAST_GCE_REGION)
 
-        runner = DataprocJobRunner(fs_tmpdir='gs://walrus/tmp/')
+        runner = DataprocJobRunner(cloud_tmp_dir='gs://walrus/tmp/')
 
-        self.assertEqual(runner._fs_tmpdir, 'gs://walrus/tmp/')
+        self.assertEqual(runner._cloud_tmp_dir, 'gs://walrus/tmp/')
 
     def test_cross_region_explicit_tmp_uri(self):
         self._make_bucket('walrus',  EU_WEST_GCE_REGION)
 
         runner = DataprocJobRunner(region=US_EAST_GCE_REGION,
-                              fs_tmpdir='gs://walrus/tmp/')
+                              cloud_tmp_dir='gs://walrus/tmp/')
 
-        self.assertEqual(runner._fs_tmpdir, 'gs://walrus/tmp/')
+        self.assertEqual(runner._cloud_tmp_dir, 'gs://walrus/tmp/')
 
         # tmp bucket shouldn't influence region (it did in 0.4.x)
         self.assertEqual(runner._gce_region, US_EAST_GCE_REGION)
@@ -471,7 +477,11 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
         runner = DataprocJobRunner(**opts)
 
         # cluster_body = runner.api_client.cluster_create()
-        runner._master_bootstrap_script_path = 'gs://fake-bucket/fake-script.sh'
+        fake_bootstrap_script = 'gs://fake-bucket/fake-script.sh'
+        runner._master_bootstrap_script_path = fake_bootstrap_script
+        runner._upload_mgr.add(fake_bootstrap_script)
+        runner._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+
         cluster_id = runner._launch_cluster()
 
         cluster_body = runner._api_cluster_get(cluster_id)
@@ -503,53 +513,53 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             master=(1, DEFAULT_GCE_INSTANCE))
 
         self._test_instance_groups(
-            {'num_worker': 2},
+            {'num_core_instances': 2},
             worker=(2, DEFAULT_GCE_INSTANCE),
             master=(1, DEFAULT_GCE_INSTANCE))
 
     def test_multiple_instances(self):
         self._test_instance_groups(
-            {'instance_type': HIGHCPU_GCE_INSTANCE, 'num_worker': 5},
+            {'instance_type': HIGHCPU_GCE_INSTANCE, 'num_core_instances': 5},
             worker=(5, HIGHCPU_GCE_INSTANCE),
             master=(1, DEFAULT_GCE_INSTANCE))
 
     def test_explicit_master_and_slave_instance_types(self):
         self._test_instance_groups(
-            {'instance_type_master': MICRO_GCE_INSTANCE},
+            {'master_instance_type': MICRO_GCE_INSTANCE},
             master=(1, MICRO_GCE_INSTANCE))
 
         self._test_instance_groups(
-            {'instance_type_worker': HIGHMEM_GCE_INSTANCE,
-             'num_worker': 2},
+            {'core_instance_type': HIGHMEM_GCE_INSTANCE,
+             'num_core_instances': 2},
             worker=(2, HIGHMEM_GCE_INSTANCE),
             master=(1, DEFAULT_GCE_INSTANCE))
 
         self._test_instance_groups(
-            {'instance_type_master': MICRO_GCE_INSTANCE,
-             'instance_type_worker': HIGHMEM_GCE_INSTANCE,
-             'num_worker': 2},
+            {'master_instance_type': MICRO_GCE_INSTANCE,
+             'core_instance_type': HIGHMEM_GCE_INSTANCE,
+             'num_core_instances': 2},
             worker=(2, HIGHMEM_GCE_INSTANCE),
             master=(1, MICRO_GCE_INSTANCE))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(
             {'instance_type': HIGHCPU_GCE_INSTANCE,
-             'instance_type_master': MICRO_GCE_INSTANCE},
+             'master_instance_type': MICRO_GCE_INSTANCE},
             master=(1, MICRO_GCE_INSTANCE),
             worker=(2, HIGHCPU_GCE_INSTANCE)
         )
 
         self._test_instance_groups(
             {'instance_type': HIGHCPU_GCE_INSTANCE,
-             'instance_type_master': MICRO_GCE_INSTANCE,
-             'instance_type_worker': HIGHMEM_GCE_INSTANCE,
+             'master_instance_type': MICRO_GCE_INSTANCE,
+             'core_instance_type': HIGHMEM_GCE_INSTANCE,
             },
             worker=(2, HIGHMEM_GCE_INSTANCE),
             master=(1, MICRO_GCE_INSTANCE))
 
     def test_cmd_line_opts_beat_mrjob_conf(self):
         # set instance_type in mrjob.conf, 1 instance
-        self.set_in_mrjob_conf(instance_type_master=HIGHCPU_GCE_INSTANCE)
+        self.set_in_mrjob_conf(master_instance_type=HIGHCPU_GCE_INSTANCE)
 
         self._test_instance_groups(
             {},
@@ -557,13 +567,13 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
         )
 
         self._test_instance_groups(
-            {'instance_type_master': MICRO_GCE_INSTANCE},
+            {'master_instance_type': MICRO_GCE_INSTANCE},
             master=(1, MICRO_GCE_INSTANCE)
         )
 
         # set instance_type in mrjob.conf, 3 instances
         self.set_in_mrjob_conf(instance_type=HIGHCPU_GCE_INSTANCE,
-                               num_worker=2)
+                               num_core_instances=2)
 
         self._test_instance_groups(
             {},
@@ -572,27 +582,27 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
         )
 
         self._test_instance_groups(
-            {'instance_type_master': MICRO_GCE_INSTANCE,
-             'instance_type_worker': HIGHMEM_GCE_INSTANCE},
+            {'master_instance_type': MICRO_GCE_INSTANCE,
+             'core_instance_type': HIGHMEM_GCE_INSTANCE},
             master=(1, MICRO_GCE_INSTANCE),
             worker=(2, HIGHMEM_GCE_INSTANCE)
         )
 
         # set master in mrjob.conf, 1 instance
-        self.set_in_mrjob_conf(instance_type_master=MICRO_GCE_INSTANCE)
+        self.set_in_mrjob_conf(master_instance_type=MICRO_GCE_INSTANCE)
 
         self._test_instance_groups(
             {},
             master=(1, MICRO_GCE_INSTANCE))
 
         self._test_instance_groups(
-            {'instance_type_master': HIGHCPU_GCE_INSTANCE},
+            {'master_instance_type': HIGHCPU_GCE_INSTANCE},
             master=(1, HIGHCPU_GCE_INSTANCE))
 
         # set master and slave in mrjob.conf, 2 instances
-        self.set_in_mrjob_conf(instance_type_master=MICRO_GCE_INSTANCE,
-                               instance_type_worker=HIGHMEM_GCE_INSTANCE,
-                               num_worker=2)
+        self.set_in_mrjob_conf(master_instance_type=MICRO_GCE_INSTANCE,
+                               core_instance_type=HIGHMEM_GCE_INSTANCE,
+                               num_core_instances=2)
 
         self._test_instance_groups(
             {},
@@ -605,17 +615,17 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             master=(1, MICRO_GCE_INSTANCE))
 
         self._test_instance_groups(
-            {'instance_type_worker': HIGHMEM_GCE_INSTANCE},
+            {'core_instance_type': HIGHMEM_GCE_INSTANCE},
             worker=(2, HIGHMEM_GCE_INSTANCE),
             master=(1, MICRO_GCE_INSTANCE))
 
     def test_core_and_task_on_demand_instances(self):
         self._test_instance_groups(
-            {'instance_type_master': MICRO_GCE_INSTANCE,
-             'instance_type_worker': HIGHCPU_GCE_INSTANCE,
-             'instance_type_preemptible': HIGHMEM_GCE_INSTANCE,
-             'num_worker': 5,
-             'num_preemptible': 20,
+            {'master_instance_type': MICRO_GCE_INSTANCE,
+             'core_instance_type': HIGHCPU_GCE_INSTANCE,
+             'task_instance_type': HIGHMEM_GCE_INSTANCE,
+             'num_core_instances': 5,
+             'num_task_instances': 20,
              },
             master=(1, MICRO_GCE_INSTANCE),
             worker=(5, HIGHCPU_GCE_INSTANCE),
@@ -623,9 +633,9 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
 
     def test_task_type_defaults_to_core_type(self):
         self._test_instance_groups(
-            {'instance_type_worker': HIGHCPU_GCE_INSTANCE,
-             'num_worker': 5,
-             'num_preemptible': 20,
+            {'core_instance_type': HIGHCPU_GCE_INSTANCE,
+             'num_core_instances': 5,
+             'num_task_instances': 20,
              },
             master=(1, DEFAULT_GCE_INSTANCE),
             worker=(5, HIGHCPU_GCE_INSTANCE),
@@ -801,15 +811,6 @@ class MaxHoursIdleTestCase(MockGoogleAPITestCase):
         expected_uri = runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
         self.assertEqual(last_init_exec, expected_uri)
 
-    def assertDidNotUseIdleTimeoutScript(self, runner):
-        cluster_metadata, last_init_exec = self._cluster_metadata_and_last_init_exec(runner)
-
-        self.assertNotIn('mrjob-max-secs-idle', cluster_metadata)
-        self.assertNotIn('mrjob-min-secs-to-end-of-hour', cluster_metadata)
-
-        expected_uri = runner._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
-        self.assertNotEqual(last_init_exec, expected_uri)
-
     def _cluster_metadata_and_last_init_exec(self, runner):
         cluster_id = runner.get_cluster_id()
 
@@ -829,7 +830,9 @@ class MaxHoursIdleTestCase(MockGoogleAPITestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertDidNotUseIdleTimeoutScript(runner)
+            self.assertRanIdleTimeoutScriptWith(runner, {
+                'mrjob-max-secs-idle': '360',
+            })
 
     def test_persistent_cluster(self):
         mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '0.01'])
@@ -839,7 +842,6 @@ class MaxHoursIdleTestCase(MockGoogleAPITestCase):
             runner.run()
             self.assertRanIdleTimeoutScriptWith(runner, {
                 'mrjob-max-secs-idle': '36',
-                'mrjob-min-secs-to-end-of-hour': '3300'
             })
 
     def test_bootstrap_script_is_actually_installed(self):
@@ -854,7 +856,7 @@ class TestCatFallback(MockGoogleAPITestCase):
             'gs://walrus/three': b'three_text',
         })
 
-        runner = DataprocJobRunner(fs_tmpdir='gs://walrus/tmp',
+        runner = DataprocJobRunner(cloud_tmp_dir='gs://walrus/tmp',
                               conf_paths=[])
 
         self.assertEqual(list(runner.fs.cat('gs://walrus/one')), [b'one_text'])

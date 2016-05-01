@@ -47,7 +47,7 @@ EMPTY_MRJOB_CONF = {'runners': {
     },
     'dataproc': {
         'api_cooldown_secs': 0.00,
-        'fs_sync_secs': 0.00
+        'cloud_fs_sync_secs': 0.00
     }
 }}
 

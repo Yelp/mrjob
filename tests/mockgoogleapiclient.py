@@ -13,6 +13,7 @@
 # limitations under the License.
 import re
 import collections
+import copy
 import os
 import tempfile
 import time
@@ -33,8 +34,7 @@ except ImportError:
     GoogleCredentials = None
     discovery = None
     google_errors = None
-    google_http = None
-
+    google_http = Noneget
 from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _DATAPROC_API_REGION
 from mrjob.fs.gcs import GCSFilesystem
@@ -170,9 +170,12 @@ class MockGoogleAPITestCase(SandboxedTestCase):
 
         self.start(patch.object(DataprocJobRunner, 'api_client', self._dataproc_client))
 
-        self.start(patch.object(GCSFilesystem, 'api_client', self._gcs_client))
-        self.start(patch.object(GCSFilesystem, '_download_io', self._gcs_client.download_io))
-        self.start(patch.object(GCSFilesystem, '_upload_io', self._gcs_client.upload_io))
+        self.gcs_patch_api_client = patch.object(GCSFilesystem, 'api_client', self._gcs_client)
+        self.gcs_patch_download_io = patch.object(GCSFilesystem, '_download_io', self._gcs_client.download_io)
+        self.gcs_patch_upload_io = patch.object(GCSFilesystem, '_upload_io', self._gcs_client.upload_io)
+        self.start(self.gcs_patch_api_client)
+        self.start(self.gcs_patch_download_io)
+        self.start(self.gcs_patch_upload_io)
 
 
         self.start(patch('mrjob.dataproc._read_gcloud_config', lambda: _GCLOUD_CONFIG))
@@ -260,9 +263,9 @@ class MockGCSClient(object):
         bucket, name = parse_gcs_uri(gcs_uri)
 
         try:
-            self._fs.bucket_get(bucket)
+            self._fs.get_bucket(bucket)
         except google_errors.HttpError:
-            self._fs.bucket_create(project=_TEST_PROJECT, name=bucket)
+            self._fs.create_bucket(project=_TEST_PROJECT, name=bucket)
 
         bytes_io_obj = BytesIO(data)
         self.upload_io(bytes_io_obj, gcs_uri)
@@ -478,8 +481,8 @@ class MockDataprocClient(object):
         self._client_jobs = MockDataprocClientJobs(self)
 
         # By default - we always resolve our infinite loops by default to state RUNNING / DONE
-        self.cluster_get_advances_to_state = 'RUNNING'
-        self.job_get_advances_to_state = 'DONE'
+        self.cluster_get_advances_states = collections.deque(['RUNNING'])
+        self.job_get_advances_states = collections.deque(['SETUP_DONE', 'RUNNING', 'DONE'])
 
     def clusters(self):
         return self._client_clusters
@@ -532,7 +535,7 @@ _CLUSTER_ZONE = None
 _CLUSTER_IMAGE_VERSION = '1.0'
 _CLUSTER_STATE = ''
 _CLUSTER_MACHINE_TYPE = 'n1-standard-1'
-_CLUSTER_NUM_WORKERS = 2
+_CLUSTER_NUM_CORE_INSTANCESS = 2
 
 
 def _datetime_to_gcptime(in_datetime=None):
@@ -540,7 +543,7 @@ def _datetime_to_gcptime(in_datetime=None):
     return in_datetime.isoformat() + 'Z'
 
 
-def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=None, machine_type=None, machine_type_master=None, num_workers=None, now=None):
+def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=None, machine_type=None, machine_type_master=None, num_core_instancess=None, now=None):
     """Fake Dataproc Cluster metadata"""
     project = project or _TEST_PROJECT
     zone = zone or _CLUSTER_ZONE
@@ -548,7 +551,7 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
     image_version = image_version or _CLUSTER_IMAGE_VERSION
     machine_type_master = machine_type_master or _CLUSTER_MACHINE_TYPE
     machine_type = machine_type or _CLUSTER_MACHINE_TYPE
-    num_workers = num_workers or _CLUSTER_NUM_WORKERS
+    num_core_instancess = num_core_instancess or _CLUSTER_NUM_CORE_INSTANCESS
 
     gce_cluster_conf = {
       "zoneUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s" % locals(),
@@ -577,8 +580,8 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
     }
 
     worker_conf = {
-      "numInstances": num_workers,
-      "instanceNames": ['%s-w-%d' % (cluster, num) for num in range(num_workers)],
+      "numInstances": num_core_instancess,
+      "instanceNames": ['%s-w-%d' % (cluster, num) for num in range(num_core_instancess)],
       "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
       "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type)s" % locals(),
       "diskConfig": {
@@ -658,6 +661,9 @@ class MockDataprocClientClusters(object):
         # Then do a deep-update as to what was requested
         cluster = _dict_deep_update(cluster, body)
 
+        # Create a local copy of advances states
+        cluster['_get_advances_states'] = copy.copy(self._client.cluster_get_advances_states)
+
         _set_deep(self._clusters, [projectId, cluster_name], cluster)
 
         return cluster
@@ -672,8 +678,10 @@ class MockDataprocClientClusters(object):
             raise mock_google_error(404)
 
         # NOTE - TESTING ONLY - Side effect is to advance the state
-        if self._client.cluster_get_advances_to_state:
-            self._client.update_state(cluster, state=self._client.cluster_get_advances_to_state)
+        advances_states = cluster['_get_advances_states']
+        if advances_states:
+            next_state = advances_states.popleft()
+            self._client.update_state(cluster, state=next_state)
 
         return cluster
 
@@ -792,8 +800,10 @@ class MockDataprocClientJobs(object):
             raise mock_google_error(404)
 
         # NOTE - TESTING ONLY - Side effect is to advance the state
-        if self._client.job_get_advances_to_state:
-            self._client.update_state(current_job, state=self._client.job_get_advances_to_state)
+        advances_states = current_job['_get_advances_states']
+        if advances_states:
+            next_state = advances_states.popleft()
+            self._client.update_state(current_job, state=next_state)
 
         return current_job
 
@@ -828,6 +838,9 @@ class MockDataprocClientJobs(object):
 
         # Then do a deep-update as to what was requested
         _dict_deep_update(job, body_job)
+
+        # Create a local copy of advances states
+        job['_get_advances_states'] = copy.copy(self._client.job_get_advances_states)
 
         _set_deep(self._jobs, [projectId, job['reference']['jobId']], job)
 

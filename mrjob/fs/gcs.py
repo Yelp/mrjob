@@ -207,13 +207,13 @@ class GCSFilesystem(Filesystem):
             req.execute()
 
     def touchz(self, dest_uri):
-        io_obj = io.BytesIO()
-        return self._upload_io(io_obj, dest_uri)
+        with io.BytesIO() as io_obj:
+            return self._upload_io(io_obj, dest_uri)
 
     def put(self, src_path, dest_uri):
         """Uploads a local file to a specific destination."""
-        io_obj = io.FileIO(src_path)
-        return self._upload_io(io_obj, dest_uri)
+        with io.FileIO(src_path) as io_obj:
+            return self._upload_io(io_obj, dest_uri)
 
     def _download_io(self, src_uri, io_obj):
         bucket_name, object_name = parse_gcs_uri(src_uri)
@@ -239,7 +239,7 @@ class GCSFilesystem(Filesystem):
         log.debug("Download Complete for %s", src_uri)
         return io_obj
 
-    def _upload_io(self, io_obj, dest_uri):
+    def _upload_io(self, io_obj, dest_uri, metadata=False):
         bucket, name = parse_gcs_uri(dest_uri)
         if self.exists(dest_uri):
             raise Exception("File already exists: " + dest_uri)
@@ -258,6 +258,9 @@ class GCSFilesystem(Filesystem):
             log.debug("Uploaded %d%%." % int(status.progress() * 100))
 
         log.debug('Upload Complete! %s', dest_uri)
+
+        if metadata:
+            return self.api_client.objects().get(bucket=bucket, object=name).execute()
 
     def list_buckets(self, project, prefix=None):
         """List buckets on GCS."""

@@ -164,7 +164,7 @@ def _http_exception(status_code):
     mock_resp = mock.Mock()
     mock_resp.status = status_code
 
-    return google_errors.HttpError(mock_resp, '')
+    return google_errors.HttpError(mock_resp, b'')
 
 class GCSFSHTTPErrorTestCase(PatcherTestCase):
 

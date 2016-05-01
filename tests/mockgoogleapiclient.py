@@ -34,7 +34,8 @@ except ImportError:
     GoogleCredentials = None
     discovery = None
     google_errors = None
-    google_http = Noneget
+    google_http = None
+
 from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _DATAPROC_API_REGION
 from mrjob.fs.gcs import GCSFilesystem

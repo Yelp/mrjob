@@ -218,14 +218,17 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
     def __init__(self, alias, opts, conf_paths):
         super(DataprocRunnerOptionStore, self).__init__(alias, opts, conf_paths)
 
-        # Dataproc requires a master and >= 2 worker instances
-        # gce_num_instances refers ONLY to number of WORKER instances and does NOT include the required 1 instance for master
-        # In other words, minimum cluster size is 3 machines, 1 master and "gce_num_instances" workers
+        # Dataproc requires a master and >= 2 core instances
+        # num_core_instances refers ONLY to number of CORE instances and does NOT include the required 1 instance for master
+        # In other words, minimum cluster size is 3 machines, 1 master and 2 "num_core_instances" workers
         if self['num_core_instances'] < _DATAPROC_MIN_WORKERS:
             raise DataprocException('Dataproc expects at LEAST %d workers' % _DATAPROC_MIN_WORKERS)
 
         for varname, fallback_varname in self.DEFAULT_FALLBACKS.items():
             self[varname] = self[varname] or self[fallback_varname]
+
+        if self['core_instance_type'] != self['task_instance_type']:
+            raise DataprocException('Dataproc v1 expects core/task instance types to be identical')
 
     def default_options(self):
         super_opts = super(DataprocRunnerOptionStore, self).default_options()
@@ -990,7 +993,7 @@ class DataprocJobRunner(MRJobRunner):
         secondary_worker_conf = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gce_zone,
             count=self._opts['num_task_instances'], instance_type=self._opts['task_instance_type'],
-            # is_preemptible=True
+            is_preemptible=True
         )
 
         cluster_config['masterConfig'] = master_conf

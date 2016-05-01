@@ -349,12 +349,11 @@ def _add_dataproc_opts(opt_group):
 
         opt_group.add_option(
             '--core-instance-type', dest='core_instance_type', default=None,
-            help='Type of GCE/EC2 worker instance(s) to launch'),
+            help='Type of GCE/EC2 core instance(s) to launch'),
 
         opt_group.add_option(
             '--task-instance-type', dest='task_instance_type', default=None,
-            help='Type of GCE/EC2 preemptible worker instance(s) to launch'),
-
+            help='Type of GCE/EC2 task instance(s) to launch'),
 
         opt_group.add_option(
             '--num-core-instances', dest='num_core_instances', default=None,

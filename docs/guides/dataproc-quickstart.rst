@@ -17,6 +17,7 @@ Dataproc and use GCS.
   * Google Cloud Storage
   * Google Cloud Storage JSON API
   * Google Cloud Dataproc API
+
 * Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
 
 * Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`_

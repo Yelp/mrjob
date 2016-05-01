@@ -24,7 +24,7 @@ from io import BytesIO
 
 import mrjob
 import mrjob.dataproc
-from mrjob.dataproc import DataprocJobRunner
+from mrjob.dataproc import DataprocJobRunner, DataprocException
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION, _DATAPROC_API_REGION, _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH, _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 
 from mrjob.fs.gcs import parse_gcs_uri
@@ -490,14 +490,14 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
 
         role_to_actual = dict(
             master=self._gce_instance_group_summary(conf['masterConfig']),
-            worker=self._gce_instance_group_summary(conf['workerConfig']),
-            preemptible=self._gce_instance_group_summary(conf.get('secondaryWorkerConfig'))
+            core=self._gce_instance_group_summary(conf['workerConfig']),
+            task=self._gce_instance_group_summary(conf.get('secondaryWorkerConfig'))
         )
 
         role_to_expected = kwargs.copy()
         role_to_expected.setdefault('master', (1, DEFAULT_GCE_INSTANCE))
-        role_to_expected.setdefault('worker', (2, DEFAULT_GCE_INSTANCE))
-        role_to_expected.setdefault('preemptible', self._gce_instance_group_summary(dict()))
+        role_to_expected.setdefault('core', (2, DEFAULT_GCE_INSTANCE))
+        role_to_expected.setdefault('task', self._gce_instance_group_summary(dict()))
         self.assertEqual(role_to_actual, role_to_expected)
 
     def set_in_mrjob_conf(self, **kwargs):
@@ -514,13 +514,13 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
 
         self._test_instance_groups(
             {'num_core_instances': 2},
-            worker=(2, DEFAULT_GCE_INSTANCE),
+            core=(2, DEFAULT_GCE_INSTANCE),
             master=(1, DEFAULT_GCE_INSTANCE))
 
     def test_multiple_instances(self):
         self._test_instance_groups(
             {'instance_type': HIGHCPU_GCE_INSTANCE, 'num_core_instances': 5},
-            worker=(5, HIGHCPU_GCE_INSTANCE),
+            core=(5, HIGHCPU_GCE_INSTANCE),
             master=(1, DEFAULT_GCE_INSTANCE))
 
     def test_explicit_master_and_slave_instance_types(self):
@@ -529,16 +529,16 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             master=(1, MICRO_GCE_INSTANCE))
 
         self._test_instance_groups(
-            {'core_instance_type': HIGHMEM_GCE_INSTANCE,
+            {'instance_type': HIGHMEM_GCE_INSTANCE,
              'num_core_instances': 2},
-            worker=(2, HIGHMEM_GCE_INSTANCE),
+            core=(2, HIGHMEM_GCE_INSTANCE),
             master=(1, DEFAULT_GCE_INSTANCE))
 
         self._test_instance_groups(
             {'master_instance_type': MICRO_GCE_INSTANCE,
-             'core_instance_type': HIGHMEM_GCE_INSTANCE,
+             'instance_type': HIGHMEM_GCE_INSTANCE,
              'num_core_instances': 2},
-            worker=(2, HIGHMEM_GCE_INSTANCE),
+            core=(2, HIGHMEM_GCE_INSTANCE),
             master=(1, MICRO_GCE_INSTANCE))
 
     def test_explicit_instance_types_take_precedence(self):
@@ -546,16 +546,9 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             {'instance_type': HIGHCPU_GCE_INSTANCE,
              'master_instance_type': MICRO_GCE_INSTANCE},
             master=(1, MICRO_GCE_INSTANCE),
-            worker=(2, HIGHCPU_GCE_INSTANCE)
+            core=(2, HIGHCPU_GCE_INSTANCE)
         )
 
-        self._test_instance_groups(
-            {'instance_type': HIGHCPU_GCE_INSTANCE,
-             'master_instance_type': MICRO_GCE_INSTANCE,
-             'core_instance_type': HIGHMEM_GCE_INSTANCE,
-            },
-            worker=(2, HIGHMEM_GCE_INSTANCE),
-            master=(1, MICRO_GCE_INSTANCE))
 
     def test_cmd_line_opts_beat_mrjob_conf(self):
         # set instance_type in mrjob.conf, 1 instance
@@ -578,14 +571,14 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
         self._test_instance_groups(
             {},
             master=(1, DEFAULT_GCE_INSTANCE),
-            worker=(2, HIGHCPU_GCE_INSTANCE)
+            core=(2, HIGHCPU_GCE_INSTANCE)
         )
 
         self._test_instance_groups(
             {'master_instance_type': MICRO_GCE_INSTANCE,
-             'core_instance_type': HIGHMEM_GCE_INSTANCE},
+             'instance_type': HIGHMEM_GCE_INSTANCE},
             master=(1, MICRO_GCE_INSTANCE),
-            worker=(2, HIGHMEM_GCE_INSTANCE)
+            core=(2, HIGHMEM_GCE_INSTANCE)
         )
 
         # set master in mrjob.conf, 1 instance
@@ -601,26 +594,28 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
 
         # set master and slave in mrjob.conf, 2 instances
         self.set_in_mrjob_conf(master_instance_type=MICRO_GCE_INSTANCE,
-                               core_instance_type=HIGHMEM_GCE_INSTANCE,
+                               instance_type=HIGHMEM_GCE_INSTANCE,
                                num_core_instances=2)
 
         self._test_instance_groups(
             {},
-            worker=(2, HIGHMEM_GCE_INSTANCE),
+            core=(2, HIGHMEM_GCE_INSTANCE),
             master=(1, MICRO_GCE_INSTANCE))
 
         self._test_instance_groups(
             {'instance_type': HIGHCPU_GCE_INSTANCE},
-            worker=(2, HIGHMEM_GCE_INSTANCE),
+            core=(2, HIGHCPU_GCE_INSTANCE),
             master=(1, MICRO_GCE_INSTANCE))
 
         self._test_instance_groups(
-            {'core_instance_type': HIGHMEM_GCE_INSTANCE},
-            worker=(2, HIGHMEM_GCE_INSTANCE),
+            {'instance_type': HIGHMEM_GCE_INSTANCE},
+            core=(2, HIGHMEM_GCE_INSTANCE),
             master=(1, MICRO_GCE_INSTANCE))
 
     def test_core_and_task_on_demand_instances(self):
-        self._test_instance_groups(
+        self.assertRaises(
+            DataprocException,
+            self._test_instance_groups,
             {'master_instance_type': MICRO_GCE_INSTANCE,
              'core_instance_type': HIGHCPU_GCE_INSTANCE,
              'task_instance_type': HIGHMEM_GCE_INSTANCE,
@@ -628,18 +623,19 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
              'num_task_instances': 20,
              },
             master=(1, MICRO_GCE_INSTANCE),
-            worker=(5, HIGHCPU_GCE_INSTANCE),
-            preemptible=(20, HIGHMEM_GCE_INSTANCE))
+            core=(5, HIGHCPU_GCE_INSTANCE),
+            task=(20, HIGHMEM_GCE_INSTANCE)
+        )
 
     def test_task_type_defaults_to_core_type(self):
         self._test_instance_groups(
-            {'core_instance_type': HIGHCPU_GCE_INSTANCE,
+            {'instance_type': HIGHCPU_GCE_INSTANCE,
              'num_core_instances': 5,
              'num_task_instances': 20,
              },
             master=(1, DEFAULT_GCE_INSTANCE),
-            worker=(5, HIGHCPU_GCE_INSTANCE),
-            preemptible=(20, DEFAULT_GCE_INSTANCE))
+            core=(5, HIGHCPU_GCE_INSTANCE),
+            task=(20, HIGHCPU_GCE_INSTANCE))
 
 
 class TestMasterBootstrapScript(MockGoogleAPITestCase):

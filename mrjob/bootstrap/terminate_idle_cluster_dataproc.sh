@@ -3,6 +3,7 @@
 # Copyright 2013 Lyft
 # Copyright 2014 Alex Konradi
 # Copyright 2015 Yelp and Contributors
+# REVIEW: Copyright 2016 Google?
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,6 +36,9 @@
 # pending in Dataproc, or ones that you're about to submit, or jobs that started
 # running since the last time we called `hadoop job -list`.
 
+# REVIEW: is the following true? it looks like the cluster terminates itself
+# through the dataproc API, not by the shutdown hack we use on EMR
+
 # This script will leave the cluster in the FAILED (not TERMINATED) state,
 # with LastStateChangeReason "The master node was terminated. ". It can
 # take Dataproc a minute or so to realize that master node has been shut down.
@@ -44,9 +48,14 @@
 # ./terminate_idle_cluster_dataproc.sh
 
 
+# REVIEW: ah, clever, that's what you were doing with metadata. I think just
+# passing this in as an arg is more generalizable/robust, but I don't feel
+# strongly about it.
 MAX_SECS_IDLE=$(/usr/share/google/get_metadata_value attributes/mrjob-max-secs-idle)
 if [ -z "${MAX_SECS_IDLE}" ]; then MAX_SECS_IDLE=1800; fi
 
+# REVIEW: I think you can get rid of MIN_SECS_TO_END_OF_HOUR; doesn't really
+# make sense on Dataproc
 MIN_SECS_TO_END_OF_HOUR=$(/usr/share/google/get_metadata_value attributes/mrjob-min-secs-to-end-of-hour)
 if [ -z "${MIN_SECS_TO_END_OF_HOUR}" ]; then MIN_SECS_TO_END_OF_HOUR=300; fi
 
@@ -58,6 +67,9 @@ do
     UPTIME=$(cat /proc/uptime | cut -f 1 -d .)
     SECS_TO_END_OF_HOUR=$(expr 3600 - $UPTIME % 3600)
 
+    # REVIEW: you can assume yarn is always available on Dataproc (the
+    # other stuff exists for Hadoop 1). You can just start with
+    # "nice yarn application..."
     if [ -z "${LAST_ACTIVE}" ] || \
         ! which hadoop > /dev/null || \
         nice hadoop job -list 2> /dev/null | grep -q '^\s*job_' || \

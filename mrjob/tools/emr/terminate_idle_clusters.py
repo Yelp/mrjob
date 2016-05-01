@@ -84,11 +84,11 @@ from mrjob.util import strip_microseconds
 
 log = logging.getLogger(__name__)
 
-DEFAULT_MAX_HOURS_IDLE = 1
-DEFAULT_MAX_MINUTES_LOCKED = 1
+_DEFAULT_MAX_HOURS_IDLE = 1
+_DEFAULT_MAX_MINUTES_LOCKED = 1
 
-DEBUG_JAR_RE = re.compile(
-    r's3n://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
+_DEBUG_JAR_ARG_RE = re.compile(
+    r's3n?://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
 
 
 def main(cl_args=None):
@@ -141,7 +141,7 @@ def _maybe_terminate_clusters(dry_run=False,
 
     # old default behavior
     if max_hours_idle is None and mins_to_end_of_hour is None:
-        max_hours_idle = DEFAULT_MAX_HOURS_IDLE
+        max_hours_idle = _DEFAULT_MAX_HOURS_IDLE
 
     runner = EMRJobRunner(**kwargs)
     emr_conn = runner.make_emr_conn()
@@ -270,7 +270,7 @@ def _is_cluster_non_streaming(steps):
             if arg.value == '-mapper':
                 return False
             # This is a debug jar associated with hadoop streaming
-            if DEBUG_JAR_RE.match(arg.value):
+            if _DEBUG_JAR_ARG_RE.match(arg.value):
                 return False
     else:
         # job has at least one step, and none are streaming steps
@@ -389,7 +389,7 @@ def _make_option_parser():
               ' your jobs can take to start instances and bootstrap.'))
     option_parser.add_option(
         '--max-mins-locked', dest='max_mins_locked',
-        default=DEFAULT_MAX_MINUTES_LOCKED, type='float',
+        default=_DEFAULT_MAX_MINUTES_LOCKED, type='float',
         help='Max number of minutes a cluster can be locked while idle.')
     option_parser.add_option(
         '--mins-to-end-of-hour', dest='mins_to_end_of_hour',

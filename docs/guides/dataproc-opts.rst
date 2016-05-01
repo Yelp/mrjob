@@ -53,7 +53,7 @@ Cluster creation and configuration
     :switch: --image-version
     :type: :ref:`string <data-type-string>`
     :set: dataproc
-    :default: ````
+    :default: ``1.0``
 
     Cloud Image to run Dataproc jobs on.  See `the Dataproc docs on specifying the Dataproc version`_.  for details.
 

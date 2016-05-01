@@ -86,7 +86,7 @@ and ``.values()``.
 If you *do* have concerns about memory usage, ``for k in some_dict`` does not
 create a list in either version of Python.
 
-Same goes for ``xrange``; just use ``range``.
+Same goes for ``xrange``; plain-old `range`` is almost always fine.
 
 Miscellany
 ----------
@@ -128,6 +128,13 @@ if PY2:
 else:
     from io import StringIO
 StringIO  # quiet, pyflakes
+
+# ``xrange``. Plain old ``range`` is almost always fine
+if PY2:
+    xrange = xrange
+else:
+    xrange = range
+xrange  # quiet, pyflakes
 
 # urllib stuff
 # in most cases you should use ``mrjob.parse.urlparse()``

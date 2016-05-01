@@ -62,7 +62,7 @@ occasionally join clusters with out knowing they are about to self-terminate
 
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
 share the same clusters. This means that the version of :py:mod:`mrjob`,
-boostrap configuration, Hadoop version and AMI version all need to be exactly
+bootstrap configuration, Hadoop version and AMI version all need to be exactly
 the same.
 
 Pooled jobs will also only use clusters with the same **pool name**, so you

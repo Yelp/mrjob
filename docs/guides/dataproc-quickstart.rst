@@ -9,6 +9,20 @@ Configuring Google Cloud Platform (GCP) credentials
 Configuring your GCP credentials allows mrjob to run your jobs on
 Dataproc and use GCS.
 
+.. REVIEW: Some more hand-holding would be helpful here.
+
+   You don't talk explicitly about how to create a project. Also, would
+   be helpful to have some advice or reassurance about choosing a project name.
+
+   Google Cloud Storage is actually called "Cloud Storage Service" in the API
+   manager (it'd be also helpful to note that it's in the upper-left under
+   "Google Cloud APIs") and Cloud Dataproc isn't even on the page; it can only
+   be found by searching (which is a little odd; I'd expect to see it under
+   "Google Cloud APIs", but whatevs).
+
+   Some direct links don't work without a project, but you can direct-link
+   to the API Manager at least: https://console.cloud.google.com/apis
+
 * Create a `Google Cloud Platform account <http://cloud.google.com/>`_
 * Setup a Billing Account and associate Billing with your Project
 * Go to the API Manager and...

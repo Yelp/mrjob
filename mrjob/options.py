@@ -44,11 +44,11 @@ def _add_protocol_opts(opt_group):
     """
     return [
         opt_group.add_option(
-            '--strict-protocols', dest='strict_protocols', default=True,
+            '--strict-protocols', dest='strict_protocols', default=None,
             action='store_true', help='If something violates an input/output '
             'protocol then raise an exception (the default)'),
         opt_group.add_option(
-            '--no-strict-protocols', dest='strict_protocols', default=True,
+            '--no-strict-protocols', dest='strict_protocols', default=None,
             action='store_false', help='If something violates an input/output '
             'protocol then increment a counter and continue'),
     ]
@@ -151,6 +151,11 @@ def _add_runner_opts(opt_group, default_runner='local'):
             'and must be empty'),
 
         opt_group.add_option(
+            '--partitioner', dest='partitioner', default=None,
+            help=('Hadoop partitioner class. Deprecated as of v0.5.1 and'
+                  ' will be removed in v0.6.0 (specify in your job instead)')),
+
+        opt_group.add_option(
             '--python-archive', dest='python_archives', default=[],
             action='append',
             help=('Archive to unpack and add to the PYTHONPATH of the mr_job'
@@ -238,19 +243,13 @@ def _add_hadoop_emr_opts(opt_group):
             help='user who ran the job (if different from the current user)'),
 
         opt_group.add_option(
-            '--partitioner', dest='partitioner', default=None,
-            help=('Hadoop partitioner class to use to determine how mapper'
-                  ' output should be sorted and distributed to reducers. For'
-                  ' example: org.apache.hadoop.mapred.lib.HashPartitioner')),
-
-        opt_group.add_option(
             '--check-input-paths', dest='check_input_paths',
-            default=True, action='store_true',
+            default=None, action='store_true',
             help='Check input paths exist before running (the default)'),
 
         opt_group.add_option(
             '--no-check-input-paths', dest='check_input_paths',
-            default=True, action='store_false',
+            default=None, action='store_false',
             help='Skip the checks to ensure all input paths exist'),
     ]
 
@@ -303,16 +302,26 @@ def _add_dataproc_emr_opts(opt_group):
             '--bootstrap-python', dest='bootstrap_python',
             action='store_true', default=None,
             help=('Attempt to install a compatible version of Python'
-                  ' at boostrap time. Currently this only does anything'
+                  ' at bootstrap time. Currently this only does anything'
                   ' for Python 3, for which it is enabled by default.')),
 
         # TODO - mtai @ davidmarin - generalize to --max-mins-idle - dataproc (minutes) vs EMR (hours)
+        # REVIEW: yeah... kind of depends on the use case, right? For basic
+        # operation, you just want to make sure this isn't so low that
+        # a cluster will terminate itself between steps of a job. The other
+        # case is firing off a cluster that you plan to develop on for the next
+        # few hours.
+        #
+        # The first case is the most common one, but I'm not sure you'd have
+        # any reason to mess with the default.
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',
             help=("If we create a persistent cluster, have it automatically"
                   " terminate itself after it's been idle this many hours.")),
 
+        # REVIEW: mins_to_end_of_hour makes no sense on Dataproc; it
+        # exists entirely to optimize EMR's weird billing by the full hour
         opt_group.add_option(
             '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
             default=None, type='float',
@@ -664,6 +673,7 @@ def _add_emr_bootstrap_opts(opt_group):
                   ' feature. You can use --bootstrap-file more than once.')),
 
         opt_group.add_option(
+
             '--bootstrap-python-package', dest='bootstrap_python_packages',
             action='append', default=[],
             help=('Path to a Python module to install on EMR. These should be'

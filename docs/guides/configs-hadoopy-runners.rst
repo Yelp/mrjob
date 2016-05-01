@@ -107,20 +107,6 @@ Options available to hadoop and emr runners
     Who is running this job (if different from the current user)
 
 .. mrjob-opt::
-    :config: partitioner
-    :switch: --partitioner
-    :type: :ref:`string <data-type-string>`
-    :set: no_mrjob_conf
-    :default: ``None``
-
-    Optional name of a Hadoop partitioner class, e.g.
-    ``'org.apache.hadoop.mapred.lib.HashPartitioner'``. Hadoop Streaming will
-    use this to determine how mapper output should be sorted and distributed
-    to reducers. You can also set this option on your job class with the
-    :py:attr:`~mrjob.job.MRJob.PARTITIONER` attribute or the
-    :py:meth:`~mrjob.job.MRJob.partitioner` method.
-
-.. mrjob-opt::
     :config: check_input_paths
     :switch: --check-input-paths, --no-check-input-paths
     :type: boolean

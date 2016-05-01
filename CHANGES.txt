@@ -1,3 +1,12 @@
+v0.5.1, 2016-04-29 -- post-release bugfixes
+ * strict_protocols in mrjob.conf is no longer ignored (#1302)
+ * check_input_paths in mrjob.conf is no longer ignored
+ * partitioner() is no longer ignored, fixing SORT_VALUES (#1294)
+   * --partitioner switch is deprecated
+ * improved probable cause of error from pre-YARN logs (#1288)
+ * ssh_bind_ports now defaults to (x)range, not list (#1284)
+ * mrjob terminate-idle-clusters handles debugging jar from boto 2.40.0 (#1306)
+
 v0.5.0, 2016-03-28 -- the future is in the past
  * supports Python 3 (#989)
  * requires boto 2.35.0 or newer (#980)
@@ -484,7 +493,7 @@ v0.2.7, 2011-07-12 -- Hooray for interns!
  * Read counters from EMR log files (Issue #134)
  * Clean old files out of S3 with mrjob.tools.emr.s3_tmpwatch (Issue #9)
  * EMR parses and reports job failure due to steps timing out (Issue #15)
- * EMR boostrap files are no longer made public on S3 (Issue #70)
+ * EMR bootstrap files are no longer made public on S3 (Issue #70)
  * mrjob.tools.emr.terminate_idle_job_flows handles custom hadoop streaming
    jars correctly (Issue #116)
  * LocalMRJobRunner separates out counters by step (Issue #28)

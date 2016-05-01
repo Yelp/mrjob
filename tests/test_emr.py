@@ -59,6 +59,7 @@ from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_no_mapper import MRNoMapper
+from tests.mr_sort_values import MRSortValues
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -1502,7 +1503,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertEqual(actions[0].args[0].value, 'python-scipy')
         self.assertEqual(actions[0].args[1].value, 'mysql-server')
 
-        # check for master boostrap script
+        # check for master bootstrap script
         self.assertTrue(actions[1].scriptpath.startswith('s3://mrjob-'))
         self.assertTrue(actions[1].scriptpath.endswith('b.py'))
         self.assertEqual(actions[1].args, [])
@@ -3683,3 +3684,37 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 # for the EMR runner
 class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
     pass
+
+
+# make sure we don't override the partitioner on EMR (tests #1294)
+class PartitionerTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(PartitionerTestCase, self).setUp()
+        # _hadoop_args_for_step() needs this
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='1.2.0'))
+
+    def test_sort_values(self):
+        job = MRSortValues(['-r', 'emr'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._hadoop_args_for_step(0), [
+                    '-D', 'mapred.text.key.partitioner.options=-k1,1',
+                    '-D', 'stream.num.map.output.key.fields=2',
+                    '-partitioner',
+                    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner',
+                ])
+
+    def test_switch_overrides_sort_values(self):
+        job = MRSortValues(['-r', 'emr', '--partitioner', 'java.lang.Object'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._hadoop_args_for_step(0), [
+                    '-D', 'mapred.text.key.partitioner.options=-k1,1',
+                    '-D', 'stream.num.map.output.key.fields=2',
+                    '-partitioner', 'java.lang.Object',
+                ])

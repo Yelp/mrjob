@@ -22,14 +22,16 @@ from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env
 from mrjob.compat import map_version
 from mrjob.compat import translate_jobconf
+from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_yarn
 
 from tests.py2 import TestCase
 from tests.py2 import patch
+from tests.sandbox import PatcherTestCase
 
 
-class GetJobConfValueTestCase(TestCase):
+class JobConfFromEnvTestCase(TestCase):
 
     def setUp(self):
         p = patch.object(os, 'environ', {})
@@ -113,6 +115,86 @@ class TranslateJobConfTestCase(TestCase):
         self.assertRaises(TypeError, translate_jobconf, 'user.name', None)
         # test unknown variables too, since they don't go through map_version()
         self.assertRaises(TypeError, translate_jobconf, 'foo.bar', None)
+
+
+class TranslateJobConfDictTestCase(PatcherTestCase):
+
+    # jobconf with spooooky mix of Hadoop 1 and Hadoop 2 variables
+    JOBCONF = {
+        'foo.bar': 'baz',                   # unknown jobconf
+        'mapred.jar': 'a.jar',              # Hadoop 1 jobconf
+        'mapreduce.job.user.name': 'dave',  # Hadoop 2 jobconf
+    }
+
+    def setUp(self):
+        super(TranslateJobConfDictTestCase, self).setUp()
+        self.log = self.start(patch('mrjob.compat.log'))
+
+    def test_empty(self):
+        self.assertEqual(translate_jobconf_dict({}), {})
+        self.assertFalse(self.log.warning.called)
+
+    def test_no_version(self):
+        self.assertEqual(
+            translate_jobconf_dict({
+                'foo.bar': 'baz',                   # unknown jobconf
+                'mapred.jar': 'a.jar',              # Hadoop 1 jobconf
+                'mapreduce.job.user.name': 'dave',  # Hadoop 2 jobconf
+            }),
+            {
+                'foo.bar': 'baz',
+                'mapred.jar': 'a.jar',
+                'mapreduce.job.jar': 'a.jar',
+                'mapreduce.job.user.name': 'dave',
+                'user.name': 'dave',
+            })
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_hadoop_1(self):
+        self.assertEqual(
+            translate_jobconf_dict({
+                'foo.bar': 'baz',
+                'mapred.jar': 'a.jar',
+                'mapreduce.job.user.name': 'dave',
+            }, hadoop_version='1.0'),
+            {
+                'foo.bar': 'baz',
+                'mapred.jar': 'a.jar',
+                'mapreduce.job.user.name': 'dave',
+                'user.name': 'dave',
+            })
+
+        self.assertTrue(self.log.warning.called)
+
+    def test_hadoop_2(self):
+        self.assertEqual(
+            translate_jobconf_dict({
+                'foo.bar': 'baz',
+                'mapred.jar': 'a.jar',
+                'mapreduce.job.user.name': 'dave',
+            }, hadoop_version='2.0'),
+            {
+                'foo.bar': 'baz',
+                'mapred.jar': 'a.jar',
+                'mapreduce.job.jar': 'a.jar',
+                'mapreduce.job.user.name': 'dave',
+            })
+
+        self.assertTrue(self.log.warning.called)
+
+    def test_dont_overwrite(self):
+        # this jobconf contains two versions of the same variable
+        jobconf = {
+            'mapred.jar': 'a.jar',
+            'mapreduce.job.jar': 'a.jar',
+        }
+
+        self.assertEqual(translate_jobconf_dict(jobconf, '1.0'), jobconf)
+        self.assertFalse(self.log.warning.called)
+
+
+class TranslateJobConfForAllVersionsTestCase(TestCase):
 
     def test_translate_jobconf_for_all_versions(self):
         self.assertEqual(translate_jobconf_for_all_versions('user.name'),

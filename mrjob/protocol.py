@@ -1,5 +1,5 @@
 # Copyright 2009-2013 Yelp and Contributors
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -151,8 +151,8 @@ class StandardJSONValueProtocol(object):
 
 
 class SimpleJSONProtocol(_KeyCachingProtocol):
-    """Implements :py:class:`JSONProtocol` using the :py:mod:`simplejson` library.
-    """
+    """Implements :py:class:`JSONProtocol` using the :py:mod:`simplejson`
+    library."""
     def _loads(self, value):
         # simplejson can handle bytes even in Python 3
         return simplejson.loads(value)

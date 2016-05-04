@@ -13,6 +13,7 @@
 # limitations under the License.
 import bz2
 import io
+import sys
 from tests.py2 import patch
 from tests.py2 import mock
 from tests.py2 import skipIf

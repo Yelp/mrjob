@@ -166,6 +166,7 @@ def _http_exception(status_code):
 
     return google_errors.HttpError(mock_resp, b'')
 
+@skipIf(sys.version_info == (3, 2), "can't install googleapiclient")
 class GCSFSHTTPErrorTestCase(PatcherTestCase):
 
     def setUp(self):

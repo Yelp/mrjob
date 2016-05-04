@@ -2,7 +2,7 @@ Dataproc runner options
 =======================
 
 All options from :doc:`configs-all-runners` and :doc:`configs-hadoopy-runners`
-are available to Dataproc emr runner.
+are available to Dataproc runner.
 
 Google credentials
 ------------------

@@ -14,6 +14,7 @@ Dataproc and use GCS.
 * `Select or create a Cloud Platform Console project <https://console.cloud.google.com/project>`_
 * `Enable billing for your project <https://console.cloud.google.com/billing>`_
 * Go to the `API Manager <https://console.cloud.google.com/apis>`_ and search for / enable the following APIs...
+
   * Google Cloud Storage
   * Google Cloud Storage JSON API
   * Google Cloud Dataproc API

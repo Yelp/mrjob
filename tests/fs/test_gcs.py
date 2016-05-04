@@ -15,6 +15,7 @@ import bz2
 import io
 from tests.py2 import patch
 from tests.py2 import mock
+from tests.py2 import skipIf
 
 try:
     from oauth2client.client import GoogleCredentials

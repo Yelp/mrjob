@@ -105,13 +105,16 @@ Setting up EMR on Amazon
 Setting up Dataproc on Google
 -----------------------------
 
-* Create a `Google Cloud Platform account <http://cloud.google.com/>`_
-* Setup a Billing Account and associate Billing with your Project
-* Go to the API Manager and...
+* `Create a Google Cloud Platform account <http://cloud.google.com/>`_, see top-right
+* `Learn about Google Cloud Platform "projects" <https://cloud.google.com/docs/overview/#projects>`_
+* `Select or create a Cloud Platform Console project <https://console.cloud.google.com/project>`_
+* `Enable billing for your project <https://console.cloud.google.com/billing>`_
+* Go to the `API Manager <https://console.cloud.google.com/apis>`_ and search for / enable the following APIs...
+  * Google Cloud Storage
+  * Google Cloud Storage JSON API
+  * Google Cloud Dataproc API
 
-  * Enable API: Google Cloud Storage
-  * Enable API: Google Cloud Dataproc API
-  * Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
+* Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
 
 * Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`_
 

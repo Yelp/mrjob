@@ -787,7 +787,7 @@ class MockEmrConnection(object):
                 applications.append(MockEmrObject(name=name, version=version))
         else:
             applications = [MockEmrObject(
-                name=hadoop_name,
+                name='hadoop',  # lowercase on older AMIs
                 version=running_hadoop_version
             )]
 

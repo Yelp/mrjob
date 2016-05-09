@@ -77,9 +77,6 @@ and install another Python binary.
     A list of lines of shell script to run once on each node in your cluster,
     at bootstrap time.
 
-    This option is complex and powerful; the best way to get started is to
-    read the :doc:`emr-bootstrap-cookbook`.
-
     Passing expressions like ``path#name`` will cause
     *path* to be automatically uploaded to the task's working directory
     with the filename *name*, marked as executable, and interpolated into the

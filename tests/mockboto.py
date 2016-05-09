@@ -89,6 +89,8 @@ AMI_HADOOP_VERSION_UPDATES = {
     '4.3.0': '2.7.1',
 }
 
+# need to fill in a version for non-Hadoop applications
+DUMMY_APPLICATION_VERSION = '0.0.0'
 
 # hard-coded EmrConnection.DebuggingJar from boto 2.39.0. boto 2.40.0 more
 # correctly uses a template with the correct region (see #1306), but
@@ -760,11 +762,28 @@ class MockEmrConnection(object):
                     ' Hadoop version'))
 
         # build applications list
-        hadoop_name = 'Hadoop' if version_gte(ami_version, '4') else 'hadoop'
-        applications = [MockEmrObject(
+        # TODO: could raise an exception if applications are set for
+        # pre-4.x AMI
+        if version_gte(ami_version, '4'):
+            application_names = set(['Hadoop'])
+            for key, value in api_params.items():
+                if (key.startswith('Applications.member.') and
+                        key.endswith('.Name')):
+                    applications.add(value)
+
+            applications = []
+            for name in sorted(application_names):
+                if name == 'Hadoop':
+                    version = running_hadoop_version
+                else:
+                    version = DUMMY_APPLICATION_VERSION
+
+                applications.append(MockEmrObject(name=name, version=version))
+        else:
+            applications = [MockEmrObject(
                 name=hadoop_name,
-                version=running_hadoop_version,
-        )]
+                version=running_hadoop_version
+            )]
 
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunner uses

@@ -3718,3 +3718,56 @@ class PartitionerTestCase(MockBotoTestCase):
                     '-D', 'stream.num.map.output.key.fields=2',
                     '-partitioner', 'java.lang.Object',
                 ])
+
+
+class EmrApplicationsTestCase(MockBotoTestCase):
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'emr', '--ami-version', '4.3.0'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_applications'], set())
+
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            applications = set(a.name for a in cluster.applications)
+            self.assertEqual(applications, set(['Hadoop']))
+
+    def test_explicit_hadoop(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ami-version', '4.3.0',
+             '--emr-application', 'Hadoop',
+             '--emr-application', 'Mahout'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_applications'],
+                             set(['Hadoop', 'Mahout']))
+
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            applications = set(a.name for a in cluster.applications)
+            self.assertEqual(applications,
+                             set(['Hadoop', 'Mahout']))
+
+    def test_implicit_hadoop(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ami-version', '4.3.0',
+             '--emr-application', 'Mahout'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            # we explicitly add Hadoop so we can see Hadoop version in
+            # the cluster description from the API
+            self.assertEqual(runner._opts['emr_applications'],
+                             set(['Hadoop', 'Mahout']))
+
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            applications = set(a.name for a in cluster.applications)
+            self.assertEqual(applications,
+                             set(['Hadoop', 'Mahout']))

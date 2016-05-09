@@ -765,11 +765,17 @@ class MockEmrConnection(object):
         # TODO: could raise an exception if applications are set for
         # pre-4.x AMI
         if version_gte(ami_version, '4'):
-            application_names = set(['Hadoop'])
+            application_names = set()
             for key, value in api_params.items():
                 if (key.startswith('Applications.member.') and
                         key.endswith('.Name')):
-                    applications.add(value)
+                    application_names.add(value)
+
+            # if Applications is set but doesn't include Hadoop, the
+            # cluster description won't either! (Even though Hadoop is
+            # in fact installed.)
+            if not application_names:
+                application_names = set(['Hadoop'])
 
             applications = []
             for name in sorted(application_names):

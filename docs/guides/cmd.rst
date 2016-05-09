@@ -58,6 +58,6 @@ Running jobs
     ``mrjob run (path to script or executable) [options]``
 
     Run a job. Takes same options as invoking a Python job. See
-    :doc:`configs-all-runners`, :doc:`configs-hadoopy-runners`, and
+    :doc:`configs-all-runners`, :doc:`configs-hadoopy-runners`, :doc:`dataproc-opts`, and
     :doc:`emr-opts`. While you can use this command to invoke your jobs, you
     can just as easily call ``python my_job.py [options]``.

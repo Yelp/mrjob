@@ -1503,7 +1503,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertEqual(actions[0].args[0].value, 'python-scipy')
         self.assertEqual(actions[0].args[1].value, 'mysql-server')
 
-        # check for master boostrap script
+        # check for master bootstrap script
         self.assertTrue(actions[1].scriptpath.startswith('s3://mrjob-'))
         self.assertTrue(actions[1].scriptpath.endswith('b.py'))
         self.assertEqual(actions[1].args, [])
@@ -3703,7 +3703,6 @@ class PartitionerTestCase(MockBotoTestCase):
             self.assertEqual(
                 runner._hadoop_args_for_step(0), [
                     '-D', 'mapred.text.key.partitioner.options=-k1,1',
-                    '-D', 'mapreduce.partition.keypartitioner.options=-k1,1',
                     '-D', 'stream.num.map.output.key.fields=2',
                     '-partitioner',
                     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner',
@@ -3716,7 +3715,6 @@ class PartitionerTestCase(MockBotoTestCase):
             self.assertEqual(
                 runner._hadoop_args_for_step(0), [
                     '-D', 'mapred.text.key.partitioner.options=-k1,1',
-                    '-D', 'mapreduce.partition.keypartitioner.options=-k1,1',
                     '-D', 'stream.num.map.output.key.fields=2',
                     '-partitioner', 'java.lang.Object',
                 ])

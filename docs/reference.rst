@@ -6,6 +6,7 @@ Reference
 
     utils-compat.rst
     configs.rst
+    runners-dataproc.rst
     runners-emr.rst
     runners-hadoop.rst
     runners-inline.rst

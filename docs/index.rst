@@ -8,8 +8,11 @@ several platforms.** You can:
 * Test on your local machine
 * Run on a Hadoop cluster
 * Run in the cloud using `Amazon Elastic MapReduce (EMR)`_
+* Run in the cloud using `Google Cloud Dataproc (Dataproc)`_
 
+.. _Google Cloud Dataproc (Dataproc): https://cloud.google.com/dataproc/overview
 .. _Amazon Elastic MapReduce (EMR): http://aws.amazon.com/documentation/elasticmapreduce/
+
 
 mrjob is licensed under the `Apache License, Version 2.0.`_
 

@@ -4,6 +4,32 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.1:
+
+0.5.1
+-----
+
+Fixes a bug in the previous relase that broke
+:py:attr:`~mrjob.job.MRJob.SORT_VALUES` and any other attempt by the job
+to set the partitioner. The ``--partitioner`` switch is now deprecated
+(the choice of partitioner is part of your job semantics).
+
+Fixes a bug in the previous release that caused :mrjob-opt:`strict_protocols`
+and :mrjob-opt:`check_input_paths` to be ignored in :file:`mrjob.conf`. (We
+would much prefer you fixed jobs that are using "loose protocols" rather than
+setting ``strict_protocols: false`` in your config file, but we didn't break
+this on purpose, we promise!)
+
+``mrjob terminate-idle-clusters`` now correctly handles EMR debugging steps
+(see :mrjob-opt:`enable_emr_debugging`) set up by boto 2.40.0.
+
+Fixed a bug that could result in showing a blank probable cause of error
+for pre-YARN (Hadoop 1) jobs.
+
+:mrjob-opt:`ssh_bind_ports` now defaults to a ``range`` object (``xrange`` on
+Python 2), so that when you run on emr in verbose mode (``-r emr -v``), debug
+logging devotes one line to the value of ``ssh_bind_ports`` rather than 840.
+
 .. _v0.5.0:
 
 0.5.0

@@ -14,9 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Write and run Hadoop Streaming jobs on Amazon Elastic MapReduce or your own
-Hadoop cluster.
-"""
+"""Write and run Hadoop Streaming jobs on
+Amazon Elastic MapReduce / Google Dataproc / your own Hadoop cluster."""
 
 __author__ = 'David Marin <dm@davidmarin.org>'
 
@@ -111,10 +110,11 @@ __credits__ = [
     'Phil Swanson <swanson.p@gmail.com>',
     'Matthew Tai <taim@google.com>',
     'Diogo Terror <me@diogoterror.com>',
+    'William Vambenepe <vbp@google.com>',
     'Paul Wais <pwais@yelp.com>',
     'Derek Wilson <jderekwilson@gmail.com>',
     'Tao Yu <taoyu@yelp.com>',
     'Andrea Zonca <andrea.zonca@gmail.com>',
 ]
 
-__version__ = '0.5.1.dev0'
+__version__ = '0.5.2.dev0'

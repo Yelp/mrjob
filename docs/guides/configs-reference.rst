@@ -26,40 +26,52 @@ You can set an option by:
 Options that can't be set from mrjob.conf (all runners)
 -------------------------------------------------------
 
-For some options, it doesn't make sense to be able to set them in the config
-file. These can only be specified when calling the constructor of
-:py:class:`~mrjob.runner.MRJobRunner`, as command line options, or sometimes by
-overriding some attribute or method of your :py:class:`~mrjob.job.MRJob`
-subclass.
+There are some options that it makes no sense to set in the config file.
 
-Runner kwargs or command line
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+These options can be set via command-line switches:
 
 .. mrjob-optlist:: no_mrjob_conf
 
-Runner kwargs or method overrides
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+These options can be set by overriding attributes or methods in your job class:
 
 .. use aliases to prevent rst from making our tables huge
 
+.. |a_hadoop_input_format| replace:: :py:attr:`~mrjob.job.MRJob.HADOOP_INPUT_FORMAT`
+.. |a_hadoop_output_format| replace:: :py:attr:`~mrjob.job.MRJob.HADOOP_OUTPUT_FORMAT`
+.. |a_partitioner| replace:: :py:attr:`~mrjob.job.MRJob.PARTITIONER`
+
+.. |m_hadoop_input_format| replace:: :py:meth:`~mrjob.job.MRJob.hadoop_input_format`
+.. |m_hadoop_output_format| replace:: :py:meth:`~mrjob.job.MRJob.hadoop_output_format`
+.. |m_partitioner| replace:: :py:meth:`~mrjob.job.MRJob.partitioner`
+
+====================== ======================== ======================== ========
+Option                 Attribute                Method                   Default
+====================== ======================== ======================== ========
+*hadoop_input_format*  |a_hadoop_input_format|  |m_hadoop_input_format|  ``None``
+*hadoop_output_format* |a_hadoop_output_format| |m_hadoop_output_format| ``None``
+*partitioner*          |a_partitioner|          |m_partitioner|          ``None``
+====================== ======================== ======================== ========
+
+These options can be set by overriding your job's
+:py:meth:`~mrjob.job.MRJob.configure_options` to call the appropriate method:
+
 .. |extra_args| replace:: :py:meth:`extra_args <mrjob.runner.MRJobRunner.__init__>`
 .. |file_upload_args| replace:: :py:meth:`file_upload_args <mrjob.runner.MRJobRunner.__init__>`
-.. |hadoop_input_format| replace:: :py:meth:`hadoop_input_format <mrjob.runner.MRJobRunner.__init__>`
-.. |hadoop_output_format| replace:: :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`
 
 .. |add_passthrough_option| replace:: :py:meth:`~mrjob.job.MRJob.add_passthrough_option`
 .. |add_file_option| replace:: :py:meth:`~mrjob.job.MRJob.add_file_option`
-.. |m_hadoop_input_format| replace:: :py:meth:`~mrjob.job.MRJob.hadoop_input_format`
-.. |m_hadoop_output_format| replace:: :py:meth:`~mrjob.job.MRJob.hadoop_output_format`
 
 ====================== ======================== ========
 Option                 Method                   Default
 ====================== ======================== ========
-|extra_args|           |add_passthrough_option| ``[]``
-|file_upload_args|     |add_file_option|        ``[]``
-|hadoop_input_format|  |m_hadoop_input_format|  ``None``
-|hadoop_output_format| |m_hadoop_output_format| ``None``
+*extra_args*           |add_passthrough_option| ``[]``
+*file_upload_args*     |add_file_option|        ``[]``
 ====================== ======================== ========
+
+All of the above can be passed as keyword arguments to
+:py:meth:`MRJobRunner.__init__() <mrjob.runner.MRJobRunner.__init__>`
+(this is what makes them runner options), but you usually don't want to
+instantiate runners directly.
 
 Other options for all runners
 -----------------------------
@@ -83,6 +95,12 @@ In addition, it ignores *hadoop_input_format*, *hadoop_output_format*,
 :py:class:`~mrjob.local.LocalMRJobRunner`, only it also ignores
 *bootstrap_mrjob*, *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*,
 *steps_python_bin*, *upload_archives*, and *upload_files*.
+
+
+Additional options for :py:class:`~mrjob.dataproc.DataprocJobRunner`
+--------------------------------------------------------------------
+
+.. mrjob-optlist:: dataproc
 
 
 Additional options for :py:class:`~mrjob.emr.EMRJobRunner`

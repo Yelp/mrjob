@@ -45,6 +45,10 @@ EMPTY_MRJOB_CONF = {'runners': {
     'inline': {
         'label': 'test_job',
     },
+    'dataproc': {
+        'api_cooldown_secs': 0.00,
+        'cloud_fs_sync_secs': 0.00
+    }
 }}
 
 
@@ -61,7 +65,6 @@ def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):
 
     return patch.object(runner, 'load_opts_from_mrjob_confs',
                         mock_load_opts_from_mrjob_confs)
-
 
 @contextmanager
 def random_seed(seed):

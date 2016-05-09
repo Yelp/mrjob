@@ -43,25 +43,6 @@ and ``inline`` runners to some degree.
     'KEY1=VALUE1', '-D', 'KEY2=VALUE2', ...]`` to
     :mrjob-opt:`hadoop_extra_args`
 
-.. mrjob-opt::
-    :config: partitioner
-    :switch: --partitioner
-    :type: :ref:`string <data-type-string>`
-    :set: no_mrjob_conf
-    :default: ``None``
-
-    .. deprecated:: 0.5.1
-
-    Name of a Hadoop partitioner class, e.g.
-    ``'org.apache.hadoop.mapred.lib.HashPartitioner'``. Hadoop Streaming will
-    use this to determine how mapper output should be sorted and distributed
-    to reducers.
-
-    The recommended way to specify partitioner is in your job, with the
-    :py:attr:`~mrjob.job.MRJob.PARTITIONER` attribute or the
-    :py:meth:`~mrjob.job.MRJob.partitioner` method.
-
-
 
 Options available to hadoop and emr runners
 -------------------------------------------

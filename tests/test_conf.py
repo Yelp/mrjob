@@ -305,11 +305,9 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
 
     def test_tilde_in_include(self):
         # regression test for #1308
+
         os.environ['HOME'] = self.tmp_dir
-
         base_conf_path = os.path.join(self.tmp_dir, 'mrjob.base.conf')
-        real_base_conf_path = os.path.realpath(base_conf_path)
-
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 
         with open(base_conf_path, 'w') as f:
@@ -320,7 +318,7 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
 
         self.assertEqual(
             load_opts_from_mrjob_conf('foo', conf_path),
-            [(real_base_conf_path, {}), (conf_path, {})])
+            [(base_conf_path, {}), (conf_path, {})])
 
     def _test_round_trip(self, conf):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')

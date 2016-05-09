@@ -94,7 +94,7 @@ There are many other ins and outs of effectively using mrjob with EMR. See
 :doc:`emr-advanced` for some of the ins, but the outs are left as an exercise
 for the reader. This is a strictly no-outs body of documentation!
 
-.. _picking-cluster-config:
+.. _picking-emr-cluster-config:
 
 Choosing Type and Number of EC2 Instances
 -----------------------------------------

@@ -7,7 +7,7 @@ Reusing Clusters
 -----------------
 
 It can take several minutes to create a cluster. To decrease wait time when
-running multiple jobs, you may find it convenient to reuse a single job.
+running multiple jobs, you may find it convenient to reuse a single cluster.
 
 :py:mod:`mrjob` includes a utility to create persistent clusters without
 running a job. For example, this command will create a cluster with 12 EC2

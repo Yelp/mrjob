@@ -170,7 +170,7 @@ def _add_runner_opts(opt_group, default_runner='local'):
 
         opt_group.add_option(
             '-r', '--runner', dest='runner', default=default_runner,
-            choices=('local', 'hadoop', 'emr', 'inline'),
+            choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
             help=('Where to run the job: local to run locally, hadoop to run'
                   ' on your Hadoop cluster, emr to run on Amazon'
                   ' ElasticMapReduce, and inline for local debugging. Default'
@@ -286,6 +286,106 @@ def _add_hadoop_opts(opt_group):
     ]
 
 
+def _add_dataproc_emr_opts(opt_group):
+    return [
+        opt_group.add_option(
+            '--cluster-id', dest='cluster_id', default=None,
+            help='ID of an existing cluster to run our job on'),
+
+        opt_group.add_option(
+            '--bootstrap', dest='bootstrap', action='append',
+            help=('A shell command to set up libraries etc. before any steps'
+                  ' (e.g. "sudo apt-get -qy install python3"). You may'
+                  ' interpolate files available via URL or locally with Hadoop'
+                  ' Distributed Cache syntax ("sudo dpkg -i foo.deb#")')),
+
+        opt_group.add_option(
+            '--bootstrap-python', dest='bootstrap_python',
+            action='store_true', default=None,
+            help=('Attempt to install a compatible version of Python'
+                  ' at bootstrap time. Currently this only does anything'
+                  ' for Python 3, for which it is enabled by default.')),
+
+        opt_group.add_option(
+            '--max-hours-idle', dest='max_hours_idle',
+            default=None, type='float',
+            help=("If we create a cluster, have it automatically"
+                  " terminate itself after it's been idle this many hours.")),
+    ]
+
+
+def _add_dataproc_opts(opt_group):
+    """Options for ``dataproc`` runner"""
+    return [
+        opt_group.add_option(
+            '--gcp-project', dest='gcp_project', default=None,
+            help='Project to run Dataproc jobs in.'),
+
+        opt_group.add_option(
+            '--region', dest='region',
+            help='GCE region to run Dataproc/EMR jobs in.'),
+
+        opt_group.add_option(
+            '--zone', dest='zone', default=None,
+            help='GCE zone to run Dataproc/EMR jobs in.'),
+
+        opt_group.add_option(
+            '--image-version', dest='image_version', default=None,
+            help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
+
+        opt_group.add_option(
+            '--check-cluster-every', dest='check_cluster_every', default=None,
+            help='How often (in seconds) to check status of your job/cluster'),
+
+        # instance types
+        opt_group.add_option(
+            '--instance-type', dest='instance_type', default=None,
+            help=('Type of GCE/EC2 instance(s) to launch \n'
+                  ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4 -'
+                  ' See https://cloud.google.com/compute/docs/machine-types\n'
+                  ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge -'
+                  ' See http://aws.amazon.com/ec2/instance-types/'
+                  )),
+
+        opt_group.add_option(
+            '--master-instance-type', dest='master_instance_type',
+            default=None,
+            help='Type of GCE/EC2 master instance(s) to launch'),
+
+        opt_group.add_option(
+            '--core-instance-type', dest='core_instance_type', default=None,
+            help='Type of GCE/EC2 core instance(s) to launch'),
+
+        opt_group.add_option(
+            '--task-instance-type', dest='task_instance_type', default=None,
+            help='Type of GCE/EC2 task instance(s) to launch'),
+
+        opt_group.add_option(
+            '--num-core-instances', dest='num_core_instances', default=None,
+            type='int',
+            help='Total number of Worker instances to launch '),
+
+        opt_group.add_option(
+            '--num-task-instances', dest='num_task_instances', default=None,
+            type='int',
+            help='Total number of preemptible Worker instances to launch '),
+
+
+        opt_group.add_option(
+            '--cloud-fs-sync-secs', dest='cloud_fs_sync_secs', default=None,
+            type='float',
+            help=('How long to wait for remote FS to reach eventual'
+                  ' consistency. This'
+                  ' is typically less than a second but the'
+                  ' default is 5.0 to be safe.')),
+
+        opt_group.add_option(
+            '--cloud-tmp-dir', dest='cloud_tmp_dir', default=None,
+            help='URI on remote FS to use as our temp directory.'),
+
+    ]
+
+
 def _add_emr_opts(opt_group):
     """Options for ``emr`` runner"""
     return (_add_emr_connect_opts(opt_group) +
@@ -322,10 +422,6 @@ def _add_emr_run_opts(opt_group):
             '--check-emr-status-every', dest='check_emr_status_every',
             default=None, type='int',
             help='How often (in seconds) to check status of your EMR job'),
-
-        opt_group.add_option(
-            '--cluster-id', dest='cluster_id', default=None,
-            help='ID of an existing EMR cluster to run our job on'),
 
         # --ec2-key-pair is used to launch the job, not to monitor it
         opt_group.add_option(
@@ -446,16 +542,10 @@ def _add_emr_launch_opts(opt_group):
                   ' "Configure IAM Roles for Amazon EMR" in AWS docs')),
 
         opt_group.add_option(
-            '--max-hours-idle', dest='max_hours_idle',
-            default=None, type='float',
-            help=("If we create a persistent cluster, have it automatically"
-                  " terminate itself after it's been idle this many hours.")),
-
-        opt_group.add_option(
             '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
             default=None, type='float',
             help=("If --max-hours-idle is set, control how close to the end"
-                  " of an EC2 billing hour the cluster can automatically"
+                  " of an hour the cluster can automatically"
                   " terminate itself (default is 5 minutes).")),
 
         opt_group.add_option(
@@ -552,13 +642,6 @@ def _add_emr_bootstrap_opts(opt_group):
     return [
 
         opt_group.add_option(
-            '--bootstrap', dest='bootstrap', action='append',
-            help=('A shell command to set up libraries etc. before any steps'
-                  ' (e.g. "sudo apt-get -qy install python3"). You may'
-                  ' interpolate files available via URL or locally with Hadoop'
-                  ' Distributed Cache syntax ("sudo dpkg -i foo.deb#")')),
-
-        opt_group.add_option(
             '--bootstrap-action', dest='bootstrap_actions', action='append',
             default=[],
             help=('Raw bootstrap action scripts to run before any of the other'
@@ -583,13 +666,7 @@ def _add_emr_bootstrap_opts(opt_group):
                   ' feature. You can use --bootstrap-file more than once.')),
 
         opt_group.add_option(
-            '--bootstrap-python', dest='bootstrap_python',
-            action='store_true', default=None,
-            help=('Attempt to install a compatible version of Python'
-                  ' at bootstrap time. Currently this only does anything'
-                  ' for Python 3, for which it is enabled by default.')),
 
-        opt_group.add_option(
             '--bootstrap-python-package', dest='bootstrap_python_packages',
             action='append', default=[],
             help=('Path to a Python module to install on EMR. These should be'

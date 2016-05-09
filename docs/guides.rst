@@ -16,6 +16,7 @@ Guides
     guides/setup-cookbook.rst
     guides/hadoop-cookbook.rst
     guides/testing.rst
+    guides/dataproc.rst
     guides/emr.rst
     guides/py2-vs-py3.rst
     guides/contributing.rst

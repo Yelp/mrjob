@@ -1,3 +1,4 @@
+.venv
 .#*
 \#*#
 *.egg
@@ -5,6 +6,7 @@
 *~
 *.swp
 .eggs
+.cache
 .idea
 .project
 .pydevproject

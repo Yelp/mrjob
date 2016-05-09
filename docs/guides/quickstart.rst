@@ -119,6 +119,16 @@ use ``-r local``.
 
 To run it on your Hadoop cluster, use ``-r hadoop``.
 
+If you have Dataproc configured (see :doc:`dataproc-quickstart`), you can
+run it there with ``-r dataproc``.
+
+Your input files can come from HDFS if you're using Hadoop, or GCS if you're
+using Dataproc::
+
+  $ python my_job.py -r dataproc gcs://my-inputs/input.txt
+  $ python my_job.py -r hadoop hdfs://my_home/input.txt
+
+
 If you have Elastic MapReduce configured (see :doc:`emr-quickstart`), you can
 run it there with ``-r emr``.
 

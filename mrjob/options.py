@@ -285,6 +285,7 @@ def _add_hadoop_opts(opt_group):
             help='Deprecated alias for --hadoop-tmp-dir'),
     ]
 
+
 def _add_dataproc_emr_opts(opt_group):
     return [
         opt_group.add_option(
@@ -311,6 +312,7 @@ def _add_dataproc_emr_opts(opt_group):
             help=("If we create a cluster, have it automatically"
                   " terminate itself after it's been idle this many hours.")),
     ]
+
 
 def _add_dataproc_opts(opt_group):
     """Options for ``dataproc`` runner"""
@@ -339,12 +341,15 @@ def _add_dataproc_opts(opt_group):
         opt_group.add_option(
             '--instance-type', dest='instance_type', default=None,
             help=('Type of GCE/EC2 instance(s) to launch \n'
-                  ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4 - See https://cloud.google.com/compute/docs/machine-types\n'
-                  ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge - See http://aws.amazon.com/ec2/instance-types/'
+                  ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4 -'
+                  ' See https://cloud.google.com/compute/docs/machine-types\n'
+                  ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge -'
+                  ' See http://aws.amazon.com/ec2/instance-types/'
                   )),
 
         opt_group.add_option(
-            '--master-instance-type', dest='master_instance_type', default=None,
+            '--master-instance-type', dest='master_instance_type',
+            default=None,
             help='Type of GCE/EC2 master instance(s) to launch'),
 
         opt_group.add_option(
@@ -369,7 +374,8 @@ def _add_dataproc_opts(opt_group):
         opt_group.add_option(
             '--cloud-fs-sync-secs', dest='cloud_fs_sync_secs', default=None,
             type='float',
-            help=('How long to wait for remote FS to reach eventual consistency. This'
+            help=('How long to wait for remote FS to reach eventual'
+                  ' consistency. This'
                   ' is typically less than a second but the'
                   ' default is 5.0 to be safe.')),
 

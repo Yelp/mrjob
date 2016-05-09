@@ -260,7 +260,8 @@ class MRJobLauncher(object):
             help='show this message and exit')
 
         self.option_parser.add_option(
-            '--help-dataproc', dest='help_dataproc', action='store_true', default=False,
+            '--help-dataproc', dest='help_dataproc', action='store_true',
+            default=False,
             help='show Dataproc-related options')
 
         self.option_parser.add_option(
@@ -324,8 +325,8 @@ class MRJobLauncher(object):
         # options for running the job on Dataproc or EMR
         self.dataproc_emr_opt_group = OptionGroup(
             self.option_parser,
-            'Running on Dataproc or EMR (these apply when you set -r dataproc or'
-            ' -r emr)')
+            'Running on Dataproc or EMR (these apply when you set -r dataproc'
+            ' or -r emr)')
         self.option_parser.add_option_group(self.dataproc_emr_opt_group)
 
         _add_dataproc_emr_opts(self.dataproc_emr_opt_group)
@@ -338,7 +339,6 @@ class MRJobLauncher(object):
 
         _add_dataproc_opts(self.dataproc_opt_group)
 
-
         # options for running the job on EMR
         self.emr_opt_group = OptionGroup(
             self.option_parser,
@@ -347,11 +347,12 @@ class MRJobLauncher(object):
 
         _add_emr_opts(self.emr_opt_group)
 
-
     def all_option_groups(self):
         return (self.option_parser, self.proto_opt_group,
-                self.runner_opt_group, self.hadoop_opt_group, self.dataproc_emr_opt_group, self.hadoop_emr_opt_group,
-                self.dataproc_opt_group, self.emr_opt_group, self.local_opt_group)
+                self.runner_opt_group, self.hadoop_opt_group,
+                self.dataproc_emr_opt_group, self.hadoop_emr_opt_group,
+                self.dataproc_opt_group, self.emr_opt_group,
+                self.local_opt_group)
 
     def is_task(self):
         """True if this is a mapper, combiner, or reducer.
@@ -465,13 +466,13 @@ class MRJobLauncher(object):
 
         if self.options.help_dataproc:
             _print_help_for_groups(self.dataproc_emr_opt_group,
-                                  self.dataproc_opt_group)
+                                   self.dataproc_opt_group)
             sys.exit(0)
 
         if self.options.help_emr:
             _print_help_for_groups(self.dataproc_emr_opt_group,
-                                  self.hadoop_emr_opt_group,
-                                  self.emr_opt_group)
+                                   self.hadoop_emr_opt_group,
+                                   self.emr_opt_group)
             sys.exit(0)
 
         if self.options.help_hadoop:

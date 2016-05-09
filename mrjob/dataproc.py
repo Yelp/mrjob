@@ -70,15 +70,16 @@ _GCE_API_VERSION = 'v1'
 
 _DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 
-# default imageVersion to use on Dataproc. This will be updated with each version
+# default imageVersion to use on Dataproc. This may be updated with each
+# version of mrjob
 _DEFAULT_IMAGE_VERSION = '1.0'
 _DEFAULT_CHECK_CLUSTER_EVERY = 10.0
 _DEFAULT_MAX_HOURS_IDLE = 0.1
 _DEFAULT_CLOUD_FS_SYNC_SECS = 5.0
 _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS = 90
 
-# https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#GceClusterConfig
-# NOTE - added cloud-platform so we can invoke gcloud commands from the cluster master (used for auto termination script)
+# https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#GceClusterConfig  # noqa
+# NOTE - added cloud-platform so we can invoke gcloud commands from the cluster master (used for auto termination script)  # noqa
 _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
     'https://www.googleapis.com/auth/cloud.useraccounts.readonly',
     'https://www.googleapis.com/auth/devstorage.read_write',
@@ -93,7 +94,9 @@ _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
 _DATAPROC_CLUSTER_STATES_READY = frozenset(['UPDATING', 'RUNNING'])
 _DATAPROC_CLUSTER_STATES_ERROR = frozenset(['ERROR', 'DELETING'])
 
-_DATAPROC_JOB_STATES_ACTIVE = frozenset(['PENDING', 'RUNNING', 'SETUP_DONE', 'CANCEL_PENDING'])
+_DATAPROC_JOB_STATES_ACTIVE = frozenset(
+    ['PENDING', 'RUNNING', 'SETUP_DONE', 'CANCEL_PENDING'])
+
 _DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
 
 _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
@@ -108,35 +111,41 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     'bootstrap',
     'terminate_idle_cluster_dataproc.sh')
 
-_HADOOP_STREAMING_JAR_URI = 'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar'
+_HADOOP_STREAMING_JAR_URI = (
+    'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
 
-# TODO - mtai @ davidmarin - Re-implement logs parsing?  See dataproc metainfo and driver output - ask Dennis Huo for more details
-# 'gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/mr_most_used_word-taim-20160228-172000-034993---Step-2-of-2/driveroutput'
+# TODO - mtai @ davidmarin - Re-implement logs parsing?  See dataproc metainfo and driver output - ask Dennis Huo for more details  # noqa
+# 'gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/mr_most_used_word-taim-20160228-172000-034993---Step-2-of-2/driveroutput'  # noqa
 
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
 
-#################### BEGIN - Helper fxns for _cluster_create_args ####################
+########## BEGIN - Helper fxns for _cluster_create_args ##########
 def _gcp_zone_uri(project, zone):
-    return 'https://www.googleapis.com/compute/%(gce_api_version)s/projects/%(project)s/zones/%(zone)s' % dict(
-        gce_api_version=_GCE_API_VERSION, project=project, zone=zone)
+    return (
+        'https://www.googleapis.com/compute/%(gce_api_version)s/projects/'
+        '%(project)s/zones/%(zone)s' % dict(
+            gce_api_version=_GCE_API_VERSION, project=project, zone=zone))
 
 
-def _gcp_instance_group_config(project, zone, count, instance_type, is_preemptible=False):
+def _gcp_instance_group_config(
+        project, zone, count, instance_type, is_preemptible=False):
     zone_uri = _gcp_zone_uri(project, zone)
-    machine_uri = "%(zone_uri)s/machineTypes/%(machine_type)s" % dict(zone_uri=zone_uri, machine_type=instance_type)
+    machine_uri = "%(zone_uri)s/machineTypes/%(machine_type)s" % dict(
+        zone_uri=zone_uri, machine_type=instance_type)
 
     return dict(
         numInstances=count,
         machineTypeUri=machine_uri,
         isPreemptible=is_preemptible
     )
-#################### END -  Helper fxns for _cluster_create_args ####################
+########## END -  Helper fxns for _cluster_create_args ###########
 
 
 def _wait_for(msg, sleep_secs):
     log.info("Waiting for %s - sleeping %.1f second(s)", msg, sleep_secs)
     time.sleep(sleep_secs)
+
 
 def _cleanse_gcp_job_id(job_id):
     return re.sub('[^a-zA-Z0-9_\-]', '-', job_id)
@@ -175,8 +184,10 @@ def _cfg_to_dot_path_dict(cfg_parser):
 
     return config_dict
 
+
 class DataprocException(Exception):
     pass
+
 
 class DataprocRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
@@ -209,26 +220,30 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         'cloud_tmp_dir': combine_paths,
     })
 
-
     DEFAULT_FALLBACKS = {
         'core_instance_type': 'instance_type',
         'task_instance_type': 'instance_type'
     }
 
     def __init__(self, alias, opts, conf_paths):
-        super(DataprocRunnerOptionStore, self).__init__(alias, opts, conf_paths)
+        super(DataprocRunnerOptionStore, self).__init__(
+            alias, opts, conf_paths)
 
         # Dataproc requires a master and >= 2 core instances
-        # num_core_instances refers ONLY to number of CORE instances and does NOT include the required 1 instance for master
-        # In other words, minimum cluster size is 3 machines, 1 master and 2 "num_core_instances" workers
+        # num_core_instances refers ONLY to number of CORE instances and does
+        # NOT include the required 1 instance for master
+        # In other words, minimum cluster size is 3 machines, 1 master and 2
+        # "num_core_instances" workers
         if self['num_core_instances'] < _DATAPROC_MIN_WORKERS:
-            raise DataprocException('Dataproc expects at LEAST %d workers' % _DATAPROC_MIN_WORKERS)
+            raise DataprocException(
+                'Dataproc expects at LEAST %d workers' % _DATAPROC_MIN_WORKERS)
 
         for varname, fallback_varname in self.DEFAULT_FALLBACKS.items():
             self[varname] = self[varname] or self[fallback_varname]
 
         if self['core_instance_type'] != self['task_instance_type']:
-            raise DataprocException('Dataproc v1 expects core/task instance types to be identical')
+            raise DataprocException(
+                'Dataproc v1 expects core/task instance types to be identical')
 
     def default_options(self):
         super_opts = super(DataprocRunnerOptionStore, self).default_options()
@@ -256,14 +271,14 @@ class DataprocJobRunner(MRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Google Cloud Dataproc.
     Invoked when you run your job with ``-r dataproc``.
 
-    :py:class:`DataprocJobRunner` runs your job in an Dataproc cluster, which is
-    basically a temporary Hadoop cluster.
+    :py:class:`DataprocJobRunner` runs your job in an Dataproc cluster, which
+    is basically a temporary Hadoop cluster.
 
     Input, support, and jar files can be either local or on GCS; use
     ``gs://...`` URLs to refer to files on GCS.
 
-    This class has some useful utilities for talking directly to GCS and Dataproc,
-    so you may find it useful to instantiate it without a script::
+    This class has some useful utilities for talking directly to GCS and
+    Dataproc, so you may find it useful to instantiate it without a script::
 
         from mrjob.dataproc import DataprocJobRunner
         ...
@@ -277,22 +292,26 @@ class DataprocJobRunner(MRJobRunner):
     OPTION_STORE_CLASS = DataprocRunnerOptionStore
 
     def __init__(self, **kwargs):
-        """:py:class:`~mrjob.dataproc.DataprocJobRunner` takes the same arguments as
+        """:py:class:`~mrjob.dataproc.DataprocJobRunner` takes the same
+        arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
-
         """
         super(DataprocJobRunner, self).__init__(**kwargs)
 
-        # Lazy-load gcloud config as needed - invocations fail in PyCharm debugging
+        # Lazy-load gcloud config as needed - invocations fail in PyCharm
+        # debugging
         self._gcloud_config = None
 
         # Google Cloud Platform - project
-        self._gcp_project = self._opts['gcp_project'] or self.gcloud_config()['core.project']
+        self._gcp_project = (
+            self._opts['gcp_project'] or self.gcloud_config()['core.project'])
 
         # Google Compute Engine - Region / Zone
-        self._gce_region = self._opts['region'] or self.gcloud_config()['compute.region']
-        self._gce_zone = self._opts['zone'] or self.gcloud_config()['compute.zone']
+        self._gce_region = (
+            self._opts['region'] or self.gcloud_config()['compute.region'])
+        self._gce_zone = (
+            self._opts['zone'] or self.gcloud_config()['compute.zone'])
 
         # cluster_id can be None here
         self._cluster_id = self._opts['cluster_id']
@@ -342,7 +361,8 @@ class DataprocJobRunner(MRJobRunner):
         self._hadoop_version = None
 
         # This will be filled by _run_steps()
-        # NOTE - log_interpretations will be empty except job_id until we parse task logs
+        # NOTE - log_interpretations will be empty except job_id until we
+        # parse task logs
         self._log_interpretations = []
 
     def gcloud_config(self):
@@ -357,15 +377,17 @@ class DataprocJobRunner(MRJobRunner):
         if not self._api_client:
             credentials = GoogleCredentials.get_application_default()
 
-            api_client = discovery.build(_DATAPROC_API_ENDPOINT, _DATAPROC_API_VERSION, credentials=credentials)
+            api_client = discovery.build(
+                _DATAPROC_API_ENDPOINT, _DATAPROC_API_VERSION,
+                credentials=credentials)
             self._api_client = api_client.projects().regions()
 
         return self._api_client
 
     @property
     def fs(self):
-        """:py:class:`~mrjob.fs.base.Filesystem` object for SSH, S3, GCS, and the
-        local filesystem.
+        """:py:class:`~mrjob.fs.base.Filesystem` object for SSH, S3, GCS, and
+        the local filesystem.
         """
         if self._fs is not None:
             return self._fs
@@ -380,16 +402,20 @@ class DataprocJobRunner(MRJobRunner):
         if given_tmpdir:
             return given_tmpdir
 
-        mrjob_buckets = self.fs.list_buckets(self._gcp_project, prefix='mrjob-')
+        mrjob_buckets = self.fs.list_buckets(
+            self._gcp_project, prefix='mrjob-')
 
         # Loop over buckets until we find one that matches region
-        # NOTE - because this is a tmpdir, we look for a GCS bucket in the same GCE region
+        # NOTE - because this is a tmpdir, we look for a GCS bucket in the
+        # same GCE region
         chosen_bucket_name = None
         gce_lower_location = self._gce_region.lower()
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket['name']
 
-            # NOTE - GCP ambiguous Behavior - Bucket location is being returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs suggest lowercase
+            # NOTE - GCP ambiguous Behavior - Bucket location is being
+            # returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs
+            # suggest lowercase
             lower_location = tmp_bucket['location'].lower()
             if lower_location == gce_lower_location:
                 # Regions are both specified and match
@@ -399,7 +425,8 @@ class DataprocJobRunner(MRJobRunner):
 
         # Example default - "mrjob-us-central1-RANDOMHEX"
         if not chosen_bucket_name:
-            chosen_bucket_name = '-'.join(['mrjob', gce_lower_location, random_identifier()])
+            chosen_bucket_name = '-'.join(
+                ['mrjob', gce_lower_location, random_identifier()])
 
         return 'gs://%s/tmp/' % chosen_bucket_name
 
@@ -478,7 +505,8 @@ class DataprocJobRunner(MRJobRunner):
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
-        # TODO - mtai @ davidmarin - hadoop_streaming_jar is currently ignored, see _HADOOP_STREAMING_JAR_URI
+        # TODO - mtai @ davidmarin - hadoop_streaming_jar is currently ignored,
+        # see _HADOOP_STREAMING_JAR_URI
         # if self._opts['hadoop_streaming_jar']:
         #     self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
@@ -504,7 +532,8 @@ class DataprocJobRunner(MRJobRunner):
     def _create_fs_tmp_bucket(self, bucket_name, location=None):
         """Create a temp bucket if missing
 
-        Tie the temporary bucket to the same region as the GCE job and set a 28 day TTL
+        Tie the temporary bucket to the same region as the GCE job and set a
+        28-day TTL
         """
         # Return early if our bucket already exists
         try:
@@ -518,10 +547,12 @@ class DataprocJobRunner(MRJobRunner):
 
         location = location or self._gce_region
 
-        # NOTE - By default, we create a bucket in the same GCE region as our job (tmp buckets ONLY)
+        # NOTE - By default, we create a bucket in the same GCE region as our
+        # job (tmp buckets ONLY)
         # https://cloud.google.com/storage/docs/bucket-locations
-        self.fs.create_bucket(self._gcp_project, bucket_name,
-                              location=location, object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
+        self.fs.create_bucket(
+            self._gcp_project, bucket_name, location=location,
+            object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
 
         self._wait_for_fs_sync()
 
@@ -552,7 +583,8 @@ class DataprocJobRunner(MRJobRunner):
 
     def _cleanup_job(self):
         job_prefix = self._dataproc_job_prefix()
-        for current_job in self._api_job_list(cluster_name=self._cluster_id, state_matcher='ACTIVE'):
+        for current_job in self._api_job_list(
+                cluster_name=self._cluster_id, state_matcher='ACTIVE'):
             # Kill all active jobs with the same job_prefix as this job
             current_job_id = current_job['reference']['jobId']
 
@@ -566,7 +598,6 @@ class DataprocJobRunner(MRJobRunner):
         if not self._cluster_id:
             # If we don't have a cluster, then we can't terminate it.
             return
-
 
         try:
             log.info("Attempting to terminate cluster")
@@ -582,17 +613,18 @@ class DataprocJobRunner(MRJobRunner):
     def _wait_for_fs_sync(self):
         """Sleep for a little while, to give FS a chance to sync up.
         """
-        _wait_for('GCS sync (eventual consistency)', self._opts['cloud_fs_sync_secs'])
+        _wait_for('GCS sync (eventual consistency)',
+                  self._opts['cloud_fs_sync_secs'])
 
     def _build_dataproc_hadoop_job(self, step_num):
-        """This function creates a "HadoopJob" to be passed to self._api_job_submit_hadoop
-
-        Reference...
-        https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob
+        """This function creates a "HadoopJob" to be passed to
+        self._api_job_submit_hadoop
 
         :param step_num:
         :return: output_hadoop_job
         """
+        # Reference: https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
+
         args = list()
         file_uris = list()
         archive_uris = list()
@@ -600,15 +632,18 @@ class DataprocJobRunner(MRJobRunner):
 
         step = self._get_step(step_num)
 
-        assert step['type'] in ('streaming', 'jar'), 'Bad step type: %r' % (step['type'],)
+        assert step['type'] in ('streaming', 'jar'), (
+            'Bad step type: %r' % (step['type'],))
 
-        # TODO - mtai @ davidmarin - Might be trivial to support jar running, see "mainJarFileUri" of variable "output_hadoop_job" in this function
-        #         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob
+        # TODO - mtai @ davidmarin - Might be trivial to support jar running,
+        # see "mainJarFileUri" of variable "output_hadoop_job" in this function
+        #         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
 
         assert step['type'] == 'streaming', 'Jar not implemented'
         main_jar_uri = _HADOOP_STREAMING_JAR_URI
 
-        # TODO - mtai @ davidmarin - Not clear if we should move _upload_args to file_uris, currently works fine as-is
+        # TODO - mtai @ davidmarin - Not clear if we should move _upload_args
+        # to file_uris, currently works fine as-is
         args.extend(self._upload_args(self._upload_mgr))
 
         args.extend(self._hadoop_args_for_step(step_num))
@@ -629,7 +664,8 @@ class DataprocJobRunner(MRJobRunner):
 
         args += ['-output', self._step_output_uri(step_num)]
 
-        # TODO - mtai @ davidmarin - Add back support to specify a different mainJarFileURI
+        # TODO - mtai @ davidmarin - Add back support to specify a different
+        # mainJarFileURI
         output_hadoop_job = dict(
             args=args,
             fileUris=file_uris,
@@ -645,11 +681,13 @@ class DataprocJobRunner(MRJobRunner):
         bucket_name, _ = parse_gcs_uri(self._job_tmpdir)
         self._create_fs_tmp_bucket(bucket_name)
 
-
-        # clusterName must be a match of regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
-        # as documented in an API error message (not currently documented in the Dataproc docs)
+        # clusterName must be a match of
+        # regex '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
+        # as documented in an API error message
+        # (not currently documented in the Dataproc docs)
         if not self._cluster_id:
-            self._cluster_id = '-'.join(['mrjob', self._gce_zone.lower(), random_identifier()])
+            self._cluster_id = '-'.join(
+                ['mrjob', self._gce_zone.lower(), random_identifier()])
 
         # Create the cluster if it's missing, otherwise join an existing one
         try:
@@ -659,7 +697,8 @@ class DataprocJobRunner(MRJobRunner):
             if not e.resp.status == 404:
                 raise
 
-            log.info('Creating Dataproc Hadoop cluster - %s' % self._cluster_id)
+            log.info(
+                'Creating Dataproc Hadoop cluster - %s' % self._cluster_id)
 
             cluster_data = self._cluster_create_args()
 
@@ -672,7 +711,7 @@ class DataprocJobRunner(MRJobRunner):
         return self._cluster_id
 
     def _wait_for_cluster_ready(self, cluster_id):
-        # See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State
+        # See https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#State  # noqa
         cluster_state = None
 
         # Poll until cluster is ready
@@ -703,11 +742,13 @@ class DataprocJobRunner(MRJobRunner):
         for step_num in range(total_steps):
             job_id = self._launch_step(step_num)
 
-            self._wait_for_step_to_complete(job_id, step_num=step_num, num_steps=total_steps)
+            self._wait_for_step_to_complete(
+                job_id, step_num=step_num, num_steps=total_steps)
 
             log.info('Completed Dataproc Hadoop Job - %s', job_id)
 
-        # After all steps completed, wait for the last output (which is usually written to GCS) to sync
+        # After all steps completed, wait for the last output (which is
+        # usually written to GCS) to sync
         self._wait_for_fs_sync()
 
     def _launch_step(self, step_num):
@@ -715,7 +756,8 @@ class DataprocJobRunner(MRJobRunner):
         hadoop_job = self._build_dataproc_hadoop_job(step_num)
 
         # Clean-up step name
-        step_name = '%s---step-%05d-of-%05d' % (self._dataproc_job_prefix(), step_num + 1, self._num_steps())
+        step_name = '%s---step-%05d-of-%05d' % (
+            self._dataproc_job_prefix(), step_num + 1, self._num_steps())
 
         # Submit it
         log.info('Submitting Dataproc Hadoop Job - %s', step_name)
@@ -727,7 +769,8 @@ class DataprocJobRunner(MRJobRunner):
 
         return job_id
 
-    def _wait_for_step_to_complete(self, job_id, step_num=None, num_steps=None):
+    def _wait_for_step_to_complete(
+            self, job_id, step_num=None, num_steps=None):
         """Helper for _wait_for_step_to_complete(). Wait for
         step with the given ID to complete, and fetch counters.
         If it fails, attempt to diagnose the error, and raise an
@@ -739,13 +782,13 @@ class DataprocJobRunner(MRJobRunner):
         self._log_interpretations.append(log_interpretation)
 
         while True:
-            # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus
+            # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus  # noqa
             job_result = self._api_job_get(job_id)
             job_state = job_result['status']['state']
 
             log.info('%s => %s' % (job_id, job_state))
 
-            # NOTE - mtai @ davidmarin - https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State
+            # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State  # noqa
             if job_state in _DATAPROC_JOB_STATES_ACTIVE:
                 self._wait_for_api('job completion')
                 continue
@@ -775,7 +818,8 @@ class DataprocJobRunner(MRJobRunner):
                 self._job_key, step_num + 1)
 
     def counters(self):
-        # TODO - mtai @ davidmarin - Counters are currently always empty as we are not processing task logs
+        # TODO - mtai @ davidmarin - Counters are currently always empty as we
+        # are not processing task logs
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
 
@@ -799,8 +843,10 @@ class DataprocJobRunner(MRJobRunner):
             raise AssertionError('cluster has not yet been created')
 
         cluster = self._api_cluster_get(self._cluster_id)
-        self._image_version = cluster['config']['softwareConfig']['imageVersion']
-        self._hadoop_version = _DATAPROC_IMAGE_TO_HADOOP_VERSION[self._image_version]
+        self._image_version = (
+            cluster['config']['softwareConfig']['imageVersion'])
+        self._hadoop_version = (
+            _DATAPROC_IMAGE_TO_HADOOP_VERSION[self._image_version])
 
     ### Bootstrapping ###
 
@@ -853,7 +899,8 @@ class DataprocJobRunner(MRJobRunner):
         path = os.path.join(self._get_local_tmp_dir(), 'b.py')
         log.info('writing master bootstrap script to %s' % path)
 
-        contents = self._master_bootstrap_script_content(self._bootstrap + mrjob_bootstrap)
+        contents = self._master_bootstrap_script_content(
+            self._bootstrap + mrjob_bootstrap)
         for line in contents:
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
@@ -904,7 +951,8 @@ class DataprocJobRunner(MRJobRunner):
         writeln('# store $PWD')
         writeln('__mrjob_PWD=$PWD')
 
-        # FYI - mtai @ davidmarin - begin section, mtai had to add this otherwise initialization didn't work
+        # FYI - mtai @ davidmarin - begin section, mtai had to add this
+        # otherwise initialization didn't work
         # // kept blowing up in all subsequent invocations of $__mrjob_PWD/
         writeln('if [ $__mrjob_PWD = "/" ]; then')
         writeln('  __mrjob_PWD=""')
@@ -922,7 +970,8 @@ class DataprocJobRunner(MRJobRunner):
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
 
-            output_string = '%s %s $__mrjob_PWD/%s' % (cp_to_local, pipes.quote(uri), pipes.quote(name))
+            output_string = '%s %s $__mrjob_PWD/%s' % (
+                cp_to_local, pipes.quote(uri), pipes.quote(name))
 
             writeln(output_string)
             # make everything executable, like Hadoop Distributed Cache
@@ -954,26 +1003,32 @@ class DataprocJobRunner(MRJobRunner):
     def _cluster_create_args(self):
         gcs_init_script_uris = []
         if self._master_bootstrap_script_path:
-            gcs_init_script_uris.append(self._upload_mgr.uri(self._master_bootstrap_script_path))
+            gcs_init_script_uris.append(
+                self._upload_mgr.uri(self._master_bootstrap_script_path))
 
             # always add idle termination script
             # add it last, so that we don't count bootstrapping as idle time
-            gcs_init_script_uris.append(self._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+            gcs_init_script_uris.append(
+                self._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
 
-        # NOTE - Cluster initializationActions can only take scripts with no script args
-        # NOTE - Cluster auto-term script therefore receives 'mrjob-max-secs-idle' via metadata instead of as an arg
+        # NOTE - Cluster initializationActions can only take scripts with no
+        # script args, so the auto-term script receives 'mrjob-max-secs-idle'
+        # via metadata instead of as an arg
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
-        cluster_metadata['mrjob-max-secs-idle'] = str(int(self._opts['max_hours_idle'] * 3600))
+        cluster_metadata['mrjob-max-secs-idle'] = str(int(
+            self._opts['max_hours_idle'] * 3600))
 
         cluster_config = dict(
             gceClusterConfig=dict(
-                zoneUri=_gcp_zone_uri(project=self._gcp_project, zone=self._gce_zone),
+                zoneUri=_gcp_zone_uri(
+                    project=self._gcp_project, zone=self._gce_zone),
                 serviceAccountScopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
                 metadata=cluster_metadata
             ),
             initializationActions=[
-                dict(executableFile=init_script_uri) for init_script_uri in gcs_init_script_uris
+                dict(executableFile=init_script_uri)
+                for init_script_uri in gcs_init_script_uris
             ]
         )
 
@@ -986,13 +1041,15 @@ class DataprocJobRunner(MRJobRunner):
         # Compute + storage
         worker_conf = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gce_zone,
-            count=self._opts['num_core_instances'], instance_type=self._opts['core_instance_type']
+            count=self._opts['num_core_instances'],
+            instance_type=self._opts['core_instance_type']
         )
 
         # Compute ONLY
         secondary_worker_conf = _gcp_instance_group_config(
             project=self._gcp_project, zone=self._gce_zone,
-            count=self._opts['num_task_instances'], instance_type=self._opts['task_instance_type'],
+            count=self._opts['num_task_instances'],
+            instance_type=self._opts['task_instance_type'],
             is_preemptible=True
         )
 
@@ -1003,10 +1060,12 @@ class DataprocJobRunner(MRJobRunner):
 
         # See - https://cloud.google.com/dataproc/dataproc-versions
         if self._opts['image_version']:
-            cluster_config['softwareConfig'] = dict(imageVersion=self._opts['image_version'])
+            cluster_config['softwareConfig'] = dict(
+                imageVersion=self._opts['image_version'])
 
-        cluster_data = dict(projectId=self._gcp_project, clusterName=self._cluster_id, config=cluster_config)
-        return cluster_data
+        return dict(projectId=self._gcp_project,
+                    clusterName=self._cluster_id,
+                    config=cluster_config)
 
     ### Dataproc-specific Stuff ###
 
@@ -1018,8 +1077,8 @@ class DataprocJobRunner(MRJobRunner):
         ).execute()
 
     def _api_cluster_create(self, cluster_data):
-        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create
-        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create  # noqa
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get  # noqa
         return self.api_client.clusters().create(
             projectId=self._gcp_project,
             region=_DATAPROC_API_REGION,
@@ -1034,7 +1093,7 @@ class DataprocJobRunner(MRJobRunner):
         ).execute()
 
     def _api_job_list(self, cluster_name=None, state_matcher=None):
-        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/list#JobStateMatcher
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/list#JobStateMatcher  # noqa
         list_kwargs = dict(
             projectId=self._gcp_project,
             region=_DATAPROC_API_REGION,
@@ -1081,9 +1140,9 @@ class DataprocJobRunner(MRJobRunner):
         ).execute()
 
     def _api_job_submit_hadoop(self, step_name, hadoop_job):
-        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/submit
-        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob
-        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobReference
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/submit  # noqa
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
+        # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobReference  # noqa
         job_data = dict(
             reference=dict(projectId=self._gcp_project, jobId=step_name),
             placement=dict(clusterName=self._cluster_id),

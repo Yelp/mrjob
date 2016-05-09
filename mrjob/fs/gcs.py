@@ -53,9 +53,11 @@ def _base64_to_hex(base64_encoded):
     base64_decoded = base64.decodestring(base64_encoded)
     return binascii.hexlify(base64_decoded)
 
+
 def _hex_to_base64(hex_encoded):
     hex_decoded = binascii.unhexlify(hex_encoded)
     return base64.encodestring(hex_decoded)
+
 
 def _path_glob_to_parsed_gcs_uri(path_glob):
     # support globs
@@ -73,7 +75,8 @@ def _path_glob_to_parsed_gcs_uri(path_glob):
 
 
 class GCSFilesystem(Filesystem):
-    """Filesystem for Google Cloud Storage (GCS) URIs. Typically you will get one of these via
+    """Filesystem for Google Cloud Storage (GCS) URIs. Typically you will get
+    one of these via
     ``DataprocJobRunner().fs``, composed with
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
@@ -85,7 +88,8 @@ class GCSFilesystem(Filesystem):
     def api_client(self):
         if not self._api_client:
             credentials = GoogleCredentials.get_application_default()
-            self._api_client = discovery.build(_GCS_API_ENDPOINT, _GCS_API_VERSION, credentials=credentials)
+            self._api_client = discovery.build(
+                _GCS_API_ENDPOINT, _GCS_API_VERSION, credentials=credentials)
 
         return self._api_client
 
@@ -122,7 +126,8 @@ class GCSFilesystem(Filesystem):
         else:
             dir_glob = path_glob + '*'
 
-        list_request = self.api_client.objects().list(bucket=bucket_name, prefix=base_name, fields=_LS_FIELDS_TO_RETURN)
+        list_request = self.api_client.objects().list(
+            bucket=bucket_name, prefix=base_name, fields=_LS_FIELDS_TO_RETURN)
 
         uri_prefix = '%s://%s' % (scheme, bucket_name)
         while list_request:
@@ -140,7 +145,8 @@ class GCSFilesystem(Filesystem):
                 uri = "%s/%s" % (uri_prefix, item['name'])
 
                 # enforce globbing
-                if not (fnmatch.fnmatchcase(uri, path_glob) or fnmatch.fnmatchcase(uri, dir_glob)):
+                if not (fnmatch.fnmatchcase(uri, path_glob) or
+                        fnmatch.fnmatchcase(uri, dir_glob)):
                     continue
 
                 # filter out folders
@@ -152,12 +158,14 @@ class GCSFilesystem(Filesystem):
                 item['size'] = int(item['size'])
                 yield item
 
-            list_request = self.api_client.objects().list_next(list_request, resp)
+            list_request = self.api_client.objects().list_next(
+                list_request, resp)
 
     def md5sum(self, path):
         object_list = list(self._ls_detailed(path))
         if len(object_list) != 1:
-            raise Exception("path for md5 sum doesn't resolve to single object" + path)
+            raise Exception(
+                "path for md5 sum doesn't resolve to single object" + path)
 
         item = object_list[0]
         return _base64_to_hex(item['md5Hash'])
@@ -170,7 +178,8 @@ class GCSFilesystem(Filesystem):
 
             tmp_fileobj.seek(0)
 
-            line_gen = read_file(gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
+            line_gen = read_file(
+                gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
             for current_line in line_gen:
                 yield current_line
 
@@ -186,7 +195,8 @@ class GCSFilesystem(Filesystem):
         If dest is a directory (ends with a "/"), we check if there are
         any files starting with that path.
         """
-        # TODO - mtai @ davidmarin - catch specific Exceptions, not sure what types of exceptions this can throw
+        # TODO - mtai @ davidmarin - catch specific Exceptions, not sure what
+        # types of exceptions this can throw
         try:
             paths = self.ls(path_glob)
         except:
@@ -198,7 +208,8 @@ class GCSFilesystem(Filesystem):
         bucket_name, base_name = _path_glob_to_parsed_gcs_uri(path_glob)
 
         for item in self._ls_detailed(path_glob):
-            req = self.api_client.objects().delete(bucket=bucket_name, object=item['name'])
+            req = self.api_client.objects().delete(
+                bucket=bucket_name, object=item['name'])
             log.debug("deleting " + item['_uri'])
             req.execute()
 
@@ -215,7 +226,8 @@ class GCSFilesystem(Filesystem):
         bucket_name, object_name = parse_gcs_uri(src_uri)
 
         # Chunked file download
-        req = self.api_client.objects().get_media(bucket=bucket_name, object=object_name)
+        req = self.api_client.objects().get_media(
+            bucket=bucket_name, object=object_name)
         downloader = google_http.MediaIoBaseDownload(io_obj, req)
 
         done = False
@@ -223,7 +235,8 @@ class GCSFilesystem(Filesystem):
             try:
                 status, done = downloader.next_chunk()
             except google_errors.HttpError as e:
-                # If error code 416, request range not satisfiable => implies we're trying to download a file of size 0
+                # Error code 416 (request range not satisfiable)
+                # implies we're trying to download a file of size 0
                 if e.resp.status == 416:
                     break
 
@@ -245,18 +258,20 @@ class GCSFilesystem(Filesystem):
 
         # Chunked file upload
         media = google_http.MediaIoBaseUpload(io_obj, mimetype, resumable=True)
-        upload_req = self.api_client.objects().insert(bucket=bucket, name=name, media_body=media)
+        upload_req = self.api_client.objects().insert(
+            bucket=bucket, name=name, media_body=media)
 
         upload_resp = None
         while upload_resp is None:
-          status, upload_resp = upload_req.next_chunk()
-          if status:
-            log.debug("Uploaded %d%%." % int(status.progress() * 100))
+            status, upload_resp = upload_req.next_chunk()
+            if status:
+                log.debug("Uploaded %d%%." % int(status.progress() * 100))
 
         log.debug('Upload Complete! %s', dest_uri)
 
         if metadata:
-            return self.api_client.objects().get(bucket=bucket, object=name).execute()
+            return self.api_client.objects().get(
+                bucket=bucket, object=name).execute()
 
     def list_buckets(self, project, prefix=None):
         """List buckets on GCS."""
@@ -274,7 +289,8 @@ class GCSFilesystem(Filesystem):
         req = self.api_client.buckets().get(bucket=bucket)
         return req.execute()
 
-    def create_bucket(self, project, name, location=None, object_ttl_days=None):
+    def create_bucket(self, project, name,
+                      location=None, object_ttl_days=None):
         """Create a bucket on GCS, optionally setting location constraint."""
         # https://cloud.google.com/storage/docs/lifecycle
         body = dict(name=name)
@@ -297,9 +313,12 @@ class GCSFilesystem(Filesystem):
         req = self.api_client.buckets().delete(bucket=bucket)
         return req.execute()
 
+
+# The equivalent S3 methods are in parse.py but it's cleaner to keep them
+# in the filesystem module; let's do that going forward
+
 def is_gcs_uri(uri):
     """Return True if *uri* can be parsed into an S3 URI, False otherwise.
-    The equivalent s3 method is in parse.py but it seemed cleaner to keep the GCS one in gcs.py
     """
     try:
         parse_gcs_uri(uri)
@@ -315,7 +334,6 @@ def parse_gcs_uri(uri):
     ('walrus', 'tmp/')
 
     If ``uri`` is not a GCS URI, raise a ValueError
-    The equivalent S3 method is in parse.py but it seemed cleaner to keep the GCS one in gcs.py
     """
     components = urlparse(uri)
     if components.scheme != "gs" or '/' not in components.path:

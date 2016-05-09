@@ -421,7 +421,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         })
 
     def _fix_emr_applications_opt(self):
-        """Convert emr_applications to a set. If it's set, make sure that
+        """Convert emr_applications to a set. If it's nonempty, make sure that
         Hadoop is included."""
         self['emr_applications'] = set(self['emr_applications'])
         if self['emr_applications']:

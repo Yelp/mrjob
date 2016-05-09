@@ -2214,6 +2214,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         - same bootstrap setup (including mrjob version)
         - have the same AMI version
+        - install the same applications (if we requested any)
         - same number and type of instances
 
         However, we allow joining clusters where for each role, every instance
@@ -2314,6 +2315,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # be a full major.minor.patch, so checking matching
                 # prefixes should be sufficient.
                 if not ami_version.startswith(self._opts['ami_version']):
+                    return
+
+            if self._opts['emr_applications']:
+                applications = set(a.name for a in cluster.applications)
+                if not self._opts['emr_applications'] <= applications:
                     return
 
             steps = list(_yield_all_steps(emr_conn, cluster.id))

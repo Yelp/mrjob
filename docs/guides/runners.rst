@@ -84,14 +84,6 @@ Running on your own Hadoop cluster
    of your Hadoop cluster, but they *do* at least need a version of Python
    that's compatible with your job.
 
-Running on Dataproc
--------------------
-
-* Set up your Google account and credentials (see :ref:`google-setup`)
-* Run your job with ``-r dataproc``::
-
-    python your_mr_job_sub_class.py -r dataproc < input > output
-
 Running on EMR
 --------------
 
@@ -99,6 +91,14 @@ Running on EMR
 * Run your job with ``-r emr``::
 
     python your_mr_job_sub_class.py -r emr < input > output
+
+Running on Dataproc
+-------------------
+
+* Set up your Google account and credentials (see :ref:`google-setup`)
+* Run your job with ``-r dataproc``::
+
+    python your_mr_job_sub_class.py -r dataproc < input > output
 
 Configuration
 -------------

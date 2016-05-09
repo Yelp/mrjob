@@ -1725,6 +1725,34 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--release-label', 'emr-4.0.0',
             '--ami-version', '1.0.0'])
 
+    def test_matching_emr_applications(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0', emr_applications=['Mahout'])
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-application', 'Mahout'])
+
+    def test_extra_emr_applications_okay(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0', emr_applications=['Ganglia', 'Mahout'])
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-application', 'Mahout'])
+
+    def test_missing_emr_applications_not_okay(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0', emr_applications=['Mahout'])
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-application', 'Ganglia',
+            '--emr-application', 'Mahout'])
+
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
         _, cluster_id = self.make_pooled_cluster(

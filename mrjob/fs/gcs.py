@@ -170,10 +170,6 @@ class GCSFilesystem(Filesystem):
 
             tmp_fileobj.seek(0)
 
-            # TODO - mtai @ davidmarin - GCS / S3 _cat_file diverges
-            #     GCS._cat_file IS a generator
-            #     S3._cat_file RETURNS a generator
-
             line_gen = read_file(gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
             for current_line in line_gen:
                 yield current_line

@@ -558,6 +558,32 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
                      'VisibleToAllUsers': 'true',
                      'Name': 'eaten_by_a_whale'})
 
+    def test_serialization(self):
+        # we can now serialize data structures from mrjob.conf
+
+        API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'emr_api_params': {
+                'Foo': {'Bar': ['Baz', {'Qux': ['Quux', 'Quuux']}]}
+            },
+        }}}
+
+        job = MRWordCount(['-r', 'emr'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
+            with job.make_runner() as runner:
+                runner._launch()
+
+                api_params = runner._describe_cluster()._api_params
+                self.assertEqual(
+                    api_params.get('Foo.Bar.member.1'), 'Baz')
+                self.assertEqual(
+                    api_params.get('Foo.Bar.member.2.Qux.member.1'), 'Quux')
+                self.assertEqual(
+                    api_params.get('Foo.Bar.member.2.Qux.member.2'), 'Quuux')
+
 
 class AMIAndHadoopVersionTestCase(MockBotoTestCase):
 
@@ -3799,3 +3825,18 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             applications = set(a.name for a in cluster.applications)
             self.assertEqual(applications,
                              set(['Hadoop', 'Mahout']))
+
+    def test_api_param_serialization(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ami-version', '4.3.0',
+             '--emr-application', 'Hadoop',
+             '--emr-application', 'Mahout'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            self.assertIn('Applications.member.1.Name', cluster._api_params)
+            self.assertIn('Applications.member.2.Name', cluster._api_params)
+            self.assertNotIn('Applications.member.0.Name', cluster._api_params)

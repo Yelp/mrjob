@@ -303,6 +303,23 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
             load_opts_from_mrjob_conf('foo', conf_symlink_path),
             [(real_base_conf_path, {}), (conf_symlink_path, {})])
 
+    def test_tilde_in_include(self):
+        # regression test for #1308
+
+        os.environ['HOME'] = self.tmp_dir
+        base_conf_path = os.path.join(self.tmp_dir, 'mrjob.base.conf')
+        conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
+
+        with open(base_conf_path, 'w') as f:
+            dump_mrjob_conf({}, f)
+
+        with open(conf_path, 'w') as f:
+            dump_mrjob_conf({'include': '~/mrjob.base.conf'}, f)
+
+        self.assertEqual(
+            load_opts_from_mrjob_conf('foo', conf_path),
+            [(base_conf_path, {}), (conf_path, {})])
+
     def _test_round_trip(self, conf):
         conf_path = os.path.join(self.tmp_dir, 'mrjob.conf')
 

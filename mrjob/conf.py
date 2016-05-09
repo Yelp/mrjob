@@ -354,14 +354,21 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
         This will only load each config file once, even if it's referenced
         from multiple paths due to symlinks.
     """
+    if already_loaded is None:
+        already_loaded = []
+
     conf_path = _expanded_mrjob_conf_path(conf_path)
+    return _load_opts_from_mrjob_conf(runner_alias, conf_path, already_loaded)
+
+
+def _load_opts_from_mrjob_conf(runner_alias, conf_path, already_loaded):
+    """Helper for :py:func:`load_opts_from_mrjob_conf` for recursive use.
+    This doesn't expand or default *conf_path*.
+    """
     conf = _conf_object_at_path(conf_path)
 
     if conf is None:
         return [(None, {})]
-
-    if already_loaded is None:
-        already_loaded = []
 
     # don't load same conf file twice
     real_conf_path = os.path.realpath(conf_path)
@@ -387,9 +394,11 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
         # precedence over inheritance
         for include in reversed(includes):
             # make include relative to (real) conf_path (see #1166)
-            include = os.path.join(os.path.dirname(real_conf_path), include)
+            # expand ~ *before* joining to dir of including file (see #1308)
+            include = os.path.join(os.path.dirname(real_conf_path),
+                                   expand_path(include))
 
-            inherited = load_opts_from_mrjob_conf(
+            inherited = _load_opts_from_mrjob_conf(
                 runner_alias, include, already_loaded) + inherited
 
     return inherited + [(conf_path, values)]

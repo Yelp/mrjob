@@ -518,6 +518,12 @@ def _add_emr_launch_opts(opt_group):
         ),
 
         opt_group.add_option(
+            '--emr-application', dest='emr_applications',
+            default=[], action='append',
+            help='Additional applications to run on 4.x AMIs (e.g. Ganglia,'
+                 ' Mahout, Spark)'),
+
+        opt_group.add_option(
             '--emr-tag', dest='emr_tags',
             default=[], action='append',
             help='Metadata tags to apply to the EMR cluster; '

@@ -558,6 +558,32 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
                      'VisibleToAllUsers': 'true',
                      'Name': 'eaten_by_a_whale'})
 
+    def test_serialization(self):
+        # we can now serialize data structures from mrjob.conf
+
+        API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
+            'check_emr_status_every': 0.00,
+            's3_sync_wait_time': 0.00,
+            'emr_api_params': {
+                'Foo': {'Bar': ['Baz', {'Qux': ['Quux', 'Quuux']}]}
+            },
+        }}}
+
+        job = MRWordCount(['-r', 'emr'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
+            with job.make_runner() as runner:
+                runner._launch()
+
+                api_params = runner._describe_cluster()._api_params
+                self.assertEqual(
+                    api_params.get('Foo.Bar.member.1'), 'Baz')
+                self.assertEqual(
+                    api_params.get('Foo.Bar.member.2.Qux.member.1'), 'Quux')
+                self.assertEqual(
+                    api_params.get('Foo.Bar.member.2.Qux.member.2'), 'Quuux')
+
 
 class AMIAndHadoopVersionTestCase(MockBotoTestCase):
 
@@ -1724,6 +1750,34 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0',
             '--ami-version', '1.0.0'])
+
+    def test_matching_emr_applications(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0', emr_applications=['Mahout'])
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-application', 'Mahout'])
+
+    def test_extra_emr_applications_okay(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0', emr_applications=['Ganglia', 'Mahout'])
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-application', 'Mahout'])
+
+    def test_missing_emr_applications_not_okay(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0', emr_applications=['Mahout'])
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-application', 'Ganglia',
+            '--emr-application', 'Mahout'])
 
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
@@ -3718,3 +3772,71 @@ class PartitionerTestCase(MockBotoTestCase):
                     '-D', 'stream.num.map.output.key.fields=2',
                     '-partitioner', 'java.lang.Object',
                 ])
+
+
+class EmrApplicationsTestCase(MockBotoTestCase):
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'emr', '--ami-version', '4.3.0'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_applications'], set())
+
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            applications = set(a.name for a in cluster.applications)
+            self.assertEqual(applications, set(['Hadoop']))
+
+    def test_explicit_hadoop(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ami-version', '4.3.0',
+             '--emr-application', 'Hadoop',
+             '--emr-application', 'Mahout'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_applications'],
+                             set(['Hadoop', 'Mahout']))
+
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            applications = set(a.name for a in cluster.applications)
+            self.assertEqual(applications,
+                             set(['Hadoop', 'Mahout']))
+
+    def test_implicit_hadoop(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ami-version', '4.3.0',
+             '--emr-application', 'Mahout'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            # we explicitly add Hadoop so we can see Hadoop version in
+            # the cluster description from the API
+            self.assertEqual(runner._opts['emr_applications'],
+                             set(['Hadoop', 'Mahout']))
+
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            applications = set(a.name for a in cluster.applications)
+            self.assertEqual(applications,
+                             set(['Hadoop', 'Mahout']))
+
+    def test_api_param_serialization(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ami-version', '4.3.0',
+             '--emr-application', 'Hadoop',
+             '--emr-application', 'Mahout'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            self.assertIn('Applications.member.1.Name', cluster._api_params)
+            self.assertIn('Applications.member.2.Name', cluster._api_params)
+            self.assertNotIn('Applications.member.0.Name', cluster._api_params)

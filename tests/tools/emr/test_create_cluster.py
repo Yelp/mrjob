@@ -54,6 +54,7 @@ class ClusterInspectionTestCase(ToolTestCase):
              'ec2_task_instance_bid_price': None,
              'ec2_task_instance_type': None,
              'emr_api_params': {},
+             'emr_applications': [],
              'emr_endpoint': None,
              'emr_tags': {},
              'enable_emr_debugging': None,

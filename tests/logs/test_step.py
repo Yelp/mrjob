@@ -60,12 +60,11 @@ PARSED_YARN_STEP_LOG_LINES = dict(
     counters={
         'File System Counters': {
             'FILE: Number of bytes read': 86,
-            }
+        }
     },
     job_id='job_1449857544442_0002',
     output_dir=('hdfs:///user/root/tmp/mrjob'
                 '/mr_wc.root.20151211.181326.984074/output'))
-
 
 
 # abbreviated version of real output from Hadoop 1.0.3 on EMR AMI 2.4.9
@@ -91,8 +90,6 @@ PARSED_PRE_YARN_STEP_LOG_LINES = dict(
     output_dir=('hdfs:///user/hadoop/tmp/mrjob'
                 '/mr_wc.hadoop.20151211.230352.433691/output'),
 )
-
-
 
 
 class ParseStepLogTestCase(TestCase):
@@ -370,7 +367,8 @@ class MatchEMRStepLogPathTestCase(TestCase):
 
     def test_ssh(self):
         log_path = (
-            'ssh://masterssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/syslog')
+            'ssh://masterssh://master/mnt/var/log/hadoop/steps/'
+            's-2BQ5U0ZHTR16N/syslog')
 
         self.assertEqual(
             _match_emr_step_log_path(log_path),
@@ -395,7 +393,8 @@ class MatchEMRStepLogPathTestCase(TestCase):
             dict(step_id='s-2BQ5U0ZHTR16N', timestamp='2016-02-26-23'))
 
     def test_match_syslog_only(self):
-        log_path = 'ssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/controller'
+        log_path = (
+            'ssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/controller')
 
         self.assertEqual(_match_emr_step_log_path(log_path), None)
 
@@ -551,6 +550,5 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
         )
 
         self.assertEqual(self.mock_paths_catted, [prev_path, current_path])
-
 
     maxDiff = None

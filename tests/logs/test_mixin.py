@@ -21,7 +21,6 @@ from tests.py2 import patch
 from tests.sandbox import PatcherTestCase
 
 
-
 class LogInterpretationMixinTestCase(PatcherTestCase):
 
     class MockRunner(Mock, LogInterpretationMixin):
@@ -300,14 +299,6 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._interpret_task_logs.called)
         self.assertFalse(self.runner._ls_task_syslogs.called)
-
-
-
-
-
-
-
-
 
 
 class PickCountersTestCase(LogInterpretationMixinTestCase):

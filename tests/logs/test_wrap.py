@@ -98,7 +98,6 @@ class CatLogsTestCase(PatcherTestCase):
         self.assertFalse(self.mock_log.warning.called)
 
 
-
 class LsLogsTestCase(TestCase):
 
     def setUp(self):

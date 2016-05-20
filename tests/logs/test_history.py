@@ -177,15 +177,15 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
         self.assertEqual(
             self.interpret_history_log(
                 [dict(path='/path/to/yarn-history.jhist', yarn=True)]),
-                dict(errors=[
-                         dict(
-                             attempt_id=(
-                                 'attempt_1449525218032_0005_m_000000_0'),
-                             task_id='task_1449525218032_0005_m_000000'),
-                         dict(
-                             hadoop_error=dict(
-                                 path='/path/to/yarn-history.jhist')),
-                    ]))
+            dict(errors=[
+                dict(
+                    attempt_id=(
+                        'attempt_1449525218032_0005_m_000000_0'),
+                    task_id='task_1449525218032_0005_m_000000'),
+                dict(
+                    hadoop_error=dict(
+                        path='/path/to/yarn-history.jhist')),
+            ]))
 
 
 # log parsing
@@ -348,9 +348,9 @@ class ParseYARNHistoryLogTestCase(TestCase):
             dict(
                 container_to_attempt_id={
                     'container_1449525218032_0005_01_000010':
-                        'attempt_1449525218032_0005_m_000000_3',
+                    'attempt_1449525218032_0005_m_000000_3',
                     'container_1449525218032_0005_01_000011':
-                        'attempt_1449525218032_0005_m_000001_3',
+                    'attempt_1449525218032_0005_m_000001_3',
                 }
             )
         )
@@ -401,8 +401,10 @@ class ParsePreYARNHistoryLogTestCase(TestCase):
                     },
                     'File Output Format Counters ': {
                         'Bytes Written': 0,
-                        },
-                }))
+                    },
+                }
+            )
+        )
 
     def test_job_counters_beat_task_counters(self):
         self.assertEqual(

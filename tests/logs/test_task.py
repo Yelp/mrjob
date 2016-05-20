@@ -633,7 +633,7 @@ class SyslogToStderrPathTestCase(TestCase):
 
     def test_gz(self):
         self.assertEqual(_syslog_to_stderr_path('/path/to/syslog.gz'),
-                        '/path/to/stderr.gz')
+                         '/path/to/stderr.gz')
 
     def test_doesnt_check_filename(self):
         self.assertEqual(_syslog_to_stderr_path('/path/to/garden'),

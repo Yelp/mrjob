@@ -27,7 +27,7 @@ class PickErrorTestCase(TestCase):
         self.assertEqual(_pick_error(dict(history={})), None)
 
     def test_pick_most_recent_error(self):
-        log_interpretation=dict(
+        log_interpretation = dict(
             history=dict(
                 errors=[
                     dict(
@@ -106,8 +106,6 @@ class PickErrorTestCase(TestCase):
                 ),
             ),
         )
-
-
 
     def test_container_to_attempt_id(self):
         container_id = 'container_1449525218032_0005_01_000010'

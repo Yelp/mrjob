@@ -90,7 +90,7 @@ class ToLinesTestCase(TestCase):
         self.assertEqual(
             list(to_lines(
                 chunk for chunk in
-                (super_long_line[0+i:1024+i]
+                (super_long_line[0 + i:1024 + i]
                  for i in range(0, len(super_long_line), 1024)))),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
@@ -100,12 +100,12 @@ class ToLinesTestCase(TestCase):
             log_to_stream('mrjob.util', stderr)
 
             self.assertEqual(
-                list(buffer_iterator_to_line_iterator(chunk for chunk in
-                          [b'The quick\nbrown fox\nju',
-                           b'mped over\nthe lazy\ndog',
-                           b's.\n'])),
-            [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
-             b'dogs.\n'])
+                list(buffer_iterator_to_line_iterator(
+                    chunk for chunk in
+                    [b'The quick\nbrown fox\njumped over\nthe lazy\ndogs.\n'])
+                ),
+                [b'The quick\n', b'brown fox\n', b'jumped over\n',
+                 b'the lazy\n', b'dogs.\n'])
 
             self.assertIn('has been renamed', stderr.getvalue())
 
@@ -462,7 +462,7 @@ class ArchiveTestCase(TestCase):
         self.archive_and_unarchive(
             'jar',
             ['jar', 'cf', '%(archive_name)s', '%(files_to_archive)s'],
-                                   added_files=['META-INF'])
+            added_files=['META-INF'])
 
     def test_unarchive_zip(self):
         # this test requires that zip is present

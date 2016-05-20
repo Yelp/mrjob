@@ -37,12 +37,12 @@ from tests.compress import gzip_compress
 from tests.mockgoogleapiclient import MockGoogleAPITestCase
 from tests.sandbox import PatcherTestCase
 
+
 class GCSFSTestCase(MockGoogleAPITestCase):
 
     def setUp(self):
         super(GCSFSTestCase, self).setUp()
         self.fs = GCSFilesystem()
-
 
     def test_cat_uncompressed(self):
         self.put_gcs_multi({
@@ -107,9 +107,11 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         })
 
         self.assertEqual(set(self.fs.ls('gs://w/')),
-                         set(['gs://w/a', 'gs://w/a/b', 'gs://w/ab', 'gs://w/b']))
+                         set(['gs://w/a', 'gs://w/a/b',
+                              'gs://w/ab', 'gs://w/b']))
         self.assertEqual(set(self.fs.ls('gs://w/*')),
-                         set(['gs://w/a', 'gs://w/a/b', 'gs://w/ab', 'gs://w/b']))
+                         set(['gs://w/a', 'gs://w/a/b',
+                              'gs://w/ab', 'gs://w/b']))
         self.assertEqual(list(self.fs.ls('gs://w/*/')),
                          ['gs://w/a/b'])
         self.assertEqual(list(self.fs.ls('gs://w/*/*')),
@@ -121,7 +123,6 @@ class GCSFSTestCase(MockGoogleAPITestCase):
                          set(['gs://w/a', 'gs://w/a/b', 'gs://w/ab']))
         self.assertEqual(set(self.fs.ls('gs://w/*b')),
                          set(['gs://w/a/b', 'gs://w/ab', 'gs://w/b']))
-
 
     def test_du(self):
         self.put_gcs_multi({
@@ -168,6 +169,7 @@ def _http_exception(status_code):
 
     return google_errors.HttpError(mock_resp, b'')
 
+
 @skipIf(
     hasattr(sys, 'pypy_version_info') and (3, 0) <= sys.version_info < (3, 3),
     "googleapiclient doesn't work with PyPy 3")
@@ -181,13 +183,15 @@ class GCSFSHTTPErrorTestCase(PatcherTestCase):
 
         objects_ret = mock.MagicMock()
         objects_ret.list.return_value = self.list_req_mock
-        objects_ret.get_media.return_value = google_http.HttpRequest(None, None, self.gcs_path)
+        objects_ret.get_media.return_value = google_http.HttpRequest(
+            None, None, self.gcs_path)
 
         api_client = mock.MagicMock()
         api_client.objects.return_value = objects_ret
 
         self.fs._api_client = api_client
-        self.next_chunk_patch = patch.object(google_http.MediaIoBaseDownload, 'next_chunk')
+        self.next_chunk_patch = patch.object(
+            google_http.MediaIoBaseDownload, 'next_chunk')
 
     def test_list_missing(self):
         self.list_req_mock.execute.side_effect = _http_exception(404)

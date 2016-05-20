@@ -197,7 +197,6 @@ class S3FSRegionTestCase(MockBotoTestCase):
             self.assertRaises(boto.exception.S3ResponseError,
                               fs.get_bucket, 'walrus')
 
-
     def test_endpoint_for_bucket_in_us_east_1(self):
         # location constraint for us-east-1 is '', not 'us-east-1'
         self.add_mock_s3_data({'walrus': {}}, location='')

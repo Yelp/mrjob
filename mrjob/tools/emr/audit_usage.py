@@ -75,7 +75,7 @@ _STEP_NAME_RE = re.compile(
 log = logging.getLogger(__name__)
 
 
-def main(args):
+def main(args=None):
     # parser command-line args
     option_parser = _make_option_parser()
     options, args = option_parser.parse_args(args)
@@ -827,4 +827,4 @@ def _percent(x, total, default=0.0):
 
 
 if __name__ == '__main__':
-    main(None)
+    main()

@@ -19,7 +19,7 @@ from sys import stderr
 from .terminate_idle_clusters import main as real_main
 
 
-def main(args):
+def main(args=None):
     print(
         'terminate-idle-job-flows is a deprecated alias for'
         ' terminate-idle-clusters and will be removed in v0.6.0',

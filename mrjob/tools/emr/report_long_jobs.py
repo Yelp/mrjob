@@ -49,7 +49,6 @@ from datetime import datetime
 from datetime import timedelta
 import logging
 from optparse import OptionParser
-import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _yield_all_clusters
@@ -67,9 +66,8 @@ DEFAULT_MIN_HOURS = 24.0
 log = logging.getLogger(__name__)
 
 
-def main(args, now=None):
-    if now is None:
-        now = datetime.utcnow()
+def main(args=None):
+    now = datetime.utcnow()
 
     option_parser = _make_option_parser()
     options, args = option_parser.parse_args(args)
@@ -240,4 +238,4 @@ def _make_option_parser():
 
 
 if __name__ == '__main__':
-    main(sys.argv[1:])
+    main()

@@ -66,9 +66,8 @@ DEFAULT_MIN_HOURS = 24.0
 log = logging.getLogger(__name__)
 
 
-def main(args=None, now=None):
-    if now is None:
-        now = datetime.utcnow()
+def main(args=None):
+    now = datetime.utcnow()
 
     option_parser = _make_option_parser()
     options, args = option_parser.parse_args(args)

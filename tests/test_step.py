@@ -225,11 +225,12 @@ class MRStepDescriptionTestCase(TestCase):
         self.assertEqual(
             MRStep(mapper=identity_mapper).description(0),
             {
-            'type': 'streaming',
-            'mapper': {
-                'type': 'script',
-            },
-        })
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+            }
+        )
 
     def test_render_reducer_first_mapper_implied(self):
         self.assertEqual(
@@ -277,8 +278,9 @@ class MRStepDescriptionTestCase(TestCase):
                 'mapper': {
                     'type': 'script',
                     'pre_filter': 'cat',
-            },
-        })
+                },
+            }
+        )
 
     def test_render_reducer_pre_filter(self):
         self.assertEqual(
@@ -301,8 +303,9 @@ class MRStepDescriptionTestCase(TestCase):
                 'mapper': {
                     'type': 'command',
                     'command': 'cat',
-            },
-        })
+                },
+            }
+        )
 
     def test_render_reducer_cmd_first_mapper_implied(self):
         self.assertEqual(
@@ -345,16 +348,17 @@ class MRStepDescriptionTestCase(TestCase):
 
     def test_render_jobconf(self):
         step = MRStep(mapper=identity_mapper,
-                         jobconf={'dfs.block.size': '134217728'})
+                      jobconf={'dfs.block.size': '134217728'})
 
         self.assertEqual(
             step.description(0),
             {
-            'type': 'streaming',
-            'mapper': {
-                'type': 'script',
-            },
-            'jobconf': {
-                'dfs.block.size': '134217728',
+                'type': 'streaming',
+                'mapper': {
+                    'type': 'script',
+                },
+                'jobconf': {
+                    'dfs.block.size': '134217728',
+                }
             }
-        })
+        )

@@ -776,7 +776,7 @@ class SetupTestCase(SandboxedTestCase):
                 r.run()
 
                 path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+                                    for line in r.stream_output())
 
                 self.assertEqual(path_to_size.get('./stdin.txt'), 0)
                 # input gets passed through by identity mapper
@@ -928,7 +928,6 @@ class FSPassthroughTestCase(TestCase):
                 'deprecated: call HadoopJobRunner.fs.ls() directly',
                 stderr.getvalue())
             self.assertNotIn('get_hadoop_version', stderr.getvalue())
-
 
     def test_pass_through_fields(self):
         # TODO: currently can't initialize HadoopRunner without setting these

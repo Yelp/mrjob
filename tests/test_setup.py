@@ -73,14 +73,17 @@ class ParseSetupCmdTestCase(TestCase):
 
     def test_shell_punctuation_after_name(self):
         self.assertEqual(
-        parse_setup_cmd('touch foo#; cat bar#>baz; cat qux#|grep quux'),
-            ['touch ',
-             {'type': 'file', 'path': 'foo', 'name': None},
-             '; cat ',
-             {'type': 'file', 'path': 'bar', 'name': None},
-             '>baz; cat ',
-             {'type': 'file', 'path': 'qux', 'name': None},
-             '|grep quux'])
+            parse_setup_cmd('touch foo#; cat bar#>baz; cat qux#|grep quux'),
+            [
+                'touch ',
+                {'type': 'file', 'path': 'foo', 'name': None},
+                '; cat ',
+                {'type': 'file', 'path': 'bar', 'name': None},
+                '>baz; cat ',
+                {'type': 'file', 'path': 'qux', 'name': None},
+                '|grep quux',
+            ]
+        )
 
     def test_colon_after_name(self):
         self.assertEqual(

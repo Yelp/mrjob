@@ -311,7 +311,6 @@ class RawProtocolAliasesTestCase(TestCase):
             self.assertEqual(RawValueProtocol, TextValueProtocol)
 
 
-
 class BytesValueProtocolTestCase(ProtocolTestCase):
 
     def test_dumps_keys(self):

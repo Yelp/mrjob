@@ -73,7 +73,7 @@ class S3TmpWatchTestCase(MockBotoTestCase):
         assert isinstance(key_qux, MockKey)
 
         _s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True,
-                   conf_paths=[])
+                    conf_paths=[])
 
         # dry-run shouldn't delete anything
         assert isinstance(key_foo, MockKey)

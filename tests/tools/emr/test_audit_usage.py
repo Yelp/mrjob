@@ -256,7 +256,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'owner': u'woo',
                 'start': datetime(2010, 6, 6, 0, 0),
                 'step_num': None,
-             }],
+            }],
         })
 
     def test_cluster_with_no_fields(self):
@@ -386,7 +386,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             'ready': datetime(2010, 6, 6, 4, 15),
             'state': u'RUNNING',
             'usage': [{
-            # bootstrapping
+                # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
@@ -403,7 +403,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'start': datetime(2010, 6, 6, 4, 0),
                 'step_num': None,
             }, {
-            # mr_exciting, step 1
+                # mr_exciting, step 1
                 'date_to_nih_used': {date(2010, 6, 6): 12.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 12.5},
@@ -469,7 +469,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             'ready': datetime(2010, 6, 6, 4, 15),
             'state': u'RUNNING',
             'usage': [{
-            # bootstrapping
+                # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
@@ -486,7 +486,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'start': datetime(2010, 6, 6, 4, 0),
                 'step_num': None,
             }, {
-            # mr_exciting, step 1 (cancelled)
+                # mr_exciting, step 1 (cancelled)
                 'date_to_nih_used': {},
                 'date_to_nih_bbnu': {date(2010, 6, 6): 17.5},
                 'date_to_nih_billed': {date(2010, 6, 6): 17.5},
@@ -570,7 +570,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             'ready': datetime(2010, 6, 5, 23, 45),
             'state': u'TERMINATED',
             'usage': [{
-            # bootstrapping
+                # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 5): 2.5},
@@ -587,7 +587,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'start': datetime(2010, 6, 5, 23, 30),
                 'step_num': None,
             }, {
-            # step 1 (and idle time after)
+                # step 1 (and idle time after)
                 'date_to_nih_used': {date(2010, 6, 5): 2.5,
                                      date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {date(2010, 6, 6): 2.5},
@@ -608,7 +608,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'start': datetime(2010, 6, 5, 23, 45),
                 'step_num': 1,
             }, {
-            # step 2
+                # step 2
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
@@ -624,9 +624,8 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'owner': u'woo',
                 'start': datetime(2010, 6, 6, 0, 30),
                 'step_num': 2,
-            },
-            # step 3 (and idle time after)
-            {
+            }, {
+                # step 3 (and idle time after)
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {date(2010, 6, 6): 5.0},
                 'date_to_nih_billed': {date(2010, 6, 6): 7.5},
@@ -645,7 +644,6 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'step_num': 3,
             }],
         })
-
 
     def test_pooled_cluster(self):
         # same as test case above with different job keys
@@ -720,7 +718,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             'ready': datetime(2010, 6, 5, 23, 45),
             'state': 'TERMINATED',
             'usage': [{
-            # bootstrapping
+                # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 5): 2.5},
@@ -737,7 +735,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'start': datetime(2010, 6, 5, 23, 30),
                 'step_num': None,
             }, {
-            # mr_exciting, step 1 (and idle time after)
+                # mr_exciting, step 1 (and idle time after)
                 'date_to_nih_used': {date(2010, 6, 5): 2.5,
                                      date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {date(2010, 6, 6): 2.5},
@@ -758,7 +756,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'start': datetime(2010, 6, 5, 23, 45),
                 'step_num': 1,
             }, {
-            # mr whatever, step 1
+                # mr whatever, step 1
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
@@ -774,9 +772,8 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'owner': u'meh',
                 'start': datetime(2010, 6, 6, 0, 30),
                 'step_num': 1,
-            },
-            # mr whatever, step 2 (and idle time after)
-            {
+            }, {
+                # mr whatever, step 2 (and idle time after)
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {date(2010, 6, 6): 5.0},
                 'date_to_nih_billed': {date(2010, 6, 6): 7.5},

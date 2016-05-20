@@ -88,17 +88,18 @@ class ClusterTerminationTestCase(MockBotoTestCase):
                 )
             )
 
-
         # empty job
-        self.add_mock_emr_cluster(MockEmrObject(
-            id = 'j-EMPTY',
-            status=MockEmrObject(
-                state='STARTING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=10)
+        self.add_mock_emr_cluster(
+            MockEmrObject(
+                id='j-EMPTY',
+                status=MockEmrObject(
+                    state='STARTING',
+                    timeline=MockEmrObject(
+                        creationdatetime=ago(hours=10)
+                    ),
                 ),
-            ),
-        ))
+            )
+        )
 
         # job that's bootstrapping
         self.add_mock_emr_cluster(MockEmrObject(
@@ -113,16 +114,18 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         ))
 
         # currently running job
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-CURRENTLY_RUNNING',
-            status=MockEmrObject(
-                state='RUNNING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=4, minutes=15),
-                    readydatetime=ago(hours=4, minutes=10))
+        self.add_mock_emr_cluster(
+            MockEmrObject(
+                id='j-CURRENTLY_RUNNING',
+                status=MockEmrObject(
+                    state='RUNNING',
+                    timeline=MockEmrObject(
+                        creationdatetime=ago(hours=4, minutes=15),
+                        readydatetime=ago(hours=4, minutes=10)
+                    )
                 ),
-            _steps=[step(start_hours_ago=4, state='RUNNING')],
-            ),
+                _steps=[step(start_hours_ago=4, state='RUNNING')]
+            )
         )
 
         # finished cluster
@@ -263,8 +266,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
                                   enable_debugging=True,
                                   now=self.now - timedelta(hours=3),
                                   job_flow_role='fake-instance-profile',
-                                  service_role='fake-service-role',
-        )
+                                  service_role='fake-service-role')
+
         j_debug_only = self.mock_emr_clusters['j-DEBUG_ONLY']
         j_debug_only.status.state = 'WAITING'
         j_debug_only.status.timeline.readydatetime = ago(hours=2, minutes=55)
@@ -278,8 +281,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
                                   enable_debugging=True,
                                   now=self.now - timedelta(hours=6),
                                   job_flow_role='fake-instance-profile',
-                                  service_role='fake-service-role',
-        )
+                                  service_role='fake-service-role')
+
         j_hadoop_debugging = self.mock_emr_clusters['j-HADOOP_DEBUGGING']
         j_hadoop_debugging._steps.append(step())
         j_hadoop_debugging.status.state = 'WAITING'
@@ -349,8 +352,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             str(cluster_id)
             for cluster_id, cluster in self.mock_emr_clusters.items()
             if cluster_id != 'j-DONE' and
-               cluster.status.state in (
-                    'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'))
+            cluster.status.state in (
+                'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'))
 
     def maybe_terminate_quietly(self, stdout=None, **kwargs):
         if 'conf_paths' not in kwargs:
@@ -373,26 +376,26 @@ class ClusterTerminationTestCase(MockBotoTestCase):
 
     def time_mock_cluster_idle(self, mock_cluster):
         if (_is_cluster_starting(mock_cluster) or
-            _is_cluster_bootstrapping(mock_cluster) or
-            _is_cluster_running(mock_cluster._steps) or
-            _is_cluster_done(mock_cluster)):
+                _is_cluster_bootstrapping(mock_cluster) or
+                _is_cluster_running(mock_cluster._steps) or
+                _is_cluster_done(mock_cluster)):
             return timedelta(0)
         else:
             return self.now - _time_last_active(
                 mock_cluster, mock_cluster._steps)
 
     def assert_mock_cluster_is(
-        self, mock_cluster,
-        starting=False,
-        bootstrapping=False,
-        done=False,
-        from_end_of_hour=timedelta(hours=1),
-        has_pending_steps=False,
-        idle_for=timedelta(0),
-        pool_hash=None,
-        pool_name=None,
-        running=False,
-        non_streaming=False):
+            self, mock_cluster,
+            starting=False,
+            bootstrapping=False,
+            done=False,
+            from_end_of_hour=timedelta(hours=1),
+            has_pending_steps=False,
+            idle_for=timedelta(0),
+            pool_hash=None,
+            pool_name=None,
+            running=False,
+            non_streaming=False):
 
         self.assertEqual(starting,
                          _is_cluster_starting(mock_cluster))
@@ -633,7 +636,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         # the filters are ANDed togther, and mins_to_end_of_hour excludes
         # jobs with pending steps.
         self.maybe_terminate_quietly(mins_to_end_of_hour=61,
-                                                 max_hours_idle=0.01)
+                                     max_hours_idle=0.01)
 
         self.assert_terminated_clusters_locked_by_terminate()
 
@@ -702,7 +705,6 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         self.maybe_terminate_quietly(
             stdout=stdout, max_hours_idle=0.01, quiet=True)
         self.assertEqual(stdout.getvalue(), '')
-
 
     EXPECTED_STDOUT_LINES = [
         'Terminated cluster j-POOLED (POOLED);'

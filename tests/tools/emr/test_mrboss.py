@@ -58,7 +58,7 @@ class MRBossTestCase(MockBotoTestCase):
         mock_ssh_file('testmaster', 'some_file', b'file contents')
 
         _run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
-                         print_stderr=False)
+                          print_stderr=False)
 
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
             self.assertEqual(f.read().rstrip(), 'file contents')
@@ -75,7 +75,7 @@ class MRBossTestCase(MockBotoTestCase):
         self.runner.fs  # force initialization of _ssh_fs
 
         _run_on_all_nodes(self.runner, self.output_dir, ['cat', 'some_file'],
-                         print_stderr=False)
+                          print_stderr=False)
 
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
             self.assertEqual(f.read().rstrip(), 'file contents 1')

@@ -253,7 +253,6 @@ class ReportLongJobsTestCase(MockBotoTestCase):
         self.assertEqual(len(lines), len(CLUSTERS_BY_ID) - 1)
 
 
-
 class FindLongRunningJobsTestCase(MockBotoTestCase):
 
     maxDiff = None  # show whole diff when tests fail

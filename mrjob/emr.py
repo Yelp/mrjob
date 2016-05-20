@@ -1048,7 +1048,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '-o', 'StrictHostKeyChecking=no',
                 '-o', 'ExitOnForwardFailure=yes',
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
-                '-L', '%d:%s:%d' % (bind_port, host, tunnel_config['port']),
+                # don't use *host* in place of localhost; it causes
+                # issues on VPCs (see #1311)
+                '-L', '%d:localhost:%d' % (bind_port, tunnel_config['port']),
                 '-N', '-q',  # no shell, no output
                 '-i', self._opts['ec2_key_pair_file'],
             ]

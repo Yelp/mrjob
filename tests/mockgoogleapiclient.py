@@ -61,6 +61,7 @@ _GCLOUD_CONFIG = {
     'core.project': _TEST_PROJECT
 }
 
+
 def mock_api(fxn):
     def req_wrapper(*args, **kwargs):
         actual_resp = fxn(*args, **kwargs)
@@ -72,14 +73,18 @@ def mock_api(fxn):
 
     return req_wrapper
 
+
 def mock_google_error(status):
     mock_resp = mock.Mock(spec=Response)
     mock_resp.status = status
     return google_errors.HttpError(mock_resp, b'')
 
+
 # Addressable data structure specific
 def _get_deep(data_structure, dot_path_or_list, default_value=None):
-    """Attempts access nested data structures and not blow up on a gross key error
+    """Attempts access nested data structures and not blow up on a gross key
+    error
+
     {
         "hello": {
             "hi": 5
@@ -105,8 +110,11 @@ def _get_deep(data_structure, dot_path_or_list, default_value=None):
 
     return current_item
 
+
 def _set_deep(data_structure, dot_path_or_list, value_to_set):
-    """Attempts access nested data structures and not blow up on a gross key error
+    """Attempts access nested data structures and not blow up on a gross key
+    error.
+
     {
         "hello": {
             "hi": 5
@@ -132,8 +140,9 @@ def _set_deep(data_structure, dot_path_or_list, value_to_set):
     current_item[search_path[-1]] = value_to_set
     return data_structure
 
+
 def _dict_deep_update(d, u):
-    """ http://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth """
+    """from http://stackoverflow.com/questions/3232943/update-value-of-a-nested-dictionary-of-varying-depth """  # noqa
     for k, v in u.items():
         if isinstance(v, collections.Mapping):
             r = _dict_deep_update(d.get(k, {}), v)
@@ -141,6 +150,7 @@ def _dict_deep_update(d, u):
         else:
             d[k] = u[k]
     return d
+
 
 ### Test Case ###
 
@@ -169,17 +179,21 @@ class MockGoogleAPITestCase(SandboxedTestCase):
         self._gcs_client = MockGCSClient(self)
         self._gcs_fs = self._gcs_client._fs
 
-        self.start(patch.object(DataprocJobRunner, 'api_client', self._dataproc_client))
+        self.start(patch.object(
+            DataprocJobRunner, 'api_client', self._dataproc_client))
 
-        self.gcs_patch_api_client = patch.object(GCSFilesystem, 'api_client', self._gcs_client)
-        self.gcs_patch_download_io = patch.object(GCSFilesystem, '_download_io', self._gcs_client.download_io)
-        self.gcs_patch_upload_io = patch.object(GCSFilesystem, '_upload_io', self._gcs_client.upload_io)
+        self.gcs_patch_api_client = patch.object(
+            GCSFilesystem, 'api_client', self._gcs_client)
+        self.gcs_patch_download_io = patch.object(
+            GCSFilesystem, '_download_io', self._gcs_client.download_io)
+        self.gcs_patch_upload_io = patch.object(
+            GCSFilesystem, '_upload_io', self._gcs_client.upload_io)
         self.start(self.gcs_patch_api_client)
         self.start(self.gcs_patch_download_io)
         self.start(self.gcs_patch_upload_io)
 
-
-        self.start(patch('mrjob.dataproc._read_gcloud_config', lambda: _GCLOUD_CONFIG))
+        self.start(patch('mrjob.dataproc._read_gcloud_config',
+                         lambda: _GCLOUD_CONFIG))
 
         super(MockGoogleAPITestCase, self).setUp()
 
@@ -224,13 +238,15 @@ class MockGoogleAPITestCase(SandboxedTestCase):
 
     def get_cluster_from_runner(self, runner, cluster_id):
         cluster = runner.api_client.clusters().get(
-            projectId=_TEST_PROJECT, region=_DATAPROC_API_REGION, clusterName=cluster_id
+            projectId=_TEST_PROJECT,
+            region=_DATAPROC_API_REGION,
+            clusterName=cluster_id,
         ).execute()
         return cluster
 
-############################# BEGIN BEGIN BEGIN ################################
-########################### GCS Client - OVERALL ###############################
-############################# BEGIN BEGIN BEGIN ################################
+############################# BEGIN BEGIN BEGIN ###############################
+########################### GCS Client - OVERALL ##############################
+############################# BEGIN BEGIN BEGIN ###############################
 
 
 class MockGCSClient(object):
@@ -303,7 +319,8 @@ class MockGCSClient(object):
 
         data = io_obj.read()
 
-        # TODO - io_obj.close() ?  Not sure if callers of this function would expect their io_objs to be closed
+        # TODO - io_obj.close() ?  Not sure if callers of this function would
+        # expect their io_objs to be closed
 
         object_resp = _insert_object_resp(bucket=bucket, name=name, data=data)
 
@@ -320,7 +337,8 @@ class MockGCSClientObjects(object):
 
     @mock_api
     def list(self, **kwargs):
-        """Emulate objects().list - fields supported - bucket, prefix, fields"""
+        """Emulate objects().list - fields supported - bucket, prefix, fields
+        """
         bucket = kwargs.get('bucket')
         prefix = kwargs.get('prefix') or ''
         fields = kwargs.get('fields') or _LS_FIELDS_TO_RETURN
@@ -454,14 +472,14 @@ def _make_bucket_resp(project=None, now=None):
         u'_projectName': project
     }
 
-#############################  END   END   END  ################################
-########################### GCS Client - OVERALL ###############################
-#############################  END   END   END  ################################
+#############################  END   END   END  ###############################
+########################### GCS Client - OVERALL ##############################
+#############################  END   END   END  ###############################
 
 
-############################# BEGIN BEGIN BEGIN ################################
-######################### Dataproc Client - OVERALL ############################
-############################# BEGIN BEGIN BEGIN ################################
+############################# BEGIN BEGIN BEGIN ###############################
+######################### Dataproc Client - OVERALL ###########################
+############################# BEGIN BEGIN BEGIN ###############################
 class MockDataprocClient(object):
     """Mock out DataprocJobRunner.api_client...
 
@@ -481,9 +499,11 @@ class MockDataprocClient(object):
         self._client_clusters = MockDataprocClientClusters(self)
         self._client_jobs = MockDataprocClientJobs(self)
 
-        # By default - we always resolve our infinite loops by default to state RUNNING / DONE
+        # By default - we always resolve our infinite loops by default to
+        # state RUNNING / DONE
         self.cluster_get_advances_states = collections.deque(['RUNNING'])
-        self.job_get_advances_states = collections.deque(['SETUP_DONE', 'RUNNING', 'DONE'])
+        self.job_get_advances_states = collections.deque(
+            ['SETUP_DONE', 'RUNNING', 'DONE'])
 
     def clusters(self):
         return self._client_clusters
@@ -493,9 +513,10 @@ class MockDataprocClient(object):
 
     def cluster_create(self, project=None, cluster=None):
         cluster_body = _create_cluster_resp(project=project, cluster=cluster)
-        cluster_resp = self._client_clusters.create(projectId=cluster_body['projectId'],
-                                                   region=_DATAPROC_API_REGION,
-                                                   body=cluster_body).execute()
+        cluster_resp = self._client_clusters.create(
+            projectId=cluster_body['projectId'],
+            region=_DATAPROC_API_REGION,
+            body=cluster_body).execute()
         return cluster_resp
 
     def get_state(self, cluster_or_job):
@@ -521,14 +542,14 @@ class MockDataprocClient(object):
         cluster_or_job['statusHistory'].append(old_status)
 
         return cluster_or_job
-#############################  END   END   END  ################################
-######################### Dataproc Client - OVERALL ############################
-#############################  END   END   END  ################################
+#############################  END   END   END  ###############################
+######################### Dataproc Client - OVERALL ###########################
+#############################  END   END   END  ###############################
 
 
-############################# BEGIN BEGIN BEGIN ################################
-######################### Dataproc Client - Clusters ###########################
-############################# BEGIN BEGIN BEGIN ################################
+############################# BEGIN BEGIN BEGIN ###############################
+######################### Dataproc Client - Clusters ##########################
+############################# BEGIN BEGIN BEGIN ###############################
 
 _DATAPROC_CLUSTER = 'test-cluster-test'
 _CLUSTER_REGION = _DATAPROC_API_REGION
@@ -544,7 +565,10 @@ def _datetime_to_gcptime(in_datetime=None):
     return in_datetime.isoformat() + 'Z'
 
 
-def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=None, machine_type=None, machine_type_master=None, num_core_instancess=None, now=None):
+def _create_cluster_resp(
+        project=None, zone=None, cluster=None, image_version=None,
+        machine_type=None, machine_type_master=None, num_core_instancess=None,
+        now=None):
     """Fake Dataproc Cluster metadata"""
     project = project or _TEST_PROJECT
     zone = zone or _CLUSTER_ZONE
@@ -555,85 +579,98 @@ def _create_cluster_resp(project=None, zone=None, cluster=None, image_version=No
     num_core_instancess = num_core_instancess or _CLUSTER_NUM_CORE_INSTANCESS
 
     gce_cluster_conf = {
-      "zoneUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s" % locals(),
-      "networkUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/global/networks/default" % locals(),
-      "serviceAccountScopes": [
-        "https://www.googleapis.com/auth/bigquery",
-        "https://www.googleapis.com/auth/bigtable.admin.table",
-        "https://www.googleapis.com/auth/bigtable.data",
-        "https://www.googleapis.com/auth/cloud.useraccounts.readonly",
-        "https://www.googleapis.com/auth/devstorage.full_control",
-        "https://www.googleapis.com/auth/devstorage.read_write",
-        "https://www.googleapis.com/auth/logging.write"
-      ]
+        "zoneUri": (
+            "https://www.googleapis.com/compute/v1/projects/%(project)s/"
+            "zones/%(zone)s" % locals()),
+        "networkUri": (
+            "https://www.googleapis.com/compute/v1/projects/%(project)s/"
+            "global/networks/default" % locals()),
+        "serviceAccountScopes": [
+            "https://www.googleapis.com/auth/bigquery",
+            "https://www.googleapis.com/auth/bigtable.admin.table",
+            "https://www.googleapis.com/auth/bigtable.data",
+            "https://www.googleapis.com/auth/cloud.useraccounts.readonly",
+            "https://www.googleapis.com/auth/devstorage.full_control",
+            "https://www.googleapis.com/auth/devstorage.read_write",
+            "https://www.googleapis.com/auth/logging.write"
+        ],
     }
 
     master_conf = {
-      "numInstances": 1,
-      "instanceNames": [
-        "%(cluster)s-m" % locals()
-      ],
-      "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
-      "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type_master)s" % locals(),
-      "diskConfig": {
-        "bootDiskSizeGb": 500
-      }
+        "numInstances": 1,
+        "instanceNames": [
+            "%(cluster)s-m" % locals()
+        ],
+        "imageUri": (
+            "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/"
+            "global/images/dataproc-1-0-20160302-200123"),
+        "machineTypeUri": (
+            "https://www.googleapis.com/compute/v1/projects/%(project)s/"
+            "zones/%(zone)s/machineTypes/%(machine_type_master)s" % locals()),
+        "diskConfig": {
+            "bootDiskSizeGb": 500
+        },
     }
 
     worker_conf = {
-      "numInstances": num_core_instancess,
-      "instanceNames": ['%s-w-%d' % (cluster, num) for num in range(num_core_instancess)],
-      "imageUri": "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/global/images/dataproc-1-0-20160302-200123",
-      "machineTypeUri": "https://www.googleapis.com/compute/v1/projects/%(project)s/zones/%(zone)s/machineTypes/%(machine_type)s" % locals(),
-      "diskConfig": {
-        "bootDiskSizeGb": 500
-      }
+        "numInstances": num_core_instancess,
+        "instanceNames": [
+            '%s-w-%d' % (cluster, num) for num in range(num_core_instancess)],
+        "imageUri": (
+            "https://www.googleapis.com/compute/v1/projects/cloud-dataproc/"
+            "global/images/dataproc-1-0-20160302-200123"),
+        "machineTypeUri": (
+            "https://www.googleapis.com/compute/v1/projects/%(project)s/"
+            "zones/%(zone)s/machineTypes/%(machine_type)s" % locals()),
+        "diskConfig": {
+            "bootDiskSizeGb": 500
+        }
     }
 
     software_conf = {
-      "imageVersion": image_version,
-      "properties": {
-        "yarn:yarn.nodemanager.resource.memory-mb": "3072",
-        "yarn:yarn.scheduler.minimum-allocation-mb": "256",
-        "yarn:yarn.scheduler.maximum-allocation-mb": "3072",
-        "mapred:mapreduce.map.memory.mb": "3072",
-        "mapred:mapreduce.map.java.opts": "-Xmx2457m",
-        "mapred:mapreduce.map.cpu.vcores": "1",
-        "mapred:mapreduce.reduce.memory.mb": "3072",
-        "mapred:mapreduce.reduce.java.opts": "-Xmx2457m",
-        "mapred:mapreduce.reduce.cpu.vcores": "1",
-        "mapred:yarn.app.mapreduce.am.resource.mb": "3072",
-        "mapred:yarn.app.mapreduce.am.command-opts": "-Xmx2457m",
-        "mapred:yarn.app.mapreduce.am.resource.cpu-vcores": "1",
-        "distcp:mapreduce.map.memory.mb": "3072",
-        "distcp:mapreduce.reduce.memory.mb": "3072",
-        "distcp:mapreduce.map.java.opts": "-Xmx2457m",
-        "distcp:mapreduce.reduce.java.opts": "-Xmx2457m",
-        "spark:spark.executor.cores": "1",
-        "spark:spark.executor.memory": "1152m",
-        "spark:spark.yarn.executor.memoryOverhead": "384",
-        "spark:spark.yarn.am.memory": "1152m",
-        "spark:spark.yarn.am.memoryOverhead": "384",
-        "spark:spark.driver.memory": "960m",
-        "spark:spark.driver.maxResultSize": "480m"
-      }
+        "imageVersion": image_version,
+        "properties": {
+            "yarn:yarn.nodemanager.resource.memory-mb": "3072",
+            "yarn:yarn.scheduler.minimum-allocation-mb": "256",
+            "yarn:yarn.scheduler.maximum-allocation-mb": "3072",
+            "mapred:mapreduce.map.memory.mb": "3072",
+            "mapred:mapreduce.map.java.opts": "-Xmx2457m",
+            "mapred:mapreduce.map.cpu.vcores": "1",
+            "mapred:mapreduce.reduce.memory.mb": "3072",
+            "mapred:mapreduce.reduce.java.opts": "-Xmx2457m",
+            "mapred:mapreduce.reduce.cpu.vcores": "1",
+            "mapred:yarn.app.mapreduce.am.resource.mb": "3072",
+            "mapred:yarn.app.mapreduce.am.command-opts": "-Xmx2457m",
+            "mapred:yarn.app.mapreduce.am.resource.cpu-vcores": "1",
+            "distcp:mapreduce.map.memory.mb": "3072",
+            "distcp:mapreduce.reduce.memory.mb": "3072",
+            "distcp:mapreduce.map.java.opts": "-Xmx2457m",
+            "distcp:mapreduce.reduce.java.opts": "-Xmx2457m",
+            "spark:spark.executor.cores": "1",
+            "spark:spark.executor.memory": "1152m",
+            "spark:spark.yarn.executor.memoryOverhead": "384",
+            "spark:spark.yarn.am.memory": "1152m",
+            "spark:spark.yarn.am.memoryOverhead": "384",
+            "spark:spark.driver.memory": "960m",
+            "spark:spark.driver.maxResultSize": "480m"
+        }
     }
 
     mock_response = {
-      "projectId": project,
-      "clusterName": cluster,
-      "config": {
-        "configBucket": "dataproc-801485be-0997-40e7-84a7-00926031747c-us",
-        "gceClusterConfig": gce_cluster_conf,
-        "masterConfig": master_conf,
-        "workerConfig": worker_conf,
-        "softwareConfig": software_conf
-      },
-      "status": {
-        "state": "CREATING",
-        "stateStartTime": _datetime_to_gcptime(now)
-      },
-      "clusterUuid": "adb4dc59-d109-4af9-badb-0d8e17e028e1"
+        "projectId": project,
+        "clusterName": cluster,
+        "config": {
+            "configBucket": "dataproc-801485be-0997-40e7-84a7-00926031747c-us",
+            "gceClusterConfig": gce_cluster_conf,
+            "masterConfig": master_conf,
+            "workerConfig": worker_conf,
+            "softwareConfig": software_conf
+        },
+        "status": {
+            "state": "CREATING",
+            "stateStartTime": _datetime_to_gcptime(now)
+        },
+        "clusterUuid": "adb4dc59-d109-4af9-badb-0d8e17e028e1"
     }
     return mock_response
 
@@ -663,7 +700,8 @@ class MockDataprocClientClusters(object):
         cluster = _dict_deep_update(cluster, body)
 
         # Create a local copy of advances states
-        cluster['_get_advances_states'] = copy.copy(self._client.cluster_get_advances_states)
+        cluster['_get_advances_states'] = copy.copy(
+            self._client.cluster_get_advances_states)
 
         _set_deep(self._clusters, [projectId, cluster_name], cluster)
 
@@ -688,18 +726,22 @@ class MockDataprocClientClusters(object):
 
     @mock_api
     def delete(self, projectId=None, region=None, clusterName=None):
-        cluster = self.get(projectId=projectId, region=region, clusterName=clusterName).execute()
+        cluster = self.get(
+            projectId=projectId,
+            region=region,
+            clusterName=clusterName,
+        ).execute()
 
         return self._client.update_state(cluster, state='DELETING')
 
-#############################  END   END   END  ################################
-######################### Dataproc Client - Clusters ###########################
-#############################  END   END   END  ################################
+#############################  END   END   END  ###############################
+######################### Dataproc Client - Clusters ##########################
+#############################  END   END   END  ###############################
 
 
-############################# BEGIN BEGIN BEGIN ################################
-########################### Dataproc Client - Jobs #############################
-############################# BEGIN BEGIN BEGIN ################################
+############################# BEGIN BEGIN BEGIN ###############################
+########################### Dataproc Client - Jobs ############################
+############################# BEGIN BEGIN BEGIN ###############################
 
 _JOB_STATE_MATCHER_ACTIVE = frozenset(['PENDING', 'RUNNING', 'CANCEL_PENDING'])
 _JOB_STATE_MATCHER_NON_ACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
@@ -714,40 +756,55 @@ _USER_NAME = 'testuser'
 _INPUT_DIR = ''
 _OUTPUT_DIR = ''
 
-def _submit_hadoop_job_resp(project=None, cluster=None, script_name=None, now=None):
+
+def _submit_hadoop_job_resp(
+        project=None, cluster=None, script_name=None, now=None):
     """Fake Dataproc Job metadata"""
     project = project or _TEST_PROJECT
     cluster = cluster or _DATAPROC_CLUSTER
     script_name = script_name or _SCRIPT_NAME
     now = now or datetime.utcnow()
 
-    job_elements = [script_name, _USER_NAME, now.strftime('%Y%m%d'), now.strftime('%H%M%S'), now.strftime('%f')]
+    job_elements = [
+        script_name, _USER_NAME, now.strftime('%Y%m%d'),
+        now.strftime('%H%M%S'), now.strftime('%f')]
 
     job_id = '-'.join(job_elements + ['-', 'Step', '1', 'of', '1'])
     dir_name = '.'.join(job_elements)
 
     mock_response = {
-      "reference": {
-        "projectId": project,
-        "jobId": job_id
-      },
-      "placement": {
-        "clusterName": cluster,
-        "clusterUuid": "8b76d95e-ebdc-4b81-896d-b2c5009b3560"
-      },
-      "hadoopJob": {
-        "mainJarFileUri": "file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar",
-        "args": [],
-        "loggingConfig": {}
-      },
-      "status": {
-        "state": "PENDING",
-        "stateStartTime": _datetime_to_gcptime(now)
-      },
-      "driverControlFilesUri": "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/" % locals(),
-      "driverOutputResourceUri": "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/driveroutput" % locals()
+        "reference": {
+            "projectId": project,
+            "jobId": job_id
+        },
+        "placement": {
+            "clusterName": cluster,
+            "clusterUuid": "8b76d95e-ebdc-4b81-896d-b2c5009b3560"
+        },
+        "hadoopJob": {
+            "mainJarFileUri": (
+                "file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar"),
+            "args": [],
+            "loggingConfig": {}
+        },
+        "status": {
+            "state": "PENDING",
+            "stateStartTime": _datetime_to_gcptime(now)
+        },
+        "driverControlFilesUri": (
+            "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/"
+            "google-cloud-dataproc-metainfo/"
+            "8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/" % locals(),
+        )
+        "driverOutputResourceUri": (
+            "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/"
+            "google-cloud-dataproc-metainfo/"
+            "8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/"
+            "driveroutput" % locals()
+        )
     }
     return mock_response
+
 
 class MockDataprocClientJobs(object):
     def __init__(self, client):
@@ -757,7 +814,9 @@ class MockDataprocClientJobs(object):
 
     @mock_api
     def list(self, **kwargs):
-        """Emulate jobs().list - fields supported - projectId, region, clusterName, jobStateMatcher"""
+        """Emulate jobs().list -
+            fields supported - projectId, region, clusterName, jobStateMatcher
+        """
         project_id = kwargs['projectId']
         region = kwargs['region']
         cluster_name = kwargs.get('clusterName')
@@ -773,7 +832,8 @@ class MockDataprocClientJobs(object):
         job_map = _get_deep(self._jobs, [project_id], dict())
 
         # Sort all jobs by latest status update time
-        jobs_sorted_by_time = sorted(job_map.values(), key=lambda j: j['status']['stateStartTime'])
+        jobs_sorted_by_time = sorted(
+            job_map.values(), key=lambda j: j['status']['stateStartTime'])
         for current_job in jobs_sorted_by_time:
             job_cluster = current_job['placement']['clusterName']
             job_state = current_job['status']['state']
@@ -813,7 +873,8 @@ class MockDataprocClientJobs(object):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-        job = self.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
+        job = self.get(
+            projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
         return self._client.update_state(job, state='CANCEL_PENDING')
 
     @mock_api
@@ -821,8 +882,8 @@ class MockDataprocClientJobs(object):
         assert projectId is not None
         assert region == _DATAPROC_API_REGION
 
-
-        job = self.get(projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
+        job = self.get(
+            projectId=projectId, region=_DATAPROC_API_REGION, jobId=jobId)
         return self._client.update_state(job, state='DELETING')
 
     @mock_api
@@ -841,12 +902,13 @@ class MockDataprocClientJobs(object):
         _dict_deep_update(job, body_job)
 
         # Create a local copy of advances states
-        job['_get_advances_states'] = copy.copy(self._client.job_get_advances_states)
+        job['_get_advances_states'] = copy.copy(
+            self._client.job_get_advances_states)
 
         _set_deep(self._jobs, [projectId, job['reference']['jobId']], job)
 
         return job
 
-#############################  END   END   END  ################################
-########################### Dataproc Client - Jobs #############################
-#############################  END   END   END  ################################
+#############################  END   END   END  ###############################
+########################### Dataproc Client - Jobs ############################
+#############################  END   END   END  ###############################

@@ -1,5 +1,5 @@
 Dataproc Quickstart
-============================
+===================
 
 .. _google-setup:
 
@@ -133,6 +133,9 @@ master instance if you have a very large number of input files; in this case,
 use the :mrjob-opt:`master_instance_type` option.
 
 If you want to run preemptible instances, use the :mrjob-opt:`task_instance_type` and :mrjob-opt:`num_task_instances` options.
+
+
+.. _dataproc-limitations:
 
 Limitations
 -----------

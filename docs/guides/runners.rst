@@ -100,6 +100,10 @@ Running on Dataproc
 
     python your_mr_job_sub_class.py -r dataproc < input > output
 
+.. note::
+
+   Dataproc support is new and has some :ref:`dataproc-limitations`.
+
 Configuration
 -------------
 

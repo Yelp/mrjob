@@ -32,7 +32,7 @@ Some important features:
 * SSH tunnel to hadoop job tracker (EMR only)
 * Minimal setup
     * To run on EMR, set ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY``
-    * To run on Dataproc, set up your Google account and credentials (see :ref:`google-setup`)
+    * To run on Dataproc, set up your Google account and credentials (see `Dataproc Quickstart <http://pythonhosted.org/mrjob/guides/dataproc-quickstart.html>`_).
     * To run on your Hadoop cluster, just make sure ``$HADOOP_HOME`` is set.
 
 Installation

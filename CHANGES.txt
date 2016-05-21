@@ -3,7 +3,7 @@ v0.5.2, 2016-05-20 -- initial Cloud Dataproc support
    * lacks log interpretation, JarStep support
  * correctly handle ~ in include path in mrjob.conf (#1308)
  * new emr_applications option (#1293)
- * emr_api_params in mrjob.conf may be a data structure
+ * emr_api_params values in mrjob.conf may be data structures
  * fix running deprecated tools with python -m (#1312)
  * fix ssh tunneling to EMR VPCs (#1311)
 

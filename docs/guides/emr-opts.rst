@@ -163,6 +163,25 @@ Cluster creation and configuration
 
     .. versionadded:: 0.4.3
 
+    In addition, values in this dict may themselves be data structures;
+    for example:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            api_params:
+              Configurations:
+              - Classification: hadoop-env
+                Configurations:
+                - Classification: export
+                  Properties:
+                    HADOOP_CLASSPATH: /path/to/my.jar
+                    HADOOP_USER_CLASSPATH_FIRST: 'true'
+                Properties: {}
+
+    .. versionadded:: 0.5.2
+
 .. mrjob-opt::
    :config: emr_applications
    :switch: --emr-application

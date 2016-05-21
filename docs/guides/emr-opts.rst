@@ -164,6 +164,19 @@ Cluster creation and configuration
     .. versionadded:: 0.4.3
 
 .. mrjob-opt::
+   :config: emr_applications
+   :switch: --emr-application
+   :type: :ref:`string list <data-type-string-list>`
+   :set: emr
+   :default: ``[]``
+
+   Additional applications to run on 4.x AMIs (e.g. ``'Ganglia'``,
+   ``'Mahout'``, ``'Spark'``). You do not need to specify ``'Hadoop'``;
+   mrjob will always include it automatically.
+
+   See `Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-release-components.html>`_ in the EMR docs for more details.
+
+.. mrjob-opt::
     :config: emr_endpoint
     :switch: --emr-endpoint
     :type: :ref:`string <data-type-string>`

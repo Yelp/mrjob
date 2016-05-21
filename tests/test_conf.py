@@ -337,8 +337,6 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
             {'runners': {'foo': {'qux': ClearedValue('quux')}}})
 
 
-
-
 class MRJobConfNoYAMLTestCase(MRJobConfTestCase):
 
     def setUp(self):
@@ -423,9 +421,10 @@ class CombineDictsTestCase(TestCase):
             {'TMPDIR': '/var/tmp', 'HOME': '/home/dave'})
 
     def test_skip_None(self):
-        self.assertEqual(combine_dicts(None, {'USER': 'dave'}, None,
-                                  {'TERM': 'xterm'}, None),
-                     {'USER': 'dave', 'TERM': 'xterm'})
+        self.assertEqual(
+            combine_dicts(None, {'USER': 'dave'}, None,
+                          {'TERM': 'xterm'}, None),
+            {'USER': 'dave', 'TERM': 'xterm'})
 
     def test_no_special_logic_for_paths(self):
         self.assertEqual(combine_dicts(
@@ -506,9 +505,10 @@ class CombineEnvsTestCase(TestCase):
             {'TMPDIR': '/var/tmp', 'HOME': '/home/dave'})
 
     def test_skip_None(self):
-        self.assertEqual(combine_envs(None, {'USER': 'dave'}, None,
-                                      {'TERM': 'xterm'}, None),
-                     {'USER': 'dave', 'TERM': 'xterm'})
+        self.assertEqual(
+            combine_envs(None, {'USER': 'dave'}, None,
+                         {'TERM': 'xterm'}, None),
+            {'USER': 'dave', 'TERM': 'xterm'})
 
     def test_paths(self):
         self.assertEqual(
@@ -588,7 +588,7 @@ class CombineListsTestCase(TestCase):
 
     def test_mix_lists_and_scalars(self):
         self.assertEqual(combine_lists([1, 2], 3, (4, 5), 6),
-                        [1, 2, 3, 4, 5, 6])
+                         [1, 2, 3, 4, 5, 6])
 
 
 class CombineOptsTestCase(TestCase):
@@ -655,7 +655,7 @@ class CombineAndExpandPathsTestCase(SandboxedTestCase):
 
     def test_combine_paths(self):
         self.assertEqual(combine_paths('~/tmp', '/tmp/$USER', None),
-                     '/tmp/foo')
+                         '/tmp/foo')
         self.assertEqual(combine_paths('~/tmp', '/tmp/$USER', ''), '')
 
     def test_combine_path_lists_empty(self):

@@ -115,9 +115,24 @@ log = logging.getLogger(__name__)
 
 # how to set up the SSH tunnel for various AMI versions
 _AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
-    '2': dict(name='job tracker', path='/jobtracker.jsp', port=9100),
-    '3': dict(name='resource manager', path='/cluster', port=9026),
-    '4': dict(name='resource manager', path='/cluster', port=8088),
+    '2': dict(
+        localhost=True,
+        name='job tracker',
+        path='/jobtracker.jsp',
+        port=9100,
+    ),
+    '3': dict(
+        localhost=False,
+        name='resource manager',
+        path='/cluster',
+        port=9026,
+    ),
+    '4': dict(
+        localhost=False,
+        name='resource manager',
+        path='/cluster',
+        port=8088,
+    ),
 }
 
 # if we SSH into a node, default place to look for logs
@@ -993,6 +1008,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return map_version(self.get_ami_version(),
                            _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
 
+    # TODO: this currently has no automated tests (see #1281)
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
@@ -1041,6 +1057,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('Created empty ssh known-hosts file: %s' % (
             fake_known_hosts_file,))
 
+        # Issue #1311: on the 2.x AMIs, we want to connect to the job
+        # tracker/resource manager through localhost; otherwise it won't work
+        # on VPCs. However, on the 3.x and 4.x AMIs, we *can't* reach the
+        # resource manager via localhost (and the VPC issues appear to be
+        # worked out, as *host* actually maps to an internal IP).
+        tunnel_host = 'localhost' if tunnel_config['localhost'] else host
+
         bind_port = None
         for bind_port in self._pick_ssh_bind_ports():
             args = self._opts['ssh_bin'] + [
@@ -1048,9 +1071,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '-o', 'StrictHostKeyChecking=no',
                 '-o', 'ExitOnForwardFailure=yes',
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
-                # don't use *host* in place of localhost; it causes
-                # issues on VPCs (see #1311)
-                '-L', '%d:localhost:%d' % (bind_port, tunnel_config['port']),
+                '-L', '%d:%s:%d' % (
+                    bind_port, tunnel_host, tunnel_config['port']),
                 '-N', '-q',  # no shell, no output
                 '-i', self._opts['ec2_key_pair_file'],
             ]

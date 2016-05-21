@@ -98,10 +98,12 @@ and install another Python binary.
    :set: dataproc
    :default: ``True``
 
-   Attempt to install a compatible version of Python at bootstrap time.
+   Attempt to install a compatible version of Python at bootstrap time,
+   including :command:`pip` and development libraries (so you can build
+   Python packages written in C).
 
-   Python 2 is already installed on all images, but if you're in Python 2,
-   this will also install :command:`pip` and the ``ujson`` library.
+   This is useful even in Python 2, which is installed by default, but without
+   :command:`pip` and development libraries.
 
    .. versionadded:: 0.5.0
 

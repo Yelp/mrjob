@@ -794,14 +794,14 @@ def _submit_hadoop_job_resp(
         "driverControlFilesUri": (
             "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/"
             "google-cloud-dataproc-metainfo/"
-            "8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/" % locals(),
-        )
+            "8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/" % locals()
+        ),
         "driverOutputResourceUri": (
             "gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/"
             "google-cloud-dataproc-metainfo/"
             "8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/%(job_id)s/"
             "driveroutput" % locals()
-        )
+        ),
     }
     return mock_response
 

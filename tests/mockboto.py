@@ -1145,11 +1145,13 @@ class MockEmrConnection(object):
 
         if marker is not None:
             raise NotImplementedError(
-                'marker not simulated for ListBootstrapActions')
+                'marker not simulated for ListSteps')
 
         cluster = self._get_mock_cluster(cluster_id)
 
         steps_listed = []
+
+        # TODO: ListSteps lists steps in *reverse* order (see #1316).
         for step in cluster._steps:
             if step_states is None or step.status.state in step_states:
                 steps_listed.append(step)

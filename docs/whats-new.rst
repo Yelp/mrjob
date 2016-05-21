@@ -4,6 +4,37 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.2:
+
+0.5.2
+-----
+
+This release adds support for `Google Cloud Dataproc`_ which is Google's
+Hadoop service, roughly analogous to EMR. See :doc:`guides/dataproc-quickstart`.
+
+.. _Google Cloud Dataproc: https://cloud.google.com/dataproc/overview
+
+Dataproc support is new and has some missing features for the time being:
+
+* fetching counters
+* finding probable cause of errors
+* running Java JARs as steps
+
+Added the :mrjob-opt:`emr_applications` option, which helps you configure
+4.x AMIs.
+
+Fixed a bug in SSH tunneling (introduced in v0.5.0) that made connections
+to the job tracker/resource manager on EMR time out when running inside
+a VPC (Virtual Private Cluster).
+
+Fixed a bug (introduced in v0.4.6) that kept mrjob from interpreting ``~``
+in includes in ``mrjob.conf``.
+
+It is now again possible to run tool modules deprecated in v0.5.0 directly
+(e.g. ``python -m mrjob.tools.emr.create_job_flow``). This is still a
+deprecated feature; it's recommended that you use the appropriate
+:command:`mrjob` subcommand instead (e.g. ``mrjob create-cluster``).
+
 .. _v0.5.1:
 
 0.5.1

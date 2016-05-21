@@ -112,6 +112,7 @@ def rel_posix_to_abs_local(host, path, environ=None):
 _SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
 _SCP_RE = re.compile(r'^.*"cat > (?P<filename>.*?)".*$')
 
+
 def main(stdin, stdout, stderr, args, environ):
 
     def slave_addresses():
@@ -134,7 +135,6 @@ def main(stdin, stdout, stderr, args, environ):
             print('No such file or directory:', dest, file=stderr)
             return 1
 
-
     def ls(host, args):
         """Mock SSH behavior for :py:func:`~mrjob.ssh._ssh_ls()`"""
         dest = args[1]
@@ -153,10 +153,10 @@ def main(stdin, stdout, stderr, args, environ):
             components = root.split(os.sep)
             new_root = posixpath.join(*components)
             for filename in files:
-                print((
-                    '/' + posixpath.join(new_root, filename)[prefix_length:]), file=stdout)
+                print(
+                    '/' + posixpath.join(new_root, filename)[prefix_length:],
+                    file=stdout)
         return 0
-
 
     def cat(host, args):
         """Mock SSH behavior for :py:func:`~mrjob.ssh._ssh_cat()`"""
@@ -175,7 +175,8 @@ def main(stdin, stdout, stderr, args, environ):
         return 0
 
     def run(host, remote_args, stdout, stderr, environ, slave_key_file=None):
-        """Execute a command as a "host." Recursively call for slave if necessary.
+        """Execute a command as a "host." Recursively call for slave if
+        necessary.
         """
         remote_arg_pos = 0
 
@@ -204,11 +205,12 @@ def main(stdin, stdout, stderr, args, environ):
             slave_key_file = remote_args[remote_arg_pos + 1]
 
             if not os.path.exists(
-                os.path.join(path_for_host(host, environ), slave_key_file)):
+                    os.path.join(path_for_host(host, environ),
+                                 slave_key_file)):
                 # This is word-for-word what SSH says.
                 print(('Warning: Identity file %s not accessible.'
-                                  ' No such file or directory.' %
-                                  slave_key_file), file=stderr)
+                       ' No such file or directory.' %
+                       slave_key_file), file=stderr)
 
                 print('Permission denied (publickey).', file=stderr)
                 return 1
@@ -216,14 +218,15 @@ def main(stdin, stdout, stderr, args, environ):
             while not remote_args[remote_arg_pos].startswith('hadoop@'):
                 remote_arg_pos += 1
 
-            slave_host = host + '!%s' % remote_args[remote_arg_pos].split('@')[1]
+            slave_host = (
+                host + '!%s' % remote_args[remote_arg_pos].split('@')[1])
 
             # build bang path
             return run(slave_host, remote_args[remote_arg_pos + 1:],
                        stdin, stdout, stderr, slave_key_file)
 
         print(("Command line not recognized: %s" %
-                          ' '.join(remote_args)), file=stderr)
+               ' '.join(remote_args)), file=stderr)
         return 1
 
     # Find where the user's commands begin

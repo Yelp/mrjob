@@ -62,6 +62,7 @@ from mrjob.util import shlex_split
 #     When we need output, we pick the first directory alphabetically, and then
 #     delete it
 
+
 def create_mock_hadoop_script(path):
     """Dump a wrapper script to the given file object that runs this
     python script."""
@@ -253,7 +254,7 @@ def hadoop_fs(stdout, stderr, environ, *args):
     # this doesn't have to be a giant switch statement, but it's a
     # bit easier to understand this way. :)
     return invoke_cmd(stdout, stderr, environ, 'hadoop_fs_', cmd, cmd_args,
-               '%s: Unknown command\nUsage: java FsShell\n' % cmd, -1)
+                      '%s: Unknown command\nUsage: java FsShell\n' % cmd, -1)
 
 
 def hadoop_fs_cat(stdout, stderr, environ, *args):
@@ -376,7 +377,6 @@ def _du(real_path):
     return total_size
 
 
-
 def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
     hdfs_uri = real_path_to_hdfs_uri(real_path, environ)
 
@@ -403,7 +403,6 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
     return (
         '%srwxrwxrwx - %s %s 2010-10-01 15:16 %s' %
         (file_type, user_and_group, size, hdfs_uri))
-
 
 
 def hadoop_fs_ls(stdout, stderr, environ, *args):
@@ -480,7 +479,6 @@ def _hadoop_fs_ls(cmd_name, stdout, stderr, environ, path_args, recursive):
         return -1
     else:
         return 0
-
 
 
 def hadoop_fs_mkdir(stdout, stderr, environ, *args):

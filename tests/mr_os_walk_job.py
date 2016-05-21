@@ -24,7 +24,7 @@ class MROSWalkJob(MRJob):
         # hook for test_local.LocalRunnerSetupTestCase.test_python_archive()
         try:
             import foo
-            foo # quiet pyflakes warning
+            foo  # quiet pyflakes warning
         except ImportError:
             pass
 

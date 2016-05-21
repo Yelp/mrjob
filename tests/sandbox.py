@@ -66,6 +66,7 @@ def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):
     return patch.object(runner, 'load_opts_from_mrjob_confs',
                         mock_load_opts_from_mrjob_confs)
 
+
 @contextmanager
 def random_seed(seed):
     """Temporarily change the seed of the random number generator."""

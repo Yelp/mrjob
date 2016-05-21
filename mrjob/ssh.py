@@ -23,6 +23,7 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.py2 import to_string
+from mrjob.util import cmd_line
 
 log = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ def _ssh_run(ssh_bin, address, ec2_key_pair_file, cmd_args, stdin=''):
     :return: (stdout, stderr)
     """
     args = _ssh_args(ssh_bin, address, ec2_key_pair_file) + list(cmd_args)
-    log.debug('Run SSH command: %s' % args)
+    log.debug('> %s' % cmd_line(args))
     p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=PIPE)
     return p.communicate(stdin)
 

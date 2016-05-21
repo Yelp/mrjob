@@ -19,8 +19,8 @@ Added the :mrjob-opt:`emr_applications` option, which helps you configure
 4.x AMIs.
 
 Fixed a bug in SSH tunneling (introduced in v0.5.0) that made connections
-to the job tracker/resource manager on EMR time out when running inside
-a VPC (Virtual Private Cluster).
+to the job tracker/resource manager on EMR time out when running on a 2.x
+AMI inside a VPC (Virtual Private Cluster).
 
 Fixed a bug (introduced in v0.4.6) that kept mrjob from interpreting ``~``
 (home directory) in includes in :file:`mrjob.conf`.

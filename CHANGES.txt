@@ -4,7 +4,7 @@ v0.5.2, 2016-05-2? -- initial Cloud Dataproc support
  * correctly handle ~ in include path in mrjob.conf (#1308)
  * new emr_applications option (#1293)
  * fix running deprecated tools with python -m (#1312)
- * fix ssh tunneling to EMR VPCs (#1311)
+ * fix ssh tunneling to 2.x AMIs on EMR in VPCs (#1311)
 
 v0.5.1, 2016-04-29 -- post-release bugfixes
  * strict_protocols in mrjob.conf is no longer ignored (#1302)

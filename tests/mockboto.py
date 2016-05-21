@@ -111,9 +111,6 @@ DEBUGGING_STEP = JarStep(
     step_args=DEBUGGING_ARGS)
 
 
-
-
-
 ### Errors ###
 
 def err_xml(message, type='Sender', code='ValidationError'):
@@ -393,8 +390,8 @@ class MockBucket(object):
 
     def new_key(self, key_name):
         if key_name not in self.mock_state():
-            self.mock_state()[key_name] = (b'',
-                    to_iso8601(datetime.utcnow()))
+            self.mock_state()[key_name] = (
+                b'', to_iso8601(datetime.utcnow()))
         return MockKey(bucket=self, name=key_name)
 
     def get_key(self, key_name):
@@ -415,8 +412,6 @@ class MockBucket(object):
     def initiate_multipart_upload(self, key_name):
         key = self.new_key(key_name)
         return MockMultiPartUpload(key)
-
-
 
 
 class MockKey(object):
@@ -658,7 +653,7 @@ class MockEmrConnection(object):
 
     def _enforce_strict_ssl(self):
         if (self.STRICT_SSL and
-            not self.host.endswith('elasticmapreduce.amazonaws.com')):
+                not self.host.endswith('elasticmapreduce.amazonaws.com')):
             from boto.https_connection import InvalidCertificateException
             raise InvalidCertificateException(
                 self.host, None, 'hostname mismatch')
@@ -874,7 +869,7 @@ class MockEmrConnection(object):
         return [
             MockEmrObject(name=action.name,
                           scriptpath=action.path,
-                          args=[MockEmrObject(value=str(v)) for v \
+                          args=[MockEmrObject(value=str(v)) for v
                                 in action.bootstrap_action_args])
             for action in bootstrap_actions
         ]
@@ -913,8 +908,7 @@ class MockEmrConnection(object):
                             'The bid price supplied for an instance group is'
                             ' invalid'))
 
-                if ('.' in bid_price and
-                    len(bid_price.split('.', 1)[1]) > 3):
+                if '.' in bid_price and len(bid_price.split('.', 1)[1]) > 3:
                     raise boto.exception.EmrResponseError(
                         400, 'Bad Request', body=err_xml(
                             'No more than 3 digits are allowed after decimal'
@@ -1240,7 +1234,7 @@ class MockEmrConnection(object):
         # if job is TERMINATING, move along to terminated
         if cluster.status.state == 'TERMINATING':
             code = getattr(getattr(cluster.status, 'statechangereason', None),
-                'code', None)
+                           'code', None)
 
             if code == 'STEP_FAILURE':
                 cluster.status.state = 'TERMINATED_WITH_ERRORS'
@@ -1279,7 +1273,7 @@ class MockEmrConnection(object):
                 step.status.state = 'FAILED'
 
                 if step.actiononfailure in (
-                    'TERMINATE_CLUSTER', 'TERMINATE_JOB_FLOW'):
+                        'TERMINATE_CLUSTER', 'TERMINATE_JOB_FLOW'):
 
                     cluster.status.state = 'TERMINATING'
                     cluster.status.statechangereason.code = 'STEP_FAILURE'
@@ -1440,7 +1434,7 @@ class MockIAMConnection(object):
                 409, 'Conflict', boto=err_xml(
                     ('Cannot exceed quota for'
                      ' InstanceSessionsPerInstanceProfile: 1'),
-                     code='LimitExceeded'))
+                    code='LimitExceeded'))
 
         self._check_role_exists(role_name)
 

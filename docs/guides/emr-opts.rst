@@ -170,7 +170,7 @@ Cluster creation and configuration
 
         runners:
           emr:
-            api_params:
+            emr_api_params:
               Configurations:
               - Classification: hadoop-env
                 Configurations:

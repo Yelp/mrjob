@@ -184,7 +184,6 @@ class CountersAndStatusTestCase(TestCase):
         self.assertRaises(TypeError,
                           mr_job.increment_counter, 'Foo', 'Bar', 'two')
 
-
         self.assertRaises(TypeError,
                           mr_job.increment_counter, 'Foo', 'Bar', None)
 
@@ -364,8 +363,10 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
 
             # there should be one Unencodable output error. Exception
             # type may vary by json implementation
-            self.assertEqual(list(counters), ['Unencodable output'])
-            self.assertEqual(list(counters['Unencodable output'].values()), [1])
+            self.assertEqual(
+                list(counters), ['Unencodable output'])
+            self.assertEqual(
+                list(counters['Unencodable output'].values()), [1])
 
     def assertJobRaisesExceptionOnUnencodableOutput(self, job_args=()):
         job = self.MRBoringReprAndJSONJob(job_args)
@@ -648,7 +649,7 @@ class MRSortValuesAndMore(MRSortValues):
     JOBCONF = {
         'stream.num.map.output.key.fields': 3,
         'mapred.output.key.comparator.class':
-            'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+        'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
         'mapred.text.key.comparator.options': '-k1 -k2nr',
     }
 

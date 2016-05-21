@@ -190,7 +190,7 @@ class CommandLineArgsTestCase(TestCase):
             '--planck-constant', '42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
-            ])
+        ])
 
         self.assertEqual(mr_job.options.foo_size, 9)
         self.assertEqual(mr_job.options.bar_name, 'Alembic')
@@ -199,18 +199,20 @@ class CommandLineArgsTestCase(TestCase):
         self.assertEqual(mr_job.options.pill_type, 'red')
         self.assertEqual(mr_job.options.planck_constant, 42)
         self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
-        self.assertEqual(mr_job.generate_passthrough_arguments(),
-                     [
-                      '--bar-name', 'Alembic',
-                      '--enable-baz-mode',
-                      '--extra-special-arg', 'you',
-                      '--extra-special-arg', 'me',
-                      '--foo-size', '9',
-                      '--pill-type', 'red',
-                      '--planck-constant', '1',
-                      '--planck-constant', '42',
-                      '--disable-quuxing',
-                      ])
+        self.assertEqual(
+            mr_job.generate_passthrough_arguments(),
+            [
+                '--bar-name', 'Alembic',
+                '--enable-baz-mode',
+                '--extra-special-arg', 'you',
+                '--extra-special-arg', 'me',
+                '--foo-size', '9',
+                '--pill-type', 'red',
+                '--planck-constant', '1',
+                '--planck-constant', '42',
+                '--disable-quuxing',
+            ]
+        )
 
     def test_explicit_passthrough_options_short(self):
         mr_job = MRCustomJobLauncher(args=[
@@ -219,7 +221,7 @@ class CommandLineArgsTestCase(TestCase):
             '-F9', '-BAlembic', '-MQ', '-T', 'red', '-C1', '-C42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
-            ])
+        ])
 
         self.assertEqual(mr_job.options.foo_size, 9)
         self.assertEqual(mr_job.options.bar_name, 'Alembic')
@@ -228,18 +230,20 @@ class CommandLineArgsTestCase(TestCase):
         self.assertEqual(mr_job.options.pill_type, 'red')
         self.assertEqual(mr_job.options.planck_constant, 42)
         self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
-        self.assertEqual(mr_job.generate_passthrough_arguments(),
-                     [
-                        '-B', 'Alembic',
-                        '-M',
-                         '--extra-special-arg', 'you',
-                         '--extra-special-arg', 'me',
-                         '-F', '9',
-                         '-T', 'red',
-                         '-C', '1',
-                         '-C', '42',
-                         '-Q',
-                     ])
+        self.assertEqual(
+            mr_job.generate_passthrough_arguments(),
+            [
+                '-B', 'Alembic',
+                '-M',
+                '--extra-special-arg', 'you',
+                '--extra-special-arg', 'me',
+                '-F', '9',
+                '-T', 'red',
+                '-C', '1',
+                '-C', '42',
+                '-Q',
+            ]
+        )
 
     def test_bad_custom_options(self):
         self.assertRaises(ValueError,

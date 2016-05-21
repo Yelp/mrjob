@@ -419,9 +419,10 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             log_to_stream('mrjob.conf', stderr)
 
             opts = HadoopRunnerOptionStore(
-                    'hadoop', dict(base_tmp_dir='/scratch',
-                         hdfs_scratch_dir='hdfs:///scratch',
-                    ), [])
+                'hadoop',
+                dict(base_tmp_dir='/scratch',
+                     hdfs_scratch_dir='hdfs:///scratch'),
+                [])
 
             self.assertEqual(opts['local_tmp_dir'], '/scratch')
             self.assertNotIn('base_tmp_dir', opts)
@@ -445,7 +446,7 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
                      emr_job_flow_pool_name='liver',
                      pool_emr_job_flows=True,
                      s3_scratch_uri='s3://bucket/walrus'),
-                    [])
+                [])
 
             self.assertEqual(opts['cluster_id'], 'j-CLUSTERID')
             self.assertNotIn('emr_job_flow_id', opts)

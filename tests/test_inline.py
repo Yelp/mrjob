@@ -133,6 +133,7 @@ class MRIncrementerJob(MRJob):
     def steps(self):
         return [MRStep(mapper=self.mapper)] * self.options.times
 
+
 class MRCustomFileOptionJob(MRJob):
     """ A simple MRJob that uses the input file option."""
 
@@ -186,6 +187,7 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
 
             self.assertEqual(output, [2, 3, 4])
 
+
 class MRJobFileOptionsTestCase(SandboxedTestCase):
 
     def setUp(self):
@@ -203,7 +205,7 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             output = sorted(mr_job.parse_output_line(line)[1]
-                        for line in runner.stream_output())
+                            for line in runner.stream_output())
 
             self.assertEqual(output, [2])
 
@@ -222,7 +224,6 @@ class NoMRJobConfTestCase(TestCase):
                 output = sorted(mr_job.parse_output_line(line)[1]
                                 for line in runner.stream_output())
                 self.assertEqual(output, [2, 3, 4])
-
 
 
 class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
@@ -321,9 +322,9 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         self.assertEqual(results['mapreduce.map.input.length'], '4')
         self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
-                       'attempt_%s_mapper_00000_0' % runner._job_key)
+                         'attempt_%s_mapper_00000_0' % runner._job_key)
         self.assertEqual(results['mapreduce.task.id'],
-                       'task_%s_mapper_00000' % runner._job_key)
+                         'task_%s_mapper_00000' % runner._job_key)
         self.assertEqual(results['mapreduce.task.ismap'], 'true')
         self.assertEqual(results['mapreduce.task.output.dir'],
                          runner._output_dir)
@@ -351,7 +352,7 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
     def test_per_step_jobconf_can_set_number_of_tasks(self):
         mr_job = MRTestPerStepJobConf([
             '-r', self.RUNNER, '--jobconf', 'mapred.map.tasks=2',
-            ])
+        ])
         # need at least two items of input to get two map tasks
         mr_job.sandbox(BytesIO(b'foo\nbar\n'))
 

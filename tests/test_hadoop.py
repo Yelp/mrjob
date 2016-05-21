@@ -392,7 +392,6 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
             list(self.runner._hadoop_log_dirs()),
             ['/logs1', '/logs2'])
 
-
     def test_need_yarn_for_yarn_log_dir_and_hdfs_log_dir(self):
         os.environ['YARN_LOG_DIR'] = '/path/to/yarn-log-dir'
 
@@ -405,7 +404,6 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
         self.mock_hadoop_version = '1.0.3'
         self.assertEqual(list(self.runner._hadoop_log_dirs()),
                          ['/mnt/var/log/hadoop'])
-
 
 
 class StreamingLogDirsTestCase(SandboxedTestCase):
@@ -422,7 +420,6 @@ class StreamingLogDirsTestCase(SandboxedTestCase):
         self.runner.fs.exists = Mock(return_value=True)
 
         self.log.reset_mock()  # ignore logging from HadoopJobRunner init
-
 
 
 class StreamHistoryLogDirsTestCase(StreamingLogDirsTestCase):
@@ -532,10 +529,6 @@ class StreamTaskLogDirsTestCase(StreamingLogDirsTestCase):
         results = self.runner._stream_task_log_dirs()
 
         self.assertRaises(StopIteration, next, results)
-
-
-
-
 
 
 class MockHadoopTestCase(SandboxedTestCase):
@@ -727,7 +720,6 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         '-output', '<hdfs step output dir>',
     ]
 
-
     def setUp(self):
         super(StreamingArgsTestCase, self).setUp()
         self.runner = HadoopJobRunner(
@@ -879,7 +871,7 @@ class JarStepTestCase(MockHadoopTestCase):
         hadoop_cmd_args = get_mock_hadoop_cmd_args()
 
         hadoop_jar_cmd_args = [args for args in hadoop_cmd_args if
-                           args and args[0] == 'jar']
+                               args and args[0] == 'jar']
         self.assertEqual(len(hadoop_jar_cmd_args), 1)
         self.assertEqual(hadoop_jar_cmd_args[0], ['jar', fake_jar])
 
@@ -901,7 +893,7 @@ class JarStepTestCase(MockHadoopTestCase):
         hadoop_cmd_args = get_mock_hadoop_cmd_args()
 
         hadoop_jar_cmd_args = [args for args in hadoop_cmd_args if
-                           args and args[0] == 'jar']
+                               args and args[0] == 'jar']
         self.assertEqual(len(hadoop_jar_cmd_args), 1)
         self.assertEqual(hadoop_jar_cmd_args[0], ['jar', jar_uri])
 
@@ -925,7 +917,7 @@ class JarStepTestCase(MockHadoopTestCase):
             hadoop_cmd_args = get_mock_hadoop_cmd_args()
 
             hadoop_jar_cmd_args = [args for args in hadoop_cmd_args if
-                               args and args[0] == 'jar']
+                                   args and args[0] == 'jar']
 
             self.assertEqual(len(hadoop_jar_cmd_args), 2)
             jar_args, streaming_args = hadoop_jar_cmd_args

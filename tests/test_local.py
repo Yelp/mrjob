@@ -105,7 +105,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
         mr_job = MRTwoStepJob(['-r', 'local',
                                '--jobconf=mapred.map.tasks=2',
-                                '--jobconf=mapred.reduce.tasks=2',
+                               '--jobconf=mapred.reduce.tasks=2',
                                '-', input_path, input_gz_path])
         mr_job.sandbox(stdin=stdin)
 
@@ -385,7 +385,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
         self.assertIn(b'--mapper', output)
 
     @skipIf(hasattr(sys, 'pypy_version_info'),
-                     "-v option doesn't work with pypy")
+            "-v option doesn't work with pypy")
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
         mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf',
@@ -483,7 +483,7 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
     def test_can_turn_off_bootstrap_mrjob(self):
         with mrjob_conf_patcher(
-            {'runners': {'local': {'bootstrap_mrjob': False}}}):
+                {'runners': {'local': {'bootstrap_mrjob': False}}}):
 
             mr_job = MRJobWhereAreYou(['-r', 'local'])
             mr_job.sandbox()

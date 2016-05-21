@@ -1,4 +1,4 @@
-v0.5.2, 2016-05-20 -- initial Cloud Dataproc support
+v0.5.2, 2016-05-2? -- initial Cloud Dataproc support
  * basic support for Google Cloud Dataproc (#1243)
    * lacks log interpretation, JarStep support
  * correctly handle ~ in include path in mrjob.conf (#1308)

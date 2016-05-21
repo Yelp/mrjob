@@ -105,8 +105,6 @@ and install another Python binary.
    This is useful even in Python 2, which is installed by default, but without
    :command:`pip` and development libraries.
 
-   .. versionadded:: 0.5.0
-
 Monitoring the cluster
 -----------------------
 

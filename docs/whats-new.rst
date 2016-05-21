@@ -18,9 +18,6 @@ This release adds basic support for `Google Cloud Dataproc <https://cloud.google
 Added the :mrjob-opt:`emr_applications` option, which helps you configure
 4.x AMIs.
 
-The :mrjob-opt:`emr_api_params` option can now take arbitrary datastructures
-in :file:`mrjob.conf`.
-
 Fixed a bug in SSH tunneling (introduced in v0.5.0) that made connections
 to the job tracker/resource manager on EMR time out when running inside
 a VPC (Virtual Private Cluster).

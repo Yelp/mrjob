@@ -2639,6 +2639,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return wrap_aws_conn(raw_iam_conn)
 
 
+# TODO: not sure this is actually what EMR wants; haven't been able to get
+# it to accept nested data structures (and don't know what to do with
+# e.g. dots in property names). Leaving this code in place for now (works
+# for emr_applications), but really, to fix this, we need to use boto3
+# (see #1304).
 def _unpack_emr_api_params(x):
     """Recursively unpack parameters to the EMR API."""
     # recursively unpack values, and flatten into main dict

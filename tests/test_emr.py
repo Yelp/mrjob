@@ -374,8 +374,8 @@ class VisibleToAllUsersTestCase(MockBotoTestCase):
     def test_force_to_bool(self):
         # make sure mockboto doesn't always convert to bool
         self.assertRaises(boto.exception.EmrResponseError,
-            self.run_and_get_cluster,
-            '--emr-api-param', 'VisibleToAllUsers=1')
+                          self.run_and_get_cluster,
+                          '--emr-api-param', 'VisibleToAllUsers=1')
 
     def test_visible(self):
         cluster = self.run_and_get_cluster('--visible-to-all-users')
@@ -488,7 +488,8 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
 
     def test_param_unset(self):
         cluster = self.run_and_get_cluster(
-            '--no-emr-api-param', 'Test.API', '--no-emr-api-param', 'Test.API2')
+            '--no-emr-api-param', 'Test.API',
+            '--no-emr-api-param', 'Test.API2')
         self.assertTrue('Test.API' in cluster._api_params)
         self.assertTrue('Test.API2' in cluster._api_params)
         self.assertIsNone(cluster._api_params['Test.API'])
@@ -530,7 +531,7 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
             self.assertNotIn('no_emr_api_params', sorted(runner._opts))
             self.assertNotIn('no_emr_api_param', sorted(runner._opts))
             self.assertEqual(runner._opts['emr_api_params'],
-                            {'VisibleToAllUsers': None})
+                             {'VisibleToAllUsers': None})
 
     def test_command_line_overrides_config(self):
         # want to make sure a nulled-out param in the config file
@@ -554,9 +555,9 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
         with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
             with job.make_runner() as runner:
                 self.assertEqual(runner._opts['emr_api_params'],
-                    {'Instances.Ec2SubnetId': None,
-                     'VisibleToAllUsers': 'true',
-                     'Name': 'eaten_by_a_whale'})
+                                 {'Instances.Ec2SubnetId': None,
+                                  'VisibleToAllUsers': 'true',
+                                  'Name': 'eaten_by_a_whale'})
 
     def test_serialization(self):
         # we can now serialize data structures from mrjob.conf
@@ -729,12 +730,12 @@ class TmpBucketTestCase(MockBotoTestCase):
 
     def test_us_west_1(self):
         self.assert_new_tmp_bucket('us-west-1',
-                                       aws_region='us-west-1')
+                                   aws_region='us-west-1')
 
     def test_us_east_1(self):
         # location should be blank
         self.assert_new_tmp_bucket('',
-                                       aws_region='us-east-1')
+                                   aws_region='us-east-1')
 
     def test_reuse_mrjob_bucket_in_same_region(self):
         self.add_mock_s3_data({'mrjob-1': {}}, location='us-west-2')
@@ -1116,14 +1117,11 @@ BUCKET_URI = 's3://' + BUCKET + '/'
 
 LOG_DIR = 'j-CLUSTERID/'
 
-GARBAGE = \
-b"""GarbageGarbageGarbage
-"""
+GARBAGE = b'GarbageGarbageGarbage\n'
 
 TRACEBACK_START = b'Traceback (most recent call last):\n'
 
-PY_EXCEPTION = \
-b"""  File "<string>", line 1, in <module>
+PY_EXCEPTION = b"""  File "<string>", line 1, in <module>
 TypeError: 'int' object is not iterable
 """
 
@@ -1317,7 +1315,6 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
             lines = [line.rstrip() for line in f]
 
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
-
 
     def _test_create_master_bootstrap_script(
             self, ami_version=None, expected_python_bin=PYTHON_BIN,
@@ -1571,8 +1568,8 @@ class EMRNoMapperTestCase(MockBotoTestCase):
                 results.append((key, value))
 
         self.assertEqual(sorted(results),
-                          [(1, ['blue', 'one', 'red', 'two']),
-                           (4, ['fish'])])
+                         [(1, ['blue', 'one', 'red', 'two']),
+                          (4, ['fish'])])
 
 
 class PoolMatchingTestCase(MockBotoTestCase):
@@ -2129,11 +2126,11 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
     def test_sorting_by_cpu_hours(self):
         _, cluster_id_1 = self.make_pooled_cluster('pool1',
-                                                     minutes_ago=40,
-                                                     num_ec2_instances=2)
+                                                   minutes_ago=40,
+                                                   num_ec2_instances=2)
         _, cluster_id_2 = self.make_pooled_cluster('pool1',
-                                                     minutes_ago=20,
-                                                     num_ec2_instances=1)
+                                                   minutes_ago=20,
+                                                   num_ec2_instances=1)
 
         runner_1 = self.make_simple_runner('pool1')
         runner_2 = self.make_simple_runner('pool1')
@@ -2419,6 +2416,7 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
 
     def test_bootstrap_script_is_actually_installed(self):
         self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+
 
 class TestCatFallback(MockBotoTestCase):
 
@@ -3194,7 +3192,7 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             with mr_job.make_runner() as runner:
                 self.assertEqual(runner._opts['bootstrap_python'], True)
                 self.assertEqual(runner._bootstrap_python(),
-                             self.EXPECTED_BOOTSTRAP)
+                                 self.EXPECTED_BOOTSTRAP)
                 self.assertEqual(runner._bootstrap,
                                  self.EXPECTED_BOOTSTRAP)
 
@@ -3227,7 +3225,7 @@ class EMRTagsTestCase(MockBotoTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['emr_tags'],
-                            {'tag_one': 'foo', 'tag_two': 'bar'})
+                             {'tag_one': 'foo', 'tag_two': 'bar'})
 
     def test_command_line_overrides_config(self):
         EMR_TAGS_MRJOB_CONF = {'runners': {'emr': {
@@ -3245,9 +3243,9 @@ class EMRTagsTestCase(MockBotoTestCase):
         with mrjob_conf_patcher(EMR_TAGS_MRJOB_CONF):
             with job.make_runner() as runner:
                 self.assertEqual(runner._opts['emr_tags'],
-                    {'tag_one': 'foo',
-                     'tag_two': 'qwerty',
-                     'tag_three': 'bar'})
+                                 {'tag_one': 'foo',
+                                  'tag_two': 'qwerty',
+                                  'tag_three': 'bar'})
 
     def test_emr_tags_get_created(self):
         cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
@@ -3313,7 +3311,6 @@ class IAMEndpointTestCase(MockBotoTestCase):
         with mr_job.make_runner() as runner:
             iam_conn = runner.make_iam_conn()
             self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')
-
 
 
 class SetupLineEncodingTestCase(MockBotoTestCase):
@@ -3563,19 +3560,19 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self._test_stream_step_log_dirs(ssh=False)
 
     def _test_stream_task_log_dirs(
-            self, ssh, bad_ssh_slave_hosts=False, application_id=None,
-            ami_version=_DEFAULT_AMI_VERSION,
-            expected_local_path='/mnt/var/log/hadoop/userlogs',
-            expected_dir_name='hadoop/userlogs',
-            expected_s3_dir_name='task-attempts'
-        ):
+        self, ssh, bad_ssh_slave_hosts=False, application_id=None,
+        ami_version=_DEFAULT_AMI_VERSION,
+        expected_local_path='/mnt/var/log/hadoop/userlogs',
+        expected_dir_name='hadoop/userlogs',
+        expected_s3_dir_name='task-attempts'
+    ):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
         self.get_hadoop_version.return_value = '1.0.3'
         self.get_ami_version.return_value = ami_version
 
         if bad_ssh_slave_hosts:
-            self.ssh_slave_hosts.side_effect=IOError
+            self.ssh_slave_hosts.side_effect = IOError
 
         results = runner._stream_task_log_dirs(application_id=application_id)
 
@@ -3643,7 +3640,6 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             ami_version='4.3.0',
             expected_dir_name='hadoop-yarn/containers/application_1',
             expected_s3_dir_name='containers/application_1')
-
 
 
 class LsStepLogsTestCase(MockBotoTestCase):

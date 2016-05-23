@@ -1,6 +1,7 @@
-v0.5.2, 2016-05-2? -- initial Cloud Dataproc support
+v0.5.2, 2016-05-23 -- initial Cloud Dataproc support
  * basic support for Google Cloud Dataproc (#1243)
    * lacks log interpretation, JarStep support
+ * on EMR, wait for steps to complete in correct order (#1316)
  * correctly handle ~ in include path in mrjob.conf (#1308)
  * new emr_applications option (#1293)
  * fix running deprecated tools with python -m (#1312)

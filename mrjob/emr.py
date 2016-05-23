@@ -2585,10 +2585,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return _patched_describe_cluster(emr_conn, self._cluster_id)
 
     def _list_steps_for_cluster(self):
-        """Get all steps for our cluster, potentially making multiple API calls
+        """Get all steps for our cluster in the order they were added.
+
+        Potentially make multiple API calls.
         """
         emr_conn = self.make_emr_conn()
-        return list(_yield_all_steps(emr_conn, self._cluster_id))
+        # the ListSteps API call returns steps in reverse order, see #1316
+        return list(reversed(list(
+            _yield_all_steps(emr_conn, self._cluster_id))))
 
     def get_hadoop_version(self):
         if self._hadoop_version is None:

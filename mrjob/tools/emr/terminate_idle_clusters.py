@@ -175,7 +175,7 @@ def _maybe_terminate_clusters(dry_run=False,
             continue
 
         # need steps to learn more about cluster
-        steps = list(_yield_all_steps(emr_conn, cluster_id))
+        steps = list(reversed(list(_yield_all_steps(emr_conn, cluster_id))))
 
         # we can't really tell if non-streaming jobs are idle or not, so
         # let them be (see Issue #60)

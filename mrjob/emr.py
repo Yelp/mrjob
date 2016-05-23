@@ -240,9 +240,12 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
 
 
 def _step_ids_for_job(steps, job_key):
-    """Return a list of the (EMR) step IDs for the job with the given key.
+    """Given a list of steps for a cluster, return a list of the (EMR) step
+    IDs for the job with the given key, in the same order.
 
-    *steps* is the result of _yield_all_steps().
+    Note that :py:func:`_yield_all_steps` returns steps in reverse order;
+    you probably want to use the value returned by
+    :py:meth:`EMRJobRunner._list_steps_for_cluster` for *steps*.
     """
     step_ids = []
 

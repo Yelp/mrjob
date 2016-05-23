@@ -229,6 +229,9 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
 
     Calls :py:func:`~mrjob.patched_boto._patched_list_steps`, to work around
     `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
+
+    Note that this returns steps in *reverse* order, because that's what
+    the ``ListSteps`` API call does. See #1316.
     """
     for resp in _repeat(_patched_list_steps, emr_conn, cluster_id,
                         *args, **kwargs):

@@ -37,7 +37,6 @@ from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
-from mrjob.emr import _yield_all_steps
 from mrjob.emr import filechunkio
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
@@ -156,8 +155,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             # make sure our input and output formats are attached to
             # the correct steps
             emr_conn = runner.make_emr_conn()
-            steps = list(reversed(list(
-                _yield_all_steps(emr_conn, runner.get_cluster_id()))))
+            steps = runner._list_steps_for_cluster()
 
             step_0_args = [a.value for a in steps[0].config.args]
             step_1_args = [a.value for a in steps[1].config.args]
@@ -686,8 +684,7 @@ class EnableDebuggingTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(reversed(list(
-                _yield_all_steps(emr_conn, runner.get_cluster_id()))))
+            steps = runner._list_steps_for_cluster()
 
             self.assertEqual(steps[0].name, 'Setup Hadoop Debugging')
 
@@ -2910,8 +2907,7 @@ class JarStepTestCase(MockBotoTestCase):
             self.assertTrue(runner.fs.ls(jar_uri))
 
             emr_conn = runner.make_emr_conn()
-            steps = list(reversed(list(
-                _yield_all_steps(emr_conn, runner.get_cluster_id()))))
+            steps = runner._list_steps_for_cluster()
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar, jar_uri)
@@ -2927,8 +2923,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(reversed(list(
-                _yield_all_steps(emr_conn, runner.get_cluster_id()))))
+            steps = runner._list_steps_for_cluster()
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar, JAR_URI)
@@ -2942,8 +2937,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(reversed(list(
-                _yield_all_steps(emr_conn, runner.get_cluster_id()))))
+            steps = runner._list_steps_for_cluster()
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar,
@@ -2965,8 +2959,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(reversed(list(
-                _yield_all_steps(emr_conn, runner.get_cluster_id()))))
+            steps = runner._list_steps_for_cluster()
 
             self.assertEqual(len(steps), 2)
             jar_step, streaming_step = steps

@@ -3864,7 +3864,7 @@ class JobStepsTestCase(MockBotoTestCase):
         runner.make_persistent_cluster()
 
         self.assertEqual(runner._job_steps(), [])
-        self.assertEqual(MockEmrConnection.list_steps.call_count, 0 )
+        self.assertEqual(MockEmrConnection.list_steps.call_count, 0)
 
     def test_own_cluster(self):
         job = MRTwoStepJob(['-r', 'emr']).sandbox()

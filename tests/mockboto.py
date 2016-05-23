@@ -1138,6 +1138,8 @@ class MockEmrConnection(object):
     def list_steps(self, cluster_id, step_states=None, marker=None):
         self._enforce_strict_ssl()
 
+        # ListSteps also allows you to filter by StepIds, but we don't use that
+
         # make sure that we only call list_steps() when we've patched
         # around https://github.com/boto/boto/issues/3268
         if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
@@ -1151,8 +1153,7 @@ class MockEmrConnection(object):
 
         steps_listed = []
 
-        # TODO: ListSteps lists steps in *reverse* order (see #1316).
-        for step in cluster._steps:
+        for step in reversed(cluster._steps):
             if step_states is None or step.status.state in step_states:
                 steps_listed.append(step)
 

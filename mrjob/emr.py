@@ -2352,7 +2352,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not self._opts['emr_applications'] <= applications:
                     return
 
-            steps = list(_yield_all_steps(emr_conn, cluster.id))
+            # _yield_all_steps() yields in reverse order. This doesn't
+            # currently seem to matter; we just care about the number
+            # of steps and if any are pending
+            steps = list(reversed(list(
+                _yield_all_steps(emr_conn, cluster.id))))
 
             # there is a hard limit of 256 steps per cluster
             if len(steps) + num_steps > _MAX_STEPS_PER_CLUSTER:
@@ -2361,6 +2365,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # in rare cases, cluster can be WAITING *and* have incomplete
             # steps. We could just check for PENDING steps, but we're
             # trying to be defensive about EMR adding a new step state.
+            #
+            # TODO: checking for PENDING steps seems pretty safe
             for step in steps:
                 if ((getattr(step.status, 'timeline', None) is None or
                      getattr(step.status.timeline, 'enddatetime', None)

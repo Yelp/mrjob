@@ -27,6 +27,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
+from itertools import islice
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -1595,25 +1596,38 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                                for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
+    def _steps_for_job(self):
+        """Get the steps we submitted for this job in chronological order,
+        ignoring steps from other jobs, and making as few API calls as
+        possible.
+        """
+        num_steps = len(self._get_steps())
+
+        # the API yields steps in reversed order. Once we've found the expected
+        # number of steps, stop.
+        return list(reversed(list(islice(
+            (step for step in
+             _yield_all_steps(self.make_emr_conn(), self.get_cluster_id())
+             if step.name.startswith(self._job_key)),
+            num_steps))))
+
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
-        steps = _list_all_steps(self.make_emr_conn(), self.get_cluster_id())
+        job_steps = self._steps_for_job()
+        num_steps = len(self._get_steps())
 
-        step_ids = _step_ids_for_job(steps, self._job_key)
-        num_steps = len(step_ids)
-
-        if num_steps != len(self._get_steps()):
+        if len(job_steps) != num_steps:
             raise AssertionError("Can't find our steps in the cluster!")
 
         # clear out _log_interpretations if for some reason it was
         # already filled
         self._log_interpretations = []
 
-        for step_num, step_id in enumerate(step_ids):
+        for step_num, step in enumerate(job_steps):
             # this will raise an exception if a step fails
             log.info('Waiting for step %d of %d (%s) to complete...' % (
-                step_num + 1, num_steps, step_id))
-            self._wait_for_step_to_complete(step_id, step_num, num_steps)
+                step_num + 1, num_steps, step.id))
+            self._wait_for_step_to_complete(step.id, step_num, num_steps)
 
     def _wait_for_step_to_complete(
             self, step_id, step_num=None, num_steps=None):

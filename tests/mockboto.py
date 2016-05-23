@@ -1091,8 +1091,18 @@ class MockEmrConnection(object):
         # summaries of cluster state, to return
         cluster_summaries = []
 
-        for cluster_id, cluster in sorted(self.mock_emr_clusters.items()):
-            # skip ahead to marker
+        # clusters are supposed to be returned in reverse chronological
+        # order (see #1316). Using cluster ID as a tiebreaker
+        def cluster_sort_key(cluster):
+            return (cluster.status.timeline.creationdatetime, cluster.id)
+
+        sorted_clusters = sorted(
+            self.mock_emr_clusters.values(),
+            key=cluster_sort_key, reverse=True)
+
+        for cluster in sorted(self.mock_emr_clusters.values()):
+            # skip ahead to marker (marker is just cluster ID)
+            cluster_id = cluster.id
             if marker is not None and cluster_id < marker:
                 continue
 
@@ -1126,6 +1136,10 @@ class MockEmrConnection(object):
 
     def list_instance_groups(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
+
+        # TODO: not sure what order API returns instance groups in,
+        # but doesn't matter for us, as our code treats them like
+        # a dictionary. See #1316.
 
         if marker is not None:
             raise NotImplementedError(

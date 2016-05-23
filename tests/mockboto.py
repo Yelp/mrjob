@@ -1217,6 +1217,8 @@ class MockEmrConnection(object):
         :type now: py:class:`datetime.datetime`
         :param now: alternate time to use as the current time (should be UTC)
         """
+        # TODO: this doesn't actually update steps to CANCELLED when
+        # cluster is shut down
         if now is None:
             now = datetime.utcnow()
 

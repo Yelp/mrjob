@@ -613,7 +613,8 @@ def _yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
         cluster_id = cluster_summary.id
 
         cluster = _patched_describe_cluster(emr_conn, cluster_id)
-        cluster.steps = list(_yield_all_steps(emr_conn, cluster_id))
+        cluster.steps = list(reversed(list(
+            _yield_all_steps(emr_conn, cluster_id))))
         cluster.bootstrapactions = list(
             _yield_all_bootstrap_actions(emr_conn, cluster_id))
 

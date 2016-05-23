@@ -3842,3 +3842,40 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             self.assertIn('Applications.member.1.Name', cluster._api_params)
             self.assertIn('Applications.member.2.Name', cluster._api_params)
             self.assertNotIn('Applications.member.0.Name', cluster._api_params)
+
+
+# regression tests for #1316
+class ListStepsForClusterTestCase(MockBotoTestCase):
+
+    def test_empty(self):
+        runner = EMRJobRunner()
+        runner.make_persistent_cluster()
+
+        self.assertEqual(runner._list_steps_for_cluster(), [])
+
+    def test_one_step(self):
+        job = MRWordCount(['-r', 'emr'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            steps = runner._list_steps_for_cluster()
+
+            self.assertEqual(len(steps), 1)
+            self.assertIn('Step 1', steps[0].name)
+
+    def test_two_steps(self):
+        # regression test for #1316 (ListSteps API call returns steps
+        # in reverse order, and we have to re-reverse them)
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox(stdin=BytesIO(b''))
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            steps = runner._list_steps_for_cluster()
+
+            self.assertEqual(len(steps), 2)
+            self.assertIn('Step 1', steps[0].name)
+            self.assertIn('Step 2', steps[1].name)

@@ -137,6 +137,11 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             # on real EMR.
             self.assertEqual(runner._opts['additional_emr_info'],
                              '{"key": "value"}')
+
+            # keep track of which steps we waited for
+            runner._wait_for_step_to_complete = Mock(
+                wraps=runner._wait_for_step_to_complete)
+
             runner.run()
 
             for line in runner.stream_output():
@@ -196,6 +201,11 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED')
+
+        # did we wait for steps in correct order? (regression test for #1316)
+        step_ids = [
+            c[0][0] for c in runner._wait_for_step_to_complete.call_args_list]
+        self.assertEqual(step_ids, [step.id for step in steps])
 
     def test_failed_job(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '-v'])

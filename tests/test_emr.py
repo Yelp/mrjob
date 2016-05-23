@@ -805,7 +805,9 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         instance_groups = list(
             _yield_all_instance_groups(emr_conn, cluster_id))
 
-        # convert actual instance groups to dicts
+        # convert actual instance groups to dicts. (This gets around any
+        # assumptions about the order the API returns instance groups in;
+        # see #1316)
         role_to_actual = {}
         for ig in instance_groups:
             info = dict(

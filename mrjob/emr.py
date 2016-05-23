@@ -217,6 +217,11 @@ def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
 
 
 def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
+    """Get all instance groups for the given cluster.
+
+    Not sure what order the API returns instance groups in (see #1316);
+    please treat it as undefined (make a dictionary, etc.)
+    """
     for resp in _repeat(emr_conn.list_instance_groups,
                         cluster_id, *args, **kwargs):
         for group in getattr(resp, 'instancegroups', []):
@@ -2384,6 +2389,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
             for ig in list(_yield_all_instance_groups(emr_conn, cluster.id)):
+                # if you edit this code, please don't rely on any particular
+                # ordering of instance groups (see #1316)
                 role = ig.instancegrouptype.lower()
 
                 # unknown, new kind of role; bail out!

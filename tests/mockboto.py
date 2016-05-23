@@ -52,6 +52,9 @@ from tests.sandbox import SandboxedTestCase
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
 
+# list_steps() only returns this many results at a time
+DEFAULT_MAX_STEPS_RETURNED = 50
+
 # Size of each chunk returned by the MockKey iterator
 SIMULATED_BUFFER_SIZE = 256
 
@@ -600,7 +603,8 @@ class MockEmrConnection(object):
                  security_token=None,
                  mock_s3_fs=None, mock_emr_clusters=None,
                  mock_emr_failures=None, mock_emr_output=None,
-                 max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED):
+                 max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED,
+                 max_steps_returned=DEFAULT_MAX_STEPS_RETURNED):
         """Create a mock version of EmrConnection. Most of these args are
         the same as for the real EmrConnection, and are ignored.
 
@@ -630,6 +634,10 @@ class MockEmrConnection(object):
         :param max_clusters_returned: the maximum number of clusters that
                                        :py:meth:`list_clusters` can return,
                                        to simulate a real limitation of EMR
+        :type max_steps_returned: int
+        :param max_steps_returned: the maximum number of clusters that
+                                   :py:meth:`list_steps` can return,
+                                   to simulate a real limitation of EMR
         :type max_days_ago: int
         :param max_days_ago: the maximum amount of days that EMR will go back
                              in time
@@ -1091,19 +1099,16 @@ class MockEmrConnection(object):
         # summaries of cluster state, to return
         cluster_summaries = []
 
-        # clusters are supposed to be returned in reverse chronological
-        # order (see #1316). Using cluster ID as a tiebreaker
-        def cluster_sort_key(cluster):
-            return (cluster.status.timeline.creationdatetime, cluster.id)
+        # add markers to clusters
+        marked_clusters = [
+            ((cluster.status.timeline.creationdatetime, cluster.id), cluster)
+            for cluster in self.mock_emr_clusters.values()]
+        marked_clusters.sort(reverse=True)
 
-        sorted_clusters = sorted(
-            self.mock_emr_clusters.values(),
-            key=cluster_sort_key, reverse=True)
+        # *marker* is just the marker for the last cluster we returned
 
-        for cluster in sorted_clusters:
-            # skip ahead to marker (marker is just cluster ID)
-            cluster_id = cluster.id
-            if marker is not None and cluster_id < marker:
+        for cluster_marker, cluster in marked_clusters:
+            if marker is not None and cluster_marker <= marker:
                 continue
 
             # stop if we hit pagination limit
@@ -1130,9 +1135,9 @@ class MockEmrConnection(object):
                 status=cluster.status))
         else:
             # we went through all clusters, no need to call again
-            cluster_id = None
+            cluster_marker = None
 
-        return MockEmrObject(clusters=cluster_summaries, marker=cluster_id)
+        return MockEmrObject(clusters=cluster_summaries, marker=cluster_marker)
 
     def list_instance_groups(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
@@ -1152,26 +1157,24 @@ class MockEmrConnection(object):
     def list_steps(self, cluster_id, step_states=None, marker=None):
         self._enforce_strict_ssl()
 
-        # ListSteps also allows you to filter by StepIds, but we don't use that
-
         # make sure that we only call list_steps() when we've patched
         # around https://github.com/boto/boto/issues/3268
         if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
             raise Exception('called un-patched version of list_steps()!')
 
-        if marker is not None:
-            raise NotImplementedError(
-                'marker not simulated for ListSteps')
-
-        cluster = self._get_mock_cluster(cluster_id)
+        steps = self._get_mock_cluster(cluster_id)._steps
 
         steps_listed = []
 
-        for step in reversed(cluster._steps):
+        # *marker* was the index of the last step we listed
+        for index in reversed(range(marker or len(steps))):
+            step = steps[index]
             if step_states is None or step.status.state in step_states:
                 steps_listed.append(step)
+        else:
+            index = None  # listed all steps, no need to call again
 
-        return MockEmrObject(steps=steps_listed)
+        return MockEmrObject(steps=steps_listed, marker=index)
 
     def terminate_jobflow(self, jobflow_id):
         self._enforce_strict_ssl()

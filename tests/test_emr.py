@@ -37,6 +37,7 @@ from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
+from mrjob.emr import _yield_all_steps
 from mrjob.emr import filechunkio
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
@@ -3872,3 +3873,11 @@ class ListStepsForClusterTestCase(MockBotoTestCase):
             self.assertEqual(len(steps), 2)
             self.assertIn('Step 1', steps[0].name)
             self.assertIn('Step 2', steps[1].name)
+
+            # double-check that API returns steps in reverse order
+            steps_from_api = list(_yield_all_steps(
+                runner.make_emr_conn(), runner.get_cluster_id()))
+
+            self.assertEqual(len(steps_from_api), 2)
+            self.assertIn('Step 2', steps_from_api[0].name)
+            self.assertIn('Step 1', steps_from_api[1].name)

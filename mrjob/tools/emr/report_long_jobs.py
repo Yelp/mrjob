@@ -51,8 +51,8 @@ import logging
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_clusters
-from mrjob.emr import _yield_all_steps
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
 from mrjob.options import _add_emr_connect_opts
@@ -146,7 +146,7 @@ def _find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
         if cs.status.state != 'RUNNING':
             continue
 
-        steps = list(_yield_all_steps(emr_conn, cs.id))
+        steps = _list_all_steps(emr_conn, cs.id)
 
         running_steps = [
             step for step in steps if step.status.state == 'RUNNING']

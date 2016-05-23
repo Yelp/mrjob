@@ -27,6 +27,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
+from itertools import islice
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -217,6 +218,11 @@ def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
 
 
 def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
+    """Get all instance groups for the given cluster.
+
+    Not sure what order the API returns instance groups in (see #1316);
+    please treat it as undefined (make a dictionary, etc.)
+    """
     for resp in _repeat(emr_conn.list_instance_groups,
                         cluster_id, *args, **kwargs):
         for group in getattr(resp, 'instancegroups', []):
@@ -229,6 +235,10 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
 
     Calls :py:func:`~mrjob.patched_boto._patched_list_steps`, to work around
     `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
+
+    Note that this returns steps in *reverse* order, because that's what
+    the ``ListSteps`` API call does (see #1316). If you want to see all steps
+    in chronological order, use :py:func:`_list_all_steps`.
     """
     for resp in _repeat(_patched_list_steps, emr_conn, cluster_id,
                         *args, **kwargs):
@@ -236,10 +246,21 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
             yield step
 
 
-def _step_ids_for_job(steps, job_key):
-    """Return a list of the (EMR) step IDs for the job with the given key.
+def _list_all_steps(emr_conn, cluster_id, *args, **kwargs):
+    """Return all steps for the cluster as a list, in chronological order
+    (the reverse of :py:func:`_yield_all_steps`).
+    """
+    return list(reversed(list(
+        _yield_all_steps(emr_conn, cluster_id, *args, **kwargs))))
 
-    *steps* is the result of _yield_all_steps().
+
+def _step_ids_for_job(steps, job_key):
+    """Given a list of steps for a cluster, return a list of the (EMR) step
+    IDs for the job with the given key, in the same order.
+
+    Note that :py:func:`_yield_all_steps` returns steps in reverse order;
+    you probably want to use the value returned by
+    :pyfunc:`_list_all_steps` for *steps*.
     """
     step_ids = []
 
@@ -1575,25 +1596,38 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                                for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
+    def _job_steps(self):
+        """Get the steps we submitted for this job in chronological order,
+        ignoring steps from other jobs, and making as few API calls as
+        possible.
+        """
+        num_steps = len(self._get_steps())
+
+        # the API yields steps in reversed order. Once we've found the expected
+        # number of steps, stop.
+        return list(reversed(list(islice(
+            (step for step in
+             _yield_all_steps(self.make_emr_conn(), self.get_cluster_id())
+             if step.name.startswith(self._job_key)),
+            num_steps))))
+
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
-        steps = self._list_steps_for_cluster()
+        job_steps = self._job_steps()
+        num_steps = len(self._get_steps())
 
-        step_ids = _step_ids_for_job(steps, self._job_key)
-        num_steps = len(step_ids)
-
-        if num_steps != len(self._get_steps()):
+        if len(job_steps) != num_steps:
             raise AssertionError("Can't find our steps in the cluster!")
 
         # clear out _log_interpretations if for some reason it was
         # already filled
         self._log_interpretations = []
 
-        for step_num, step_id in enumerate(step_ids):
+        for step_num, step in enumerate(job_steps):
             # this will raise an exception if a step fails
             log.info('Waiting for step %d of %d (%s) to complete...' % (
-                step_num + 1, num_steps, step_id))
-            self._wait_for_step_to_complete(step_id, step_num, num_steps)
+                step_num + 1, num_steps, step.id))
+            self._wait_for_step_to_complete(step.id, step_num, num_steps)
 
     def _wait_for_step_to_complete(
             self, step_id, step_num=None, num_steps=None):
@@ -2346,7 +2380,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not self._opts['emr_applications'] <= applications:
                     return
 
-            steps = list(_yield_all_steps(emr_conn, cluster.id))
+            steps = _list_all_steps(emr_conn, cluster.id)
 
             # there is a hard limit of 256 steps per cluster
             if len(steps) + num_steps > _MAX_STEPS_PER_CLUSTER:
@@ -2355,6 +2389,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # in rare cases, cluster can be WAITING *and* have incomplete
             # steps. We could just check for PENDING steps, but we're
             # trying to be defensive about EMR adding a new step state.
+            #
+            # TODO: checking for PENDING steps seems pretty safe
             for step in steps:
                 if ((getattr(step.status, 'timeline', None) is None or
                      getattr(step.status.timeline, 'enddatetime', None)
@@ -2372,6 +2408,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
             for ig in list(_yield_all_instance_groups(emr_conn, cluster.id)):
+                # if you edit this code, please don't rely on any particular
+                # ordering of instance groups (see #1316)
                 role = ig.instancegrouptype.lower()
 
                 # unknown, new kind of role; bail out!
@@ -2580,20 +2618,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
         return _patched_describe_cluster(emr_conn, self._cluster_id)
-
-    def _list_steps_for_cluster(self):
-        """Get all steps for our cluster, potentially making multiple API calls
-        """
-        emr_conn = self.make_emr_conn()
-        return list(_yield_all_steps(emr_conn, self._cluster_id))
-
-    def _step_num_to_id(self):
-        if self._cluster_id is None:
-            return {}
-
-        return dict((step_num, step.id)
-                    for step_num, step in
-                    enumerate(self._list_steps_for_cluster(), start=1))
 
     def get_hadoop_version(self):
         if self._hadoop_version is None:

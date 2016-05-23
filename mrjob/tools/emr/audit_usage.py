@@ -54,9 +54,9 @@ import re
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_bootstrap_actions
-from mrjob.emr import _yield_all_steps
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
 from mrjob.options import _add_emr_connect_opts
@@ -613,7 +613,7 @@ def _yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
         cluster_id = cluster_summary.id
 
         cluster = _patched_describe_cluster(emr_conn, cluster_id)
-        cluster.steps = list(_yield_all_steps(emr_conn, cluster_id))
+        cluster.steps = _list_all_steps(emr_conn, cluster_id)
         cluster.bootstrapactions = list(
             _yield_all_bootstrap_actions(emr_conn, cluster_id))
 

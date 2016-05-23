@@ -34,10 +34,10 @@ from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
+from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
-from mrjob.emr import _yield_all_steps
 from mrjob.emr import filechunkio
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
@@ -50,6 +50,7 @@ from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
+from tests.mockboto import DEFAULT_MAX_STEPS_RETURNED
 from tests.mockboto import MockBotoTestCase
 from tests.mockboto import MockEmrConnection
 from tests.mockboto import MockEmrObject
@@ -137,6 +138,11 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             # on real EMR.
             self.assertEqual(runner._opts['additional_emr_info'],
                              '{"key": "value"}')
+
+            # keep track of which steps we waited for
+            runner._wait_for_step_to_complete = Mock(
+                wraps=runner._wait_for_step_to_complete)
+
             runner.run()
 
             for line in runner.stream_output():
@@ -156,7 +162,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             # make sure our input and output formats are attached to
             # the correct steps
             emr_conn = runner.make_emr_conn()
-            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             step_0_args = [a.value for a in steps[0].config.args]
             step_1_args = [a.value for a in steps[1].config.args]
@@ -196,6 +202,11 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster.status.state, 'TERMINATED')
+
+        # did we wait for steps in correct order? (regression test for #1316)
+        step_ids = [
+            c[0][0] for c in runner._wait_for_step_to_complete.call_args_list]
+        self.assertEqual(step_ids, [step.id for step in steps])
 
     def test_failed_job(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '-v'])
@@ -571,7 +582,7 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
         }}}
 
         job = MRWordCount(['-r', 'emr'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
             with job.make_runner() as runner:
@@ -685,7 +696,7 @@ class EnableDebuggingTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(steps[0].name, 'Setup Hadoop Debugging')
 
@@ -805,7 +816,9 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         instance_groups = list(
             _yield_all_instance_groups(emr_conn, cluster_id))
 
-        # convert actual instance groups to dicts
+        # convert actual instance groups to dicts. (This gets around any
+        # assumptions about the order the API returns instance groups in;
+        # see #1316)
         role_to_actual = {}
         for ig in instance_groups:
             info = dict(
@@ -2908,7 +2921,7 @@ class JarStepTestCase(MockBotoTestCase):
             self.assertTrue(runner.fs.ls(jar_uri))
 
             emr_conn = runner.make_emr_conn()
-            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar, jar_uri)
@@ -2924,7 +2937,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar, JAR_URI)
@@ -2938,7 +2951,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar,
@@ -2960,7 +2973,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = list(_yield_all_steps(emr_conn, runner.get_cluster_id()))
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(len(steps), 2)
             jar_step, streaming_step = steps
@@ -3774,7 +3787,7 @@ class EmrApplicationsTestCase(MockBotoTestCase):
 
     def test_default(self):
         job = MRTwoStepJob(['-r', 'emr', '--ami-version', '4.3.0'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['emr_applications'], set())
@@ -3790,7 +3803,7 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             ['-r', 'emr', '--ami-version', '4.3.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['emr_applications'],
@@ -3807,7 +3820,7 @@ class EmrApplicationsTestCase(MockBotoTestCase):
         job = MRTwoStepJob(
             ['-r', 'emr', '--ami-version', '4.3.0',
              '--emr-application', 'Mahout'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with job.make_runner() as runner:
             # we explicitly add Hadoop so we can see Hadoop version in
@@ -3827,7 +3840,7 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             ['-r', 'emr', '--ami-version', '4.3.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with job.make_runner() as runner:
             runner._launch()
@@ -3836,3 +3849,76 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             self.assertIn('Applications.member.1.Name', cluster._api_params)
             self.assertIn('Applications.member.2.Name', cluster._api_params)
             self.assertNotIn('Applications.member.0.Name', cluster._api_params)
+
+
+class JobStepsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(JobStepsTestCase, self).setUp()
+        self.start(patch.object(MockEmrConnection, 'list_steps',
+                                side_effect=MockEmrConnection.list_steps,
+                                autospec=True))
+
+    def test_empty(self):
+        runner = EMRJobRunner()
+        runner.make_persistent_cluster()
+
+        self.assertEqual(runner._job_steps(), [])
+        self.assertEqual(MockEmrConnection.list_steps.call_count, 0 )
+
+    def test_own_cluster(self):
+        job = MRTwoStepJob(['-r', 'emr']).sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            job_steps = runner._job_steps()
+
+            self.assertEqual(len(job_steps), 2)
+
+            # ensure that steps appear in correct order (see #1316)
+            self.assertIn('Step 1', job_steps[0].name)
+            self.assertIn('Step 2', job_steps[1].name)
+
+            self.assertEqual(MockEmrConnection.list_steps.call_count, 1)
+
+    def test_shared_cluster(self):
+        cluster_id = EMRJobRunner().make_persistent_cluster()
+
+        def add_other_steps(n):
+            for _ in range(n):
+                self.mock_emr_clusters[cluster_id]._steps.append(
+                    MockEmrObject(id='s-NONE', name=''))
+
+        job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id]).sandbox()
+
+        with job.make_runner() as runner:
+            add_other_steps(n=DEFAULT_MAX_STEPS_RETURNED)
+            runner._launch()
+            add_other_steps(n=3)
+
+            # this test won't work if pages of steps are really small
+            assert(DEFAULT_MAX_STEPS_RETURNED >= 5)
+
+            job_steps = runner._job_steps()
+
+            self.assertEqual(len(job_steps), 2)
+
+            # ensure that steps appear in correct order (see #1316)
+            self.assertIn('Step 1', job_steps[0].name)
+            self.assertIn('Step 2', job_steps[1].name)
+
+            # ensure that steps are for correct job
+            self.assertTrue(job_steps[0].name.startswith(runner._job_key))
+            self.assertTrue(job_steps[1].name.startswith(runner._job_key))
+
+            # this should have only taken one call to list_steps(),
+            # thanks to pagination
+            self.assertEqual(MockEmrConnection.list_steps.call_count, 1)
+
+            # listing all the steps would take two calls
+            MockEmrConnection.list_steps.reset_mock()
+
+            all_steps = _list_all_steps(runner.make_emr_conn(), cluster_id)
+            self.assertEqual(len(all_steps), DEFAULT_MAX_STEPS_RETURNED + 5)
+            self.assertEqual(MockEmrConnection.list_steps.call_count, 2)

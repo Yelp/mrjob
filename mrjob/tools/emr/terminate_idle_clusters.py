@@ -70,9 +70,9 @@ import re
 
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
-from mrjob.emr import _yield_all_steps
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
 from mrjob.options import _add_emr_connect_opts
@@ -175,7 +175,7 @@ def _maybe_terminate_clusters(dry_run=False,
             continue
 
         # need steps to learn more about cluster
-        steps = list(_yield_all_steps(emr_conn, cluster_id))
+        steps = _list_all_steps(emr_conn, cluster_id)
 
         # we can't really tell if non-streaming jobs are idle or not, so
         # let them be (see Issue #60)

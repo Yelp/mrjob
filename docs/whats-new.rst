@@ -15,12 +15,12 @@ This release adds basic support for `Google Cloud Dataproc <https://cloud.google
 * finding probable cause of errors
 * running Java JARs as steps
 
-Fixed a pretty bad bug (introduced in v0.5.0) where we were waiting for steps
-to complete in the wrong order. (In a multi-step job, we wouldn't register that
-the first step had finished until the last one had.)
-
 Added the :mrjob-opt:`emr_applications` option, which helps you configure
 4.x AMIs.
+
+Fixed an EMR bug (introduced in v0.5.0) where we were waiting for steps
+to complete in the wrong order (in a multi-step job, we wouldn't register
+that the first step had finished until the last one had).
 
 Fixed a bug in SSH tunneling (introduced in v0.5.0) that made connections
 to the job tracker/resource manager on EMR time out when running on a 2.x

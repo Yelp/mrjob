@@ -146,7 +146,8 @@ def _find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
         if cs.status.state != 'RUNNING':
             continue
 
-        steps = list(_yield_all_steps(emr_conn, cs.id))
+        # _yield_all_steps() is in reverse order, see #1316
+        steps = list(reversed(list(_yield_all_steps(emr_conn, cs.id))))
 
         running_steps = [
             step for step in steps if step.status.state == 'RUNNING']

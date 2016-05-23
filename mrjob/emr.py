@@ -1596,7 +1596,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                                for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
-    def _steps_for_job(self):
+    def _job_steps(self):
         """Get the steps we submitted for this job in chronological order,
         ignoring steps from other jobs, and making as few API calls as
         possible.
@@ -1613,7 +1613,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
-        job_steps = self._steps_for_job()
+        job_steps = self._job_steps()
         num_steps = len(self._get_steps())
 
         if len(job_steps) != num_steps:

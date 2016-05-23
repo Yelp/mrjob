@@ -653,6 +653,7 @@ class MockEmrConnection(object):
         self.mock_emr_failures = combine_values({}, mock_emr_failures)
         self.mock_emr_output = combine_values({}, mock_emr_output)
         self.max_clusters_returned = max_clusters_returned
+        self.max_steps_returned = max_steps_returned
 
         if region is not None:
             self.host = region.endpoint
@@ -1171,6 +1172,9 @@ class MockEmrConnection(object):
             step = steps[index]
             if step_states is None or step.status.state in step_states:
                 steps_listed.append(step)
+
+            if len(steps_listed) >= self.max_steps_returned:
+                break
         else:
             index = None  # listed all steps, no need to call again
 

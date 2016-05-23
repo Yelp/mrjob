@@ -2590,14 +2590,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         emr_conn = self.make_emr_conn()
         return list(_yield_all_steps(emr_conn, self._cluster_id))
 
-    def _step_num_to_id(self):
-        if self._cluster_id is None:
-            return {}
-
-        return dict((step_num, step.id)
-                    for step_num, step in
-                    enumerate(self._list_steps_for_cluster(), start=1))
-
     def get_hadoop_version(self):
         if self._hadoop_version is None:
             self._store_cluster_info()

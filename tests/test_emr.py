@@ -582,7 +582,7 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
         }}}
 
         job = MRWordCount(['-r', 'emr'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
             with job.make_runner() as runner:
@@ -3787,7 +3787,7 @@ class EmrApplicationsTestCase(MockBotoTestCase):
 
     def test_default(self):
         job = MRTwoStepJob(['-r', 'emr', '--ami-version', '4.3.0'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['emr_applications'], set())
@@ -3803,7 +3803,7 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             ['-r', 'emr', '--ami-version', '4.3.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['emr_applications'],
@@ -3820,7 +3820,7 @@ class EmrApplicationsTestCase(MockBotoTestCase):
         job = MRTwoStepJob(
             ['-r', 'emr', '--ami-version', '4.3.0',
              '--emr-application', 'Mahout'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with job.make_runner() as runner:
             # we explicitly add Hadoop so we can see Hadoop version in
@@ -3840,7 +3840,7 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             ['-r', 'emr', '--ami-version', '4.3.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         with job.make_runner() as runner:
             runner._launch()

@@ -943,7 +943,7 @@ class SetupLineEncodingTestCase(MockHadoopTestCase):
 
     def test_setup_wrapper_script_uses_local_line_endings(self):
         job = MRTwoStepJob(['-r', 'hadoop', '--setup', 'true'])
-        job.sandbox(stdin=BytesIO(b''))
+        job.sandbox()
 
         add_mock_hadoop_output([b''])
         add_mock_hadoop_output([b''])

@@ -236,12 +236,21 @@ def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
     `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
 
     Note that this returns steps in *reverse* order, because that's what
-    the ``ListSteps`` API call does. See #1316.
+    the ``ListSteps`` API call does (see #1316). If you want to see all steps
+    in chronological order, use :py:func:`_list_all_steps`.
     """
     for resp in _repeat(_patched_list_steps, emr_conn, cluster_id,
                         *args, **kwargs):
         for step in getattr(resp, 'steps', []):
             yield step
+
+
+def _list_all_steps(emr_conn, cluster_id, *args, **kwargs):
+    """Return all steps for the cluster as a list, in chronological order
+    (the reverse of :py:func:`_yield_all_steps`).
+    """
+    return list(reversed(list(
+        _yield_all_steps(emr_conn, cluster_id, *args, **kwargs))))
 
 
 def _step_ids_for_job(steps, job_key):
@@ -250,7 +259,7 @@ def _step_ids_for_job(steps, job_key):
 
     Note that :py:func:`_yield_all_steps` returns steps in reverse order;
     you probably want to use the value returned by
-    :py:meth:`EMRJobRunner._list_steps_for_cluster` for *steps*.
+    :pyfunc:`_list_all_steps` for *steps*.
     """
     step_ids = []
 
@@ -1588,7 +1597,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
-        steps = self._list_steps_for_cluster()
+        steps = _list_all_steps(self.make_emr_conn(), self.get_cluster_id())
 
         step_ids = _step_ids_for_job(steps, self._job_key)
         num_steps = len(step_ids)
@@ -2357,11 +2366,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not self._opts['emr_applications'] <= applications:
                     return
 
-            # _yield_all_steps() yields in reverse order. This doesn't
-            # currently seem to matter; we just care about the number
-            # of steps and if any are pending
-            steps = list(reversed(list(
-                _yield_all_steps(emr_conn, cluster.id))))
+            steps = _list_all_steps(emr_conn, cluster.id)
 
             # there is a hard limit of 256 steps per cluster
             if len(steps) + num_steps > _MAX_STEPS_PER_CLUSTER:
@@ -2599,16 +2604,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
         return _patched_describe_cluster(emr_conn, self._cluster_id)
-
-    def _list_steps_for_cluster(self):
-        """Get all steps for our cluster in the order they were added.
-
-        Potentially make multiple API calls.
-        """
-        emr_conn = self.make_emr_conn()
-        # the ListSteps API call returns steps in reverse order, see #1316
-        return list(reversed(list(
-            _yield_all_steps(emr_conn, self._cluster_id))))
 
     def get_hadoop_version(self):
         if self._hadoop_version is None:

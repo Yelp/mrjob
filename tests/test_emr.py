@@ -34,6 +34,7 @@ from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
+from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
@@ -161,7 +162,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
             # make sure our input and output formats are attached to
             # the correct steps
             emr_conn = runner.make_emr_conn()
-            steps = runner._list_steps_for_cluster()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             step_0_args = [a.value for a in steps[0].config.args]
             step_1_args = [a.value for a in steps[1].config.args]
@@ -695,7 +696,7 @@ class EnableDebuggingTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = runner._list_steps_for_cluster()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(steps[0].name, 'Setup Hadoop Debugging')
 
@@ -2920,7 +2921,7 @@ class JarStepTestCase(MockBotoTestCase):
             self.assertTrue(runner.fs.ls(jar_uri))
 
             emr_conn = runner.make_emr_conn()
-            steps = runner._list_steps_for_cluster()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar, jar_uri)
@@ -2936,7 +2937,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = runner._list_steps_for_cluster()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar, JAR_URI)
@@ -2950,7 +2951,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = runner._list_steps_for_cluster()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar,
@@ -2972,7 +2973,7 @@ class JarStepTestCase(MockBotoTestCase):
             runner.run()
 
             emr_conn = runner.make_emr_conn()
-            steps = runner._list_steps_for_cluster()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
             self.assertEqual(len(steps), 2)
             jar_step, streaming_step = steps
@@ -3848,48 +3849,3 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             self.assertIn('Applications.member.1.Name', cluster._api_params)
             self.assertIn('Applications.member.2.Name', cluster._api_params)
             self.assertNotIn('Applications.member.0.Name', cluster._api_params)
-
-
-# regression tests for #1316
-class ListStepsForClusterTestCase(MockBotoTestCase):
-
-    def test_empty(self):
-        runner = EMRJobRunner()
-        runner.make_persistent_cluster()
-
-        self.assertEqual(runner._list_steps_for_cluster(), [])
-
-    def test_one_step(self):
-        job = MRWordCount(['-r', 'emr'])
-        job.sandbox(stdin=BytesIO(b''))
-
-        with job.make_runner() as runner:
-            runner._launch()
-
-            steps = runner._list_steps_for_cluster()
-
-            self.assertEqual(len(steps), 1)
-            self.assertIn('Step 1', steps[0].name)
-
-    def test_two_steps(self):
-        # regression test for #1316 (ListSteps API call returns steps
-        # in reverse order, and we have to re-reverse them)
-        job = MRTwoStepJob(['-r', 'emr'])
-        job.sandbox(stdin=BytesIO(b''))
-
-        with job.make_runner() as runner:
-            runner._launch()
-
-            steps = runner._list_steps_for_cluster()
-
-            self.assertEqual(len(steps), 2)
-            self.assertIn('Step 1', steps[0].name)
-            self.assertIn('Step 2', steps[1].name)
-
-            # double-check that API returns steps in reverse order
-            steps_from_api = list(_yield_all_steps(
-                runner.make_emr_conn(), runner.get_cluster_id()))
-
-            self.assertEqual(len(steps_from_api), 2)
-            self.assertIn('Step 2', steps_from_api[0].name)
-            self.assertIn('Step 1', steps_from_api[1].name)

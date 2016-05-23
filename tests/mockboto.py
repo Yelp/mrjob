@@ -1100,7 +1100,7 @@ class MockEmrConnection(object):
             self.mock_emr_clusters.values(),
             key=cluster_sort_key, reverse=True)
 
-        for cluster in sorted(self.mock_emr_clusters.values()):
+        for cluster in sorted_clusters:
             # skip ahead to marker (marker is just cluster ID)
             cluster_id = cluster.id
             if marker is not None and cluster_id < marker:

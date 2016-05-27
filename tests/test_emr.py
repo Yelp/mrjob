@@ -3922,3 +3922,134 @@ class JobStepsTestCase(MockBotoTestCase):
             all_steps = _list_all_steps(runner.make_emr_conn(), cluster_id)
             self.assertEqual(len(all_steps), DEFAULT_MAX_STEPS_RETURNED + 5)
             self.assertEqual(MockEmrConnection.list_steps.call_count, 2)
+
+
+class WaitForStepsToCompleteTestCase(MockBotoTestCase):
+
+    # this mostly ensures that we open the SSH tunnel at an appropriate time
+
+    class StopTest(Exception):
+        pass
+
+    def setUp(self):
+        super(WaitForStepsToCompleteTestCase, self).setUp()
+
+        # mock out setting up SSH tunnel
+        self.start(patch.object(EMRJobRunner, '_set_up_ssh_tunnel'))
+
+        # mock out logging
+        self.start(patch('mrjob.emr.log'))
+
+        # track number of calls to _wait_for_step_to_complete()
+        #
+        # need to keep a ref to the mock; apparently, when side_effect/autospec
+        # is used, we can read mock attributes of
+        # EMRJobRunner._wait_for_step_to_complete but not write them
+        self._wait_for_step_to_complete = self.start(patch.object(
+            EMRJobRunner, '_wait_for_step_to_complete',
+            side_effect=EMRJobRunner._wait_for_step_to_complete,
+            autospec=True))
+
+    def make_runner(self, *extra_args):
+        """Make a runner for a two step job and launch it."""
+        job = MRTwoStepJob(['-r', 'emr'] + list(extra_args)).sandbox()
+        runner = job.make_runner()
+        runner._launch()
+        return runner
+
+    def test_basic(self):
+        runner = self.make_runner()
+
+        runner._wait_for_steps_to_complete()
+
+        self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 2)
+        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
+        self.assertEqual(len(runner._log_interpretations), 2)
+
+    def test_blanks_out_log_interpretations(self):
+        runner = self.make_runner()
+
+        runner._log_interpretations = ['foo', 'bar', 'baz']
+
+        self._wait_for_step_to_complete.side_effect = self.StopTest
+
+        self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
+        self.assertEqual(runner._log_interpretations, [])
+
+    def test_open_ssh_tunnel_when_first_step_runs(self):
+        # normally, we'll open the SSH tunnel when the first step
+        # is RUNNING
+
+        # stop the test as soon as SSH tunnel is set up
+        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+
+        runner = self.make_runner()
+
+        self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
+
+        self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 1)
+
+        mock_cluster = runner._describe_cluster()
+        mock_steps = mock_cluster._steps
+
+        self.assertEqual(len(mock_steps), 2)
+        self.assertEqual(mock_steps[0].status.state, 'RUNNING')
+
+    def test_open_ssh_tunnel_if_cluster_running(self):
+        # tests #1115
+
+        # stop the test as soon as SSH tunnel is set up
+        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+
+        runner = self.make_runner()
+        mock_cluster = runner._describe_cluster()
+        mock_cluster.status.state = 'RUNNING'
+
+        # run until SSH tunnel is set up
+        self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
+
+        self.assertFalse(EMRJobRunner._wait_for_step_to_complete.called)
+
+    def test_open_ssh_tunnel_if_cluster_waiting(self):
+        # tests #1115
+
+        # stop the test as soon as SSH tunnel is set up
+        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+
+        runner = self.make_runner()
+        mock_cluster = runner._describe_cluster()
+        mock_cluster.status.state = 'WAITING'
+
+        # run until SSH tunnel is set up
+        self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
+
+        self.assertFalse(EMRJobRunner._wait_for_step_to_complete.called)
+
+    def test_open_ssh_tunnel_when_step_pending_but_cluster_running(self):
+        # tests #1115
+
+        # stop the test as soon as SSH tunnel is set up
+        EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
+
+        # put steps from previous job on cluster
+        previous_runner = self.make_runner()
+
+        runner = self.make_runner(
+            '--cluster-id', previous_runner.get_cluster_id())
+
+        mock_cluster = runner._describe_cluster()
+        mock_steps = mock_cluster._steps
+
+        # sanity-check: are steps from the previous cluster on there?
+        self.assertEqual(len(mock_steps), 4)
+
+        # run until ssh tunnel is called
+        self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
+
+        # should have only waited for first step
+        self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 1)
+
+        # cluster should be running, step should still be pending
+        self.assertEqual(mock_cluster.status.state, 'RUNNING')
+        self.assertIn(runner._job_key, mock_steps[2].name)
+        self.assertEqual(mock_steps[2].status.state, 'PENDING')

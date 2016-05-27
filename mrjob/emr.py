@@ -1665,6 +1665,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 reason = _get_reason(cluster)
                 reason_desc = (': %s' % reason) if reason else ''
 
+                # we can open the ssh tunnel if cluster is RUNNING (see #1115)
+                if cluster.state.state == 'RUNNING':
+                    self._set_up_ssh_tunnel()
+
                 log.info('  PENDING (cluster is %s%s)' % (
                     cluster.status.state, reason_desc))
                 continue
@@ -1678,7 +1682,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     start = iso8601_to_timestamp(startdatetime)
                     time_running_desc = ' for %.1fs' % (time.time() - start)
 
-                # now is the time to tunnel if, if we haven't already
+                # now is the time to tunnel, if we haven't already
                 self._set_up_ssh_tunnel()
                 log.info('  RUNNING%s' % time_running_desc)
                 self._log_step_progress()

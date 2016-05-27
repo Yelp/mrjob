@@ -1249,14 +1249,6 @@ class MockEmrConnection(object):
 
             return
 
-        # if job is BOOTSTRAPPING, move it along to RUNNING
-        if cluster.status.state == 'BOOTSTRAPPING':
-            cluster.status.state = 'RUNNING'
-            for ig in cluster._instancegroups:
-                ig.status.state = 'RUNNING'
-
-            return
-
         # if job is TERMINATING, move along to terminated
         if cluster.status.state == 'TERMINATING':
             code = getattr(getattr(cluster.status, 'statechangereason', None),
@@ -1272,6 +1264,12 @@ class MockEmrConnection(object):
         # if job is done, nothing to do
         if cluster.status.state in ('TERMINATED', 'TERMINATED_WITH_ERRORS'):
             return
+
+        # if job is BOOTSTRAPPING, move it along to RUNNING and continue
+        if cluster.status.state == 'BOOTSTRAPPING':
+            cluster.status.state = 'RUNNING'
+            for ig in cluster._instancegroups:
+                ig.status.state = 'RUNNING'
 
         # at this point, should be RUNNING or WAITING
         assert cluster.status.state in ('RUNNING', 'WAITING')

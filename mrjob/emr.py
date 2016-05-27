@@ -1094,7 +1094,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
                 '-L', '%d:%s:%d' % (
                     bind_port, tunnel_host, tunnel_config['port']),
-                '-N', '-q',  # no shell, no output
+                '-N', '-n', '-q',  # no shell, no input, no output
                 '-i', self._opts['ec2_key_pair_file'],
             ]
             if self._opts['ssh_tunnel_is_open']:

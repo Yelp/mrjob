@@ -1623,6 +1623,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # already filled
         self._log_interpretations = []
 
+        # open SSH tunnel if cluster is already ready
+        # (this happens with pooling). See #1115
+        cluster = self._describe_cluster()
+        if cluster.status.state in ('RUNNING', 'WAITING'):
+            self._set_up_ssh_tunnel()
+
         for step_num, step in enumerate(job_steps):
             # this will raise an exception if a step fails
             log.info('Waiting for step %d of %d (%s) to complete...' % (
@@ -1665,8 +1671,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 reason = _get_reason(cluster)
                 reason_desc = (': %s' % reason) if reason else ''
 
-                # we can open the ssh tunnel if cluster is RUNNING (see #1115)
-                if cluster.state.state == 'RUNNING':
+                # we can open the ssh tunnel if cluster is ready (see #1115)
+                if cluster.status.state in ('RUNNING', 'WAITING'):
                     self._set_up_ssh_tunnel()
 
                 log.info('  PENDING (cluster is %s%s)' % (

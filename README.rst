@@ -127,6 +127,7 @@ other advanced mrjob features, you'll need to set up ``mrjob.conf``. mrjob looks
 for its conf file in:
 
 * The contents of ``$MRJOB_CONF``
+* ``./mrjob.conf``
 * ``~/.mrjob.conf``
 * ``/etc/mrjob.conf``
 

@@ -125,7 +125,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hadoop_extra_args': combine_lists,
         'hadoop_home': combine_paths,
         'hadoop_log_dirs': combine_path_lists,
-        'Hadoop_tmp_dir': combine_paths,
+        'hadoop_tmp_dir': combine_paths,
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {

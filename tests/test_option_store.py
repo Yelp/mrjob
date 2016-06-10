@@ -30,10 +30,12 @@ import mrjob.conf
 import mrjob.hadoop
 from mrjob.conf import ClearedValue
 from mrjob.conf import dump_mrjob_conf
+from mrjob.dataproc import DataprocRunnerOptionStore
 from mrjob.emr import EMRRunnerOptionStore
 from mrjob.hadoop import HadoopRunnerOptionStore
 from mrjob.py2 import StringIO
 from mrjob.runner import RunnerOptionStore
+from mrjob.sim import SimRunnerOptionStore
 from mrjob.util import log_to_stream
 
 from tests.py2 import TestCase
@@ -498,3 +500,29 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             self.assertIn(
                 'Deprecated cleanup_on_failure option SCRATCH has been renamed'
                 ' to TMP', stderr.getvalue())
+
+
+class OptionStoreSanityCheckTestCase(TestCase):
+
+    # catch typos etc. in option store definition. See #1322
+
+    def assert_option_store_is_sane(self, _class):
+        self.assertLessEqual(set(_class.COMBINERS),
+                             _class.ALLOWED_KEYS)
+        self.assertLessEqual(set(_class.DEPRECATED_ALIASES.values()),
+                             _class.ALLOWED_KEYS)
+
+    def test_runner_option_store_is_sane(self):
+        self.assert_option_store_is_sane(RunnerOptionStore)
+
+    def test_dataproc_runner_option_store_is_sane(self):
+        self.assert_option_store_is_sane(DataprocRunnerOptionStore)
+
+    def test_emr_runner_option_store_is_sane(self):
+        self.assert_option_store_is_sane(EMRRunnerOptionStore)
+
+    def test_hadoop_runner_option_store_is_sane(self):
+        self.assert_option_store_is_sane(HadoopRunnerOptionStore)
+
+    def test_sim_runner_option_store_is_sane(self):
+        self.assert_option_store_is_sane(SimRunnerOptionStore)

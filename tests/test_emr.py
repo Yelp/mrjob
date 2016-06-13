@@ -3747,6 +3747,13 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 # for the EMR runner
 class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
 
+    def setUp(self):
+        super(HadoopExtraArgsTestCase, self).setUp()
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='2.4.0'))
+
     RUNNER = 'emr'
 
 

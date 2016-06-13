@@ -78,6 +78,8 @@ class SimMRJobRunner(MRJobRunner):
     If you specify *hadoop_version*, we'll only simulate environment variables
     for that version of Hadoop.
     """
+    OPTION_STORE_CLASS = SimRunnerOptionStore
+
     # try to run at least two tasks to catch bugs
     _DEFAULT_MAP_TASKS = 2
     _DEFAULT_REDUCE_TASKS = 2

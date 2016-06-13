@@ -49,8 +49,6 @@ class InlineMRJobRunner(SimMRJobRunner):
     """
     alias = 'inline'
 
-    OPTION_STORE_CLASS = SimRunnerOptionStore
-
     def __init__(self, mrjob_cls=None, **kwargs):
         """:py:class:`~mrjob.inline.InlineMRJobRunner` takes the same keyword
         args as :py:class:`~mrjob.runner.MRJobRunner`. However, please note:

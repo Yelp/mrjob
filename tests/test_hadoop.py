@@ -712,10 +712,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         'hadoop',
         'jar', '<streaming jar>',
         '<upload args>',
-        '<hadoop args for step>',
     ]
 
     BASIC_JOB_ARGS = [
+        '<hadoop args for step>',
         '-input', '<hdfs step input files>',
         '-output', '<hdfs step output dir>',
     ]
@@ -757,7 +757,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
         self.assertEqual(
             self.runner._args_for_streaming_step(0),
-            (self.BASIC_HADOOP_ARGS + ['-D', 'mapreduce.job.reduces=0'] +
+            (self.BASIC_HADOOP_ARGS +
+             ['-D', 'mapreduce.job.reduces=0'] +
              self.BASIC_JOB_ARGS + [
                  '-mapper',
                  PYTHON_BIN + ' my_job.py --step-num=0 --mapper']))
@@ -778,7 +779,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
         self.assertEqual(
             self.runner._args_for_streaming_step(0),
-            (self.BASIC_HADOOP_ARGS + ['-D', 'mapred.reduce.tasks=0'] +
+            (self.BASIC_HADOOP_ARGS +
+             ['-D', 'mapred.reduce.tasks=0'] +
              self.BASIC_JOB_ARGS + [
                  '-mapper',
                  PYTHON_BIN + ' my_job.py --step-num=0 --mapper']))
@@ -847,7 +849,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
         self.assertEqual(
             self.runner._args_for_streaming_step(0),
-            (self.BASIC_HADOOP_ARGS + ['-D', 'mapreduce.job.reduces=0'] +
+            (self.BASIC_HADOOP_ARGS +
+             ['-D', 'mapreduce.job.reduces=0'] +
              self.BASIC_JOB_ARGS + [
                  '-mapper',
                  "bash -c 'bash -c '\\''grep"
@@ -1034,7 +1037,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0), ['-foo'])
 
-    def test_hadoop_extra_args_comes_first(self):
+    def test_hadoop_extra_args_comes_after_jobconf(self):
         job = MRWordCount(
             ['-r', self.RUNNER,
              '--cmdenv', 'FOO=bar',
@@ -1046,5 +1049,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
 
         with job.make_runner() as runner:
             hadoop_args = runner._hadoop_args_for_step(0)
-            self.assertEqual(hadoop_args[:2], ['-libjar', 'qux.jar'])
+            self.assertEqual(
+                hadoop_args[:4],
+                ['-D', 'baz=qux', '-libjar', 'qux.jar'])
             self.assertEqual(len(hadoop_args), 12)

@@ -3746,7 +3746,9 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 # this basically just checks that hadoop_extra_args is an option
 # for the EMR runner
 class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
-    pass
+
+    RUNNER = 'emr'
+
 
 
 # make sure we don't override the partitioner on EMR (tests #1294)

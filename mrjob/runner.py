@@ -1175,9 +1175,6 @@ class MRJobRunner(object):
 
         args = []
 
-        # hadoop_extra_args isn't defined for sim runners
-        args.extend(self._opts.get('hadoop_extra_args', ()))
-
         # translate the jobconf configuration names to match
         # the hadoop version
         jobconf = self._jobconf_for_step(step_num)
@@ -1185,6 +1182,11 @@ class MRJobRunner(object):
         for key, value in sorted(jobconf.items()):
             if value is not None:
                 args.extend(['-D', '%s=%s' % (key, value)])
+
+        # hadoop_extra_args (if defined; it's not for sim runners)
+        # this has to come after -D because it may include streaming-specific
+        # args (see #1332).
+        args.extend(self._opts.get('hadoop_extra_args', ()))
 
         # partitioner
         if self._partitioner:

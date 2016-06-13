@@ -465,24 +465,28 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         if not hadoop_streaming_jar:
             raise Exception('no Hadoop streaming jar')
 
+        mapper, combiner, reducer = (
+            self._hadoop_streaming_commands(step_num))
+
         args = self.get_hadoop_bin() + ['jar', hadoop_streaming_jar]
 
         # set up uploading from HDFS to the working dir
         args.extend(
             self._upload_args(self._upload_mgr))
 
+        # if no reducer, shut off reducer tasks. This has to come before
+        # extra hadoop args, which could contain jar-specific args
+        # (e.g. -outputformat). See #1331.
+        #
+        # might want to just integrate this into _hadoop_args_for_step?
+        if not reducer:
+            args.extend(['-D', ('%s=0' % translate_jobconf(
+                'mapreduce.job.reduces', self.get_hadoop_version()))])
+
         # Add extra hadoop args first as hadoop args could be a hadoop
         # specific argument (e.g. -libjar) which must come before job
         # specific args.
         args.extend(self._hadoop_args_for_step(step_num))
-
-        mapper, combiner, reducer = (
-            self._hadoop_streaming_commands(step_num))
-
-        # if no reducer, shut off reducer tasks
-        if not reducer:
-            args.extend(['-D', ('%s=0' % translate_jobconf(
-                'mapreduce.job.reduces', self.get_hadoop_version()))])
 
         # set up input
         for input_uri in self._hdfs_step_input_files(step_num):

@@ -597,8 +597,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         # -libjar is now a supported feature. Maybe -verbose?
 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar'] + list(args)
+                               '--no-conf', '--libjar', 'containsJars.jar',
+                               '--hadoop-arg', '-verbose'] + list(args)
                               + ['-', local_input_path, remote_input_path]
                               + ['--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
@@ -628,7 +628,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertEqual(os.listdir(os.path.join(home_dir, 'tmp')),
                              ['mrjob'])
             self.assertEqual(runner._opts['hadoop_extra_args'],
-                             ['-libjar', 'containsJars.jar'])
+                             ['-verbose'])
 
             # make sure mrjob.tar.gz is was uploaded
             self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path))
@@ -668,11 +668,18 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         self.assertNotIn('-inputformat', step_1_args)
         self.assertIn('-outputformat', step_1_args)
 
-        # make sure -libjar extra arg comes before -mapper
+        # make sure extra arg (-verbose) comes before mapper
         for args in (step_0_args, step_1_args):
-            self.assertIn('-libjar', args)
+            self.assertIn('-verbose', args)
             self.assertIn('-mapper', args)
-            self.assertLess(args.index('-libjar'), args.index('-mapper'))
+            self.assertLess(args.index('-verbose'), args.index('-mapper'))
+
+        # make sure -libjar is set and comes before mapper
+        for args in (step_0_args, step_1_args):
+            self.assertIn('-libjars', args)
+            self.assertIn('containsJars.jar', args)
+            self.assertIn('-mapper', args)
+            self.assertLess(args.index('-libjars'), args.index('-mapper'))
 
         # make sure -D (jobconf) made it through
         self.assertIn('-D', step_0_args)

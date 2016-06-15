@@ -483,8 +483,12 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             args.extend(['-D', ('%s=0' % translate_jobconf(
                 'mapreduce.job.reduces', self.get_hadoop_version()))])
 
+        # -libjars (#198)
+        if self._opts['libjars']:
+            args.extend(['-libjars', ','.join(self._opts['libjars'])])
+
         # Add extra hadoop args first as hadoop args could be a hadoop
-        # specific argument (e.g. -libjar) which must come before job
+        # specific argument (e.g. -libjars) which must come before job
         # specific args.
         args.extend(self._hadoop_args_for_step(step_num))
 

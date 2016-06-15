@@ -594,6 +594,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         add_mock_hadoop_output([b'1\t"qux"\n2\t"bar"\n',
                                 b'2\t"foo"\n5\tnull\n'])
 
+        # -libjar is now a supported feature. Maybe -verbose?
+
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf', '--hadoop-arg', '-libjar',
                                '--hadoop-arg', 'containsJars.jar'] + list(args)
@@ -1053,3 +1055,45 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
                 hadoop_args[:4],
                 ['-D', 'baz=qux', '-libjar', 'qux.jar'])
             self.assertEqual(len(hadoop_args), 12)
+
+
+class LibjarsTestCase(MockHadoopTestCase):
+
+    def test_empty(self):
+        job = MRWordCount(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+            args = runner._args_for_streaming_step(0)
+
+            self.assertNotIn('-libjars', args)
+
+    def test_one_jar(self):
+        job = MRWordCount([
+            '-r', 'hadoop',
+            '--libjar', '/path/to/a.jar',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+            args = runner._args_for_streaming_step(0)
+
+            self.assertIn('-libjars', args)
+            self.assertIn('/path/to/a.jar', args)
+
+    def test_two_jars(self):
+        job = MRWordCount([
+            '-r', 'hadoop',
+            '--libjar', '/path/to/a.jar',
+            '--libjar', '/path/to/b.jar',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+            args = runner._args_for_streaming_step(0)
+
+            self.assertIn('-libjars', args)
+            self.assertIn('/path/to/a.jar,/path/to/b.jar', args)

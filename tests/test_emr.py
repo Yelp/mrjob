@@ -3004,22 +3004,22 @@ class ActionOnFailureTestCase(MockBotoTestCase):
 
     def test_default(self):
         runner = EMRJobRunner()
-        self.assertEqual(runner._action_on_failure,
+        self.assertEqual(runner._action_on_failure(),
                          'TERMINATE_CLUSTER')
 
     def test_default_with_cluster_id(self):
         runner = EMRJobRunner(cluster_id='j-CLUSTER')
-        self.assertEqual(runner._action_on_failure,
+        self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 
     def test_default_with_pooling(self):
         runner = EMRJobRunner(pool_clusters=True)
-        self.assertEqual(runner._action_on_failure,
+        self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 
     def test_option(self):
         runner = EMRJobRunner(emr_action_on_failure='CONTINUE')
-        self.assertEqual(runner._action_on_failure,
+        self.assertEqual(runner._action_on_failure(),
                          'CONTINUE')
 
     def test_switch(self):
@@ -3028,7 +3028,7 @@ class ActionOnFailureTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            self.assertEqual(runner._action_on_failure, 'CONTINUE')
+            self.assertEqual(runner._action_on_failure(), 'CONTINUE')
 
 
 class MultiPartUploadTestCase(MockBotoTestCase):

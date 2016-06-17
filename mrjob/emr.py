@@ -2436,7 +2436,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return self.get_cluster_id()
 
-    # TODO: add to docs
     def get_cluster_id(self):
         return self._cluster_id
 

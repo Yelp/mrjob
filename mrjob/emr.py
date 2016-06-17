@@ -1488,6 +1488,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 _FALLBACK_SERVICE_ROLE)
             return _FALLBACK_SERVICE_ROLE
 
+    # TODO: just make this a method
     @property
     def _action_on_failure(self):
         # don't terminate other people's clusters
@@ -1588,11 +1589,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _build_master_node_setup_step(self):
         name = '%s: Master node setup' % self._job_key
-        jar = self._script_runner_jar_uri(),
+        jar = self._script_runner_jar_uri()
         step_args = [self._upload_mgr.uri(self._master_node_setup_script_path)]
 
         return boto.emr.JarStep(
-            name=name, jar=jar, step_args=step_args)
+            name=name, jar=jar, step_args=step_args,
+            action_on_failure=self._action_on_failure)
 
     def _libjar_step_args(self):
         libjar_paths = []
@@ -2326,7 +2328,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # create script
         path = os.path.join(self._get_local_tmp_dir(), 'mns.sh')
-        log.debug('writing master node setup script to %s')
+        log.debug('writing master node setup script to %s' % path)
 
         contents = self._master_node_setup_script_content()
         for line in contents:

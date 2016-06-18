@@ -3662,8 +3662,8 @@ class LsStepLogsTestCase(MockBotoTestCase):
 
         self.log = self.start(patch('mrjob.emr.log'))
 
-        self._ls_emr_step_logs = self.start(patch(
-            'mrjob.emr._ls_emr_step_logs'))
+        self._ls_emr_step_syslogs = self.start(patch(
+            'mrjob.emr._ls_emr_step_syslogs'))
         self._stream_step_log_dirs = self.start(patch(
             'mrjob.emr.EMRJobRunner._stream_step_log_dirs'))
 
@@ -3671,7 +3671,7 @@ class LsStepLogsTestCase(MockBotoTestCase):
         # just verify that the keyword args get passed through and
         # that logging happens in the right order
 
-        self._ls_emr_step_logs.return_value = [
+        self._ls_emr_step_syslogs.return_value = [
             dict(path='s3://bucket/logs/steps/syslog'),
         ]
 
@@ -3679,7 +3679,7 @@ class LsStepLogsTestCase(MockBotoTestCase):
 
         self.log.info.reset_mock()
 
-        results = runner._ls_step_logs(step_id='s-STEPID')
+        results = runner._ls_step_syslogs(step_id='s-STEPID')
 
         self.assertFalse(self.log.info.called)
 
@@ -3688,7 +3688,7 @@ class LsStepLogsTestCase(MockBotoTestCase):
 
         self._stream_step_log_dirs.assert_called_once_with(
             step_id='s-STEPID')
-        self._ls_emr_step_logs.assert_called_once_with(
+        self._ls_emr_step_syslogs.assert_called_once_with(
             runner.fs,
             self._stream_step_log_dirs.return_value,
             step_id='s-STEPID')
@@ -3709,8 +3709,8 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self._interpret_emr_step_logs = self.start(patch(
             'mrjob.emr._interpret_emr_step_logs'))
-        self._ls_step_logs = self.start(patch(
-            'mrjob.emr.EMRJobRunner._ls_step_logs'))
+        self._ls_step_syslogs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ls_step_syslogs'))
 
     def test_basic(self):
         runner = EMRJobRunner()
@@ -3724,9 +3724,9 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
             self._interpret_emr_step_logs.return_value)
 
         self.assertFalse(self.log.warning.called)
-        self._ls_step_logs.assert_called_once_with(step_id='s-STEPID')
+        self._ls_step_syslogs.assert_called_once_with(step_id='s-STEPID')
         self._interpret_emr_step_logs.assert_called_once_with(
-            runner.fs, self._ls_step_logs.return_value)
+            runner.fs, self._ls_step_syslogs.return_value)
 
     def test_no_step_id(self):
         runner = EMRJobRunner()
@@ -3739,7 +3739,7 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
             runner._get_step_log_interpretation(log_interpretation), None)
 
         self.assertTrue(self.log.warning.called)
-        self.assertFalse(self._ls_step_logs.called)
+        self.assertFalse(self._ls_step_syslogs.called)
         self.assertFalse(self._interpret_emr_step_logs.called)
 
 

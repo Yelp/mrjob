@@ -73,7 +73,7 @@ _TASK_ATTEMPT_FAILED_RE = re.compile(
 log = getLogger(__name__)
 
 
-def _ls_emr_step_logs(fs, log_dir_stream, step_id=None):
+def _ls_emr_step_syslogs(fs, log_dir_stream, step_id=None):
     """Yield matching step logs, optionally filtering by *step_id*.
     Yields dicts with the keys:
 
@@ -104,7 +104,7 @@ def _match_emr_step_log_path(path, step_id=None):
 
 
 def _interpret_emr_step_logs(fs, matches):
-    """Extract information from step log (see :py:func:`_parse_step_log()`),
+    """Extract information from step log (see :py:func:`_parse_step_syslog()`),
     which may be split into several chunks by timestamp"""
     # going to merge results for each log into final result
     errors = []
@@ -113,7 +113,7 @@ def _interpret_emr_step_logs(fs, matches):
     for match in matches:
         path = match['path']
 
-        interpretation = _parse_step_log(_cat_log(fs, path))
+        interpretation = _parse_step_syslog(_cat_log(fs, path))
 
         result.update(interpretation)
         for error in result.get('errors') or ():
@@ -131,7 +131,7 @@ def _interpret_emr_step_logs(fs, matches):
 
 def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     """Parse stderr from the ``hadoop jar`` command. Works like
-    :py:func:`_parse_step_log` (same return format)  with a few extra features
+    :py:func:`_parse_step_syslog` (same return format)  with a few extra features
     to handle the output of the ``hadoop jar`` command on the fly:
 
     - Converts ``bytes`` lines to ``str``
@@ -163,7 +163,7 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
                 record_callback(record)
             yield record
 
-    result = _parse_step_log_from_log4j_records(yield_records())
+    result = _parse_step_syslog_from_log4j_records(yield_records())
 
     _add_implied_job_id(result)
     for error in result.get('errors') or ():
@@ -172,7 +172,7 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     return result
 
 
-def _parse_step_log(lines):
+def _parse_step_syslog(lines):
     """Parse the syslog from the ``hadoop jar`` command.
 
     Returns a dictionary which potentially contains the following keys:
@@ -191,15 +191,15 @@ def _parse_step_log(lines):
     output_dir: a URI like 'hdfs:///user/hadoop/tmp/my-output-dir'. Should
         always be set on success.
     """
-    return _parse_step_log_from_log4j_records(
+    return _parse_step_syslog_from_log4j_records(
         _parse_hadoop_log4j_records(lines))
 
 
-def _parse_step_log_from_log4j_records(records):
+def _parse_step_syslog_from_log4j_records(records):
     """Pulls errors, counters, IDs, etc. from log4j records
     emitted by Hadoop.
 
-    This powers :py:func:`_parse_step_log` and
+    This powers :py:func:`_parse_step_syslog` and
     :py:func:`_interpret_hadoop_jar_command_stderr`.
     """
     result = {}

@@ -82,7 +82,7 @@ from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_emr_step_logs
-from mrjob.logs.step import _ls_emr_step_logs
+from mrjob.logs.step import _ls_emr_step_syslogs
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -2000,11 +2000,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return
 
         return _interpret_emr_step_logs(
-            self.fs, self._ls_step_logs(step_id=step_id))
+            self.fs, self._ls_step_syslogs(step_id=step_id))
 
-    def _ls_step_logs(self, step_id):
+    def _ls_step_syslogs(self, step_id):
         """Yield step log matches, logging a message for each one."""
-        for match in _ls_emr_step_logs(
+        for match in _ls_emr_step_syslogs(
                 self.fs, self._stream_step_log_dirs(step_id=step_id),
                 step_id=step_id):
             log.info('  Parsing step log: %s' % match['path'])

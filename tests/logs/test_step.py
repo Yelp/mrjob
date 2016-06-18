@@ -15,10 +15,10 @@ import errno
 
 from mrjob.logs.step import _interpret_emr_step_logs
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
-from mrjob.logs.step import _ls_emr_step_logs
+from mrjob.logs.step import _ls_emr_step_syslogs
 from mrjob.logs.step import _match_emr_step_log_path
 from mrjob.logs.step import _parse_indented_counters
-from mrjob.logs.step import _parse_step_log
+from mrjob.logs.step import _parse_step_syslog
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
@@ -95,16 +95,16 @@ PARSED_PRE_YARN_STEP_LOG_LINES = dict(
 class ParseStepLogTestCase(TestCase):
 
     def test_empty(self):
-        self.assertEqual(_parse_step_log([]), {})
+        self.assertEqual(_parse_step_syslog([]), {})
 
     def test_yarn(self):
         self.assertEqual(
-            _parse_step_log(YARN_STEP_LOG_LINES),
+            _parse_step_syslog(YARN_STEP_LOG_LINES),
             PARSED_YARN_STEP_LOG_LINES)
 
     def test_pre_yarn(self):
         self.assertEqual(
-            _parse_step_log(PRE_YARN_STEP_LOG_LINES),
+            _parse_step_syslog(PRE_YARN_STEP_LOG_LINES),
             PARSED_PRE_YARN_STEP_LOG_LINES)
 
 
@@ -417,8 +417,8 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
                 self.mock_paths_catted.append(path)
             return path
 
-        # (the real _parse_step_log() expects lines, not paths)
-        def mock_parse_step_log(path_from_mock_cat_log):
+        # (the real _parse_step_syslog() expects lines, not paths)
+        def mock_parse_step_syslog(path_from_mock_cat_log):
             return self.path_to_mock_result.get(path_from_mock_cat_log, {})
 
         # need to mock ls so that _ls_task_syslogs() can work
@@ -434,12 +434,12 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
         self.mock_cat_log = self.start(
             patch('mrjob.logs.step._cat_log', side_effect=mock_cat_log))
 
-        self.start(patch('mrjob.logs.step._parse_step_log',
-                         side_effect=mock_parse_step_log))
+        self.start(patch('mrjob.logs.step._parse_step_syslog',
+                         side_effect=mock_parse_step_syslog))
 
     def mock_path_matches(self):
         mock_log_dir_stream = [['']]  # needed to make _ls_logs() work
-        return _ls_emr_step_logs(self.mock_fs, mock_log_dir_stream)
+        return _ls_emr_step_syslogs(self.mock_fs, mock_log_dir_stream)
 
     def interpret_emr_step_logs(self, **kwargs):
         return _interpret_emr_step_logs(

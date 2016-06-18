@@ -1693,12 +1693,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
         num_steps = len(self._get_steps())
+
+        # if there's a master node setup script, we'll treat that as
+        # step -1
         if self._master_node_setup_script_path:
-            num_steps += 1
+            max_steps = num_steps + 1
+        else:
+            max_steps = num_steps
 
-        job_steps = self._job_steps(max_steps=num_steps)
+        job_steps = self._job_steps(max_steps=max_steps)
 
-        if len(job_steps) < num_steps:
+        if len(job_steps) < max_steps:
             raise AssertionError("Can't find our steps in the cluster!")
 
         # clear out _log_interpretations if for some reason it was
@@ -1842,7 +1847,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     log.error('Probable cause of failure:\n\n%s\n\n' %
                               _format_error(error))
 
-            raise StepFailedException(step_num=step_num, num_steps=num_steps)
+            raise StepFailedException(
+                step_num=step_num, num_steps=num_steps,
+                # "Step 0 of ... failed" looks weird
+                step_desc=(
+                    'Master node setup step' if step_num == -1 else None))
 
     def _log_step_progress(self):
         """Tunnel to the job tracker/resource manager and log the

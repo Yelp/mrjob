@@ -724,6 +724,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # contain 'step_id' (the s-XXXXXXXX step ID on EMR).
         #
         # This will be filled by _wait_for_steps_to_complete()
+        #
+        # If there is a master node setup script, this has an extra step.
+        #
+        # This might work better as a dictionary.
         self._log_interpretations = []
 
         # set of step numbers (0-indexed) where we waited 5 minutes for logs to
@@ -1668,13 +1672,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                                for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
-    def _job_steps(self):
+    def _job_steps(self, max_steps=None):
         """Get the steps we submitted for this job in chronological order,
-        ignoring steps from other jobs, and making as few API calls as
-        possible.
-        """
-        num_steps = len(self._get_steps())
+        ignoring steps from other jobs.
 
+        Generally, you want to set *max_steps*, so we can make as few API
+        calls as possible.
+        """
         # the API yields steps in reversed order. Once we've found the expected
         # number of steps, stop.
         #
@@ -1684,18 +1688,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             (step for step in
              _yield_all_steps(self.make_emr_conn(), self.get_cluster_id())
              if step.name.startswith(self._job_key)),
-            num_steps))))
+            max_steps))))
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
-        job_steps = self._job_steps()
         num_steps = len(self._get_steps())
+        if self._master_node_setup_script_path:
+            num_steps += 1
 
-        if len(job_steps) != num_steps:
+        job_steps = self._job_steps(max_steps=num_steps)
+
+        if len(job_steps) < num_steps:
             raise AssertionError("Can't find our steps in the cluster!")
-
-        # TODO: currently, there is no monitoring for the master node
-        # setup script (if any); it gets folded away by _job_steps()
 
         # clear out _log_interpretations if for some reason it was
         # already filled
@@ -1707,10 +1711,22 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if cluster.status.state in ('RUNNING', 'WAITING'):
             self._set_up_ssh_tunnel()
 
-        for step_num, step in enumerate(job_steps):
+        # treat master node setup as step -1
+        if self._master_node_setup_script_path:
+            start = -1
+        else:
+            start = 0
+
+        for step_num, step in enumerate(job_steps, start=start):
             # this will raise an exception if a step fails
-            log.info('Waiting for step %d of %d (%s) to complete...' % (
-                step_num + 1, num_steps, step.id))
+            if step_num == -1:
+                log.info(
+                    'Waiting for master node setup step (%s) to complete...' %
+                    step.id)
+            else:
+                log.info('Waiting for step %d of %d (%s) to complete...' % (
+                    step_num + 1, num_steps, step.id))
+
             self._wait_for_step_to_complete(step.id, step_num, num_steps)
 
     def _wait_for_step_to_complete(
@@ -1769,7 +1785,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # now is the time to tunnel, if we haven't already
                 self._set_up_ssh_tunnel()
                 log.info('  RUNNING%s' % time_running_desc)
-                self._log_step_progress()
+
+                # don't log progress for master node setup step, because
+                # it doesn't appear in job tracker
+                if step_num >= 0:
+                    self._log_step_progress()
 
                 continue
 
@@ -2043,6 +2063,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if cluster.status.state != 'TERMINATING':
             # going to need to wait for logs to get archived to S3
             step_num = len(self._log_interpretations)
+            if self._master_node_setup_script_path:
+                step_num -= 1  # master node setup is step -1
 
             # already did this for this step
             if step_num in self._waited_for_logs_on_s3:

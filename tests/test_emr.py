@@ -3872,7 +3872,7 @@ class JobStepsTestCase(MockBotoTestCase):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
 
-        self.assertEqual(runner._job_steps(), [])
+        self.assertEqual(runner._job_steps(max_steps=0), [])
         self.assertEqual(MockEmrConnection.list_steps.call_count, 0)
 
     def test_own_cluster(self):
@@ -3881,7 +3881,7 @@ class JobStepsTestCase(MockBotoTestCase):
         with job.make_runner() as runner:
             runner._launch()
 
-            job_steps = runner._job_steps()
+            job_steps = runner._job_steps(max_steps=2)
 
             self.assertEqual(len(job_steps), 2)
 
@@ -3909,7 +3909,7 @@ class JobStepsTestCase(MockBotoTestCase):
             # this test won't work if pages of steps are really small
             assert(DEFAULT_MAX_STEPS_RETURNED >= 5)
 
-            job_steps = runner._job_steps()
+            job_steps = runner._job_steps(max_steps=2)
 
             self.assertEqual(len(job_steps), 2)
 
@@ -3925,11 +3925,11 @@ class JobStepsTestCase(MockBotoTestCase):
             # thanks to pagination
             self.assertEqual(MockEmrConnection.list_steps.call_count, 1)
 
-            # listing all the steps would take two calls
+            # would take two calls to list all the steps
             MockEmrConnection.list_steps.reset_mock()
 
-            all_steps = _list_all_steps(runner.make_emr_conn(), cluster_id)
-            self.assertEqual(len(all_steps), DEFAULT_MAX_STEPS_RETURNED + 5)
+            job_steps = runner._job_steps()
+            self.assertEqual(len(job_steps), 2)
             self.assertEqual(MockEmrConnection.list_steps.call_count, 2)
 
 

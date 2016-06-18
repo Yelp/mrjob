@@ -23,16 +23,17 @@ from mrjob.py2 import to_string
 from .ids import _add_implied_job_id
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
+from .task import _parse_task_stderr
 from .wrap import _cat_log
 from .wrap import _ls_logs
 
 
-# path of step log (these only exist on EMR). Step syslogs on S3 are
+# path of step logs (these only exist on EMR). Step logs on S3 are
 # rotated and timestamped with YYYY-MM-DD-HH
 _EMR_STEP_LOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<step_id>s-[A-Z0-9]+)/'
-    r'syslog(\.(?P<timestamp>[\d-]+))?(?P<suffix>\.\w+)?')
+    r'(?P<log_type>syslog|stderr)(\.(?P<timestamp>[\d-]+))?(?P<suffix>\.\w+)?')
 
 # hadoop streaming always prints "packageJobJar..." to stdout,
 # and prints Streaming Command Failed! to stderr on failure
@@ -100,7 +101,8 @@ def _match_emr_step_log_path(path, step_id=None):
     if not (step_id is None or m.group('step_id') == step_id):
         return None
 
-    return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'))
+    return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'),
+                log_type=m.group('log_type'))
 
 
 def _interpret_emr_step_logs(fs, matches):
@@ -110,15 +112,23 @@ def _interpret_emr_step_logs(fs, matches):
     errors = []
     result = {}
 
-    for match in matches:
-        path = match['path']
+    # TODO: a better approach would be to keep track of stderr paths as
+    # we go, and then go through them in reverse
+    matches = list(matches)
 
-        interpretation = _parse_step_syslog(_cat_log(fs, path))
+    # scan syslogs for cause of error
+    for match in matches:
+        if match['log_type'] != 'syslog':
+            continue
+
+        syslog_path = match['path']
+
+        interpretation = _parse_step_syslog(_cat_log(fs, syslog_path))
 
         result.update(interpretation)
         for error in result.get('errors') or ():
             if 'hadoop_error' in error:
-                error['hadoop_error']['path'] = path
+                error['hadoop_error']['path'] = syslog_path
             _add_implied_task_id(error)
             errors.append(error)
 
@@ -126,13 +136,33 @@ def _interpret_emr_step_logs(fs, matches):
     if errors:
         result['errors'] = errors
 
+    # handle script-runner.jar, which doesn't create a job ID, and
+    # just outputs to stderr
+    if not (result.get('job_id') or result.get('errors')):
+        for match in reversed(matches):
+            if match['log_type'] != 'stderr':
+                continue
+
+            stderr_path = match['path']
+
+            # _parse_task_stderr() handles any sort of stderr
+
+            # a little iffy on calling this a task_error, but it's certainly
+            # not a Java error
+            task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
+
+            if task_error:
+                task_error['path'] = stderr_path
+                result['errors'] = [task_error]
+                break  # found error, no need to parse previous logs
+
     return result
 
 
 def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     """Parse stderr from the ``hadoop jar`` command. Works like
-    :py:func:`_parse_step_syslog` (same return format)  with a few extra features
-    to handle the output of the ``hadoop jar`` command on the fly:
+    :py:func:`_parse_step_syslog` (same return format)  with a few extra
+    features to handle the output of the ``hadoop jar`` command on the fly:
 
     - Converts ``bytes`` lines to ``str``
     - Pre-filters non-log4j stuff from Hadoop Streaming so it doesn't

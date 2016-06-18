@@ -94,7 +94,9 @@ _interpret_*_logs(fs, matches, partial=True):
         container_id: YARN container where error originated from
         task_id: task that this error originated from
     ]
-    job_id: job ID for the step
+    job_id: job ID for the step. Set to False if we know there isn't supposed
+            to be a job ID (e.g. with EMR's script-runner.jar), to suppress
+            warnings
     partial: set to true if we stopped parsing
 
     Errors' task_id should always be set if attempt_id is set (use

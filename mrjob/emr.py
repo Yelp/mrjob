@@ -1752,6 +1752,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         This also adds an item to self._log_interpretations
         """
         log_interpretation = dict(step_id=step_id)
+
+        # suppress warnings about missing job ID for script-runner.jar
+        if step_num == -1:
+            log_interpretation['job_id'] = False
+
         self._log_interpretations.append(log_interpretation)
 
         emr_conn = self.make_emr_conn()

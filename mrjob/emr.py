@@ -1755,7 +1755,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # suppress warnings about missing job ID for script-runner.jar
         if step_num == -1:
-            log_interpretation['job_id'] = False
+            log_interpretation['no_job'] = True
 
         self._log_interpretations.append(log_interpretation)
 
@@ -1837,11 +1837,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters
             if step.status.state != 'CANCELLED':
-                counters = self._pick_counters(log_interpretation)
-                if counters:
-                    log.info(_format_counters(counters))
-                else:
-                    log.warning('No counters found')
+                if step_num >= 0:
+                    counters = self._pick_counters(log_interpretation)
+                    if counters:
+                        log.info(_format_counters(counters))
+                    else:
+                        log.warning('No counters found')
 
             if step.status.state == 'COMPLETED':
                 return

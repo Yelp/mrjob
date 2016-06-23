@@ -21,6 +21,11 @@ step: stderr of `hadoop jar` command (so named because on EMR it appears in
     <log dir>/steps/)
 task: stderr and syslog of individual tasks (found in <log dir>/userlogs/)
 
+Other fields at the top level:
+
+step_id: step ID (e.g. s-XXXXXXXX on EMR)
+no_job: don't expect to find job/application ID (e.g. EMR's script-runner.jar)
+
 
 Each of these should have methods like this:
 
@@ -94,10 +99,8 @@ _interpret_*_logs(fs, matches, partial=True):
         container_id: YARN container where error originated from
         task_id: task that this error originated from
     ]
-    job_id: job ID for the step. Set to False if we know there isn't supposed
-            to be a job ID (e.g. with EMR's script-runner.jar), to suppress
-            warnings
-    partial: set to true if we stopped parsing
+    job_id: job ID for the step
+    partial: set to true if we stopped parsing after the first error
 
     Errors' task_id should always be set if attempt_id is set (use
     mrjob.logs.id._add_implied_task_id()) and job_id should always be set

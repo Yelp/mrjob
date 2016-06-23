@@ -127,7 +127,7 @@ class LogInterpretationMixin(object):
 
         job_id = step_interpretation.get('job_id')
         if not job_id:
-            if job_id is None:  # if False, no job ID expected
+            if not log_interpretation.get('no_job'):
                 log.warning("Can't fetch history log; missing job ID")
             return
 
@@ -172,11 +172,13 @@ class LogInterpretationMixin(object):
 
         if yarn:
             if not application_id:
-                log.warning("Can't fetch task logs; missing application ID")
+                if not log_interpretation.get('no_job'):
+                    log.warning(
+                        "Can't fetch task logs; missing application ID")
                 return
         else:
             if not job_id:
-                if job_id is None:
+                if not log_interpretation.get('no_job'):
                     log.warning("Can't fetch task logs; missing job ID")
                 return
 

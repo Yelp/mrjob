@@ -153,7 +153,7 @@ def _interpret_emr_step_logs(fs, matches):
 
             if task_error:
                 task_error['path'] = stderr_path
-                result['errors'] = [task_error]
+                result['errors'] = [dict(task_error=task_error)]
                 break  # found error, no need to parse previous logs
 
     return result

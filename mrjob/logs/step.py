@@ -138,14 +138,22 @@ def _interpret_emr_step_logs(fs, matches):
                     error['hadoop_error']['path'] = syslog_path
                 _add_implied_task_id(error)
                 errors.append(error)
-                result['errors'] = errors
 
-            # if syslogs were useful, don't even bother with stderr
+            # if syslogs were useful, don't even bother iterating as far
+            # as stderr logs (which would trigger a logging message)
             if not match['timestamp'] and (result.get('job_id') or errors):
                 break
 
         else:
             # log_type is stderr
+
+            # only want one error from stderr, as a fallback.
+            #
+            # this will only get triggered if matches are out-of-order or
+            # syslog is missing for some reason
+            if result.get('job_id') or errors:
+                continue
+
             stderr_path = match['path']
 
             # _parse_task_stderr() handles any sort of stderr
@@ -157,8 +165,10 @@ def _interpret_emr_step_logs(fs, matches):
 
             if task_error:
                 task_error['path'] = stderr_path
-                result['errors'] = [dict(task_error=task_error)]
-                break  # found error, no need to parse previous logs
+                errors.append(dict(task_error=task_error))
+
+    if errors:
+        result['errors'] = errors
 
     return result
 

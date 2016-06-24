@@ -725,10 +725,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         #
         # This will be filled by _wait_for_steps_to_complete()
         #
-        # If there is a master node setup script, this has an extra step.
-        #
         # This might work better as a dictionary.
         self._log_interpretations = []
+
+        # log interpretation for master node setup step (currently we don't
+        # use this for anything; we just want to keep it out of
+        # self._log_interpretations)
+        self._mns_log_interpretation = None
 
         # set of step numbers (0-indexed) where we waited 5 minutes for logs to
         # transfer to S3 (so we don't do it twice)
@@ -1706,9 +1709,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if len(job_steps) < max_steps:
             raise AssertionError("Can't find our steps in the cluster!")
 
-        # clear out _log_interpretations if for some reason it was
-        # already filled
+        # clear out log interpretations if they were filled somehow
         self._log_interpretations = []
+        self._mns_log_interpretation = None
 
         # open SSH tunnel if cluster is already ready
         # (this happens with pooling). See #1115
@@ -1756,8 +1759,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # suppress warnings about missing job ID for script-runner.jar
         if step_num == -1:
             log_interpretation['no_job'] = True
-
-        self._log_interpretations.append(log_interpretation)
+            self._mns_log_interpretation = log_interpretation
+        else:
+            self._log_interpretations.append(log_interpretation)
 
         emr_conn = self.make_emr_conn()
 
@@ -2077,9 +2081,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         if cluster.status.state != 'TERMINATING':
             # going to need to wait for logs to get archived to S3
-            step_num = len(self._log_interpretations)
-            if self._master_node_setup_script_path:
-                step_num -= 1  # master node setup is step -1
+
+            # "step_num" is just a unique ID for the step; using -1
+            # for master node setup script
+            if (self._master_node_setup_script_path and
+                    self._mns_log_interpretation is None):
+                step_num = -1
+            else:
+                step_num = len(self._log_interpretations)
 
             # already did this for this step
             if step_num in self._waited_for_logs_on_s3:

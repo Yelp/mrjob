@@ -84,14 +84,18 @@ def _ls_emr_step_logs(fs, log_dir_stream, step_id=None):
     matches = _ls_logs(fs, log_dir_stream, _match_emr_step_log_path,
                        step_id=step_id)
 
-    # "recency" isn't useful here; sort by timestamp, with unstamped
-    # log last
-    return sorted(
-        matches,
-        key=lambda m: (
-            m['log_type'] == 'stderr',
-            m['timestamp'] is None,
-            m['timestamp'] or ''))
+    time_sort_key = lambda m: (m['timestamp'] is None, m['timestamp'] or '')
+
+    # sort syslogs in chronological order
+    syslog_matches = [m for m in matches if m['log_type'] == 'syslog']
+    syslog_matches.sort(key=time_sort_key)
+
+    # sort stderr in reverse chronological order (we only use this if
+    # syslogs are useless, and then we basically want to tail them)
+    stderr_matches = [m for m in matches if m['log_type'] == 'stderr']
+    stderr_matches.sort(key=time_sort_key, reverse=True)
+
+    return syslog_matches + stderr_matches
 
 
 def _match_emr_step_log_path(path, step_id=None):
@@ -103,11 +107,6 @@ def _match_emr_step_log_path(path, step_id=None):
         return None
 
     if not (step_id is None or m.group('step_id') == step_id):
-        return None
-
-    # only need the current rotation of the stderr log, since we only extract
-    # the very end of it
-    if m.group('log_type') == 'stderr' and m.group('timestamp'):
         return None
 
     return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'),
@@ -125,31 +124,28 @@ def _interpret_emr_step_logs(fs, matches):
 
     # scan syslogs for cause of error
     for match in matches:
-        # save stderr for next step. (*should* always come last, but
-        # let's not assume that here)
-        if match['log_type'] == 'stderr':
-            stderr_matches.append(match)
-            continue
+        # first we see syslogs
+        if match['log_type'] == 'syslog':
+            syslog_path = match['path']
 
-        syslog_path = match['path']
+            interpretation = _parse_step_syslog(_cat_log(fs, syslog_path))
 
-        interpretation = _parse_step_syslog(_cat_log(fs, syslog_path))
+            result.update(interpretation)
+            _add_implied_job_id(result)
 
-        result.update(interpretation)
-        for error in result.get('errors') or ():
-            if 'hadoop_error' in error:
-                error['hadoop_error']['path'] = syslog_path
-            _add_implied_task_id(error)
-            errors.append(error)
+            for error in result.get('errors') or ():
+                if 'hadoop_error' in error:
+                    error['hadoop_error']['path'] = syslog_path
+                _add_implied_task_id(error)
+                errors.append(error)
+                result['errors'] = errors
 
-    _add_implied_job_id(result)
-    if errors:
-        result['errors'] = errors
+            # if syslogs were useful, don't even bother with stderr
+            if not match['timestamp'] and (result.get('job_id') or errors):
+                break
 
-    # handle script-runner.jar, which doesn't create a job ID, and
-    # just outputs to stderr
-    if not (result.get('job_id') or result.get('errors')):
-        for match in stderr_matches:
+        else:
+            # log_type is stderr
             stderr_path = match['path']
 
             # _parse_task_stderr() handles any sort of stderr

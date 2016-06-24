@@ -92,7 +92,7 @@ PARSED_PRE_YARN_STEP_LOG_LINES = dict(
 )
 
 
-class ParseStepLogTestCase(TestCase):
+class ParseStepSyslogTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_step_syslog([]), {})
@@ -409,12 +409,16 @@ class MatchEMRStepLogPathTestCase(TestCase):
                  step_id='s-2BQ5U0ZHTR16N',
                  timestamp=None))
 
-    def test_ignore_rotated_stderr(self):
+    def test_stderr_rotation(self):
         log_path = (
             's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
             '/s-2BQ5U0ZHTR16N/stderr.2016-02-26-23.gz')
 
-        self.assertEqual(_match_emr_step_log_path(log_path), None)
+        self.assertEqual(
+            _match_emr_step_log_path(log_path),
+            dict(log_type='stderr',
+                 step_id='s-2BQ5U0ZHTR16N',
+                 timestamp='2016-02-26-23'))
 
     def test_ignore_other_types_of_logs(self):
         log_path = (
@@ -429,7 +433,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
         super(InterpretEMRStepLogsTestCase, self).setUp()
 
         # instead of mocking out contents of files, just mock out
-        # what _parse_task_{syslog,stderr}() should return, and have
+        # what _parse_step_syslog() should return, and have
         # _cat_log() just pass through the path
         self.mock_paths = []
         self.path_to_mock_result = {}
@@ -441,9 +445,14 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
                 self.mock_paths_catted.append(path)
             return path
 
-        # (the real _parse_step_syslog() expects lines, not paths)
+        # (the real versions of these take lines, not paths)
         def mock_parse_step_syslog(path_from_mock_cat_log):
+            # default to {}
             return self.path_to_mock_result.get(path_from_mock_cat_log, {})
+
+        def mock_parse_task_stderr(path_from_mock_cat_log):
+            # default to None
+            return self.path_to_mock_result.get(path_from_mock_cat_log)
 
         # need to mock ls so that _ls_task_syslogs() can work
         def mock_exists(path):
@@ -460,6 +469,9 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
 
         self.start(patch('mrjob.logs.step._parse_step_syslog',
                          side_effect=mock_parse_step_syslog))
+
+        self.start(patch('mrjob.logs.step._parse_task_stderr',
+                         side_effect=mock_parse_task_stderr))
 
     def mock_path_matches(self):
         mock_log_dir_stream = [['']]  # needed to make _ls_logs() work
@@ -523,6 +535,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
     def test_multiple_logs(self):
         prev_path = 's3://bucket/logs/steps/s-STEPID/syslog.2015-05-06-09.gz'
         current_path = 's3://bucket/logs/steps/s-STEPID/syslog.gz'
+        stderr_path = 's3://bucket/logs/steps/s-STEPID/stderr.gz'
 
         # current log would come first in alphabetical sort
         self.mock_paths = [prev_path, current_path]
@@ -548,9 +561,13 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
                     ),
                 ],
             ),
+            stderr_path: dict(
+                message='error logging',
+            ),
         }
 
-        # both errors should appear, in the correct order
+        # both errors should appear, in the correct order. stderr should
+        # be ignored
         self.assertEqual(
             self.interpret_emr_step_logs(),
             dict(
@@ -574,5 +591,84 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
         )
 
         self.assertEqual(self.mock_paths_catted, [prev_path, current_path])
+
+    def test_fall_back_to_stderr(self):
+        prev_path = 's3://bucket/logs/steps/s-STEPID/syslog.2015-05-06-09.gz'
+        current_path = 's3://bucket/logs/steps/s-STEPID/syslog.gz'
+        prev_stderr_path = (
+            's3://bucket/logs/steps/s-STEPID/stderr.2015-05-06-09.gz')
+        current_stderr_path = 's3://bucket/logs/steps/s-STEPID/stderr.gz'
+
+        # current log would come first in alphabetical sort
+        self.mock_paths = [
+            prev_path, current_path, prev_stderr_path, current_stderr_path]
+
+        self.path_to_mock_result = {
+            prev_stderr_path: dict(
+                message='warning',
+            ),
+            current_stderr_path: dict(
+                message='actual error',
+            ),
+        }
+
+        # both errors should appear, in the correct order. stderr should
+        # be ignored
+        self.assertEqual(
+            self.interpret_emr_step_logs(),
+            dict(
+                errors=[
+                    dict(
+                        task_error=dict(
+                            message='actual error',
+                            path=current_stderr_path,
+                        ),
+                    ),
+                ]
+            ),
+        )
+
+        # we should never look at prev_stderr_path; we only care about
+        # the end of stderr anyway
+        self.assertEqual(self.mock_paths_catted,
+                         [prev_path, current_path, current_stderr_path])
+
+    # this could happen if the current stderr log is empty
+    def test_fall_back_to_rotated_stderr(self):
+        prev_path = 's3://bucket/logs/steps/s-STEPID/syslog.2015-05-06-09.gz'
+        current_path = 's3://bucket/logs/steps/s-STEPID/syslog.gz'
+        prev_stderr_path = (
+            's3://bucket/logs/steps/s-STEPID/stderr.2015-05-06-09.gz')
+        current_stderr_path = 's3://bucket/logs/steps/s-STEPID/stderr.gz'
+
+        # current log would come first in alphabetical sort
+        self.mock_paths = [
+            prev_path, current_path, prev_stderr_path, current_stderr_path]
+
+        self.path_to_mock_result = {
+            prev_stderr_path: dict(
+                message='actual error',
+            ),
+        }
+
+        # both errors should appear, in the correct order. stderr should
+        # be ignored
+        self.assertEqual(
+            self.interpret_emr_step_logs(),
+            dict(
+                errors=[
+                    dict(
+                        task_error=dict(
+                            message='actual error',
+                            path=prev_stderr_path,
+                        ),
+                    ),
+                ]
+            ),
+        )
+
+        self.assertEqual(self.mock_paths_catted,
+                         [prev_path, current_path,
+                          current_stderr_path, prev_stderr_path])
 
     maxDiff = None

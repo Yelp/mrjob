@@ -372,7 +372,9 @@ class MatchEMRStepLogPathTestCase(TestCase):
 
         self.assertEqual(
             _match_emr_step_log_path(log_path),
-            dict(step_id='s-2BQ5U0ZHTR16N', timestamp=None))
+            dict(log_type='syslog',
+                 step_id='s-2BQ5U0ZHTR16N',
+                 timestamp=None))
 
     def test_s3(self):
         log_path = (
@@ -381,7 +383,9 @@ class MatchEMRStepLogPathTestCase(TestCase):
 
         self.assertEqual(
             _match_emr_step_log_path(log_path),
-            dict(step_id='s-2BQ5U0ZHTR16N', timestamp=None))
+            dict(log_type='syslog',
+                 step_id='s-2BQ5U0ZHTR16N',
+                 timestamp=None))
 
     def test_s3_log_rotation(self):
         log_path = (
@@ -390,7 +394,9 @@ class MatchEMRStepLogPathTestCase(TestCase):
 
         self.assertEqual(
             _match_emr_step_log_path(log_path),
-            dict(step_id='s-2BQ5U0ZHTR16N', timestamp='2016-02-26-23'))
+            dict(log_type='syslog',
+                 step_id='s-2BQ5U0ZHTR16N',
+                 timestamp='2016-02-26-23'))
 
     def test_match_syslog_only(self):
         log_path = (

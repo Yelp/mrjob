@@ -74,36 +74,66 @@ _TASK_ATTEMPT_FAILED_RE = re.compile(
 log = getLogger(__name__)
 
 
-def _ls_emr_step_logs(fs, log_dir_stream, step_id=None):
+def _ls_emr_step_syslogs(fs, log_dir_stream, step_id=None):
     """Yield matching step logs, optionally filtering by *step_id*.
     Yields dicts with the keys:
 
     path: path/URI of step file
     step_id: step_id in *path* (must match *step_id* if set)
     """
-    matches = _ls_logs(fs, log_dir_stream, _match_emr_step_log_path,
+    matches = _ls_logs(fs, log_dir_stream, _match_emr_step_syslog_path,
                        step_id=step_id)
 
-    time_sort_key = lambda m: (m['timestamp'] is None, m['timestamp'] or '')
-
-    # sort syslogs in chronological order
-    syslog_matches = [m for m in matches if m['log_type'] == 'syslog']
-    syslog_matches.sort(key=time_sort_key)
-
-    # sort stderr in reverse chronological order (we only use this if
-    # syslogs are useless, and then we basically want to tail them)
-    stderr_matches = [m for m in matches if m['log_type'] == 'stderr']
-    stderr_matches.sort(key=time_sort_key, reverse=True)
-
-    return syslog_matches + stderr_matches
+    return sorted(matches, key=_match_sort_key)
 
 
-def _match_emr_step_log_path(path, step_id=None):
-    """Yields paths/URIs of all job history files in the given directories,
-    optionally filtering by *step_id*.
+def _ls_emr_step_stderr_logs(fs, log_dir_stream, step_id=None):
+    """Yield matching step logs, optionally filtering by *step_id*.
+    Yields dicts with the keys:
+
+    path: path/URI of step file
+    step_id: step_id in *path* (must match *step_id* if set)
+    """
+    matches = _ls_logs(fs, log_dir_stream, _match_emr_step_stderr_path,
+                       step_id=step_id)
+
+    # we basically want to tail the stderr log, so search rotated
+    # logs in reverse
+    return sorted(matches, key=_match_sort_key, reverse=True)
+
+
+def _match_sort_key(m):
+    """sort key which treats empty timestamp as most recent"""
+    return (m['timestamp'] is None, m['timestamp'] or '')
+
+
+def _match_emr_step_syslog_path(path, step_id=None):
+    """Match path of a step syslog, optionally filtering by *step_id*.
+
+    If there is a match, return a dict with the keys *step_id* and
+    *timestamp* (a string). Otherwise, returns None.
+    """
+    return _match_emr_step_log_path(path, 'syslog', step_id=step_id)
+
+
+def _match_emr_step_stderr_path(path, step_id=None):
+    """Match path of a step stderr log, optionally filtering by *step_id*.
+
+    If there is a match, return a dict with the keys *step_id* and
+    *timestamp* (a string). Otherwise, returns None.
+    """
+    return _match_emr_step_log_path(path, 'stderr', step_id=step_id)
+
+
+def _match_emr_step_log_path(path, log_type, step_id=None):
+    """Helper for :py:func:`_match_emr_step_syslog_path` and
+    :py:func:`_match_emr_step_stderr_path`
     """
     m = _EMR_STEP_LOG_PATH_RE.match(path)
     if not m:
+        return None
+
+    if m.group('log_type') != log_type:
         return None
 
     if not (step_id is None or m.group('step_id') == step_id):
@@ -113,64 +143,48 @@ def _match_emr_step_log_path(path, step_id=None):
                 log_type=m.group('log_type'))
 
 
-def _interpret_emr_step_logs(fs, matches):
-    """Extract information from step log (see :py:func:`_parse_step_syslog()`),
+def _interpret_emr_step_syslog(fs, matches):
+    """Extract information from step syslog (see :py:func:`_parse_step_log()`),
     which may be split into several chunks by timestamp"""
     # going to merge results for each log into final result
     errors = []
     result = {}
 
-    stderr_matches = []
-
-    # scan syslogs for cause of error
     for match in matches:
-        # first we see syslogs
-        if match['log_type'] == 'syslog':
-            syslog_path = match['path']
+        path = match['path']
 
-            interpretation = _parse_step_syslog(_cat_log(fs, syslog_path))
+        interpretation = _parse_step_log(_cat_log(fs, path))
 
-            result.update(interpretation)
-            _add_implied_job_id(result)
+        result.update(interpretation)
+        for error in result.get('errors') or ():
+            if 'hadoop_error' in error:
+                error['hadoop_error']['path'] = path
+            _add_implied_task_id(error)
+            errors.append(error)
 
-            for error in result.get('errors') or ():
-                if 'hadoop_error' in error:
-                    error['hadoop_error']['path'] = syslog_path
-                _add_implied_task_id(error)
-                errors.append(error)
-
-            # if syslogs were useful, don't even bother iterating as far
-            # as stderr logs (which would trigger a logging message)
-            if not match['timestamp'] and (result.get('job_id') or errors):
-                break
-
-        else:
-            # log_type is stderr
-
-            # only want one error from stderr, as a fallback.
-            #
-            # this will only get triggered if matches are out-of-order or
-            # syslog is missing for some reason
-            if result.get('job_id') or errors:
-                continue
-
-            stderr_path = match['path']
-
-            # _parse_task_stderr() handles any sort of stderr
-            #
-            # TODO: a little iffy on calling this a task_error, but it's
-            # certainly not a Java error. Might want to rename these to
-            # java_error/script_error or some such
-            task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
-
-            if task_error:
-                task_error['path'] = stderr_path
-                errors.append(dict(task_error=task_error))
-
+    _add_implied_job_id(result)
     if errors:
         result['errors'] = errors
 
     return result
+
+
+def _interpret_emr_step_stderr(fs, matches):
+    """Extract information from step stderr (see
+    :py:func:`~mrjob.logs.task._parse_task_stderr()`),
+    which may be split into several chunks by timestamp"""
+    for match in matches:
+        path = match['path']
+
+        error = _parse_task_stderr(_cat_log(fs, stderr_path))
+
+        if error:
+            error['path'] = path
+            # We're essentially just tailing the stderr log, so stop when we
+            # find an error.
+            return dict(errors=[dict(task_error=task_error)])
+
+    return {}
 
 
 def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):

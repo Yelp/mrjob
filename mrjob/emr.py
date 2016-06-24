@@ -81,8 +81,10 @@ from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
-from mrjob.logs.step import _interpret_emr_step_logs
-from mrjob.logs.step import _ls_emr_step_logs
+from mrjob.logs.step import _interpret_emr_step_stderr_logs
+from mrjob.logs.step import _interpret_emr_step_syslogs
+from mrjob.logs.step import _ls_emr_step_stderr_logs
+from mrjob.logs.step import _ls_emr_step_syslogs
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -2009,8 +2011,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.warning("Can't fetch step log; missing step ID")
             return
 
-        return _interpret_emr_step_logs(
-            self.fs, self._ls_step_syslogs(step_id=step_id))
+        return (
+            _interpret_emr_step_syslog(
+                self.fs, self._ls_step_syslogs(step_id=step_id)) or
+            _interpret_emr_step_stderr(
+                self.fs, self._ls_step_stderr_logs(step_id=step_id))
+        )
 
     def _ls_step_syslogs(self, step_id):
         """Yield step log matches, logging a message for each one."""

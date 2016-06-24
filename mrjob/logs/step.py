@@ -74,7 +74,7 @@ _TASK_ATTEMPT_FAILED_RE = re.compile(
 log = getLogger(__name__)
 
 
-def _ls_emr_step_syslogs(fs, log_dir_stream, step_id=None):
+def _ls_emr_step_logs(fs, log_dir_stream, step_id=None):
     """Yield matching step logs, optionally filtering by *step_id*.
     Yields dicts with the keys:
 
@@ -86,8 +86,12 @@ def _ls_emr_step_syslogs(fs, log_dir_stream, step_id=None):
 
     # "recency" isn't useful here; sort by timestamp, with unstamped
     # log last
-    return sorted(matches,
-                  key=lambda m: (m['timestamp'] is None, m['timestamp'] or ''))
+    return sorted(
+        matches,
+        key=lambda m: (
+            m['log_type'] == 'stderr',
+            m['timestamp'] is None,
+            m['timestamp'] or ''))
 
 
 def _match_emr_step_log_path(path, step_id=None):
@@ -101,6 +105,11 @@ def _match_emr_step_log_path(path, step_id=None):
     if not (step_id is None or m.group('step_id') == step_id):
         return None
 
+    # only need the current rotation of the stderr log, since we only extract
+    # the very end of it
+    if m.group('log_type') == 'stderr' and m.group('timestamp'):
+        return None
+
     return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'),
                 log_type=m.group('log_type'))
 
@@ -112,13 +121,14 @@ def _interpret_emr_step_logs(fs, matches):
     errors = []
     result = {}
 
-    # TODO: a better approach would be to keep track of stderr paths as
-    # we go, and then go through them in reverse
-    matches = list(matches)
+    stderr_matches = []
 
     # scan syslogs for cause of error
     for match in matches:
-        if match['log_type'] != 'syslog':
+        # save stderr for next step. (*should* always come last, but
+        # let's not assume that here)
+        if match['log_type'] == 'stderr':
+            stderr_matches.append(match)
             continue
 
         syslog_path = match['path']
@@ -139,16 +149,14 @@ def _interpret_emr_step_logs(fs, matches):
     # handle script-runner.jar, which doesn't create a job ID, and
     # just outputs to stderr
     if not (result.get('job_id') or result.get('errors')):
-        for match in reversed(matches):
-            if match['log_type'] != 'stderr':
-                continue
-
+        for match in stderr_matches:
             stderr_path = match['path']
 
             # _parse_task_stderr() handles any sort of stderr
-
-            # a little iffy on calling this a task_error, but it's certainly
-            # not a Java error
+            #
+            # TODO: a little iffy on calling this a task_error, but it's
+            # certainly not a Java error. Might want to rename these to
+            # java_error/script_error or some such
             task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
 
             if task_error:

@@ -15,7 +15,7 @@ import errno
 
 from mrjob.logs.step import _interpret_emr_step_logs
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
-from mrjob.logs.step import _ls_emr_step_syslogs
+from mrjob.logs.step import _ls_emr_step_logs
 from mrjob.logs.step import _match_emr_step_log_path
 from mrjob.logs.step import _parse_indented_counters
 from mrjob.logs.step import _parse_step_syslog
@@ -439,7 +439,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
 
     def mock_path_matches(self):
         mock_log_dir_stream = [['']]  # needed to make _ls_logs() work
-        return _ls_emr_step_syslogs(self.mock_fs, mock_log_dir_stream)
+        return _ls_emr_step_logs(self.mock_fs, mock_log_dir_stream)
 
     def interpret_emr_step_logs(self, **kwargs):
         return _interpret_emr_step_logs(

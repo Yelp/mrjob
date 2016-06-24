@@ -3662,8 +3662,8 @@ class LsStepLogsTestCase(MockBotoTestCase):
 
         self.log = self.start(patch('mrjob.emr.log'))
 
-        self._ls_emr_step_syslogs = self.start(patch(
-            'mrjob.emr._ls_emr_step_syslogs'))
+        self._ls_emr_step_logs = self.start(patch(
+            'mrjob.emr._ls_emr_step_logs'))
         self._stream_step_log_dirs = self.start(patch(
             'mrjob.emr.EMRJobRunner._stream_step_log_dirs'))
 
@@ -3671,7 +3671,7 @@ class LsStepLogsTestCase(MockBotoTestCase):
         # just verify that the keyword args get passed through and
         # that logging happens in the right order
 
-        self._ls_emr_step_syslogs.return_value = [
+        self._ls_emr_step_logs.return_value = [
             dict(path='s3://bucket/logs/steps/syslog'),
         ]
 
@@ -3688,7 +3688,7 @@ class LsStepLogsTestCase(MockBotoTestCase):
 
         self._stream_step_log_dirs.assert_called_once_with(
             step_id='s-STEPID')
-        self._ls_emr_step_syslogs.assert_called_once_with(
+        self._ls_emr_step_logs.assert_called_once_with(
             runner.fs,
             self._stream_step_log_dirs.return_value,
             step_id='s-STEPID')

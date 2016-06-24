@@ -365,7 +365,7 @@ class MatchEMRStepLogPathTestCase(TestCase):
     def test_empty(self):
         self.assertEqual(_match_emr_step_log_path(''), None)
 
-    def test_ssh(self):
+    def test_syslog_over_ssh(self):
         log_path = (
             'ssh://masterssh://master/mnt/var/log/hadoop/steps/'
             's-2BQ5U0ZHTR16N/syslog')
@@ -376,7 +376,7 @@ class MatchEMRStepLogPathTestCase(TestCase):
                  step_id='s-2BQ5U0ZHTR16N',
                  timestamp=None))
 
-    def test_s3(self):
+    def test_syslog_gz_from_s3(self):
         log_path = (
             's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
             '/s-2BQ5U0ZHTR16N/syslog.gz')
@@ -387,7 +387,7 @@ class MatchEMRStepLogPathTestCase(TestCase):
                  step_id='s-2BQ5U0ZHTR16N',
                  timestamp=None))
 
-    def test_s3_log_rotation(self):
+    def test_syslog_rotation(self):
         log_path = (
             's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
             '/s-2BQ5U0ZHTR16N/syslog.2016-02-26-23.gz')
@@ -398,7 +398,25 @@ class MatchEMRStepLogPathTestCase(TestCase):
                  step_id='s-2BQ5U0ZHTR16N',
                  timestamp='2016-02-26-23'))
 
-    def test_match_syslog_only(self):
+    def test_stderr_gz_from_s3(self):
+        log_path = (
+            's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
+            '/s-2BQ5U0ZHTR16N/stderr.gz')
+
+        self.assertEqual(
+            _match_emr_step_log_path(log_path),
+            dict(log_type='stderr',
+                 step_id='s-2BQ5U0ZHTR16N',
+                 timestamp=None))
+
+    def test_ignore_rotated_stderr(self):
+        log_path = (
+            's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
+            '/s-2BQ5U0ZHTR16N/stderr.2016-02-26-23.gz')
+
+        self.assertEqual(_match_emr_step_log_path(log_path), None)
+
+    def test_ignore_other_types_of_logs(self):
         log_path = (
             'ssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/controller')
 

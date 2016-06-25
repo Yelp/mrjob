@@ -3655,10 +3655,10 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             expected_s3_dir_name='containers/application_1')
 
 
-class LsStepLogsTestCase(MockBotoTestCase):
+class LsStepSyslogsTestCase(MockBotoTestCase):
 
     def setUp(self):
-        super(LsStepLogsTestCase, self).setUp()
+        super(LsStepSyslogsTestCase, self).setUp()
 
         self.log = self.start(patch('mrjob.emr.log'))
 
@@ -3707,10 +3707,15 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self.log = self.start(patch('mrjob.emr.log'))
 
-        self._interpret_emr_step_logs = self.start(patch(
-            'mrjob.emr._interpret_emr_step_logs'))
+        self._interpret_emr_step_syslog = self.start(patch(
+            'mrjob.emr._interpret_emr_step_syslog'))
         self._ls_step_syslogs = self.start(patch(
             'mrjob.emr.EMRJobRunner._ls_step_syslogs'))
+
+        self._interpret_emr_step_stderr= self.start(patch(
+            'mrjob.emr._interpret_emr_step_stderr'))
+        self._ls_step_stderr_logs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ls_step_stderr_logs'))
 
     def test_basic(self):
         runner = EMRJobRunner()
@@ -3721,12 +3726,14 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self.assertEqual(
             runner._get_step_log_interpretation(log_interpretation),
-            self._interpret_emr_step_logs.return_value)
+            self._interpret_emr_step_syslog.return_value)
 
         self.assertFalse(self.log.warning.called)
         self._ls_step_syslogs.assert_called_once_with(step_id='s-STEPID')
-        self._interpret_emr_step_logs.assert_called_once_with(
+        self._interpret_emr_step_syslog.assert_called_once_with(
             runner.fs, self._ls_step_syslogs.return_value)
+        self.assertFalse(self._ls_step_stderr_logs.called)
+        self.assertFalse(self._interpret_emr_step_stderr.called)
 
     def test_no_step_id(self):
         runner = EMRJobRunner()
@@ -3740,7 +3747,30 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._ls_step_syslogs.called)
-        self.assertFalse(self._interpret_emr_step_logs.called)
+        self.assertFalse(self._interpret_emr_step_syslog.called)
+        self.assertFalse(self._ls_step_stderr_logs.called)
+        self.assertFalse(self._interpret_emr_step_stderr.called)
+
+    def test_fallback_to_stderr(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = dict(step_id='s-STEPID')
+
+        self.log.reset_mock()
+
+        self._interpret_emr_step_syslog.return_value = {}
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(log_interpretation),
+            self._interpret_emr_step_stderr.return_value)
+
+        self.assertFalse(self.log.warning.called)
+        self._ls_step_syslogs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_syslog.assert_called_once_with(
+            runner.fs, self._ls_step_syslogs.return_value)
+        self._ls_step_stderr_logs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_stderr.assert_called_once_with(
+            runner.fs, self._ls_step_stderr_logs.return_value)
 
 
 # this basically just checks that hadoop_extra_args is an option

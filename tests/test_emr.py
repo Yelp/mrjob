@@ -2738,27 +2738,41 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(BuildStreamingStepTestCase, self).setUp()
-        self.runner = EMRJobRunner(
-            mr_job_script='my_job.py', conf_paths=[], stdin=BytesIO())
-        self.runner._steps = []  # don't actually run `my_job.py --steps`
-        self.runner._add_job_files_for_upload()
 
-        self.start(patch.object(
-            self.runner, '_step_input_uris', return_value=['input']))
-        self.start(patch.object(
-            self.runner, '_step_output_uri', return_value=['output']))
-        self.start(patch.object(
-            self.runner, '_get_streaming_jar_and_step_arg_prefix',
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._step_input_uris',
+            return_value=['input']))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._step_output_uri',
+            return_value='output'))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_ami_version',
+            return_value='3.7.0'))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='2.4.0'))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._get_streaming_jar_and_step_arg_prefix',
             return_value=('streaming.jar', [])))
-        self.start(patch.object(
-            self.runner, 'get_ami_version', return_value='3.8.0'))
 
-        self.start(patch.object(boto.emr, 'StreamingStep', dict))
-        self.runner._hadoop_version = '0.20'
+    def _get_streaming_step(self, step, **kwargs):
+        runner = EMRJobRunner(
+            mr_job_script='my_job.py',
+            conf_paths=[],
+            stdin=BytesIO(),
+            **kwargs)
 
-    def _get_streaming_step(self, step):
-        with patch.object(self.runner, '_steps', [step]):
-            return self.runner._build_streaming_step(0)
+        runner._steps = [step]
+
+        runner._add_job_files_for_upload()
+        runner._add_master_node_setup_files_for_upload()
+
+        with patch('boto.emr.StreamingStep', dict):
+            return runner._build_streaming_step(0)
 
     def test_basic_mapper(self):
         ss = self._get_streaming_step(
@@ -2839,7 +2853,7 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
     def test_custom_streaming_jar_and_step_arg_prefix(self):
         # test integration with custom jar options. See
         # StreamingJarAndStepArgPrefixTestCase below.
-        self.runner._get_streaming_jar_and_step_arg_prefix.return_value = (
+        EMRJobRunner._get_streaming_jar_and_step_arg_prefix.return_value = (
             ('launch.jar', ['streaming', '-v']))
 
         ss = self._get_streaming_step(

@@ -2867,6 +2867,33 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.assertEqual(ss['step_args'][2], '-files')
         self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
 
+    def test_libjars_and_hadoop_args_for_step(self):
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._libjar_step_args',
+            return_value=[
+                '-libjars',
+                '/home/hadoop/dir/honey.jar,/home/hadoop/door/a.jar']))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._hadoop_args_for_step',
+            return_value=['-D', 'foo=bar']))
+
+        ss = self._get_streaming_step(
+            dict(type='streaming', mapper=dict(type='script')))
+
+        self.assertEqual(ss['jar'], 'streaming.jar')
+
+        # step_args should be -files script_uri#script_name
+        self.assertEqual(len(ss['step_args']), 6)
+        self.assertEqual(ss['step_args'][0], '-files')
+        self.assertTrue(ss['step_args'][1].endswith('#my_job.py'))
+        self.assertEqual(
+            ss['step_args'][2:],
+            ['-libjars', '/home/hadoop/dir/honey.jar,/home/hadoop/door/a.jar',
+             '-D', 'foo=bar'])
+
+
+
 
 class DefaultPythonBinTestCase(MockBotoTestCase):
 

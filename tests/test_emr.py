@@ -3059,6 +3059,44 @@ class JarStepTestCase(MockBotoTestCase):
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar, jar_uri)
 
+    def test_with_libjar(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        with open(fake_jar, 'w'):
+            pass
+
+        fake_libjar = os.path.join(self.tmp_dir, 'libfake.jar')
+        with open(fake_libjar, 'w'):
+            pass
+
+        job = MRJustAJar(
+            ['-r', 'emr', '--jar', fake_jar, '--libjar', fake_libjar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(fake_jar, runner._upload_mgr.path_to_uri())
+            jar_uri = runner._upload_mgr.uri(fake_jar)
+            self.assertTrue(runner.fs.ls(jar_uri))
+
+            self.assertIn(fake_libjar, runner._upload_mgr.path_to_uri())
+            libjar_uri = runner._upload_mgr.uri(fake_libjar)
+            self.assertTrue(runner.fs.ls(libjar_uri))
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 2)  # adds master node setup
+
+            jar_step = steps[1]
+            self.assertEqual(jar_step.config.jar, jar_uri)
+            step_args = [a.value for a in jar_step.config.args]
+
+            working_dir = runner._master_node_setup_working_dir()
+
+            self.assertEqual(step_args,
+                             ['-libjars', working_dir + '/libfake.jar'])
+
     def test_jar_on_s3(self):
         self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': b''}})
         JAR_URI = 's3://dubliners/whiskeyinthe.jar'

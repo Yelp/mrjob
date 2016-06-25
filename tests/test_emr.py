@@ -1552,6 +1552,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 class MasterNodeSetupScriptTestCase(MockBotoTestCase):
 
     def setUp(self):
+        super(MasterNodeSetupScriptTestCase, self).setUp()
         self.start(patch('mrjob.emr.log'))
 
     def test_no_script_needed(self):
@@ -1611,9 +1612,6 @@ class MasterNodeSetupScriptTestCase(MockBotoTestCase):
             contents = f.read()
 
         self.assertTrue(contents.startswith(b'#!/usr/bin/env bash\n'))
-
-
-
 
 
 class EMRNoMapperTestCase(MockBotoTestCase):

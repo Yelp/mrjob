@@ -967,8 +967,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._master_node_setup_mgr.add('file', path)
             self._upload_mgr.add(path)
 
-        if self._master_node_setup_mgr.paths():
-            self._create_master_node_setup_script()
+        self._create_master_node_setup_script_if_needed()
+        if self._master_node_setup_script_path:
             self._upload_mgr.add(self._master_node_setup_script_path)
 
     def _add_job_files_for_upload(self):
@@ -2374,14 +2374,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     ### master node setup script ###
 
-    def _create_master_node_setup_script(self):
+    def _create_master_node_setup_script_if_needed(self):
         """Helper for :py:meth:`_add_bootstrap_files_for_upload`.
 
-        Create the master node setup script and write it into our local
+        If we need a master node setup script and write it into our local
         temp directory. Set self._master_node_setup_script_path.
         """
         # already created
         if self._master_node_setup_script_path:
+            return
+
+        # currently, the only thing this script does is upload files
+        if not self._master_node_setup_mgr.paths():
             return
 
         # create script

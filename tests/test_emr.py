@@ -1549,6 +1549,73 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertTrue(runner.fs.exists(actions[1].scriptpath))
 
 
+class MasterNodeSetupScriptTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        self.start(patch('mrjob.emr.log'))
+
+    def test_no_script_needed(self):
+        runner = EMRJobRunner()
+
+        runner._add_master_node_setup_files_for_upload()
+        self.assertIsNone(runner._master_node_setup_script_path)
+        self.assertEqual(runner._master_node_setup_mgr.paths(), set())
+
+    def test_libjars(self):
+        runner = EMRJobRunner(libjars=[
+            'cookie.jar',
+            's3://pooh/honey.jar',
+            'file:///left/dora.jar',
+        ])
+
+        runner._add_master_node_setup_files_for_upload()
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+        # don't need to manage file:/// URI
+        self.assertEqual(
+            set(runner._master_node_setup_mgr.name_to_path('file')),
+            set(['cookie.jar', 'honey.jar']))
+
+        with open(runner._master_node_setup_script_path, 'rb') as f:
+            contents = f.read()
+
+        self.assertTrue(contents.startswith(b'#!/bin/sh -ex\n'))
+        self.assertIn(b'hadoop fs -copyToLocal ', contents)
+        self.assertNotIn(b'aws s3 cp ', contents)
+        self.assertIn(b'chmod a+x ', contents)
+        self.assertIn(b'cookie.jar', contents)
+        self.assertIn(b's3://pooh/honey.jar', contents)
+        self.assertNotIn(b'dora.jar', contents)
+
+    def test_4_x_ami(self):
+        runner = EMRJobRunner(libjars=['cookie.jar'],
+                              release_label='emr-4.0.0')
+
+        runner._add_master_node_setup_files_for_upload()
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+
+        with open(runner._master_node_setup_script_path, 'rb') as f:
+            contents = f.read()
+
+        self.assertNotIn(b'hadoop fs -copyToLocal ', contents)
+        self.assertIn(b'aws s3 cp ', contents)
+        self.assertIn(b'cookie.jar', contents)
+
+    def test_usr_bin_env(self):
+        runner = EMRJobRunner(libjars=['cookie.jar'],
+                              sh_bin=['bash'])
+
+        runner._add_master_node_setup_files_for_upload()
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+
+        with open(runner._master_node_setup_script_path, 'rb') as f:
+            contents = f.read()
+
+        self.assertTrue(contents.startswith(b'#!/usr/bin/env bash\n'))
+
+
+
+
+
 class EMRNoMapperTestCase(MockBotoTestCase):
 
     def test_no_mapper(self):

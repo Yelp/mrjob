@@ -2893,6 +2893,32 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
              '-D', 'foo=bar'])
 
 
+class LibjarStepArgsTestCase(MockBotoTestCase):
+
+    def test_no_libjars(self):
+        runner = EMRJobRunner()
+        runner._add_master_node_setup_files_for_upload()
+
+        self.assertEqual(runner._libjar_step_args(), [])
+
+    def test_libjars(self):
+        runner = EMRJobRunner(libjars=[
+            'cookie.jar',
+            's3://pooh/honey.jar',
+            'file:///left/dora.jar',
+        ])
+        runner._add_master_node_setup_files_for_upload()
+
+        working_dir = runner._master_node_setup_working_dir()
+
+        self.assertEqual(
+            runner._libjar_step_args(),
+            [
+                '-libjars',
+                '%s/cookie.jar,%s/honey.jar,/left/dora.jar' % (
+                    working_dir, working_dir),
+            ]
+        )
 
 
 class DefaultPythonBinTestCase(MockBotoTestCase):

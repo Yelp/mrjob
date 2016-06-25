@@ -1573,8 +1573,11 @@ class MasterNodeSetupScriptTestCase(MockBotoTestCase):
         self.assertIsNotNone(runner._master_node_setup_script_path)
         # don't need to manage file:/// URI
         self.assertEqual(
-            set(runner._master_node_setup_mgr.name_to_path('file')),
-            set(['cookie.jar', 'honey.jar']))
+            runner._master_node_setup_mgr.paths(),
+            set(['cookie.jar', 's3://pooh/honey.jar']))
+
+        uploaded_paths = set(runner._upload_mgr.path_to_uri())
+        self.assertIn('cookie.jar', uploaded_paths)
 
         with open(runner._master_node_setup_script_path, 'rb') as f:
             contents = f.read()

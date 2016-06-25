@@ -71,7 +71,6 @@ from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
-from tests.sandbox import patch_fs_s3
 from tests.test_hadoop import HadoopExtraArgsTestCase
 
 try:
@@ -2739,9 +2738,8 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(BuildStreamingStepTestCase, self).setUp()
-        with patch_fs_s3():
-            self.runner = EMRJobRunner(
-                mr_job_script='my_job.py', conf_paths=[], stdin=BytesIO())
+        self.runner = EMRJobRunner(
+            mr_job_script='my_job.py', conf_paths=[], stdin=BytesIO())
         self.runner._steps = []  # don't actually run `my_job.py --steps`
         self.runner._add_job_files_for_upload()
 

@@ -13,10 +13,13 @@
 # limitations under the License.
 import errno
 
-from mrjob.logs.step import _interpret_emr_step_logs
+from mrjob.logs.step import _interpret_emr_step_syslog
+from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
-from mrjob.logs.step import _ls_emr_step_logs
-from mrjob.logs.step import _match_emr_step_log_path
+from mrjob.logs.step import _ls_emr_step_syslogs
+from mrjob.logs.step import _ls_emr_step_stderr_logs
+from mrjob.logs.step import _match_emr_step_syslog_path
+from mrjob.logs.step import _match_emr_step_stderr_path
 from mrjob.logs.step import _parse_indented_counters
 from mrjob.logs.step import _parse_step_syslog
 from mrjob.py2 import StringIO
@@ -359,81 +362,96 @@ class ParseIndentedCountersTestCase(TestCase):
         })
 
 
-# path matching
-class MatchEMRStepLogPathTestCase(TestCase):
+class MatchEMRStepSyslogPathTestCase(TestCase):
 
     def test_empty(self):
-        self.assertEqual(_match_emr_step_log_path(''), None)
+        self.assertEqual(_match_emr_step_syslog_path(''), None)
 
-    def test_syslog_over_ssh(self):
+    def test_ssh(self):
         log_path = (
             'ssh://masterssh://master/mnt/var/log/hadoop/steps/'
             's-2BQ5U0ZHTR16N/syslog')
 
         self.assertEqual(
-            _match_emr_step_log_path(log_path),
-            dict(log_type='syslog',
-                 step_id='s-2BQ5U0ZHTR16N',
-                 timestamp=None))
+            _match_emr_step_syslog_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp=None))
 
-    def test_syslog_gz_from_s3(self):
+    def test_s3(self):
         log_path = (
             's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
             '/s-2BQ5U0ZHTR16N/syslog.gz')
 
         self.assertEqual(
-            _match_emr_step_log_path(log_path),
-            dict(log_type='syslog',
-                 step_id='s-2BQ5U0ZHTR16N',
-                 timestamp=None))
+            _match_emr_step_syslog_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp=None))
 
-    def test_syslog_rotation(self):
+    def test_s3_log_rotation(self):
         log_path = (
             's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
             '/s-2BQ5U0ZHTR16N/syslog.2016-02-26-23.gz')
 
         self.assertEqual(
-            _match_emr_step_log_path(log_path),
-            dict(log_type='syslog',
-                 step_id='s-2BQ5U0ZHTR16N',
-                 timestamp='2016-02-26-23'))
+            _match_emr_step_syslog_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp='2016-02-26-23'))
 
-    def test_stderr_gz_from_s3(self):
+    def test_match_syslog_only(self):
+        syslog_path = (
+            'ssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/syslog')
+
+        self.assertEqual(
+            _match_emr_step_stderr_path(syslog_path), None)
+
+
+# this is currently almost identical to MatchEMRStepSyslogPathTestCase,
+# but that could change (for example, previous versions of the code
+# ignored rotated stderr logs)
+class MatchEMRStepStderrPathTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_match_emr_step_stderr_path(''), None)
+
+    def test_ssh(self):
+        log_path = (
+            'ssh://masterssh://master/mnt/var/log/hadoop/steps/'
+            's-2BQ5U0ZHTR16N/stderr')
+
+        self.assertEqual(
+            _match_emr_step_stderr_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp=None))
+
+    def test_s3(self):
         log_path = (
             's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
             '/s-2BQ5U0ZHTR16N/stderr.gz')
 
         self.assertEqual(
-            _match_emr_step_log_path(log_path),
-            dict(log_type='stderr',
-                 step_id='s-2BQ5U0ZHTR16N',
-                 timestamp=None))
+            _match_emr_step_stderr_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp=None))
 
-    def test_stderr_rotation(self):
+    def test_s3_log_rotation(self):
         log_path = (
             's3://mrjob-394dc542f5df5612/tmp/logs/j-1GIXXKEE3MJ2H/steps'
             '/s-2BQ5U0ZHTR16N/stderr.2016-02-26-23.gz')
 
         self.assertEqual(
-            _match_emr_step_log_path(log_path),
-            dict(log_type='stderr',
-                 step_id='s-2BQ5U0ZHTR16N',
-                 timestamp='2016-02-26-23'))
+            _match_emr_step_stderr_path(log_path),
+            dict(step_id='s-2BQ5U0ZHTR16N', timestamp='2016-02-26-23'))
 
-    def test_ignore_other_types_of_logs(self):
-        log_path = (
-            'ssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/controller')
+    def test_match_stderr_only(self):
+        syslog_path = (
+            'ssh://master/mnt/var/log/hadoop/steps/s-2BQ5U0ZHTR16N/syslog')
 
-        self.assertEqual(_match_emr_step_log_path(log_path), None)
+        self.assertEqual(
+            _match_emr_step_stderr_path(syslog_path), None)
 
 
-class InterpretEMRStepLogsTestCase(PatcherTestCase):
+class InterpretEMRStepSyslogTestCase(PatcherTestCase):
 
     def setUp(self):
-        super(InterpretEMRStepLogsTestCase, self).setUp()
+        super(InterpretEMRStepSyslogTestCase, self).setUp()
 
         # instead of mocking out contents of files, just mock out
-        # what _parse_step_syslog() should return, and have
+        # what _parse_step_log() should return, and have
         # _cat_log() just pass through the path
         self.mock_paths = []
         self.path_to_mock_result = {}
@@ -445,14 +463,9 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
                 self.mock_paths_catted.append(path)
             return path
 
-        # (the real versions of these take lines, not paths)
+        # (the real _parse_step_log() expects lines, not paths)
         def mock_parse_step_syslog(path_from_mock_cat_log):
-            # default to {}
             return self.path_to_mock_result.get(path_from_mock_cat_log, {})
-
-        def mock_parse_task_stderr(path_from_mock_cat_log):
-            # default to None
-            return self.path_to_mock_result.get(path_from_mock_cat_log)
 
         # need to mock ls so that _ls_task_syslogs() can work
         def mock_exists(path):
@@ -470,19 +483,16 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
         self.start(patch('mrjob.logs.step._parse_step_syslog',
                          side_effect=mock_parse_step_syslog))
 
-        self.start(patch('mrjob.logs.step._parse_task_stderr',
-                         side_effect=mock_parse_task_stderr))
-
     def mock_path_matches(self):
         mock_log_dir_stream = [['']]  # needed to make _ls_logs() work
-        return _ls_emr_step_logs(self.mock_fs, mock_log_dir_stream)
+        return _ls_emr_step_syslogs(self.mock_fs, mock_log_dir_stream)
 
-    def interpret_emr_step_logs(self, **kwargs):
-        return _interpret_emr_step_logs(
+    def interpret_emr_step_syslog(self, **kwargs):
+        return _interpret_emr_step_syslog(
             self.mock_fs, self.mock_path_matches(), **kwargs)
 
     def test_empty(self):
-        self.assertEqual(self.interpret_emr_step_logs(), {})
+        self.assertEqual(self.interpret_emr_step_syslog(), {})
 
     def test_single_log(self):
         log_path = 'ssh://master/mnt/var/log/hadoop/steps/s-STEPID/syslog'
@@ -493,7 +503,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
             log_path: dict(output_dir='hdfs:///output')
         }
 
-        self.assertEqual(self.interpret_emr_step_logs(),
+        self.assertEqual(self.interpret_emr_step_syslog(),
                          dict(output_dir='hdfs:///output'))
 
     def test_implied_job_id(self):
@@ -505,7 +515,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
             log_path: dict(application_id='application_1')
         }
 
-        self.assertEqual(self.interpret_emr_step_logs(),
+        self.assertEqual(self.interpret_emr_step_syslog(),
                          dict(application_id='application_1',
                               job_id='job_1'))
 
@@ -523,7 +533,7 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(
-            self.interpret_emr_step_logs(),
+            self.interpret_emr_step_syslog(),
             dict(errors=[dict(
                 attempt_id='attempt_201512232143_0008_m_000001_3',
                 hadoop_error=dict(
@@ -535,7 +545,6 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
     def test_multiple_logs(self):
         prev_path = 's3://bucket/logs/steps/s-STEPID/syslog.2015-05-06-09.gz'
         current_path = 's3://bucket/logs/steps/s-STEPID/syslog.gz'
-        stderr_path = 's3://bucket/logs/steps/s-STEPID/stderr.gz'
 
         # current log would come first in alphabetical sort
         self.mock_paths = [prev_path, current_path]
@@ -561,15 +570,11 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
                     ),
                 ],
             ),
-            stderr_path: dict(
-                message='error logging',
-            ),
         }
 
-        # both errors should appear, in the correct order. stderr should
-        # be ignored
+        # both errors should appear, in the correct order
         self.assertEqual(
-            self.interpret_emr_step_logs(),
+            self.interpret_emr_step_syslog(),
             dict(
                 counters=dict(foo=dict(bar=1)),
                 errors=[
@@ -592,83 +597,129 @@ class InterpretEMRStepLogsTestCase(PatcherTestCase):
 
         self.assertEqual(self.mock_paths_catted, [prev_path, current_path])
 
-    def test_fall_back_to_stderr(self):
-        prev_path = 's3://bucket/logs/steps/s-STEPID/syslog.2015-05-06-09.gz'
-        current_path = 's3://bucket/logs/steps/s-STEPID/syslog.gz'
-        prev_stderr_path = (
-            's3://bucket/logs/steps/s-STEPID/stderr.2015-05-06-09.gz')
-        current_stderr_path = 's3://bucket/logs/steps/s-STEPID/stderr.gz'
+    maxDiff = None
 
-        # current log would come first in alphabetical sort
-        self.mock_paths = [
-            prev_path, current_path, prev_stderr_path, current_stderr_path]
+
+class InterpretEMRStepStderrTestCase(PatcherTestCase):
+
+    def setUp(self):
+        super(InterpretEMRStepStderrTestCase, self).setUp()
+
+        # instead of mocking out contents of files, just mock out
+        # what _parse_step_syslog() should return, and have
+        # _cat_log() just pass through the path
+        self.mock_paths = []
+        self.path_to_mock_result = {}
+
+        self.mock_paths_catted = []
+
+        def mock_cat_log(fs, path):
+            if path in self.mock_paths:
+                self.mock_paths_catted.append(path)
+            return path
+
+        def mock_parse_task_stderr(path_from_mock_cat_log):
+            return self.path_to_mock_result.get(path_from_mock_cat_log)
+
+        # need to mock ls so that _ls_task_syslogs() can work
+        def mock_exists(path):
+            return path in self.mock_paths
+
+        def mock_ls(log_dir):
+            return self.mock_paths
+
+        self.mock_fs = Mock()
+        self.mock_fs.ls = Mock(side_effect=mock_ls)
+
+        self.mock_cat_log = self.start(
+            patch('mrjob.logs.step._cat_log', side_effect=mock_cat_log))
+
+        self.start(patch('mrjob.logs.step._parse_task_stderr',
+                         side_effect=mock_parse_task_stderr))
+
+    def mock_path_matches(self):
+        mock_log_dir_stream = [['']]  # needed to make _ls_logs() work
+        return _ls_emr_step_stderr_logs(self.mock_fs, mock_log_dir_stream)
+
+    def interpret_emr_step_stderr(self, **kwargs):
+        return _interpret_emr_step_stderr(
+            self.mock_fs, self.mock_path_matches(), **kwargs)
+
+    def test_empty(self):
+        self.assertEqual(self.interpret_emr_step_stderr(), {})
+
+    def test_single_log(self):
+        log_path = 'ssh://master/mnt/var/log/hadoop/steps/s-STEPID/stderr'
+
+        self.mock_paths = [log_path]
 
         self.path_to_mock_result = {
-            prev_stderr_path: dict(
+            log_path: dict(message='unfortunate error')
+        }
+
+        self.assertEqual(
+            self.interpret_emr_step_stderr(),
+            dict(errors=[dict(task_error=dict(
+                message='unfortunate error', path=log_path))]))
+
+    def test_multiple_logs(self):
+        prev_path = 's3://bucket/logs/steps/s-STEPID/stderr.2015-05-06-09.gz'
+        current_path = 's3://bucket/logs/steps/s-STEPID/stderr.gz'
+
+        self.mock_paths = [prev_path, current_path]
+
+        self.path_to_mock_result = {
+            prev_path: dict(
                 message='warning',
             ),
-            current_stderr_path: dict(
+            current_path: dict(
                 message='actual error',
             ),
         }
 
-        # both errors should appear, in the correct order. stderr should
-        # be ignored
         self.assertEqual(
-            self.interpret_emr_step_logs(),
+            self.interpret_emr_step_stderr(),
             dict(
                 errors=[
                     dict(
                         task_error=dict(
                             message='actual error',
-                            path=current_stderr_path,
+                            path=current_path,
                         ),
                     ),
                 ]
             ),
         )
 
-        # we should never look at prev_stderr_path; we only care about
-        # the end of stderr anyway
-        self.assertEqual(self.mock_paths_catted,
-                         [prev_path, current_path, current_stderr_path])
+        # no need to look at previous chunk of stderr (basically tailing here)
+        self.assertEqual(self.mock_paths_catted, [current_path])
 
-    # this could happen if the current stderr log is empty
-    def test_fall_back_to_rotated_stderr(self):
-        prev_path = 's3://bucket/logs/steps/s-STEPID/syslog.2015-05-06-09.gz'
-        current_path = 's3://bucket/logs/steps/s-STEPID/syslog.gz'
-        prev_stderr_path = (
-            's3://bucket/logs/steps/s-STEPID/stderr.2015-05-06-09.gz')
-        current_stderr_path = 's3://bucket/logs/steps/s-STEPID/stderr.gz'
+    def test_fall_back_to_rotated_logs(self):
+        prev_path = 's3://bucket/logs/steps/s-STEPID/stderr.2015-05-06-09.gz'
+        current_path = 's3://bucket/logs/steps/s-STEPID/stderr.gz'
 
-        # current log would come first in alphabetical sort
-        self.mock_paths = [
-            prev_path, current_path, prev_stderr_path, current_stderr_path]
+        self.mock_paths = [prev_path, current_path]
 
         self.path_to_mock_result = {
-            prev_stderr_path: dict(
-                message='actual error',
+            prev_path: dict(
+                message='warning',
             ),
         }
 
-        # both errors should appear, in the correct order. stderr should
-        # be ignored
         self.assertEqual(
-            self.interpret_emr_step_logs(),
+            self.interpret_emr_step_stderr(),
             dict(
                 errors=[
                     dict(
                         task_error=dict(
-                            message='actual error',
-                            path=prev_stderr_path,
+                            message='warning',
+                            path=prev_path,
                         ),
                     ),
                 ]
             ),
         )
 
-        self.assertEqual(self.mock_paths_catted,
-                         [prev_path, current_path,
-                          current_stderr_path, prev_stderr_path])
+        self.assertEqual(self.mock_paths_catted, [current_path, prev_path])
 
     maxDiff = None

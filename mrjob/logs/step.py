@@ -139,8 +139,7 @@ def _match_emr_step_log_path(path, log_type, step_id=None):
     if not (step_id is None or m.group('step_id') == step_id):
         return None
 
-    return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'),
-                log_type=m.group('log_type'))
+    return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'))
 
 
 def _interpret_emr_step_syslog(fs, matches):
@@ -153,7 +152,7 @@ def _interpret_emr_step_syslog(fs, matches):
     for match in matches:
         path = match['path']
 
-        interpretation = _parse_step_log(_cat_log(fs, path))
+        interpretation = _parse_step_syslog(_cat_log(fs, path))
 
         result.update(interpretation)
         for error in result.get('errors') or ():
@@ -176,13 +175,13 @@ def _interpret_emr_step_stderr(fs, matches):
     for match in matches:
         path = match['path']
 
-        error = _parse_task_stderr(_cat_log(fs, stderr_path))
+        error = _parse_task_stderr(_cat_log(fs, path))
 
         if error:
             error['path'] = path
             # We're essentially just tailing the stderr log, so stop when we
             # find an error.
-            return dict(errors=[dict(task_error=task_error)])
+            return dict(errors=[dict(task_error=error)])
 
     return {}
 

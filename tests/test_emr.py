@@ -3171,6 +3171,26 @@ class JarStepTestCase(MockBotoTestCase):
             self.assertEqual(jar_output_arg, streaming_input_arg)
 
 
+class BuildMasterNodeSetupStep(MockBotoTestCase):
+
+    def test_build_master_node_setup_step(self):
+        runner = EMRJobRunner(libjars=['cookie.jar'])
+        runner._add_master_node_setup_files_for_upload()
+
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+        master_node_setup_uri = runner._upload_mgr.uri(
+            runner._master_node_setup_script_path)
+
+        with patch('boto.emr.JarStep', dict):
+            step = runner._build_master_node_setup_step()
+
+        self.assertTrue(step['name'].endswith(': Master node setup'))
+        self.assertEqual(step['jar'], runner._script_runner_jar_uri())
+        self.assertEqual(step['step_args'], [master_node_setup_uri])
+        self.assertEqual(step['action_on_failure'],
+                         runner._action_on_failure())
+
+
 class ActionOnFailureTestCase(MockBotoTestCase):
 
     def test_default(self):

@@ -3662,8 +3662,8 @@ class LsStepSyslogsTestCase(MockBotoTestCase):
 
         self.log = self.start(patch('mrjob.emr.log'))
 
-        self._ls_emr_step_logs = self.start(patch(
-            'mrjob.emr._ls_emr_step_logs'))
+        self._ls_emr_step_syslogs = self.start(patch(
+            'mrjob.emr._ls_emr_step_syslogs'))
         self._stream_step_log_dirs = self.start(patch(
             'mrjob.emr.EMRJobRunner._stream_step_log_dirs'))
 
@@ -3671,7 +3671,7 @@ class LsStepSyslogsTestCase(MockBotoTestCase):
         # just verify that the keyword args get passed through and
         # that logging happens in the right order
 
-        self._ls_emr_step_logs.return_value = [
+        self._ls_emr_step_syslogs.return_value = [
             dict(path='s3://bucket/logs/steps/syslog'),
         ]
 
@@ -3688,7 +3688,7 @@ class LsStepSyslogsTestCase(MockBotoTestCase):
 
         self._stream_step_log_dirs.assert_called_once_with(
             step_id='s-STEPID')
-        self._ls_emr_step_logs.assert_called_once_with(
+        self._ls_emr_step_syslogs.assert_called_once_with(
             runner.fs,
             self._stream_step_log_dirs.return_value,
             step_id='s-STEPID')
@@ -3698,6 +3698,52 @@ class LsStepSyslogsTestCase(MockBotoTestCase):
                       self.log.info.call_args[0][0])
 
         self.assertRaises(StopIteration, next, results)
+
+
+class LsStepStderrLogsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(LsStepStderrLogsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._ls_emr_step_stderr_logs = self.start(patch(
+            'mrjob.emr._ls_emr_step_stderr_logs'))
+        self._stream_step_log_dirs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._stream_step_log_dirs'))
+
+    def test_basic(self):
+        # just verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        self._ls_emr_step_stderr_logs.return_value = [
+            dict(path='s3://bucket/logs/steps/stderr'),
+        ]
+
+        runner = EMRJobRunner()
+
+        self.log.info.reset_mock()
+
+        results = runner._ls_step_stderr_logs(step_id='s-STEPID')
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results),
+                         dict(path='s3://bucket/logs/steps/stderr'))
+
+        self._stream_step_log_dirs.assert_called_once_with(
+            step_id='s-STEPID')
+        self._ls_emr_step_stderr_logs.assert_called_once_with(
+            runner.fs,
+            self._stream_step_log_dirs.return_value,
+            step_id='s-STEPID')
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn('s3://bucket/logs/steps/stderr',
+                      self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
 
 
 class GetStepLogInterpretationTestCase(MockBotoTestCase):

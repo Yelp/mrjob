@@ -20,11 +20,13 @@ import inspect
 import itertools
 import json
 import logging
+import os.path
 import sys
 from optparse import OptionGroup
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
+from mrjob.conf import combine_lists
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
@@ -33,6 +35,7 @@ from mrjob.step import MRStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
+from mrjob.util import expand_path
 from mrjob.util import read_input
 
 
@@ -971,6 +974,43 @@ class MRJob(MRJobLauncher):
         redefining this method is only for when you want to get fancy.
         """
         return self.HADOOP_OUTPUT_FORMAT
+
+    ### Libjars ###
+
+    #: Optional list of paths of jar files to run our job with using Hadoop's
+    #: ``-libjar`` option. Relative paths will be interpreted as relative
+    #: to the directory containing the script.
+    #:
+    #: If you require more sophisticated behavior, try :py:meth:`libjars`.
+    LIBJARS = []
+
+    def libjars(self):
+        """Optional list of paths of jar files to run our job with using
+        Hadoop's ``-libjar`` option. Normally setting :py:attr:`LIBJARS`
+        is sufficient.
+
+        By default, this combines :option:`libjars` options from the command
+        lines with :py:attr:`LIBJARS`, with command line arguments taking
+        precedence. Paths from :py:attr:`LIBJARS` are interpreted as relative
+        to the the directory containing the script (paths from the
+        command-line are relative to the current working directory).
+        """
+        script_dir = os.path.dirname(self.mr_job_script())
+
+        paths_from_libjars = []
+
+        # libjar paths will eventually be combined with combine_path_lists,
+        # which will expand environment variables. We don't want to assume
+        # a path like $MY_DIR/some.jar is always relative ($MY_DIR could start
+        # with /), but we also don't want to expand environment variables
+        # prematurely.
+        for path in self.LIBJARS or []:
+            if os.path.isabs(expand_path(path)):
+                paths_from_libjars.append(path)
+            else:
+                paths_from_libjars.append(os.path.join(script_dir), path)
+
+        return combine_lists(paths_from_libjars, self.options.libjars)
 
     ### Partitioning ###
 

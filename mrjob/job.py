@@ -1008,7 +1008,7 @@ class MRJob(MRJobLauncher):
             if os.path.isabs(expand_path(path)):
                 paths_from_libjars.append(path)
             else:
-                paths_from_libjars.append(os.path.join(script_dir), path)
+                paths_from_libjars.append(os.path.join(script_dir, path))
 
         return combine_lists(paths_from_libjars, self.options.libjars)
 

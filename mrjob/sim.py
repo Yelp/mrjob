@@ -114,7 +114,7 @@ class SimMRJobRunner(MRJobRunner):
                     'ignoring %s keyword arg (requires real Hadoop): %r' %
                     (ignored_attr[1:], value))
 
-        for ignored_opt in self._opts:
+        for ignored_opt in self._IGNORED_HADOOP_OPTS:
             value = self._opts.get(ignored_opt)
             if value:  # ignore [], the default value of libjars
                 log.warning(

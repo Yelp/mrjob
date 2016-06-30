@@ -808,7 +808,7 @@ a tab)::
 
   def reducer(self, word, counts):
       total = sum(counts)
-      yield None, '\t'.join(word[0], json.dumps(word), json.dumps(total))
+      yield None, '\t'.join([word[0], json.dumps(word), json.dumps(total)])
 
 Done! Here's the full, working job (this is
 :py:mod:`mrjob.examples.mr_nick_nack`)::
@@ -836,7 +836,7 @@ Done! Here's the full, working job (this is
 
         def reducer(self, word, counts):
             total = sum(counts)
-            yield None, '\t'.join(word[0], json.dumps(word), json.dumps(total))
+            yield None, '\t'.join([word[0], json.dumps(word), json.dumps(total)])
 
 
     if __name__ == '__main__':

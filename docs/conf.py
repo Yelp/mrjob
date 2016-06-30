@@ -34,7 +34,7 @@ pygments_style = 'sphinx'
 # project info
 
 project = u'mrjob'
-copyright = u'2009-2015 Yelp and Contributors'
+copyright = u'2009-2016 Yelp and Contributors'
 # The short X.Y version. Can refer to in docs with |version|.
 version = mrjob.__version__.split('-')[0]
 # The full version, including alpha/beta/rc tags.

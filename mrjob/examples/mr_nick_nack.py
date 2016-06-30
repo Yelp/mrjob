@@ -29,7 +29,10 @@ class MRNickNack(MRJob):
     # tell hadoop to massage our mrjob output using this output format
     HADOOP_OUTPUT_FORMAT = 'nicknack.MultipleValueOutputFormat'
 
-    # use the nicknack jar in this directory
+    # use the nicknack JAR in this directory
+    #
+    # This JAR was downloaded from https://github.com/empiricalresults/nicknack
+    # and is also under the Apache 2.0 license.
     LIBJARS = ['nicknack-1.0.0.jar']
 
     # tell mrjob not to format our output -- leave that to hadoop

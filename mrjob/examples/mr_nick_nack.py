@@ -21,7 +21,8 @@ import re
 from mrjob.job import MRJob
 from mrjob.protocol import RawProtocol
 
-WORD_RE = re.compile(r"[\w']+")
+# restrict to a-z so we don't get odd filenames
+WORD_RE = re.compile(r"[A-Za-z]+")
 
 
 class MRNickNack(MRJob):

@@ -704,8 +704,6 @@ class LibjarsTestCase(TestCase):
             self.assertEqual(job.job_runner_kwargs()['libjars'], ['honey.jar'])
 
 
-
-
 class MRSortValuesAndMore(MRSortValues):
     PARTITIONER = 'org.apache.hadoop.mapred.lib.HashPartitioner'
 

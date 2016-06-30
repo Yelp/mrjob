@@ -413,6 +413,7 @@ These options are ignored because they require a real instance of Hadoop:
 
 * :py:meth:`hadoop_input_format <mrjob.runner.MRJobRunner.__init__>`
 * :py:meth:`hadoop_output_format <mrjob.runner.MRJobRunner.__init__>`
+* :mrjob-opt:`libjars`
 * :py:meth:`partitioner <mrjob.runner.MRJobRunner.__init__>`
 
 

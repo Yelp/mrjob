@@ -594,9 +594,11 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         add_mock_hadoop_output([b'1\t"qux"\n2\t"bar"\n',
                                 b'2\t"foo"\n5\tnull\n'])
 
+        # -libjar is now a supported feature. Maybe -verbose?
+
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
-                               '--no-conf', '--hadoop-arg', '-libjar',
-                               '--hadoop-arg', 'containsJars.jar'] + list(args)
+                               '--no-conf', '--libjar', 'containsJars.jar',
+                               '--hadoop-arg', '-verbose'] + list(args)
                               + ['-', local_input_path, remote_input_path]
                               + ['--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
@@ -626,7 +628,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertEqual(os.listdir(os.path.join(home_dir, 'tmp')),
                              ['mrjob'])
             self.assertEqual(runner._opts['hadoop_extra_args'],
-                             ['-libjar', 'containsJars.jar'])
+                             ['-verbose'])
 
             # make sure mrjob.tar.gz is was uploaded
             self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path))
@@ -666,11 +668,18 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
         self.assertNotIn('-inputformat', step_1_args)
         self.assertIn('-outputformat', step_1_args)
 
-        # make sure -libjar extra arg comes before -mapper
+        # make sure extra arg (-verbose) comes before mapper
         for args in (step_0_args, step_1_args):
-            self.assertIn('-libjar', args)
+            self.assertIn('-verbose', args)
             self.assertIn('-mapper', args)
-            self.assertLess(args.index('-libjar'), args.index('-mapper'))
+            self.assertLess(args.index('-verbose'), args.index('-mapper'))
+
+        # make sure -libjar is set and comes before mapper
+        for args in (step_0_args, step_1_args):
+            self.assertIn('-libjars', args)
+            self.assertIn('containsJars.jar', args)
+            self.assertIn('-mapper', args)
+            self.assertLess(args.index('-libjars'), args.index('-mapper'))
 
         # make sure -D (jobconf) made it through
         self.assertIn('-D', step_0_args)
@@ -712,10 +721,10 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
         'hadoop',
         'jar', '<streaming jar>',
         '<upload args>',
-        '<hadoop args for step>',
     ]
 
     BASIC_JOB_ARGS = [
+        '<hadoop args for step>',
         '-input', '<hdfs step input files>',
         '-output', '<hdfs step output dir>',
     ]
@@ -757,7 +766,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
         self.assertEqual(
             self.runner._args_for_streaming_step(0),
-            (self.BASIC_HADOOP_ARGS + ['-D', 'mapreduce.job.reduces=0'] +
+            (self.BASIC_HADOOP_ARGS +
+             ['-D', 'mapreduce.job.reduces=0'] +
              self.BASIC_JOB_ARGS + [
                  '-mapper',
                  PYTHON_BIN + ' my_job.py --step-num=0 --mapper']))
@@ -778,7 +788,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
         self.assertEqual(
             self.runner._args_for_streaming_step(0),
-            (self.BASIC_HADOOP_ARGS + ['-D', 'mapred.reduce.tasks=0'] +
+            (self.BASIC_HADOOP_ARGS +
+             ['-D', 'mapred.reduce.tasks=0'] +
              self.BASIC_JOB_ARGS + [
                  '-mapper',
                  PYTHON_BIN + ' my_job.py --step-num=0 --mapper']))
@@ -847,7 +858,8 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
         self.assertEqual(
             self.runner._args_for_streaming_step(0),
-            (self.BASIC_HADOOP_ARGS + ['-D', 'mapreduce.job.reduces=0'] +
+            (self.BASIC_HADOOP_ARGS +
+             ['-D', 'mapreduce.job.reduces=0'] +
              self.BASIC_JOB_ARGS + [
                  '-mapper',
                  "bash -c 'bash -c '\\''grep"
@@ -1034,7 +1046,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0), ['-foo'])
 
-    def test_hadoop_extra_args_comes_first(self):
+    def test_hadoop_extra_args_comes_after_jobconf(self):
         job = MRWordCount(
             ['-r', self.RUNNER,
              '--cmdenv', 'FOO=bar',
@@ -1046,5 +1058,49 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
 
         with job.make_runner() as runner:
             hadoop_args = runner._hadoop_args_for_step(0)
-            self.assertEqual(hadoop_args[:2], ['-libjar', 'qux.jar'])
+            self.assertEqual(
+                hadoop_args[:4],
+                ['-D', 'baz=qux', '-libjar', 'qux.jar'])
             self.assertEqual(len(hadoop_args), 12)
+
+
+class LibjarsTestCase(MockHadoopTestCase):
+
+    def test_empty(self):
+        job = MRWordCount(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+            args = runner._args_for_streaming_step(0)
+
+            self.assertNotIn('-libjars', args)
+
+    def test_one_jar(self):
+        job = MRWordCount([
+            '-r', 'hadoop',
+            '--libjar', '/path/to/a.jar',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+            args = runner._args_for_streaming_step(0)
+
+            self.assertIn('-libjars', args)
+            self.assertIn('/path/to/a.jar', args)
+
+    def test_two_jars(self):
+        job = MRWordCount([
+            '-r', 'hadoop',
+            '--libjar', '/path/to/a.jar',
+            '--libjar', '/path/to/b.jar',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+            args = runner._args_for_streaming_step(0)
+
+            self.assertIn('-libjars', args)
+            self.assertIn('/path/to/a.jar,/path/to/b.jar', args)

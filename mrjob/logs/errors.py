@@ -86,7 +86,10 @@ def _format_error_helper(error):
 
     task_error = error.get('task_error')
     if task_error:
-        result += '\n\ncaused by:\n\n%s' % (task_error.get('message', ''))
+        if hadoop_error:
+            result += '\n\ncaused by:\n\n%s' % (task_error.get('message', ''))
+        else:
+            result += task_error.get('message', '')
 
         if task_error.get('path'):
             result += '\n\n(from %s)' % _describe_source(task_error)

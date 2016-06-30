@@ -23,16 +23,17 @@ from mrjob.py2 import to_string
 from .ids import _add_implied_job_id
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
+from .task import _parse_task_stderr
 from .wrap import _cat_log
 from .wrap import _ls_logs
 
 
-# path of step log (these only exist on EMR). Step syslogs on S3 are
+# path of step logs (these only exist on EMR). Step logs on S3 are
 # rotated and timestamped with YYYY-MM-DD-HH
 _EMR_STEP_LOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<step_id>s-[A-Z0-9]+)/'
-    r'syslog(\.(?P<timestamp>[\d-]+))?(?P<suffix>\.\w+)?')
+    r'(?P<log_type>syslog|stderr)(\.(?P<timestamp>[\d-]+))?(?P<suffix>\.\w+)?')
 
 # hadoop streaming always prints "packageJobJar..." to stdout,
 # and prints Streaming Command Failed! to stderr on failure
@@ -73,28 +74,66 @@ _TASK_ATTEMPT_FAILED_RE = re.compile(
 log = getLogger(__name__)
 
 
-def _ls_emr_step_logs(fs, log_dir_stream, step_id=None):
+def _ls_emr_step_syslogs(fs, log_dir_stream, step_id=None):
     """Yield matching step logs, optionally filtering by *step_id*.
     Yields dicts with the keys:
 
     path: path/URI of step file
     step_id: step_id in *path* (must match *step_id* if set)
     """
-    matches = _ls_logs(fs, log_dir_stream, _match_emr_step_log_path,
+    matches = _ls_logs(fs, log_dir_stream, _match_emr_step_syslog_path,
                        step_id=step_id)
 
-    # "recency" isn't useful here; sort by timestamp, with unstamped
-    # log last
-    return sorted(matches,
-                  key=lambda m: (m['timestamp'] is None, m['timestamp'] or ''))
+    return sorted(matches, key=_match_sort_key)
 
 
-def _match_emr_step_log_path(path, step_id=None):
-    """Yields paths/URIs of all job history files in the given directories,
-    optionally filtering by *step_id*.
+def _ls_emr_step_stderr_logs(fs, log_dir_stream, step_id=None):
+    """Yield matching step logs, optionally filtering by *step_id*.
+    Yields dicts with the keys:
+
+    path: path/URI of step file
+    step_id: step_id in *path* (must match *step_id* if set)
+    """
+    matches = _ls_logs(fs, log_dir_stream, _match_emr_step_stderr_path,
+                       step_id=step_id)
+
+    # we basically want to tail the stderr log, so search rotated
+    # logs in reverse
+    return sorted(matches, key=_match_sort_key, reverse=True)
+
+
+def _match_sort_key(m):
+    """sort key which treats empty timestamp as most recent"""
+    return (m['timestamp'] is None, m['timestamp'] or '')
+
+
+def _match_emr_step_syslog_path(path, step_id=None):
+    """Match path of a step syslog, optionally filtering by *step_id*.
+
+    If there is a match, return a dict with the keys *step_id* and
+    *timestamp* (a string). Otherwise, returns None.
+    """
+    return _match_emr_step_log_path(path, 'syslog', step_id=step_id)
+
+
+def _match_emr_step_stderr_path(path, step_id=None):
+    """Match path of a step stderr log, optionally filtering by *step_id*.
+
+    If there is a match, return a dict with the keys *step_id* and
+    *timestamp* (a string). Otherwise, returns None.
+    """
+    return _match_emr_step_log_path(path, 'stderr', step_id=step_id)
+
+
+def _match_emr_step_log_path(path, log_type, step_id=None):
+    """Helper for :py:func:`_match_emr_step_syslog_path` and
+    :py:func:`_match_emr_step_stderr_path`
     """
     m = _EMR_STEP_LOG_PATH_RE.match(path)
     if not m:
+        return None
+
+    if m.group('log_type') != log_type:
         return None
 
     if not (step_id is None or m.group('step_id') == step_id):
@@ -103,8 +142,8 @@ def _match_emr_step_log_path(path, step_id=None):
     return dict(step_id=m.group('step_id'), timestamp=m.group('timestamp'))
 
 
-def _interpret_emr_step_logs(fs, matches):
-    """Extract information from step log (see :py:func:`_parse_step_log()`),
+def _interpret_emr_step_syslog(fs, matches):
+    """Extract information from step syslog (see :py:func:`_parse_step_log()`),
     which may be split into several chunks by timestamp"""
     # going to merge results for each log into final result
     errors = []
@@ -113,7 +152,7 @@ def _interpret_emr_step_logs(fs, matches):
     for match in matches:
         path = match['path']
 
-        interpretation = _parse_step_log(_cat_log(fs, path))
+        interpretation = _parse_step_syslog(_cat_log(fs, path))
 
         result.update(interpretation)
         for error in result.get('errors') or ():
@@ -129,10 +168,28 @@ def _interpret_emr_step_logs(fs, matches):
     return result
 
 
+def _interpret_emr_step_stderr(fs, matches):
+    """Extract information from step stderr (see
+    :py:func:`~mrjob.logs.task._parse_task_stderr()`),
+    which may be split into several chunks by timestamp"""
+    for match in matches:
+        path = match['path']
+
+        error = _parse_task_stderr(_cat_log(fs, path))
+
+        if error:
+            error['path'] = path
+            # We're essentially just tailing the stderr log, so stop when we
+            # find an error.
+            return dict(errors=[dict(task_error=error)])
+
+    return {}
+
+
 def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     """Parse stderr from the ``hadoop jar`` command. Works like
-    :py:func:`_parse_step_log` (same return format)  with a few extra features
-    to handle the output of the ``hadoop jar`` command on the fly:
+    :py:func:`_parse_step_syslog` (same return format)  with a few extra
+    features to handle the output of the ``hadoop jar`` command on the fly:
 
     - Converts ``bytes`` lines to ``str``
     - Pre-filters non-log4j stuff from Hadoop Streaming so it doesn't
@@ -163,7 +220,7 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
                 record_callback(record)
             yield record
 
-    result = _parse_step_log_from_log4j_records(yield_records())
+    result = _parse_step_syslog_from_log4j_records(yield_records())
 
     _add_implied_job_id(result)
     for error in result.get('errors') or ():
@@ -172,7 +229,7 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     return result
 
 
-def _parse_step_log(lines):
+def _parse_step_syslog(lines):
     """Parse the syslog from the ``hadoop jar`` command.
 
     Returns a dictionary which potentially contains the following keys:
@@ -191,15 +248,15 @@ def _parse_step_log(lines):
     output_dir: a URI like 'hdfs:///user/hadoop/tmp/my-output-dir'. Should
         always be set on success.
     """
-    return _parse_step_log_from_log4j_records(
+    return _parse_step_syslog_from_log4j_records(
         _parse_hadoop_log4j_records(lines))
 
 
-def _parse_step_log_from_log4j_records(records):
+def _parse_step_syslog_from_log4j_records(records):
     """Pulls errors, counters, IDs, etc. from log4j records
     emitted by Hadoop.
 
-    This powers :py:func:`_parse_step_log` and
+    This powers :py:func:`_parse_step_syslog` and
     :py:func:`_interpret_hadoop_jar_command_stderr`.
     """
     result = {}

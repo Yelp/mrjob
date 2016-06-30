@@ -287,7 +287,6 @@ class FormatErrorTestCase(TestCase):
             _format_error(dict(task_error=dict(
                 message='system will self-destruct in 5s'
             ))),
-            '\n\ncaused by:\n\n'
             'system will self-destruct in 5s')
 
         # everything uses the same code to format path + line range, so
@@ -298,7 +297,6 @@ class FormatErrorTestCase(TestCase):
                 path='/path/to/stderr',
                 start_line=0,
                 num_lines=1))),
-            '\n\ncaused by:\n\n'
             'system will self-destruct in 5s'
             '\n\n(from line 1 of /path/to/stderr)')
 

@@ -71,7 +71,6 @@ from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
-from tests.sandbox import patch_fs_s3
 from tests.test_hadoop import HadoopExtraArgsTestCase
 
 try:
@@ -1549,6 +1548,74 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertTrue(runner.fs.exists(actions[1].scriptpath))
 
 
+class MasterNodeSetupScriptTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(MasterNodeSetupScriptTestCase, self).setUp()
+        self.start(patch('mrjob.emr.log'))
+
+    def test_no_script_needed(self):
+        runner = EMRJobRunner()
+
+        runner._add_master_node_setup_files_for_upload()
+        self.assertIsNone(runner._master_node_setup_script_path)
+        self.assertEqual(runner._master_node_setup_mgr.paths(), set())
+
+    def test_libjars(self):
+        runner = EMRJobRunner(libjars=[
+            'cookie.jar',
+            's3://pooh/honey.jar',
+            'file:///left/dora.jar',
+        ])
+
+        runner._add_master_node_setup_files_for_upload()
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+        # don't need to manage file:/// URI
+        self.assertEqual(
+            runner._master_node_setup_mgr.paths(),
+            set(['cookie.jar', 's3://pooh/honey.jar']))
+
+        uploaded_paths = set(runner._upload_mgr.path_to_uri())
+        self.assertIn('cookie.jar', uploaded_paths)
+
+        with open(runner._master_node_setup_script_path, 'rb') as f:
+            contents = f.read()
+
+        self.assertTrue(contents.startswith(b'#!/bin/sh -ex\n'))
+        self.assertIn(b'hadoop fs -copyToLocal ', contents)
+        self.assertNotIn(b'aws s3 cp ', contents)
+        self.assertIn(b'chmod a+x ', contents)
+        self.assertIn(b'cookie.jar', contents)
+        self.assertIn(b's3://pooh/honey.jar', contents)
+        self.assertNotIn(b'dora.jar', contents)
+
+    def test_4_x_ami(self):
+        runner = EMRJobRunner(libjars=['cookie.jar'],
+                              release_label='emr-4.0.0')
+
+        runner._add_master_node_setup_files_for_upload()
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+
+        with open(runner._master_node_setup_script_path, 'rb') as f:
+            contents = f.read()
+
+        self.assertNotIn(b'hadoop fs -copyToLocal ', contents)
+        self.assertIn(b'aws s3 cp ', contents)
+        self.assertIn(b'cookie.jar', contents)
+
+    def test_usr_bin_env(self):
+        runner = EMRJobRunner(libjars=['cookie.jar'],
+                              sh_bin=['bash'])
+
+        runner._add_master_node_setup_files_for_upload()
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+
+        with open(runner._master_node_setup_script_path, 'rb') as f:
+            contents = f.read()
+
+        self.assertTrue(contents.startswith(b'#!/usr/bin/env bash\n'))
+
+
 class EMRNoMapperTestCase(MockBotoTestCase):
 
     def test_no_mapper(self):
@@ -2671,28 +2738,41 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(BuildStreamingStepTestCase, self).setUp()
-        with patch_fs_s3():
-            self.runner = EMRJobRunner(
-                mr_job_script='my_job.py', conf_paths=[], stdin=BytesIO())
-        self.runner._steps = []  # don't actually run `my_job.py --steps`
-        self.runner._add_job_files_for_upload()
 
-        self.start(patch.object(
-            self.runner, '_step_input_uris', return_value=['input']))
-        self.start(patch.object(
-            self.runner, '_step_output_uri', return_value=['output']))
-        self.start(patch.object(
-            self.runner, '_get_streaming_jar_and_step_arg_prefix',
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._step_input_uris',
+            return_value=['input']))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._step_output_uri',
+            return_value='output'))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_ami_version',
+            return_value='3.7.0'))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='2.4.0'))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._get_streaming_jar_and_step_arg_prefix',
             return_value=('streaming.jar', [])))
-        self.start(patch.object(
-            self.runner, 'get_ami_version', return_value='3.8.0'))
 
-        self.start(patch.object(boto.emr, 'StreamingStep', dict))
-        self.runner._hadoop_version = '0.20'
+    def _get_streaming_step(self, step, **kwargs):
+        runner = EMRJobRunner(
+            mr_job_script='my_job.py',
+            conf_paths=[],
+            stdin=BytesIO(),
+            **kwargs)
 
-    def _get_streaming_step(self, step):
-        with patch.object(self.runner, '_steps', [step]):
-            return self.runner._build_streaming_step(0)
+        runner._steps = [step]
+
+        runner._add_job_files_for_upload()
+        runner._add_master_node_setup_files_for_upload()
+
+        with patch('boto.emr.StreamingStep', dict):
+            return runner._build_streaming_step(0)
 
     def test_basic_mapper(self):
         ss = self._get_streaming_step(
@@ -2773,7 +2853,7 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
     def test_custom_streaming_jar_and_step_arg_prefix(self):
         # test integration with custom jar options. See
         # StreamingJarAndStepArgPrefixTestCase below.
-        self.runner._get_streaming_jar_and_step_arg_prefix.return_value = (
+        EMRJobRunner._get_streaming_jar_and_step_arg_prefix.return_value = (
             ('launch.jar', ['streaming', '-v']))
 
         ss = self._get_streaming_step(
@@ -2786,6 +2866,59 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.assertEqual(ss['step_args'][:2], ['streaming', '-v'])
         self.assertEqual(ss['step_args'][2], '-files')
         self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
+
+    def test_libjars_and_hadoop_args_for_step(self):
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._libjar_step_args',
+            return_value=[
+                '-libjars',
+                '/home/hadoop/dir/honey.jar,/home/hadoop/door/a.jar']))
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._hadoop_args_for_step',
+            return_value=['-D', 'foo=bar']))
+
+        ss = self._get_streaming_step(
+            dict(type='streaming', mapper=dict(type='script')))
+
+        self.assertEqual(ss['jar'], 'streaming.jar')
+
+        # step_args should be -files script_uri#script_name
+        self.assertEqual(len(ss['step_args']), 6)
+        self.assertEqual(ss['step_args'][0], '-files')
+        self.assertTrue(ss['step_args'][1].endswith('#my_job.py'))
+        self.assertEqual(
+            ss['step_args'][2:],
+            ['-libjars', '/home/hadoop/dir/honey.jar,/home/hadoop/door/a.jar',
+             '-D', 'foo=bar'])
+
+
+class LibjarStepArgsTestCase(MockBotoTestCase):
+
+    def test_no_libjars(self):
+        runner = EMRJobRunner()
+        runner._add_master_node_setup_files_for_upload()
+
+        self.assertEqual(runner._libjar_step_args(), [])
+
+    def test_libjars(self):
+        runner = EMRJobRunner(libjars=[
+            'cookie.jar',
+            's3://pooh/honey.jar',
+            'file:///left/dora.jar',
+        ])
+        runner._add_master_node_setup_files_for_upload()
+
+        working_dir = runner._master_node_setup_working_dir()
+
+        self.assertEqual(
+            runner._libjar_step_args(),
+            [
+                '-libjars',
+                '%s/cookie.jar,%s/honey.jar,/left/dora.jar' % (
+                    working_dir, working_dir),
+            ]
+        )
 
 
 class DefaultPythonBinTestCase(MockBotoTestCase):
@@ -2926,6 +3059,44 @@ class JarStepTestCase(MockBotoTestCase):
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0].config.jar, jar_uri)
 
+    def test_with_libjar(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        with open(fake_jar, 'w'):
+            pass
+
+        fake_libjar = os.path.join(self.tmp_dir, 'libfake.jar')
+        with open(fake_libjar, 'w'):
+            pass
+
+        job = MRJustAJar(
+            ['-r', 'emr', '--jar', fake_jar, '--libjar', fake_libjar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(fake_jar, runner._upload_mgr.path_to_uri())
+            jar_uri = runner._upload_mgr.uri(fake_jar)
+            self.assertTrue(runner.fs.ls(jar_uri))
+
+            self.assertIn(fake_libjar, runner._upload_mgr.path_to_uri())
+            libjar_uri = runner._upload_mgr.uri(fake_libjar)
+            self.assertTrue(runner.fs.ls(libjar_uri))
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 2)  # adds master node setup
+
+            jar_step = steps[1]
+            self.assertEqual(jar_step.config.jar, jar_uri)
+            step_args = [a.value for a in jar_step.config.args]
+
+            working_dir = runner._master_node_setup_working_dir()
+
+            self.assertEqual(step_args,
+                             ['-libjars', working_dir + '/libfake.jar'])
+
     def test_jar_on_s3(self):
         self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': b''}})
         JAR_URI = 's3://dubliners/whiskeyinthe.jar'
@@ -3000,26 +3171,46 @@ class JarStepTestCase(MockBotoTestCase):
             self.assertEqual(jar_output_arg, streaming_input_arg)
 
 
+class BuildMasterNodeSetupStep(MockBotoTestCase):
+
+    def test_build_master_node_setup_step(self):
+        runner = EMRJobRunner(libjars=['cookie.jar'])
+        runner._add_master_node_setup_files_for_upload()
+
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+        master_node_setup_uri = runner._upload_mgr.uri(
+            runner._master_node_setup_script_path)
+
+        with patch('boto.emr.JarStep', dict):
+            step = runner._build_master_node_setup_step()
+
+        self.assertTrue(step['name'].endswith(': Master node setup'))
+        self.assertEqual(step['jar'], runner._script_runner_jar_uri())
+        self.assertEqual(step['step_args'], [master_node_setup_uri])
+        self.assertEqual(step['action_on_failure'],
+                         runner._action_on_failure())
+
+
 class ActionOnFailureTestCase(MockBotoTestCase):
 
     def test_default(self):
         runner = EMRJobRunner()
-        self.assertEqual(runner._action_on_failure,
+        self.assertEqual(runner._action_on_failure(),
                          'TERMINATE_CLUSTER')
 
     def test_default_with_cluster_id(self):
         runner = EMRJobRunner(cluster_id='j-CLUSTER')
-        self.assertEqual(runner._action_on_failure,
+        self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 
     def test_default_with_pooling(self):
         runner = EMRJobRunner(pool_clusters=True)
-        self.assertEqual(runner._action_on_failure,
+        self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 
     def test_option(self):
         runner = EMRJobRunner(emr_action_on_failure='CONTINUE')
-        self.assertEqual(runner._action_on_failure,
+        self.assertEqual(runner._action_on_failure(),
                          'CONTINUE')
 
     def test_switch(self):
@@ -3028,7 +3219,7 @@ class ActionOnFailureTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
-            self.assertEqual(runner._action_on_failure, 'CONTINUE')
+            self.assertEqual(runner._action_on_failure(), 'CONTINUE')
 
 
 class MultiPartUploadTestCase(MockBotoTestCase):
@@ -3655,15 +3846,15 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             expected_s3_dir_name='containers/application_1')
 
 
-class LsStepLogsTestCase(MockBotoTestCase):
+class LsStepSyslogsTestCase(MockBotoTestCase):
 
     def setUp(self):
-        super(LsStepLogsTestCase, self).setUp()
+        super(LsStepSyslogsTestCase, self).setUp()
 
         self.log = self.start(patch('mrjob.emr.log'))
 
-        self._ls_emr_step_logs = self.start(patch(
-            'mrjob.emr._ls_emr_step_logs'))
+        self._ls_emr_step_syslogs = self.start(patch(
+            'mrjob.emr._ls_emr_step_syslogs'))
         self._stream_step_log_dirs = self.start(patch(
             'mrjob.emr.EMRJobRunner._stream_step_log_dirs'))
 
@@ -3671,7 +3862,7 @@ class LsStepLogsTestCase(MockBotoTestCase):
         # just verify that the keyword args get passed through and
         # that logging happens in the right order
 
-        self._ls_emr_step_logs.return_value = [
+        self._ls_emr_step_syslogs.return_value = [
             dict(path='s3://bucket/logs/steps/syslog'),
         ]
 
@@ -3679,7 +3870,7 @@ class LsStepLogsTestCase(MockBotoTestCase):
 
         self.log.info.reset_mock()
 
-        results = runner._ls_step_logs(step_id='s-STEPID')
+        results = runner._ls_step_syslogs(step_id='s-STEPID')
 
         self.assertFalse(self.log.info.called)
 
@@ -3688,7 +3879,7 @@ class LsStepLogsTestCase(MockBotoTestCase):
 
         self._stream_step_log_dirs.assert_called_once_with(
             step_id='s-STEPID')
-        self._ls_emr_step_logs.assert_called_once_with(
+        self._ls_emr_step_syslogs.assert_called_once_with(
             runner.fs,
             self._stream_step_log_dirs.return_value,
             step_id='s-STEPID')
@@ -3700,6 +3891,52 @@ class LsStepLogsTestCase(MockBotoTestCase):
         self.assertRaises(StopIteration, next, results)
 
 
+class LsStepStderrLogsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(LsStepStderrLogsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._ls_emr_step_stderr_logs = self.start(patch(
+            'mrjob.emr._ls_emr_step_stderr_logs'))
+        self._stream_step_log_dirs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._stream_step_log_dirs'))
+
+    def test_basic(self):
+        # just verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        self._ls_emr_step_stderr_logs.return_value = [
+            dict(path='s3://bucket/logs/steps/stderr'),
+        ]
+
+        runner = EMRJobRunner()
+
+        self.log.info.reset_mock()
+
+        results = runner._ls_step_stderr_logs(step_id='s-STEPID')
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results),
+                         dict(path='s3://bucket/logs/steps/stderr'))
+
+        self._stream_step_log_dirs.assert_called_once_with(
+            step_id='s-STEPID')
+        self._ls_emr_step_stderr_logs.assert_called_once_with(
+            runner.fs,
+            self._stream_step_log_dirs.return_value,
+            step_id='s-STEPID')
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn('s3://bucket/logs/steps/stderr',
+                      self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
+
+
 class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
     def setUp(self):
@@ -3707,10 +3944,15 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self.log = self.start(patch('mrjob.emr.log'))
 
-        self._interpret_emr_step_logs = self.start(patch(
-            'mrjob.emr._interpret_emr_step_logs'))
-        self._ls_step_logs = self.start(patch(
-            'mrjob.emr.EMRJobRunner._ls_step_logs'))
+        self._interpret_emr_step_syslog = self.start(patch(
+            'mrjob.emr._interpret_emr_step_syslog'))
+        self._ls_step_syslogs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ls_step_syslogs'))
+
+        self._interpret_emr_step_stderr= self.start(patch(
+            'mrjob.emr._interpret_emr_step_stderr'))
+        self._ls_step_stderr_logs = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ls_step_stderr_logs'))
 
     def test_basic(self):
         runner = EMRJobRunner()
@@ -3721,12 +3963,14 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
         self.assertEqual(
             runner._get_step_log_interpretation(log_interpretation),
-            self._interpret_emr_step_logs.return_value)
+            self._interpret_emr_step_syslog.return_value)
 
         self.assertFalse(self.log.warning.called)
-        self._ls_step_logs.assert_called_once_with(step_id='s-STEPID')
-        self._interpret_emr_step_logs.assert_called_once_with(
-            runner.fs, self._ls_step_logs.return_value)
+        self._ls_step_syslogs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_syslog.assert_called_once_with(
+            runner.fs, self._ls_step_syslogs.return_value)
+        self.assertFalse(self._ls_step_stderr_logs.called)
+        self.assertFalse(self._interpret_emr_step_stderr.called)
 
     def test_no_step_id(self):
         runner = EMRJobRunner()
@@ -3739,14 +3983,46 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
             runner._get_step_log_interpretation(log_interpretation), None)
 
         self.assertTrue(self.log.warning.called)
-        self.assertFalse(self._ls_step_logs.called)
-        self.assertFalse(self._interpret_emr_step_logs.called)
+        self.assertFalse(self._ls_step_syslogs.called)
+        self.assertFalse(self._interpret_emr_step_syslog.called)
+        self.assertFalse(self._ls_step_stderr_logs.called)
+        self.assertFalse(self._interpret_emr_step_stderr.called)
+
+    def test_fallback_to_stderr(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = dict(step_id='s-STEPID')
+
+        self.log.reset_mock()
+
+        self._interpret_emr_step_syslog.return_value = {}
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(log_interpretation),
+            self._interpret_emr_step_stderr.return_value)
+
+        self.assertFalse(self.log.warning.called)
+        self._ls_step_syslogs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_syslog.assert_called_once_with(
+            runner.fs, self._ls_step_syslogs.return_value)
+        self._ls_step_stderr_logs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_stderr.assert_called_once_with(
+            runner.fs, self._ls_step_stderr_logs.return_value)
 
 
 # this basically just checks that hadoop_extra_args is an option
 # for the EMR runner
 class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
-    pass
+
+    def setUp(self):
+        super(HadoopExtraArgsTestCase, self).setUp()
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_hadoop_version',
+            return_value='2.4.0'))
+
+    RUNNER = 'emr'
+
 
 
 # make sure we don't override the partitioner on EMR (tests #1294)
@@ -3863,7 +4139,7 @@ class JobStepsTestCase(MockBotoTestCase):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
 
-        self.assertEqual(runner._job_steps(), [])
+        self.assertEqual(runner._job_steps(max_steps=0), [])
         self.assertEqual(MockEmrConnection.list_steps.call_count, 0)
 
     def test_own_cluster(self):
@@ -3872,7 +4148,7 @@ class JobStepsTestCase(MockBotoTestCase):
         with job.make_runner() as runner:
             runner._launch()
 
-            job_steps = runner._job_steps()
+            job_steps = runner._job_steps(max_steps=2)
 
             self.assertEqual(len(job_steps), 2)
 
@@ -3900,7 +4176,7 @@ class JobStepsTestCase(MockBotoTestCase):
             # this test won't work if pages of steps are really small
             assert(DEFAULT_MAX_STEPS_RETURNED >= 5)
 
-            job_steps = runner._job_steps()
+            job_steps = runner._job_steps(max_steps=2)
 
             self.assertEqual(len(job_steps), 2)
 
@@ -3916,11 +4192,11 @@ class JobStepsTestCase(MockBotoTestCase):
             # thanks to pagination
             self.assertEqual(MockEmrConnection.list_steps.call_count, 1)
 
-            # listing all the steps would take two calls
+            # would take two calls to list all the steps
             MockEmrConnection.list_steps.reset_mock()
 
-            all_steps = _list_all_steps(runner.make_emr_conn(), cluster_id)
-            self.assertEqual(len(all_steps), DEFAULT_MAX_STEPS_RETURNED + 5)
+            job_steps = runner._job_steps()
+            self.assertEqual(len(job_steps), 2)
             self.assertEqual(MockEmrConnection.list_steps.call_count, 2)
 
 
@@ -3965,16 +4241,39 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
         self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 2)
         self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
         self.assertEqual(len(runner._log_interpretations), 2)
+        self.assertIsNone(runner._mns_log_interpretation)
+
+    def test_master_node_setup(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        with open(fake_jar, 'w'):
+            pass
+
+        # --libjar is currently the only way to create the master
+        # node setup script
+        runner = self.make_runner('--libjar', fake_jar)
+
+        runner._add_master_node_setup_files_for_upload()
+        runner._wait_for_steps_to_complete()
+
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+
+        self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 3)
+        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
+        self.assertEqual(len(runner._log_interpretations), 2)
+        self.assertIsNotNone(runner._mns_log_interpretation)
+        self.assertEqual(runner._mns_log_interpretation['no_job'], True)
 
     def test_blanks_out_log_interpretations(self):
         runner = self.make_runner()
 
         runner._log_interpretations = ['foo', 'bar', 'baz']
+        runner._mns_log_interpretation = 'qux'
 
         self._wait_for_step_to_complete.side_effect = self.StopTest
 
         self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
         self.assertEqual(runner._log_interpretations, [])
+        self.assertEqual(runner._mns_log_interpretation, None)
 
     def test_open_ssh_tunnel_when_first_step_runs(self):
         # normally, we'll open the SSH tunnel when the first step

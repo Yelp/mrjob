@@ -81,8 +81,10 @@ from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
-from mrjob.logs.step import _interpret_emr_step_logs
-from mrjob.logs.step import _ls_emr_step_logs
+from mrjob.logs.step import _interpret_emr_step_stderr
+from mrjob.logs.step import _interpret_emr_step_syslog
+from mrjob.logs.step import _ls_emr_step_stderr_logs
+from mrjob.logs.step import _ls_emr_step_syslogs
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -370,6 +372,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'iam_instance_profile',
         'iam_endpoint',
         'iam_service_role',
+        'libjars',
         'max_hours_idle',
         'mins_to_end_of_hour',
         'num_ec2_core_instances',
@@ -403,6 +406,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_applications': combine_lists,
         'emr_tags': combine_dicts,
         'hadoop_extra_args': combine_lists,
+        'libjars': combine_lists,
         's3_log_uri': combine_paths,
         's3_tmp_dir': combine_paths,
         'ssh_bin': combine_cmds,
@@ -639,13 +643,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.warning('1.x AMIs will probably not work because they use'
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
 
-        # manage working dir for bootstrap script
-        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
-
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
         s3_files_dir = self._s3_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
+
+        # manage working dir for bootstrap script
+        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
 
         # add the bootstrap files to a list of files to upload
         self._bootstrap_actions = []
@@ -680,11 +684,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
 
-        # where our own logs ended up (we'll find this out once we run the job)
-        self._s3_log_dir_uri = None
-
         # we'll create the script later
         self._master_bootstrap_script_path = None
+
+        # master node setup script (handled later by
+        # _add_master_node_setup_files_for_upload())
+        self._master_node_setup_mgr = BootstrapWorkingDirManager()
+        self._master_node_setup_script_path = None
+
+        # where our own logs ended up (we'll find this out once we run the job)
+        self._s3_log_dir_uri = None
 
         # the ID assigned by EMR to this job (might be None)
         self._cluster_id = self._opts['cluster_id']
@@ -717,7 +726,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # contain 'step_id' (the s-XXXXXXXX step ID on EMR).
         #
         # This will be filled by _wait_for_steps_to_complete()
+        #
+        # This might work better as a dictionary.
         self._log_interpretations = []
+
+        # log interpretation for master node setup step (currently we don't
+        # use this for anything; we just want to keep it out of
+        # self._log_interpretations)
+        self._mns_log_interpretation = None
 
         # set of step numbers (0-indexed) where we waited 5 minutes for logs to
         # transfer to S3 (so we don't do it twice)
@@ -871,6 +887,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._check_output_not_exists()
         self._create_setup_wrapper_script()
         self._add_bootstrap_files_for_upload()
+        self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_s3()
 
@@ -933,6 +950,26 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if (self._opts['max_hours_idle'] and
                 (persistent or self._opts['pool_clusters'])):
             self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+
+    def _add_master_node_setup_files_for_upload(self):
+        """Add files necesary for the master node setup script to
+        self._master_node_setup_mgr() and self._upload_mgr().
+
+        Create the master node setup script if necessary.
+        """
+        # currently, only used by libjars; see #1336 for how we might open
+        # this up more generally
+        for path in self._opts['libjars']:
+            # passthrough for libjars already on EMR
+            if path.startswith('file:///'):
+                continue
+
+            self._master_node_setup_mgr.add('file', path)
+            self._upload_mgr.add(path)
+
+        self._create_master_node_setup_script_if_needed()
+        if self._master_node_setup_script_path:
+            self._upload_mgr.add(self._master_node_setup_script_path)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -1460,7 +1497,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 _FALLBACK_SERVICE_ROLE)
             return _FALLBACK_SERVICE_ROLE
 
-    @property
     def _action_on_failure(self):
         # don't terminate other people's clusters
         if (self._opts['emr_action_on_failure']):
@@ -1475,8 +1511,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""
         # quick, add the other steps before the job spins up and
-        # then shuts itself down (in practice this takes several minutes)
-        return [self._build_step(n) for n in range(self._num_steps())]
+        # then shuts itself down! (in practice that won't happen
+        # for several minutes)
+        steps = []
+
+        if self._master_node_setup_script_path:
+            steps.append(self._build_master_node_setup_step())
+
+        for n in range(self._num_steps()):
+            steps.append(self._build_step(n))
+
+        return steps
 
     def _build_step(self, step_num):
         step = self._get_step(step_num)
@@ -1492,7 +1537,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         jar, step_arg_prefix = self._get_streaming_jar_and_step_arg_prefix()
 
         streaming_step_kwargs = dict(
-            action_on_failure=self._action_on_failure,
+            action_on_failure=self._action_on_failure(),
             input=self._step_input_uris(step_num),
             jar=jar,
             name='%s: Step %d of %d' % (
@@ -1503,6 +1548,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         step_args = []
         step_args.extend(step_arg_prefix)  # add 'hadoop-streaming' for 4.x
         step_args.extend(self._upload_args(self._upload_mgr))
+        step_args.extend(self._libjar_step_args())
         step_args.extend(self._hadoop_args_for_step(step_num))
 
         streaming_step_kwargs['step_args'] = step_args
@@ -1537,13 +1583,43 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if step_args:
             step_args = [interpolate(arg) for arg in step_args]
 
+        # -libjars comes before jar-specific args
+        step_args = self._libjar_step_args() + step_args
+
         return boto.emr.JarStep(
             name='%s: Step %d of %d' % (
                 self._job_key, step_num + 1, self._num_steps()),
             jar=jar,
             main_class=step['main_class'],
             step_args=step_args,
-            action_on_failure=self._action_on_failure)
+            action_on_failure=self._action_on_failure())
+
+    def _build_master_node_setup_step(self):
+        name = '%s: Master node setup' % self._job_key
+        jar = self._script_runner_jar_uri()
+        step_args = [self._upload_mgr.uri(self._master_node_setup_script_path)]
+
+        return boto.emr.JarStep(
+            name=name, jar=jar, step_args=step_args,
+            action_on_failure=self._action_on_failure())
+
+    def _libjar_step_args(self):
+        libjar_paths = []
+
+        # libjars should be in the working dir of the master node setup
+        # script path, unless they refer to paths directly (file:///)
+        for path in self._opts['libjars']:
+            if path.startswith('file:///'):
+                libjar_paths.append(path[7:])  # keep leading slash
+            else:
+                libjar_paths.append(posixpath.join(
+                    self._master_node_setup_working_dir(),
+                    self._master_node_setup_mgr.name('file', path)))
+
+        if libjar_paths:
+            return ['-libjars', ','.join(libjar_paths)]
+        else:
+            return []
 
     def _get_streaming_jar_and_step_arg_prefix(self):
         if self._opts['hadoop_streaming_jar']:
@@ -1566,7 +1642,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
         if self._opts['pool_clusters'] and not self._cluster_id:
-            cluster_id = self._find_cluster(num_steps=self._num_steps())
+            # master node setup script is an additional step
+            num_steps = self._num_steps()
+            if self._master_node_setup_script_path:
+                num_steps += 1
+
+            cluster_id = self._find_cluster(num_steps=num_steps)
             if cluster_id:
                 self._cluster_id = cluster_id
 
@@ -1596,32 +1677,43 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                                for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
-    def _job_steps(self):
+    def _job_steps(self, max_steps=None):
         """Get the steps we submitted for this job in chronological order,
-        ignoring steps from other jobs, and making as few API calls as
-        possible.
-        """
-        num_steps = len(self._get_steps())
+        ignoring steps from other jobs.
 
+        Generally, you want to set *max_steps*, so we can make as few API
+        calls as possible.
+        """
         # the API yields steps in reversed order. Once we've found the expected
         # number of steps, stop.
+        #
+        # This implicitly excludes the master node setup script, which
+        # is what we want for now.
         return list(reversed(list(islice(
             (step for step in
              _yield_all_steps(self.make_emr_conn(), self.get_cluster_id())
              if step.name.startswith(self._job_key)),
-            num_steps))))
+            max_steps))))
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
-        job_steps = self._job_steps()
         num_steps = len(self._get_steps())
 
-        if len(job_steps) != num_steps:
+        # if there's a master node setup script, we'll treat that as
+        # step -1
+        if self._master_node_setup_script_path:
+            max_steps = num_steps + 1
+        else:
+            max_steps = num_steps
+
+        job_steps = self._job_steps(max_steps=max_steps)
+
+        if len(job_steps) < max_steps:
             raise AssertionError("Can't find our steps in the cluster!")
 
-        # clear out _log_interpretations if for some reason it was
-        # already filled
+        # clear out log interpretations if they were filled somehow
         self._log_interpretations = []
+        self._mns_log_interpretation = None
 
         # open SSH tunnel if cluster is already ready
         # (this happens with pooling). See #1115
@@ -1629,10 +1721,22 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if cluster.status.state in ('RUNNING', 'WAITING'):
             self._set_up_ssh_tunnel()
 
-        for step_num, step in enumerate(job_steps):
+        # treat master node setup as step -1
+        if self._master_node_setup_script_path:
+            start = -1
+        else:
+            start = 0
+
+        for step_num, step in enumerate(job_steps, start=start):
             # this will raise an exception if a step fails
-            log.info('Waiting for step %d of %d (%s) to complete...' % (
-                step_num + 1, num_steps, step.id))
+            if step_num == -1:
+                log.info(
+                    'Waiting for master node setup step (%s) to complete...' %
+                    step.id)
+            else:
+                log.info('Waiting for step %d of %d (%s) to complete...' % (
+                    step_num + 1, num_steps, step.id))
+
             self._wait_for_step_to_complete(step.id, step_num, num_steps)
 
     def _wait_for_step_to_complete(
@@ -1653,7 +1757,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         This also adds an item to self._log_interpretations
         """
         log_interpretation = dict(step_id=step_id)
-        self._log_interpretations.append(log_interpretation)
+
+        # suppress warnings about missing job ID for script-runner.jar
+        if step_num == -1:
+            log_interpretation['no_job'] = True
+            self._mns_log_interpretation = log_interpretation
+        else:
+            self._log_interpretations.append(log_interpretation)
 
         emr_conn = self.make_emr_conn()
 
@@ -1691,7 +1801,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # now is the time to tunnel, if we haven't already
                 self._set_up_ssh_tunnel()
                 log.info('  RUNNING%s' % time_running_desc)
-                self._log_step_progress()
+
+                # don't log progress for master node setup step, because
+                # it doesn't appear in job tracker
+                if step_num >= 0:
+                    self._log_step_progress()
 
                 continue
 
@@ -1729,11 +1843,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters
             if step.status.state != 'CANCELLED':
-                counters = self._pick_counters(log_interpretation)
-                if counters:
-                    log.info(_format_counters(counters))
-                else:
-                    log.warning('No counters found')
+                if step_num >= 0:
+                    counters = self._pick_counters(log_interpretation)
+                    if counters:
+                        log.info(_format_counters(counters))
+                    else:
+                        log.warning('No counters found')
 
             if step.status.state == 'COMPLETED':
                 return
@@ -1744,7 +1859,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     log.error('Probable cause of failure:\n\n%s\n\n' %
                               _format_error(error))
 
-            raise StepFailedException(step_num=step_num, num_steps=num_steps)
+            raise StepFailedException(
+                step_num=step_num, num_steps=num_steps,
+                # "Step 0 of ... failed" looks weird
+                step_desc=(
+                    'Master node setup step' if step_num == -1 else None))
 
     def _log_step_progress(self):
         """Tunnel to the job tracker/resource manager and log the
@@ -1892,12 +2011,24 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.warning("Can't fetch step log; missing step ID")
             return
 
-        return _interpret_emr_step_logs(
-            self.fs, self._ls_step_logs(step_id=step_id))
+        return (
+            _interpret_emr_step_syslog(
+                self.fs, self._ls_step_syslogs(step_id=step_id)) or
+            _interpret_emr_step_stderr(
+                self.fs, self._ls_step_stderr_logs(step_id=step_id))
+        )
 
-    def _ls_step_logs(self, step_id):
+    def _ls_step_syslogs(self, step_id):
         """Yield step log matches, logging a message for each one."""
-        for match in _ls_emr_step_logs(
+        for match in _ls_emr_step_syslogs(
+                self.fs, self._stream_step_log_dirs(step_id=step_id),
+                step_id=step_id):
+            log.info('  Parsing step log: %s' % match['path'])
+            yield match
+
+    def _ls_step_stderr_logs(self, step_id):
+        """Yield step log matches, logging a message for each one."""
+        for match in _ls_emr_step_stderr_logs(
                 self.fs, self._stream_step_log_dirs(step_id=step_id),
                 step_id=step_id):
             log.info('  Parsing step log: %s' % match['path'])
@@ -1964,7 +2095,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         if cluster.status.state != 'TERMINATING':
             # going to need to wait for logs to get archived to S3
-            step_num = len(self._log_interpretations)
+
+            # "step_num" is just a unique ID for the step; using -1
+            # for master node setup script
+            if (self._master_node_setup_script_path and
+                    self._mns_log_interpretation is None):
+                step_num = -1
+            else:
+                step_num = len(self._log_interpretations)
 
             # already did this for this step
             if step_num in self._waited_for_logs_on_s3:
@@ -2066,6 +2204,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
                  cmd_line(self._python_bin())])
 
+        # TODO: isn't it b.sh now?
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
         path = os.path.join(self._get_local_tmp_dir(), 'b.py')
@@ -2076,6 +2215,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         for line in contents:
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
+        # TODO: Windows line endings?
         with open(path, 'w') as f:
             for line in contents:
                 f.write(line)
@@ -2203,6 +2343,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # on the 2.x and 3.x AMIs, use hadoop
             cp_to_local = 'hadoop fs -copyToLocal'
 
+        # TODO: why bother with $__mrjob_PWD here, since we're already in it?
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
@@ -2230,6 +2371,93 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         writeln()
 
         return out
+
+    ### master node setup script ###
+
+    def _create_master_node_setup_script_if_needed(self):
+        """Helper for :py:meth:`_add_bootstrap_files_for_upload`.
+
+        If we need a master node setup script and write it into our local
+        temp directory. Set self._master_node_setup_script_path.
+        """
+        # already created
+        if self._master_node_setup_script_path:
+            return
+
+        # currently, the only thing this script does is upload files
+        if not self._master_node_setup_mgr.paths():
+            return
+
+        # create script
+        path = os.path.join(self._get_local_tmp_dir(), 'mns.sh')
+        log.debug('writing master node setup script to %s' % path)
+
+        contents = self._master_node_setup_script_content()
+        for line in contents:
+            log.debug('MASTER NODE SETUP: ' + line.rstrip('\r\n'))
+
+        with open(path, 'wb') as f:
+            for line in contents:
+                f.write(line.encode('utf-8'))
+
+        # the script itself doesn't need to be on the master node, just S3
+        self._master_node_setup_script_path = path
+        self._upload_mgr.add(path)
+
+    def _master_node_setup_script_content(self):
+        """Create the contents of the master node setup script as an
+        array of strings.
+
+        (prepare self._master_node_setup_mgr first)
+        """
+        # TODO: this is very similar to _master_bootstrap_script_content();
+        # merge common code
+        out = []
+
+        def writeln(line=''):
+            out.append(line + '\n')
+
+        # shebang
+        sh_bin = self._opts['sh_bin']
+        if not sh_bin[0].startswith('/'):
+            sh_bin = ['/usr/bin/env'] + sh_bin
+        writeln('#!' + cmd_line(sh_bin))
+        writeln()
+
+        # make working dir
+        working_dir = self._master_node_setup_working_dir()
+        writeln('mkdir -p %s' % pipes.quote(working_dir))
+        writeln('cd %s' % pipes.quote(working_dir))
+        writeln()
+
+        # download files
+        if self._opts['release_label']:
+            # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
+            cp_to_local = 'aws s3 cp'
+        else:
+            # on the 2.x and 3.x AMIs, use hadoop
+            cp_to_local = 'hadoop fs -copyToLocal'
+
+        for name, path in sorted(
+                self._master_node_setup_mgr.name_to_path('file').items()):
+            uri = self._upload_mgr.uri(path)
+            writeln('%s %s %s' % (
+                cp_to_local, pipes.quote(uri), pipes.quote(name)))
+            # make everything executable, like Hadoop Distributed Cache
+            writeln('chmod a+x %s' % pipes.quote(name))
+
+        # at some point we will probably run commands as well (see #1336)
+
+        return out
+
+    def _master_node_setup_working_dir(self):
+        """Where to place files used by the master node setup script."""
+        return '/home/hadoop/%s' % self._job_key
+
+    def _script_runner_jar_uri(self):
+        return (
+            's3://%s.elasticmapreduce/libs/script-runner/script-runner.jar' %
+            self._opts['aws_region'])
 
     ### EMR JOB MANAGEMENT UTILS ###
 
@@ -2270,7 +2498,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return self.get_cluster_id()
 
-    # TODO: add to docs
     def get_cluster_id(self):
         return self._cluster_id
 

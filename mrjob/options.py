@@ -235,6 +235,13 @@ def _add_hadoop_emr_opts(opt_group):
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)'),
 
         opt_group.add_option(
+            '--libjar', dest='libjars', default=[],
+            action='append', help=(
+                'Path of a JAR to pass to Hadoop with -libjar. On EMR, this'
+                ' can also be a URI; use file:/// to reference JARs already'
+                ' on the EMR cluster')),
+
+        opt_group.add_option(
             '--label', dest='label', default=None,
             help='alternate label for the job, to help us identify it'),
 

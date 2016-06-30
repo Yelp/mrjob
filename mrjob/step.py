@@ -62,12 +62,15 @@ class StepFailedException(Exception):
     :ref:`run your job programatically <runners-programmatically>`.
     """
 
-    def __init__(self, reason=None, step_num=None, num_steps=None):
+    def __init__(
+            self, reason=None, step_num=None, num_steps=None, step_desc=None):
         """Initialize a reason for step failure.
 
         :param string reason: brief explanation of which step failed
         :param int step_num: which step failed (0-indexed)
         :param int num_steps: number of steps in the job
+        :param string step_desc: description of step (if we don't like the
+                                 default "Step X of Y")
 
         *reason* should not be several lines long; use ``log.error(...)``
         for that.
@@ -75,21 +78,24 @@ class StepFailedException(Exception):
         self.reason = reason
         self.step_num = step_num
         self.num_steps = num_steps
+        self.step_desc = step_desc
 
     def __str__(self):
         """Human-readable version of the exception. Note that this 1-indexes
         *step_num*."""
-        return 'Step%s%s failed%s' % (
-            '' if self.step_num is None else ' %d' % (self.step_num + 1),
-            '' if (self.step_num is None or self.num_steps is None) else (
-                ' of %d' % self.num_steps),
+        return '%s failed%s' % (
+            (self.step_desc or 'Step%s%s' % (
+                '' if self.step_num is None else ' %d' % (self.step_num + 1),
+                '' if (self.step_num is None or self.num_steps is None) else (
+                    ' of %d' % self.num_steps))),
             '' if self.reason is None else ': %s' % self.reason)
 
     def __repr__(self):
         return '%s(%s)' % (
             self.__class__.__name__,
             ', '.join(('%s=%r' % (k, getattr(self, k))
-                       for k in ('reason', 'step_num', 'num_steps')
+                       for k in ('reason', 'step_num',
+                                 'num_steps', 'step_desc')
                        if getattr(self, k) is not None)))
 
 

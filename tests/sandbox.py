@@ -52,13 +52,6 @@ EMPTY_MRJOB_CONF = {'runners': {
 }}
 
 
-def patch_fs_s3():
-    m_boto = MagicMock()
-    m_s3 = m_boto.connect_s3()
-    m_s3.get_all_buckets.__name__ = 'get_all_buckets'
-    return patch('mrjob.fs.s3.boto', m_boto)
-
-
 def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):
     def mock_load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
         return [(None, substitute_conf['runners'][runner_alias])]

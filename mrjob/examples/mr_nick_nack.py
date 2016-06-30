@@ -18,7 +18,7 @@ import json
 import re
 
 from mrjob.job import MRJob
-from mrjob.protocol import RawProtocol
+from mrjob.protocol import RawValueProtocol
 
 # restrict to a-z so we don't get odd filenames
 WORD_RE = re.compile(r"[A-Za-z]+")
@@ -36,7 +36,7 @@ class MRNickNack(MRJob):
     LIBJARS = ['nicknack-1.0.0.jar']
 
     # tell mrjob not to format our output -- leave that to hadoop
-    OUTPUT_PROTOCOL = RawProtocol
+    OUTPUT_PROTOCOL = RawValueProtocol
 
     def mapper(self, _, line):
         for word in WORD_RE.findall(line):
@@ -44,7 +44,7 @@ class MRNickNack(MRJob):
 
     def reducer(self, word, counts):
         total = sum(counts)
-        yield word[0].lower(), json.dumps(word) + '\t' + json.dumps(total)
+        yield None, '\t'.join(word[0], json.dumps(word), json.dumps(total))
 
 
 if __name__ == '__main__':

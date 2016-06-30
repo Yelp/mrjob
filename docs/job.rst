@@ -115,6 +115,8 @@ Hadoop configuration
 .. automethod:: MRJob.hadoop_output_format
 .. autoattribute:: MRJob.JOBCONF
 .. automethod:: MRJob.jobconf
+.. autoattribute:: MRJob.LIBJARS
+.. automethod:: MRJob.libjars
 .. autoattribute:: MRJob.PARTITIONER
 .. automethod:: MRJob.partitioner
 

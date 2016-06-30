@@ -63,6 +63,13 @@ class StepFailedExceptionTestCase(TestCase):
         self.assertEqual(str(ex), 'Step failed')
         self.assertEqual(repr(ex), 'StepFailedException(num_steps=4)')
 
+    def test_step_desc(self):
+        ex = StepFailedException(step_desc='Master node setup step')
+        self.assertEqual(str(ex), 'Master node setup step failed')
+        self.assertEqual(
+            repr(ex),
+            "StepFailedException(step_desc='Master node setup step')")
+
 
 class JarStepTestCase(TestCase):
 

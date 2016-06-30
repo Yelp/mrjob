@@ -84,13 +84,18 @@ class SimMRJobRunner(MRJobRunner):
     _DEFAULT_MAP_TASKS = 2
     _DEFAULT_REDUCE_TASKS = 2
 
-    # keyword arguments that we ignore that are stored directly in
-    # self._<kwarg_name> because they aren't configurable from mrjob.conf
-    # use the version with the underscore to better support grepping our code
+    # keyword arguments that we ignore because they require real Hadoop.
+    # We look directly at self._<kwarg_name> because they aren't in
+    # self._opts
     _IGNORED_HADOOP_ATTRS = [
         '_hadoop_input_format',
         '_hadoop_output_format',
         '_partitioner',
+    ]
+
+    # options that we ignore becaue they require real Hadoop.
+    _IGNORED_HADOOP_OPTS = [
+        'libjars',
     ]
 
     def __init__(self, **kwargs):
@@ -108,6 +113,13 @@ class SimMRJobRunner(MRJobRunner):
                 log.warning(
                     'ignoring %s keyword arg (requires real Hadoop): %r' %
                     (ignored_attr[1:], value))
+
+        for ignored_opt in self._IGNORED_HADOOP_OPTS:
+            value = self._opts.get(ignored_opt)
+            if value:  # ignore [], the default value of libjars
+                log.warning(
+                    'ignoring %s option (requires real Hadoop): %r' %
+                    (ignored_opt, value))
 
     def _symlink_to_file_or_copy(self, path, dest):
         """Symlink from *dest* to the absolute version of *path*.

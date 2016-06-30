@@ -120,6 +120,7 @@ class RunnerOptionStore(OptionStore):
         'interpreter',
         'jobconf',
         'label',
+        'libjars',
         'local_tmp_dir',
         'owner',
         'python_archives',
@@ -139,6 +140,7 @@ class RunnerOptionStore(OptionStore):
         'cmdenv': combine_envs,
         'interpreter': combine_cmds,
         'jobconf': combine_dicts,
+        'libjars': combine_path_lists,
         'local_tmp_dir': combine_paths,
         'python_archives': combine_path_lists,
         'python_bin': combine_cmds,
@@ -1213,6 +1215,8 @@ class MRJobRunner(object):
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
+    # TODO: upload_mgr is always self._upload_mgr, and _arg_hash_paths()
+    # hard-codes it anyway. Do we really want to pass it in?
     def _upload_args(self, upload_mgr):
         args = []
 

@@ -761,3 +761,89 @@ At the end of your job, you'll get the counter's total value::
 
 .. |JSONProtocol| replace:: :py:class:`~mrjob.protocol.JSONProtocol`
 .. |RawValueProtocol| replace:: :py:class:`~mrjob.protocol.RawValueProtocol`
+
+Input and output formats
+------------------------
+
+Input and output formats are Java classes that determine how your job
+interfaces with data on Hadoop's filesystem(s).
+
+Suppose we wanted to write a word frequency count job that wrote output
+into a separate directory based on the first letter of the word counted
+(``a/part-*``, ``b/part-*``, etc.). We
+could accomplish this by using the ``MultipleValueOutputFormat`` class
+from the Open Source project
+`nicknack <http://empiricalresults.github.io/nicknack/>`__.
+
+First, we need to tell our job to use the custom output format by setting
+:py:attr:`~mrjob.job.MRJob.HADOOP_OUTPUT_FORMAT` in our job class::
+
+  HADOOP_OUTPUT_FORMAT = 'nicknack.MultipleValueOutputFormat'
+
+The output format class is part of a custom JAR, so we need to make sure that
+this JAR gets included in Hadoop's classpath. First
+`download <https://github.com/empiricalresults/nicknack/releases/download/v1.0.0/nicknack-1.0.0.jar>`__
+the jar to the same directory as your script, and add its name to
+:py:attr:`~mrjob.job.MRJob.LIBJARS`::
+
+  LIBJARS = ['nicknack-1.0.0.jar']
+
+(You can skip this step if you're using a format class that's built into
+Hadoop.)
+
+Finally, output your data the way that your output format expects.
+``MultipleValueOutputFormat`` expects the subdirectory name, followed by
+a tab, followed the actual line to write into the file.
+
+First, we need to take direct control of how the job writes output by
+setting
+:py:attr:`~mrjob.job.MRJob.OUTPUT_PROTOCOL` to
+:py:class:`~mrjob.protocol.RawValueProtocol`::
+
+  OUTPUT_PROTOCOL = RawValueProtocol
+
+Then we need to format the line accordingly. In this case, let's
+continue output our final data in the standard format (two JSONs separated by
+a tab)::
+
+  def reducer(self, word, counts):
+      total = sum(counts)
+      yield None, '\t'.join([word[0], json.dumps(word), json.dumps(total)])
+
+Done! Here's the full, working job (this is
+:py:mod:`mrjob.examples.mr_nick_nack`)::
+
+    import json
+    import re
+
+    from mrjob.job import MRJob
+    from mrjob.protocol import RawValueProtocol
+
+    WORD_RE = re.compile(r"[A-Za-z]+")
+
+
+    class MRNickNack(MRJob):
+
+        HADOOP_OUTPUT_FORMAT = 'nicknack.MultipleValueOutputFormat'
+
+        LIBJARS = ['nicknack-1.0.0.jar']
+
+        OUTPUT_PROTOCOL = RawValueProtocol
+
+        def mapper(self, _, line):
+            for word in WORD_RE.findall(line):
+                yield (word.lower(), 1)
+
+        def reducer(self, word, counts):
+            total = sum(counts)
+            yield None, '\t'.join([word[0], json.dumps(word), json.dumps(total)])
+
+
+    if __name__ == '__main__':
+        MRNickNack.run()
+
+
+Input formats work the same way; just set
+:py:attr:`~mrjob.job.MRJob.HADOOP_INPUT_FORMAT`. (You usually won't need to set
+:py:attr:`~mrjob.job.MRJob.INPUT_PROTOCOL` because it already defaults to
+:py:class:`~mrjob.protocol.RawValueProtocol`.)

@@ -89,6 +89,20 @@ Options available to hadoop and emr runners
     inside EMR.)
 
 .. mrjob-opt::
+   :config: libjars
+   :switch: --libjar
+   :type: :ref:`string list <data-type-string-list>`
+   :set: all
+   :default: ``[]``
+
+   List of paths of JARs to be passed to Hadoop with the ``-libjar`` switch.
+
+   ``~`` and environment variables within paths will be resolved based on the
+   local environment.
+
+   .. versionadded:: 0.5.3
+
+.. mrjob-opt::
     :config: label
     :switch: --label
     :type: :ref:`string <data-type-string>`

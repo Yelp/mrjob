@@ -133,6 +133,13 @@ def _add_runner_opts(opt_group, default_runner='local'):
                   ' times.')),
 
         opt_group.add_option(
+            '--libjar', dest='libjars', default=[],
+            action='append', help=(
+                'Path of a JAR to pass to Hadoop with -libjar. On EMR, this'
+                ' can also be a URI; use file:/// to reference JARs already'
+                ' on the EMR cluster')),
+
+        opt_group.add_option(
             '--no-bootstrap-mrjob', dest='bootstrap_mrjob',
             action='store_false', default=None,
             help=("Don't automatically tar up the mrjob library and install it"
@@ -233,13 +240,6 @@ def _add_hadoop_emr_opts(opt_group):
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
             default=None,
             help='Path of your hadoop streaming jar (locally, or on S3/HDFS)'),
-
-        opt_group.add_option(
-            '--libjar', dest='libjars', default=[],
-            action='append', help=(
-                'Path of a JAR to pass to Hadoop with -libjar. On EMR, this'
-                ' can also be a URI; use file:/// to reference JARs already'
-                ' on the EMR cluster')),
 
         opt_group.add_option(
             '--label', dest='label', default=None,

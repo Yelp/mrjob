@@ -517,6 +517,7 @@ class MRJobLauncher(object):
             'input_paths': self.args,
             'interpreter': self.options.interpreter,
             'jobconf': self.jobconf(),
+            'libjars': self.libjars(),
             'mr_job_script': self._script_path,
             'label': self.options.label,
             'output_dir': self.options.output_dir,
@@ -620,6 +621,10 @@ class MRJobLauncher(object):
     def jobconf(self):
         """See hadoop_input_format()."""
         return {}
+
+    def libjars(self):
+        """See hadoop_input_format()."""
+        return []
 
     def partitioner(self):
         """See hadoop_input_format()."""

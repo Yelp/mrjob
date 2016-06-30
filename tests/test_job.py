@@ -15,6 +15,7 @@
 # limitations under the License.
 """Unit testing of MRJob."""
 import os
+import os.path
 import sys
 import time
 from io import BytesIO
@@ -44,6 +45,7 @@ from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
@@ -641,6 +643,65 @@ class JobConfTestCase(TestCase):
         # --jobconf is ignored because that's the way we defined jobconf()
         self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
                          {'mapred.baz': 'bar'})
+
+
+
+class LibjarsTestCase(TestCase):
+
+    def test_default(self):
+        job = MRJob()
+
+        self.assertEqual(job.job_runner_kwargs()['libjars'], [])
+
+    def test_libjar_option(self):
+        job = MRJob(['--libjar', 'honey.jar'])
+
+        self.assertEqual(job.job_runner_kwargs()['libjars'], ['honey.jar'])
+
+    def test_libjars_attr(self):
+        with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
+            job = MRJob()
+
+            self.assertEqual(job.job_runner_kwargs()['libjars'],
+                             ['/left/dora.jar'])
+
+    def test_libjars_attr_plus_option(self):
+        with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
+            job = MRJob(['--libjar', 'honey.jar'])
+
+            self.assertEqual(job.job_runner_kwargs()['libjars'],
+                             ['/left/dora.jar', 'honey.jar'])
+
+    def test_libjars_attr_relative_path(self):
+        job_dir = os.path.dirname(MRJob.mr_job_script())
+
+        with patch.object(MRJob, 'LIBJARS', ['cookie.jar', '/left/dora.jar']):
+            job = MRJob()
+
+            self.assertEqual(
+                job.job_runner_kwargs()['libjars'],
+                [os.path.join(job_dir, 'cookie.jar'), '/left/dora.jar'])
+
+    def test_libjars_environment_variables(self):
+        job_dir = os.path.dirname(MRJob.mr_job_script())
+
+        with patch.dict('os.environ', A='/path/to/a', B='b'):
+            with patch.object(MRJob, 'LIBJARS',
+                              ['$A/cookie.jar', '$B/honey.jar']):
+                job = MRJob()
+
+                # libjars() peeks into envvars to figure out if the path
+                # is relative or absolute
+                self.assertEqual(
+                    job.job_runner_kwargs()['libjars'],
+                    ['$A/cookie.jar', os.path.join(job_dir, '$B/honey.jar')])
+
+    def test_override_libjars(self):
+        with patch.object(MRJob, 'libjars', return_value=['honey.jar']):
+            job = MRJob(['--libjar', 'cookie.jar'])
+
+            # ignore switch, don't resolve relative path
+            self.assertEqual(job.job_runner_kwargs()['libjars'], ['honey.jar'])
 
 
 class MRSortValuesAndMore(MRSortValues):

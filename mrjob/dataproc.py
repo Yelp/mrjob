@@ -644,6 +644,10 @@ class DataprocJobRunner(MRJobRunner):
 
         # TODO - mtai @ davidmarin - Not clear if we should move _upload_args
         # to file_uris, currently works fine as-is
+
+        # TODO - dmarin @ mtai - Probably a little safer to do the API's way,
+        # assuming the API supports distributed cache syntax (so we can pick
+        # the names of the uploaded files).
         args.extend(self._upload_args(self._upload_mgr))
 
         args.extend(self._hadoop_args_for_step(step_num))

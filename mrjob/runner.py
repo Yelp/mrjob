@@ -1215,6 +1215,8 @@ class MRJobRunner(object):
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
+    # TODO: upload_mgr is always self._upload_mgr, and _arg_hash_paths()
+    # hard-codes it anyway. Do we really want to pass it in?
     def _upload_args(self, upload_mgr):
         args = []
 

@@ -4241,16 +4241,39 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
         self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 2)
         self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
         self.assertEqual(len(runner._log_interpretations), 2)
+        self.assertIsNone(runner._mns_log_interpretation)
+
+    def test_master_node_setup(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        with open(fake_jar, 'w'):
+            pass
+
+        # --libjar is currently the only way to create the master
+        # node setup script
+        runner = self.make_runner('--libjar', fake_jar)
+
+        runner._add_master_node_setup_files_for_upload()
+        runner._wait_for_steps_to_complete()
+
+        self.assertIsNotNone(runner._master_node_setup_script_path)
+
+        self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 3)
+        self.assertTrue(EMRJobRunner._set_up_ssh_tunnel.called)
+        self.assertEqual(len(runner._log_interpretations), 2)
+        self.assertIsNotNone(runner._mns_log_interpretation)
+        self.assertEqual(runner._mns_log_interpretation['no_job'], True)
 
     def test_blanks_out_log_interpretations(self):
         runner = self.make_runner()
 
         runner._log_interpretations = ['foo', 'bar', 'baz']
+        runner._mns_log_interpretation = 'qux'
 
         self._wait_for_step_to_complete.side_effect = self.StopTest
 
         self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
         self.assertEqual(runner._log_interpretations, [])
+        self.assertEqual(runner._mns_log_interpretation, None)
 
     def test_open_ssh_tunnel_when_first_step_runs(self):
         # normally, we'll open the SSH tunnel when the first step

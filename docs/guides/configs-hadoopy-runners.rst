@@ -100,6 +100,8 @@ Options available to hadoop and emr runners
    ``~`` and environment variables within paths will be resolved based on the
    local environment.
 
+   .. versionadded:: 0.5.3
+
 .. mrjob-opt::
     :config: label
     :switch: --label

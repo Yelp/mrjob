@@ -985,7 +985,10 @@ class MRJob(MRJobLauncher):
     #: relative to the directory containing the script (not the current
     #: working directory).
     #:
-    #: If you require more sophisticated behavior, try :py:meth:`libjars`.
+    #: If you require more sophisticated behavior, try overriding
+    #: :py:meth:`libjars`.
+    #:
+    #: .. versionadded:: 0.5.3
     LIBJARS = []
 
     def libjars(self):
@@ -1001,6 +1004,8 @@ class MRJob(MRJobLauncher):
 
         Note that ``~`` and environment variables in paths will always be
         expanded by the job runner (see :mrjob-opt:`libjars`).
+
+        .. versionadded:: 0.5.3
         """
         script_dir = os.path.dirname(self.mr_job_script())
 

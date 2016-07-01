@@ -20,6 +20,7 @@ import os.path
 import pipes
 import posixpath
 import random
+import re
 import signal
 import socket
 import sys
@@ -180,6 +181,21 @@ _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
+
+# match cause of failure when there's a problem with bootstrap script. Example:
+#
+# On the master instance (i-96c21a39), bootstrap action 1 returned a non-zero
+# return code
+#
+# This correponds to a path like
+# <s3_log_dir>/node/i-96c21a39/bootstrap-actions/1/stderr.gz
+#
+# (may or may not actually be gzipped)
+_BOOTSTRAP_NONZERO_RETURN_CODE_RE = re.compile(
+    r'^.*\((?P<node>i-[0-9a-f]+)\)'
+    r'.*bootstrap action (?P<action_num>\d+)'
+    r'.*non-zero return code'
+    r'.*$')
 
 
 def s3_key_to_uri(s3_key):
@@ -1658,7 +1674,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
 
-        # define out steps
+        # define our steps
         steps = self._build_steps()
         log.debug('Calling add_jobflow_steps(%r, %r)' % (
             self._cluster_id, steps))
@@ -1837,6 +1853,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     self._check_for_missing_default_iam_roles(cluster)
                     # was it caused by a key pair from the wrong region?
                     self._check_for_key_pair_from_wrong_region(cluster)
+                    # was it because a bootstrap action failed?
+                    self._check_for_failed_bootstrap_action(cluster)
 
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters
@@ -1932,6 +1950,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '    https://pythonhosted.org/mrjob/guides'
                 '/emr-quickstart.html#configuring-ssh-credentials\n' %
                 (_DEFAULT_AWS_REGION, _DEFAULT_AWS_REGION))
+
+    def _check_for_failed_bootstrap_action(self, cluster):
+        """If our bootstrap actions failed, parse the stderr to find
+        out why."""
+        reason = _get_reason(cluster)
+        m = _BOOTSTRAP_NONZERO_RETURN_CODE_RE.match(reason)
+        if not m:
+            return
+
+        self._wait_for_cluster_to_terminate()
+
+        # TODO: find the relevant bootstrap log and parse it
 
     def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""

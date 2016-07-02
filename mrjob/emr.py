@@ -20,7 +20,6 @@ import os.path
 import pipes
 import posixpath
 import random
-import re
 import signal
 import socket
 import sys
@@ -78,9 +77,13 @@ from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import _FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
+from mrjob.logs.bootstrap import _check_for_nonzero_return_code
+from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
+from mrjob.logs.bootstrap import _ls_emr_bootstrap_stderr_logs
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _pick_error
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_emr_step_syslog
@@ -181,21 +184,6 @@ _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
-
-# match cause of failure when there's a problem with bootstrap script. Example:
-#
-# On the master instance (i-96c21a39), bootstrap action 1 returned a non-zero
-# return code
-#
-# This correponds to a path like
-# <s3_log_dir>/node/i-96c21a39/bootstrap-actions/1/stderr.gz
-#
-# (may or may not actually be gzipped)
-_BOOTSTRAP_NONZERO_RETURN_CODE_RE = re.compile(
-    r'^.*\((?P<node>i-[0-9a-f]+)\)'
-    r'.*bootstrap action (?P<action_num>\d+)'
-    r'.*non-zero return code'
-    r'.*$')
 
 
 def s3_key_to_uri(s3_key):
@@ -1951,18 +1939,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '/emr-quickstart.html#configuring-ssh-credentials\n' %
                 (_DEFAULT_AWS_REGION, _DEFAULT_AWS_REGION))
 
-    def _check_for_failed_bootstrap_action(self, cluster):
-        """If our bootstrap actions failed, parse the stderr to find
-        out why."""
-        reason = _get_reason(cluster)
-        m = _BOOTSTRAP_NONZERO_RETURN_CODE_RE.match(reason)
-        if not m:
-            return
-
-        self._wait_for_cluster_to_terminate()
-
-        # TODO: find the relevant bootstrap log and parse it
-
     def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
         if step_num == 0:
@@ -1982,6 +1958,52 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 self._job_key, step_num)
 
     ### LOG PARSING (implementation of LogInterpretationMixin) ###
+
+    def _check_for_failed_bootstrap_action(self, cluster):
+        """If our bootstrap actions failed, parse the stderr to find
+        out why."""
+        reason = _get_reason(cluster)
+        action_num_and_node_id = _check_for_nonzero_return_code(reason)
+        if not action_num_and_node_id:
+            return
+
+        # this doesn't really correspond to a step, so
+        # don't bother storing it in self._log_interpretations
+        bootstrap_interpretation = _interpret_emr_bootstrap_stderr(
+            self.fs, self._ls_bootstrap_stderr_logs(*action_num_and_node_id))
+
+        # should be 0 or 1 errors, since we're checking a single stderr file
+        error = _pick_error(bootstrap_interpretation)
+        if error:
+            log.error('Probable cause of failure:\n\n%s\n\n' %
+                      _format_error(error))
+
+    def _ls_bootstrap_stderr_logs(self, action_num=None, node_id=None):
+        """_ls_bootstrap_stderr_logs(), with logging for each log we parse."""
+        for match in _ls_emr_bootstrap_stderr_logs(
+                self.fs,
+                self._stream_bootstrap_log_dirs(
+                    action_num=action_num, node_id=node_id),
+                action_num=action_num,
+                node_id=node_id):
+            log.info('  Parsing boostrap stderr log: %s' % match['path'])
+            yield match
+
+    def _stream_bootstrap_log_dirs(self, action_num=None, node_id=None):
+        """Stream a single directory on S3 containing the relevant bootstrap
+        stderr. Optionally, use *action_num* and *node_id* to narrow it down
+        further.
+        """
+        if action_num is None or node_id is None:
+            s3_dir_name = 'node'
+        else:
+            s3_dir_name = posixpath.join(
+                'node', node_id, 'bootstrap-actions', str(action_num + 1))
+
+            return self._stream_log_dirs(
+                'bootstrap stderr log',
+                dir_name=None,  # don't SSH in
+                s3_dir_name=s3_dir_name)
 
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
@@ -2080,7 +2102,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         TERMINATING, we first wait for it to terminate (since that
         will trigger copying logs over).
         """
-        if self.fs.can_handle_path('ssh:///'):
+        if dir_name and self.fs.can_handle_path('ssh:///'):
             ssh_host = self._address_of_master()
             if ssh_host:
                 hosts = [ssh_host]
@@ -2103,9 +2125,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # wait for logs to be on S3
         self._wait_for_logs_on_s3()
 
-        if self._s3_log_dir():
-            s3_log_uri = posixpath.join(
-                self._s3_log_dir(), (s3_dir_name or dir_name))
+        s3_dir_name = s3_dir_name or dir_name
+
+        if s3_dir_name and self._s3_log_dir():
+            s3_log_uri = posixpath.join(self._s3_log_dir(), s3_dir_name)
             log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
             yield [s3_log_uri]
 

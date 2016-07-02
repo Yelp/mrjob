@@ -33,7 +33,8 @@ from .wrap import _ls_logs
 _EMR_STEP_LOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<step_id>s-[A-Z0-9]+)/'
-    r'(?P<log_type>syslog|stderr)(\.(?P<timestamp>[\d-]+))?(?P<suffix>\.\w+)?')
+    r'(?P<log_type>syslog|stderr)'
+    r'(\.(?P<timestamp>[\d-]+))?(?P<suffix>\.\w+)?$')
 
 # hadoop streaming always prints "packageJobJar..." to stdout,
 # and prints Streaming Command Failed! to stderr on failure

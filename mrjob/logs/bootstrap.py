@@ -24,7 +24,7 @@ from .wrap import _ls_logs
 # On the master instance (i-96c21a39), bootstrap action 1 returned a non-zero
 # return code
 _BOOTSTRAP_NONZERO_RETURN_CODE_RE = re.compile(
-    r'^.*\((?P<node_id>i-[0-9a-f]+)\)'
+    r'^.*\(.*?(?P<node_id>i-[0-9a-f]+).*\)'
     r'.*bootstrap action (?P<action_num>\d+)'
     r'.*non-zero return code'
     r'.*$')

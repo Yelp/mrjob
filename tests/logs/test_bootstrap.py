@@ -36,7 +36,13 @@ class CheckForNonzeroReturnCodeTestCase(TestCase):
             dict(action_num=1, node_id='i-96c21a39'),
         )
 
-    # would be good to test this on other instances too
+    def test_nonzero_return_code_on_two_slave_instances(self):
+        self.assertEqual(
+            _check_for_nonzero_return_code(
+                'On 2 slave instances (including i-105af6bf and i-b659f519),'
+                ' bootstrap action 1 returned a non-zero return code'),
+            dict(action_num=0, node_id='i-105af6bf')
+        )
 
     def test_failed_to_download_bootstrap_action(self):
         self.assertEqual(

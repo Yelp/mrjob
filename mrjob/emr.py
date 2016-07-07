@@ -1970,7 +1970,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # this doesn't really correspond to a step, so
         # don't bother storing it in self._log_interpretations
         bootstrap_interpretation = _interpret_emr_bootstrap_stderr(
-            self.fs, self._ls_bootstrap_stderr_logs(*action_num_and_node_id))
+            self.fs, self._ls_bootstrap_stderr_logs(**action_num_and_node_id))
 
         # should be 0 or 1 errors, since we're checking a single stderr file
         error = _pick_error(bootstrap_interpretation)

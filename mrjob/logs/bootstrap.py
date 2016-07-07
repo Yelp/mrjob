@@ -39,7 +39,7 @@ _EMR_BOOTSTRAP_STDERR_PATH_RE = re.compile(
     r'(?P<node_id>i-[0-9a-f]+)/'
     r'bootstrap-actions/'
     r'(?P<action_num>\d+)/'
-    r'syslog(?P<suffix>\.\w+)?')
+    r'stderr(?P<suffix>\.\w+)?')
 
 
 def _check_for_nonzero_return_code(reason):
@@ -89,7 +89,7 @@ def _match_emr_bootstrap_stderr_path(path, node_id=None, action_num=None):
     if node_id is not None and node_id != result['node_id']:
         return None
 
-    return m
+    return result
 
 
 def _interpret_emr_bootstrap_stderr(fs, matches, partial=True):

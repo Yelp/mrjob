@@ -797,7 +797,7 @@ class MockEmrConnection(object):
 
         # optional subnet (we don't do anything with this other than put it
         # in ec2instanceattributes)
-        ec2_subnet_id = api_params.get('Instances.Ec2SubnetId')
+        ec2_subnet_id = (api_params or {}).get('Instances.Ec2SubnetId')
 
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunner uses

@@ -1369,15 +1369,19 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # check PWD gets stored
         self.assertIn('__mrjob_PWD=$PWD', lines)
 
+        # check for stdout -> stderr redirect
+        self.assertIn('{', lines)
+        self.assertIn('} 1>&2', lines)
+
         def assertScriptDownloads(path, name=None):
             uri = runner._upload_mgr.uri(path)
             name = runner._bootstrap_dir_mgr.name('file', path, name=name)
 
             self.assertIn(
-                'hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
+                '  hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
                 lines)
             self.assertIn(
-                'chmod a+x $__mrjob_PWD/%s' % (name,),
+                '  chmod a+x $__mrjob_PWD/%s' % (name,),
                 lines)
 
         # check files get downloaded
@@ -1393,31 +1397,33 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # check scripts get run
 
         # bootstrap
-        self.assertIn(expected_python_bin + ' $__mrjob_PWD/bar.py', lines)
-        self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
+        self.assertIn('  ' + expected_python_bin + ' $__mrjob_PWD/bar.py',
+                      lines)
+        self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
         # bootstrap_cmds
-        self.assertIn('echo "Hi!"', lines)
-        self.assertIn('true', lines)
-        self.assertIn('ls', lines)
+        self.assertIn('  echo "Hi!"', lines)
+        self.assertIn('  true', lines)
+        self.assertIn('  ls', lines)
         # bootstrap_mrjob
         mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_tar_gz_path)
-        self.assertIn("__mrjob_PYTHON_LIB=$(" + expected_python_bin +
+        self.assertIn("  __mrjob_PYTHON_LIB=$(" + expected_python_bin +
                       " -c 'from distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
-        self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
+        self.assertIn('  sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
                       ' -C $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('sudo ' + expected_python_bin + ' -m compileall -f'
+        self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
         if expect_pip_binary:
-            self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
+            self.assertIn('  sudo pip install $__mrjob_PWD/yelpy.tar.gz',
+                          lines)
         else:
-            self.assertIn(('sudo ' + expected_python_bin +
+            self.assertIn(('  sudo ' + expected_python_bin +
                            ' -m pip install $__mrjob_PWD/yelpy.tar.gz'), lines)
         # bootstrap_scripts
-        self.assertIn('$__mrjob_PWD/speedups.sh', lines)
-        self.assertIn('$__mrjob_PWD/s.sh', lines)
+        self.assertIn('  $__mrjob_PWD/speedups.sh', lines)
+        self.assertIn('  $__mrjob_PWD/s.sh', lines)
 
     def test_create_master_bootstrap_script(self):
         self._test_create_master_bootstrap_script()
@@ -3665,6 +3671,47 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner'
             '._wait_for_logs_on_s3'))
 
+    def _test_stream_bootstrap_log_dirs(
+            self, ssh=False,
+            action_num=0, node_id='i-b659f519',
+            expected_s3_dir_name='node/i-b659f519/bootstrap-actions/1',
+        ):
+        # ssh doesn't matter, but let's test it
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+
+        results = runner._stream_bootstrap_log_dirs(
+            action_num=action_num, node_id=node_id)
+
+        self.log.info.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
+        ])
+        self.assertTrue(
+            self._wait_for_logs_on_s3.called)
+        self.log.info.assert_called_once_with(
+            'Looking for bootstrap logs in'
+            ' s3://bucket/logs/j-CLUSTERID/' +
+            expected_s3_dir_name + '...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_history_log_dirs_without_ssh(self):
+        self._test_stream_bootstrap_log_dirs()
+
+    def test_stream_history_log_dirs_with_ssh(self):
+        # shouldn't make a difference
+        self._test_stream_bootstrap_log_dirs(ssh=True)
+
+    def test_stream_history_log_dirs_without_action_num(self):
+        self._test_stream_bootstrap_log_dirs(
+            action_num=None, expected_s3_dir_name='node')
+
+    def test_stream_history_log_dirs_without_node_id(self):
+        self._test_stream_bootstrap_log_dirs(
+            action_num=None, expected_s3_dir_name='node')
+
     def _test_stream_history_log_dirs(
             self, ssh, ami_version=_DEFAULT_AMI_VERSION,
             expected_dir_name='hadoop/history',
@@ -4202,7 +4249,8 @@ class JobStepsTestCase(MockBotoTestCase):
 
 class WaitForStepsToCompleteTestCase(MockBotoTestCase):
 
-    # this mostly ensures that we open the SSH tunnel at an appropriate time
+    # TODO: test more functionality. This currently
+    # mostly ensures that we open the SSH tunnel at an appropriate time
 
     class StopTest(Exception):
         pass
@@ -4352,3 +4400,158 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
         self.assertEqual(mock_cluster.status.state, 'RUNNING')
         self.assertIn(runner._job_key, mock_steps[2].name)
         self.assertEqual(mock_steps[2].status.state, 'PENDING')
+
+    def test_terminated_cluster(self):
+        runner = self.make_runner()
+
+        self.start(patch(
+            'mrjob.emr._patched_describe_step',
+            return_value=MockEmrObject(
+                status=MockEmrObject(
+                    state='CANCELLED',
+                ),
+            ),
+        ))
+
+        self.start(patch(
+            'mrjob.emr._patched_describe_cluster',
+            return_value=MockEmrObject(
+                id='j-CLUSTERID',
+                status=MockEmrObject(
+                    state='TERMINATING',
+                ),
+            ),
+        ))
+
+        self.start(patch.object(
+            runner, '_check_for_missing_default_iam_roles'))
+        self.start(patch.object(
+            runner, '_check_for_key_pair_from_wrong_region'))
+        self.start(patch.object(
+            runner, '_check_for_failed_bootstrap_action',
+            side_effect=self.StopTest))
+
+        self.assertRaises(self.StopTest,
+                          runner._wait_for_steps_to_complete)
+
+        self.assertTrue(runner._check_for_missing_default_iam_roles.called)
+        self.assertTrue(runner._check_for_key_pair_from_wrong_region.called)
+        self.assertTrue(runner._check_for_failed_bootstrap_action.called)
+
+
+class LsBootstrapStderrLogsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(LsBootstrapStderrLogsTestCase, self).setUp()
+
+        self.runner = EMRJobRunner()
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._ls_emr_bootstrap_stderr_logs = self.start(
+            patch('mrjob.emr._ls_emr_bootstrap_stderr_logs'))
+        self.runner._stream_bootstrap_log_dirs = Mock()
+
+    def test_basic(self):
+        # _ls_bootstrap_stderr_logs() is a very thin wrapper. Just
+        # verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        stderr_path = ('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/i-e647eb49/'
+                       'bootstrap-actions/1/stderr.gz')
+
+        self._ls_emr_bootstrap_stderr_logs.return_value = [
+            dict(
+                action_num=0,
+                node_id='i-e647eb49',
+                path=stderr_path,
+            ),
+        ]
+
+        results = self.runner._ls_bootstrap_stderr_logs(
+            action_num=0,
+            node_id='i-e647eb49',
+        )
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results), dict(
+                action_num=0,
+                node_id='i-e647eb49',
+                path=stderr_path,
+        ))
+        self._ls_emr_bootstrap_stderr_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._stream_bootstrap_log_dirs.return_value,
+            action_num=0,
+            node_id='i-e647eb49',
+        )
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn(stderr_path, self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)
+
+
+class CheckForFailedBootstrapActionTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(CheckForFailedBootstrapActionTestCase, self).setUp()
+
+        self.runner = EMRJobRunner()
+
+        self.start(patch('mrjob.emr._get_reason'))
+        self._check_for_nonzero_return_code = self.start(
+            patch('mrjob.emr._check_for_nonzero_return_code',
+                  return_value=None))
+        self.log = self.start(patch('mrjob.emr.log'))
+        self._ls_bootstrap_stderr_logs = self.start(
+            patch('mrjob.emr.EMRJobRunner._ls_bootstrap_stderr_logs'))
+        self._interpret_emr_bootstrap_stderr = self.start(
+            patch('mrjob.emr._interpret_emr_bootstrap_stderr',
+                  return_value={}))
+
+    def test_failed_for_wrong_reason(self):
+        self.runner._check_for_failed_bootstrap_action(cluster=Mock())
+
+        self.assertFalse(self._interpret_emr_bootstrap_stderr.called)
+        self.assertFalse(self.log.error.called)
+
+    def test_empty_interpretation(self):
+        self._check_for_nonzero_return_code.return_value = dict(
+            action_num=0, node_id='i-e647eb49')
+
+        self.runner._check_for_failed_bootstrap_action(cluster=Mock())
+
+        self._ls_bootstrap_stderr_logs.assert_called_once_with(
+            action_num=0, node_id='i-e647eb49')
+        self.assertTrue(self._interpret_emr_bootstrap_stderr.called)
+
+        self.assertFalse(self.log.error.called)
+
+    def test_error(self):
+        self._check_for_nonzero_return_code.return_value = dict(
+            action_num=0, node_id='i-e647eb49')
+
+        stderr_path = ('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                       'i-e647eb49/bootstrap-actions/1/stderr.gz')
+
+        self._interpret_emr_bootstrap_stderr.return_value = dict(
+            errors=[dict(
+                action_num=0,
+                node_id='i-e647eb49',
+                task_error=dict(
+                    message='BOOM!\n',
+                    path=stderr_path,
+                ))],
+            partial=True,
+        )
+
+        self.runner._check_for_failed_bootstrap_action(cluster=Mock())
+
+        self._ls_bootstrap_stderr_logs.assert_called_once_with(
+            action_num=0, node_id='i-e647eb49')
+        self.assertTrue(self._interpret_emr_bootstrap_stderr.called)
+
+        self.assertTrue(self.log.error.called)
+        self.assertIn('BOOM!', self.log.error.call_args[0][0])
+        self.assertIn(stderr_path, self.log.error.call_args[0][0])

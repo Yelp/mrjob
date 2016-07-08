@@ -53,7 +53,6 @@ from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
-from mrjob.util import file_ext
 from mrjob.util import tar_and_gzip
 
 
@@ -1129,7 +1128,8 @@ class MRJobRunner(object):
 
             def filter_path(path):
                 filename = os.path.basename(path)
-                return not(file_ext(filename).lower() in ('.pyc', '.pyo') or
+                return not(filename.lower().endswith('.pyc') or
+                           filename.lower().endswith('.pyo') or
                            # filter out emacs backup files
                            filename.endswith('~') or
                            # filter out emacs lock files

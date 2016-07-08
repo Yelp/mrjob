@@ -203,6 +203,9 @@ class CreateMrjobTarGzTestCase(TestCase):
                     self.assertEqual(path[:6], 'mrjob/')
 
                 self.assertIn('mrjob/job.py', contents)
+                for filename in contents:
+                    self.assertFalse(filename.endswith('.pyc'),
+                                     msg="%s ends with '.pyc'" % filename)
 
 
 class TestStreamingOutput(TestCase):

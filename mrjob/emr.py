@@ -77,9 +77,13 @@ from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import _FALLBACK_SERVICE_ROLE
 from mrjob.iam import get_or_create_mrjob_instance_profile
 from mrjob.iam import get_or_create_mrjob_service_role
+from mrjob.logs.bootstrap import _check_for_nonzero_return_code
+from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
+from mrjob.logs.bootstrap import _ls_emr_bootstrap_stderr_logs
 from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
+from mrjob.logs.errors import _pick_error
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_emr_step_syslog
@@ -1258,22 +1262,25 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                   self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
-    def _cluster_is_done(self, cluster):
-        return cluster.status.state in (
-            'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS')
+    def _wait_for_cluster_to_terminate(self, cluster=None):
+        if not cluster:
+            cluster = self._describe_cluster()
 
-    def _wait_for_cluster_to_terminate(self):
-        cluster = self._describe_cluster()
+        log.info('Waiting for cluster (%s) to terminate...' %
+                 cluster.id)
 
         if (cluster.status.state == 'WAITING' and
-                cluster.autoterminate != 'true'):
+            cluster.autoterminate != 'true'):
             raise Exception('Operation requires cluster to terminate, but'
                             ' it may never do so.')
 
-        while not self._cluster_is_done(cluster):
-            msg = 'Waiting for cluster to terminate (currently %s)' % (
-                cluster.status.state)
-            log.info(msg)
+        while True:
+            log.info('  %s' % cluster.status.state)
+
+            if cluster.status.state in (
+                    'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                return
+
             time.sleep(self._opts['check_emr_status_every'])
             cluster = self._describe_cluster()
 
@@ -1658,7 +1665,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
 
-        # define out steps
+        # define our steps
         steps = self._build_steps()
         log.debug('Calling add_jobflow_steps(%r, %r)' % (
             self._cluster_id, steps))
@@ -1837,6 +1844,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     self._check_for_missing_default_iam_roles(cluster)
                     # was it caused by a key pair from the wrong region?
                     self._check_for_key_pair_from_wrong_region(cluster)
+                    # was it because a bootstrap action failed?
+                    self._check_for_failed_bootstrap_action(cluster)
 
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters
@@ -1953,6 +1962,58 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     ### LOG PARSING (implementation of LogInterpretationMixin) ###
 
+    def _check_for_failed_bootstrap_action(self, cluster):
+        """If our bootstrap actions failed, parse the stderr to find
+        out why."""
+        reason = _get_reason(cluster)
+        action_num_and_node_id = _check_for_nonzero_return_code(reason)
+        if not action_num_and_node_id:
+            return
+
+        # this doesn't really correspond to a step, so
+        # don't bother storing it in self._log_interpretations
+        bootstrap_interpretation = _interpret_emr_bootstrap_stderr(
+            self.fs, self._ls_bootstrap_stderr_logs(**action_num_and_node_id))
+
+        # should be 0 or 1 errors, since we're checking a single stderr file
+        if bootstrap_interpretation.get('errors'):
+            error = bootstrap_interpretation['errors'][0]
+            log.error('Probable cause of failure:\n\n%s\n\n' %
+                      _format_error(error))
+
+    def _ls_bootstrap_stderr_logs(self, action_num=None, node_id=None):
+        """_ls_bootstrap_stderr_logs(), with logging for each log we parse."""
+        for match in _ls_emr_bootstrap_stderr_logs(
+                self.fs,
+                self._stream_bootstrap_log_dirs(
+                    action_num=action_num, node_id=node_id),
+                action_num=action_num,
+                node_id=node_id):
+            log.info('  Parsing boostrap stderr log: %s' % match['path'])
+            yield match
+
+    def _stream_bootstrap_log_dirs(self, action_num=None, node_id=None):
+        """Stream a single directory on S3 containing the relevant bootstrap
+        stderr. Optionally, use *action_num* and *node_id* to narrow it down
+        further.
+        """
+        if action_num is None or node_id is None:
+            s3_dir_name = 'node'
+        else:
+            s3_dir_name = posixpath.join(
+                'node', node_id, 'bootstrap-actions', str(action_num + 1))
+
+        # dir_name=None means don't try to SSH in.
+        #
+        # TODO: If the failure is on the master node, we could just look in
+        # /mnt/var/log/bootstrap-actions. However, if it's on a slave node,
+        # we'd have to look up its internal IP using the ListInstances
+        # API call. This *would* be a bit faster though. See #1346.
+        return self._stream_log_dirs(
+            'bootstrap logs',
+            dir_name=None,  # don't SSH in
+            s3_dir_name=s3_dir_name)
+
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
         # History logs have different paths on the 4.x AMIs.
@@ -2050,7 +2111,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         TERMINATING, we first wait for it to terminate (since that
         will trigger copying logs over).
         """
-        if self.fs.can_handle_path('ssh:///'):
+        if dir_name and self.fs.can_handle_path('ssh:///'):
             ssh_host = self._address_of_master()
             if ssh_host:
                 hosts = [ssh_host]
@@ -2073,9 +2134,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # wait for logs to be on S3
         self._wait_for_logs_on_s3()
 
-        if self._s3_log_dir():
-            s3_log_uri = posixpath.join(
-                self._s3_log_dir(), (s3_dir_name or dir_name))
+        s3_dir_name = s3_dir_name or dir_name
+
+        if s3_dir_name and self._s3_log_dir():
+            s3_log_uri = posixpath.join(self._s3_log_dir(), s3_dir_name)
             log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
             yield [s3_log_uri]
 
@@ -2127,25 +2189,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._waited_for_logs_on_s3.add(step_num)
             return
 
-        log.info('Waiting for cluster (%s) to terminate...' %
-                 cluster.id)
-
-        while True:
-            reason_desc = ''
-            reason = getattr(
-                getattr(cluster.status, 'statechangereason', ''),
-                'message', '')
-            if reason:
-                reason_desc = ': ' + reason
-
-            log.info('  %s%s' % (cluster.status.state, reason_desc))
-
-            if cluster.status.state in (
-                    'TERMINATED', 'TERMINATED_WITH_ERRORS'):
-                return
-
-            time.sleep(self._opts['check_emr_status_every'])
-            cluster = self._describe_cluster()
+        self._wait_for_cluster_to_terminate()
 
     def counters(self):
         # not using self._pick_counters() because we don't want to
@@ -2331,8 +2375,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         writeln('__mrjob_PWD=$PWD')
         writeln()
 
+        # run commands in a block so we can redirect stdout to stderr
+        # (e.g. to catch errors from compileall). See #370
+
+        writeln('{')
+
         # download files
-        writeln('# download files and mark them executable')
+        writeln('  # download files and mark them executable')
 
         if self._opts['release_label']:
             # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
@@ -2345,18 +2394,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            writeln('%s %s $__mrjob_PWD/%s' %
+            writeln('  %s %s $__mrjob_PWD/%s' %
                     (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # make everything executable, like Hadoop Distributed Cache
-            writeln('chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
+            writeln('  chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
         writeln()
 
         # run bootstrap commands
-        writeln('# bootstrap commands')
+        writeln('  # bootstrap commands')
         for cmd in bootstrap:
             # reconstruct the command line, substituting $__mrjob_PWD/<name>
             # for path dicts
-            line = ''
+            line = '  '
             for token in cmd:
                 if isinstance(token, dict):
                     # it's a path dictionary
@@ -2366,6 +2415,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     # it's raw script
                     line += token
             writeln(line)
+
+        writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
         writeln()
 
         return out

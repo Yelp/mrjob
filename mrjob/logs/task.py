@@ -41,7 +41,7 @@ _PRE_YARN_TASK_SYSLOG_PATH_RE = re.compile(
     r'(?P<attempt_id>attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_'
     r'(?P<task_type>[mr])_(?P<task_num>\d+)_'
     r'(?P<attempt_num>\d+))/'
-    r'syslog(?P<suffix>\.\w+)?')
+    r'syslog(?P<suffix>\.\w+)?$')
 
 # ignore warnings about initializing log4j in task stderr
 _TASK_STDERR_IGNORE_RE = re.compile(r'^log4j:WARN .*$')
@@ -58,7 +58,7 @@ _YARN_TASK_SYSLOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<application_id>application_\d+_\d{4})/'
     r'(?P<container_id>container(_\d+)+)/'
-    r'syslog(?P<suffix>\.\w+)?')
+    r'syslog(?P<suffix>\.\w+)?$')
 
 
 def _ls_task_syslogs(fs, log_dir_stream, application_id=None, job_id=None):

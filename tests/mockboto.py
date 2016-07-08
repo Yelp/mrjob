@@ -795,6 +795,10 @@ class MockEmrConnection(object):
                 version=running_hadoop_version
             )]
 
+        # optional subnet (we don't do anything with this other than put it
+        # in ec2instanceattributes)
+        ec2_subnet_id = api_params.get('Instances.Ec2SubnetId')
+
         # create a MockEmrObject corresponding to the job flow. We only
         # need to fill in the fields that EMRJobRunner uses
         steps = steps or []
@@ -808,6 +812,7 @@ class MockEmrConnection(object):
             ec2instanceattributes=MockEmrObject(
                 ec2availabilityzone=availability_zone,
                 ec2keyname=ec2_keyname,
+                ec2subnetid=ec2_subnet_id,
                 iaminstanceprofile=job_flow_role,
             ),
             id=cluster_id,

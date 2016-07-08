@@ -402,6 +402,21 @@ class VisibleToAllUsersTestCase(MockBotoTestCase):
             self.assertEqual(visible_cluster.visibletoallusers, 'true')
 
 
+class SubnetTestCase(MockBotoTestCase):
+
+    def test_defaults(self):
+        cluster = self.run_and_get_cluster()
+        self.assertEqual(
+            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            None)
+
+    def test_subnet_option(self):
+        cluster = self.run_and_get_cluster('--subnet', 'subnet-ffffffff')
+        self.assertEqual(
+            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            'subnet-ffffffff')
+
+
 class IAMTestCase(MockBotoTestCase):
 
     def setUp(self):

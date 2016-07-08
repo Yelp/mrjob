@@ -416,6 +416,12 @@ class SubnetTestCase(MockBotoTestCase):
             getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
             'subnet-ffffffff')
 
+    def test_empty_string_means_no_subnet(self):
+        cluster = self.run_and_get_cluster('--subnet', '')
+        self.assertEqual(
+            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            None)
+
 
 class IAMTestCase(MockBotoTestCase):
 
@@ -1870,6 +1876,44 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--ami-version', '4.0.0',
             '--emr-application', 'Ganglia',
             '--emr-application', 'Mahout'])
+
+    def test_matching_subnet(self):
+        _, cluster_id = self.make_pooled_cluster(
+            subnet='subnet-ffffffff')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--subnet', 'subnet-ffffffff'])
+
+    def test_other_subnet(self):
+        _, cluster_id = self.make_pooled_cluster(
+            subnet='subnet-ffffffff')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--subnet', 'subnet-eeeeeeee'])
+
+    def test_require_subnet(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--subnet', 'subnet-ffffffff'])
+
+    def test_require_no_subnet(self):
+        _, cluster_id = self.make_pooled_cluster(
+            subnet='subnet-ffffffff')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters'])
+
+    def test_empty_string_subnet(self):
+        # same as no subnet
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--subnet', ''])
 
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'

@@ -123,6 +123,7 @@ def _interpret_emr_bootstrap_stderr(fs, matches, partial=True):
 
         task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
         if task_error:
+            task_error = dict(task_error)  # make a copy
             task_error['path'] = stderr_path
             error = dict(
                 action_num=match['action_num'],

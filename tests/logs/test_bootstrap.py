@@ -121,9 +121,160 @@ class MatchEMRBootstrapStderrPathTestCase(TestCase):
 
 class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
 
-    def interpret_bootstrap_stderr(self, matches):
-        # implement this; see test_history.py
-        return {}
+    def setUp(self):
+        super(InterpretEMRBootstrapStderrTestCase, self).setUp()
+
+        self.mock_fs = Mock()
+
+        self.mock_parse_task_stderr = self.start(
+            patch('mrjob.logs.bootstrap._parse_task_stderr',
+                  return_value=dict(message='BOOM!\n')))
+
+        self.mock_cat_log = self.start(patch('mrjob.logs.bootstrap._cat_log'))
+
+    def interpret_bootstrap_stderr(self, matches, **kwargs):
+        """Wrap _interpret_emr_bootstrap_stderr(), since fs doesn't matter"""
+        return _interpret_emr_bootstrap_stderr(self.mock_fs, matches, **kwargs)
 
     def test_empty(self):
         self.assertEqual(self.interpret_bootstrap_stderr([]), {})
+
+    def test_single_stderr_log(self):
+        self.assertEqual(
+            self.interpret_bootstrap_stderr([dict(
+                action_num=0,
+                node_id='i-b659f519',
+                path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                      'i-b659f519/bootstrap-actions/1/stderr.gz'),
+            )]),
+            dict(
+                errors=[dict(
+                    action_num=0,
+                    node_id='i-b659f519',
+                    task_error=dict(
+                        message='BOOM!\n',
+                        path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                              'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                    ),
+                )],
+                partial=True,
+            )
+        )
+
+    def test_ignore_multiple_matches(self):
+        self.assertEqual(
+            self.interpret_bootstrap_stderr([
+                dict(
+                    action_num=0,
+                    node_id='i-b659f519',
+                    path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                          'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                ),
+                dict(
+                    action_num=0,
+                    node_id='i-e647eb49',
+                    path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                          'i-e647eb49/bootstrap-actions/1/stderr.gz'),
+                ),
+
+            ]),
+            dict(
+                errors=[dict(
+                    action_num=0,
+                    node_id='i-b659f519',
+                    task_error=dict(
+                        message='BOOM!\n',
+                        path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                              'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                    ),
+                )],
+                partial=True,
+            )
+        )
+
+        self.mock_cat_log.called_once_with(
+            self.mock_fs, ('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                           'i-b659f519/bootstrap-actions/1/stderr.gz'))
+
+    def test_use_all_matches(self):
+        self.assertEqual(
+            self.interpret_bootstrap_stderr(
+                [
+                    dict(
+                        action_num=0,
+                        node_id='i-b659f519',
+                        path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                              'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                    ),
+                    dict(
+                        action_num=0,
+                        node_id='i-e647eb49',
+                        path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                              'i-e647eb49/bootstrap-actions/1/stderr.gz'),
+                    ),
+                ],
+                partial=False,
+            ),
+            dict(
+                errors=[
+                    dict(
+                        action_num=0,
+                        node_id='i-b659f519',
+                        task_error=dict(
+                            message='BOOM!\n',
+                            path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                                  'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                        ),
+                    ),
+                    dict(
+                        action_num=0,
+                        node_id='i-e647eb49',
+                        task_error=dict(
+                            message='BOOM!\n',
+                            path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                                  'i-e647eb49/bootstrap-actions/1/stderr.gz'),
+                        ),
+                    ),
+                ],
+            )
+        )
+
+    maxDiff = None
+
+    def test_skip_blank_log(self):
+        self.mock_parse_task_stderr.side_effect = [
+            None,
+            dict(message='ARGH!\n')
+        ]
+
+        self.assertEqual(
+            self.interpret_bootstrap_stderr([
+                dict(
+                    action_num=0,
+                    node_id='i-b659f519',
+                    path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                          'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                ),
+                dict(
+                    action_num=0,
+                    node_id='i-e647eb49',
+                    path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                          'i-e647eb49/bootstrap-actions/1/stderr.gz'),
+                ),
+
+            ]),
+            dict(
+                errors=[dict(
+                    action_num=0,
+                    node_id='i-e647eb49',
+                    task_error=dict(
+                        message='ARGH!\n',
+                        path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                              'i-e647eb49/bootstrap-actions/1/stderr.gz'),
+                    ),
+                )],
+                partial=True,  # we still don't check
+            )
+        )
+
+        self.assertEqual(self.mock_cat_log.call_count, 2)

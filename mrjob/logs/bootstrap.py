@@ -98,6 +98,17 @@ def _match_emr_bootstrap_stderr_path(path, node_id=None, action_num=None):
     return result
 
 
+# This strategy assumes we can ask the EMR API which node(s) the error
+# occurred on. This is true even after the cluster has shut down, so it's
+# a pretty reasonable assumption, even for after-the-fact log parsing.
+#
+# If we *had* to figure out from logs alone whether a node had an error,
+# we'd want to first check the controller file for a line like:
+#
+# 2016-07-07T23:26:49.565Z ERROR Execution failed with code '1'
+#
+# and then look in the corresponding stderr file, much like how we handle
+# task logs. This seems like overkill at the moment.
 def _interpret_emr_bootstrap_stderr(fs, matches, partial=True):
     """Extract errors from bootstrap stderr.
 

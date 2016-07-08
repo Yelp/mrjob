@@ -3685,7 +3685,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self.assertTrue(
             self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
-            'Looking for bootstrap logs in'
+            'Looking for bootstrap log in'
             ' s3://bucket/logs/j-CLUSTERID/' +
             expected_s3_dir_name + '...')
 
@@ -4243,7 +4243,8 @@ class JobStepsTestCase(MockBotoTestCase):
 
 class WaitForStepsToCompleteTestCase(MockBotoTestCase):
 
-    # this mostly ensures that we open the SSH tunnel at an appropriate time
+    # TODO: test more functionality. This currently
+    # mostly ensures that we open the SSH tunnel at an appropriate time
 
     class StopTest(Exception):
         pass
@@ -4393,6 +4394,42 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
         self.assertEqual(mock_cluster.status.state, 'RUNNING')
         self.assertIn(runner._job_key, mock_steps[2].name)
         self.assertEqual(mock_steps[2].status.state, 'PENDING')
+
+    def test_terminated_cluster(self):
+        runner = self.make_runner()
+
+        self.start(patch(
+            'mrjob.emr._patched_describe_step',
+            return_value=MockEmrObject(
+                status=MockEmrObject(
+                    state='CANCELLED',
+                ),
+            ),
+        ))
+
+        self.start(patch(
+            'mrjob.emr._patched_describe_cluster',
+            return_value=MockEmrObject(
+                id='j-CLUSTERID',
+                status=MockEmrObject(
+                    state='TERMINATED',
+                ),
+            ),
+        ))
+
+        self.start(patch.object(
+            runner, '_check_for_missing_default_iam_roles'))
+        self.start(patch.object(
+            runner, '_check_for_key_pair_from_wrong_region'))
+        self.start(patch.object(
+            runner, '_check_for_failed_bootstrap_action'))
+
+        self.assertRaises(StepFailedException,
+                          runner._wait_for_steps_to_complete)
+
+        self.assertTrue(runner._check_for_missing_default_iam_roles.called)
+        self.assertTrue(runner._check_for_key_pair_from_wrong_region.called)
+        self.assertTrue(runner._check_for_failed_bootstrap_action.called)
 
 
 class LsBootstrapStderrLogsTestCase(MockBotoTestCase):

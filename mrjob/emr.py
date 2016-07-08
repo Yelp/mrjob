@@ -2619,6 +2619,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not self._opts['emr_applications'] <= applications:
                     return
 
+            subnet = getattr(
+                cluster.ec2instanceattributes, 'ec2subnetid', None)
+            if subnet != (self._opts['subnet'] or None):
+                return
+
             steps = _list_all_steps(emr_conn, cluster.id)
 
             # there is a hard limit of 256 steps per cluster

@@ -78,6 +78,7 @@ class ClusterInspectionTestCase(ToolTestCase):
              's3_sync_wait_time': None,
              's3_tmp_dir': None,
              's3_upload_part_size': None,
+             'subnet': None,
              'visible_to_all_users': None,
              })
 

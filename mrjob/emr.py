@@ -1262,22 +1262,25 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                   self._opts['s3_sync_wait_time'])
         time.sleep(self._opts['s3_sync_wait_time'])
 
-    def _cluster_is_done(self, cluster):
-        return cluster.status.state in (
-            'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS')
+    def _wait_for_cluster_to_terminate(self, cluster=None):
+        if not cluster:
+            cluster = self._describe_cluster()
 
-    def _wait_for_cluster_to_terminate(self):
-        cluster = self._describe_cluster()
+        log.info('Waiting for cluster (%s) to terminate...' %
+                 cluster.id)
 
         if (cluster.status.state == 'WAITING' and
-                cluster.autoterminate != 'true'):
+            cluster.autoterminate != 'true'):
             raise Exception('Operation requires cluster to terminate, but'
                             ' it may never do so.')
 
-        while not self._cluster_is_done(cluster):
-            msg = 'Waiting for cluster to terminate (currently %s)' % (
-                cluster.status.state)
-            log.info(msg)
+        while True:
+            log.info('  %s' % cluster.status.state)
+
+            if cluster.status.state in (
+                    'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                return
+
             time.sleep(self._opts['check_emr_status_every'])
             cluster = self._describe_cluster()
 
@@ -2186,25 +2189,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._waited_for_logs_on_s3.add(step_num)
             return
 
-        log.info('Waiting for cluster (%s) to terminate...' %
-                 cluster.id)
-
-        while True:
-            reason_desc = ''
-            reason = getattr(
-                getattr(cluster.status, 'statechangereason', ''),
-                'message', '')
-            if reason:
-                reason_desc = ': ' + reason
-
-            log.info('  %s%s' % (cluster.status.state, reason_desc))
-
-            if cluster.status.state in (
-                    'TERMINATED', 'TERMINATED_WITH_ERRORS'):
-                return
-
-            time.sleep(self._opts['check_emr_status_every'])
-            cluster = self._describe_cluster()
+        self._wait_for_cluster_to_terminate()
 
     def counters(self):
         # not using self._pick_counters() because we don't want to

@@ -4352,3 +4352,56 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
         self.assertEqual(mock_cluster.status.state, 'RUNNING')
         self.assertIn(runner._job_key, mock_steps[2].name)
         self.assertEqual(mock_steps[2].status.state, 'PENDING')
+
+
+class LsBootstrapStderrLogsTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(LsBootstrapStderrLogsTestCase, self).setUp()
+
+        self.runner = EMRJobRunner()
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        self._ls_emr_bootstrap_stderr_logs = self.start(
+            patch('mrjob.emr._ls_emr_bootstrap_stderr_logs'))
+        self.runner._stream_bootstrap_log_dirs = Mock()
+
+    def test_basic(self):
+        # _ls_bootstrap_stderr_logs() is a very thin wrapper. Just
+        # verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        stderr_path = ('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/i-e647eb49/'
+                       'bootstrap-actions/1/stderr.gz')
+
+        self._ls_emr_bootstrap_stderr_logs.return_value = [
+            dict(
+                action_num=0,
+                node_id='i-e647eb49',
+                path=stderr_path,
+            ),
+        ]
+
+        results = self.runner._ls_bootstrap_stderr_logs(
+            action_num=0,
+            node_id='i-e647eb49',
+        )
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results), dict(
+                action_num=0,
+                node_id='i-e647eb49',
+                path=stderr_path,
+        ))
+        self._ls_emr_bootstrap_stderr_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._stream_bootstrap_log_dirs.return_value,
+            action_num=0,
+            node_id='i-e647eb49',
+        )
+
+        self.assertEqual(self.log.info.call_count, 1)
+        self.assertIn(stderr_path, self.log.info.call_args[0][0])
+
+        self.assertRaises(StopIteration, next, results)

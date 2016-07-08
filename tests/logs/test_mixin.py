@@ -373,7 +373,7 @@ class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
         self.runner._stream_history_log_dirs = Mock()
 
     def test_basic(self):
-        # the _ls_history_log() method is a very thin wrapper. Just
+        # the _ls_history_logs() method is a very thin wrapper. Just
         # verify that the keyword args get passed through and
         # that logging happens in the right order
 

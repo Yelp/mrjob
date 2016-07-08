@@ -634,8 +634,9 @@ def _add_emr_launch_opts(opt_group):
 
         opt_group.add_option(
             '--subnet', dest='subnet', default=None,
-            help=('ID of Amazon VPC subnet to launch cluster in (if not set,'
-                  ' cluster is launched in the normal AWS cloud)')),
+            help=('ID of Amazon VPC subnet to launch cluster in (if not set'
+                  ' or empty string, cluster is launched in the normal AWS'
+                  ' cloud)')),
 
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',

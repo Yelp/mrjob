@@ -70,11 +70,16 @@ _EMR_HADOOP_STREAMING_JAR_DIRS = [
     '/usr/lib/hadoop-mapreduce',
 ]
 
-# places to look for logs if we're inside EMR.
-_EMR_HADOOP_LOG_DIRS = [
-    # for the 2.x and 3.x AMIs
-    '/mnt/var/log/hadoop',
+# these are fairly standard places to keep Hadoop logs
+_FALLBACK_HADOOP_LOG_DIRS = [
+    '/var/log/hadoop',
+    '/mnt/var/log/hadoop',  # EMR's 2.x and 3.x AMIs use this
+]
 
+# fairly standard places to keep YARN logs (see #1339)
+_FALLBACK_HADOOP_YARN_LOG_DIRS = [
+    '/var/log/hadoop-yarn',
+    '/mnt/var/log/hadoop-yarn',
 ]
 
 # start of Counters printed by Hadoop
@@ -298,7 +303,9 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         if hadoop_log_dir:
             yield hadoop_log_dir
 
-        if uses_yarn(self.get_hadoop_version()):
+        yarn = uses_yarn(self.get_hadoop_version())
+
+        if yarn:
             yarn_log_dir = os.environ.get('YARN_LOG_DIR')
             if yarn_log_dir:
                 yield yarn_log_dir
@@ -312,8 +319,12 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         for hadoop_dir in self._hadoop_dirs():
             yield posixpath.join(hadoop_dir, 'logs')
 
-        # hard-coded log paths for EMR, so this can work out-of-the-box
-        for path in _EMR_HADOOP_LOG_DIRS:
+        # hard-coded fallback paths
+        if yarn:
+            for path in _FALLBACK_HADOOP_YARN_LOG_DIRS:
+                yield path
+
+        for path in _FALLBACK_HADOOP_LOG_DIRS:
             yield path
 
     def _run(self):

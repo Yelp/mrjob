@@ -18,6 +18,7 @@ from tests.py2 import patch
 
 from mrjob.logs.bootstrap import _check_for_nonzero_return_code
 from mrjob.logs.bootstrap import _match_emr_bootstrap_stderr_path
+from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
 
 
 class CheckForNonzeroReturnCodeTestCase(TestCase):
@@ -116,3 +117,13 @@ class MatchEMRBootstrapStderrPathTestCase(TestCase):
                 node_id='i-105af6bf'),
             None
         )
+
+
+class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
+
+    def interpret_bootstrap_stderr(self, matches):
+        # implement this; see test_history.py
+        return {}
+
+    def test_empty(self):
+        self.assertEqual(self.interpret_bootstrap_stderr([]), {})

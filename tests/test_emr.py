@@ -3691,7 +3691,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self.assertTrue(
             self._wait_for_logs_on_s3.called)
         self.log.info.assert_called_once_with(
-            'Looking for bootstrap log in'
+            'Looking for bootstrap logs in'
             ' s3://bucket/logs/j-CLUSTERID/' +
             expected_s3_dir_name + '...')
 

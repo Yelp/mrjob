@@ -2008,7 +2008,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # TODO: If the failure is on the master node, we could just look in
         # /mnt/var/log/bootstrap-actions. However, if it's on a slave node,
         # we'd have to look up its internal IP using the ListInstances
-        # API call. This *would* be a bit faster though.
+        # API call. This *would* be a bit faster though. See #1346.
         return self._stream_log_dirs(
             'bootstrap logs',
             dir_name=None,  # don't SSH in

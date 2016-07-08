@@ -314,6 +314,19 @@ Cluster creation and configuration
     .. versionadded:: 0.5.0
 
 .. mrjob-opt::
+   :config: subnet
+   :switch: --subnet
+   :type: :ref:`string <data-type-string>`
+   :set: emr
+   :default: ``None``
+
+   ID of Amazon VPC subnet to launch cluster in (e.g. ``'subnet-12345678'``).
+   If this is not set, or an empty string, cluster will be launched in the
+   normal AWS cloud.
+
+   .. versionadded:: 0.5.3
+
+.. mrjob-opt::
     :config: visible_to_all_users
     :switch: --visible-to-all-users, --no-visible-to-all-users
     :type: boolean

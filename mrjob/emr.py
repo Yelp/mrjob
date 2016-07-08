@@ -394,6 +394,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_bind_ports',
         'ssh_tunnel',
         'ssh_tunnel_is_open',
+        'subnet',
         'visible_to_all_users',
     ]))
 
@@ -1467,6 +1468,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['emr_applications']:
             api_params['Applications'] = [
                 dict(Name=a) for a in sorted(self._opts['emr_applications'])]
+
+        if self._opts['subnet']:
+            api_params['Instances.Ec2SubnetId'] = self._opts['subnet']
 
         if self._opts['emr_api_params']:
             api_params.update(self._opts['emr_api_params'])
@@ -2665,6 +2669,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 applications = set(a.name for a in cluster.applications)
                 if not self._opts['emr_applications'] <= applications:
                     return
+
+            subnet = getattr(
+                cluster.ec2instanceattributes, 'ec2subnetid', None)
+            if subnet != (self._opts['subnet'] or None):
+                return
 
             steps = _list_all_steps(emr_conn, cluster.id)
 

@@ -61,12 +61,20 @@ occasionally join clusters with out knowing they are about to self-terminate
 (this is better for development than production).
 
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
-share the same clusters. This means that the version of :py:mod:`mrjob`,
-bootstrap configuration, Hadoop version and AMI version all need to be exactly
-the same.
+share the same clusters. This means that the version of :py:mod:`mrjob` and
+bootstrap configuration. Other options that affect which cluster a job can
+join:
+
+* :mrjob-opt:`ami_version`\/:mrjob-opt:`release_label`: must match
+* :mrjob-opt:`emr_applications`: require *at least* these applications
+  (extra ones okay)
+* :mrjob-opt:`ec2_key_pair`: if specified, only join clusters with the same key
+  pair
+* :mrjob-opt:`subnet`: only join clusters with the same EC2 subnet ID (or
+  lack thereof)
 
 Pooled jobs will also only use clusters with the same **pool name**, so you
-can use the :option:`--pool-name` option to partition your clusters into
+can use the :mrjob-opt:`pool_name` to partition your clusters into
 separate pools.
 
 Pooling is flexible about instance type and number of instances; it will

@@ -402,6 +402,27 @@ class VisibleToAllUsersTestCase(MockBotoTestCase):
             self.assertEqual(visible_cluster.visibletoallusers, 'true')
 
 
+class SubnetTestCase(MockBotoTestCase):
+
+    def test_defaults(self):
+        cluster = self.run_and_get_cluster()
+        self.assertEqual(
+            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            None)
+
+    def test_subnet_option(self):
+        cluster = self.run_and_get_cluster('--subnet', 'subnet-ffffffff')
+        self.assertEqual(
+            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            'subnet-ffffffff')
+
+    def test_empty_string_means_no_subnet(self):
+        cluster = self.run_and_get_cluster('--subnet', '')
+        self.assertEqual(
+            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            None)
+
+
 class IAMTestCase(MockBotoTestCase):
 
     def setUp(self):
@@ -1862,6 +1883,44 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--emr-application', 'Ganglia',
             '--emr-application', 'Mahout'])
 
+    def test_matching_subnet(self):
+        _, cluster_id = self.make_pooled_cluster(
+            subnet='subnet-ffffffff')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--subnet', 'subnet-ffffffff'])
+
+    def test_other_subnet(self):
+        _, cluster_id = self.make_pooled_cluster(
+            subnet='subnet-ffffffff')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--subnet', 'subnet-eeeeeeee'])
+
+    def test_require_subnet(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--subnet', 'subnet-ffffffff'])
+
+    def test_require_no_subnet(self):
+        _, cluster_id = self.make_pooled_cluster(
+            subnet='subnet-ffffffff')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters'])
+
+    def test_empty_string_subnet(self):
+        # same as no subnet
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--subnet', ''])
+
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'
         _, cluster_id = self.make_pooled_cluster(
@@ -2043,7 +2102,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--ec2-task-instance-bid-price', '22.00'])
 
     def test_dont_join_full_cluster(self):
-        dummy_runner, cluster_id = self.make_pooled_cluster('pool1')
+        dummy_runner, cluster_id = self.make_pooled_cluster()
 
         # fill the cluster
         self.mock_emr_clusters[cluster_id]._steps = 255 * [
@@ -2060,12 +2119,11 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         # a two-step job shouldn't fit
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-clusters',
-            '--pool-name', 'pool1'],
+            '-r', 'emr', '-v', '--pool-clusters'],
             job_class=MRTwoStepJob)
 
     def test_join_almost_full_cluster(self):
-        dummy_runner, cluster_id = self.make_pooled_cluster('pool1')
+        dummy_runner, cluster_id = self.make_pooled_cluster()
 
         # fill the cluster
         self.mock_emr_clusters[cluster_id]._steps = 255 * [
@@ -2082,8 +2140,51 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         # a one-step job should fit
         self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters'],
+            job_class=MRWordCount)
+
+    def test_no_space_for_master_node_setup(self):
+        dummy_runner, cluster_id = self.make_pooled_cluster()
+
+        # fill the cluster
+        self.mock_emr_clusters[cluster_id]._steps = 255 * [
+            MockEmrObject(
+                actiononfailure='CANCEL_AND_WAIT',
+                config=MockEmrObject(args=[]),
+                id='s-FAKE',
+                name='dummy',
+                status=MockEmrObject(
+                    state='COMPLETED',
+                    timeline=MockEmrObject(
+                        enddatetime='definitely not none')))
+        ]
+
+        # --libjar makes this a two-step job, which won't fit
+        self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--pool-name', 'pool1'],
+            '--libjar', 's3:///poohs-house/HUNNY.jar'],
+            job_class=MRWordCount)
+
+    def test_bearly_space_for_master_node_setup(self):
+        dummy_runner, cluster_id = self.make_pooled_cluster()
+
+        # fill the cluster
+        self.mock_emr_clusters[cluster_id]._steps = 254 * [
+            MockEmrObject(
+                actiononfailure='CANCEL_AND_WAIT',
+                config=MockEmrObject(args=[]),
+                id='s-FAKE',
+                name='dummy',
+                status=MockEmrObject(
+                    state='COMPLETED',
+                    timeline=MockEmrObject(
+                        enddatetime='definitely not none')))
+        ]
+
+        # now there's space for two steps
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--libjar', 's3:///poohs-house/HUNNY.jar'],
             job_class=MRWordCount)
 
     def test_dont_join_idle_with_pending_steps(self):

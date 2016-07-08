@@ -3665,6 +3665,47 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner'
             '._wait_for_logs_on_s3'))
 
+    def _test_stream_bootstrap_log_dirs(
+            self, ssh=False,
+            action_num=0, node_id='i-b659f519',
+            expected_s3_dir_name='node/i-b659f519/bootstrap-actions/1',
+        ):
+        # ssh doesn't matter, but let's test it
+        ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+
+        results = runner._stream_bootstrap_log_dirs(
+            action_num=action_num, node_id=node_id)
+
+        self.log.info.reset_mock()
+
+        self.assertEqual(next(results), [
+            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
+        ])
+        self.assertTrue(
+            self._wait_for_logs_on_s3.called)
+        self.log.info.assert_called_once_with(
+            'Looking for bootstrap logs in'
+            ' s3://bucket/logs/j-CLUSTERID/' +
+            expected_s3_dir_name + '...')
+
+        self.assertRaises(StopIteration, next, results)
+
+    def test_stream_history_log_dirs_without_ssh(self):
+        self._test_stream_bootstrap_log_dirs()
+
+    def test_stream_history_log_dirs_with_ssh(self):
+        # shouldn't make a difference
+        self._test_stream_bootstrap_log_dirs(ssh=True)
+
+    def test_stream_history_log_dirs_without_action_num(self):
+        self._test_stream_bootstrap_log_dirs(
+            action_num=None, expected_s3_dir_name='node')
+
+    def test_stream_history_log_dirs_without_node_id(self):
+        self._test_stream_bootstrap_log_dirs(
+            action_num=None, expected_s3_dir_name='node')
+
     def _test_stream_history_log_dirs(
             self, ssh, ami_version=_DEFAULT_AMI_VERSION,
             expected_dir_name='hadoop/history',

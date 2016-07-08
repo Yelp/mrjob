@@ -2000,15 +2000,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_dir_name = posixpath.join(
                 'node', node_id, 'bootstrap-actions', str(action_num + 1))
 
-            # dir_name=None means don't try to SSH in.
-            # TODO: If the failure is on the master node, we just look in
-            # /mnt/var/log/bootstrap-actions. However, if it's on a slave node,
-            # we have to look up its internal IP using the ListInstances
-            # API call. This *would* be a bit faster though.
-            return self._stream_log_dirs(
-                'bootstrap stderr log',
-                dir_name=None,  # don't SSH in
-                s3_dir_name=s3_dir_name)
+        # dir_name=None means don't try to SSH in.
+        #
+        # TODO: If the failure is on the master node, we could just look in
+        # /mnt/var/log/bootstrap-actions. However, if it's on a slave node,
+        # we'd have to look up its internal IP using the ListInstances
+        # API call. This *would* be a bit faster though.
+        return self._stream_log_dirs(
+            'bootstrap logs',
+            dir_name=None,  # don't SSH in
+            s3_dir_name=s3_dir_name)
 
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""

@@ -1973,8 +1973,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self.fs, self._ls_bootstrap_stderr_logs(**action_num_and_node_id))
 
         # should be 0 or 1 errors, since we're checking a single stderr file
-        error = _pick_error(bootstrap_interpretation)
-        if error:
+        if bootstrap_interpretation.get('errors'):
+            error = bootstrap_interpretation['errors'][0]
             log.error('Probable cause of failure:\n\n%s\n\n' %
                       _format_error(error))
 
@@ -2000,6 +2000,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_dir_name = posixpath.join(
                 'node', node_id, 'bootstrap-actions', str(action_num + 1))
 
+            # dir_name=None means don't try to SSH in.
+            # TODO: If the failure is on the master node, we just look in
+            # /mnt/var/log/bootstrap-actions. However, if it's on a slave node,
+            # we have to look up its internal IP using the ListInstances
+            # API call. This *would* be a bit faster though.
             return self._stream_log_dirs(
                 'bootstrap stderr log',
                 dir_name=None,  # don't SSH in

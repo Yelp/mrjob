@@ -525,6 +525,13 @@ def _add_emr_launch_opts(opt_group):
         ),
 
         opt_group.add_option(
+            '--no-emr-api-param', dest='no_emr_api_params',
+            default=[], action='append',
+            help='Parameters to be unset when calling EMR API.'
+                 ' You can use --no-emr-api-param multiple times.'
+        ),
+
+        opt_group.add_option(
             '--emr-application', dest='emr_applications',
             default=[], action='append',
             help='Additional applications to run on 4.x AMIs (e.g. Ganglia,'
@@ -626,11 +633,9 @@ def _add_emr_launch_opts(opt_group):
                   ' multipart uploading entirely.')),
 
         opt_group.add_option(
-            '--no-emr-api-param', dest='no_emr_api_params',
-            default=[], action='append',
-            help='Parameters to be unset when calling EMR API.'
-                 ' You can use --no-emr-api-param multiple times.'
-        ),
+            '--subnet', dest='subnet', default=None,
+            help=('ID of Amazon VPC subnet to launch cluster in (if not set,'
+                  ' cluster is launched in the normal AWS cloud)')),
 
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',

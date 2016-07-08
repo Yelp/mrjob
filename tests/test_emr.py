@@ -2096,7 +2096,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--ec2-task-instance-bid-price', '22.00'])
 
     def test_dont_join_full_cluster(self):
-        dummy_runner, cluster_id = self.make_pooled_cluster('pool1')
+        dummy_runner, cluster_id = self.make_pooled_cluster()
 
         # fill the cluster
         self.mock_emr_clusters[cluster_id]._steps = 255 * [
@@ -2113,12 +2113,11 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         # a two-step job shouldn't fit
         self.assertDoesNotJoin(cluster_id, [
-            '-r', 'emr', '-v', '--pool-clusters',
-            '--pool-name', 'pool1'],
+            '-r', 'emr', '-v', '--pool-clusters'],
             job_class=MRTwoStepJob)
 
     def test_join_almost_full_cluster(self):
-        dummy_runner, cluster_id = self.make_pooled_cluster('pool1')
+        dummy_runner, cluster_id = self.make_pooled_cluster()
 
         # fill the cluster
         self.mock_emr_clusters[cluster_id]._steps = 255 * [
@@ -2135,8 +2134,51 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         # a one-step job should fit
         self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters'],
+            job_class=MRWordCount)
+
+    def test_no_space_for_master_node_setup(self):
+        dummy_runner, cluster_id = self.make_pooled_cluster()
+
+        # fill the cluster
+        self.mock_emr_clusters[cluster_id]._steps = 255 * [
+            MockEmrObject(
+                actiononfailure='CANCEL_AND_WAIT',
+                config=MockEmrObject(args=[]),
+                id='s-FAKE',
+                name='dummy',
+                status=MockEmrObject(
+                    state='COMPLETED',
+                    timeline=MockEmrObject(
+                        enddatetime='definitely not none')))
+        ]
+
+        # --libjar makes this a two-step job, which won't fit
+        self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--pool-name', 'pool1'],
+            '--libjar', 's3:///poohs-house/HUNNY.jar'],
+            job_class=MRWordCount)
+
+    def test_bearly_space_for_master_node_setup(self):
+        dummy_runner, cluster_id = self.make_pooled_cluster()
+
+        # fill the cluster
+        self.mock_emr_clusters[cluster_id]._steps = 254 * [
+            MockEmrObject(
+                actiononfailure='CANCEL_AND_WAIT',
+                config=MockEmrObject(args=[]),
+                id='s-FAKE',
+                name='dummy',
+                status=MockEmrObject(
+                    state='COMPLETED',
+                    timeline=MockEmrObject(
+                        enddatetime='definitely not none')))
+        ]
+
+        # now there's space for two steps
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--libjar', 's3:///poohs-house/HUNNY.jar'],
             job_class=MRWordCount)
 
     def test_dont_join_idle_with_pending_steps(self):

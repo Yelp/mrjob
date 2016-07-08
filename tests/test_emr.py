@@ -4405,3 +4405,68 @@ class LsBootstrapStderrLogsTestCase(MockBotoTestCase):
         self.assertIn(stderr_path, self.log.info.call_args[0][0])
 
         self.assertRaises(StopIteration, next, results)
+
+
+class CheckForFailedBootstrapActionTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(CheckForFailedBootstrapActionTestCase, self).setUp()
+
+        self.runner = EMRJobRunner()
+
+        self.start(patch('mrjob.emr._get_reason'))
+        self._check_for_nonzero_return_code = self.start(
+            patch('mrjob.emr._check_for_nonzero_return_code',
+                  return_value=None))
+        self.log = self.start(patch('mrjob.emr.log'))
+        self._ls_bootstrap_stderr_logs = self.start(
+            patch('mrjob.emr.EMRJobRunner._ls_bootstrap_stderr_logs'))
+        self._interpret_emr_bootstrap_stderr = self.start(
+            patch('mrjob.emr._interpret_emr_bootstrap_stderr',
+                  return_value={}))
+
+    def test_failed_for_wrong_reason(self):
+        self.runner._check_for_failed_bootstrap_action(cluster=Mock())
+
+        self.assertFalse(self._interpret_emr_bootstrap_stderr.called)
+        self.assertFalse(self.log.error.called)
+
+    def test_empty_interpretation(self):
+        self._check_for_nonzero_return_code.return_value = dict(
+            action_num=0, node_id='i-e647eb49')
+
+        self.runner._check_for_failed_bootstrap_action(cluster=Mock())
+
+        self._ls_bootstrap_stderr_logs.assert_called_once_with(
+            action_num=0, node_id='i-e647eb49')
+        self.assertTrue(self._interpret_emr_bootstrap_stderr.called)
+
+        self.assertFalse(self.log.error.called)
+
+    def test_error(self):
+        self._check_for_nonzero_return_code.return_value = dict(
+            action_num=0, node_id='i-e647eb49')
+
+        stderr_path = ('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                       'i-e647eb49/bootstrap-actions/1/stderr.gz')
+
+        self._interpret_emr_bootstrap_stderr.return_value = dict(
+            errors=[dict(
+                action_num=0,
+                node_id='i-e647eb49',
+                task_error=dict(
+                    message='BOOM!\n',
+                    path=stderr_path,
+                ))],
+            partial=True,
+        )
+
+        self.runner._check_for_failed_bootstrap_action(cluster=Mock())
+
+        self._ls_bootstrap_stderr_logs.assert_called_once_with(
+            action_num=0, node_id='i-e647eb49')
+        self.assertTrue(self._interpret_emr_bootstrap_stderr.called)
+
+        self.assertTrue(self.log.error.called)
+        self.assertIn('BOOM!', self.log.error.call_args[0][0])
+        self.assertIn(stderr_path, self.log.error.call_args[0][0])

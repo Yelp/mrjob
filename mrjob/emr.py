@@ -2390,8 +2390,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         writeln('__mrjob_PWD=$PWD')
         writeln()
 
+        # run commands in a block so we can redirect stdout to stderr
+        # (e.g. to catch errors from compileall). See #370
+
+        writeln('{')
+
         # download files
-        writeln('# download files and mark them executable')
+        writeln('  # download files and mark them executable')
 
         if self._opts['release_label']:
             # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
@@ -2404,18 +2409,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            writeln('%s %s $__mrjob_PWD/%s' %
+            writeln('  %s %s $__mrjob_PWD/%s' %
                     (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # make everything executable, like Hadoop Distributed Cache
-            writeln('chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
+            writeln('  chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
         writeln()
 
         # run bootstrap commands
-        writeln('# bootstrap commands')
+        writeln('  # bootstrap commands')
         for cmd in bootstrap:
             # reconstruct the command line, substituting $__mrjob_PWD/<name>
             # for path dicts
-            line = ''
+            line = '  '
             for token in cmd:
                 if isinstance(token, dict):
                     # it's a path dictionary
@@ -2425,6 +2430,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     # it's raw script
                     line += token
             writeln(line)
+
+        writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
         writeln()
 
         return out

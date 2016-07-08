@@ -1369,15 +1369,19 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # check PWD gets stored
         self.assertIn('__mrjob_PWD=$PWD', lines)
 
+        # check for stdout -> stderr redirect
+        self.assertIn('{', lines)
+        self.assertIn('} 1>&2', lines)
+
         def assertScriptDownloads(path, name=None):
             uri = runner._upload_mgr.uri(path)
             name = runner._bootstrap_dir_mgr.name('file', path, name=name)
 
             self.assertIn(
-                'hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
+                '  hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
                 lines)
             self.assertIn(
-                'chmod a+x $__mrjob_PWD/%s' % (name,),
+                '  chmod a+x $__mrjob_PWD/%s' % (name,),
                 lines)
 
         # check files get downloaded
@@ -1393,31 +1397,33 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # check scripts get run
 
         # bootstrap
-        self.assertIn(expected_python_bin + ' $__mrjob_PWD/bar.py', lines)
-        self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
+        self.assertIn('  ' + expected_python_bin + ' $__mrjob_PWD/bar.py',
+                      lines)
+        self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
         # bootstrap_cmds
-        self.assertIn('echo "Hi!"', lines)
-        self.assertIn('true', lines)
-        self.assertIn('ls', lines)
+        self.assertIn('  echo "Hi!"', lines)
+        self.assertIn('  true', lines)
+        self.assertIn('  ls', lines)
         # bootstrap_mrjob
         mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_tar_gz_path)
-        self.assertIn("__mrjob_PYTHON_LIB=$(" + expected_python_bin +
+        self.assertIn("  __mrjob_PYTHON_LIB=$(" + expected_python_bin +
                       " -c 'from distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
-        self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
+        self.assertIn('  sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
                       ' -C $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('sudo ' + expected_python_bin + ' -m compileall -f'
+        self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
         if expect_pip_binary:
-            self.assertIn('sudo pip install $__mrjob_PWD/yelpy.tar.gz', lines)
+            self.assertIn('  sudo pip install $__mrjob_PWD/yelpy.tar.gz',
+                          lines)
         else:
-            self.assertIn(('sudo ' + expected_python_bin +
+            self.assertIn(('  sudo ' + expected_python_bin +
                            ' -m pip install $__mrjob_PWD/yelpy.tar.gz'), lines)
         # bootstrap_scripts
-        self.assertIn('$__mrjob_PWD/speedups.sh', lines)
-        self.assertIn('$__mrjob_PWD/s.sh', lines)
+        self.assertIn('  $__mrjob_PWD/speedups.sh', lines)
+        self.assertIn('  $__mrjob_PWD/s.sh', lines)
 
     def test_create_master_bootstrap_script(self):
         self._test_create_master_bootstrap_script()

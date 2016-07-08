@@ -59,10 +59,26 @@ class MatchEMRBootstrapStderrPathTestCase(TestCase):
             _match_emr_bootstrap_stderr_path(''),
             None)
 
-    def test_gz(self):
+    def test_stderr(self):
+        self.assertEqual(
+            _match_emr_bootstrap_stderr_path(
+                's3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/i-e647eb49/'
+                'bootstrap-actions/2/stderr'),
+            dict(action_num=1, node_id='i-e647eb49')
+        )
+
+    def test_stderr_gz(self):
         self.assertEqual(
             _match_emr_bootstrap_stderr_path(
                 's3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/i-e647eb49/'
                 'bootstrap-actions/1/stderr.gz'),
             dict(action_num=0, node_id='i-e647eb49')
+        )
+
+    def test_syslog(self):
+        self.assertEqual(
+            _match_emr_bootstrap_stderr_path(
+                's3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/i-e647eb49/'
+                'bootstrap-actions/1/syslog'),
+            None
         )

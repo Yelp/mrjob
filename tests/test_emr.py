@@ -4412,7 +4412,7 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
             return_value=MockEmrObject(
                 id='j-CLUSTERID',
                 status=MockEmrObject(
-                    state='TERMINATED',
+                    state='TERMINATING',
                 ),
             ),
         ))
@@ -4422,9 +4422,10 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
         self.start(patch.object(
             runner, '_check_for_key_pair_from_wrong_region'))
         self.start(patch.object(
-            runner, '_check_for_failed_bootstrap_action'))
+            runner, '_check_for_failed_bootstrap_action',
+            side_effect=self.StopTest))
 
-        self.assertRaises(StepFailedException,
+        self.assertRaises(self.StopTest,
                           runner._wait_for_steps_to_complete)
 
         self.assertTrue(runner._check_for_missing_default_iam_roles.called)

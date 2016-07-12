@@ -364,6 +364,9 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
     def test_empty(self):
         self.assertEqual(list(self.runner._hadoop_log_dirs()),
                          ['hdfs:///tmp/hadoop-yarn/staging',
+                          '/var/log/hadoop-yarn',
+                          '/mnt/var/log/hadoop-yarn',
+                          '/var/log/hadoop',
                           '/mnt/var/log/hadoop'])
 
     def test_precedence(self):
@@ -380,6 +383,9 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
              'hdfs:///output/_logs',
              '/path/to/hadoop-prefix/logs',
              '/path/to/hadoop-home/logs',
+             '/var/log/hadoop-yarn',
+             '/mnt/var/log/hadoop-yarn',
+             '/var/log/hadoop',
              '/mnt/var/log/hadoop'])
 
     def test_hadoop_log_dirs_opt(self):
@@ -399,11 +405,15 @@ class HadoopLogDirsTestCase(SandboxedTestCase):
         self.assertEqual(list(self.runner._hadoop_log_dirs()),
                          ['/path/to/yarn-log-dir',
                           'hdfs:///tmp/hadoop-yarn/staging',
+                          '/var/log/hadoop-yarn',
+                          '/mnt/var/log/hadoop-yarn',
+                          '/var/log/hadoop',
                           '/mnt/var/log/hadoop'])
 
         self.mock_hadoop_version = '1.0.3'
         self.assertEqual(list(self.runner._hadoop_log_dirs()),
-                         ['/mnt/var/log/hadoop'])
+                         ['/var/log/hadoop',
+                          '/mnt/var/log/hadoop'])
 
 
 class StreamingLogDirsTestCase(SandboxedTestCase):

@@ -194,6 +194,12 @@ Options available to hadoop runner only
    * ``$HADOOP_MAPRED_HOME/logs``
    * ``<dir containing hadoop bin>/logs`` (see :mrjob-opt:`hadoop_bin`), unless the hadoop binary is in ``/bin``, ``/usr/bin``, or ``/usr/local/bin``
    * ``$HADOOP_*_HOME/logs`` (in alphabetical order by environment variable name)
+   * ``/var/log/hadoop-yarn`` (on YARN only)
+   * ``/mnt/var/log/hadoop-yarn`` (on YARN only)
+   * ``/var/log/hadoop``
+   * ``/mnt/var/log/hadoop``
+
+   (The last path allows the Hadoop runner to work out-of-the box inside EMR.)
 
 .. mrjob-opt::
     :config: hadoop_tmp_dir

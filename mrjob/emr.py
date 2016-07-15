@@ -2395,7 +2395,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # run commands in a block so we can redirect stdout to stderr
         # (e.g. to catch errors from compileall). See #370
-
         writeln('{')
 
         # download files
@@ -2435,7 +2434,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             writeln(line)
 
         writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
-        writeln()
 
         return out
 
@@ -2491,10 +2489,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         writeln('#!' + cmd_line(sh_bin))
         writeln()
 
+        # run commands in a block so we can redirect stdout to stderr
+        # (e.g. to catch errors from compileall). See #370
+        writeln('{')
+
         # make working dir
         working_dir = self._master_node_setup_working_dir()
-        writeln('mkdir -p %s' % pipes.quote(working_dir))
-        writeln('cd %s' % pipes.quote(working_dir))
+        writeln('  mkdir -p %s' % pipes.quote(working_dir))
+        writeln('  cd %s' % pipes.quote(working_dir))
         writeln()
 
         # download files
@@ -2508,12 +2510,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         for name, path in sorted(
                 self._master_node_setup_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            writeln('%s %s %s' % (
+            writeln('  %s %s %s' % (
                 cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # make everything executable, like Hadoop Distributed Cache
-            writeln('chmod a+x %s' % pipes.quote(name))
+            writeln('  chmod a+x %s' % pipes.quote(name))
 
         # at some point we will probably run commands as well (see #1336)
+
+        writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
 
         return out
 

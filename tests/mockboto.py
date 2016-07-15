@@ -768,9 +768,7 @@ class MockEmrConnection(object):
                     'The requested AMI version does not support the requested'
                     ' Hadoop version'))
 
-        # build applications list
-        # TODO: could raise an exception if applications are set for
-        # pre-4.x AMI
+        # Applications
         application_objs = getattr(api_params_obj, 'applications', [])
 
         if version_gte(ami_version, '4'):
@@ -803,6 +801,18 @@ class MockEmrConnection(object):
                 version=running_hadoop_version
             )]
 
+        # Configurations
+        if hasattr(api_params_obj, 'configurations'):
+            configurations = api_params_obj.configurations
+            _normalize_configuration_objs(configurations)
+        else:
+            configurations = None
+
+        if configurations and not version_gte(ami_version, '4'):
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'Cannot specify configurations when AMI version is used.'))
+
         # optional subnet (we don't do anything with this other than put it
         # in ec2instanceattributes)
         ec2_subnet_id = (api_params or {}).get('Instances.Ec2SubnetId')
@@ -813,19 +823,6 @@ class MockEmrConnection(object):
 
         cluster_id = _id or 'j-MOCKCLUSTER%d' % len(self.mock_emr_clusters)
         assert cluster_id not in self.mock_emr_clusters
-
-        # Configurations
-        if hasattr(api_params_obj, 'configurations'):
-            configurations = api_params_obj.configurations
-            _normalize_configuration_objs(configurations)
-        else:
-            configurations = None
-
-        # this is a 4.x AMI feature
-        if configurations and not version_gte(ami_version, '4'):
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'Cannot specify configurations when AMI version is used.'))
 
         cluster = MockEmrObject(
             applications=applications,

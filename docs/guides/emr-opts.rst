@@ -176,6 +176,34 @@ Cluster creation and configuration
 
    See `Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-release-components.html>`_ in the EMR docs for more details.
 
+   .. versionadded:: 0.5.2
+
+.. mrjob-opt::
+    :config: emr_configurations
+    :switch: --emr-configuration
+    :type: list of dicts
+    :set: emr
+    :default: ``[]``
+
+    Configurations for 4.x AMIs. For example:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            emr_configurations:
+            - Classification: core-site
+              Properties:
+                hadoop.security.groups.cache.secs: 250
+
+    On the command line, configurations should be JSON-encoded:
+
+    .. code-block:: sh
+
+        --emr-configuration '{"Classification": "core-site", ...}
+
+    See `Configuring Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html>`_ in the EMR docs for more details.
+
 .. mrjob-opt::
     :config: emr_endpoint
     :switch: --emr-endpoint

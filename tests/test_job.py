@@ -645,7 +645,6 @@ class JobConfTestCase(TestCase):
                          {'mapred.baz': 'bar'})
 
 
-
 class LibjarsTestCase(TestCase):
 
     def test_default(self):

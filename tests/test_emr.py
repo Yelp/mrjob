@@ -94,7 +94,7 @@ else:
     PYTHON_BIN = 'python3'
 
 # EMR configurations used for testing
-# from http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  #noqa
+# from http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  # noqa
 
 # simple configuration
 CORE_SITE_EMR_CONFIGURATION = dict(
@@ -3873,8 +3873,8 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def _test_stream_bootstrap_log_dirs(
             self, ssh=False,
             action_num=0, node_id='i-b659f519',
-            expected_s3_dir_name='node/i-b659f519/bootstrap-actions/1',
-        ):
+            expected_s3_dir_name='node/i-b659f519/bootstrap-actions/1'):
+
         # ssh doesn't matter, but let's test it
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
@@ -4182,7 +4182,6 @@ class LsStepStderrLogsTestCase(MockBotoTestCase):
         self.assertRaises(StopIteration, next, results)
 
 
-
 class GetStepLogInterpretationTestCase(MockBotoTestCase):
 
     def setUp(self):
@@ -4195,7 +4194,7 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
         self._ls_step_syslogs = self.start(patch(
             'mrjob.emr.EMRJobRunner._ls_step_syslogs'))
 
-        self._interpret_emr_step_stderr= self.start(patch(
+        self._interpret_emr_step_stderr = self.start(patch(
             'mrjob.emr._interpret_emr_step_stderr'))
         self._ls_step_stderr_logs = self.start(patch(
             'mrjob.emr.EMRJobRunner._ls_step_stderr_logs'))
@@ -4268,7 +4267,6 @@ class HadoopExtraArgsOnEMRTestCase(HadoopExtraArgsTestCase, MockBotoTestCase):
             return_value='2.4.0'))
 
     RUNNER = 'emr'
-
 
 
 # make sure we don't override the partitioner on EMR (tests #1294)
@@ -4399,7 +4397,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 class EMRConfigurationsTestCase(MockBotoTestCase):
 
     # example from:
-    # http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  #noqa
+    # http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  # noqa
 
     def test_default(self):
         job = MRTwoStepJob(['-r', 'emr'])
@@ -4810,9 +4808,9 @@ class LsBootstrapStderrLogsTestCase(MockBotoTestCase):
         self.assertFalse(self.log.info.called)
 
         self.assertEqual(next(results), dict(
-                action_num=0,
-                node_id='i-e647eb49',
-                path=stderr_path,
+            action_num=0,
+            node_id='i-e647eb49',
+            path=stderr_path,
         ))
         self._ls_emr_bootstrap_stderr_logs.assert_called_once_with(
             self.runner.fs,
@@ -4871,13 +4869,16 @@ class CheckForFailedBootstrapActionTestCase(MockBotoTestCase):
                        'i-e647eb49/bootstrap-actions/1/stderr.gz')
 
         self._interpret_emr_bootstrap_stderr.return_value = dict(
-            errors=[dict(
-                action_num=0,
-                node_id='i-e647eb49',
-                task_error=dict(
-                    message='BOOM!\n',
-                    path=stderr_path,
-                ))],
+            errors=[
+                dict(
+                    action_num=0,
+                    node_id='i-e647eb49',
+                    task_error=dict(
+                        message='BOOM!\n',
+                        path=stderr_path,
+                    ),
+                ),
+            ],
             partial=True,
         )
 

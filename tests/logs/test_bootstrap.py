@@ -148,15 +148,17 @@ class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
                       'i-b659f519/bootstrap-actions/1/stderr.gz'),
             )]),
             dict(
-                errors=[dict(
-                    action_num=0,
-                    node_id='i-b659f519',
-                    task_error=dict(
-                        message='BOOM!\n',
-                        path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
-                              'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                errors=[
+                    dict(
+                        action_num=0,
+                        node_id='i-b659f519',
+                        task_error=dict(
+                            message='BOOM!\n',
+                            path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                                  'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                        ),
                     ),
-                )],
+                ],
                 partial=True,
             )
         )
@@ -179,15 +181,17 @@ class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
 
             ]),
             dict(
-                errors=[dict(
-                    action_num=0,
-                    node_id='i-b659f519',
-                    task_error=dict(
-                        message='BOOM!\n',
-                        path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
-                              'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                errors=[
+                    dict(
+                        action_num=0,
+                        node_id='i-b659f519',
+                        task_error=dict(
+                            message='BOOM!\n',
+                            path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                                  'i-b659f519/bootstrap-actions/1/stderr.gz'),
+                        ),
                     ),
-                )],
+                ],
                 partial=True,
             )
         )
@@ -264,15 +268,17 @@ class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
 
             ]),
             dict(
-                errors=[dict(
-                    action_num=0,
-                    node_id='i-e647eb49',
-                    task_error=dict(
-                        message='ARGH!\n',
-                        path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
-                              'i-e647eb49/bootstrap-actions/1/stderr.gz'),
+                errors=[
+                    dict(
+                        action_num=0,
+                        node_id='i-e647eb49',
+                        task_error=dict(
+                            message='ARGH!\n',
+                            path=('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
+                                  'i-e647eb49/bootstrap-actions/1/stderr.gz'),
+                        ),
                     ),
-                )],
+                ],
                 partial=True,  # we still don't check
             )
         )

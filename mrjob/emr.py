@@ -1280,7 +1280,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                  cluster.id)
 
         if (cluster.status.state == 'WAITING' and
-            cluster.autoterminate != 'true'):
+                cluster.autoterminate != 'true'):
             raise Exception('Operation requires cluster to terminate, but'
                             ' it may never do so.')
 

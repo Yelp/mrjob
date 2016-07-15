@@ -595,7 +595,6 @@ class CombineListsTestCase(TestCase):
                          [1, 2, 3, 4, 5, 6])
 
 
-
 class CombineOptsTestCase(TestCase):
 
     def test_empty(self):

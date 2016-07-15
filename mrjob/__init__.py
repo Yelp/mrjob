@@ -45,6 +45,7 @@ __credits__ = [
     'Buck Evan <buck@yelp.com>',
     'Dan Frank <danielhfrank@gmail.com>',
     'Sudarshan Gaikaiwari <sudarshan@acm.org>',
+    'Alex Gaynor <alex.gaynor@gmail.com>',
     'Brett Gibson <brett@swiftserve.com>',
     'Benjamin Goldenberg <benjamin@yelp.com',
     'Thomas Grainger <tagrain@gmail.com>',

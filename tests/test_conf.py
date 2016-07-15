@@ -582,6 +582,10 @@ class CombineListsTestCase(TestCase):
         self.assertEqual(combine_lists('one', None, 'two', u'three'),
                          ['one', 'two', u'three'])
 
+    def test_dicts(self):
+        self.assertEqual(combine_lists({1: 2}, None, {}),
+                         [{1: 2}, {}])
+
     def test_scalars(self):
         self.assertEqual(combine_lists(None, False, b'\x00', 42, 3.14),
                          [False, b'\x00', 42, 3.14])
@@ -589,6 +593,7 @@ class CombineListsTestCase(TestCase):
     def test_mix_lists_and_scalars(self):
         self.assertEqual(combine_lists([1, 2], 3, (4, 5), 6),
                          [1, 2, 3, 4, 5, 6])
+
 
 
 class CombineOptsTestCase(TestCase):

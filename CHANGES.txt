@@ -1,9 +1,11 @@
 v0.5.3, 2016-07-?? -- ???
  * runners:
+   * all:
+     * .cpython-3*.pyc files no longer included when bootstrapping mrjob
    * EMR:
      * determine cause of failure of bootstrap scripts (#370)
        * master bootstrap script now redirects stdout to stderr
- * .cpython-3x.pyc files no longer included when bootstrapping mrjob
+ * combine_lists() treats lists as values, not sequences
 
 v0.5.2, 2016-05-23 -- initial Cloud Dataproc support
  * basic support for Google Cloud Dataproc (#1243)

@@ -3088,14 +3088,14 @@ def _decode_configurations_from_api(configurations):
     for c in configurations:
         result = {}
 
-        if hasattr(configuration, 'classification'):
+        if hasattr(c, 'classification'):
             result['Classification'] = c.classification
 
-        if hasattr(configuration, 'configurations'):
+        if hasattr(c, 'configurations'):
             result['Configurations'] = _decode_configurations_from_api(
                 c.configurations)
 
-        if hasattr(configuration, 'properties'):
+        if hasattr(c, 'properties'):
             result['Properties'] = dict(
                 (kv.key, kv.value) for kv in c.properties)
 

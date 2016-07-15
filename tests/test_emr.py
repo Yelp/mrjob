@@ -32,6 +32,7 @@ from mrjob.emr import _DEFAULT_AMI_VERSION
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
+from mrjob.emr import _decode_configurations_from_api
 from mrjob.emr import _lock_acquire_step_1
 from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _list_all_steps
@@ -4207,9 +4208,22 @@ class PartitionerTestCase(MockBotoTestCase):
                 ])
 
 
-class EmrApplicationsTestCase(MockBotoTestCase):
+class EMRApplicationsTestCase(MockBotoTestCase):
 
-    def test_default(self):
+    def test_default_on_3_x_ami(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_applications'], set())
+
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            applications = set(a.name for a in cluster.applications)
+            self.assertEqual(applications, set(['hadoop']))
+
+    def test_default_on_4_x_ami(self):
         job = MRTwoStepJob(['-r', 'emr', '--ami-version', '4.3.0'])
         job.sandbox()
 
@@ -4221,6 +4235,16 @@ class EmrApplicationsTestCase(MockBotoTestCase):
 
             applications = set(a.name for a in cluster.applications)
             self.assertEqual(applications, set(['Hadoop']))
+
+    def test_emr_applications_requires_4_x_ami(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr',
+             '--emr-application', 'Hadoop',
+             '--emr-application', 'Mahout'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(boto.exception.EmrResponseError, runner._launch)
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
@@ -4275,8 +4299,130 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             self.assertNotIn('Applications.member.0.Name', cluster._api_params)
 
 
-class EmrConfigurationsTestCase(MockBotoTestCase):
-    pass
+# configurations to use for this test and for pooling
+# from http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  #noqa
+
+# simple configuration
+CORE_SITE_EMR_CONFIGURATION = dict(
+    Classification='core-site',
+    Properties={
+        'hadoop.security.groups.cache.secs': '250',
+    },
+)
+
+# nested configuration
+HADOOP_ENV_EMR_CONFIGURATION = dict(
+    Classification='hadoop-env',
+    Configurations=[
+        dict(
+            Classification='export',
+            Properties={
+                'HADOOP_DATANODE_HEAPSIZE': '2048',
+                'HADOOP_NAMENODE_OPTS': '-XX:GCTimeRatio=19',
+            },
+        ),
+    ],
+    Properties={},
+)
+
+# non-normalized version of HADOOP_ENV_EMR_CONFIGURATION
+HADOOP_ENV_EMR_CONFIGURATION_VARIANT = dict(
+    Classification='hadoop-env',
+    Configurations=[
+        dict(
+            Classification='export',
+            Configurations=[],
+            Properties={
+                'HADOOP_DATANODE_HEAPSIZE': 2048,
+                'HADOOP_NAMENODE_OPTS': '-XX:GCTimeRatio=19',
+            },
+        ),
+    ],
+)
+
+
+class EMRConfigurationsTestCase(MockBotoTestCase):
+
+    # example from:
+    # http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  #noqa
+
+
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            self.assertFalse(hasattr(cluster, 'configurations'))
+
+    def test_requires_4_x_ami(self):
+        self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
+            emr_configurations=[CORE_SITE_EMR_CONFIGURATION])))))
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(boto.exception.EmrResponseError, runner._launch)
+
+    def _test_normalized_emr_configurations(
+            self, emr_configurations, expected_api_response=None):
+
+        self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
+            ami_version='4.3.0',
+            emr_configurations=emr_configurations)))))
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_configurations'],
+                             emr_configurations)
+
+            runner._launch()
+            cluster = runner._describe_cluster()
+
+            if expected_api_response:
+                self.assertEqual(cluster.configurations, expected_api_response)
+
+            self.assertEqual(
+                _decode_configurations_from_api(cluster.configurations),
+                emr_configurations)
+
+    def test_basic_emr_configuration(self, raw=None):
+        self._test_normalized_emr_configurations(
+            [CORE_SITE_EMR_CONFIGURATION],
+            [
+                MockEmrObject(
+                    classification='core-site',
+                    properties=[
+                        MockEmrObject(
+                            key='hadoop.security.groups.cache.secs',
+                            value='250',
+                        ),
+                    ],
+                ),
+            ])
+
+    def test_complex_emr_configurations(self):
+        self._test_normalized_emr_configurations(
+            [CORE_SITE_EMR_CONFIGURATION, HADOOP_ENV_EMR_CONFIGURATION])
+
+    def test_normalization(self):
+        self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
+            ami_version='4.3.0',
+            emr_configurations=[
+                HADOOP_ENV_EMR_CONFIGURATION_VARIANT])))))
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_configurations'],
+                             [HADOOP_ENV_EMR_CONFIGURATION])
 
 
 class JobStepsTestCase(MockBotoTestCase):

@@ -1481,7 +1481,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['emr_api_params']:
             api_params.update(self._opts['emr_api_params'])
 
-        args['api_params'] = _unpack_emr_api_params(api_params)
+        args['api_params'] = _encode_emr_api_params(api_params)
 
         if steps:
             args['steps'] = steps
@@ -2985,7 +2985,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return wrap_aws_conn(raw_iam_conn)
 
-def _unpack_emr_api_params(x):
+
+def _encode_emr_api_params(x):
     """Recursively unpack parameters to the EMR API."""
     # recursively unpack values, and flatten into main dict
     if isinstance(x, dict):
@@ -2998,7 +2999,7 @@ def _unpack_emr_api_params(x):
                 value = [{'Key': k, 'Value': v}
                          for k, v in sorted(value.items())]
 
-            unpacked_value = _unpack_emr_api_params(value)
+            unpacked_value = _encode_emr_api_params(value)
             if isinstance(unpacked_value, dict):
                 for subkey, subvalue in unpacked_value.items():
                     result['%s.%s' % (key, subkey)] = subvalue
@@ -3009,7 +3010,7 @@ def _unpack_emr_api_params(x):
 
     # treat lists like dicts mapping "member.N" (1-indexed) to value
     if isinstance(x, (list, tuple)):
-        return _unpack_emr_api_params(dict(
+        return _encode_emr_api_params(dict(
             ('member.%d' % (i + 1), item)
             for i, item in enumerate(x)))
 

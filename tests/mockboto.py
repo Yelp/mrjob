@@ -694,6 +694,9 @@ class MockEmrConnection(object):
         if now is None:
             now = datetime.utcnow()
 
+        # convert api_params into MockEmrObject
+        api_params_obj = _api_params_to_emr_object(api_params or {})
+
         # default fields that can be set from api_params
         if job_flow_role is None:
             job_flow_role = (api_params or {}).get('JobFlowRole')
@@ -769,11 +772,8 @@ class MockEmrConnection(object):
         # TODO: could raise an exception if applications are set for
         # pre-4.x AMI
         if version_gte(ami_version, '4'):
-            application_names = set()
-            for key, value in api_params.items():
-                if (key.startswith('Applications.member.') and
-                        key.endswith('.Name')):
-                    application_names.add(value)
+            application_objs = getattr(api_params_obj, 'applications', [])
+            application_names = set(a.name for a in application_objs)
 
             # if Applications is set but doesn't include Hadoop, the
             # cluster description won't either! (Even though Hadoop is
@@ -809,6 +809,7 @@ class MockEmrConnection(object):
         cluster = MockEmrObject(
             applications=applications,
             autoterminate=('false' if keep_alive else 'true'),
+            configurations=getattr(api_params_obj, 'configurations', None),
             ec2instanceattributes=MockEmrObject(
                 ec2availabilityzone=availability_zone,
                 ec2keyname=ec2_keyname,
@@ -1673,3 +1674,44 @@ class MockIAMConnection(object):
        # could add response_metadata to result_dict, but we don't use it
 
         return {prefix + '_response': result_dict}
+
+
+def _api_params_to_emr_object(params):
+    """Convert emr_api_params into a MockEmrObject."""
+    result = MockEmrObject()
+
+    # iteratively set value, creating MockEmrObjects as needed
+    for key, value in params.items():
+        # boto converts attrs to lowercase
+        attrs = [a.lower() for a in key.split('.')]
+
+        obj = result
+        for attr in attrs[:-1]:
+            if not hasattr(obj, attr):
+                setattr(obj, attr, MockEmrObject())
+            obj = getattr(obj, attr)
+
+        setattr(obj, attrs[-1], str(value))
+
+    # convert objects with "member" key to lists
+    def _convert_lists(x):
+        # base case
+        if not isinstance(x, MockEmrObject):
+            return x
+
+        # recursively convert sub-objects
+        if not hasattr(x, 'member'):
+            for k, v in x.__dict__.items():
+                setattr(x, k, _convert_lists(v))
+            return x
+
+        # special case: this object was meant to be a list
+        result = []
+
+        for k in sorted(x.member.__dict__, key=lambda k: int(k)):
+            assert(len(result) == int(k) - 1)  # verify correct numbering
+            result.append(_convert_lists(getattr(x.member, k)))
+
+        return result
+
+    return _convert_lists(result)

@@ -85,7 +85,7 @@ class _Configuration(EmrObject):
         self.properties = None
 
     def startElement(self, name, attrs, connection):
-        if name == 'Configuration':
+        if name == 'Configurations':
             # configurations can contain themselves
             self.configurations = ResultSet([('member', _Configuration)])
             return self.configurations

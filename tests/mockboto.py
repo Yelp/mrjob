@@ -806,10 +806,16 @@ class MockEmrConnection(object):
         cluster_id = _id or 'j-MOCKCLUSTER%d' % len(self.mock_emr_clusters)
         assert cluster_id not in self.mock_emr_clusters
 
+        if hasattr(api_params_obj, 'configurations'):
+            configurations = api_params_obj.configurations
+            _add_properties_to_configuration_objs(configurations)
+        else:
+            configurations = None
+
         cluster = MockEmrObject(
             applications=applications,
             autoterminate=('false' if keep_alive else 'true'),
-            configurations=getattr(api_params_obj, 'configurations', None),
+            configurations=configurations,
             ec2instanceattributes=MockEmrObject(
                 ec2availabilityzone=availability_zone,
                 ec2keyname=ec2_keyname,
@@ -1715,3 +1721,14 @@ def _api_params_to_emr_object(params):
         return result
 
     return _convert_lists(result)
+
+
+def _add_properties_to_configuration_objs(configurations):
+    """The API will return an empty Properties list for configurations
+    without properties set."""
+    for c in configurations:
+        if not hasattr(c, 'properties'):
+            c.properties = []
+
+        if hasattr(c, 'configurations'):
+            _add_properties_to_configuration_objs(c.configurations)

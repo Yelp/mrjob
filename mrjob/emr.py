@@ -3016,3 +3016,27 @@ def _encode_emr_api_params(x):
 
     # base case, not a dict or list
     return x
+
+
+def _decode_configurations_from_api(configurations):
+    """Recursively convert configurations object from describe_cluster()
+    back into simple data structure."""
+    results = []
+
+    for c in configurations:
+        result = {}
+
+        if hasattr(configuration, 'classification'):
+            result['Classification'] = c.classification
+
+        if hasattr(configuration, 'configurations'):
+            result['Configurations'] = _decode_configurations_from_api(
+                c.configurations)
+
+        if hasattr(configuration, 'properties'):
+            result['Properties'] = dict(
+                (kv.key, kv.value) for kv in c.properties)
+
+        results.append(result)
+
+    return results

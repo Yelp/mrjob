@@ -2684,6 +2684,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not self._opts['emr_applications'] <= applications:
                     return
 
+            emr_configurations = _decode_configurations_from_api(
+                getattr(cluster, 'configurations', []))
+            if self._opts['emr_configurations'] != emr_configurations:
+                return
+
             subnet = getattr(
                 cluster.ec2instanceattributes, 'ec2subnetid', None)
             if subnet != (self._opts['subnet'] or None):
@@ -3091,13 +3096,14 @@ def _decode_configurations_from_api(configurations):
         if hasattr(c, 'classification'):
             result['Classification'] = c.classification
 
-        if hasattr(c, 'configurations'):
+        # don't decode empty configurations (which API shouldn't return)
+        if getattr(c, 'configurations', None):
             result['Configurations'] = _decode_configurations_from_api(
                 c.configurations)
 
-        if hasattr(c, 'properties'):
-            result['Properties'] = dict(
-                (kv.key, kv.value) for kv in c.properties)
+        # Properties should always be set (API should do this anyway)
+        result['Properties'] = dict(
+            (kv.key, kv.value) for kv in getattr(c, 'properties', []))
 
         results.append(result)
 

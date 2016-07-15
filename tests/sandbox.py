@@ -24,7 +24,6 @@ from shutil import rmtree
 import mrjob
 from mrjob import runner
 
-from tests.py2 import MagicMock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import add_null_handler_to_root_logger

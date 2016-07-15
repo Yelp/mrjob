@@ -23,7 +23,6 @@ from shutil import copyfile
 from mrjob.job import MRJob
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.sim import SimMRJobRunner
-from mrjob.sim import SimRunnerOptionStore
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 

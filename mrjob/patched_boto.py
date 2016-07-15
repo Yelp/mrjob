@@ -21,7 +21,6 @@ import boto.emr.connection
 from boto.emr.emrobject import Cluster
 from boto.emr.emrobject import ClusterTimeline
 from boto.emr.emrobject import EmrObject
-from boto.emr.emrobject import KeyValue
 from boto.resultset import ResultSet
 
 

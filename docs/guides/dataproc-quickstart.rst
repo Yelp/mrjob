@@ -146,3 +146,4 @@ features supported by other runners, including:
 * fetching counters
 * finding probable cause of errors
 * running Java JARs as steps
+* :mrjob-opt:`libjars` support

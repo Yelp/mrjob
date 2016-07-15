@@ -90,8 +90,16 @@ class _Configuration(EmrObject):
             self.configurations = ResultSet([('member', _Configuration)])
             return self.configurations
         elif name == 'Properties':
-            self.properties = ResultSet([('member', KeyValue)])
+            self.properties = ResultSet([('entry', _KeyValueEntry)])
             return self.properties
+
+
+class _KeyValueEntry(EmrObject):
+    """Like KeyValue, but used for Properties in _Configurations."""
+    Fields = set([
+        'key',
+        'value',
+    ])
 
 
 class _PatchedCluster(Cluster):

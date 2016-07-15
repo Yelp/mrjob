@@ -366,6 +366,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_action_on_failure',
         'emr_api_params',
         'emr_applications',
+        'emr_configurations',
         'emr_endpoint',
         'emr_tags',
         'enable_emr_debugging',
@@ -408,6 +409,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ec2_key_pair_file': combine_paths,
         'emr_api_params': combine_dicts,
         'emr_applications': combine_lists,
+        'emr_configurations': combine_lists,
         'emr_tags': combine_dicts,
         'hadoop_extra_args': combine_lists,
         's3_log_uri': combine_paths,
@@ -1468,6 +1470,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['emr_applications']:
             api_params['Applications'] = [
                 dict(Name=a) for a in sorted(self._opts['emr_applications'])]
+
+        if self._opts['emr_configurations']:
+            # Properties will be automatically converted to KeyValue objects
+            api_params['Configurations'] = self._opts['emr_configurations']
 
         if self._opts['subnet']:
             api_params['Instances.Ec2SubnetId'] = self._opts['subnet']
@@ -2979,12 +2985,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return wrap_aws_conn(raw_iam_conn)
 
-
-# TODO: not sure this is actually what EMR wants; haven't been able to get
-# it to accept nested data structures (and don't know what to do with
-# e.g. dots in property names). Leaving this code in place for now (works
-# for emr_applications), but really, to fix this, we need to use boto3
-# (see #1304).
 def _unpack_emr_api_params(x):
     """Recursively unpack parameters to the EMR API."""
     # recursively unpack values, and flatten into main dict
@@ -2992,6 +2992,12 @@ def _unpack_emr_api_params(x):
         result = {}
 
         for key, value in x.items():
+            # special case for Properties dicts, which have to be
+            # represented as KeyValue objects
+            if key == 'Properties' and isinstance(value, dict):
+                value = [{'Key': k, 'Value': v}
+                         for k, v in sorted(value.items())]
+
             unpacked_value = _unpack_emr_api_params(value)
             if isinstance(unpacked_value, dict):
                 for subkey, subvalue in unpacked_value.items():

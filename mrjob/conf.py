@@ -495,6 +495,9 @@ def combine_lists(*seqs):
     .. versionchanged:: 0.4.6
        Strings, bytes, and non-sequence objects (e.g. numbers) are treated as
        single-item lists.
+
+    .. versionchanged:: 0.5.3
+       Dicts are treated as single-item lists
     """
     result = []
 
@@ -502,7 +505,7 @@ def combine_lists(*seqs):
         if seq is None:
             continue
 
-        if isinstance(seq, (bytes, string_types)):
+        if isinstance(seq, (bytes, string_types, dict)):
             result.append(seq)
         else:
             try:

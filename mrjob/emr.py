@@ -366,6 +366,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_action_on_failure',
         'emr_api_params',
         'emr_applications',
+        'emr_configurations',
         'emr_endpoint',
         'emr_tags',
         'enable_emr_debugging',
@@ -408,6 +409,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ec2_key_pair_file': combine_paths,
         'emr_api_params': combine_dicts,
         'emr_applications': combine_lists,
+        'emr_configurations': combine_lists,
         'emr_tags': combine_dicts,
         'hadoop_extra_args': combine_lists,
         's3_log_uri': combine_paths,
@@ -431,6 +433,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['aws_region'] = _DEFAULT_AWS_REGION
 
         self._fix_emr_applications_opt()
+        self._fix_emr_configurations_opt()
         self._fix_ec2_instance_opts()
         self._fix_ami_version_latest()
         self._fix_release_label_opt()
@@ -469,6 +472,13 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         self['emr_applications'] = set(self['emr_applications'])
         if self['emr_applications']:
             self['emr_applications'].add('Hadoop')
+
+    def _fix_emr_configurations_opt(self):
+        """Normalize emr_configurations, raising an exception if we find
+        serious problems.
+        """
+        self['emr_configurations'] = [
+            _fix_configuration_opt(c) for c in self['emr_configurations']]
 
     def _fix_ec2_instance_opts(self):
         """If the *ec2_instance_type* option is set, override instance
@@ -1469,13 +1479,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             api_params['Applications'] = [
                 dict(Name=a) for a in sorted(self._opts['emr_applications'])]
 
+        if self._opts['emr_configurations']:
+            # Properties will be automatically converted to KeyValue objects
+            api_params['Configurations'] = self._opts['emr_configurations']
+
         if self._opts['subnet']:
             api_params['Instances.Ec2SubnetId'] = self._opts['subnet']
 
         if self._opts['emr_api_params']:
             api_params.update(self._opts['emr_api_params'])
 
-        args['api_params'] = _unpack_emr_api_params(api_params)
+        args['api_params'] = _encode_emr_api_params(api_params)
 
         if steps:
             args['steps'] = steps
@@ -2670,6 +2684,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not self._opts['emr_applications'] <= applications:
                     return
 
+            emr_configurations = _decode_configurations_from_api(
+                getattr(cluster, 'configurations', []))
+            if self._opts['emr_configurations'] != emr_configurations:
+                return
+
             subnet = getattr(
                 cluster.ec2instanceattributes, 'ec2subnetid', None)
             if subnet != (self._opts['subnet'] or None):
@@ -2980,19 +2999,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return wrap_aws_conn(raw_iam_conn)
 
 
-# TODO: not sure this is actually what EMR wants; haven't been able to get
-# it to accept nested data structures (and don't know what to do with
-# e.g. dots in property names). Leaving this code in place for now (works
-# for emr_applications), but really, to fix this, we need to use boto3
-# (see #1304).
-def _unpack_emr_api_params(x):
+def _encode_emr_api_params(x):
     """Recursively unpack parameters to the EMR API."""
     # recursively unpack values, and flatten into main dict
     if isinstance(x, dict):
         result = {}
 
         for key, value in x.items():
-            unpacked_value = _unpack_emr_api_params(value)
+            # special case for Properties dicts, which have to be
+            # represented as KeyValue objects
+            if key == 'Properties' and isinstance(value, dict):
+                value = [{'Key': k, 'Value': v}
+                         for k, v in sorted(value.items())]
+
+            unpacked_value = _encode_emr_api_params(value)
             if isinstance(unpacked_value, dict):
                 for subkey, subvalue in unpacked_value.items():
                     result['%s.%s' % (key, subkey)] = subvalue
@@ -3003,7 +3023,7 @@ def _unpack_emr_api_params(x):
 
     # treat lists like dicts mapping "member.N" (1-indexed) to value
     if isinstance(x, (list, tuple)):
-        return _unpack_emr_api_params(dict(
+        return _encode_emr_api_params(dict(
             ('member.%d' % (i + 1), item)
             for i, item in enumerate(x)))
 
@@ -3011,17 +3031,80 @@ def _unpack_emr_api_params(x):
     return x
 
 
-# not currently used; should use in mrjob.options to unpack --emr-api-param
-def _maybe_unpack_json(x):
-    """If *x* is a string starting with ``{`` or ``[``,
-    try to JSON-decode it. Otherwise, return *x* as-is.
+def _fix_configuration_opt(c):
+    """Return copy of *c* with *Properties* is always set
+    (defaults to {}) and with *Configurations* is not set if empty.
+    Convert all values to strings.
 
-    This allows us to read in JSON from the command line.
+    Raise exception on more serious problems (extra fields, wrong data
+    type, etc).
+
+    This allows us to use :py:func:`_decode_configurations_from_api`
+    to match configurations against the API, *and* catches bad configurations
+    before they result in cryptic API errors.
     """
-    if isinstance(x, string_types) and x[:1] in ('{', '['):
-        try:
-            return json.loads(x)
-        except:
-            log.warning("tried to decode %r but it isn't valid JSON" % x)
+    if not isinstance(c, dict):
+        raise TypeError('configurations must be dicts, not %r' % (c,))
 
-    return x
+    c = dict(c)  # make a copy
+
+    # extra keys
+    extra_keys = (
+        set(c) - set(['Classification', 'Configurations', 'Properties']))
+    if extra_keys:
+        raise ValueError('configuration opt has extra keys: %s' % ', '.join(
+            sorted(extra_keys)))
+
+    # Classification
+    if 'Classification' not in c:
+        raise ValueError('configuration opt has no Classification')
+
+    if not isinstance(c['Classification'], string_types):
+        raise TypeError('Classification must be string')
+
+    # Properties
+    c.setdefault('Properties', {})
+    if not isinstance(c['Properties'], dict):
+        raise TypeError('Properties must be a dict')
+
+    c['Properties'] = dict(
+        (str(k), str(v)) for k, v in c['Properties'].items())
+
+    # sub-Configurations
+    if 'Configurations' in c:
+        if c['Configurations']:
+            if not isinstance(c['Configurations'], list):
+                raise TypeError('Configurations must be a list')
+            # recursively fix subconfigurations
+            c['Configurations'] = [
+                _fix_configuration_opt(sc) for sc in c['Configurations']]
+        else:
+            # don't keep empty configurations around
+            del c['Configurations']
+
+    return c
+
+
+def _decode_configurations_from_api(configurations):
+    """Recursively convert configurations object from describe_cluster()
+    back into simple data structure."""
+    results = []
+
+    for c in configurations:
+        result = {}
+
+        if hasattr(c, 'classification'):
+            result['Classification'] = c.classification
+
+        # don't decode empty configurations (which API shouldn't return)
+        if getattr(c, 'configurations', None):
+            result['Configurations'] = _decode_configurations_from_api(
+                c.configurations)
+
+        # Properties should always be set (API should do this anyway)
+        result['Properties'] = dict(
+            (kv.key, kv.value) for kv in getattr(c, 'properties', []))
+
+        results.append(result)
+
+    return results

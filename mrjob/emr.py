@@ -3015,19 +3015,3 @@ def _unpack_emr_api_params(x):
 
     # base case, not a dict or list
     return x
-
-
-# not currently used; should use in mrjob.options to unpack --emr-api-param
-def _maybe_unpack_json(x):
-    """If *x* is a string starting with ``{`` or ``[``,
-    try to JSON-decode it. Otherwise, return *x* as-is.
-
-    This allows us to read in JSON from the command line.
-    """
-    if isinstance(x, string_types) and x[:1] in ('{', '['):
-        try:
-            return json.loads(x)
-        except:
-            log.warning("tried to decode %r but it isn't valid JSON" % x)
-
-    return x

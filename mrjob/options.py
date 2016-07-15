@@ -16,7 +16,7 @@
 objects with categorized command line parameters. This module should not be
 made public until at least 0.4 if not later or never.
 """
-
+import json
 from optparse import OptionParser
 from optparse import SUPPRESS_USAGE
 
@@ -538,6 +538,13 @@ def _add_emr_launch_opts(opt_group):
                  ' Mahout, Spark)'),
 
         opt_group.add_option(
+            '--emr-configuration', dest='emr_configurations',
+            default=[], action='append',
+            help=('Configuration to use on 4.x AMIs as a JSON-encoded dict;'
+                  ' see http://docs.aws.amazon.com/ElasticMapReduce/latest/'
+                  'ReleaseGuide/emr-configure-apps.html for examples.')),
+
+        opt_group.add_option(
             '--emr-tag', dest='emr_tags',
             default=[], action='append',
             help='Metadata tags to apply to the EMR cluster; '
@@ -850,6 +857,19 @@ def _fix_custom_options(options, option_parser):
         if hasattr(options, 'no_emr_api_params'):
                 for param in options.no_emr_api_params:
                     options.emr_api_params[param] = None
+
+    if hasattr(options, 'emr_configurations'):
+        decoded_configurations = []
+
+        for c in options.emr_configurations:
+            try:
+                decoded_configurations.append(json.loads(c))
+            except ValueError as e:
+                option_parser.error(
+                    'Malformed JSON passed to --emr-configuration: %s' % (
+                        str(e)))
+
+        options.emr_configurations = decoded_configurations
 
     if hasattr(options, 'emr_tags'):
         emr_tag_err = '--emr-tag argument %r is not of the form KEY=VALUE'

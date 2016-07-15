@@ -15,6 +15,7 @@
 """Tests for EMRJobRunner"""
 import copy
 import getpass
+import json
 import os
 import os.path
 import posixpath
@@ -91,6 +92,47 @@ if PY2:
         PYTHON_BIN = 'python2.7'
 else:
     PYTHON_BIN = 'python3'
+
+# EMR configurations used for testing
+# from http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  #noqa
+
+# simple configuration
+CORE_SITE_EMR_CONFIGURATION = dict(
+    Classification='core-site',
+    Properties={
+        'hadoop.security.groups.cache.secs': '250',
+    },
+)
+
+# nested configuration
+HADOOP_ENV_EMR_CONFIGURATION = dict(
+    Classification='hadoop-env',
+    Configurations=[
+        dict(
+            Classification='export',
+            Properties={
+                'HADOOP_DATANODE_HEAPSIZE': '2048',
+                'HADOOP_NAMENODE_OPTS': '-XX:GCTimeRatio=19',
+            },
+        ),
+    ],
+    Properties={},
+)
+
+# non-normalized version of HADOOP_ENV_EMR_CONFIGURATION
+HADOOP_ENV_EMR_CONFIGURATION_VARIANT = dict(
+    Classification='hadoop-env',
+    Configurations=[
+        dict(
+            Classification='export',
+            Configurations=[],
+            Properties={
+                'HADOOP_DATANODE_HEAPSIZE': 2048,
+                'HADOOP_NAMENODE_OPTS': '-XX:GCTimeRatio=19',
+            },
+        ),
+    ],
+)
 
 
 class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
@@ -1883,6 +1925,61 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--ami-version', '4.0.0',
             '--emr-application', 'Ganglia',
             '--emr-application', 'Mahout'])
+
+    def test_matching_emr_configurations(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0',
+            emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
+        ])
+
+    def test_missing_emr_configurations(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0',
+            emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ami-version', '4.0.0',
+        ])
+
+    def test_extra_emr_configuration(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
+        ])
+
+    def test_wrong_emr_configuration(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0',
+            emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
+        ])
+
+    def test_wrong_emr_configuration_ordering(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ami_version='4.0.0',
+            emr_configurations=[CORE_SITE_EMR_CONFIGURATION,
+                                HADOOP_ENV_EMR_CONFIGURATION])
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ami-version', '4.0.0',
+            '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
+            '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
+        ])
 
     def test_matching_subnet(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -4299,54 +4396,10 @@ class EMRApplicationsTestCase(MockBotoTestCase):
             self.assertNotIn('Applications.member.0.Name', cluster._api_params)
 
 
-# configurations to use for this test and for pooling
-# from http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  #noqa
-
-# simple configuration
-CORE_SITE_EMR_CONFIGURATION = dict(
-    Classification='core-site',
-    Properties={
-        'hadoop.security.groups.cache.secs': '250',
-    },
-)
-
-# nested configuration
-HADOOP_ENV_EMR_CONFIGURATION = dict(
-    Classification='hadoop-env',
-    Configurations=[
-        dict(
-            Classification='export',
-            Properties={
-                'HADOOP_DATANODE_HEAPSIZE': '2048',
-                'HADOOP_NAMENODE_OPTS': '-XX:GCTimeRatio=19',
-            },
-        ),
-    ],
-    Properties={},
-)
-
-# non-normalized version of HADOOP_ENV_EMR_CONFIGURATION
-HADOOP_ENV_EMR_CONFIGURATION_VARIANT = dict(
-    Classification='hadoop-env',
-    Configurations=[
-        dict(
-            Classification='export',
-            Configurations=[],
-            Properties={
-                'HADOOP_DATANODE_HEAPSIZE': 2048,
-                'HADOOP_NAMENODE_OPTS': '-XX:GCTimeRatio=19',
-            },
-        ),
-    ],
-)
-
-
 class EMRConfigurationsTestCase(MockBotoTestCase):
 
     # example from:
     # http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html  #noqa
-
-
 
     def test_default(self):
         job = MRTwoStepJob(['-r', 'emr'])
@@ -4423,6 +4476,37 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['emr_configurations'],
                              [HADOOP_ENV_EMR_CONFIGURATION])
+
+    def test_command_line_switch(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr',
+             '--ami-version', '4.3.0',
+             '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
+             '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
+             ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_configurations'],
+                             [CORE_SITE_EMR_CONFIGURATION,
+                              HADOOP_ENV_EMR_CONFIGURATION])
+
+    def test_combine_command_line_with_conf(self):
+        self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
+            ami_version='4.3.0',
+            emr_configurations=[
+                CORE_SITE_EMR_CONFIGURATION])))))
+
+        job = MRTwoStepJob(
+            ['-r', 'emr',
+             '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
+             ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._opts['emr_configurations'],
+                             [CORE_SITE_EMR_CONFIGURATION,
+                              HADOOP_ENV_EMR_CONFIGURATION])
 
 
 class JobStepsTestCase(MockBotoTestCase):

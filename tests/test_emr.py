@@ -4275,6 +4275,10 @@ class EmrApplicationsTestCase(MockBotoTestCase):
             self.assertNotIn('Applications.member.0.Name', cluster._api_params)
 
 
+class EmrConfigurationsTestCase(MockBotoTestCase):
+    pass
+
+
 class JobStepsTestCase(MockBotoTestCase):
 
     def setUp(self):

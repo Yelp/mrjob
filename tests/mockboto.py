@@ -771,8 +771,9 @@ class MockEmrConnection(object):
         # build applications list
         # TODO: could raise an exception if applications are set for
         # pre-4.x AMI
+        application_objs = getattr(api_params_obj, 'applications', [])
+
         if version_gte(ami_version, '4'):
-            application_objs = getattr(api_params_obj, 'applications', [])
             application_names = set(a.name for a in application_objs)
 
             # if Applications is set but doesn't include Hadoop, the
@@ -790,6 +791,13 @@ class MockEmrConnection(object):
 
                 applications.append(MockEmrObject(name=name, version=version))
         else:
+            if application_objs:
+                raise boto.exception.EmrResponseError(
+                    400, 'Bad Request', body=err_xml(
+                        'Cannot specify applications when AMI version is used.'
+                        ' Specify supported products or new supported products'
+                        ' instead.'))
+
             applications = [MockEmrObject(
                 name='hadoop',  # lowercase on older AMIs
                 version=running_hadoop_version
@@ -806,11 +814,18 @@ class MockEmrConnection(object):
         cluster_id = _id or 'j-MOCKCLUSTER%d' % len(self.mock_emr_clusters)
         assert cluster_id not in self.mock_emr_clusters
 
+        # Configurations
         if hasattr(api_params_obj, 'configurations'):
             configurations = api_params_obj.configurations
-            _add_properties_to_configuration_objs(configurations)
+            _normalize_configuration_objs(configurations)
         else:
             configurations = None
+
+        # this is a 4.x AMI feature
+        if configurations and not version_gte(ami_version, '4'):
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'Cannot specify configurations when AMI version is used.'))
 
         cluster = MockEmrObject(
             applications=applications,
@@ -1723,12 +1738,15 @@ def _api_params_to_emr_object(params):
     return _convert_lists(result)
 
 
-def _add_properties_to_configuration_objs(configurations):
+def _normalize_configuration_objs(configurations):
     """The API will return an empty Properties list for configurations
-    without properties set."""
+    without properties set, and remove empty sub-configurations"""
     for c in configurations:
         if not hasattr(c, 'properties'):
             c.properties = []
 
         if hasattr(c, 'configurations'):
-            _add_properties_to_configuration_objs(c.configurations)
+            if not c.configurations:
+                del c.configurations
+            else:
+                _normalize_configuration_objs(c.configurations)

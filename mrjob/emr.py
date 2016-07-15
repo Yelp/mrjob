@@ -433,6 +433,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['aws_region'] = _DEFAULT_AWS_REGION
 
         self._fix_emr_applications_opt()
+        self._fix_emr_configurations_opt()
         self._fix_ec2_instance_opts()
         self._fix_ami_version_latest()
         self._fix_release_label_opt()
@@ -471,6 +472,13 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         self['emr_applications'] = set(self['emr_applications'])
         if self['emr_applications']:
             self['emr_applications'].add('Hadoop')
+
+    def _fix_emr_configurations_opt(self):
+        """Normalize emr_configurations, raising an exception if we find
+        serious problems.
+        """
+        self['emr_configurations'] = [
+            _fix_configuration_opt(c) for c in self['emr_configurations']]
 
     def _fix_ec2_instance_opts(self):
         """If the *ec2_instance_type* option is set, override instance
@@ -3016,6 +3024,60 @@ def _encode_emr_api_params(x):
 
     # base case, not a dict or list
     return x
+
+
+def _fix_configuration_opt(c):
+    """Return copy of *c* with *Properties* is always set
+    (defaults to {}) and with *Configurations* is not set if empty.
+    Convert all values to strings.
+
+    Raise exception on more serious problems (extra fields, wrong data
+    type, etc).
+
+    This allows us to use :py:func:`_decode_configurations_from_api`
+    to match configurations against the API, *and* catches bad configurations
+    before they result in cryptic API errors.
+    """
+    if not isinstance(c, dict):
+        raise TypeError('configurations must be dicts, not %r' % (c,))
+
+    c = dict(c)  # make a copy
+
+    # extra keys
+    extra_keys = (
+        set(c) - set(['Classification', 'Configurations', 'Properties']))
+    if extra_keys:
+        raise ValueError('configuration opt has extra keys: %s' % ', '.join(
+            sorted(extra_keys)))
+
+    # Classification
+    if 'Classification' not in c:
+        raise ValueError('configuration opt has no Classification')
+
+    if not isinstance(c['Classification'], string_types):
+        raise TypeError('Classification must be string')
+
+    # Properties
+    c.setdefault('Properties', {})
+    if not isinstance(c['Properties'], dict):
+        raise TypeError('Properties must be a dict')
+
+    c['Properties'] = dict(
+        (str(k), str(v)) for k, v in c['Properties'].items())
+
+    # sub-Configurations
+    if 'Configurations' in c:
+        if c['Configurations']:
+            if not isinstance(c['Configurations'], list):
+                raise TypeError('Configurations must be a list')
+            # recursively fix subconfigurations
+            c['Configurations'] = [
+                _fix_configuration_opt(sc) for sc in c['Configurations']]
+        else:
+            # don't keep empty configurations around
+            del c['Configurations']
+
+    return c
 
 
 def _decode_configurations_from_api(configurations):

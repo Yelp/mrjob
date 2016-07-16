@@ -204,6 +204,8 @@ Cluster creation and configuration
 
     See `Configuring Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-configure-apps.html>`_ in the EMR docs for more details.
 
+    .. versionadded:: 0.5.3
+
 .. mrjob-opt::
     :config: emr_endpoint
     :switch: --emr-endpoint

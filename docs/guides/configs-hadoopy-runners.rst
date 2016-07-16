@@ -205,7 +205,6 @@ Options available to hadoop runner only
 
        Added paths in ``/var/log`` and ``/mnt/var/log/hadoop-yarn``
 
-
 .. mrjob-opt::
     :config: hadoop_tmp_dir
     :switch: --hadoop-tmp-dir

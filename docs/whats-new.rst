@@ -12,16 +12,16 @@ For a complete list of changes, see `CHANGES.txt
 
 This release adds support for custom :mrjob-opt:`libjars` (such as
 `nicknack <http://empiricalresults.github.io/nicknack/>`__), allowing easy
-access to custom input and formats. This works on Hadoop and EMR (including
-on a cluster that's already running).
+access to custom input and output formats. This works on Hadoop and EMR
+(including on a cluster that's already running).
 
 In addition, jobs can specify needed libjars by setting the
 :py:attr:`~mrjob.job.MRJob.LIBJARS` attribute or overriding the
 :py:meth:`~mrjob.job.MRJob.libjars` method. For examples, see
 :ref:`input-and-output-formats`.
 
-The Hadoop runner now tries even harder to find your log files without needing
-additional configuration (see :mrjob-opt:`hadoop_log_dirs`).
+The Hadoop runner now tries *even harder* to find your log files without
+needing additional configuration (see :mrjob-opt:`hadoop_log_dirs`).
 
 The EMR runner now supports Amazon VPC subnets (see :mrjob-opt:`subnet`), and,
 on 4.x AMIs, Application Configurations (see :mrjob-opt:`emr_configurations`).

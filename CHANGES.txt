@@ -1,10 +1,24 @@
-v0.5.3, 2016-07-?? -- ???
+v0.5.3, 2016-07-?? -- libjars
+ * jobs:
+   * LIBJARS and libjars method (#1341)
  * runners:
    * all:
      * .cpython-3*.pyc files no longer included when bootstrapping mrjob
+   * local:
+     *PATH envvars combined with local separator (#1321)
+   * Hadoop and EMR:
+     * libjars option (#198)
+     * fixes to ordering of generic and JAR-specific options (#1331, #1332)
+   * Hadoop:
+     * more default log dirs (#1339)
+     * hadoop_tmp_dir handles ~ and envvars (#1322) (broken in v0.5.0)
    * EMR:
      * determine cause of failure of bootstrap scripts (#370)
        * master bootstrap script now redirects stdout to stderr
+     * emr_configurations option (#1276)
+     * subnet option (#1323)
+     * SSH tunnel opened as soon as cluster is ready (#1115)
+     * SSH tunnel leaves stdin alone (#1161)
  * combine_lists() treats lists as values, not sequences
 
 v0.5.2, 2016-05-23 -- initial Cloud Dataproc support

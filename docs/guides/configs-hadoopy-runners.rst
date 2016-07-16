@@ -199,7 +199,12 @@ Options available to hadoop runner only
    * ``/var/log/hadoop``
    * ``/mnt/var/log/hadoop``
 
-   (The last path allows the Hadoop runner to work out-of-the box inside EMR.)
+   .. versionadded:: 0.5.0
+
+   .. versionchanged:: 0.5.3
+
+       Added paths in ``/var/log`` and ``/mnt/var/log/hadoop-yarn``
+
 
 .. mrjob-opt::
     :config: hadoop_tmp_dir

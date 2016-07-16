@@ -762,6 +762,8 @@ At the end of your job, you'll get the counter's total value::
 .. |JSONProtocol| replace:: :py:class:`~mrjob.protocol.JSONProtocol`
 .. |RawValueProtocol| replace:: :py:class:`~mrjob.protocol.RawValueProtocol`
 
+.. _input-and-output-formats:
+
 Input and output formats
 ------------------------
 

@@ -19,7 +19,7 @@ v0.5.3, 2016-07-?? -- libjars
      * subnet option (#1323)
      * SSH tunnel opened as soon as cluster is ready (#1115)
      * SSH tunnel leaves stdin alone (#1161)
- * combine_lists() treats lists as values, not sequences
+ * combine_lists() treats dicts as values, not sequences
 
 v0.5.2, 2016-05-23 -- initial Cloud Dataproc support
  * basic support for Google Cloud Dataproc (#1243)

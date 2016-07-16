@@ -4,6 +4,35 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+
+.. _v0.5.3:
+
+0.5.3
+-----
+
+This release adds support for custom :mrjob-opt:`libjars` (such as
+`nicknack <http://empiricalresults.github.io/nicknack/>`__), allowing easy
+access to custom input and formats. This works on Hadoop and EMR (including
+on a cluster that's already running).
+
+In addition, jobs can specify needed libjars by setting the
+:py:attr:`~mrjob.job.MRJob.LIBJARS` attribute or overriding the
+:py:meth:`~mrjob.job.MRJob.libjars` method. For examples, see
+:ref:`input-and-output-formats`.
+
+The Hadoop runner now tries even harder to find your log files without needing
+additional configuration (see :mrjob-opt:`hadoop_log_dirs`).
+
+The EMR runner now supports Amazon VPC subnets (see :mrjob-opt:`subnet`), and,
+on 4.x AMIs, Application Configurations (see :mrjob-opt:`emr_configurations`).
+
+If your EMR cluster fails during bootstrapping, mrjob can now determine
+the probable cause of failure.
+
+There are also some minor improvements to SSH tunneling and a handful of
+small bugfixes; see `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_ for details.
+
 .. _v0.5.2:
 
 0.5.2

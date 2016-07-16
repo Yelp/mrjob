@@ -1,4 +1,4 @@
-v0.5.3, 2016-07-?? -- libjars
+v0.5.3, 2016-07-15 -- libjars
  * jobs:
    * LIBJARS and libjars method (#1341)
  * runners:

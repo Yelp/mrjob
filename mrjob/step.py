@@ -19,7 +19,7 @@ from mrjob.py2 import string_types
 from mrjob.util import cmd_line
 
 
-STEP_TYPES = ('streaming', 'jar')
+STEP_TYPES = ('jar', 'spark_python', 'streaming')
 
 # Function names mapping to mapper, reducer, and combiner operations
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
@@ -37,6 +37,9 @@ _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 
 # all allowable JarStep constructor keyword args
 _JAR_STEP_KWARGS = ['args', 'main_class']
+
+# all allowable SparkPythonStep constructor keyword args
+_SPARK_PYTHON_STEP_KWARGS = ['args', 'spark_args']
 
 
 log = logging.getLogger(__name__)
@@ -292,10 +295,12 @@ class JarStep(object):
     :param jar: The local path to the Jar. On EMR, this can also be an
                 ``s3://`` URI, or ``file://`` to reference a jar on
                 the local filesystem of your EMR instance(s).
+    :param args: (optional) A list of arguments to the jar. Use
+                 :py:attr:`INPUT` and :py:attr:`OUTPUT` to interpolate
+                 input and output paths.
     :param main_class: (optional) The main class to run from the jar. If
                        not specified, Hadoop will use the main class
                        in the jar's manifest file.
-    :param args: (optional) A list of arguments to the jar
 
     *jar* can also be passed as a positional argument
 
@@ -354,4 +359,77 @@ class JarStep(object):
             'args': self.args,
             'jar': self.jar,
             'main_class': self.main_class,
+        }
+
+
+class SparkPythonStep(object):
+    """Represents a running a Python script through Spark
+
+    Accepts the following keyword arguments:
+
+    :param script: The local path to the Python script to run. On EMR, this
+                   can also be an ``s3://`` URI, or ``file://`` to reference a
+                   jar on the local filesystem of your EMR instance(s).
+    :param args: (optional) A list of arguments to the script. Use
+                 :py:attr:`INPUT` and :py:attr:`OUTPUT` to interpolate
+                 input and output paths.
+    :param spark_args: (optional) an array of arguments to pass to spark-submit
+                       (e.g. ``['--executor-memory', '2G']``).
+
+    *script* can also be passed as a positional argument
+    """
+    #: If this is passed as one of the step's arguments, it'll be replaced
+    #: with the step's input paths (if there are multiple paths, they'll
+    #: be joined with commas)
+    INPUT = '<input>'
+    #: If this is passed as one of the step's arguments, it'll be replaced
+    #: with the step's output path
+    OUTPUT = '<output>'
+
+    def __init__(self, script, **kwargs):
+        bad_kwargs = sorted(set(kwargs) - set(_SPARK_PYTHON_STEP_KWARGS))
+        if bad_kwargs:
+            raise TypeError(
+                'SparkPythonStep() got an unexpected keyword argument %r' %
+                bad_kwargs[0])
+
+        self.script = script
+
+        self.args = kwargs.get('args') or []
+        self.spark_args = kwargs.get('spark_args') or []
+
+    def __repr__(self):
+        repr_args = []
+        repr_args.append(repr(self.script))
+        if self.args:
+            repr_args.append('args=' + repr(self.args))
+        if self.main_class:
+            repr_args.append('spark_args=' + repr(self.spark_args))
+
+        return 'JarStep(%s)' % ', '.join(repr_args)
+
+    def __eq__(self, other):
+        return (isinstance(other, JarStep) and
+                all(getattr(self, key) == getattr(other, key)
+                    for key in ('script', 'args', 'spark_args')))
+
+    def description(self, step_num):
+        """Returns a dictionary representation of this step:
+
+        .. code-block:: js
+
+            {
+                'type': 'spark_python',
+                'script': <path of the Python script>,
+                'args': <list of strings, args to the spark script>,
+                'spark_args': <list of strings, args to spark-submit>
+            }
+
+        See :ref:`steps-format` for examples.
+        """
+        return {
+            'type': 'spark_python',
+            'args': self.args,
+            'script': self.script,
+            'spark_args': self.spark_args,
         }

@@ -995,9 +995,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
+        # upload JARs and (Python) scripts run by steps
         for step in self._get_steps():
-            if step.get('jar'):
-                self._upload_mgr.add(step['jar'])
+            for key in 'jar', 'script':
+                if step.get(key)
+                    self._upload_mgr.add(step[key])
 
     def _upload_local_files_to_s3(self):
         """Copy local files tracked by self._upload_mgr to S3."""

@@ -19,7 +19,7 @@ from mrjob.py2 import string_types
 from mrjob.util import cmd_line
 
 
-STEP_TYPES = ('jar', 'spark_python', 'streaming')
+STEP_TYPES = ('jar', 'spark_script', 'streaming')
 
 # Function names mapping to mapper, reducer, and combiner operations
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
@@ -38,8 +38,8 @@ _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 # all allowable JarStep constructor keyword args
 _JAR_STEP_KWARGS = ['args', 'main_class']
 
-# all allowable SparkPythonStep constructor keyword args
-_SPARK_PYTHON_STEP_KWARGS = ['args', 'spark_args']
+# all allowable SparkScriptStep constructor keyword args
+_SPARK_SCRIPT_STEP_KWARGS = ['args', 'spark_args']
 
 
 log = logging.getLogger(__name__)
@@ -362,7 +362,7 @@ class JarStep(object):
         }
 
 
-class SparkPythonStep(object):
+class SparkScriptStep(object):
     """Represents a running a Python script through Spark
 
     Accepts the following keyword arguments:
@@ -387,10 +387,10 @@ class SparkPythonStep(object):
     OUTPUT = '<output>'
 
     def __init__(self, script, **kwargs):
-        bad_kwargs = sorted(set(kwargs) - set(_SPARK_PYTHON_STEP_KWARGS))
+        bad_kwargs = sorted(set(kwargs) - set(_SPARK_SCRIPT_STEP_KWARGS))
         if bad_kwargs:
             raise TypeError(
-                'SparkPythonStep() got an unexpected keyword argument %r' %
+                'SparkScriptStep() got an unexpected keyword argument %r' %
                 bad_kwargs[0])
 
         self.script = script
@@ -419,7 +419,7 @@ class SparkPythonStep(object):
         .. code-block:: js
 
             {
-                'type': 'spark_python',
+                'type': 'spark_script',
                 'script': <path of the Python script>,
                 'args': <list of strings, args to the spark script>,
                 'spark_args': <list of strings, args to spark-submit>
@@ -428,7 +428,7 @@ class SparkPythonStep(object):
         See :ref:`steps-format` for examples.
         """
         return {
-            'type': 'spark_python',
+            'type': 'spark_script',
             'args': self.args,
             'script': self.script,
             'spark_args': self.spark_args,

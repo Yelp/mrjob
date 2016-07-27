@@ -42,6 +42,18 @@ _JAR_STEP_KWARGS = ['args', 'main_class']
 _SPARK_SCRIPT_STEP_KWARGS = ['args', 'spark_args']
 
 
+#: If passed as an argument to :py:class:`JarStep` or
+#: py:class:`SparkScriptStep`, it'll be replaced with the step's input path(s)
+#: (if there are multiple paths, they'll be joined with commas)
+INPUT = '<input>'
+
+#: If this is passed as passed as an argument to :py:class:`JarStep` or
+#: py:class:`SparkScriptStep`, it'll be replaced
+#: with the step's output path
+OUTPUT = '<output>'
+
+
+
 log = logging.getLogger(__name__)
 
 
@@ -296,8 +308,8 @@ class JarStep(object):
                 ``s3://`` URI, or ``file://`` to reference a jar on
                 the local filesystem of your EMR instance(s).
     :param args: (optional) A list of arguments to the jar. Use
-                 :py:attr:`INPUT` and :py:attr:`OUTPUT` to interpolate
-                 input and output paths.
+                 :py:data:`mrjob.step.INPUT` and :py:data:`OUTPUT` to
+                 interpolate input and output paths.
     :param main_class: (optional) The main class to run from the jar. If
                        not specified, Hadoop will use the main class
                        in the jar's manifest file.
@@ -306,13 +318,9 @@ class JarStep(object):
 
     See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
     """
-    #: If this is passed as one of the step's arguments, it'll be replaced
-    #: with the step's input paths (if there are multiple paths, they'll
-    #: be joined with commas)
-    INPUT = '<input>'
-    #: If this is passed as one of the step's arguments, it'll be replaced
-    #: with the step's output path
-    OUTPUT = '<output>'
+    # TODO: add deprecation warning, update docs
+    INPUT = INPUT
+    OUTPUT = OUTPUT
 
     def __init__(self, jar, **kwargs):
         bad_kwargs = sorted(set(kwargs) - set(_JAR_STEP_KWARGS))

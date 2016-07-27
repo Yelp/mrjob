@@ -998,7 +998,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # upload JARs and (Python) scripts run by steps
         for step in self._get_steps():
             for key in 'jar', 'script':
-                if step.get(key)
+                if step.get(key):
                     self._upload_mgr.add(step[key])
 
     def _upload_local_files_to_s3(self):
@@ -1554,6 +1554,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._build_jar_step(step_num)
+        elif step['type'] == 'spark_script':
+            return self._build_spark_script_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -1589,34 +1591,64 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _build_jar_step(self, step_num):
         step = self._get_step(step_num)
 
-        # special case to allow access to jars inside EMR
-        if step['jar'].startswith('file:///'):
-            jar = step['jar'][7:]  # keep leading slash
-        else:
-            jar = self._upload_mgr.uri(step['jar'])
-
-        def interpolate(arg):
-            if arg == mrjob.step.JarStep.INPUT:
-                return ','.join(self._step_input_uris(step_num))
-            elif arg == mrjob.step.JarStep.OUTPUT:
-                return self._step_output_uri(step_num)
-            else:
-                return arg
-
-        step_args = step['args']
-        if step_args:
-            step_args = [interpolate(arg) for arg in step_args]
+        jar = self._upload_uri_or_remote_path(step['jar'])
+        step_args = self._interpolate_input_and_output(step['args'], step_num)
 
         # -libjars comes before jar-specific args
         step_args = self._libjar_step_args() + step_args
 
         return boto.emr.JarStep(
-            name='%s: Step %d of %d' % (
-                self._job_key, step_num + 1, self._num_steps()),
+            name=self._step_name(step_num),
             jar=jar,
             main_class=step['main_class'],
             step_args=step_args,
             action_on_failure=self._action_on_failure())
+
+    def _build_spark_script_step(self, step_num):
+        step = self._get_step(step_num)
+
+        script = self._upload_uri_or_remote_path(step['script'])
+
+        script_args = self._interpolate_input_and_output(
+            step['args'], step_num)
+        spark_args = step['spark_args']
+
+        # TODO: use script-runner and full spark-submit path on 3.x
+        jar = _4_X_INTERMEDIARY_JAR
+        step_args = (
+            ['spark-submit', '--master', 'yarn', '--deploy-mode', 'cluster'] +
+            spark_args + [script] + script_args)
+
+        return boto.emr.JarStep(
+            name=self._step_name(step_num),
+            jar=jar,
+            step_args=step_args,
+            action_on_failure=self._action_on_failure())
+
+    def _step_name(self, step_num):
+        """Return something like: ``'mr_your_job Step X of Y'``"""
+        return '%s: Step %d of %d' % (
+            self._job_key, step_num + 1, self._num_steps())
+
+    def _upload_uri_or_remote_path(self, path):
+        """Return where *path* will be uploaded, or, if it starts with
+        ``'file:///'``, a local path."""
+        if path.startswith('file:///'):
+            return path[7:]  # keep leading slash
+        else:
+            return self._upload_mgr.uri(path)
+
+    def _interpolate_input_and_output(self, args, step_num):
+
+        def interpolate(arg):
+            if arg == mrjob.step.INPUT:
+                return ','.join(self._step_input_uris(step_num))
+            elif arg == mrjob.step.OUTPUT:
+                return self._step_output_uri(step_num)
+            else:
+                return arg
+
+        return [interpolate(arg) for arg in args]
 
     def _build_master_node_setup_step(self):
         name = '%s: Master node setup' % self._job_key

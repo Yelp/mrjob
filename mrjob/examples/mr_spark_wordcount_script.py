@@ -11,6 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from os.path import dirname
 from os.path import join
 
 from mrjob.job import MRJob
@@ -22,7 +23,7 @@ class MRSparkScriptWordcount(MRJob):
     def steps(self):
         return [
             SparkScriptStep(
-                script=join(__file__, 'spark_script_wordcount.py'),
+                script=join(dirname(__file__), 'spark_wordcount_script.py'),
                 args=[SparkScriptStep.INPUT, SparkScriptStep.OUTPUT],
             ),
         ]

@@ -27,14 +27,15 @@ from optparse import OptionGroup
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
-from mrjob.protocol import JSONProtocol
-from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.step import MRStep
-from mrjob.step import _JOB_STEP_FUNC_PARAMS
+from mrjob.protocol import JSONProtocol
+from mrjob.protocol import RawValueProtocol
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
+from mrjob.step import MRStep
+from mrjob.step import SparkStep
+from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import expand_path
 from mrjob.util import read_input
 
@@ -106,7 +107,7 @@ class MRJob(MRJobLauncher):
     def _usage(cls):
         return "usage: %prog [options] [input files]"
 
-    ### Defining one-step jobs ###
+    ### Defining one-step streaming jobs ###
 
     def mapper(self, key, value):
         """Re-define this to define the mapper for a one-step job.
@@ -313,6 +314,18 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
+    ### Defining one-step Spark jobs ###
+
+    def spark(self, input_path, output_path):
+        """Re-define this with Spark code to run. You can read input
+        with *input_path* and output with *output_path*.
+        """
+        raise NotImplementedError
+
+    def spark_args(self):
+        """Redefine this to pass custom arguments to Spark."""
+        return []
+
     ### Defining multi-step jobs ###
 
     def steps(self):
@@ -335,9 +348,19 @@ class MRJob(MRJobLauncher):
         # only include methods that have been redefined
         kwargs = dict(
             (func_name, getattr(self, func_name))
-            for func_name in _JOB_STEP_FUNC_PARAMS
+            for func_name in _JOB_STEP_FUNC_PARAMS + ['spark']
             if (_im_func(getattr(self, func_name)) is not
                 _im_func(getattr(MRJob, func_name))))
+
+        # special case for spark()
+        # TODO: support jobconf as well
+        if 'spark' in kwargs:
+            if sorted(kwargs) != ['spark']:
+                raise ValueError(
+                    "Can't mix spark() and streaming functions")
+            return SparkStep(
+                spark=kwargs['spark'],
+                spark_args=self.spark_args())
 
         # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
@@ -447,6 +470,9 @@ class MRJob(MRJobLauncher):
         elif self.options.run_reducer:
             self.run_reducer(self.options.step_num)
 
+        elif self.options.run_spark:
+            self.run_spark(self.options.step_num)
+
         else:
             super(MRJob, self).execute()
 
@@ -457,7 +483,8 @@ class MRJob(MRJobLauncher):
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
         bad_words = (
-            '--steps', '--mapper', '--reducer', '--combiner', '--step-num')
+            '--steps', '--mapper', '--reducer', '--combiner', '--step-num',
+            '--spark')
         for w in bad_words:
             if w in sys.argv:
                 raise UsageError("make_runner() was called with %s. This"
@@ -600,6 +627,17 @@ class MRJob(MRJobLauncher):
         if combiner_final:
             for out_key, out_value in combiner_final() or ():
                 write_line(out_key, out_value)
+
+    def run_spark(self):
+        """Run the Spark code for the given step.
+
+        :type step_num: int
+        :param step_num: which step to run (0-indexed)
+
+        Called from :py:meth:`run`. You'd probably only want to call this
+        directly from automated tests.
+        """
+        raise NotImplementedError
 
     def show_steps(self):
         """Print information about how many steps there are, and whether
@@ -817,6 +855,12 @@ class MRJob(MRJobLauncher):
             '--reducer', dest='run_reducer', action='store_true',
             default=False, help='run a reducer')
 
+        # To run spark steps
+        self.mux_opt_group.add_option(
+            '--spark', dest='run_spark', action='store_true', default=False,
+            help='run Spark code')
+
+        # To choose step number
         self.mux_opt_group.add_option(
             '--step-num', dest='step_num', type='int', default=0,
             help='which step to execute (default is 0)')

@@ -629,7 +629,7 @@ class MRJob(MRJobLauncher):
             for out_key, out_value in combiner_final() or ():
                 write_line(out_key, out_value)
 
-    def run_spark(self):
+    def run_spark(self, step_num):
         """Run the Spark code for the given step.
 
         :type step_num: int
@@ -647,7 +647,7 @@ class MRJob(MRJobLauncher):
             raise ValueError('Wrong number of args')
         input_path, output_path = self.args
 
-        spark_method = step['spark']
+        spark_method = step.spark
         spark_method(input_path, output_path)
 
     def show_steps(self):

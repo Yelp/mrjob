@@ -27,14 +27,14 @@ class MRSparkWordcount(MRJob):
 
         sc = SparkContext(appName='mrjob Spark wordcount script')
 
-        lines = sc.textFile(inputPath)
+        lines = sc.textFile(input_path)
 
         counts = (
             lines.flatMap(lambda line: WORD_RE.findall(line))
             .map(lambda word: (word, 1))
             .reduceByKey(add))
 
-        counts.saveAsTextFile(outputPath)
+        counts.saveAsTextFile(output_path)
 
         sc.stop()
 

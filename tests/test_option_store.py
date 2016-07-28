@@ -526,3 +526,75 @@ class OptionStoreSanityCheckTestCase(TestCase):
 
     def test_sim_runner_option_store_is_sane(self):
         self.assert_option_store_is_sane(SimRunnerOptionStore)
+
+
+class OptionStoreDebugPrintoutTestCase(ConfigFilesTestCase):
+
+    def get_debug_printout(self, opt_store_class, alias, opts):
+        stderr = StringIO()
+
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.runner', stderr, debug=True)
+
+            # debug printout happens in constructor
+            opt_store_class(alias, opts, [])
+
+        return stderr.getvalue()
+
+    def test_option_debug_printout(self):
+        printout = self.get_debug_printout(
+            RunnerOptionStore, 'inline', dict(owner='dave'))
+
+        self.assertIn("'owner'", printout)
+        self.assertIn("'dave'", printout)
+
+    def test_non_obfuscated_option_on_emr(self):
+        printout = self.get_debug_printout(
+            EMRRunnerOptionStore, 'emr', dict(owner='dave'))
+
+        self.assertIn("'owner'", printout)
+        self.assertIn("'dave'", printout)
+
+    def test_aws_access_key_id(self):
+        printout = self.get_debug_printout(
+            EMRRunnerOptionStore, 'emr', dict(
+                aws_access_key_id='AKIATOPQUALITYSALESEVENT'))
+
+        self.assertIn("'aws_access_key_id'", printout)
+        self.assertIn("'...VENT'", printout)
+
+    def test_aws_access_key_id_with_wrong_type(self):
+        printout = self.get_debug_printout(
+            EMRRunnerOptionStore, 'emr', dict(
+                aws_access_key_id=['AKIATOPQUALITYSALESEVENT']))
+
+        self.assertIn("'aws_access_key_id'", printout)
+        self.assertNotIn('VENT', printout)
+        self.assertIn("'...'", printout)
+
+    def test_aws_secret_access_key(self):
+        printout = self.get_debug_printout(
+            EMRRunnerOptionStore, 'emr', dict(
+                aws_secret_access_key='PASSWORD'))
+
+        self.assertIn("'aws_secret_access_key'", printout)
+        self.assertNotIn('PASSWORD', printout)
+        self.assertIn("'...'", printout)
+
+    def test_aws_security_token(self):
+        printout = self.get_debug_printout(
+            EMRRunnerOptionStore, 'emr', dict(
+                aws_security_token='TOKEN'))
+
+        self.assertIn("'aws_security_token'", printout)
+        self.assertNotIn('TOKEN', printout)
+        self.assertIn("'...'", printout)
+
+    def test_dont_obfuscate_empty_opts(self):
+        printout = self.get_debug_printout(
+            EMRRunnerOptionStore, 'emr', {})
+
+        self.assertNotIn("'...'", printout)
+        self.assertIn("'aws_access_key_id'", printout)
+        self.assertIn("'aws_secret_access_key'", printout)
+        self.assertIn("'aws_security_token'", printout)

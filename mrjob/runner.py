@@ -186,7 +186,9 @@ class RunnerOptionStore(OptionStore):
         self.populate_values_from_cascading_dicts()
 
         log.debug('Active configuration:')
-        log.debug(pprint.pformat(self))
+        log.debug(pprint.pformat(
+            dict((opt_key, self._obfuscate(opt_key, opt_value))
+                 for opt_key, opt_value in self.items())))
 
     def default_options(self):
         super_opts = super(RunnerOptionStore, self).default_options()
@@ -246,6 +248,11 @@ class RunnerOptionStore(OptionStore):
         opt_list = [handle_cleanup_opt(opt) for opt in opt_list]
 
         opts[opt_key] = opt_list
+
+    def _obfuscate(self, opt_key, opt_value):
+        """Return value of opt to show in debug printout. Used to obfuscate
+        credentials, etc."""
+        return opt_value
 
 
 class MRJobRunner(object):

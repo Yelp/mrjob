@@ -1554,6 +1554,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._build_jar_step(step_num)
+        elif step['type'] == 'spark':
+            return self._build_spark_step(step_num)
         elif step['type'] == 'spark_script':
             return self._build_spark_script_step(step_num)
         else:
@@ -1604,17 +1606,44 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             step_args=step_args,
             action_on_failure=self._action_on_failure())
 
+    def _build_spark_step(self, step_num):
+        step = self._get_step(step_num)
+
+        return self._build_spark_step_helper(
+            step_num=step_num,
+            spark_args=step['spark_args'],
+            script=self._script_path,
+            script_args=[
+                '--step-num=%d' % step_num,
+                '--spark',
+                mrjob.step.INPUT,
+                mrjob.step.OUTPUT,
+            ],
+        )
+
     def _build_spark_script_step(self, step_num):
         step = self._get_step(step_num)
 
-        script = self._upload_uri_or_remote_path(step['script'])
+        return self._build_spark_step_helper(
+            step_num=step_num,
+            spark_args=step['spark_args'],
+            script=step['script'],
+            script_args=step['args'])
 
-        script_args = self._interpolate_input_and_output(
-            step['args'], step_num)
-        spark_args = step['spark_args']
+    def _build_spark_step_helper(
+            self, step_num, spark_args, script, script_args):
+        """Common code for _build_spark_step() and _build_spark_script_step()
+
+        Interpolates :py:data:`~mrjob.step.INPUT` and
+        :py:data:`~mrjob.step.OUTPUT` into *script_args*, and looks up
+        upload URI of *script*
+        """
+        script = self._upload_uri_or_remote_path(script)
+        script_args = self._interpolate_input_and_output(script_args)
 
         # TODO: use script-runner and full spark-submit path on 3.x
         jar = _4_X_INTERMEDIARY_JAR
+
         step_args = (
             ['spark-submit', '--master', 'yarn', '--deploy-mode', 'cluster'] +
             spark_args + [script] + script_args)

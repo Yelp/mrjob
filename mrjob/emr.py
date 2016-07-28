@@ -601,7 +601,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             else:
                 # don't expose aws_access_key_id if it was accidentally
                 # put in a list or something
-                return type(opt_value)
+                return '...'
         else:
             return opt_value
 

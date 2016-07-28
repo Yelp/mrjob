@@ -570,7 +570,7 @@ class OptionStoreDebugPrintoutTestCase(ConfigFilesTestCase):
 
         self.assertIn("'aws_access_key_id'", printout)
         self.assertNotIn('VENT', printout)
-        self.assertIn("'list'", printout)
+        self.assertIn("'...'", printout)
 
     def test_aws_secret_access_key(self):
         printout = self.get_debug_printout(

@@ -637,7 +637,17 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        raise NotImplementedError
+        steps = self.steps()
+        if not 0 <= step_num < len(steps):
+            raise ValueError('Out-of-range step: %d' % step_num)
+        step = steps[step_num]
+
+        if len(self.args) != 2:
+            raise ValueError('Wrong number of args')
+        input_paths, output_path = self.args
+
+        spark_method = step['spark']
+        spark_method(input_paths, output_path)
 
     def show_steps(self):
         """Print information about how many steps there are, and whether

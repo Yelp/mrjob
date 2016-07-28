@@ -587,6 +587,24 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 not self['release_label']):
             self['release_label'] = 'emr-' + self['ami_version']
 
+    def _obfuscate(self, opt_key, opt_value):
+        # don't need to obfuscate empty values
+        if not opt_value:
+            return opt_value
+
+        if opt_key in ('aws_secret_access_key', 'aws_security_token'):
+            # don't expose any part of secret credentials
+            return '...'
+        elif opt_key == 'aws_access_key_id':
+            if isinstance(opt_value, string_types):
+                return '...' + opt_value[-4:]
+            else:
+                # don't expose aws_access_key_id if it was accidentally
+                # put in a list or something
+                return type(opt_value)
+        else:
+            return opt_value
+
 
 class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.

@@ -42,7 +42,7 @@ _JAR_STEP_KWARGS = ['args', 'main_class']
 _SPARK_SCRIPT_STEP_KWARGS = ['spark', 'spark_args']
 
 # all allowable SparkScriptStep constructor keyword args
-_SPARK_SCRIPT_STEP_KWARGS = ['args', 'spark_args']
+_SPARK_STEP_KWARGS = ['args', 'spark_args']
 
 
 #: If passed as an argument to :py:class:`JarStep` or

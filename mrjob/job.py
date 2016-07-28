@@ -36,6 +36,7 @@ from mrjob.py2 import string_types
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
+from mrjob.step import _SPARK_STEP_KWARGS
 from mrjob.util import expand_path
 from mrjob.util import read_input
 
@@ -348,7 +349,7 @@ class MRJob(MRJobLauncher):
         # only include methods that have been redefined
         kwargs = dict(
             (func_name, getattr(self, func_name))
-            for func_name in _JOB_STEP_FUNC_PARAMS + ['spark']
+            for func_name in _JOB_STEP_FUNC_PARAMS + ('spark',)
             if (_im_func(getattr(self, func_name)) is not
                 _im_func(getattr(MRJob, func_name))))
 
@@ -358,9 +359,9 @@ class MRJob(MRJobLauncher):
             if sorted(kwargs) != ['spark']:
                 raise ValueError(
                     "Can't mix spark() and streaming functions")
-            return SparkStep(
+            return [SparkStep(
                 spark=kwargs['spark'],
-                spark_args=self.spark_args())
+                spark_args=self.spark_args())]
 
         # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.

@@ -19,7 +19,7 @@ from mrjob.job import MRJob
 WORD_RE = re.compile(r"[\w']+")
 
 
-def MRSparkWordcount(MRJob):
+class MRSparkWordcount(MRJob):
 
     def spark(self, input_path, output_path):
         # Spark may not be available where script is launched

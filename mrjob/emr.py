@@ -1639,7 +1639,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         upload URI of *script*
         """
         script = self._upload_uri_or_remote_path(script)
-        script_args = self._interpolate_input_and_output(script_args)
+        script_args = self._interpolate_input_and_output(script_args, step_num)
 
         # TODO: use script-runner and full spark-submit path on 3.x
         jar = _4_X_INTERMEDIARY_JAR

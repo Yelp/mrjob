@@ -644,10 +644,10 @@ class MRJob(MRJobLauncher):
 
         if len(self.args) != 2:
             raise ValueError('Wrong number of args')
-        input_paths, output_path = self.args
+        input_path, output_path = self.args
 
         spark_method = step['spark']
-        spark_method(input_paths, output_path)
+        spark_method(input_path, output_path)
 
     def show_steps(self):
         """Print information about how many steps there are, and whether

@@ -1641,11 +1641,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         script = self._upload_uri_or_remote_path(script)
         script_args = self._interpolate_input_and_output(script_args, step_num)
 
-        # TODO: use script-runner and full spark-submit path on 3.x
-        jar = _4_X_INTERMEDIARY_JAR
+        jar, step_arg_prefix = self._get_spark_jar_and_step_arg_prefix()
 
+        # have to use `--deploy-mode cluster` to reference s3:// URIs
         step_args = (
-            ['spark-submit', '--master', 'yarn', '--deploy-mode', 'cluster'] +
+            step_arg_prefix +
+            ['--master', 'yarn', '--deploy-mode', 'cluster'] +
             spark_args + [script] + script_args)
 
         return boto.emr.JarStep(
@@ -1717,6 +1718,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             # 2.x and 3.x AMIs just use a regular old streaming jar
             return _PRE_4_X_STREAMING_JAR, []
+
+    def _get_spark_jar_and_step_arg_prefix(self):
+        # TODO: add spark_submit_bin option
+
+        if version_gte(self.get_ami_version(), '4'):
+            return (_4_X_INTERMEDIARY_JAR, ['spark-submit'])
+        else:
+            return (self._script_runner_jar_uri(),
+                    ['/home/hadoop/spark/bin/spark-submit'])
 
     def _launch_emr_job(self):
         """Create an empty cluster on EMR, and set self._cluster_id to

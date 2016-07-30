@@ -886,14 +886,15 @@ class MRJob(MRJobLauncher):
         return super(MRJob, self).all_option_groups() + (self.mux_opt_group,)
 
     def is_task(self):
-        """True if this is a mapper, combiner, or reducer.
+        """True if this is a mapper, combiner, reducer, or Spark script.
 
         This is mostly useful inside :py:meth:`load_options`, to disable
-        loading options when we aren't running inside Hadoop Streaming.
+        loading options when we aren't running inside Hadoop.
         """
         return (self.options.run_mapper or
                 self.options.run_combiner or
-                self.options.run_reducer)
+                self.options.run_reducer or
+                self.options.run_spark)
 
     def _process_args(self, args):
         """mrjob.launch takes the first arg as the script path, but mrjob.job

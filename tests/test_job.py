@@ -873,6 +873,7 @@ class IsTaskTestCase(TestCase):
         self.assertEqual(MRJob(['--mapper']).is_task(), True)
         self.assertEqual(MRJob(['--reducer']).is_task(), True)
         self.assertEqual(MRJob(['--combiner']).is_task(), True)
+        self.assertEqual(MRJob(['--spark']).is_task(), True)
         self.assertEqual(MRJob(['--steps']).is_task(), False)
 
     def test_deprecated_alias(self):

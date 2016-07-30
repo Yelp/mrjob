@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob.job import MRJob
+from mrjob.step import INPUT
 from mrjob.step import JarStep
 from mrjob.step import MRStep
+from mrjob.step import OUTPUT
 
 
 class MRJarAndStreaming(MRJob):
@@ -27,7 +29,7 @@ class MRJarAndStreaming(MRJob):
         return [
             JarStep(
                 jar=self.options.jar,
-                args=['stuff', JarStep.INPUT, JarStep.OUTPUT]
+                args=['stuff', INPUT, OUTPUT]
             ),
             MRStep(mapper=self.mapper, reducer=self.reducer)
         ]

@@ -15,8 +15,10 @@
 # limitations under the License.
 """Tests for mrjob.step"""
 from mrjob.step import _IDENTITY_MAPPER
+from mrjob.step import INPUT
 from mrjob.step import JarStep
 from mrjob.step import MRStep
+from mrjob.step import OUTPUT
 from mrjob.step import SparkStep
 from mrjob.step import SparkScriptStep
 from mrjob.step import StepFailedException
@@ -103,6 +105,10 @@ class JarStepTestCase(TestCase):
             'args': [],
         })
         self.assertEqual(JarStep(**kwargs).description(0), expected)
+
+    def test_deprecated_INPUT_and_OUTPUT_attrs(self):
+        self.assertEqual(JarStep.INPUT, INPUT)
+        self.assertEqual(JarStep.OUTPUT, OUTPUT)
 
 
 class MRStepInitTestCase(TestCase):

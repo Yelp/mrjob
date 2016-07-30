@@ -117,7 +117,7 @@ class StepFailedException(Exception):
                        if getattr(self, k) is not None)))
 
 
-# TODO: reduce enormous amount of boilerplate in these classes
+# TODO: reduce enormous amount of boilerplate in these classes (see #1368)
 
 class MRStep(object):
     """Represents steps handled by the script containing your job.
@@ -326,7 +326,11 @@ class JarStep(object):
 
     See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
     """
-    # TODO: add deprecation warning, update docs
+    # these are deprecated and will be removed in v0.6.0; use
+    # mrjob.step.INPUT and mrjob.step.OUTPUT instead.
+    #
+    # Unfortunately, creating a "class property" to issue a deprecation
+    # warning for these is way more trouble than it's worth (metaclasses, etc.)
     INPUT = INPUT
     OUTPUT = OUTPUT
 

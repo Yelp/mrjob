@@ -501,6 +501,16 @@ class MRJob(MRJobLauncher):
 
         return super(MRJob, self).make_runner()
 
+    def _get_step(self, step_num, expected_type):
+        """Helper for run_* methods"""
+        steps = self.steps()
+        if not 0 <= step_num < len(steps):
+            raise ValueError('Out-of-range step: %d' % step_num)
+        step = steps[step_num]
+        if not isinstance(step, expected_type):
+            raise TypeError('Step %d is not a %s', expected_type.__name__)
+        return step
+
     def run_mapper(self, step_num=0):
         """Run the mapper and final mapper action for the given step.
 
@@ -515,10 +525,8 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        steps = self.steps()
-        if not 0 <= step_num < len(steps):
-            raise ValueError('Out-of-range step: %d' % step_num)
-        step = steps[step_num]
+        step = self._get_step(step_num, MRStep)
+
         mapper = step['mapper']
         mapper_init = step['mapper_init']
         mapper_final = step['mapper_final']
@@ -553,10 +561,8 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        steps = self.steps()
-        if not 0 <= step_num < len(steps):
-            raise ValueError('Out-of-range step: %d' % step_num)
-        step = steps[step_num]
+        step = self._get_step(step_num, MRStep)
+
         reducer = step['reducer']
         reducer_init = step['reducer_init']
         reducer_final = step['reducer_final']
@@ -598,10 +604,8 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        steps = self.steps()
-        if not 0 <= step_num < len(steps):
-            raise ValueError('Out-of-range step: %d' % step_num)
-        step = steps[step_num]
+        step = self._get_step(step_num, MRStep)
+
         combiner = step['combiner']
         combiner_init = step['combiner_init']
         combiner_final = step['combiner_final']
@@ -638,10 +642,7 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        steps = self.steps()
-        if not 0 <= step_num < len(steps):
-            raise ValueError('Out-of-range step: %d' % step_num)
-        step = steps[step_num]
+        step = self._get_step(step_num, SparkStep)
 
         if len(self.args) != 2:
             raise ValueError('Wrong number of args')

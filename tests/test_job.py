@@ -46,6 +46,7 @@ from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import TestCase
 from tests.py2 import patch
@@ -1191,3 +1192,52 @@ class DeprecatedMRMethodTestCase(TestCase):
 
         with logger_disabled('mrjob.job'):
             self.assertEqual(MRJob.mr(**kwargs), MRStep(**kwargs))
+
+
+class RunSparkTestCase(TestCase):
+
+    def test_spark(self):
+        job = MRJob(['--spark', 'input_dir', 'output_dir'])
+        job.spark = MagicMock()
+
+        job.execute()
+
+        job.spark.assert_called_once_with('input_dir', 'output_dir')
+
+    def test_spark_with_step_num(self):
+        job = MRJob(['--step-num=1', '--spark', 'input_dir', 'output_dir'])
+
+        mapper = MagicMock()
+        spark = MagicMock()
+
+        job.steps = Mock(
+            return_value=[MRStep(mapper=mapper), SparkStep(spark)])
+
+        job.execute()
+
+        spark.assert_called_once_with('input_dir', 'output_dir')
+        self.assertFalse(mapper.called)
+
+    def test_wrong_step_type(self):
+        job = MRJob(['--spark', 'input_dir', 'output_dir'])
+        job.mapper = MagicMock()
+
+        self.assertRaises(TypeError, job.execute)
+
+    def test_wrong_step_num(self):
+        job = MRJob(['--step-num=1', '--spark', 'input_dir', 'output_dir'])
+        job.spark = MagicMock()
+
+        self.assertRaises(ValueError, job.execute)
+
+    def test_too_few_args(self):
+        job = MRJob(['--spark'])
+        job.spark = MagicMock()
+
+        self.assertRaises(ValueError, job.execute)
+
+    def test_too_many_args(self):
+        job = MRJob(['--spark', 'input_dir', 'output_dir', 'error_dir'])
+        job.spark = MagicMock()
+
+        self.assertRaises(ValueError, job.execute)

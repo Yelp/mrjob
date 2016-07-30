@@ -12,33 +12,26 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Job that runs a single spark script, specified on the command line."""
+"""Job that runs an empty spark() method."""
 
 from mrjob.job import MRJob
-from mrjob.step import SparkScriptStep
 
 
-class MRSparkScript(MRJob):
+class MRNullSpark(MRJob):
 
     def configure_options(self):
-        super(MRSparkScript, self).configure_options()
+        super(MRNullSpark, self).configure_options()
 
         self.add_passthrough_option(
-            '--script', dest='script')
-        self.add_passthrough_option(
-            '--script-arg', dest='script_args',
-            action='append', default=[])
-        self.add_passthrough_option(
-            '--script-spark-arg', dest='script_spark_args',
+            '--extra-spark-arg', dest='extra_spark_args',
             action='append', default=[])
 
-    def steps(self):
-        return [SparkScriptStep(
-            script=self.options.script,
-            args=self.options.script_args,
-            spark_args=self.options.script_spark_args,
-        )]
+    def spark(self):
+        pass
+
+    def spark_args(self):
+        return self.options.extra_spark_args
 
 
 if __name__ == '__main__':
-    MRSparkScript.run()
+    MRNullSpark.run()

@@ -66,6 +66,7 @@ from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
+from tests.mr_null_spark import MRNullSpark
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_sort_values import MRSortValues
 from tests.mr_spark_script import MRSparkScript
@@ -3382,10 +3383,108 @@ class JarStepTestCase(MockBotoTestCase):
             self.assertEqual(jar_output_arg, streaming_input_arg)
 
 
-class SparkScriptTestCase(MockBotoTestCase):
+class SparkStepTestCase(MockBotoTestCase):
+
+    # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
+
+    def test_3_x_ami(self):
+        job = MRNullSpark(['-r', 'emr', '--ami-version', '3.11.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, runner._script_runner_jar_uri())
+            self.assertEqual(
+                steps[0].config.args[0].value,
+                _3_X_SPARK_SUBMIT)
+
+    def test_4_x_ami(self):
+        job = MRNullSpark(['-r', 'emr', '--ami-version', '4.7.2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, _4_X_INTERMEDIARY_JAR)
+            self.assertEqual(
+                steps[0].config.args[0].value, 'spark-submit')
+
+    def test_input_and_output_args(self):
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
+
+        job = MRNullSpark(['-r', 'emr', input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            script_uri = runner._upload_mgr.uri(runner._script_path)
+            input1_uri = runner._upload_mgr.uri(input1)
+            input2_uri = runner._upload_mgr.uri(input2)
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                _EMR_SPARK_ARGS +
+                [
+                    script_uri,
+                    '--step-num=0',
+                    '--spark',
+                    input1_uri + ',' + input2_uri,
+                    runner._output_dir,
+                ])
+
+    maxDiff = None
+
+    def test_spark_args_in_step(self):
+        job = MRNullSpark(['-r', 'emr', '--extra-spark-arg', 'ARGH'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            script_uri = runner._upload_mgr.uri(runner._script_path)
+
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            step_args = [a.value for a in steps[0].config.args]
+
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                _EMR_SPARK_ARGS + [
+                    'ARGH',
+                    script_uri,
+                    '--step-num=0',
+                    '--spark',
+                    ','.join(runner._step_input_uris(0)),
+                    runner._output_dir,
+                ]
+            )
+
+
+class SparkScriptStepTestCase(MockBotoTestCase):
 
     def setUp(self):
-        super(SparkScriptTestCase, self).setUp()
+        super(SparkScriptStepTestCase, self).setUp()
 
         self.fake_script = os.path.join(self.tmp_dir, 'fake.py')
         open(self.fake_script, 'w').close()
@@ -3521,8 +3620,6 @@ class BuildMasterNodeSetupStep(MockBotoTestCase):
         self.assertEqual(step['step_args'], [master_node_setup_uri])
         self.assertEqual(step['action_on_failure'],
                          runner._action_on_failure())
-
-
 
 
 class ActionOnFailureTestCase(MockBotoTestCase):

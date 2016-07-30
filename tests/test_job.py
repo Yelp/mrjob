@@ -39,6 +39,7 @@ from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import _IDENTITY_REDUCER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
+from mrjob.step import SparkStep
 from mrjob.util import log_to_stream
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_sort_values import MRSortValues
@@ -1097,6 +1098,20 @@ class StepsTestCase(TestCase):
         def jobconf(self):
             return {'mapred.baz': 'bar'}
 
+    class SparkyJob(MRJob):
+        def spark(self, input_path, output_path):
+            pass
+
+        def spark_args(self):
+            return ['argh', 'ARRRRGH!']
+
+    class ConflictedSparkyJob(MRJob):
+        def mapper(self, key, value):
+            return None
+
+        def spark(self, input_path, output_path):
+            pass
+
     def test_steps(self):
         j = self.SteppyJob(['--no-conf'])
         self.assertEqual(
@@ -1130,6 +1145,34 @@ class StepsTestCase(TestCase):
         self.assertEqual(
             j.steps()[0],
             MRStep(mapper=j.mapper))
+
+    def test_spark_method(self):
+        j = self.SparkyJob(['--no-conf'])
+
+        self.assertEqual(
+            j.steps(),
+            [
+                SparkStep(
+                    spark=j.spark,
+                    spark_args=['argh', 'ARRRRGH!'],
+                )
+            ]
+        )
+
+        self.assertEqual(
+            j._steps_desc(),
+            [
+                dict(
+                    type='spark',
+                    spark_args=['argh', 'ARRRRGH!'],
+                )
+            ]
+        )
+
+    def test_spark_and_streaming_dont_mix(self):
+        j = self.ConflictedSparkyJob(['--no-conf'])
+
+        self.assertRaises(ValueError, j.steps)
 
 
 class DeprecatedMRMethodTestCase(TestCase):

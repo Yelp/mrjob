@@ -39,10 +39,10 @@ _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 _JAR_STEP_KWARGS = ['args', 'main_class']
 
 # all allowable SparkScriptStep constructor keyword args
-_SPARK_SCRIPT_STEP_KWARGS = ['spark', 'spark_args']
+_SPARK_SCRIPT_STEP_KWARGS = ['args', 'script', 'spark_args']
 
-# all allowable SparkScriptStep constructor keyword args
-_SPARK_STEP_KWARGS = ['args', 'spark_args']
+# all allowable SparkStep constructor keyword args
+_SPARK_STEP_KWARGS = ['spark', 'spark_args']
 
 
 #: If passed as an argument to :py:class:`JarStep` or
@@ -438,21 +438,13 @@ class SparkScriptStep(object):
                    can also be an ``s3://`` URI, or ``file://`` to reference a
                    jar on the local filesystem of your EMR instance(s).
     :param args: (optional) A list of arguments to the script. Use
-                 :py:attr:`INPUT` and :py:attr:`OUTPUT` to interpolate
-                 input and output paths.
+                  :py:data:`mrjob.step.INPUT` and :py:data:`OUTPUT` to
+                 interpolate input and output paths.
     :param spark_args: (optional) an array of arguments to pass to spark-submit
                        (e.g. ``['--executor-memory', '2G']``).
 
     *script* can also be passed as a positional argument
     """
-    #: If this is passed as one of the step's arguments, it'll be replaced
-    #: with the step's input paths (if there are multiple paths, they'll
-    #: be joined with commas)
-    INPUT = '<input>'
-    #: If this is passed as one of the step's arguments, it'll be replaced
-    #: with the step's output path
-    OUTPUT = '<output>'
-
     def __init__(self, script, **kwargs):
         bad_kwargs = sorted(set(kwargs) - set(_SPARK_SCRIPT_STEP_KWARGS))
         if bad_kwargs:

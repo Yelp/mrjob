@@ -403,4 +403,55 @@ class SparkStepTestCase(TestCase):
         )
 
     def test_positional_spark_arg(self):
-        self.assertEqual(SparkStep(spark_func), SparkStep(spark=spark_func))
+        step1 = SparkStep(spark_func)
+        step2 = SparkStep(spark=spark_func)
+
+        self.assertEqual(step1, step2)
+        self.assertEqual(step1.description(0), step2.description(0))
+
+
+class SparkScriptStepTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertRaises(SparkScriptStep)
+
+    def test_defaults(self):
+        step = SparkScriptStep(script='macbeth.py')
+
+        self.assertEqual(step.script, 'macbeth.py')
+        self.assertEqual(step.args, [])
+        self.assertEqual(step.spark_args, [])
+        self.assertEqual(
+            step.description(0),
+            dict(
+                type='spark_script',
+                script='macbeth.py',
+                args=[],
+                spark_args=[],
+             )
+        )
+
+    def test_all_args(self):
+        step = SparkScriptStep(script='macbeth.py',
+                               args=['ARGH', 'ARGH'],
+                               spark_args=['argh', 'argh'])
+
+        self.assertEqual(step.script, 'macbeth.py')
+        self.assertEqual(step.args, ['ARGH', 'ARGH'])
+        self.assertEqual(step.spark_args, ['argh', 'argh'])
+        self.assertEqual(
+            step.description(0),
+            dict(
+                type='spark_script',
+                script='macbeth.py',
+                args=['ARGH', 'ARGH'],
+                spark_args=['argh', 'argh'],
+             )
+        )
+
+    def test_positional_spark_arg(self):
+        step1 = SparkScriptStep('macbeth.py')
+        step2 = SparkScriptStep(script='macbeth.py')
+
+        self.assertEqual(step1, step2)
+        self.assertEqual(step1.description(0), step2.description(0))

@@ -407,9 +407,9 @@ class SparkStep(object):
         return 'SparkStep(%s)' % ', '.join(repr_args)
 
     def __eq__(self, other):
-        return (isinstance(other, JarStep) and
+        return (isinstance(other, SparkStep) and
                 all(getattr(self, key) == getattr(other, key)
-                    for key in ('script', 'args', 'spark_args')))
+                    for key in ('spark', 'spark_args')))
 
     def description(self, step_num):
         """Returns a dictionary representation of this step:
@@ -476,7 +476,7 @@ class SparkScriptStep(object):
         return 'SparkScriptStep(%s)' % ', '.join(repr_args)
 
     def __eq__(self, other):
-        return (isinstance(other, JarStep) and
+        return (isinstance(other, SparkScriptStep) and
                 all(getattr(self, key) == getattr(other, key)
                     for key in ('script', 'args', 'spark_args')))
 

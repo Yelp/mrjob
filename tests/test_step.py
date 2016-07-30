@@ -17,6 +17,8 @@
 from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
+from mrjob.step import SparkStep
+from mrjob.step import SparkScriptStep
 from mrjob.step import StepFailedException
 
 from tests.py2 import TestCase
@@ -31,6 +33,10 @@ def identity_mapper(k=None, v=None):
 def identity_reducer(k, vals):
     for v in vals:
         yield k, v
+
+
+def spark_func(input_path, output_path):
+    pass
 
 
 class StepFailedExceptionTestCase(TestCase):
@@ -369,3 +375,32 @@ class MRStepDescriptionTestCase(TestCase):
                 }
             }
         )
+
+
+class SparkStepTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertRaises(SparkStep)
+
+    def test_defaults(self):
+        step = SparkStep(spark=spark_func)
+
+        self.assertEqual(step.spark, spark_func)
+        self.assertEqual(step.spark_args, [])
+        self.assertEqual(
+            step.description(0),
+            dict(type='spark', spark_args=[]),
+        )
+
+    def test_all_args(self):
+        step = SparkStep(spark=spark_func, spark_args=['argh', 'argh'])
+
+        self.assertEqual(step.spark, spark_func)
+        self.assertEqual(step.spark_args, ['argh', 'argh'])
+        self.assertEqual(
+            step.description(0),
+            dict(type='spark', spark_args=['argh', 'argh']),
+        )
+
+    def test_positional_spark_arg(self):
+        self.assertEqual(SparkStep(spark_func), SparkStep(spark=spark_func))

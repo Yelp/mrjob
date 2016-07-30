@@ -178,6 +178,12 @@ _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 # intermediary jar used on 4.x AMIs
 _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
+# path to spark-submit on 3.x AMIs. (On 4.x, it's just 'spark-submit')
+_3_X_SPARK_SUBMIT = '/home/hadoop/spark/bin/spark-submit'
+
+# always use these args with spark-submit
+_EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
+
 # we have to wait this many minutes for logs to transfer to S3 (or wait
 # for the cluster to terminate). Docs say logs are transferred every 5
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
@@ -1664,7 +1670,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # have to use `--deploy-mode cluster` to reference s3:// URIs
         step_args = (
             step_arg_prefix +
-            ['--master', 'yarn', '--deploy-mode', 'cluster'] +
+            _EMR_SPARK_ARGS +
             spark_args + [script] + script_args)
 
         return boto.emr.JarStep(
@@ -1743,8 +1749,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if version_gte(self.get_ami_version(), '4'):
             return (_4_X_INTERMEDIARY_JAR, ['spark-submit'])
         else:
-            return (self._script_runner_jar_uri(),
-                    ['/home/hadoop/spark/bin/spark-submit'])
+            return (self._script_runner_jar_uri(), [_3_X_SPARK_SUBMIT])
 
     def _launch_emr_job(self):
         """Create an empty cluster on EMR, and set self._cluster_id to

@@ -28,8 +28,10 @@ from io import BytesIO
 import mrjob
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_INTERMEDIARY_JAR
 from mrjob.emr import _DEFAULT_AMI_VERSION
+from mrjob.emr import _EMR_SPARK_ARGS
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
@@ -46,7 +48,10 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
+from mrjob.step import INPUT
+from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
+from mrjob.step import SparkScriptStep
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
@@ -61,8 +66,10 @@ from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
+from tests.mr_null_spark import MRNullSpark
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_sort_values import MRSortValues
+from tests.mr_spark_script import MRSparkScript
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -3374,6 +3381,225 @@ class JarStepTestCase(MockBotoTestCase):
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class SparkStepTestCase(MockBotoTestCase):
+
+    # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
+
+    def test_3_x_ami(self):
+        job = MRNullSpark(['-r', 'emr', '--ami-version', '3.11.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, runner._script_runner_jar_uri())
+            self.assertEqual(
+                steps[0].config.args[0].value,
+                _3_X_SPARK_SUBMIT)
+
+    def test_4_x_ami(self):
+        job = MRNullSpark(['-r', 'emr', '--ami-version', '4.7.2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, _4_X_INTERMEDIARY_JAR)
+            self.assertEqual(
+                steps[0].config.args[0].value, 'spark-submit')
+
+    def test_input_and_output_args(self):
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
+
+        job = MRNullSpark(['-r', 'emr', input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            script_uri = runner._upload_mgr.uri(runner._script_path)
+            input1_uri = runner._upload_mgr.uri(input1)
+            input2_uri = runner._upload_mgr.uri(input2)
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                _EMR_SPARK_ARGS +
+                [
+                    script_uri,
+                    '--step-num=0',
+                    '--spark',
+                    input1_uri + ',' + input2_uri,
+                    runner._output_dir,
+                ])
+
+    maxDiff = None
+
+    def test_spark_args_in_step(self):
+        job = MRNullSpark(['-r', 'emr', '--extra-spark-arg', 'ARGH'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            script_uri = runner._upload_mgr.uri(runner._script_path)
+
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            step_args = [a.value for a in steps[0].config.args]
+
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                _EMR_SPARK_ARGS + [
+                    'ARGH',
+                    script_uri,
+                    '--step-num=0',
+                    '--spark',
+                    ','.join(runner._step_input_uris(0)),
+                    runner._output_dir,
+                ]
+            )
+
+
+class SparkScriptStepTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(SparkScriptStepTestCase, self).setUp()
+
+        self.fake_script = os.path.join(self.tmp_dir, 'fake.py')
+        open(self.fake_script, 'w').close()
+
+    def test_script_gets_uploaded(self):
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(self.fake_script, runner._upload_mgr.path_to_uri())
+            script_uri = runner._upload_mgr.uri(self.fake_script)
+            self.assertTrue(runner.fs.ls(script_uri))
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(step_args[1:], _EMR_SPARK_ARGS + [script_uri])
+
+    # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
+
+    def test_3_x_ami(self):
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
+                             '--ami-version', '3.11.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, runner._script_runner_jar_uri())
+            self.assertEqual(
+                steps[0].config.args[0].value,
+                _3_X_SPARK_SUBMIT)
+
+    def test_4_x_ami(self):
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
+                             '--ami-version', '4.7.2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, _4_X_INTERMEDIARY_JAR)
+            self.assertEqual(
+                steps[0].config.args[0].value, 'spark-submit')
+
+    def test_arg_interpolation(self):
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
+
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
+                             '--script-arg', INPUT,
+                             '--script-arg', '-o',
+                             '--script-arg', OUTPUT,
+                             input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            script_uri = runner._upload_mgr.uri(self.fake_script)
+            input1_uri = runner._upload_mgr.uri(input1)
+            input2_uri = runner._upload_mgr.uri(input2)
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                _EMR_SPARK_ARGS +
+                [
+                    script_uri,
+                    input1_uri + ',' + input2_uri,
+                    '-o',
+                    runner._output_dir,
+                ]
+            )
+
+    def test_spark_args_in_step(self):
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
+                             '--script-spark-arg', 'ARGH'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            script_uri = runner._upload_mgr.uri(self.fake_script)
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                _EMR_SPARK_ARGS + ['ARGH', script_uri]
+            )
 
 
 class BuildMasterNodeSetupStep(MockBotoTestCase):

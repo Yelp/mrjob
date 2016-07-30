@@ -1,3 +1,7 @@
+v0.5.?, 2016-??-?? -- Spark
+ * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
+
+
 v0.5.3, 2016-07-15 -- libjars
  * jobs:
    * LIBJARS and libjars method (#1341)

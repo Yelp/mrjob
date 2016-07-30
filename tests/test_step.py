@@ -386,7 +386,7 @@ class MRStepDescriptionTestCase(TestCase):
 class SparkStepTestCase(TestCase):
 
     def test_empty(self):
-        self.assertRaises(SparkStep)
+        self.assertRaises(TypeError, SparkStep)
 
     def test_defaults(self):
         step = SparkStep(spark=spark_func)
@@ -419,7 +419,7 @@ class SparkStepTestCase(TestCase):
 class SparkScriptStepTestCase(TestCase):
 
     def test_empty(self):
-        self.assertRaises(SparkScriptStep)
+        self.assertRaises(TypeError, SparkScriptStep)
 
     def test_defaults(self):
         step = SparkScriptStep(script='macbeth.py')

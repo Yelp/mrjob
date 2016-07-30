@@ -405,7 +405,7 @@ class SparkStep(object):
     def __repr__(self):
         repr_args = []
         repr_args.append(repr(self.spark))
-        if self.main_class:
+        if self.spark_args:
             repr_args.append('spark_args=' + repr(self.spark_args))
 
         return 'SparkStep(%s)' % ', '.join(repr_args)
@@ -466,7 +466,7 @@ class SparkScriptStep(object):
         repr_args.append(repr(self.script))
         if self.args:
             repr_args.append('args=' + repr(self.args))
-        if self.main_class:
+        if self.spark_args:
             repr_args.append('spark_args=' + repr(self.spark_args))
 
         return 'SparkScriptStep(%s)' % ', '.join(repr_args)

@@ -41,10 +41,12 @@ from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
 from mrjob.util import log_to_stream
+
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import MagicMock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import logger_disabled
@@ -1098,19 +1100,7 @@ class StepsTestCase(TestCase):
         def jobconf(self):
             return {'mapred.baz': 'bar'}
 
-    class SparkyJob(MRJob):
-        def spark(self, input_path, output_path):
-            pass
-
-        def spark_args(self):
-            return ['argh', 'ARRRRGH!']
-
-    class ConflictedSparkyJob(MRJob):
-        def mapper(self, key, value):
-            return None
-
-        def spark(self, input_path, output_path):
-            pass
+    # for spark testing used mock methods instead
 
     def test_steps(self):
         j = self.SteppyJob(['--no-conf'])
@@ -1147,32 +1137,47 @@ class StepsTestCase(TestCase):
             MRStep(mapper=j.mapper))
 
     def test_spark_method(self):
-        j = self.SparkyJob(['--no-conf'])
+        j = MRJob(['--no-conf'])
+        j.spark = MagicMock()
 
         self.assertEqual(
             j.steps(),
-            [
-                SparkStep(
-                    spark=j.spark,
-                    spark_args=['argh', 'ARRRRGH!'],
-                )
-            ]
+            [SparkStep(j.spark)]
         )
 
         self.assertEqual(
             j._steps_desc(),
-            [
-                dict(
-                    type='spark',
-                    spark_args=['argh', 'ARRRRGH!'],
-                )
-            ]
+            [dict(type='spark', spark_args=[])]
+        )
+
+    def test_spark_and_spark_args_methods(self):
+        j = MRJob(['--no-conf'])
+        j.spark = MagicMock()
+        j.spark_args = MagicMock(return_value=['argh', 'ARRRRGH!'])
+
+        self.assertEqual(
+            j.steps(),
+            [SparkStep(j.spark, spark_args=['argh', 'ARRRRGH!'])]
+        )
+
+        self.assertEqual(
+            j._steps_desc(),
+            [dict(type='spark', spark_args=['argh', 'ARRRRGH!'])]
         )
 
     def test_spark_and_streaming_dont_mix(self):
-        j = self.ConflictedSparkyJob(['--no-conf'])
+        j = MRJob(['--no-conf'])
+        j.mapper = MagicMock()
+        j.spark = MagicMock()
 
         self.assertRaises(ValueError, j.steps)
+
+    def test_spark_args_ignored_without_spark(self):
+        j = MRJob(['--no-conf'])
+        j.reducer = MagicMock()
+        j.spark_args = MagicMock(spark_args=['argh', 'ARRRRGH!'])
+
+        self.assertEqual(j.steps(), [MRStep(reducer=j.reducer)])
 
 
 class DeprecatedMRMethodTestCase(TestCase):

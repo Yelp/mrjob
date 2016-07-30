@@ -941,6 +941,14 @@ class StepNumTestCase(TestCase):
         self.assertRaises(ValueError, mr_job.run_mapper, 2)
         self.assertRaises(ValueError, mr_job.run_reducer, -1)
 
+    def test_wrong_type_of_step(self):
+        mr_job = MRJob()
+        mr_job.spark = MagicMock()
+
+        self.assertRaises(TypeError, mr_job.run_mapper)
+        self.assertRaises(TypeError, mr_job.run_combiner)
+        self.assertRaises(TypeError, mr_job.run_reducer)
+
 
 class FileOptionsTestCase(SandboxedTestCase):
 

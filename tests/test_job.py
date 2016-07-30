@@ -39,11 +39,15 @@ from mrjob.step import _IDENTITY_MAPPER
 from mrjob.step import _IDENTITY_REDUCER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
+from mrjob.step import SparkStep
 from mrjob.util import log_to_stream
+
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import Mock
+from tests.py2 import MagicMock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import logger_disabled
@@ -870,6 +874,7 @@ class IsTaskTestCase(TestCase):
         self.assertEqual(MRJob(['--mapper']).is_task(), True)
         self.assertEqual(MRJob(['--reducer']).is_task(), True)
         self.assertEqual(MRJob(['--combiner']).is_task(), True)
+        self.assertEqual(MRJob(['--spark']).is_task(), True)
         self.assertEqual(MRJob(['--steps']).is_task(), False)
 
     def test_deprecated_alias(self):
@@ -935,6 +940,14 @@ class StepNumTestCase(TestCase):
         self.assertRaises(ValueError, mr_job.run_reducer, 1)
         self.assertRaises(ValueError, mr_job.run_mapper, 2)
         self.assertRaises(ValueError, mr_job.run_reducer, -1)
+
+    def test_wrong_type_of_step(self):
+        mr_job = MRJob()
+        mr_job.spark = MagicMock()
+
+        self.assertRaises(TypeError, mr_job.run_mapper)
+        self.assertRaises(TypeError, mr_job.run_combiner)
+        self.assertRaises(TypeError, mr_job.run_reducer)
 
 
 class FileOptionsTestCase(SandboxedTestCase):
@@ -1097,6 +1110,8 @@ class StepsTestCase(TestCase):
         def jobconf(self):
             return {'mapred.baz': 'bar'}
 
+    # for spark testing used mock methods instead
+
     def test_steps(self):
         j = self.SteppyJob(['--no-conf'])
         self.assertEqual(
@@ -1131,6 +1146,49 @@ class StepsTestCase(TestCase):
             j.steps()[0],
             MRStep(mapper=j.mapper))
 
+    def test_spark_method(self):
+        j = MRJob(['--no-conf'])
+        j.spark = MagicMock()
+
+        self.assertEqual(
+            j.steps(),
+            [SparkStep(j.spark)]
+        )
+
+        self.assertEqual(
+            j._steps_desc(),
+            [dict(type='spark', spark_args=[])]
+        )
+
+    def test_spark_and_spark_args_methods(self):
+        j = MRJob(['--no-conf'])
+        j.spark = MagicMock()
+        j.spark_args = MagicMock(return_value=['argh', 'ARRRRGH!'])
+
+        self.assertEqual(
+            j.steps(),
+            [SparkStep(j.spark, spark_args=['argh', 'ARRRRGH!'])]
+        )
+
+        self.assertEqual(
+            j._steps_desc(),
+            [dict(type='spark', spark_args=['argh', 'ARRRRGH!'])]
+        )
+
+    def test_spark_and_streaming_dont_mix(self):
+        j = MRJob(['--no-conf'])
+        j.mapper = MagicMock()
+        j.spark = MagicMock()
+
+        self.assertRaises(ValueError, j.steps)
+
+    def test_spark_args_ignored_without_spark(self):
+        j = MRJob(['--no-conf'])
+        j.reducer = MagicMock()
+        j.spark_args = MagicMock(spark_args=['argh', 'ARRRRGH!'])
+
+        self.assertEqual(j.steps(), [MRStep(reducer=j.reducer)])
+
 
 class DeprecatedMRMethodTestCase(TestCase):
 
@@ -1142,3 +1200,52 @@ class DeprecatedMRMethodTestCase(TestCase):
 
         with logger_disabled('mrjob.job'):
             self.assertEqual(MRJob.mr(**kwargs), MRStep(**kwargs))
+
+
+class RunSparkTestCase(TestCase):
+
+    def test_spark(self):
+        job = MRJob(['--spark', 'input_dir', 'output_dir'])
+        job.spark = MagicMock()
+
+        job.execute()
+
+        job.spark.assert_called_once_with('input_dir', 'output_dir')
+
+    def test_spark_with_step_num(self):
+        job = MRJob(['--step-num=1', '--spark', 'input_dir', 'output_dir'])
+
+        mapper = MagicMock()
+        spark = MagicMock()
+
+        job.steps = Mock(
+            return_value=[MRStep(mapper=mapper), SparkStep(spark)])
+
+        job.execute()
+
+        spark.assert_called_once_with('input_dir', 'output_dir')
+        self.assertFalse(mapper.called)
+
+    def test_wrong_step_type(self):
+        job = MRJob(['--spark', 'input_dir', 'output_dir'])
+        job.mapper = MagicMock()
+
+        self.assertRaises(TypeError, job.execute)
+
+    def test_wrong_step_num(self):
+        job = MRJob(['--step-num=1', '--spark', 'input_dir', 'output_dir'])
+        job.spark = MagicMock()
+
+        self.assertRaises(ValueError, job.execute)
+
+    def test_too_few_args(self):
+        job = MRJob(['--spark'])
+        job.spark = MagicMock()
+
+        self.assertRaises(ValueError, job.execute)
+
+    def test_too_many_args(self):
+        job = MRJob(['--spark', 'input_dir', 'output_dir', 'error_dir'])
+        job.spark = MagicMock()
+
+        self.assertRaises(ValueError, job.execute)

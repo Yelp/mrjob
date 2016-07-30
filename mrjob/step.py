@@ -19,7 +19,7 @@ from mrjob.py2 import string_types
 from mrjob.util import cmd_line
 
 
-STEP_TYPES = ('streaming', 'jar')
+STEP_TYPES = ('jar', 'spark', 'spark_script', 'streaming')
 
 # Function names mapping to mapper, reducer, and combiner operations
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
@@ -37,6 +37,24 @@ _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 
 # all allowable JarStep constructor keyword args
 _JAR_STEP_KWARGS = ['args', 'main_class']
+
+# all allowable SparkScriptStep constructor keyword args
+_SPARK_SCRIPT_STEP_KWARGS = ['args', 'script', 'spark_args']
+
+# all allowable SparkStep constructor keyword args
+_SPARK_STEP_KWARGS = ['spark', 'spark_args']
+
+
+#: If passed as an argument to :py:class:`JarStep` or
+#: py:class:`SparkScriptStep`, it'll be replaced with the step's input path(s)
+#: (if there are multiple paths, they'll be joined with commas)
+INPUT = '<input>'
+
+#: If this is passed as passed as an argument to :py:class:`JarStep` or
+#: py:class:`SparkScriptStep`, it'll be replaced
+#: with the step's output path
+OUTPUT = '<output>'
+
 
 
 log = logging.getLogger(__name__)
@@ -99,6 +117,8 @@ class StepFailedException(Exception):
                        if getattr(self, k) is not None)))
 
 
+# TODO: reduce enormous amount of boilerplate in these classes (see #1368)
+
 class MRStep(object):
     """Represents steps handled by the script containing your job.
 
@@ -108,29 +128,32 @@ class MRStep(object):
     Accepts the following keyword arguments:
 
     :param mapper: function with same function signature as
-                   :py:meth:`mapper`, or ``None`` for an identity mapper.
+                   :py:meth:`~mrjob.job.MRJob.mapper`, or ``None`` for an
+                   identity mapper.
     :param reducer: function with same function signature as
-                    :py:meth:`reducer`, or ``None`` for no reducer.
+                    :py:meth:`~mrjob.job.MRJob.reducer`, or ``None`` for no
+                    reducer.
     :param combiner: function with same function signature as
-                     :py:meth:`combiner`, or ``None`` for no combiner.
+                     :py:meth:`~mrjob.job.MRJob.combiner`, or ``None`` for no
+                     combiner.
     :param mapper_init: function with same function signature as
-                        :py:meth:`mapper_init`, or ``None`` for no initial
-                        mapper action.
+                        :py:meth:`~mrjob.job.MRJob.mapper_init`, or ``None``
+                        for no initial mapper action.
     :param mapper_final: function with same function signature as
-                         :py:meth:`mapper_final`, or ``None`` for no final
-                         mapper action.
+                         :py:meth:`~mrjob.job.MRJob.mapper_final`, or ``None``
+                         for no final mapper action.
     :param reducer_init: function with same function signature as
-                         :py:meth:`reducer_init`, or ``None`` for no
-                         initial reducer action.
+                         :py:meth:`~mrjob.job.MRJob.reducer_init`, or ``None``
+                         for no initial reducer action.
     :param reducer_final: function with same function signature as
-                          :py:meth:`reducer_final`, or ``None`` for no
-                          final reducer action.
+                          :py:meth:`~mrjob.job.MRJob.reducer_final`, or
+                          ``None`` for no final reducer action.
     :param combiner_init: function with same function signature as
-                          :py:meth:`combiner_init`, or ``None`` for no
-                          initial combiner action.
+                          :py:meth:`~mrjob.job.MRJob.combiner_init`, or
+                          ``None`` for no initial combiner action.
     :param combiner_final: function with same function signature as
-                           :py:meth:`combiner_final`, or ``None`` for no
-                           final combiner action.
+                           :py:meth:`~mrjob.job.MRJob.combiner_final`, or
+                           ``None`` for no final combiner action.
     :param jobconf: dictionary with custom jobconf arguments to pass to
                     hadoop.
     """
@@ -292,22 +315,24 @@ class JarStep(object):
     :param jar: The local path to the Jar. On EMR, this can also be an
                 ``s3://`` URI, or ``file://`` to reference a jar on
                 the local filesystem of your EMR instance(s).
+    :param args: (optional) A list of arguments to the jar. Use
+                 :py:data:`mrjob.step.INPUT` and :py:data:`OUTPUT` to
+                 interpolate input and output paths.
     :param main_class: (optional) The main class to run from the jar. If
                        not specified, Hadoop will use the main class
                        in the jar's manifest file.
-    :param args: (optional) A list of arguments to the jar
 
     *jar* can also be passed as a positional argument
 
     See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
     """
-    #: If this is passed as one of the step's arguments, it'll be replaced
-    #: with the step's input paths (if there are multiple paths, they'll
-    #: be joined with commas)
-    INPUT = '<input>'
-    #: If this is passed as one of the step's arguments, it'll be replaced
-    #: with the step's output path
-    OUTPUT = '<output>'
+    # these are deprecated and will be removed in v0.6.0; use
+    # mrjob.step.INPUT and mrjob.step.OUTPUT instead.
+    #
+    # Unfortunately, creating a "class property" to issue a deprecation
+    # warning for these is way more trouble than it's worth (metaclasses, etc.)
+    INPUT = INPUT
+    OUTPUT = OUTPUT
 
     def __init__(self, jar, **kwargs):
         bad_kwargs = sorted(set(kwargs) - set(_JAR_STEP_KWARGS))
@@ -354,4 +379,120 @@ class JarStep(object):
             'args': self.args,
             'jar': self.jar,
             'main_class': self.main_class,
+        }
+
+
+class SparkStep(object):
+    """Represents running a Spark step defined in your job.
+
+    Accepts the following keyword arguments:
+
+    :param spark: function containing your Spark code with same function
+                  signature as :py:meth:`~mrjob.job.MRJob.spark`
+    :param spark_args: (optional) an array of arguments to pass to spark-submit
+                       (e.g. ``['--executor-memory', '2G']``).
+    """
+    def __init__(self, spark, **kwargs):
+        bad_kwargs = sorted(set(kwargs) - set(_SPARK_STEP_KWARGS))
+        if bad_kwargs:
+            raise TypeError(
+                'SparkStep() got an unexpected keyword argument %r' %
+                bad_kwargs[0])
+
+        self.spark = spark
+        self.spark_args = kwargs.get('spark_args') or []
+
+    def __repr__(self):
+        repr_args = []
+        repr_args.append(repr(self.spark))
+        if self.spark_args:
+            repr_args.append('spark_args=' + repr(self.spark_args))
+
+        return 'SparkStep(%s)' % ', '.join(repr_args)
+
+    def __eq__(self, other):
+        return (isinstance(other, SparkStep) and
+                all(getattr(self, key) == getattr(other, key)
+                    for key in ('spark', 'spark_args')))
+
+    def description(self, step_num):
+        """Returns a dictionary representation of this step:
+
+        .. code-block:: js
+
+            {
+                'type': 'spark',
+                'spark_args': <list of strings, args to spark-submit>
+            }
+
+        See :ref:`steps-format` for examples.
+        """
+        return {
+            'type': 'spark',
+            'spark_args': self.spark_args,
+        }
+
+
+class SparkScriptStep(object):
+    """Represents a running a separate Python script through Spark
+
+    Accepts the following keyword arguments:
+
+    :param script: The local path to the Python script to run. On EMR, this
+                   can also be an ``s3://`` URI, or ``file://`` to reference a
+                   jar on the local filesystem of your EMR instance(s).
+    :param args: (optional) A list of arguments to the script. Use
+                  :py:data:`mrjob.step.INPUT` and :py:data:`OUTPUT` to
+                 interpolate input and output paths.
+    :param spark_args: (optional) an array of arguments to pass to spark-submit
+                       (e.g. ``['--executor-memory', '2G']``).
+
+    *script* can also be passed as a positional argument
+    """
+    def __init__(self, script, **kwargs):
+        bad_kwargs = sorted(set(kwargs) - set(_SPARK_SCRIPT_STEP_KWARGS))
+        if bad_kwargs:
+            raise TypeError(
+                'SparkScriptStep() got an unexpected keyword argument %r' %
+                bad_kwargs[0])
+
+        self.script = script
+
+        self.args = kwargs.get('args') or []
+        self.spark_args = kwargs.get('spark_args') or []
+
+    def __repr__(self):
+        repr_args = []
+        repr_args.append(repr(self.script))
+        if self.args:
+            repr_args.append('args=' + repr(self.args))
+        if self.spark_args:
+            repr_args.append('spark_args=' + repr(self.spark_args))
+
+        return 'SparkScriptStep(%s)' % ', '.join(repr_args)
+
+    def __eq__(self, other):
+        return (isinstance(other, SparkScriptStep) and
+                all(getattr(self, key) == getattr(other, key)
+                    for key in ('script', 'args', 'spark_args')))
+
+    def description(self, step_num):
+        """Returns a dictionary representation of this step:
+
+        .. code-block:: js
+
+            {
+                'type': 'spark_script',
+                'script': <path of the Python script>,
+                'args': <list of strings, args to the spark script>,
+                'spark_args': <list of strings, args to spark-submit>
+            }
+
+        See :ref:`steps-format` for examples.
+        """
+        return {
+            'type': 'spark_script',
+            'args': self.args,
+            'script': self.script,
+            'spark_args': self.spark_args,
         }

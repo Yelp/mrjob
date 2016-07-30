@@ -178,6 +178,12 @@ _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 # intermediary jar used on 4.x AMIs
 _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
+# path to spark-submit on 3.x AMIs. (On 4.x, it's just 'spark-submit')
+_3_X_SPARK_SUBMIT = '/home/hadoop/spark/bin/spark-submit'
+
+# always use these args with spark-submit
+_EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
+
 # we have to wait this many minutes for logs to transfer to S3 (or wait
 # for the cluster to terminate). Docs say logs are transferred every 5
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
@@ -1013,9 +1019,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
+        # upload JARs and (Python) scripts run by steps
         for step in self._get_steps():
-            if step.get('jar'):
-                self._upload_mgr.add(step['jar'])
+            for key in 'jar', 'script':
+                if step.get(key):
+                    self._upload_mgr.add(step[key])
 
     def _upload_local_files_to_s3(self):
         """Copy local files tracked by self._upload_mgr to S3."""
@@ -1570,6 +1578,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._build_jar_step(step_num)
+        elif step['type'] == 'spark':
+            return self._build_spark_step(step_num)
+        elif step['type'] == 'spark_script':
+            return self._build_spark_script_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -1605,34 +1617,92 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _build_jar_step(self, step_num):
         step = self._get_step(step_num)
 
-        # special case to allow access to jars inside EMR
-        if step['jar'].startswith('file:///'):
-            jar = step['jar'][7:]  # keep leading slash
-        else:
-            jar = self._upload_mgr.uri(step['jar'])
-
-        def interpolate(arg):
-            if arg == mrjob.step.JarStep.INPUT:
-                return ','.join(self._step_input_uris(step_num))
-            elif arg == mrjob.step.JarStep.OUTPUT:
-                return self._step_output_uri(step_num)
-            else:
-                return arg
-
-        step_args = step['args']
-        if step_args:
-            step_args = [interpolate(arg) for arg in step_args]
+        jar = self._upload_uri_or_remote_path(step['jar'])
+        step_args = self._interpolate_input_and_output(step['args'], step_num)
 
         # -libjars comes before jar-specific args
         step_args = self._libjar_step_args() + step_args
 
         return boto.emr.JarStep(
-            name='%s: Step %d of %d' % (
-                self._job_key, step_num + 1, self._num_steps()),
+            name=self._step_name(step_num),
             jar=jar,
             main_class=step['main_class'],
             step_args=step_args,
             action_on_failure=self._action_on_failure())
+
+    def _build_spark_step(self, step_num):
+        step = self._get_step(step_num)
+
+        return self._build_spark_step_helper(
+            step_num=step_num,
+            spark_args=step['spark_args'],
+            script=self._script_path,
+            script_args=[
+                '--step-num=%d' % step_num,
+                '--spark',
+                mrjob.step.INPUT,
+                mrjob.step.OUTPUT,
+            ],
+        )
+
+    def _build_spark_script_step(self, step_num):
+        step = self._get_step(step_num)
+
+        return self._build_spark_step_helper(
+            step_num=step_num,
+            spark_args=step['spark_args'],
+            script=step['script'],
+            script_args=step['args'])
+
+    def _build_spark_step_helper(
+            self, step_num, spark_args, script, script_args):
+        """Common code for _build_spark_step() and _build_spark_script_step()
+
+        Interpolates :py:data:`~mrjob.step.INPUT` and
+        :py:data:`~mrjob.step.OUTPUT` into *script_args*, and looks up
+        upload URI of *script*
+        """
+        script = self._upload_uri_or_remote_path(script)
+        script_args = self._interpolate_input_and_output(script_args, step_num)
+
+        jar, step_arg_prefix = self._get_spark_jar_and_step_arg_prefix()
+
+        # have to use `--deploy-mode cluster` to reference s3:// URIs
+        step_args = (
+            step_arg_prefix +
+            _EMR_SPARK_ARGS +
+            spark_args + [script] + script_args)
+
+        return boto.emr.JarStep(
+            name=self._step_name(step_num),
+            jar=jar,
+            step_args=step_args,
+            action_on_failure=self._action_on_failure())
+
+    def _step_name(self, step_num):
+        """Return something like: ``'mr_your_job Step X of Y'``"""
+        return '%s: Step %d of %d' % (
+            self._job_key, step_num + 1, self._num_steps())
+
+    def _upload_uri_or_remote_path(self, path):
+        """Return where *path* will be uploaded, or, if it starts with
+        ``'file:///'``, a local path."""
+        if path.startswith('file:///'):
+            return path[7:]  # keep leading slash
+        else:
+            return self._upload_mgr.uri(path)
+
+    def _interpolate_input_and_output(self, args, step_num):
+
+        def interpolate(arg):
+            if arg == mrjob.step.INPUT:
+                return ','.join(self._step_input_uris(step_num))
+            elif arg == mrjob.step.OUTPUT:
+                return self._step_output_uri(step_num)
+            else:
+                return arg
+
+        return [interpolate(arg) for arg in args]
 
     def _build_master_node_setup_step(self):
         name = '%s: Master node setup' % self._job_key
@@ -1672,6 +1742,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             # 2.x and 3.x AMIs just use a regular old streaming jar
             return _PRE_4_X_STREAMING_JAR, []
+
+    def _get_spark_jar_and_step_arg_prefix(self):
+        # TODO: add spark_submit_bin option
+
+        if version_gte(self.get_ami_version(), '4'):
+            return (_4_X_INTERMEDIARY_JAR, ['spark-submit'])
+        else:
+            return (self._script_runner_jar_uri(), [_3_X_SPARK_SUBMIT])
 
     def _launch_emr_job(self):
         """Create an empty cluster on EMR, and set self._cluster_id to

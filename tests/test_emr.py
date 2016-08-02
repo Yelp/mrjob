@@ -3616,6 +3616,29 @@ class BootstrapPythonTestCase(MockBotoTestCase):
         self._assert_tries_to_install_python3_on_py3(
             '--ami-version', '3.6.0')
 
+    def test_ami_version_3_7_0(self):
+        # the first version where Python 3 is available
+        self._assert_installs_python3_on_py3(
+            '--ami-version', '3.7.0')
+
+    def test_ami_version_4_5_0(self):
+        # the last version where Python 3 is not pre-installed
+        self._assert_installs_python3_on_py3(
+            '--ami-version', '4.5.0')
+
+    def test_ami_version_4_6_0(self):
+        # from this point on, Python 3 is already installed
+        self._assert_never_installs_python3(
+            '--ami-version', '4.6.0')
+
+    def test_force_booststrap_python(self):
+        self._assert_installs_python3_on_py3(
+            '--bootstrap-python', '--ami-version', '4.6.0')
+
+    def test_force_no_bootstrap_python(self):
+        self._assert_never_installs_python3(
+            '--no-bootstrap-python', '--ami-version', '3.7.0')
+
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])
 

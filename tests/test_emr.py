@@ -3568,7 +3568,6 @@ class BootstrapPythonTestCase(MockBotoTestCase):
     def _assert_installs_python3_on_py3(self, *args):
         mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
         with mr_job.make_runner() as runner:
-            self.assertEqual(runner._opts['bootstrap_python'], True)
             self.assertEqual(runner._bootstrap_python(),
                              self.EXPECTED_BOOTSTRAP)
             self.assertEqual(runner._bootstrap,
@@ -3582,7 +3581,6 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             log_to_stream('mrjob.emr', stderr)
 
             with mr_job.make_runner() as runner:
-                self.assertEqual(runner._opts['bootstrap_python'], True)
                 self.assertEqual(runner._bootstrap_python(),
                                  self.EXPECTED_BOOTSTRAP)
                 self.assertEqual(runner._bootstrap,
@@ -3594,7 +3592,6 @@ class BootstrapPythonTestCase(MockBotoTestCase):
     def _assert_never_installs_python3(self, *args):
         mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
         with mr_job.make_runner() as runner:
-            self.assertEqual(runner._opts['bootstrap_python'], False)
             self.assertEqual(runner._bootstrap_python(), [])
             self.assertEqual(runner._bootstrap, [])
 

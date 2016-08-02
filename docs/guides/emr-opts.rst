@@ -458,19 +458,23 @@ and install another Python binary.
    :switch: --bootstrap-python, --no-bootstrap-python
    :type: boolean
    :set: emr
-   :default: ``True``
+   :default: (automatic)
 
    Attempt to install a compatible (major) version of Python at bootstrap time,
    including header files and :command:`pip` (see :ref:`using-pip`).
 
-   In Python 2, this currently does nothing (no need).
+   In Python 2, this never does anything.
 
    In Python 3, this runs
-   :command:`sudo yum install -y python34 python34-devel python34-pip`, which
-   will work unless you've set :mrjob-opt:`ami_version` to something earlier
-   than 3.7.0.
+   :command:`sudo yum install -y python34 python34-devel python34-pip`
+   by default on AMIs prior to 4.6.0 (starting with AMI 4.6.0, Python 3 is
+   pre-installed).
 
    .. versionadded:: 0.5.0
+
+   .. versionchanged:: 0.5.4
+
+      no longer installs Python 3 on AMI version 4.6.0+ by default
 
 .. mrjob-opt::
     :config: bootstrap_python_packages

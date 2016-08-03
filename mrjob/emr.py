@@ -2323,9 +2323,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
                     '-cookbook.html#installing-python-from-source')
 
-                return [[
-                    'sudo yum install -y python34 python34-devel python34-pip'
-                ]]
+            return [[
+                'sudo yum install -y python34 python34-devel python34-pip'
+            ]]
         else:
             return []
 

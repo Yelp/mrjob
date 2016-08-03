@@ -3565,41 +3565,22 @@ class BootstrapPythonTestCase(MockBotoTestCase):
         EXPECTED_BOOTSTRAP = [
             ['sudo yum install -y python34 python34-devel python34-pip']]
 
-    def test_default(self):
-        mr_job = MRTwoStepJob(['-r', 'emr'])
+    def _assert_installs_python3_on_py3(self, *args):
+        mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
         with mr_job.make_runner() as runner:
-            self.assertEqual(runner._opts['bootstrap_python'], True)
             self.assertEqual(runner._bootstrap_python(),
                              self.EXPECTED_BOOTSTRAP)
             self.assertEqual(runner._bootstrap,
                              self.EXPECTED_BOOTSTRAP)
 
-    def test_bootstrap_python_switch(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap-python'])
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(runner._opts['bootstrap_python'], True)
-            self.assertEqual(runner._bootstrap_python(),
-                             self.EXPECTED_BOOTSTRAP)
-            self.assertEqual(runner._bootstrap,
-                             self.EXPECTED_BOOTSTRAP)
-
-    def test_no_bootstrap_python_switch(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '--no-bootstrap-python'])
-        with mr_job.make_runner() as runner:
-            self.assertEqual(runner._opts['bootstrap_python'], False)
-            self.assertEqual(runner._bootstrap_python(), [])
-            self.assertEqual(runner._bootstrap, [])
-
-    def _test_pre_python3_ami_version(self, ami_version):
-        mr_job = MRTwoStepJob(['-r', 'emr', '--ami-version', ami_version])
+    def _assert_tries_to_install_python3_on_py3(self, *args):
+        mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
 
         with no_handlers_for_logger('mrjob.emr'):
             stderr = StringIO()
             log_to_stream('mrjob.emr', stderr)
 
             with mr_job.make_runner() as runner:
-                self.assertEqual(runner._opts['bootstrap_python'], True)
                 self.assertEqual(runner._bootstrap_python(),
                                  self.EXPECTED_BOOTSTRAP)
                 self.assertEqual(runner._bootstrap,
@@ -3608,12 +3589,52 @@ class BootstrapPythonTestCase(MockBotoTestCase):
                 if not PY2:
                     self.assertIn('will probably not work', stderr.getvalue())
 
-    def test_ami_version_3_6_0(self):
-        self._test_pre_python3_ami_version(ami_version='3.6.0')
+    def _assert_never_installs_python3(self, *args):
+        mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._bootstrap_python(), [])
+            self.assertEqual(runner._bootstrap, [])
+
+    def test_default(self):
+        self._assert_installs_python3_on_py3()
+
+    def test_bootstrap_python_switch(self):
+        self._assert_installs_python3_on_py3('--bootstrap-python')
+
+    def test_no_bootstrap_python_switch(self):
+        self._assert_never_installs_python3('--no-bootstrap-python')
 
     def test_ami_version_2_4_11(self):
         # this *really, really* probably won't work, but what can we do?
-        self._test_pre_python3_ami_version(ami_version='2.4.11')
+        self._assert_tries_to_install_python3_on_py3(
+            '--ami-version', '2.4.11')
+
+    def test_ami_version_3_6_0(self):
+        self._assert_tries_to_install_python3_on_py3(
+            '--ami-version', '3.6.0')
+
+    def test_ami_version_3_7_0(self):
+        # the first version where Python 3 is available
+        self._assert_installs_python3_on_py3(
+            '--ami-version', '3.7.0')
+
+    def test_ami_version_4_5_0(self):
+        # the last version where Python 3 is not pre-installed
+        self._assert_installs_python3_on_py3(
+            '--ami-version', '4.5.0')
+
+    def test_ami_version_4_6_0(self):
+        # from this point on, Python 3 is already installed
+        self._assert_never_installs_python3(
+            '--ami-version', '4.6.0')
+
+    def test_force_booststrap_python(self):
+        self._assert_installs_python3_on_py3(
+            '--bootstrap-python', '--ami-version', '4.6.0')
+
+    def test_force_no_bootstrap_python(self):
+        self._assert_never_installs_python3(
+            '--no-bootstrap-python', '--ami-version', '3.7.0')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])

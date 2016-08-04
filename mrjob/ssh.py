@@ -134,7 +134,8 @@ def _ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
     return [ip for ip in ips.split('\n') if ip]
 
 
-def _ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
+def _ssh_cat(ssh_bin, address, ec2_key_pair_file, path,
+             keyfile=None, sudo=False):
     """Return the file at ``path`` as a string. Raises ``IOError`` if the
     file doesn't exist or SSH access fails.
 
@@ -144,14 +145,19 @@ def _ssh_cat(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param path: Path on the remote host to get
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
+    :param sudo: if true, run command with ``sudo``
     """
-    out = _check_output(*_ssh_run_with_recursion(ssh_bin, address,
-                                                 ec2_key_pair_file,
-                                                 keyfile, ['cat', path]))
+    cmd_args = ['cat', path]
+    if sudo:
+        cmd_args = ['sudo'] + cmd_args
+
+    out = _check_output(*_ssh_run_with_recursion(
+        ssh_bin, address, ec2_key_pair_file, keyfile, cmd_args))
     return out
 
 
-def _ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
+def _ssh_ls(ssh_bin, address, ec2_key_pair_file, path,
+            keyfile=None, sudo=False):
     """Recursively list files under ``path`` on the specified SSH host.
     Return the file at ``path`` as a string. Raises ``IOError`` if the
     path doesn't exist or SSH access fails.
@@ -162,10 +168,14 @@ def _ssh_ls(ssh_bin, address, ec2_key_pair_file, path, keyfile=None):
     :param path: Path on the remote host to list
     :param keyfile: Name of the EMR private key file on the master node in case
                     ``path`` exists on one of the slave nodes
+    :param sudo: if true, run command with ``sudo``
     """
+    cmd_args = ['find', '-L', path, '-type', 'f']
+    if sudo:
+        cmd_args = ['sudo'] + cmd_args
+
     out = to_string(_check_output(*_ssh_run_with_recursion(
-        ssh_bin, address, ec2_key_pair_file, keyfile,
-        ['find', '-L', path, '-type', 'f'])))
+        ssh_bin, address, ec2_key_pair_file, keyfile, cmd_args)))
     if 'No such file or directory' in out:
         raise IOError("No such file or directory: %s" % path)
     return out.split('\n')

@@ -895,7 +895,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if self._opts['ec2_key_pair_file']:
                 ssh_fs = SSHFilesystem(
                     ssh_bin=self._opts['ssh_bin'],
-                    ec2_key_pair_file=self._opts['ec2_key_pair_file'])
+                    ec2_key_pair_file=self._opts['ec2_key_pair_file'],
+                    sudo=True)
 
                 self._fs = CompositeFilesystem(
                     ssh_fs, s3_fs, LocalFilesystem())

@@ -38,7 +38,7 @@ class SSHFilesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
 
-    def __init__(self, ssh_bin, ec2_key_pair_file):
+    def __init__(self, ssh_bin, ec2_key_pair_file, sudo=False):
         """
         :param ssh_bin: path to ``ssh`` binary
         :param ec2_key_pair_file: path to an SSH keyfile
@@ -55,6 +55,9 @@ class SSHFilesystem(Filesystem):
 
         # keep track of the slave hosts accessible through each host
         self._host_to_slave_hosts = {}
+
+        # should we use sudo? (for EMR)
+        self._sudo = sudo
 
     def can_handle_path(self, path):
         return _SSH_URI_RE.match(path) is not None
@@ -105,6 +108,7 @@ class SSHFilesystem(Filesystem):
             self._ec2_key_pair_file,
             m.group('filesystem_path'),
             keyfile,
+            sudo=self._sudo,
         )
 
         for line in output:
@@ -127,6 +131,7 @@ class SSHFilesystem(Filesystem):
             self._ec2_key_pair_file,
             ssh_match.group('filesystem_path'),
             keyfile,
+            sudo=self._sudo,
         )
         return read_file(filename, fileobj=BytesIO(output))
 

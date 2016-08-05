@@ -180,6 +180,14 @@ def main(stdin, stdout, stderr, args, environ):
         """
         remote_arg_pos = 0
 
+        # handle sudo
+        if remote_args[0] == 'sudo':
+            remote_args = remote_args[1:]
+        elif environ.get('MOCK_SSH_REQUIRES_SUDO'):
+            if remote_args[0] in ('find', 'cat'):
+                print('sudo required')
+                return 1
+
         # Get slave addresses (this is 'bash -c "hadoop dfsadmn ...')
         if remote_args[0].startswith('bash -c "hadoop'):
             return slave_addresses()

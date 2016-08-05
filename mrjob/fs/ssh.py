@@ -158,3 +158,8 @@ class SSHFilesystem(Filesystem):
                 self._ssh_bin, host, self._ec2_key_pair_file)
 
         return self._host_to_slave_hosts[host]
+
+    def use_sudo_over_ssh(self, sudo=True):
+        """Use this to turn on *sudo* (we do this depending on the AMI
+        version on EMR)."""
+        self._sudo = sudo

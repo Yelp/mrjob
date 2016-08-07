@@ -211,10 +211,10 @@ class ParseLegacyHashPathTestCase(TestCase):
             parse_legacy_hash_path, 'file', 'foo#bar/baz')
 
 
-class NameUniqueTestCase(TestCase):
+class NameUniquelyTestCase(TestCase):
 
     def test_no_empty_names(self):
-        self.assertEqual(name_uniquely(''), '_')
+        self.assertEqual(name_uniquely(''), '1')
 
     def test_empty_proposed_name_same_as_none(self):
         self.assertEqual(name_uniquely('foo.py', proposed_name=None), 'foo.py')
@@ -222,7 +222,7 @@ class NameUniqueTestCase(TestCase):
 
     def test_use_basename_by_default(self):
         self.assertEqual(name_uniquely('foo/bar.py'), 'bar.py')
-        self.assertEqual(name_uniquely('foo/bar/'), '_')
+        self.assertEqual(name_uniquely('foo/bar/'), '1')
 
     def test_dont_use_names_taken(self):
         self.assertEqual(name_uniquely('foo.py'), 'foo.py')
@@ -265,8 +265,8 @@ class NameUniqueTestCase(TestCase):
             'foo-1')
         self.assertEqual(
             name_uniquely(
-                '', names_taken=['_']),
-            '_-1')
+                '', names_taken=['1']),
+            '2')
 
     def test_initial_dot_isnt_extension(self):
         self.assertEqual(
@@ -341,8 +341,8 @@ class UploadDirManagerTestCase(TestCase):
         sd.add('foo/_bar.py')
         sd.add('_bar.py')
         self.assertEqual(sd.path_to_uri(),
-                         {'foo/bar.py': 'hdfs:///bar.py',
-                          'bar.py': 'hdfs:///bar-1.py'})
+                         {'foo/_bar.py': 'hdfs:///bar.py',
+                          '_bar.py': 'hdfs:///bar-1.py'})
 
     def test_underscores_only(self):
         sd = UploadDirManager('hdfs:///')
@@ -439,3 +439,11 @@ class WorkingDirManagerTestCase(TestCase):
         self.assertEqual(wd.name('file', 'bar.py', 'qux.py'), 'qux.py')
         self.assertRaises(ValueError,
                           wd.name, 'file', 'bar.py')
+
+    def test_allow_hidden_files(self):
+        wd = WorkingDirManager()
+        wd.add('archive', '_foo.tar.gz')
+        wd.add('file', '.bazrc')
+
+        self.assertEqual(wd.name('archive', '_foo.tar.gz'), '_foo.tar.gz')
+        self.assertEqual(wd.name('file', '.bazrc'), '.bazrc')

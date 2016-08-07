@@ -327,6 +327,44 @@ class UploadDirManagerTestCase(TestCase):
         self.assertEqual(sd.path_to_uri(),
                          {'foo/bar.py': 's3://bucket/dir/bar.py'})
 
+    def test_unhide_files(self):
+        # avoid giving names to files that Hadoop will ignore as input
+        sd = UploadDirManager('hdfs:///')
+        sd.add('.foo.log')
+        sd.add('_bar.txt')
+        self.assertEqual(sd.path_to_uri(),
+                         {'.foo.log': 'hdfs:///foo.log',
+                          '_bar.txt': 'hdfs:///bar.txt'})
+
+    def test_hidden_file_name_collision(self):
+        sd = UploadDirManager('hdfs:///')
+        sd.add('foo/_bar.py')
+        sd.add('_bar.py')
+        self.assertEqual(sd.path_to_uri(),
+                         {'foo/bar.py': 'hdfs:///bar.py',
+                          'bar.py': 'hdfs:///bar-1.py'})
+
+    def test_underscores_only(self):
+        sd = UploadDirManager('hdfs:///')
+        sd.add('_')
+        sd.add('_.txt')
+
+        self.assertEqual(sd.path_to_uri(),
+                         {'_': 'hdfs:///1',
+                          '_.txt': 'hdfs:///1.txt'})
+
+    def test_dot_underscore(self):
+        sd = UploadDirManager('hdfs:///')
+
+        sd.add('._')
+        sd.add('._.txt')
+        sd.add('._foo')
+
+        self.assertEqual(sd.path_to_uri(),
+                         {'._': 'hdfs:///1',
+                          '._.txt': 'hdfs:///1.txt',
+                          '._foo': 'hdfs:///foo'})
+
 
 class WorkingDirManagerTestCase(TestCase):
 

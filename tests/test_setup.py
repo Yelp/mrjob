@@ -279,6 +279,24 @@ class NameUniquelyTestCase(TestCase):
                 '.mrjob.conf', names_taken=['.mrjob.conf']),
             '.mrjob-1.conf')  # not '-1.mrjob.conf'
 
+    def test_unhide(self):
+        self.assertEqual(
+            name_uniquely('.emacs', unhide=True), 'emacs')
+        self.assertEqual(
+            name_uniquely('._foo', unhide=True), 'foo')
+        self.assertEqual(
+            name_uniquely('_.bar', unhide=True), '1.bar')
+        self.assertEqual(
+            name_uniquely('_', unhide=True), '1')
+
+    def test_unhide_affects_proposed_name(self):
+        # these options aren't used together in practice, but of course
+        # the proposed name is the one we care about if it's given
+        self.assertEqual(
+            name_uniquely(
+                'foo.py', proposed_name='.hidden.foo.py', unhide=True),
+            'hidden.foo.py')
+
 
 class UploadDirManagerTestCase(TestCase):
 

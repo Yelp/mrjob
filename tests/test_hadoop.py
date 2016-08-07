@@ -482,6 +482,17 @@ class StreamHistoryLogDirsTestCase(StreamingLogDirsTestCase):
 
         self.assertRaises(StopIteration, next, results)
 
+    def test_io_error_from_fs_exists(self):
+        self.runner._hadoop_log_dirs.return_value = [
+            'hdfs:///tmp/output/_logs',
+        ]
+
+        self.runner.fs.exists.side_effect = IOError
+
+        results = self.runner._stream_history_log_dirs()
+
+        self.assertRaises(StopIteration, next, results)
+
 
 class StreamTaskLogDirsTestCase(StreamingLogDirsTestCase):
 
@@ -539,6 +550,18 @@ class StreamTaskLogDirsTestCase(StreamingLogDirsTestCase):
         results = self.runner._stream_task_log_dirs()
 
         self.assertRaises(StopIteration, next, results)
+
+    def test_io_error_from_fs_exists(self):
+        self.runner._hadoop_log_dirs.return_value = [
+            'hdfs:///tmp/output/_logs',
+        ]
+
+        self.runner.fs.exists.side_effect = IOError
+
+        results = self.runner._stream_task_log_dirs()
+
+        self.assertRaises(StopIteration, next, results)
+
 
 
 class MockHadoopTestCase(SandboxedTestCase):

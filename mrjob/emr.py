@@ -448,7 +448,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         return combine_dicts(super_opts, {
             'ami_version': _DEFAULT_AMI_VERSION,
             'aws_region': _DEFAULT_AWS_REGION,
-            'bootstrap_python': True,
+            'bootstrap_python': None,
             'check_emr_status_every': 30,
             'cleanup_on_failure': ['JOB'],
             'ec2_core_instance_type': 'm1.medium',
@@ -899,13 +899,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 s3_endpoint=self._opts['s3_endpoint'])
 
             if self._opts['ec2_key_pair_file']:
-                ssh_fs = SSHFilesystem(
+                self._ssh_fs = SSHFilesystem(
                     ssh_bin=self._opts['ssh_bin'],
                     ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
                 self._fs = CompositeFilesystem(
-                    ssh_fs, s3_fs, LocalFilesystem())
+                    self._ssh_fs, s3_fs, LocalFilesystem())
             else:
+                self._ssh_fs = None
                 self._fs = CompositeFilesystem(s3_fs, LocalFilesystem())
 
         return self._fs
@@ -1795,6 +1796,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                                for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
 
+        # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
+        if self._ssh_fs and version_gte(self.get_ami_version(), '4.3.0'):
+            self._ssh_fs.use_sudo_over_ssh()
+
     def _job_steps(self, max_steps=None):
         """Get the steps we submitted for this job in chronological order,
         ignoring steps from other jobs.
@@ -2380,26 +2385,32 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _bootstrap_python(self):
         """Return a (possibly empty) list of parsed commands (in the same
         format as returned by parse_setup_cmd())'"""
-        if not self._opts['bootstrap_python']:
-            return []
-
         if PY2:
             # Python 2 and pip are basically already installed everywhere
             # (Okay, there's no pip on AMIs prior to 2.4.3, but there's no
             # longer an easy way to get it now that apt-get is broken.)
             return []
 
-        # we have to have at least on AMI 3.7.0. But give it a shot
-        if not (self._opts['release_label'] or
-                version_gte(self._opts['ami_version'], '3.7.0')):
-            log.warning(
-                'bootstrapping Python 3 will probably not work on'
-                ' AMIs prior to 3.7.0. For an alternative, see:'
-                ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
-                '-cookbook.html#installing-python-from-source')
+        # if bootstrap_python is None, install it for all AMIs up to 4.6.0,
+        # and warn if it's an AMI before 3.7.0
+        if self._opts['bootstrap_python'] or (
+                self._opts['bootstrap_python'] is None and
+                not version_gte(self._opts['ami_version'], '4.6.0')):
 
-        return [
-            ['sudo yum install -y python34 python34-devel python34-pip']]
+            # we have to have at least on AMI 3.7.0. But give it a shot
+            if not (self._opts['release_label'] or
+                    version_gte(self._opts['ami_version'], '3.7.0')):
+                log.warning(
+                    'bootstrapping Python 3 will probably not work on'
+                    ' AMIs prior to 3.7.0. For an alternative, see:'
+                    ' https://pythonhosted.org/mrjob/guides/emr-bootstrap'
+                    '-cookbook.html#installing-python-from-source')
+
+            return [[
+                'sudo yum install -y python34 python34-devel python34-pip'
+            ]]
+        else:
+            return []
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with

@@ -80,3 +80,11 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
             return _sort_by_recency(matches)
 
     return []
+
+
+def _logs_exist(fs, path):
+    """Do ``fs.exists(path)``, and return ``None`` if it raises ``IOError``"""
+    try:
+        return fs.exists(path)
+    except IOError:
+        return None

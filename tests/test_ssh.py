@@ -13,8 +13,4 @@
 # limitations under the License.
 """Tests for mrjob.ssh"""
 
-# *chirp*
-
-# *chirp*
-
-# *chirp*
+# this is mostly tested indirectly through fs/test_ssh.py.

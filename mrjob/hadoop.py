@@ -43,6 +43,7 @@ from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
+from mrjob.logs.wrap import _logs_exist
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
 from mrjob.runner import MRJobRunner
@@ -587,7 +588,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
         for log_dir in unique(self._hadoop_log_dirs(output_dir=output_dir)):
-            if self.fs.exists(log_dir):
+            if _logs_exist(self.fs, log_dir):
                 log.info('Looking for history log in %s...' % log_dir)
                 # logs aren't always in a subdir named history/
                 yield [log_dir]
@@ -603,7 +604,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             else:
                 path = self.fs.join(log_dir, 'userlogs')
 
-            if self.fs.exists(path):
+            if _logs_exist(self.fs, path):
                 log.info('Looking for task syslogs in %s...' % path)
                 yield [path]
 

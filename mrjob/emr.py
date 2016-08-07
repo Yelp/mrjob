@@ -893,13 +893,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 s3_endpoint=self._opts['s3_endpoint'])
 
             if self._opts['ec2_key_pair_file']:
-                ssh_fs = SSHFilesystem(
+                self._ssh_fs = SSHFilesystem(
                     ssh_bin=self._opts['ssh_bin'],
                     ec2_key_pair_file=self._opts['ec2_key_pair_file'])
 
                 self._fs = CompositeFilesystem(
-                    ssh_fs, s3_fs, LocalFilesystem())
+                    self._ssh_fs, s3_fs, LocalFilesystem())
             else:
+                self._ssh_fs = None
                 self._fs = CompositeFilesystem(s3_fs, LocalFilesystem())
 
         return self._fs
@@ -1716,6 +1717,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                      ', '.join('%s=%s' % (tag, value)
                                for tag, value in tags.items()))
             emr_conn.add_tags(self._cluster_id, tags)
+
+        # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
+        if self._ssh_fs and version_gte(self.get_ami_version(), '4.3.0'):
+            self._ssh_fs.use_sudo_over_ssh()
 
     def _job_steps(self, max_steps=None):
         """Get the steps we submitted for this job in chronological order,

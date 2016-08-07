@@ -56,6 +56,9 @@ class SSHFilesystem(Filesystem):
         # keep track of the slave hosts accessible through each host
         self._host_to_slave_hosts = {}
 
+        # should we use sudo (for EMR)? Enable with use_sudo_over_ssh()
+        self._sudo = False
+
     def can_handle_path(self, path):
         return _SSH_URI_RE.match(path) is not None
 
@@ -105,6 +108,7 @@ class SSHFilesystem(Filesystem):
             self._ec2_key_pair_file,
             m.group('filesystem_path'),
             keyfile,
+            sudo=self._sudo,
         )
 
         for line in output:
@@ -127,6 +131,7 @@ class SSHFilesystem(Filesystem):
             self._ec2_key_pair_file,
             ssh_match.group('filesystem_path'),
             keyfile,
+            sudo=self._sudo,
         )
         return read_file(filename, fileobj=BytesIO(output))
 
@@ -153,3 +158,8 @@ class SSHFilesystem(Filesystem):
                 self._ssh_bin, host, self._ec2_key_pair_file)
 
         return self._host_to_slave_hosts[host]
+
+    def use_sudo_over_ssh(self, sudo=True):
+        """Use this to turn on *sudo* (we do this depending on the AMI
+        version on EMR)."""
+        self._sudo = sudo

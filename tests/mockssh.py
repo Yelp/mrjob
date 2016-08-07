@@ -20,6 +20,9 @@ MOCK_SSH_ROOTS -- specify directories for hosts in the form:
 MOCK_SSH_VERIFY_KEY_FILE -- set to 'true' if the script should print an error
                             when the key file does not exist
 
+You can optionally set MOCK_SSH_REQUIRES_SUDO to 1 (or any nonempty value)
+to raise an error unless ls and cat are preceded by sudo.
+
 This is designed to run as: python -m tests.mockssh <ssh args>
 
 mrjob requires a single binary (no args) to stand in for ssh, so
@@ -180,6 +183,14 @@ def main(stdin, stdout, stderr, args, environ):
         """
         remote_arg_pos = 0
 
+        # handle sudo
+        if remote_args[0] == 'sudo':
+            remote_args = remote_args[1:]
+        elif environ.get('MOCK_SSH_REQUIRES_SUDO'):
+            if remote_args[0] in ('find', 'cat'):
+                print('sudo required', file=stderr)
+                return 1
+
         # Get slave addresses (this is 'bash -c "hadoop dfsadmn ...')
         if remote_args[0].startswith('bash -c "hadoop'):
             return slave_addresses()
@@ -223,7 +234,7 @@ def main(stdin, stdout, stderr, args, environ):
 
             # build bang path
             return run(slave_host, remote_args[remote_arg_pos + 1:],
-                       stdin, stdout, stderr, slave_key_file)
+                       stdout, stderr, environ, slave_key_file)
 
         print(("Command line not recognized: %s" %
                ' '.join(remote_args)), file=stderr)

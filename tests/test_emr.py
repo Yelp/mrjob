@@ -4912,3 +4912,46 @@ class CheckForFailedBootstrapActionTestCase(MockBotoTestCase):
         self.assertTrue(self.log.error.called)
         self.assertIn('BOOM!', self.log.error.call_args[0][0])
         self.assertIn(stderr_path, self.log.error.call_args[0][0])
+
+
+class UseSudoOverSshTestCase(MockBotoTestCase):
+
+    def test_ami_4_3_0_with_ssh_fs(self):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ec2-key-pair-file', '/path/to/EMR.pem',
+             '--ami-version', '4.3.0']).sandbox()
+
+        with job.make_runner() as runner:
+            self.assertIsNotNone(runner._ssh_fs)
+            self.assertFalse(runner._ssh_fs._sudo)
+
+            runner._launch()
+
+            self.assertTrue(runner._ssh_fs._sudo)
+
+    def test_ami_4_2_0_with_ssh_fs(self):
+
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ec2-key-pair-file', '/path/to/EMR.pem',
+             '--ami-version', '4.2.0']).sandbox()
+
+        with job.make_runner() as runner:
+            self.assertIsNotNone(runner._ssh_fs)
+            self.assertFalse(runner._ssh_fs._sudo)
+
+            runner._launch()
+
+            self.assertFalse(runner._ssh_fs._sudo)
+
+    def test_ami_4_3_0_without_ssh_fs(self):
+        # just make sure we don't cause an error trying to set up sudo
+        # on a nonexistent filesystem
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ami-version', '4.3.0']).sandbox()
+
+        with job.make_runner() as runner:
+            self.assertIsNone(runner._ssh_fs)
+
+            runner._launch()
+
+            self.assertIsNone(runner._ssh_fs)

@@ -248,3 +248,17 @@ class SSHFSTestCase(MockSubprocessTestCase):
     def test_md5sum(self):
         # not implemented
         self.assertRaises(IOError, self.fs.md5sum, 'ssh://testmaster/d')
+
+    def test_ssh_slave_hosts(self):
+        self.add_slave()
+        self.add_slave()
+
+        self.assertEquals(self.fs.ssh_slave_hosts('testmaster'),
+                          ['testslave1', 'testslave2'])
+
+    def test_ssh_no_slave_hosts(self):
+        self.assertEquals(self.fs.ssh_slave_hosts('testmaster'), [])
+
+    def test_ssh_slave_hosts_doesnt_care_about_sudo(self):
+        self.require_sudo()
+        self.test_ssh_slave_hosts()

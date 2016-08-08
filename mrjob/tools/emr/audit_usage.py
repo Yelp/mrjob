@@ -46,11 +46,12 @@ Options::
 # http://aws.amazon.com/elasticmapreduce/faqs/
 from __future__ import print_function
 
-from datetime import datetime
-from datetime import timedelta
 import math
 import logging
 import re
+from datetime import datetime
+from datetime import timedelta
+from time import sleep
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
@@ -71,6 +72,9 @@ _JOB_KEY_RE = re.compile(r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+)$')
 # match an mrjob step name (these are used to name steps in EMR)
 _STEP_NAME_RE = re.compile(
     r'^(.*)\.(.*)\.(\d+)\.(\d+)\.(\d+): Step (\d+) of (\d+)$')
+
+# wait one second between successive calls to EMR API
+_DELAY = 1
 
 log = logging.getLogger(__name__)
 
@@ -608,14 +612,18 @@ def _yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
     if max_days_ago is not None:
         created_after = now - timedelta(days=max_days_ago)
 
+    # use _DELAY to sleep 1 second before each API call (see #1091). Could
+    # implement some sort of connection wrapper for this if it becomes more
+    # generally useful.
     for cluster_summary in _yield_all_clusters(
-            emr_conn, created_after=created_after):
+            emr_conn, created_after=created_after, _delay=_DELAY):
         cluster_id = cluster_summary.id
 
+        sleep(_DELAY)
         cluster = _patched_describe_cluster(emr_conn, cluster_id)
-        cluster.steps = _list_all_steps(emr_conn, cluster_id)
+        cluster.steps = _list_all_steps(emr_conn, cluster_id, _delay=_DELAY)
         cluster.bootstrapactions = list(
-            _yield_all_bootstrap_actions(emr_conn, cluster_id))
+            _yield_all_bootstrap_actions(emr_conn, cluster_id, _delay=_DELAY))
 
         yield cluster
 

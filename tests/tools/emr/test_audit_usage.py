@@ -28,14 +28,27 @@ from mrjob.tools.emr.audit_usage import main
 
 from tests.mockboto import MockEmrObject
 from tests.py2 import TestCase
+from tests.py2 import patch
 from tests.tools.emr import ToolTestCase
 
 
 class AuditUsageTestCase(ToolTestCase):
 
+    def setUp(self):
+        super(AuditUsageTestCase, self).setUp()
+
+        self.repeat_sleep = self.start(patch('time.sleep'))
+        # this is called once per cluster (no pagination), so we can
+        # test quantity as well as whether it was called
+        self.describe_cluster_sleep = self.start(
+            patch('mrjob.tools.emr.audit_usage.sleep'))
+
     def test_with_no_clusters(self):
         self.monkey_patch_stdout()
-        main(['-q', '--no-conf'])  # just make sure it doesn't crash
+        main(['-q', '--no-conf'])  # make sure it doesn't crash
+
+        self.assertTrue(self.repeat_sleep.called)
+        self.assertFalse(self.describe_cluster_sleep.called)
 
     def test_with_one_cluster(self):
         emr_conn = boto.emr.connection.EmrConnection()
@@ -45,6 +58,9 @@ class AuditUsageTestCase(ToolTestCase):
         self.monkey_patch_stdout()
         main(['-q', '--no-conf'])
         self.assertIn(b'j-MOCKCLUSTER0', sys.stdout.getvalue())
+
+        self.assertTrue(self.repeat_sleep.called)
+        self.assertEqual(self.describe_cluster_sleep.call_count, 1)
 
 
 class ClusterToFullSummaryTestCase(TestCase):

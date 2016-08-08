@@ -196,9 +196,18 @@ def _repeat(api_call, *args, **kwargs):
 
     Yields one or more responses.
     """
+    # the _delay kwarg sleeps that many seconds before each API call
+    # (including the first). This was added for audit-emr-usage; should
+    # re-visit if we need to use more generally. See #1091
+
     marker = None
 
+    _delay = kwargs.pop('_delay', None)
+
     while True:
+        if _delay:
+            time.sleep(_delay)
+
         resp = api_call(*args, marker=marker, **kwargs)
         yield resp
 

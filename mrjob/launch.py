@@ -68,8 +68,6 @@ class MRJobLauncher(object):
     #: :py:class:`optparse.OptionParser` instance.
     OPTION_CLASS = Option
 
-    _DEFAULT_RUNNER = 'local'
-
     def __init__(self, script_path=None, args=None, from_cl=False):
         """
         :param script_path: Path to script unless it's the first item of *args*
@@ -294,7 +292,7 @@ class MRJobLauncher(object):
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        _add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
+        _add_runner_opts(self.runner_opt_group)
         _add_basic_opts(self.runner_opt_group)
 
         # options for inline/local runners

@@ -79,7 +79,7 @@ def _add_basic_opts(opt_group):
     ]
 
 
-def _add_runner_opts(opt_group, default_runner='local'):
+def _add_runner_opts(opt_group):
     """Options for all runners."""
     return [
         opt_group.add_option(
@@ -176,12 +176,10 @@ def _add_runner_opts(opt_group, default_runner='local'):
                   ' include arguments, e.g. --python-bin "python -v"')),
 
         opt_group.add_option(
-            '-r', '--runner', dest='runner', default=default_runner,
+            '-r', '--runner', dest='runner', default=None,
             choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
-            help=('Where to run the job: local to run locally, hadoop to run'
-                  ' on your Hadoop cluster, emr to run on Amazon'
-                  ' ElasticMapReduce, and inline for local debugging. Default'
-                  ' is %s.' % default_runner)),
+            help=('Where to run the job; one of dataproc, emr, hadoop, inline,'
+                  ' or local')),
 
         opt_group.add_option(
             '--setup', dest='setup', action='append',

@@ -79,10 +79,6 @@ class MRJob(MRJobLauncher):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
 
-    # inline can be the default because we have the class object in the same
-    # process as the launcher
-    _DEFAULT_RUNNER = 'inline'
-
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
 

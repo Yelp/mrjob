@@ -383,6 +383,9 @@ class MRJobLauncher(object):
 
         If you want to pass files through to the mapper/reducer, use
         :py:meth:`add_file_option` instead.
+
+        If you want to pass through a built-in option (e.g. ``--runner``, use
+        :py:meth:`pass_through_option` instead.
         """
         if 'opt_group' in kwargs:
             pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
@@ -390,6 +393,13 @@ class MRJobLauncher(object):
             pass_opt = self.option_parser.add_option(*args, **kwargs)
 
         self._passthrough_options.append(pass_opt)
+
+    def pass_through_option(self, opt_str):
+        """Pass through a built-in option to tasks. For example:
+        ``job.pass_through_option('--runner')``.
+        """
+        self._passthrough_options.append(
+            self.option_parser.get_option(opt_str))
 
     def add_file_option(self, *args, **kwargs):
         """Add a command-line option that sends an external file

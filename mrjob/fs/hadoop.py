@@ -267,7 +267,7 @@ class HadoopFilesystem(Filesystem):
         def cleanup():
             # there shouldn't be any stderr
             for line in cat_proc.stderr:
-                log.error('STDERR: ' + line)
+                log.error('STDERR: ' + line.decode('utf-8'))
 
             cat_proc.stdout.close()
             cat_proc.stderr.close()

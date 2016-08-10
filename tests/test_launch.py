@@ -29,6 +29,8 @@ from mrjob.launch import MRJobLauncher
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 
+from tests.mr_no_runner import MRNoRunner
+from tests.mr_runner import MRRunner
 from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import TestCase
@@ -327,3 +329,26 @@ class TestToolLogging(TestCase):
                 log.info('INFO')
                 log.debug('DEBUG')
                 self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
+
+
+class TestPassThroughRunner(TestCase):
+
+    def get_value(self, job):
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = job.parse_output_line(line)
+                return value
+
+    def test_no_pass_through(self):
+        self.assertEqual(self.get_value(MRNoRunner()), None)
+        self.assertEqual(self.get_value(MRNoRunner(['-r', 'inline'])), None)
+        self.assertEqual(self.get_value(MRNoRunner(['-r', 'local'])), None)
+
+    def test_pass_through(self):
+        self.assertEqual(self.get_value(MRRunner()), None)
+        self.assertEqual(self.get_value(MRRunner(['-r', 'inline'])), 'inline')
+        self.assertEqual(self.get_value(MRRunner(['-r', 'local'])), 'local')

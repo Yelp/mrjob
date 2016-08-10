@@ -79,10 +79,14 @@ configuration options.
 .. automethod:: MRJob.configure_options
 .. automethod:: MRJob.add_passthrough_option
 .. automethod:: MRJob.add_file_option
+.. automethod:: MRJob.pass_through_option
 .. automethod:: MRJob.load_options
 .. automethod:: MRJob.is_task
 
 .. autoattribute:: MRJob.OPTION_CLASS
+
+   Redefine this if you want to use a subclass of :py:class:`optparse.Option`
+   for option parsing.
 
 .. _job-configuration:
 

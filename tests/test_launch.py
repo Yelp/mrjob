@@ -29,6 +29,8 @@ from mrjob.launch import MRJobLauncher
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 
+from tests.mr_no_runner import MRNoRunner
+from tests.mr_runner import MRRunner
 from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import TestCase
@@ -64,6 +66,8 @@ class MRCustomJobLauncher(MRJobLauncher):
         self.add_passthrough_option(
             '--extra-special-arg', '-S', action='append',
             dest='extra_special_args', default=[])
+
+        self.pass_through_option('--runner')
 
         self.add_file_option('--foo-config', dest='foo_config', default=None)
         self.add_file_option('--accordian-file', dest='accordian_files',
@@ -171,6 +175,7 @@ class CommandLineArgsTestCase(TestCase):
         self.assertEqual(mr_job.options.pill_type, 'blue')
         self.assertEqual(mr_job.options.planck_constant, 6.626068e-34)
         self.assertEqual(mr_job.options.extra_special_args, [])
+        self.assertEqual(mr_job.options.runner, None)
         # should include all --protocol options
         # should include default value of --num-items
         # should use long option names (--protocol, not -p)
@@ -190,6 +195,7 @@ class CommandLineArgsTestCase(TestCase):
             '--planck-constant', '42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
+            '--runner', 'inline',
         ])
 
         self.assertEqual(mr_job.options.foo_size, 9)
@@ -211,6 +217,7 @@ class CommandLineArgsTestCase(TestCase):
                 '--planck-constant', '1',
                 '--planck-constant', '42',
                 '--disable-quuxing',
+                '--runner', 'inline',
             ]
         )
 
@@ -221,6 +228,7 @@ class CommandLineArgsTestCase(TestCase):
             '-F9', '-BAlembic', '-MQ', '-T', 'red', '-C1', '-C42',
             '--extra-special-arg', 'you',
             '--extra-special-arg', 'me',
+            '-r', 'inline',
         ])
 
         self.assertEqual(mr_job.options.foo_size, 9)
@@ -242,6 +250,7 @@ class CommandLineArgsTestCase(TestCase):
                 '-C', '1',
                 '-C', '42',
                 '-Q',
+                '-r', 'inline',
             ]
         )
 
@@ -320,3 +329,26 @@ class TestToolLogging(TestCase):
                 log.info('INFO')
                 log.debug('DEBUG')
                 self.assertEqual(stderr.getvalue(), 'INFO\nDEBUG\n')
+
+
+class TestPassThroughRunner(TestCase):
+
+    def get_value(self, job):
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for line in runner.stream_output():
+                key, value = job.parse_output_line(line)
+                return value
+
+    def test_no_pass_through(self):
+        self.assertEqual(self.get_value(MRNoRunner()), None)
+        self.assertEqual(self.get_value(MRNoRunner(['-r', 'inline'])), None)
+        self.assertEqual(self.get_value(MRNoRunner(['-r', 'local'])), None)
+
+    def test_pass_through(self):
+        self.assertEqual(self.get_value(MRRunner()), None)
+        self.assertEqual(self.get_value(MRRunner(['-r', 'inline'])), 'inline')
+        self.assertEqual(self.get_value(MRRunner(['-r', 'local'])), 'local')

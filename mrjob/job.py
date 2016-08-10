@@ -79,10 +79,6 @@ class MRJob(MRJobLauncher):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
 
-    # inline can be the default because we have the class object in the same
-    # process as the launcher
-    _DEFAULT_RUNNER = 'inline'
-
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
 
@@ -467,7 +463,8 @@ class MRJob(MRJobLauncher):
         # support inline runner when running from the MRJob itself
         from mrjob.inline import InlineMRJobRunner
 
-        if self.options.runner == 'inline':
+        # inline is the default, not local
+        if not self.options.runner or self.options.runner == 'inline':
             return InlineMRJobRunner(mrjob_cls=self.__class__,
                                      **self.inline_job_runner_kwargs())
 
@@ -798,6 +795,20 @@ class MRJob(MRJobLauncher):
     ### Command-line arguments ###
 
     def configure_options(self):
+        """Define arguments for this script. Called from :py:meth:`__init__()`.
+
+        Re-define to define custom command-line arguments or pass
+        through existing ones::
+
+            def configure_options(self):
+                super(MRYourJob, self).configure_options()
+
+                self.add_passthrough_option(...)
+                self.add_file_option(...)
+                self.pass_through_option(...)
+                ...
+        """
+
         super(MRJob, self).configure_options()
 
         # To run mappers or reducers

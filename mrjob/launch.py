@@ -68,8 +68,6 @@ class MRJobLauncher(object):
     #: :py:class:`optparse.OptionParser` instance.
     OPTION_CLASS = Option
 
-    _DEFAULT_RUNNER = 'local'
-
     def __init__(self, script_path=None, args=None, from_cl=False):
         """
         :param script_path: Path to script unless it's the first item of *args*
@@ -244,15 +242,15 @@ class MRJobLauncher(object):
     def configure_options(self):
         """Define arguments for this script. Called from :py:meth:`__init__()`.
 
-        Run ``python -m mrjob.job.MRJob --help`` to see all options.
-
-        Re-define to define custom command-line arguments::
+        Re-define to define custom command-line arguments or pass
+        through existing ones::
 
             def configure_options(self):
                 super(MRYourJob, self).configure_options
 
                 self.add_passthrough_option(...)
                 self.add_file_option(...)
+                self.pass_through_option(...)
                 ...
         """
         self.option_parser.add_option(
@@ -294,7 +292,7 @@ class MRJobLauncher(object):
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        _add_runner_opts(self.runner_opt_group, self._DEFAULT_RUNNER)
+        _add_runner_opts(self.runner_opt_group)
         _add_basic_opts(self.runner_opt_group)
 
         # options for inline/local runners
@@ -385,6 +383,9 @@ class MRJobLauncher(object):
 
         If you want to pass files through to the mapper/reducer, use
         :py:meth:`add_file_option` instead.
+
+        If you want to pass through a built-in option (e.g. ``--runner``, use
+        :py:meth:`pass_through_option` instead.
         """
         if 'opt_group' in kwargs:
             pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
@@ -392,6 +393,26 @@ class MRJobLauncher(object):
             pass_opt = self.option_parser.add_option(*args, **kwargs)
 
         self._passthrough_options.append(pass_opt)
+
+    def pass_through_option(self, opt_str):
+        """Pass through a built-in option to tasks. For example, for
+        tasks to see which runner launched them::
+
+            def configure_options(self):
+                super(MRYourJob, self).configure_options()
+                self.pass_through_option('--runner')
+
+            def mapper_init(self):
+                if self.options.runner == 'emr':
+                    ...
+
+         *opt_str* can be a long option switch like ``--runner`` or a short
+         one like ``-r``.
+
+         .. versionadded:: 0.5.4
+         """
+        self._passthrough_options.append(
+            self.option_parser.get_option(opt_str))
 
     def add_file_option(self, *args, **kwargs):
         """Add a command-line option that sends an external file

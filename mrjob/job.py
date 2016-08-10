@@ -463,7 +463,8 @@ class MRJob(MRJobLauncher):
         # support inline runner when running from the MRJob itself
         from mrjob.inline import InlineMRJobRunner
 
-        if self.options.runner == 'inline':
+        # inline is the default, not local
+        if not self.options.runner or self.options.runner == 'inline':
             return InlineMRJobRunner(mrjob_cls=self.__class__,
                                      **self.inline_job_runner_kwargs())
 

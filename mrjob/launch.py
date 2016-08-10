@@ -242,15 +242,15 @@ class MRJobLauncher(object):
     def configure_options(self):
         """Define arguments for this script. Called from :py:meth:`__init__()`.
 
-        Run ``python -m mrjob.job.MRJob --help`` to see all options.
-
-        Re-define to define custom command-line arguments::
+        Re-define to define custom command-line arguments or pass
+        through existing ones::
 
             def configure_options(self):
                 super(MRYourJob, self).configure_options
 
                 self.add_passthrough_option(...)
                 self.add_file_option(...)
+                self.pass_through_option(...)
                 ...
         """
         self.option_parser.add_option(
@@ -395,9 +395,22 @@ class MRJobLauncher(object):
         self._passthrough_options.append(pass_opt)
 
     def pass_through_option(self, opt_str):
-        """Pass through a built-in option to tasks. For example:
-        ``job.pass_through_option('--runner')``.
-        """
+        """Pass through a built-in option to tasks. For example, for
+        tasks to see which runner launched them::
+
+            def configure_options(self):
+                super(MRYourJob, self).configure_options()
+                self.pass_through_option('--runner')
+
+            def mapper_init(self):
+                if self.options.runner == 'emr':
+                    ...
+
+         *opt_str* can be a long option switch like ``--runner`` or a short
+         one like ``-r``.
+
+         .. versionadded:: 0.5.4
+         """
         self._passthrough_options.append(
             self.option_parser.get_option(opt_str))
 

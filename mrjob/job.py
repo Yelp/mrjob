@@ -794,6 +794,20 @@ class MRJob(MRJobLauncher):
     ### Command-line arguments ###
 
     def configure_options(self):
+        """Define arguments for this script. Called from :py:meth:`__init__()`.
+
+        Re-define to define custom command-line arguments or pass
+        through existing ones::
+
+            def configure_options(self):
+                super(MRYourJob, self).configure_options()
+
+                self.add_passthrough_option(...)
+                self.add_file_option(...)
+                self.pass_through_option(...)
+                ...
+        """
+
         super(MRJob, self).configure_options()
 
         # To run mappers or reducers

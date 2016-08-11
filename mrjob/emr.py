@@ -925,13 +925,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _run(self):
         self._launch()
-        try:
-            self._wait_for_steps_to_complete()
-        except _PooledClusterSelfTerminatedException:
-            self._relaunch()
-            self._wait_for_steps_to_complete()
+        while True:
+            try:
+                self._wait_for_steps_to_complete()
+                break
+            except _PooledClusterSelfTerminatedException:
+                self._relaunch()
 
     def _prepare_for_launch(self):
+        """Set up files needed for the job."""
         self._check_input_exists()
         self._check_output_not_exists()
         self._create_setup_wrapper_script()
@@ -941,15 +943,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._upload_local_files_to_s3()
 
     def _launch(self):
+        """Set up files and then launch our job on EMR."""
         self._prepare_for_launch()
         self._launch_emr_job()
 
     def _relaunch(self):
+        # files are already in place; just start with a fresh cluster
         assert not self._opts['cluster_id']
         self._cluster_id = None
         self._clear_cluster_info()
 
-        self._launch_emr_job(relaunch=True)
+        self._launch_emr_job()
 
     def _check_input_exists(self):
         """Make sure all input exists before continuing with our job.
@@ -1703,20 +1707,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # 2.x and 3.x AMIs just use a regular old streaming jar
             return _PRE_4_X_STREAMING_JAR, []
 
-    def _launch_emr_job(self, relaunch=False):
+    def _launch_emr_job(self):
         """Create an empty cluster on EMR, and set self._cluster_id to
         its ID.
-
-        If *relaunch* is true, don't look for pooled clusters to connect to.
         """
         self._create_s3_tmp_bucket_if_needed()
         emr_conn = self.make_emr_conn()
 
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
-        if (self._opts['pool_clusters'] and
-                not self._cluster_id and
-                not relaunch):
+        if (self._opts['pool_clusters'] and not self._cluster_id):
             # master node setup script is an additional step
             num_steps = self._num_steps()
             if self._master_node_setup_script_path:

@@ -189,7 +189,8 @@ _S3_LOG_WAIT_MINUTES = 10
 class _PooledClusterSelfTerminatedException(Exception):
     pass
 
-# mildly flexible regex to detect cluster self-termination
+# mildly flexible regex to detect cluster self-termination. Termination of
+# non-master nodes won't shut down the cluster, so don't need to match that.
 _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*The master node was terminated.*$', re.I)
 
@@ -2012,6 +2013,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # code.
 
         # cluster should have stopped because master node failed
+        # could also check for
+        # cluster.status.statechangereason.code == 'INSTANCE_FAILURE'
         if not _CLUSTER_SELF_TERMINATED_RE.match(_get_reason(cluster)):
             return
 

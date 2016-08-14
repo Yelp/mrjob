@@ -2644,6 +2644,37 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
 
             self.assertRaises(StepFailedException, runner._finish_run)
 
+    def test_recover_if_our_cluster_self_terminates(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            cluster_id = runner.get_cluster_id()
+            self.assertEqual(self.num_steps(cluster_id), 2)
+            self.mock_emr_self_termination.add(cluster_id)
+
+            runner._finish_run()
+
+            self.assertNotEqual(runner.get_cluster_id(), cluster_id)
+            self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+    def test_dont_recover_when_no_pooling(self):
+        # kind of odd that our own cluster would idle-time-out, but whatever
+
+        job = MRTwoStepJob(['-r', 'emr', '--no-pool-clusters'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            cluster_id = runner.get_cluster_id()
+            self.assertEqual(self.num_steps(cluster_id), 2)
+            self.mock_emr_self_termination.add(cluster_id)
+
+            self.assertRaises(StepFailedException, runner._finish_run)
+
 
 class PoolingDisablingTestCase(MockBotoTestCase):
 

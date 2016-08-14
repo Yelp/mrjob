@@ -25,7 +25,10 @@ from tests.compress import gzip_compress
 from tests.fs import MockSubprocessTestCase
 from tests.mockhadoop import get_mock_hdfs_root
 from tests.mockhadoop import main as mock_hadoop_main
+from tests.py2 import MagicMock
+from tests.py2 import Mock
 from tests.py2 import patch
+
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 
@@ -326,3 +329,36 @@ class FindHadoopBinTestCase(SandboxedTestCase):
         # $HADOOP_ANYTHING_HOME comes before $HADOOP_MAPRED_HOME
         self._add_hadoop_bin_for_envvar('HADOOP_MAPRED_HOME', 'bin')
         self.test_hadoop_anything_home()
+
+
+class CatFileCleanupTestCase(SandboxedTestCase):
+    # regression test for #1396
+
+    def test_logging_stderr_in_cleanup(self):
+
+        def mock_Popen(*args, **kwargs):
+            mock_proc = MagicMock()
+
+            mock_proc.stdout = MagicMock()
+            mock_proc.stdout.__iter__.return_value = [
+                b'line1\n', b'line2\n']
+
+            mock_proc.stderr = MagicMock()
+            mock_proc.stderr.__iter__.return_value = [
+                b'Emergency, everybody to get from street\n']
+
+            mock_proc.wait.return_value = 0
+
+            return mock_proc
+
+        self.start(patch('mrjob.fs.hadoop.Popen', mock_Popen))
+
+        mock_log = self.start(patch('mrjob.fs.hadoop.log'))
+
+        fs = HadoopFilesystem()
+
+        data = b''.join(fs._cat_file('/some/path'))
+        self.assertEqual(data, b'line1\nline2\n')
+
+        mock_log.error.assert_called_once_with(
+            'STDERR: Emergency, everybody to get from street')

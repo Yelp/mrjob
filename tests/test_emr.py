@@ -2532,6 +2532,119 @@ class PoolMatchingTestCase(MockBotoTestCase):
             ['-r', 'emr', '--pool-clusters'])
 
 
+
+class PoolingRecoveryTestCase(MockBotoTestCase):
+
+    MRJOB_CONF_CONTENTS = {'runners': {'emr': {'pool_clusters': True}}}
+
+    # for multiple failover test
+    MAX_EMR_CONNECTIONS = 1000
+
+    def make_pooled_cluster(self, **kwargs):
+        cluster_id = EMRJobRunner(**kwargs).make_persistent_cluster()
+
+        mock_cluster = self.mock_emr_clusters[cluster_id]
+        mock_cluster.status.state = 'WAITING'
+
+        return cluster_id
+
+    def num_steps(self, cluster_id):
+        return len(self.mock_emr_clusters[cluster_id]._steps)
+
+    def test_join_healthy_cluster(self):
+        cluster_id = self.make_pooled_cluster()
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(self.num_steps(cluster_id), 2)
+            self.assertEqual(runner.get_cluster_id(), cluster_id)
+
+    def test_launch_new_cluster_after_self_termination(self):
+        cluster_id = self.make_pooled_cluster()
+        self.mock_emr_self_termination.add(cluster_id)
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # tried to add steps to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 2)
+
+            self.assertNotEqual(runner.get_cluster_id(), cluster_id)
+            self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+    def test_join_pooled_cluster_after_self_termination(self):
+        # cluster 1 should be preferable
+        cluster1_id = self.make_pooled_cluster(num_ec2_instances=20)
+        self.mock_emr_self_termination.add(cluster1_id)
+        cluster2_id = self.make_pooled_cluster()
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(self.num_steps(cluster1_id), 2)
+
+            self.assertEqual(runner.get_cluster_id(), cluster2_id)
+            self.assertEqual(self.num_steps(cluster2_id), 2)
+
+    def test_multiple_failover(self):
+        cluster_ids = []
+        for _ in range(10):
+            cluster_id = self.make_pooled_cluster()
+            self.mock_emr_self_termination.add(cluster_id)
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            for cluster_id in cluster_ids:
+                self.assertEqual(self.num_steps(cluster_id), 2)
+
+            self.assertNotIn(runner.get_cluster_id(), cluster_ids)
+            self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+    def test_dont_recover_with_explicit_cluster_id(self):
+        cluster_id = self.make_pooled_cluster()
+        self.mock_emr_self_termination.add(cluster_id)
+
+        job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+            self.assertEqual(self.num_steps(cluster_id), 2)
+
+    def test_dont_recover_from_user_termination(self):
+        cluster_id = self.make_pooled_cluster()
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            # don't have a mockboto hook for termination of cluster
+            # during run(), so running the two halves of run() separately
+            runner._launch()
+
+            self.assertEqual(runner.get_cluster_id(), cluster_id)
+            self.assertEqual(self.num_steps(cluster_id), 2)
+
+            self.connect_emr().terminate_jobflow(cluster_id)
+
+            self.assertRaises(StepFailedException, runner._finish_run)
+
+
 class PoolingDisablingTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {

@@ -152,7 +152,7 @@ class MockBotoTestCase(SandboxedTestCase):
     def setUp(self):
         # patch boto
         self.mock_emr_failures = {}
-        self.mock_emr_self_termination = {}
+        self.mock_emr_self_termination = set()
         self.mock_emr_clusters = {}
         self.mock_emr_output = {}
         self.mock_iam_instance_profiles = {}
@@ -1318,6 +1318,8 @@ class MockEmrConnection(object):
             for step in cluster._steps:
                 if step.status.state in ('PENDING', 'RUNNING'):
                     step.status.state = 'CANCELLED'  # not INTERRUPTED
+
+            return
 
         # try to find the next step, and advance it
 

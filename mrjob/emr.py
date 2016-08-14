@@ -926,6 +926,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _run(self):
         self._launch()
+        self._finish_run()
+
+    def _finish_run(self):
         while True:
             try:
                 self._wait_for_steps_to_complete()

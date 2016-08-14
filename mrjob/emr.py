@@ -746,6 +746,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # the ID assigned by EMR to this job (might be None)
         self._cluster_id = self._opts['cluster_id']
+        # did we create this cluster?
+        self._created_cluster = False
 
         # when did our particular task start?
         self._emr_job_start = None
@@ -955,7 +957,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # files are already in place; just start with a fresh cluster
         assert not self._opts['cluster_id']
         self._cluster_id = None
-        self._clear_cluster_info()
+        self._created_cluster = False
+        self._clear_cached_cluster_info()
 
         self._launch_emr_job()
 
@@ -1734,6 +1737,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._cluster_id:
             self._cluster_id = self._create_cluster(
                 persistent=False)
+            self._created_cluster = True
             log.info('Created new cluster %s' % self._cluster_id)
         else:
             log.info('Adding our job to existing cluster %s' %
@@ -1998,6 +2002,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return
 
         if self._opts['cluster_id']:
+            return
+
+        # if a cluster we created self-terminated, something is wrong with
+        # the way self-termination is set up (e.g. very low idle time)
+        if self._created_cluster:
             return
 
         # don't check for max_hours_idle because it's possible to
@@ -3086,7 +3095,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     # TODO: would be much smarter to maintain a map from cluster ID
     # to cached info, so we don't have to clear the cache explicitly
-    def _clear_cluster_info(self):
+    def _clear_cached_cluster_info(self):
         """Clear out cached info about our cluster (because we're retrying
         with a fresh cluster)."""
         self._ami_version = None

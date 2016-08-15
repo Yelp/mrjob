@@ -2657,6 +2657,25 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
 
             self.assertRaises(StepFailedException, runner._finish_run)
 
+    def test_cluster_info_cache_gets_cleared(self):
+        cluster_id = self.make_pooled_cluster()
+
+        self.mock_emr_self_termination.add(cluster_id)
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            self.assertEqual(runner.get_cluster_id(), cluster_id)
+            addr = runner._address_of_master()
+
+            runner._finish_run()
+
+            self.assertNotEqual(runner.get_cluster_id(), cluster_id)
+            self.assertNotEqual(runner._address_of_master(), addr)
+
 
 class PoolingDisablingTestCase(MockBotoTestCase):
 

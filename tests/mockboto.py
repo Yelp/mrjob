@@ -846,7 +846,7 @@ class MockEmrConnection(object):
             id=cluster_id,
             loguri=log_uri,
             # TODO: set this later, once cluster is running
-            masterpublicdnsname='mockmaster',
+            masterpublicdnsname='mockmaster%d' % len(self.mock_emr_clusters),
             name=name,
             normalizedinstancehours='0',
             releaselabel=release_label,

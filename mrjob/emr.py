@@ -20,6 +20,7 @@ import os.path
 import pipes
 import posixpath
 import random
+import re
 import signal
 import socket
 import sys
@@ -183,6 +184,15 @@ _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
+
+# used to bail out and retry when a pooled cluster self-terminates
+class _PooledClusterSelfTerminatedException(Exception):
+    pass
+
+# mildly flexible regex to detect cluster self-termination. Termination of
+# non-master nodes won't shut down the cluster, so don't need to match that.
+_CLUSTER_SELF_TERMINATED_RE = re.compile(
+    '^.*The master node was terminated.*$', re.I)
 
 
 def s3_key_to_uri(s3_key):
@@ -736,6 +746,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # the ID assigned by EMR to this job (might be None)
         self._cluster_id = self._opts['cluster_id']
+        # did we create this cluster?
+        self._created_cluster = False
 
         # when did our particular task start?
         self._emr_job_start = None
@@ -916,13 +928,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _run(self):
         self._launch()
-        self._wait_for_steps_to_complete()
+        self._finish_run()
 
-    def _launch(self):
-        self._prepare_for_launch()
-        self._launch_emr_job()
+    def _finish_run(self):
+        while True:
+            try:
+                self._wait_for_steps_to_complete()
+                break
+            except _PooledClusterSelfTerminatedException:
+                self._relaunch()
 
     def _prepare_for_launch(self):
+        """Set up files needed for the job."""
         self._check_input_exists()
         self._check_output_not_exists()
         self._create_setup_wrapper_script()
@@ -930,6 +947,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_s3()
+
+    def _launch(self):
+        """Set up files and then launch our job on EMR."""
+        self._prepare_for_launch()
+        self._launch_emr_job()
+
+    def _relaunch(self):
+        # files are already in place; just start with a fresh cluster
+        assert not self._opts['cluster_id']
+        self._cluster_id = None
+        self._created_cluster = False
+        self._clear_cached_cluster_info()
+
+        self._launch_emr_job()
 
     def _check_input_exists(self):
         """Make sure all input exists before continuing with our job.
@@ -1685,13 +1716,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _launch_emr_job(self):
         """Create an empty cluster on EMR, and set self._cluster_id to
-        its ID."""
+        its ID.
+        """
         self._create_s3_tmp_bucket_if_needed()
         emr_conn = self.make_emr_conn()
 
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
-        if self._opts['pool_clusters'] and not self._cluster_id:
+        if (self._opts['pool_clusters'] and not self._cluster_id):
             # master node setup script is an additional step
             num_steps = self._num_steps()
             if self._master_node_setup_script_path:
@@ -1705,6 +1737,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._cluster_id:
             self._cluster_id = self._create_cluster(
                 persistent=False)
+            self._created_cluster = True
             log.info('Created new cluster %s' % self._cluster_id)
         else:
             log.info('Adding our job to existing cluster %s' %
@@ -1889,6 +1922,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
                 if cluster.status.state in (
                         'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                    # was it caused by a pooled cluster self-terminating?
+                    # (if so, raise _PooledClusterSelfTerminatedException)
+                    self._check_for_pooled_cluster_self_termination(
+                        cluster, step)
                     # was it caused by IAM roles?
                     self._check_for_missing_default_iam_roles(cluster)
                     # was it caused by a key pair from the wrong region?
@@ -1956,6 +1993,45 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         finally:
             if tunnel_handle is not None:
                 tunnel_handle.close()
+
+    def _check_for_pooled_cluster_self_termination(self, cluster, step):
+        """If failure could have been due to a pooled cluster self-terminating,
+        raise _PooledClusterSelfTerminatedException"""
+        # this check might not even be relevant
+        if not self._opts['pool_clusters']:
+            return
+
+        if self._opts['cluster_id']:
+            return
+
+        # if a cluster we created self-terminated, something is wrong with
+        # the way self-termination is set up (e.g. very low idle time)
+        if self._created_cluster:
+            return
+
+        # don't check for max_hours_idle because it's possible to
+        # join a self-terminating cluster without having max_hours_idle set
+        # on this runner (pooling only cares about the master bootstrap script,
+        # not other bootstrap actions)
+
+        # our step should be CANCELLED (not failed)
+        if step.status.state != 'CANCELLED':
+            return
+
+        # we *could* check if the step had a chance to start by checking if
+        # step.status.timeline.startdatetime is set. This shouldn't happen in
+        # practice, and if it did, we'd still be fine as long as the script
+        # didn't write data to the output dir, so it's not worth the extra
+        # code.
+
+        # cluster should have stopped because master node failed
+        # could also check for
+        # cluster.status.statechangereason.code == 'INSTANCE_FAILURE'
+        if not _CLUSTER_SELF_TERMINATED_RE.match(_get_reason(cluster)):
+            return
+
+        log.info('Pooled cluster self-terminated, trying again...')
+        raise _PooledClusterSelfTerminatedException
 
     def _check_for_missing_default_iam_roles(self, cluster):
         """If cluster couldn't start due to missing IAM roles, tell
@@ -3016,6 +3092,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         if cluster.status.state in ('RUNNING', 'WAITING'):
             self._address = cluster.masterpublicdnsname
+
+    # TODO: would be much smarter to maintain a map from cluster ID
+    # to cached info, so we don't have to clear the cache explicitly
+    def _clear_cached_cluster_info(self):
+        """Clear out cached info about our cluster (because we're retrying
+        with a fresh cluster)."""
+        self._ami_version = None
+        self._hadoop_version = None
+        self._address = None
 
     def make_iam_conn(self):
         """Create a connection to S3.

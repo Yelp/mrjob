@@ -255,7 +255,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         mr_job.sandbox()
 
         self.add_mock_s3_data({'walrus': {}})
-        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
+        self.mock_emr_failures = set([('j-MOCKCLUSTER0', 0)])
 
         with no_handlers_for_logger('mrjob.emr'):
             stderr = StringIO()
@@ -2429,7 +2429,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
                                '--pool-clusters'])
         mr_job.sandbox()
 
-        self.mock_emr_failures = {('j-MOCKCLUSTER0', 0): None}
+        self.mock_emr_failures = set([('j-MOCKCLUSTER0', 0)])
 
         with mr_job.make_runner() as runner:
             self.assertIsInstance(runner, EMRJobRunner)
@@ -2458,7 +2458,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         # Issue 242: job failure shouldn't kill the pooled clusters
         _, cluster_id = self.make_pooled_cluster()
 
-        self.mock_emr_failures = {(cluster_id, 0): None}
+        self.mock_emr_failures = set([(cluster_id, 0)])
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '--pool-clusters'])
@@ -2656,6 +2656,19 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
             self.mock_emr_self_termination.add(cluster_id)
 
             self.assertRaises(StepFailedException, runner._finish_run)
+
+    def test_dont_recover_from_step_failure(self):
+        cluster_id = self.make_pooled_cluster()
+        self.mock_emr_failures = set([(cluster_id, 0)])
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+            self.assertEqual(runner.get_cluster_id(), cluster_id)
+
 
     def test_cluster_info_cache_gets_cleared(self):
         cluster_id = self.make_pooled_cluster()

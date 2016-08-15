@@ -151,7 +151,7 @@ class MockBotoTestCase(SandboxedTestCase):
 
     def setUp(self):
         # patch boto
-        self.mock_emr_failures = {}
+        self.mock_emr_failures = set()
         self.mock_emr_self_termination = set()
         self.mock_emr_clusters = {}
         self.mock_emr_output = {}

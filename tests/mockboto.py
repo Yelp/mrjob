@@ -231,8 +231,6 @@ class MockBotoTestCase(SandboxedTestCase):
 
         # Tell the runner to use the fake binary
         runner._opts['ssh_bin'] = [self.ssh_bin]
-        # Inject master node hostname so it doesn't try to 'emr --describe' it
-        runner._address = 'testmaster'
         # Also pretend to have an SSH key pair file
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
 

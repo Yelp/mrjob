@@ -22,7 +22,6 @@ from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.mrboss import _run_on_all_nodes
 from tests.mockssh import mock_ssh_file
 from tests.mockboto import MockBotoTestCase
-from tests.py2 import MagicMock
 from tests.test_emr import BUCKET_URI
 from tests.test_emr import LOG_DIR
 
@@ -46,7 +45,6 @@ class MRBossTestCase(MockBotoTestCase):
         self.runner._s3_log_dir_uri = BUCKET_URI + LOG_DIR
         self.prepare_runner_for_ssh(self.runner)
         self.output_dir = tempfile.mkdtemp(prefix='mrboss_wd')
-        self.runner._address_of_master = MagicMock(return_value='testmaster')
 
     def cleanup_runner(self):
         """This method assumes ``prepare_runner_for_ssh()`` was called. That

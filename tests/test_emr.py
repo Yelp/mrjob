@@ -2880,11 +2880,11 @@ class TestCatFallback(MockBotoTestCase):
         mock_ssh_file('testmaster', 'etc/init.d', b'meow')
 
         ssh_cat_gen = runner.fs.cat(
-            'ssh://' + runner._address + '/etc/init.d')
+            'ssh://testmaster/etc/init.d')
         self.assertEqual(list(ssh_cat_gen)[0].rstrip(), b'meow')
         self.assertRaises(
             IOError, list,
-            runner.fs.cat('ssh://' + runner._address + '/does_not_exist'))
+            runner.fs.cat('ssh://testmaster/does_not_exist'))
 
     def test_ssh_cat_errlog(self):
         # A file *containing* an error message shouldn't cause an error.
@@ -2894,7 +2894,7 @@ class TestCatFallback(MockBotoTestCase):
         error_message = b'cat: logs/err.log: No such file or directory\n'
         mock_ssh_file('testmaster', 'logs/err.log', error_message)
         self.assertEqual(
-            list(runner.fs.cat('ssh://' + runner._address + '/logs/err.log')),
+            list(runner.fs.cat('ssh://testmaster/logs/err.log')),
             [error_message])
 
 

@@ -769,9 +769,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # - ami_version
         # - hadoop_version
         # - master_public_dns
-        # - master_public_ip
         # - master_private_ip
-        self._cluster_cache = defaultdict(defaultdict)
+        self._cluster_to_cache = defaultdict(dict)
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task'. These will also always
@@ -3076,15 +3075,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _get_cluster_info(self, key):
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
-        cache = self._cluster_cache[self._cluster_id]
+        cache = self._cluster_to_cache[self._cluster_id]
 
-        if not cache[key]:
+        if not cache.get(key):
             if key == 'master_private_ip':
                 self._store_master_instance_info()
             else:
                 self._store_cluster_info()
 
-        return cache[key]
+        return cache.get(key)
 
     def _store_cluster_info(self):
         """Describe our cluster, and cache ami_version, hadoop_version,
@@ -3092,7 +3091,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
 
-        cache = self._cluster_cache[self._cluster_id]
+        cache = self._cluster_to_cache[self._cluster_id]
 
         cluster = self._describe_cluster()
 
@@ -3117,7 +3116,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
 
-        cache = self._cluster_cache[self._cluster_id]
+        cache = self._cluster_to_cache[self._cluster_id]
 
         emr_conn = self.make_emr_conn()
 

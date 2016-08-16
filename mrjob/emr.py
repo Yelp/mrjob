@@ -760,7 +760,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # cache for SSH address
         self._address = None
-        self._ssh_slave_addrs = None
 
         # store the (tunneled) URL of the job tracker/resource manager
         self._tunnel_url = None
@@ -771,6 +770,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # init hadoop, ami version caches
         self._ami_version = None
         self._hadoop_version = None
+
+        # map from cluster ID to a dictionary containing cached info about
+        # that cluster. Includes the following keys:
+        # - ami_version
+        # - hadoop_version
+        # - master_public_dns
+        # - master_public_ip
+        # - master_private_ip
+        self._cluster_cache = defaultdict(dict)
+
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task'. These will also always
@@ -958,7 +967,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         assert not self._opts['cluster_id']
         self._cluster_id = None
         self._created_cluster = False
-        self._clear_cached_cluster_info()
 
         self._launch_emr_job()
 
@@ -3051,56 +3059,52 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return _patched_describe_cluster(emr_conn, self._cluster_id)
 
     def get_hadoop_version(self):
-        if self._hadoop_version is None:
-            self._store_cluster_info()
-        return self._hadoop_version
+        return self._get_cluster_info('hadoop_version')
 
     def get_ami_version(self):
         """Get the AMI that our cluster is running.
 
         .. versionadded:: 0.4.5
         """
-        if self._ami_version is None:
-            self._store_cluster_info()
-        return self._ami_version
+        return self._get_cluster_info('ami_version')
 
     def _address_of_master(self):
         """Get the address of the master node so we can SSH to it"""
-        if not self._address:
+        return self._get_cluster_info('master_public_dns')
+
+    def _get_cluster_info(self, key):
+        if not self._cluster_id:
+            raise AssertionError('cluster has not yet been created')
+        cache = self._cluster_cache[self._cluster_id]
+
+        if not cache[key]:
             self._store_cluster_info()
 
-        return self._address
+        return cache[key]
 
     def _store_cluster_info(self):
         """Set self._ami_version and self._hadoop_version."""
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
 
+        cache = self._cluster_cache[self._cluster_id]
+
         cluster = self._describe_cluster()
 
         # AMI version might be in RunningAMIVersion (2.x, 3.x)
         # or ReleaseLabel (4.x)
-        self._ami_version = getattr(cluster, 'runningamiversion', None)
-        if not self._ami_version:
+        cache['ami_version'] = getattr(cluster, 'runningamiversion', None)
+        if not cache['ami_version']:
             release_label = getattr(cluster, 'releaselabel', None)
             if release_label:
-                self._ami_version = release_label.lstrip('emr-')
+                cache['ami_version'] = release_label.lstrip('emr-')
 
         for a in cluster.applications:
             if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs
-                self._hadoop_version = a.version
+                cache['hadoop_version'] = a.version
 
         if cluster.status.state in ('RUNNING', 'WAITING'):
-            self._address = cluster.masterpublicdnsname
-
-    # TODO: would be much smarter to maintain a map from cluster ID
-    # to cached info, so we don't have to clear the cache explicitly
-    def _clear_cached_cluster_info(self):
-        """Clear out cached info about our cluster (because we're retrying
-        with a fresh cluster)."""
-        self._ami_version = None
-        self._hadoop_version = None
-        self._address = None
+            cache['master_public_dns'] = cluster.masterpublicdnsname
 
     def make_iam_conn(self):
         """Create a connection to S3.

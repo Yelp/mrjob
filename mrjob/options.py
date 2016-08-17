@@ -887,4 +887,5 @@ def _fix_custom_options(options, option_parser):
         except ValueError as e:
             option_parser.error('invalid port range list %r: \n%s' %
                                 (options.ssh_bind_ports, e.args[0]))
-            options.ssh_bind_ports = ports
+
+        options.ssh_bind_ports = ports

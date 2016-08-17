@@ -758,19 +758,19 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
 
-        # cache for SSH address
-        self._address = None
-        self._ssh_slave_addrs = None
-
         # store the (tunneled) URL of the job tracker/resource manager
         self._tunnel_url = None
 
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
 
-        # init hadoop, ami version caches
-        self._ami_version = None
-        self._hadoop_version = None
+        # map from cluster ID to a dictionary containing cached info about
+        # that cluster. Includes the following keys:
+        # - ami_version
+        # - hadoop_version
+        # - master_public_dns
+        # - master_private_ip
+        self._cluster_to_cache = defaultdict(dict)
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task'. These will also always
@@ -958,7 +958,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         assert not self._opts['cluster_id']
         self._cluster_id = None
         self._created_cluster = False
-        self._clear_cached_cluster_info()
 
         self._launch_emr_job()
 
@@ -1137,7 +1136,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return map_version(self.get_ami_version(),
                            _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
 
-    # TODO: this currently has no automated tests (see #1281)
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
@@ -1148,6 +1146,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         host = self._address_of_master()
         if not host:
             return
+
+        # look up what we're supposed to do on this AMI version
+        tunnel_config = self._ssh_tunnel_config()
+
+        if tunnel_config['localhost']:
+            # Issue #1311: on the 2.x AMIs, we want to tunnel to the job
+            # tracker on localhost; otherwise it won't
+            # work on some VPC setups.
+            remote_host = 'localhost'
+        else:
+            # Issue #1397: on the 3.x and 4.x AMIs we want to tunnel to the
+            # resource manager on the master node's *internal* IP; otherwise
+            # it work won't work on some VPC setups
+            remote_host = self._master_private_ip()
 
         REQUIRED_OPTS = ['ec2_key_pair', 'ec2_key_pair_file', 'ssh_bind_ports']
         for opt_name in REQUIRED_OPTS:
@@ -1169,9 +1181,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                             ' %d, restarting...' % self._ssh_proc.returncode)
                 self._ssh_proc = None
 
-        # look up what we're supposed to do on this AMI version
-        tunnel_config = self._ssh_tunnel_config()
-
         log.info('  Opening ssh tunnel to %s...' % tunnel_config['name'])
 
         # if ssh detects that a host key has changed, it will silently not
@@ -1186,13 +1195,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('Created empty ssh known-hosts file: %s' % (
             fake_known_hosts_file,))
 
-        # Issue #1311: on the 2.x AMIs, we want to connect to the job
-        # tracker/resource manager through localhost; otherwise it won't work
-        # on VPCs. However, on the 3.x and 4.x AMIs, we *can't* reach the
-        # resource manager via localhost (and the VPC issues appear to be
-        # worked out, as *host* actually maps to an internal IP).
-        tunnel_host = 'localhost' if tunnel_config['localhost'] else host
-
         bind_port = None
         for bind_port in self._pick_ssh_bind_ports():
             args = self._opts['ssh_bin'] + [
@@ -1201,7 +1203,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '-o', 'ExitOnForwardFailure=yes',
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
                 '-L', '%d:%s:%d' % (
-                    bind_port, tunnel_host, tunnel_config['port']),
+                    bind_port, remote_host, tunnel_config['port']),
                 '-N', '-n', '-q',  # no shell, no input, no output
                 '-i', self._opts['ec2_key_pair_file'],
             ]
@@ -3051,56 +3053,83 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return _patched_describe_cluster(emr_conn, self._cluster_id)
 
     def get_hadoop_version(self):
-        if self._hadoop_version is None:
-            self._store_cluster_info()
-        return self._hadoop_version
+        return self._get_cluster_info('hadoop_version')
 
     def get_ami_version(self):
         """Get the AMI that our cluster is running.
 
         .. versionadded:: 0.4.5
         """
-        if self._ami_version is None:
-            self._store_cluster_info()
-        return self._ami_version
+        return self._get_cluster_info('ami_version')
 
     def _address_of_master(self):
         """Get the address of the master node so we can SSH to it"""
-        if not self._address:
-            self._store_cluster_info()
+        return self._get_cluster_info('master_public_dns')
 
-        return self._address
+    def _master_private_ip(self):
+        """Get the internal ("private") address of the master node, so we
+        can direct our SSH tunnel to it."""
+        return self._get_cluster_info('master_private_ip')
 
-    def _store_cluster_info(self):
-        """Set self._ami_version and self._hadoop_version."""
+    def _get_cluster_info(self, key):
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
+        cache = self._cluster_to_cache[self._cluster_id]
+
+        if not cache.get(key):
+            if key == 'master_private_ip':
+                self._store_master_instance_info()
+            else:
+                self._store_cluster_info()
+
+        return cache.get(key)
+
+    def _store_cluster_info(self):
+        """Describe our cluster, and cache ami_version, hadoop_version,
+        and master_public_dns"""
+        if not self._cluster_id:
+            raise AssertionError('cluster has not yet been created')
+
+        cache = self._cluster_to_cache[self._cluster_id]
 
         cluster = self._describe_cluster()
 
         # AMI version might be in RunningAMIVersion (2.x, 3.x)
         # or ReleaseLabel (4.x)
-        self._ami_version = getattr(cluster, 'runningamiversion', None)
-        if not self._ami_version:
+        cache['ami_version'] = getattr(cluster, 'runningamiversion', None)
+        if not cache['ami_version']:
             release_label = getattr(cluster, 'releaselabel', None)
             if release_label:
-                self._ami_version = release_label.lstrip('emr-')
+                cache['ami_version'] = release_label.lstrip('emr-')
 
         for a in cluster.applications:
             if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs
-                self._hadoop_version = a.version
+                cache['hadoop_version'] = a.version
 
         if cluster.status.state in ('RUNNING', 'WAITING'):
-            self._address = cluster.masterpublicdnsname
+            cache['master_public_dns'] = cluster.masterpublicdnsname
 
-    # TODO: would be much smarter to maintain a map from cluster ID
-    # to cached info, so we don't have to clear the cache explicitly
-    def _clear_cached_cluster_info(self):
-        """Clear out cached info about our cluster (because we're retrying
-        with a fresh cluster)."""
-        self._ami_version = None
-        self._hadoop_version = None
-        self._address = None
+    def _store_master_instance_info(self):
+        """List master instance for our cluster, and cache
+        master_private_ip."""
+        if not self._cluster_id:
+            raise AssertionError('cluster has not yet been created')
+
+        cache = self._cluster_to_cache[self._cluster_id]
+
+        emr_conn = self.make_emr_conn()
+
+        instances = emr_conn.list_instances(
+            self._cluster_id, instance_group_types=['MASTER']).instances
+
+        if not instances:
+            return
+
+        master = instances[0]
+
+        # can also get private DNS and public IP/DNS, but we don't use this
+        if hasattr(master, 'privateipaddress'):
+            cache['master_private_ip'] = master.privateipaddress
 
     def make_iam_conn(self):
         """Create a connection to S3.

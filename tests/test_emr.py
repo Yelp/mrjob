@@ -65,6 +65,7 @@ from tests.mr_no_mapper import MRNoMapper
 from tests.mr_sort_values import MRSortValues
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import call
@@ -2880,11 +2881,11 @@ class TestCatFallback(MockBotoTestCase):
         mock_ssh_file('testmaster', 'etc/init.d', b'meow')
 
         ssh_cat_gen = runner.fs.cat(
-            'ssh://' + runner._address + '/etc/init.d')
+            'ssh://testmaster/etc/init.d')
         self.assertEqual(list(ssh_cat_gen)[0].rstrip(), b'meow')
         self.assertRaises(
             IOError, list,
-            runner.fs.cat('ssh://' + runner._address + '/does_not_exist'))
+            runner.fs.cat('ssh://testmaster/does_not_exist'))
 
     def test_ssh_cat_errlog(self):
         # A file *containing* an error message shouldn't cause an error.
@@ -2894,7 +2895,7 @@ class TestCatFallback(MockBotoTestCase):
         error_message = b'cat: logs/err.log: No such file or directory\n'
         mock_ssh_file('testmaster', 'logs/err.log', error_message)
         self.assertEqual(
-            list(runner.fs.cat('ssh://' + runner._address + '/logs/err.log')),
+            list(runner.fs.cat('ssh://testmaster/logs/err.log')),
             [error_message])
 
 
@@ -5113,3 +5114,144 @@ class UseSudoOverSshTestCase(MockBotoTestCase):
             runner._launch()
 
             self.assertIsNone(runner._ssh_fs)
+
+
+class MasterPrivateIPTestCase(MockBotoTestCase):
+
+    # logic for runner._master_private_ip()
+
+    def test_master_private_ip(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            # no cluster yet
+            self.assertRaises(AssertionError, runner._master_private_ip)
+
+            runner._launch()
+
+            self.assertIsNone(runner._master_private_ip())
+
+            self.connect_emr().simulate_progress(runner.get_cluster_id())
+            self.assertIsNotNone(runner._master_private_ip())
+
+
+class SetUpSSHTunnelTestCase(MockBotoTestCase):
+
+    def setUp(self, *args):
+        super(SetUpSSHTunnelTestCase, self).setUp()
+
+        self.mock_Popen = self.start(patch('mrjob.emr.Popen'))
+        # simulate successfully binding port
+        self.mock_Popen.return_value.returncode = None
+        self.mock_Popen.return_value.pid = 99999
+
+        self.start(patch('os.kill'))  # don't clean up fake SSH proc
+
+    def get_ssh_args(self, *args):
+        job_args = [
+            '-r', 'emr',
+            '--ssh-tunnel',
+            '--ec2-key-pair', 'EMR',
+            '--ec2-key-pair-file', '/path/to/EMR.pem'] + list(args)
+
+        job = MRTwoStepJob(job_args)
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            cluster_id = runner.get_cluster_id()
+
+            cluster = self.mock_emr_clusters[cluster_id]
+            while cluster.status.state in ('STARTING', 'BOOTSTRAPPING'):
+                self.connect_emr().simulate_progress(cluster_id)
+
+            runner._set_up_ssh_tunnel()
+
+            ssh_args = self.mock_Popen.call_args[0][0]
+
+            return ssh_args
+
+    def parse_ssh_args(self, ssh_args):
+        local_port, remote_host, remote_port = (
+            ssh_args[ssh_args.index('-L') + 1].split(':'))
+
+        local_port = int(local_port)
+        remote_port = int(remote_port)
+
+        user, host = ssh_args[-1].split('@')
+
+        return dict(
+            host=host,
+            local_port=local_port,
+            remote_host=remote_host,
+            remote_port=remote_port,
+            user=user)
+
+    def test_basic(self):
+        # test things that don't depend on AMI
+        ssh_args = self.get_ssh_args()
+        params = self.parse_ssh_args(ssh_args)
+
+        self.assertEqual(params['user'], 'hadoop')
+        self.assertNotEqual(params['host'], params['remote_host'])
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+
+        self.assertNotIn('-g', ssh_args)
+        self.assertNotIn('-4', ssh_args)
+
+    def test_2_x_ami(self):
+        ssh_args = self.get_ssh_args('--ami-version', '2.4.11')
+        params = self.parse_ssh_args(ssh_args)
+
+        self.assertEqual(params['remote_port'], 9100)
+        self.assertEqual(params['remote_host'], 'localhost')
+
+    def test_3_x_ami(self):
+        ssh_args = self.get_ssh_args('--ami-version', '3.11.0')
+        params = self.parse_ssh_args(ssh_args)
+
+        self.assertEqual(params['remote_port'], 9026)
+        self.assertEqual(len(params['remote_host'].split('.')), 4)
+
+    def test_4_x_ami(self):
+        ssh_args = self.get_ssh_args('--ami-version', '4.7.2')
+        params = self.parse_ssh_args(ssh_args)
+
+        self.assertEqual(params['remote_port'], 8088)
+        self.assertEqual(len(params['remote_host'].split('.')), 4)
+
+    def test_ssh_tunnel_is_open(self):
+        # this is the same on all AMIs
+        ssh_args = self.get_ssh_args('--ssh-tunnel-is-open')
+
+        self.assertIn('-g', ssh_args)
+        self.assertIn('-4', ssh_args)
+
+    def test_ssh_bind_ports(self):
+        ssh_args = self.get_ssh_args('--ssh-bind-ports', '12345')
+        params = self.parse_ssh_args(ssh_args)
+
+        self.assertEqual(params['local_port'], 12345)
+
+    def test_retry_ports(self):
+        returncodes = [None, 255, 255]  # in reverse order
+
+        def popen_side_effect(*args, **kwargs):
+            return_value = Mock()
+            return_value.pid = 99999
+            return_value.returncode = returncodes.pop()
+            return return_value
+
+        self.mock_Popen.side_effect = popen_side_effect
+
+        self.start(patch('mrjob.emr.EMRJobRunner._pick_ssh_bind_ports',
+                   return_value=[10001, 10002, 10003, 10004]))
+
+        ssh_args = self.get_ssh_args()
+        params = self.parse_ssh_args(ssh_args)
+
+        self.assertEqual(self.mock_Popen.call_count, 3)
+        self.assertEqual(params['local_port'], 10003)

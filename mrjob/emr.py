@@ -1136,7 +1136,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return map_version(self.get_ami_version(),
                            _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
 
-    # TODO: this currently has no automated tests (see #1281)
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
@@ -3121,7 +3120,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         emr_conn = self.make_emr_conn()
 
         instances = emr_conn.list_instances(
-            self._cluster_id, instance_group_types='MASTER').instances
+            self._cluster_id, instance_group_types=['MASTER']).instances
 
         if not instances:
             return

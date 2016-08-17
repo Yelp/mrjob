@@ -236,6 +236,7 @@ class MockBotoTestCase(SandboxedTestCase):
 
         # use fake hostname
         runner._address_of_master = MagicMock(return_value='testmaster')
+        runner._master_private_ip = MagicMock(return_value='172.172.172.172')
 
         # re-initialize fs
         runner._fs = None

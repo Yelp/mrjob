@@ -295,9 +295,9 @@ def _step_ids_for_job(steps, job_key):
     return step_ids
 
 
-def _make_lock_uri(s3_tmp_dir, cluster_id, step_num):
+def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
     """Generate the URI to lock the cluster ``cluster_id``"""
-    return s3_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
+    return cloud_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
 
 
 def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
@@ -407,7 +407,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_endpoint',
         'cloud_log_dir',
         's3_sync_wait_time',
-        's3_tmp_dir',
+        'cloud_tmp_dir',
         's3_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
@@ -431,7 +431,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_tags': combine_dicts,
         'hadoop_extra_args': combine_lists,
         'cloud_log_dir': combine_paths,
-        's3_tmp_dir': combine_paths,
+        'cloud_tmp_dir': combine_paths,
         'ssh_bin': combine_cmds,
     })
 
@@ -441,7 +441,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_job_flow_pool_name': 'pool_name',
         'pool_emr_job_flows': 'pool_clusters',
         's3_log_uri': 'cloud_log_dir',
-        's3_scratch_uri': 's3_tmp_dir',
+        's3_scratch_uri': 'cloud_tmp_dir',
+        's3_tmp_dir': 'cloud_tmp_dir',
         'ssh_tunnel_to_job_tracker': 'ssh_tunnel',
     })
 
@@ -681,13 +682,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._fix_s3_tmp_and_log_uri_opts()
 
         # use job key to make a unique tmp dir
-        self._s3_tmp_dir = self._opts['s3_tmp_dir'] + self._job_key + '/'
+        self._cloud_tmp_dir = self._opts['cloud_tmp_dir'] + self._job_key + '/'
 
         # pick/validate output dir
         if self._output_dir:
             self._output_dir = self._check_and_fix_s3_dir(self._output_dir)
         else:
-            self._output_dir = self._s3_tmp_dir + 'output/'
+            self._output_dir = self._cloud_tmp_dir + 'output/'
 
         # check AMI version
         if self._opts['ami_version'].startswith('1.'):
@@ -696,7 +697,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
-        s3_files_dir = self._s3_tmp_dir + 'files/'
+        s3_files_dir = self._cloud_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
 
         # manage working dir for bootstrap script
@@ -823,28 +824,28 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return ['python2.6']
 
     def _fix_s3_tmp_and_log_uri_opts(self):
-        """Fill in s3_tmp_dir and cloud_log_dir (in self._opts) if they
+        """Fill in cloud_tmp_dir and cloud_log_dir (in self._opts) if they
         aren't already set.
 
         Helper for __init__.
         """
-        # set s3_tmp_dir by checking for existing buckets
-        if not self._opts['s3_tmp_dir']:
-            self._set_s3_tmp_dir()
+        # set cloud_tmp_dir by checking for existing buckets
+        if not self._opts['cloud_tmp_dir']:
+            self._set_cloud_tmp_dir()
             log.info('Using %s as our temp dir on S3' %
-                     self._opts['s3_tmp_dir'])
+                     self._opts['cloud_tmp_dir'])
 
-        self._opts['s3_tmp_dir'] = self._check_and_fix_s3_dir(
-            self._opts['s3_tmp_dir'])
+        self._opts['cloud_tmp_dir'] = self._check_and_fix_s3_dir(
+            self._opts['cloud_tmp_dir'])
 
         # set cloud_log_dir
         if self._opts['cloud_log_dir']:
             self._opts['cloud_log_dir'] = self._check_and_fix_s3_dir(
                 self._opts['cloud_log_dir'])
         else:
-            self._opts['cloud_log_dir'] = self._opts['s3_tmp_dir'] + 'logs/'
+            self._opts['cloud_log_dir'] = self._opts['cloud_tmp_dir'] + 'logs/'
 
-    def _set_s3_tmp_dir(self):
+    def _set_cloud_tmp_dir(self):
         """Helper for _fix_s3_tmp_and_log_uri_opts"""
         buckets = self.fs.get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
@@ -861,14 +862,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # Regions are both specified and match
                 log.debug("using existing temp bucket %s" %
                           tmp_bucket_name)
-                self._opts['s3_tmp_dir'] = ('s3://%s/tmp/' %
+                self._opts['cloud_tmp_dir'] = ('s3://%s/tmp/' %
                                             tmp_bucket_name)
                 return
 
         # That may have all failed. If so, pick a name.
         tmp_bucket_name = 'mrjob-' + random_identifier()
         self._s3_tmp_bucket_to_create = tmp_bucket_name
-        self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
+        self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
         log.info('Auto-created temp S3 bucket %s' % tmp_bucket_name)
         self._wait_for_s3_eventual_consistency()
 
@@ -1292,11 +1293,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _cleanup_cloud_tmp(self):
         # delete all the files we created on S3
-        if self._s3_tmp_dir:
+        if self._cloud_tmp_dir:
             try:
-                log.info('Removing s3 temp directory %s...' % self._s3_tmp_dir)
-                self.fs.rm(self._s3_tmp_dir)
-                self._s3_tmp_dir = None
+                log.info('Removing s3 temp directory %s...' % self._cloud_tmp_dir)
+                self.fs.rm(self._cloud_tmp_dir)
+                self._cloud_tmp_dir = None
             except Exception as e:
                 log.exception(e)
 
@@ -2961,7 +2962,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return None
 
     def _lock_uri(self, cluster_id, num_steps):
-        return _make_lock_uri(self._opts['s3_tmp_dir'],
+        return _make_lock_uri(self._opts['cloud_tmp_dir'],
                               cluster_id,
                               num_steps + 1)
 

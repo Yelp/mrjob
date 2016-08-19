@@ -119,7 +119,7 @@ Cluster creation and configuration
     :default: ``'us-west-2'``
 
     region to run EMR jobs on (e.g.  ``us-west-1``). Also used by mrjob
-    to create temporary buckets if you don't set :mrjob-opt:`s3_tmp_dir`
+    to create temporary buckets if you don't set :mrjob-opt:`cloud_tmp_dir`
     explicitly.
 
 .. mrjob-opt::
@@ -759,7 +759,7 @@ MRJob uses boto to manipulate/access S3.
     :switch: --cloud-log-dir
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: append ``logs`` to :mrjob-opt:`s3_tmp_dir`
+    :default: append ``logs`` to :mrjob-opt:`cloud_tmp_dir`
 
     Where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for
     your cluster will go into a subdirectory, e.g.
@@ -770,8 +770,8 @@ MRJob uses boto to manipulate/access S3.
        This option used to be named ``s3_log_uri``
 
 .. mrjob-opt::
-    :config: s3_tmp_dir
-    :switch: --s3-tmp-dir
+    :config: cloud_tmp_dir
+    :switch: --cloud-tmp-dir
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: (automatic)
@@ -783,6 +783,10 @@ MRJob uses boto to manipulate/access S3.
     ``mrjob-`` and which matches :mrjob-opt:`aws_region`. If it can't find
     one, it creates one with a random name. This option is then set to `tmp/`
     in this bucket (e.g. ``s3://mrjob-01234567890abcdef/tmp/``).
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be called ``s3_tmp_dir``.
 
     .. versionchanged:: 0.5.0
 

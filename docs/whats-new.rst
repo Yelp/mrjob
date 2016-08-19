@@ -233,7 +233,7 @@ If you want to get ahead of the game, here is a list of things that are deprecat
     - *emr_job_flow_pool_name* is now :mrjob-opt:`pool_name`
     - *hdfs_scratch_dir* is now :mrjob-opt:`hadoop_tmp_dir`
     - *pool_emr_job_flows* is now :mrjob-opt:`pool_clusters`
-    - *s3_scratch_uri* is now :mrjob-opt:`s3_tmp_dir`
+    - *s3_scratch_uri* is now :mrjob-opt:`cloud_tmp_dir`
     - *ssh_tunnel_to_job_tracker* is now simply :mrjob-opt:`ssh_tunnel`
 
   - functions and methods:

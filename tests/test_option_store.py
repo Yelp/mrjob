@@ -470,10 +470,10 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             self.assertIn('Deprecated option emr_job_flow_pool_name has been'
                           ' renamed to pool_name', stderr.getvalue())
 
-            self.assertEqual(opts['s3_tmp_dir'], 's3://bucket/walrus')
+            self.assertEqual(opts['cloud_tmp_dir'], 's3://bucket/walrus')
             self.assertNotIn('s3_scratch_uri', opts)
             self.assertIn('Deprecated option s3_scratch_uri has been renamed'
-                          ' to s3_tmp_dir', stderr.getvalue())
+                          ' to cloud_tmp_dir', stderr.getvalue())
 
     def test_cleanup_options(self):
         stderr = StringIO()

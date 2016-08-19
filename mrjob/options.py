@@ -312,6 +312,10 @@ def _add_dataproc_emr_opts(opt_group):
             help='How often (in seconds) to check status of your job/cluster'),
 
         opt_group.add_option(
+            '--cloud-tmp-dir', dest='cloud_tmp_dir', default=None,
+            help='URI on remote FS to use as our temp directory.'),
+
+        opt_group.add_option(
             '--cluster-id', dest='cluster_id', default=None,
             help='ID of an existing cluster to run our job on'),
 
@@ -383,10 +387,6 @@ def _add_dataproc_opts(opt_group):
                   ' consistency. This'
                   ' is typically less than a second but the'
                   ' default is 5.0 to be safe.')),
-
-        opt_group.add_option(
-            '--cloud-tmp-dir', dest='cloud_tmp_dir', default=None,
-            help='URI on remote FS to use as our temp directory.'),
     ]
 
 
@@ -620,7 +620,11 @@ def _add_emr_launch_opts(opt_group):
 
         opt_group.add_option(
             '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
-            help='Deprecated alias for --s3-tmp-dir.'),
+            help='Deprecated alias for --cloud-tmp-dir'),
+
+        opt_group.add_option(
+            '--s3-tmp-dir', dest='s3_tmp_dir', default=None,
+            help='Deprecated alias for --cloud-tmp-dir'),
 
         opt_group.add_option(
             '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
@@ -628,10 +632,6 @@ def _add_emr_launch_opts(opt_group):
             help=('How long to wait for S3 to reach eventual consistency. This'
                   ' is typically less than a second (zero in us-west) but the'
                   ' default is 5.0 to be safe.')),
-
-        opt_group.add_option(
-            '--s3-tmp-dir', dest='s3_tmp_dir', default=None,
-            help='URI on S3 to use as our temp directory.'),
 
         opt_group.add_option(
             '--s3-upload-part-size', dest='s3_upload_part_size', default=None,

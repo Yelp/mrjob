@@ -46,7 +46,7 @@ runners:
     - $BT/aws/src-tree.tar.gz
     # our bucket also lives in the us-west region
     cloud_log_dir: s3://walrus/tmp/logs/
-    s3_tmp_dir: s3://walrus/tmp/
+    cloud_tmp_dir: s3://walrus/tmp/
     setup_cmds: &setup_cmds
     # these files are different between dev and production, so they're
     # uploaded separately. copying them into place isn't safe because

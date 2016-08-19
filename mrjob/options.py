@@ -285,7 +285,7 @@ def _add_hadoop_opts(opt_group):
             help='Temp space on HDFS (default is tmp/mrjob)'),
 
         opt_group.add_option(
-            '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
+            '--hdfs-scratch-dir', dest='hadoop_tmp_dir',
             default=None,
             help='Deprecated alias for --hadoop-tmp-dir'),
     ]
@@ -409,7 +409,7 @@ def _add_emr_connect_opts(opt_group):
     """Options for connecting to the EMR API."""
     return [
         opt_group.add_option(
-            '--aws-region', dest='aws_region', default=None,
+            '--aws-region', dest='region', default=None,
             help='Deprecated alias for --region'),
 
         opt_group.add_option(
@@ -431,7 +431,7 @@ def _add_emr_run_opts(opt_group):
     """Options for running and monitoring a job on EMR."""
     return [
         opt_group.add_option(
-            '--check-emr-status-every', dest='check_emr_status_every',
+            '--check-emr-status-every', dest='check_cluster_every',
             default=None, type='int',
             help='Deprecated alias for --check-cluster-every'),
 
@@ -447,7 +447,7 @@ def _add_emr_run_opts(opt_group):
                   ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
 
         opt_group.add_option(
-            '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
+            '--emr-job-flow-id', dest='cluster_id', default=None,
             help='Deprecated alias for --cluster-id'),
 
         opt_group.add_option(
@@ -499,7 +499,7 @@ def _add_emr_run_opts(opt_group):
                   ' localhost).')),
 
         opt_group.add_option(
-            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
+            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel',
             default=None, action='store_true',
             help='Deprecated alias for --ssh-tunnel'),
     ]
@@ -513,7 +513,7 @@ def _add_emr_launch_opts(opt_group):
             help='A JSON string for selecting additional features on EMR'),
 
         opt_group.add_option(
-            '--aws-availability-zone', dest='aws_availability_zone',
+            '--aws-availability-zone', dest='zone',
             default=None,
             help='Deprecated alias for --zone'),
 
@@ -561,7 +561,6 @@ def _add_emr_launch_opts(opt_group):
                   ' see http://docs.aws.amazon.com/ElasticMapReduce/latest/'
                   'ReleaseGuide/emr-configure-apps.html for examples.')),
 
-        # options.tags has a custom parser, so don't store in options.emr_tags
         opt_group.add_option(
             '--emr-tag', dest='tags',
             default=[], action='append',
@@ -603,7 +602,7 @@ def _add_emr_launch_opts(opt_group):
             help="Don't run our job on a pooled cluster (the default)."),
 
         opt_group.add_option(
-            '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
+            '--no-pool-emr-job-flows', dest='pool_clusters',
             action='store_false',
             help="Deprecated alias for --no-pool-clusters"),
 
@@ -619,7 +618,7 @@ def _add_emr_launch_opts(opt_group):
                  ' clusters left idle can quickly become expensive!'),
 
         opt_group.add_option(
-            '--pool-emr-job-flows', dest='pool_emr_job_flows',
+            '--pool-emr-job-flows', dest='pool_clusters',
             action='store_true',
             help='Deprecated alias for --pool-clusters'),
 
@@ -630,24 +629,25 @@ def _add_emr_launch_opts(opt_group):
                   ' specified.')),
 
         opt_group.add_option(
-            '--s3-log-uri', dest='s3_log_uri', default=None,
+            '--s3-log-uri', dest='cloud_log_dir', default=None,
             help='Deprecated alias for --cloud-log-dir'),
 
         opt_group.add_option(
-            '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
+            '--s3-scratch-uri', dest='cloud_tmp_dir', default=None,
             help='Deprecated alias for --cloud-tmp-dir'),
 
         opt_group.add_option(
-            '--s3-tmp-dir', dest='s3_tmp_dir', default=None,
+            '--s3-tmp-dir', dest='cloud_tmp_dir', default=None,
             help='Deprecated alias for --cloud-tmp-dir'),
 
         opt_group.add_option(
-            '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
+            '--s3-sync-wait-time', dest='cloud_fs_sync_secs', default=None,
             type='float',
             help='Deprecated alias for --cloud-fs-sync-secs'),
 
         opt_group.add_option(
-            '--s3-upload-part-size', dest='s3_upload_part_size', default=None,
+            '--s3-upload-part-size', dest='cloud_upload_part_size',
+            default=None,
             type='float',
             help='Deprecated alias for --cloud-upload-part-size'),
 
@@ -744,7 +744,7 @@ def _add_emr_instance_opts(opt_group):
     return [
         # AMI
         opt_group.add_option(
-            '--ami-version', dest='ami_version', default=None,
+            '--ami-version', dest='image_version', default=None,
             help='Deprecated alias for --image-version'),
 
         opt_group.add_option(
@@ -757,20 +757,20 @@ def _add_emr_instance_opts(opt_group):
 
         opt_group.add_option(
             '--ec2-core-instance-type', '--ec2-slave-instance-type',
-            dest='ec2_core_instance_type', default=None,
+            dest='core_instance_type', default=None,
             help='Deprecated alias for --core-instance-type'),
 
         opt_group.add_option(
-            '--ec2-instance-type', dest='ec2_instance_type', default=None,
+            '--ec2-instance-type', dest='instance_type', default=None,
             help='Deprecated alias for --instance-type'),
 
         opt_group.add_option(
-            '--ec2-master-instance-type', dest='ec2_master_instance_type',
+            '--ec2-master-instance-type', dest='master_instance_type',
             default=None,
             help='Deprecated alias for --master-instance-type'),
 
         opt_group.add_option(
-            '--ec2-task-instance-type', dest='ec2_task_instance_type',
+            '--ec2-task-instance-type', dest='task_instance_type',
             default=None,
             help='Deprecated alias for --task-instance-type'),
 
@@ -784,12 +784,12 @@ def _add_emr_instance_opts(opt_group):
                   '--num-core-instances instead')),
 
         opt_group.add_option(
-            '--num-ec2-core-instances', dest='num_ec2_core_instances',
+            '--num-ec2-core-instances', dest='num_core_instances',
             default=None, type='int',
             help='Deprecated alias for --num-core-instances'),
 
         opt_group.add_option(
-            '--num-ec2-task-instances', dest='num_ec2_task_instances',
+            '--num-ec2-task-instances', dest='num_task_instances',
             default=None, type='int',
             help='Deprecated alias for --num-task-instances'),
 
@@ -823,19 +823,19 @@ def _add_emr_instance_opts(opt_group):
 
         opt_group.add_option(
             '--ec2-core-instance-bid-price',
-            dest='ec2_core_instance_bid_price', default=None,
+            dest='core_instance_bid_price', default=None,
             help='Deprecated alias for --core-instance-bid-price',
         ),
 
         opt_group.add_option(
             '--ec2-master-instance-bid-price',
-            dest='ec2_master_instance_bid_price', default=None,
+            dest='master_instance_bid_price', default=None,
             help='Deprecated alias for --master-instance-bid-price',
         ),
 
         opt_group.add_option(
             '--ec2-task-instance-bid-price',
-            dest='ec2_task_instance_bid_price', default=None,
+            dest='task_instance_bid_price', default=None,
             help='Deprecated alias for --task-instance-bid-price',
         ),
     ]

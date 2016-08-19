@@ -405,7 +405,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'pool_wait_minutes',
         'release_label',
         's3_endpoint',
-        's3_log_uri',
+        'cloud_log_dir',
         's3_sync_wait_time',
         's3_tmp_dir',
         's3_upload_part_size',
@@ -430,7 +430,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_configurations': combine_lists,
         'emr_tags': combine_dicts,
         'hadoop_extra_args': combine_lists,
-        's3_log_uri': combine_paths,
+        'cloud_log_dir': combine_paths,
         's3_tmp_dir': combine_paths,
         'ssh_bin': combine_cmds,
     })
@@ -440,6 +440,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_job_flow_id': 'cluster_id',
         'emr_job_flow_pool_name': 'pool_name',
         'pool_emr_job_flows': 'pool_clusters',
+        's3_log_uri': 'cloud_log_dir',
         's3_scratch_uri': 's3_tmp_dir',
         'ssh_tunnel_to_job_tracker': 'ssh_tunnel',
     })
@@ -822,7 +823,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return ['python2.6']
 
     def _fix_s3_tmp_and_log_uri_opts(self):
-        """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
+        """Fill in s3_tmp_dir and cloud_log_dir (in self._opts) if they
         aren't already set.
 
         Helper for __init__.
@@ -836,12 +837,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._opts['s3_tmp_dir'] = self._check_and_fix_s3_dir(
             self._opts['s3_tmp_dir'])
 
-        # set s3_log_uri
-        if self._opts['s3_log_uri']:
-            self._opts['s3_log_uri'] = self._check_and_fix_s3_dir(
-                self._opts['s3_log_uri'])
+        # set cloud_log_dir
+        if self._opts['cloud_log_dir']:
+            self._opts['cloud_log_dir'] = self._check_and_fix_s3_dir(
+                self._opts['cloud_log_dir'])
         else:
-            self._opts['s3_log_uri'] = self._opts['s3_tmp_dir'] + 'logs/'
+            self._opts['cloud_log_dir'] = self._opts['s3_tmp_dir'] + 'logs/'
 
     def _set_s3_tmp_dir(self):
         """Helper for _fix_s3_tmp_and_log_uri_opts"""
@@ -1407,10 +1408,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
-            self._job_key, self._opts['s3_log_uri'],
+            self._job_key, self._opts['cloud_log_dir'],
             ', '.join('%s=%r' % (k, v) for k, v in args.items())))
         cluster_id = emr_conn.run_jobflow(
-            self._job_key, self._opts['s3_log_uri'], **args)
+            self._job_key, self._opts['cloud_log_dir'], **args)
 
          # keep track of when we started our job
         self._emr_job_start = time.time()
@@ -2265,9 +2266,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         s3_dir_name = s3_dir_name or dir_name
 
         if s3_dir_name and self._s3_log_dir():
-            s3_log_uri = posixpath.join(self._s3_log_dir(), s3_dir_name)
-            log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
-            yield [s3_log_uri]
+            cloud_log_dir = posixpath.join(self._s3_log_dir(), s3_dir_name)
+            log.info('Looking for %s in %s...' % (log_desc, cloud_log_dir))
+            yield [cloud_log_dir]
 
     def _wait_for_logs_on_s3(self):
         """If the cluster is already terminating, wait for it to terminate,

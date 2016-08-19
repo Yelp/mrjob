@@ -387,7 +387,6 @@ def _add_dataproc_opts(opt_group):
         opt_group.add_option(
             '--cloud-tmp-dir', dest='cloud_tmp_dir', default=None,
             help='URI on remote FS to use as our temp directory.'),
-
     ]
 
 
@@ -511,6 +510,10 @@ def _add_emr_launch_opts(opt_group):
             help='Availability zone to run the cluster on'),
 
         opt_group.add_option(
+             '--cloud-log-dir', dest='cloud_log_dir', default=None,
+             help='URI on remote FS to write logs into'),
+
+        opt_group.add_option(
             '--ec2-key-pair', dest='ec2_key_pair', default=None,
             help='Name of the SSH key pair you set up for EMR'),
 
@@ -613,7 +616,7 @@ def _add_emr_launch_opts(opt_group):
 
         opt_group.add_option(
             '--s3-log-uri', dest='s3_log_uri', default=None,
-            help='URI on S3 to write logs into'),
+            help='Deprecated alias for --cloud-log-dir'),
 
         opt_group.add_option(
             '--s3-scratch-uri', dest='s3_scratch_uri', default=None,

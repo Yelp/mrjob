@@ -755,8 +755,8 @@ MRJob uses boto to manipulate/access S3.
                  be able to access buckets located in other regions.
 
 .. mrjob-opt::
-    :config: s3_log_uri
-    :switch: --s3-log-uri
+    :config: cloud_log_dir
+    :switch: --cloud-log-dir
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: append ``logs`` to :mrjob-opt:`s3_tmp_dir`
@@ -764,6 +764,10 @@ MRJob uses boto to manipulate/access S3.
     Where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for
     your cluster will go into a subdirectory, e.g.
     ``s3://yourbucket/logs/j-CLUSTERID/``.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``s3_log_uri``
 
 .. mrjob-opt::
     :config: s3_tmp_dir

@@ -103,13 +103,17 @@ Cluster creation and configuration
         2.5.
 
 .. mrjob-opt::
-    :config: aws_availability_zone
-    :switch: --aws-availability-zone
+    :config: zone
+    :switch: zone
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: AWS default
 
     Availability zone to run the job in
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``aws_availability_zone``
 
 .. mrjob-opt::
     :config: region

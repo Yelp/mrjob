@@ -741,7 +741,7 @@ class AvailabilityZoneTestCase(MockBotoTestCase):
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
         'check_cluster_every': 0.00,
         's3_sync_wait_time': 0.00,
-        'aws_availability_zone': 'PUPPYLAND',
+        'zone': 'PUPPYLAND',
     }}}
 
     def test_availability_zone_config(self):

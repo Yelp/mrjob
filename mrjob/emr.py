@@ -358,7 +358,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'additional_emr_info',
         'ami_version',
         'aws_access_key_id',
-        'aws_availability_zone',
         'aws_secret_access_key',
         'aws_security_token',
         'bootstrap',
@@ -414,6 +413,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'task_instance_bid_price',
         'task_instance_type',
         'visible_to_all_users',
+        'zone',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -435,6 +435,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
+        'aws_availability_zone': 'zone',
         'aws_region': 'region',
         'check_emr_status_every': 'check_cluster_every',
         'ec2_core_instance_bid_price': 'core_instance_bid_price',
@@ -1431,8 +1432,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             args['ami_version'] = self._opts['ami_version']
 
-        if self._opts['aws_availability_zone']:
-            args['availability_zone'] = self._opts['aws_availability_zone']
+        if self._opts['zone']:
+            args['availability_zone'] = self._opts['zone']
         # The old, simple API, available if we're not using task instances
         # or bid prices
         if not (self._opts['num_task_instances'] or

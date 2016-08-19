@@ -356,6 +356,11 @@ def _add_dataproc_emr_opts(opt_group):
         opt_group.add_option(
             '--task-instance-type', dest='task_instance_type', default=None,
             help='Type of GCE/EC2 task instance(s) to launch'),
+
+        opt_group.add_option(
+            '--zone', dest='zone', default=None,
+            help=('GCE zone/AWS availability zone to run Dataproc/EMR jobs'
+                  ' in.')),
     ] + (
         _add_dataproc_emr_connect_opts(opt_group)
     )
@@ -377,10 +382,6 @@ def _add_dataproc_opts(opt_group):
         opt_group.add_option(
             '--gcp-project', dest='gcp_project', default=None,
             help='Project to run Dataproc jobs in.'),
-
-        opt_group.add_option(
-            '--zone', dest='zone', default=None,
-            help='GCE zone to run Dataproc/EMR jobs in.'),
 
         opt_group.add_option(
             '--image-version', dest='image_version', default=None,
@@ -513,7 +514,7 @@ def _add_emr_launch_opts(opt_group):
         opt_group.add_option(
             '--aws-availability-zone', dest='aws_availability_zone',
             default=None,
-            help='Availability zone to run the cluster on'),
+            help='Deprecated alias for --zone'),
 
         opt_group.add_option(
              '--cloud-log-dir', dest='cloud_log_dir', default=None,

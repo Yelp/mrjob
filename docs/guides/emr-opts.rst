@@ -512,14 +512,18 @@ Monitoring the cluster
 -----------------------
 
 .. mrjob-opt::
-    :config: check_emr_status_every
-    :switch: --check-emr-status-every
+    :config: check_cluster_every
+    :switch: --check-cluster-every
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: 30
 
     How often to check on the status of EMR jobs in seconds. If you set this
     too low, AWS will throttle you.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be called ``check_emr_status_every``
 
 .. mrjob-opt::
     :config: enable_emr_debugging

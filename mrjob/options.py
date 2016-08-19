@@ -294,10 +294,6 @@ def _add_hadoop_opts(opt_group):
 def _add_dataproc_emr_opts(opt_group):
     return [
         opt_group.add_option(
-            '--cluster-id', dest='cluster_id', default=None,
-            help='ID of an existing cluster to run our job on'),
-
-        opt_group.add_option(
             '--bootstrap', dest='bootstrap', action='append',
             help=('A shell command to set up libraries etc. before any steps'
                   ' (e.g. "sudo apt-get -qy install python3"). You may'
@@ -310,6 +306,14 @@ def _add_dataproc_emr_opts(opt_group):
             help=('Attempt to install a compatible version of Python'
                   ' at bootstrap time. Currently this only does anything'
                   ' for Python 3, for which it is enabled by default.')),
+
+        opt_group.add_option(
+            '--check-cluster-every', dest='check_cluster_every', default=None,
+            help='How often (in seconds) to check status of your job/cluster'),
+
+        opt_group.add_option(
+            '--cluster-id', dest='cluster_id', default=None,
+            help='ID of an existing cluster to run our job on'),
 
         opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
@@ -337,10 +341,6 @@ def _add_dataproc_opts(opt_group):
         opt_group.add_option(
             '--image-version', dest='image_version', default=None,
             help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
-
-        opt_group.add_option(
-            '--check-cluster-every', dest='check_cluster_every', default=None,
-            help='How often (in seconds) to check status of your job/cluster'),
 
         # instance types
         opt_group.add_option(
@@ -426,7 +426,7 @@ def _add_emr_run_opts(opt_group):
         opt_group.add_option(
             '--check-emr-status-every', dest='check_emr_status_every',
             default=None, type='int',
-            help='How often (in seconds) to check status of your EMR job'),
+            help='Deprecated alias for --check-cluster-every'),
 
         # --ec2-key-pair is used to launch the job, not to monitor it
         opt_group.add_option(

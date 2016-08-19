@@ -369,7 +369,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_python',
         'bootstrap_python_packages',
         'bootstrap_scripts',
-        'check_emr_status_every',
+        'check_cluster_every',
         'cluster_id',
         'ec2_core_instance_bid_price',
         'ec2_core_instance_type',
@@ -436,6 +436,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
+        'check_emr_status_every': 'check_cluster_every',
         'emr_job_flow_id': 'cluster_id',
         'emr_job_flow_pool_name': 'pool_name',
         'pool_emr_job_flows': 'pool_clusters',
@@ -462,7 +463,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ami_version': _DEFAULT_AMI_VERSION,
             'aws_region': _DEFAULT_AWS_REGION,
             'bootstrap_python': None,
-            'check_emr_status_every': 30,
+            'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
             'ec2_core_instance_type': 'm1.medium',
             'ec2_master_instance_type': 'm1.medium',
@@ -1352,7 +1353,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     'TERMINATED', 'TERMINATED_WITH_ERRORS'):
                 return
 
-            time.sleep(self._opts['check_emr_status_every'])
+            time.sleep(self._opts['check_cluster_every'])
             cluster = self._describe_cluster()
 
     def _create_instance_group(self, role, instance_type, count, bid_price):
@@ -1859,8 +1860,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         while True:
             # don't antagonize EMR's throttling
             log.debug('Waiting %.1f seconds...' %
-                      self._opts['check_emr_status_every'])
-            time.sleep(self._opts['check_emr_status_every'])
+                      self._opts['check_cluster_every'])
+            time.sleep(self._opts['check_cluster_every'])
 
             step = _patched_describe_step(emr_conn, self._cluster_id, step_id)
 

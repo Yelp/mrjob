@@ -139,7 +139,7 @@ HADOOP_ENV_EMR_CONFIGURATION_VARIANT = dict(
 class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_emr_status_every': 0.00,
+        'check_cluster_every': 0.00,
         's3_sync_wait_time': 0.00,
         'additional_emr_info': {'key': 'value'}
     }}}
@@ -436,7 +436,7 @@ class VisibleToAllUsersTestCase(MockBotoTestCase):
         self.assertTrue(cluster.visibletoallusers, 'true')
 
         VISIBLE_MRJOB_CONF = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
+            'check_cluster_every': 0.00,
             's3_sync_wait_time': 0.00,
             'visible_to_all_users': 1,  # should be True
         }}}
@@ -613,7 +613,7 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
         # can't override a param set on the command line
 
         API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
+            'check_cluster_every': 0.00,
             's3_sync_wait_time': 0.00,
             'emr_api_params': {
                 'Instances.Ec2SubnetId': 'someID',
@@ -638,7 +638,7 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
         # we can now serialize data structures from mrjob.conf
 
         API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
+            'check_cluster_every': 0.00,
             's3_sync_wait_time': 0.00,
             'emr_api_params': {
                 'Foo': {'Bar': ['Baz', {'Qux': ['Quux', 'Quuux']}]}
@@ -739,7 +739,7 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
 class AvailabilityZoneTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_emr_status_every': 0.00,
+        'check_cluster_every': 0.00,
         's3_sync_wait_time': 0.00,
         'aws_availability_zone': 'PUPPYLAND',
     }}}
@@ -2694,7 +2694,7 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
 class PoolingDisablingTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_emr_status_every': 0.00,
+        'check_cluster_every': 0.00,
         's3_sync_wait_time': 0.00,
         'pool_clusters': True,
     }}}
@@ -3084,7 +3084,7 @@ class PoolWaitMinutesOptionTestCase(MockBotoTestCase):
     def test_pool_wait_minutes_from_mrjob_conf(self):
         # tests issue #1070
         MRJOB_CONF_WITH_POOL_WAIT_MINUTES = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
+            'check_cluster_every': 0.00,
             's3_sync_wait_time': 0.00,
             'pool_wait_minutes': 11,
         }}}
@@ -3398,7 +3398,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
 class JarStepTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_emr_status_every': 0.00,
+        'check_cluster_every': 0.00,
         's3_sync_wait_time': 0.00,
     }}}
 
@@ -3818,7 +3818,7 @@ class EMRTagsTestCase(MockBotoTestCase):
 
     def test_command_line_overrides_config(self):
         EMR_TAGS_MRJOB_CONF = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
+            'check_cluster_every': 0.00,
             's3_sync_wait_time': 0.00,
             'emr_tags': {
                 'tag_one': 'foo',

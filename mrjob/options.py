@@ -514,6 +514,14 @@ def _add_emr_launch_opts(opt_group):
              help='URI on remote FS to write logs into'),
 
         opt_group.add_option(
+            '--cloud-upload-part-size', dest='cloud_upload_part_size',
+            default=None,
+            type='float',
+            help=('Upload files to S3 in parts no bigger than this many'
+                  ' megabytes. Default is 100 MiB. Set to 0 to disable'
+                  ' multipart uploading entirely.')),
+
+        opt_group.add_option(
             '--ec2-key-pair', dest='ec2_key_pair', default=None,
             help='Name of the SSH key pair you set up for EMR'),
 
@@ -636,9 +644,7 @@ def _add_emr_launch_opts(opt_group):
         opt_group.add_option(
             '--s3-upload-part-size', dest='s3_upload_part_size', default=None,
             type='float',
-            help=('Upload files to S3 in parts no bigger than this many'
-                  ' megabytes. Default is 100 MiB. Set to 0 to disable'
-                  ' multipart uploading entirely.')),
+            help='Deprecated alias for --cloud-upload-part-size'),
 
         opt_group.add_option(
             '--subnet', dest='subnet', default=None,

@@ -803,8 +803,8 @@ MRJob uses boto to manipulate/access S3.
     less than a second (zero in U.S. West), but the default is 5.0 to be safe.
 
 .. mrjob-opt::
-   :config: s3_upload_part_size
-   :switch: --s3-upload-part-size
+   :config: cloud_upload_part_size
+   :switch: --cloud-upload-part-size
    :type: integer
    :set: emr
    :default: 100
@@ -823,6 +823,10 @@ MRJob uses boto to manipulate/access S3.
        http://docs.aws.amazon.com/AmazonS3/latest/dev/UploadingObjects.html
    .. _`requires parts to be between 5 MiB and 5 GiB`:
        http://docs.aws.amazon.com/AmazonS3/latest/dev/qfacts.html
+
+   .. versionchanged:: 0.5.4
+
+      This option used to be called ``s3_upload_part_size``.
 
 SSH access and tunneling
 ------------------------

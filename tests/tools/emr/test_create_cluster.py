@@ -46,6 +46,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'check_cluster_every': None,
                 'cloud_log_dir': None,
                 'cloud_tmp_dir': None,
+                'cloud_upload_part_size': None,
                 'cluster_id': None,
                 'conf_paths': None,
                 'ec2_core_instance_bid_price': None,

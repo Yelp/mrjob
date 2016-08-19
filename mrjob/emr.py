@@ -408,7 +408,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'cloud_log_dir',
         's3_sync_wait_time',
         'cloud_tmp_dir',
-        's3_upload_part_size',
+        'cloud_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
         'ssh_tunnel',
@@ -443,6 +443,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         's3_log_uri': 'cloud_log_dir',
         's3_scratch_uri': 'cloud_tmp_dir',
         's3_tmp_dir': 'cloud_tmp_dir',
+        's3_upload_part_size': 'cloud_upload_part_size',
         'ssh_tunnel_to_job_tracker': 'ssh_tunnel',
     })
 
@@ -476,7 +477,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'pool_name': 'default',
             'pool_wait_minutes': 0,
             's3_sync_wait_time': 5.0,
-            's3_upload_part_size': 100,  # 100 MB
+            'cloud_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
             # don't use a list because it makes it hard to read option values
@@ -1110,7 +1111,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB
-        return int((self._opts['s3_upload_part_size'] or 0) * 1024 * 1024)
+        return int((self._opts['cloud_upload_part_size'] or 0) * 1024 * 1024)
 
     def _should_use_multipart_upload(self, fsize, part_size, path):
         """Decide if we want to use multipart uploading.

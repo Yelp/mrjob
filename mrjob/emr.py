@@ -368,6 +368,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_python_packages',
         'bootstrap_scripts',
         'check_cluster_every',
+        'cloud_fs_sync_secs',
         'cloud_log_dir',
         'cloud_tmp_dir',
         'cloud_upload_part_size',
@@ -403,7 +404,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'region',
         'release_label',
         's3_endpoint',
-        's3_sync_wait_time',
         'ssh_bin',
         'ssh_bind_ports',
         'ssh_tunnel',
@@ -454,6 +454,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'pool_emr_job_flows': 'pool_clusters',
         's3_log_uri': 'cloud_log_dir',
         's3_scratch_uri': 'cloud_tmp_dir',
+        's3_sync_wait_time': 'cloud_fs_sync_secs',
         's3_tmp_dir': 'cloud_tmp_dir',
         's3_upload_part_size': 'cloud_upload_part_size',
         'ssh_tunnel_to_job_tracker': 'ssh_tunnel',
@@ -488,7 +489,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'num_task_instances': 0,
             'pool_name': 'default',
             'pool_wait_minutes': 0,
-            's3_sync_wait_time': 5.0,
+            'cloud_fs_sync_secs': 5.0,
             'cloud_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
@@ -1329,8 +1330,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Sleep for a little while, to give S3 a chance to sync up.
         """
         log.debug('Waiting %.1fs for S3 eventual consistency...' %
-                  self._opts['s3_sync_wait_time'])
-        time.sleep(self._opts['s3_sync_wait_time'])
+                  self._opts['cloud_fs_sync_secs'])
+        time.sleep(self._opts['cloud_fs_sync_secs'])
 
     def _wait_for_cluster_to_terminate(self, cluster=None):
         if not cluster:
@@ -2935,7 +2936,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 cluster_id, num_steps = cluster_info_list[-1]
                 status = _attempt_to_acquire_lock(
                     self.fs, self._lock_uri(cluster_id, num_steps),
-                    self._opts['s3_sync_wait_time'], self._job_key)
+                    self._opts['cloud_fs_sync_secs'], self._job_key)
                 if status:
                     return cluster_id
                 else:

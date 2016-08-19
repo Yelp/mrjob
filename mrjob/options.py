@@ -312,6 +312,14 @@ def _add_dataproc_emr_opts(opt_group):
             help='How often (in seconds) to check status of your job/cluster'),
 
         opt_group.add_option(
+            '--cloud-fs-sync-secs', dest='cloud_fs_sync_secs', default=None,
+            type='float',
+            help=('How long to wait for remote FS to reach eventual'
+                  ' consistency. This'
+                  ' is typically less than a second but the'
+                  ' default is 5.0 to be safe.')),
+
+        opt_group.add_option(
             '--cloud-tmp-dir', dest='cloud_tmp_dir', default=None,
             help='URI on remote FS to use as our temp directory.'),
 
@@ -387,13 +395,6 @@ def _add_dataproc_opts(opt_group):
             '--image-version', dest='image_version', default=None,
             help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
 
-        opt_group.add_option(
-            '--cloud-fs-sync-secs', dest='cloud_fs_sync_secs', default=None,
-            type='float',
-            help=('How long to wait for remote FS to reach eventual'
-                  ' consistency. This'
-                  ' is typically less than a second but the'
-                  ' default is 5.0 to be safe.')),
     ]
 
 
@@ -643,9 +644,7 @@ def _add_emr_launch_opts(opt_group):
         opt_group.add_option(
             '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
             type='float',
-            help=('How long to wait for S3 to reach eventual consistency. This'
-                  ' is typically less than a second (zero in us-west) but the'
-                  ' default is 5.0 to be safe.')),
+            help='Deprecated alias for --cloud-fs-sync-secs'),
 
         opt_group.add_option(
             '--s3-upload-part-size', dest='s3_upload_part_size', default=None,

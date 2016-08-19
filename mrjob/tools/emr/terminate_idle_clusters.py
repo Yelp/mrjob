@@ -356,7 +356,7 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
         status = _attempt_to_acquire_lock(
             runner.fs.make_s3_conn(),
             runner._lock_uri(cluster_id, num_steps),
-            runner._opts['s3_sync_wait_time'],
+            runner._opts['cloud_fs_sync_secs'],
             '%s (%s)' % (msg,
                          runner._make_unique_job_key(label='terminate')),
             mins_to_expiration=max_mins_locked,

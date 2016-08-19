@@ -43,6 +43,6 @@ class ToolTestCase(MockBotoTestCase):
         kwargs.update(dict(
             conf_paths=[],
             cloud_tmp_dir='s3://walrus/',
-            s3_sync_wait_time=0))
+            cloud_fs_sync_secs=0))
         with EMRJobRunner(**kwargs) as runner:
             return runner.make_persistent_cluster()

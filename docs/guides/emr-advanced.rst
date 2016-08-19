@@ -92,7 +92,8 @@ cluster. This is somewhat ugly but works in practice, and avoids
 
 .. warning::
 
-    If S3 eventual consistency takes longer than *s3_sync_wait_time*, then you
+    If S3 eventual consistency takes longer than
+    :mrjob:opt:`cloud_fs_sync_secs`, then you
     may encounter race conditions when using pooling, e.g. two jobs claiming
     the same cluster at the same time, or the idle cluster killer shutting
     down your job before it has started to run. Regions with read-after-write

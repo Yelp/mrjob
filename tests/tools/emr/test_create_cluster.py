@@ -44,6 +44,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'bootstrap_python_packages': [],
                 'bootstrap_scripts': [],
                 'check_cluster_every': None,
+                'cloud_fs_sync_secs': None,
                 'cloud_log_dir': None,
                 'cloud_tmp_dir': None,
                 'cloud_upload_part_size': None,
@@ -102,8 +103,8 @@ class ClusterInspectionTestCase(ToolTestCase):
         self.add_mock_s3_data({'walrus': {}})
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
-            '--s3-sync-wait-time', '0',
-            '--s3-tmp-dir', 's3://walrus/tmp')
+            '--cloud-fs-sync-secs', '0',
+            '--cloud-tmp-dir', 's3://walrus/tmp')
         self.monkey_patch_stdout()
         create_cluster_main()
         self.assertEqual(list(self.mock_emr_clusters.keys()),
@@ -116,8 +117,8 @@ class ClusterInspectionTestCase(ToolTestCase):
         self.add_mock_s3_data({'walrus': {}})
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
-            '--s3-sync-wait-time', '0',
-            '--s3-scratch-uri', 's3://walrus/tmp',
+            '--cloud-fs-sync-secs', '0',
+            '--cloud-tmp-dir', 's3://walrus/tmp',
             '--tag', 'tag_one=foo',
             '--tag', 'tag_two=bar',
         )

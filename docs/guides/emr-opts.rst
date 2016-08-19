@@ -837,14 +837,18 @@ MRJob uses boto to manipulate/access S3.
        This option used to be called ``s3_scratch_uri``.
 
 .. mrjob-opt::
-    :config: s3_sync_wait_time
-    :switch: --s3-sync-wait-time
+    :config: cloud_fs_sync_secs
+    :switch: --cloud_fs_sync_secs
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: 5.0
 
     How long to wait for S3 to reach eventual consistency. This is typically
     less than a second (zero in U.S. West), but the default is 5.0 to be safe.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be called ``s3_sync_wait_time``
 
 .. mrjob-opt::
    :config: cloud_upload_part_size

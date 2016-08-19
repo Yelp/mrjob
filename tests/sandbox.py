@@ -36,7 +36,7 @@ EMPTY_MRJOB_CONF = {'runners': {
     },
     'emr': {
         'check_cluster_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'cloud_fs_sync_secs': 0.00,
     },
     'hadoop': {
         'label': 'test_job',

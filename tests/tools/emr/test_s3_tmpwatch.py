@@ -49,7 +49,7 @@ class S3TmpWatchTestCase(MockBotoTestCase):
         shutil.rmtree(self.tmp_dir)
 
     def test_cleanup(self):
-        runner = EMRJobRunner(conf_paths=[], s3_sync_wait_time=0.01)
+        runner = EMRJobRunner(conf_paths=[], cloud_fs_sync_secs=0.01)
 
         # add some mock data and change last_modified
         remote_input_path = 's3://walrus/data/'

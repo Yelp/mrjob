@@ -140,7 +140,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
         'check_cluster_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'cloud_fs_sync_secs': 0.00,
         'additional_emr_info': {'key': 'value'}
     }}}
 
@@ -437,7 +437,7 @@ class VisibleToAllUsersTestCase(MockBotoTestCase):
 
         VISIBLE_MRJOB_CONF = {'runners': {'emr': {
             'check_cluster_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'visible_to_all_users': 1,  # should be True
         }}}
 
@@ -614,7 +614,7 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
 
         API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
             'check_cluster_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'emr_api_params': {
                 'Instances.Ec2SubnetId': 'someID',
                 'VisibleToAllUsers': None,
@@ -639,7 +639,7 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
 
         API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
             'check_cluster_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'emr_api_params': {
                 'Foo': {'Bar': ['Baz', {'Qux': ['Quux', 'Quuux']}]}
             },
@@ -740,7 +740,7 @@ class AvailabilityZoneTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
         'check_cluster_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'cloud_fs_sync_secs': 0.00,
         'zone': 'PUPPYLAND',
     }}}
 
@@ -1532,7 +1532,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_actions=bootstrap_actions,
-                              s3_sync_wait_time=0.00)
+                              cloud_fs_sync_secs=0.00)
 
         cluster_id = runner.make_persistent_cluster()
 
@@ -1586,7 +1586,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_actions=bootstrap_actions,
-                              s3_sync_wait_time=0.00)
+                              cloud_fs_sync_secs=0.00)
 
         cluster_id = runner.make_persistent_cluster()
 
@@ -2686,7 +2686,7 @@ class PoolingDisablingTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
         'check_cluster_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'cloud_fs_sync_secs': 0.00,
         'pool_clusters': True,
     }}}
 
@@ -3076,7 +3076,7 @@ class PoolWaitMinutesOptionTestCase(MockBotoTestCase):
         # tests issue #1070
         MRJOB_CONF_WITH_POOL_WAIT_MINUTES = {'runners': {'emr': {
             'check_cluster_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'pool_wait_minutes': 11,
         }}}
 
@@ -3390,7 +3390,7 @@ class JarStepTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
         'check_cluster_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'cloud_fs_sync_secs': 0.00,
     }}}
 
     def test_local_jar_gets_uploaded(self):
@@ -3810,7 +3810,7 @@ class EMRTagsTestCase(MockBotoTestCase):
     def test_command_line_overrides_config(self):
         TAGS_MRJOB_CONF = {'runners': {'emr': {
             'check_cluster_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'tags': {
                 'tag_one': 'foo',
                 'tag_two': None,

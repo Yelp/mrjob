@@ -6,7 +6,6 @@
 # {"runners": {
 #    "emr": {
 #      "aws_access_key_id": "AKIAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-#      "aws_region": "us-west-1",
 #      "aws_secret_access_key": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
 #      "bootstrap_python_packages": [
 #        "$BT/aws/python-packages/*.tar.gz"
@@ -16,9 +15,6 @@
 runners:
   emr:
     aws_access_key_id: AKIAAAAAAAAAAAAAAAAAAAAAAAAAAAA
-    # We run on in the west region because we're located on the west coast,
-    # and there are no eventual consistency issues with newly created S3 keys.
-    aws_region: us-west-1
     aws_secret_access_key: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
     # instead of keys, you can use a temporary security token
     #aws_security_token: AREALLYLONGHASH
@@ -47,6 +43,9 @@ runners:
     # our bucket also lives in the us-west region
     cloud_log_dir: s3://walrus/tmp/logs/
     cloud_tmp_dir: s3://walrus/tmp/
+    # We run on in the west region because we're located on the west coast,
+    # and there are no eventual consistency issues with newly created S3 keys.
+    region: us-west-1
     setup_cmds: &setup_cmds
     # these files are different between dev and production, so they're
     # uploaded separately. copying them into place isn't safe because

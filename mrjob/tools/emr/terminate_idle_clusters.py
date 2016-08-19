@@ -75,6 +75,7 @@ from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
+from mrjob.options import _add_dataproc_emr_connect_opts
 from mrjob.options import _add_emr_connect_opts
 from mrjob.options import _alphabetize_options
 from mrjob.parse import iso8601_to_datetime
@@ -414,6 +415,7 @@ def _make_option_parser():
         help="Don't actually kill idle jobs; just log that we would")
 
     _add_basic_opts(option_parser)
+    _add_dataproc_emr_connect_opts(option_parser)
     _add_emr_connect_opts(option_parser)
     _alphabetize_options(option_parser)
 

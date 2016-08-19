@@ -86,6 +86,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'pool_emr_job_flows': None,
                 'pool_name': None,
                 'release_label': None,
+                'region': None,
                 's3_endpoint': None,
                 's3_log_uri': None,
                 's3_scratch_uri': None,

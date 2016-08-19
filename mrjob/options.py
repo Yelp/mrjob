@@ -356,6 +356,18 @@ def _add_dataproc_emr_opts(opt_group):
         opt_group.add_option(
             '--task-instance-type', dest='task_instance_type', default=None,
             help='Type of GCE/EC2 task instance(s) to launch'),
+    ] + (
+        _add_dataproc_emr_connect_opts(opt_group)
+    )
+
+
+def _add_dataproc_emr_connect_opts(opt_group):
+    """Options for ``dataproc`` and ``emr`` runner used for connecting
+    to the API."""
+    return [
+        opt_group.add_option(
+            '--region', dest='region',
+            help='GCE/AWS region to run Dataproc/EMR jobs in.'),
     ]
 
 
@@ -365,10 +377,6 @@ def _add_dataproc_opts(opt_group):
         opt_group.add_option(
             '--gcp-project', dest='gcp_project', default=None,
             help='Project to run Dataproc jobs in.'),
-
-        opt_group.add_option(
-            '--region', dest='region',
-            help='GCE region to run Dataproc/EMR jobs in.'),
 
         opt_group.add_option(
             '--zone', dest='zone', default=None,
@@ -400,13 +408,13 @@ def _add_emr_connect_opts(opt_group):
     return [
         opt_group.add_option(
             '--aws-region', dest='aws_region', default=None,
-            help=('Region to run EMR jobs in. Default is us-west-2')),
+            help='Deprecated alias for --region'),
 
         opt_group.add_option(
             '--emr-endpoint', dest='emr_endpoint', default=None,
             help=('Force mrjob to connect to EMR on this endpoint'
                   ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
-                  ' is to infer this from aws_region.')),
+                  ' is to infer this from region.')),
 
         opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,

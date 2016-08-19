@@ -769,15 +769,15 @@ class RegionTestCase(MockBotoTestCase):
 
     def test_default(self):
         runner = EMRJobRunner()
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_explicit_region(self):
-        runner = EMRJobRunner(aws_region='us-east-1')
-        self.assertEqual(runner._opts['aws_region'], 'us-east-1')
+        runner = EMRJobRunner(region='us-east-1')
+        self.assertEqual(runner._opts['region'], 'us-east-1')
 
     def test_cannot_be_empty(self):
-        runner = EMRJobRunner(aws_region='')
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        runner = EMRJobRunner(region='')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
 
 class TmpBucketTestCase(MockBotoTestCase):
@@ -805,12 +805,12 @@ class TmpBucketTestCase(MockBotoTestCase):
 
     def test_us_west_1(self):
         self.assert_new_tmp_bucket('us-west-1',
-                                   aws_region='us-west-1')
+                                   region='us-west-1')
 
     def test_us_east_1(self):
         # location should be blank
         self.assert_new_tmp_bucket('',
-                                   aws_region='us-east-1')
+                                   region='us-east-1')
 
     def test_reuse_mrjob_bucket_in_same_region(self):
         self.add_mock_s3_data({'mrjob-1': {}}, location='us-west-2')
@@ -835,7 +835,7 @@ class TmpBucketTestCase(MockBotoTestCase):
         # buckets is '', not 'us-east-1'
         self.add_mock_s3_data({'mrjob-1': {}}, location='')
 
-        runner = EMRJobRunner(aws_region='us-east-1')
+        runner = EMRJobRunner(region='us-east-1')
 
         self.assertEqual(runner._opts['cloud_tmp_dir'],
                          's3://mrjob-1/tmp/')
@@ -851,14 +851,14 @@ class TmpBucketTestCase(MockBotoTestCase):
     def test_cross_region_explicit_tmp_uri(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
 
-        runner = EMRJobRunner(aws_region='us-west-1',
+        runner = EMRJobRunner(region='us-west-1',
                               cloud_tmp_dir='s3://walrus/tmp/')
 
         self.assertEqual(runner._opts['cloud_tmp_dir'],
                          's3://walrus/tmp/')
 
-        # tmp bucket shouldn't influence aws_region (it did in 0.4.x)
-        self.assertEqual(runner._opts['aws_region'], 'us-west-1')
+        # tmp bucket shouldn't influence region (it did in 0.4.x)
+        self.assertEqual(runner._opts['region'], 'us-west-1')
 
 
 class EC2InstanceGroupTestCase(MockBotoTestCase):
@@ -1230,64 +1230,64 @@ class TestEMREndpoints(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[])
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-2.amazonaws.com')
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_none_region(self):
         # blank region should be treated the same as no region
-        runner = EMRJobRunner(conf_paths=[], aws_region=None)
+        runner = EMRJobRunner(conf_paths=[], region=None)
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-2.amazonaws.com')
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_blank_region(self):
         # blank region should be treated the same as no region
-        runner = EMRJobRunner(conf_paths=[], aws_region='')
+        runner = EMRJobRunner(conf_paths=[], region='')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-2.amazonaws.com')
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_eu(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='EU')
+        runner = EMRJobRunner(conf_paths=[], region='EU')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.eu-west-1.amazonaws.com')
 
     def test_eu_case_insensitive(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='eu')
+        runner = EMRJobRunner(conf_paths=[], region='eu')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.eu-west-1.amazonaws.com')
 
     def test_us_east_1(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='us-east-1')
+        runner = EMRJobRunner(conf_paths=[], region='us-east-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-east-1.amazonaws.com')
 
     def test_us_west_1(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
+        runner = EMRJobRunner(conf_paths=[], region='us-west-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-1.amazonaws.com')
 
     def test_us_west_1_case_insensitive(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='US-West-1')
+        runner = EMRJobRunner(conf_paths=[], region='US-West-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-1.amazonaws.com')
 
     def test_ap_southeast_1(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='ap-southeast-1')
+        runner = EMRJobRunner(conf_paths=[], region='ap-southeast-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.ap-southeast-1.amazonaws.com')
 
     def test_previously_unknown_region(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='lolcatnia-1')
+        runner = EMRJobRunner(conf_paths=[], region='lolcatnia-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.lolcatnia-1.amazonaws.com')
 
     def test_explicit_endpoints(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='EU',
+        runner = EMRJobRunner(conf_paths=[], region='EU',
                               s3_endpoint='s3-proxy', emr_endpoint='emr-proxy')
         self.assertEqual(runner.make_emr_conn().host, 'emr-proxy')
 
     def test_ssl_fallback_host(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
+        runner = EMRJobRunner(conf_paths=[], region='us-west-1')
 
         with patch.object(MockEmrConnection, 'STRICT_SSL', True):
             emr_conn = runner.make_emr_conn()

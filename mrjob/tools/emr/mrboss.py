@@ -53,6 +53,7 @@ import sys
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
+from mrjob.options import _add_dataproc_emr_connect_opts
 from mrjob.options import _add_emr_connect_opts
 from mrjob.options import _alphabetize_options
 from mrjob.py2 import to_string
@@ -74,6 +75,7 @@ def main(cl_args=None):
                              help="Specify an output directory (default:"
                              " CLUSTER_ID)")
     _add_basic_opts(option_parser)
+    _add_dataproc_emr_connect_opts(option_parser)
     _add_emr_connect_opts(option_parser)
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
         option_parser: ('ec2_key_pair_file', 'ssh_bin'),

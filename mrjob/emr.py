@@ -164,7 +164,7 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 
 # default AWS region to use for EMR. Using us-west-2 because it is the default
 # for new (since October 10, 2012) accounts (see #1025)
-_DEFAULT_AWS_REGION = 'us-west-2'
+_DEFAULT_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_AMI_VERSION = '3.11.0'
@@ -359,7 +359,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ami_version',
         'aws_access_key_id',
         'aws_availability_zone',
-        'aws_region',
         'aws_secret_access_key',
         'aws_security_token',
         'bootstrap',
@@ -370,16 +369,14 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_python_packages',
         'bootstrap_scripts',
         'check_cluster_every',
+        'cloud_log_dir',
+        'cloud_tmp_dir',
+        'cloud_upload_part_size',
         'cluster_id',
         'core_instance_bid_price',
         'core_instance_type',
-        'instance_type',
         'ec2_key_pair',
         'ec2_key_pair_file',
-        'master_instance_bid_price',
-        'master_instance_type',
-        'task_instance_bid_price',
-        'task_instance_type',
         'emr_action_on_failure',
         'emr_api_params',
         'emr_applications',
@@ -391,9 +388,12 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_streaming_jar',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
-        'iam_instance_profile',
         'iam_endpoint',
+        'iam_instance_profile',
         'iam_service_role',
+        'instance_type',
+        'master_instance_bid_price',
+        'master_instance_type',
         'max_hours_idle',
         'mins_to_end_of_hour',
         'num_core_instances',
@@ -402,17 +402,17 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'pool_clusters',
         'pool_name',
         'pool_wait_minutes',
+        'region',
         'release_label',
         's3_endpoint',
-        'cloud_log_dir',
         's3_sync_wait_time',
-        'cloud_tmp_dir',
-        'cloud_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
         'ssh_tunnel',
         'ssh_tunnel_is_open',
         'subnet',
+        'task_instance_bid_price',
+        'task_instance_type',
         'visible_to_all_users',
     ]))
 
@@ -435,6 +435,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
+        'aws_region': 'region',
         'check_emr_status_every': 'check_cluster_every',
         'ec2_core_instance_bid_price': 'core_instance_bid_price',
         'ec2_core_instance_type': 'core_instance_type',
@@ -459,9 +460,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     def __init__(self, alias, opts, conf_paths):
         super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_paths)
 
-        # don't allow aws_region to be ''
-        if not self['aws_region']:
-            self['aws_region'] = _DEFAULT_AWS_REGION
+        # don't allow region to be ''
+        if not self['region']:
+            self['region'] = _DEFAULT_REGION
 
         self._fix_emr_applications_opt()
         self._fix_emr_configurations_opt()
@@ -473,7 +474,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'ami_version': _DEFAULT_AMI_VERSION,
-            'aws_region': _DEFAULT_AWS_REGION,
+            'region': _DEFAULT_REGION,
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
@@ -844,13 +845,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
         # Loop over buckets until we find one that is not region-
-        #   restricted, matches aws_region, or can be used to
-        #   infer aws_region if no aws_region is specified
+        #   restricted, matches region, or can be used to
+        #   infer region if no region is specified
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket.name
 
             if (tmp_bucket.get_location() == s3_location_constraint_for_region(
-                    self._opts['aws_region'])):
+                    self._opts['region'])):
 
                 # Regions are both specified and match
                 log.debug("using existing temp bucket %s" %
@@ -883,7 +884,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.debug('creating S3 bucket %r to use as temp space' %
                       self._s3_tmp_bucket_to_create)
             location = s3_location_constraint_for_region(
-                self._opts['aws_region'])
+                self._opts['region'])
             self.fs.create_bucket(
                 self._s3_tmp_bucket_to_create, location=location)
             self._s3_tmp_bucket_to_create = None
@@ -2049,7 +2050,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Help users tripped up by the default AWS region changing
         in mrjob v0.5.0 (see #1111) by pointing them to the
         docs for creating EC2 key pairs."""
-        if not self._opts.is_default('aws_region'):
+        if not self._opts.is_default('region'):
             return
 
         reason = _get_reason(cluster)
@@ -2060,7 +2061,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 ' %s by following:\n\n'
                 '    https://pythonhosted.org/mrjob/guides'
                 '/emr-quickstart.html#configuring-ssh-credentials\n' %
-                (_DEFAULT_AWS_REGION, _DEFAULT_AWS_REGION))
+                (_DEFAULT_REGION, _DEFAULT_REGION))
 
     def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
@@ -2636,7 +2637,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _script_runner_jar_uri(self):
         return (
             's3://%s.elasticmapreduce/libs/script-runner/script-runner.jar' %
-            self._opts['aws_region'])
+            self._opts['region'])
 
     ### EMR JOB MANAGEMENT UTILS ###
 
@@ -3014,14 +3015,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 region=boto.regioninfo.RegionInfo(
-                    name=self._opts['aws_region'], endpoint=endpoint,
+                    name=self._opts['region'], endpoint=endpoint,
                     connection_cls=boto.emr.connection.EmrConnection),
                 security_token=self._opts['aws_security_token'])
 
             return conn
 
         endpoint = (self._opts['emr_endpoint'] or
-                    emr_endpoint_for_region(self._opts['aws_region']))
+                    emr_endpoint_for_region(self._opts['region']))
 
         log.debug('creating EMR connection (to %s)' % endpoint)
         conn = emr_conn_for_endpoint(endpoint)
@@ -3031,7 +3032,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # that matches the SSL cert
         if not self._opts['emr_endpoint']:
 
-            ssl_host = emr_ssl_host_for_region(self._opts['aws_region'])
+            ssl_host = emr_ssl_host_for_region(self._opts['region'])
             fallback_conn = emr_conn_for_endpoint(ssl_host)
 
             conn = RetryGoRound(

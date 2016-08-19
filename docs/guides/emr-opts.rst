@@ -112,8 +112,8 @@ Cluster creation and configuration
     Availability zone to run the job in
 
 .. mrjob-opt::
-    :config: aws_region
-    :switch: --aws-region
+    :config: region
+    :switch: --region
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'us-west-2'``
@@ -121,6 +121,10 @@ Cluster creation and configuration
     region to run EMR jobs on (e.g.  ``us-west-1``). Also used by mrjob
     to create temporary buckets if you don't set :mrjob-opt:`cloud_tmp_dir`
     explicitly.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``aws_region``.
 
 .. mrjob-opt::
     :config: emr_api_params
@@ -211,7 +215,7 @@ Cluster creation and configuration
     :switch: --emr-endpoint
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: infer from :mrjob-opt:`aws_region`
+    :default: infer from :mrjob-opt:`region`
 
     Force mrjob to connect to EMR on this endpoint (e.g.
     ``us-west-1.elasticmapreduce.amazonaws.com``).
@@ -252,8 +256,8 @@ Cluster creation and configuration
     .. versionadded:: 0.4.5
 
 .. mrjob-opt::
-    :config: hadoop_streaming_jar_on_emr
-    :switch: --hadoop-streaming-jar-on-emr
+    :config: hadoop_streaming_jar_on_cluster
+    :switch: --hadoop-streaming-jar-on-cluster
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: AWS default
@@ -261,6 +265,8 @@ Cluster creation and configuration
     Like :mrjob-opt:`hadoop_streaming_jar`, except that it points to a path on
     the EMR instance, rather than to a local file or one on S3. Rarely
     necessary to set this by hand.
+
+
 
 .. mrjob-opt::
     :config: iam_endpoint
@@ -810,7 +816,7 @@ MRJob uses boto to manipulate/access S3.
     ``s3://yourbucket/tmp/``.
 
     By default, mrjob looks for a bucket belong to you whose name starts with
-    ``mrjob-`` and which matches :mrjob-opt:`aws_region`. If it can't find
+    ``mrjob-`` and which matches :mrjob-opt:`region`. If it can't find
     one, it creates one with a random name. This option is then set to `tmp/`
     in this bucket (e.g. ``s3://mrjob-01234567890abcdef/tmp/``).
 

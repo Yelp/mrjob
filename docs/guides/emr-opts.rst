@@ -81,21 +81,26 @@ Cluster creation and configuration
     structures in the config file (which is itself basically JSON).
 
 .. mrjob-opt::
-    :config: ami_version
-    :switch: --ami-version
+    :config: image_version
+    :switch: --image-version
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'3.11.0'``
 
-    EMR AMI version to use. This controls which Hadoop version(s) are
-    available and which version of Python is installed, among other things;
-    see `the AWS docs on specifying the AMI version`_.  for details.
+    EMR AMI (Amazon Machine Image) version to use. This controls which Hadoop
+    version(s) are available and which version of Python is installed, among
+    other things; see `the AWS docs on specifying the AMI version`_.  for
+    details.
 
     .. _`the AWS docs on specifying the AMI version`:
         http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
 
     This works for 4.x AMIs as well; mrjob will just prepend ``emr-`` and
     use that as the :mrjob-opt:`release_label`.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be called ``ami_version``
 
     .. warning::
 

@@ -29,7 +29,7 @@ import mrjob
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _4_X_INTERMEDIARY_JAR
-from mrjob.emr import _DEFAULT_AMI_VERSION
+from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
@@ -666,46 +666,46 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
     def test_default(self):
         with self.make_runner() as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), _DEFAULT_AMI_VERSION)
+            self.assertEqual(runner.get_image_version(), _DEFAULT_IMAGE_VERSION)
             self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
     def test_ami_version_1_0_no_longer_supported(self):
-        with self.make_runner('--ami-version', '1.0') as runner:
+        with self.make_runner('--image-version', '1.0') as runner:
             self.assertRaises(boto.exception.EmrResponseError,
                               runner._launch)
 
     def test_ami_version_2_0(self):
-        with self.make_runner('--ami-version', '2.0') as runner:
+        with self.make_runner('--image-version', '2.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '2.0.6')
+            self.assertEqual(runner.get_image_version(), '2.0.6')
             self.assertEqual(runner.get_hadoop_version(), '0.20.205')
 
     def test_latest_ami_version(self):
         # "latest" is no longer actually the latest version
-        with self.make_runner('--ami-version', 'latest') as runner:
+        with self.make_runner('--image-version', 'latest') as runner:
             # we should translate "latest" ourselves (see #1269)
-            self.assertEqual(runner._opts['ami_version'], '2.4.2')
+            self.assertEqual(runner._opts['image_version'], '2.4.2')
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '2.4.2')
+            self.assertEqual(runner.get_image_version(), '2.4.2')
             self.assertEqual(runner.get_hadoop_version(), '1.0.3')
 
     def test_ami_version_3_0(self):
-        with self.make_runner('--ami-version', '3.0') as runner:
+        with self.make_runner('--image-version', '3.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '3.0.4')
+            self.assertEqual(runner.get_image_version(), '3.0.4')
             self.assertEqual(runner.get_hadoop_version(), '2.2.0')
 
     def test_ami_version_3_8_0(self):
-        with self.make_runner('--ami-version', '3.8.0') as runner:
+        with self.make_runner('--image-version', '3.8.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '3.8.0')
+            self.assertEqual(runner.get_image_version(), '3.8.0')
             self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
     def test_ami_version_4_0_0_via_release_label_option(self):
         # the way EMR wants us to set 4.x AMI versions
         with self.make_runner('--release-label', 'emr-4.0.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '4.0.0')
+            self.assertEqual(runner.get_image_version(), '4.0.0')
             self.assertEqual(runner.get_hadoop_version(), '2.6.0')
 
             cluster = runner._describe_cluster()
@@ -714,11 +714,11 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
             self.assertEqual(getattr(cluster, 'requestedamiversion', ''), '')
             self.assertEqual(getattr(cluster, 'runningamiversion', ''), '')
 
-    def test_ami_version_4_0_0_via_ami_version_option(self):
+    def test_ami_version_4_0_0_via_image_version_option(self):
         # mrjob should also be smart enough to handle this
-        with self.make_runner('--ami-version', '4.0.0') as runner:
+        with self.make_runner('--image-version', '4.0.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '4.0.0')
+            self.assertEqual(runner.get_image_version(), '4.0.0')
             self.assertEqual(runner.get_hadoop_version(), '2.6.0')
 
             cluster = runner._describe_cluster()
@@ -731,8 +731,8 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
         with logger_disabled('mrjob.emr'):
             with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
                 runner.run()
-                self.assertEqual(runner.get_ami_version(),
-                                 _DEFAULT_AMI_VERSION)
+                self.assertEqual(runner.get_image_version(),
+                                 _DEFAULT_IMAGE_VERSION)
                 self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
 
@@ -1386,7 +1386,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
     def _test_create_master_bootstrap_script(
-            self, ami_version=None, expected_python_bin=PYTHON_BIN,
+            self, image_version=None, expected_python_bin=PYTHON_BIN,
             expect_pip_binary=None):
 
         if expect_pip_binary is None:
@@ -1402,7 +1402,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
-                              ami_version=ami_version,
+                              image_version=image_version,
                               bootstrap=[
                                   expected_python_bin + ' ' +
                                   foo_py_path + '#bar.py',
@@ -1487,13 +1487,13 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='2.4.11',
+            image_version='2.4.11',
             expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
             expect_pip_binary=False)
 
     def test_create_master_bootstrap_script_on_2_4_2_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='2.4.2',
+            image_version='2.4.2',
             expected_python_bin=('python2.6' if PY2 else PYTHON_BIN),
             expect_pip_binary=PY2)
 
@@ -1805,48 +1805,48 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--pool-name', 'pool1'])
 
     def test_join_anyway_if_i_say_so(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.0')
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--cluster-id', cluster_id,
-            '--ami-version', '2.2'])
+            '--image-version', '2.2'])
 
-    def test_pooling_with_ami_version(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.0')
-
-        self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2.0'])
-
-    def test_pooling_with_ami_version_prefix_major_minor(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.0.0')
+    def test_pooling_with_image_version(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2.0'])
+            '--image-version', '2.0'])
 
-    def test_pooling_with_ami_version_prefix_major(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.0.0')
+    def test_pooling_with_image_version_prefix_major_minor(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2'])
+            '--image-version', '2.0'])
 
-    def test_dont_join_pool_with_wrong_ami_version(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.2')
+    def test_pooling_with_image_version_prefix_major(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--image-version', '2'])
+
+    def test_dont_join_pool_with_wrong_image_version(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.2')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2.0'])
+            '--image-version', '2.0'])
 
     def test_pooling_with_4_x_ami_version(self):
         # this actually uses release label internally
-        _, cluster_id = self.make_pooled_cluster(ami_version='4.0.0')
+        _, cluster_id = self.make_pooled_cluster(image_version='4.0.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0'])
+            '--image-version', '4.0.0'])
 
     def test_pooling_with_release_label(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
@@ -1863,7 +1863,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--release-label', 'emr-4.0.0'])
 
     def test_dont_join_pool_without_release_label(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.2')
+        _, cluster_id = self.make_pooled_cluster(image_version='2.2')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -1874,14 +1874,14 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0'])
+            '--image-version', '4.0.0'])
 
     def test_non_matching_release_label_and_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2.2'])
+            '--image-version', '2.2'])
 
     def test_release_label_hides_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
@@ -1889,87 +1889,87 @@ class PoolMatchingTestCase(MockBotoTestCase):
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0',
-            '--ami-version', '1.0.0'])
+            '--image-version', '1.0.0'])
 
     def test_matching_emr_applications(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', emr_applications=['Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-application', 'Mahout'])
 
     def test_extra_emr_applications_okay(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0', emr_applications=['Ganglia', 'Mahout'])
+            image_version='4.0.0', emr_applications=['Ganglia', 'Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-application', 'Mahout'])
 
     def test_missing_emr_applications_not_okay(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', emr_applications=['Mahout'])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-application', 'Ganglia',
             '--emr-application', 'Mahout'])
 
     def test_matching_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0',
+            image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
         ])
 
     def test_missing_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0',
+            image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
         ])
 
     def test_extra_emr_configuration(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0')
+            image_version='4.0.0')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
         ])
 
     def test_wrong_emr_configuration(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0',
+            image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
         ])
 
     def test_wrong_emr_configuration_ordering(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0',
+            image_version='4.0.0',
             emr_configurations=[CORE_SITE_EMR_CONFIGURATION,
                                 HADOOP_ENV_EMR_CONFIGURATION])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
             '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
         ])
@@ -3103,7 +3103,7 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
             return_value='output'))
 
         self.start(patch(
-            'mrjob.emr.EMRJobRunner.get_ami_version',
+            'mrjob.emr.EMRJobRunner.get_image_version',
             return_value='3.7.0'))
 
         self.start(patch(
@@ -3281,7 +3281,7 @@ class DefaultPythonBinTestCase(MockBotoTestCase):
     def test_default_ami(self):
         # this tests 3.x AMIs
         runner = EMRJobRunner()
-        self.assertTrue(runner._opts['ami_version'].startswith('3.'))
+        self.assertTrue(runner._opts['image_version'].startswith('3.'))
         self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_4_x_release_label(self):
@@ -3289,14 +3289,14 @@ class DefaultPythonBinTestCase(MockBotoTestCase):
         self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_2_4_3_ami(self):
-        runner = EMRJobRunner(ami_version='2.4.3')
+        runner = EMRJobRunner(image_version='2.4.3')
         if PY2:
             self.assertEqual(runner._default_python_bin(), ['python2.7'])
         else:
             self.assertEqual(runner._default_python_bin(), ['python3'])
 
     def test_2_4_2_ami(self):
-        runner = EMRJobRunner(ami_version='2.4.3')
+        runner = EMRJobRunner(image_version='2.4.3')
         if PY2:
             self.assertEqual(runner._default_python_bin(), ['python2.7'])
         else:
@@ -3324,18 +3324,18 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
                          (_PRE_4_X_STREAMING_JAR, []))
 
     def test_pre_4_x_ami(self):
-        runner = self.launch_runner('--ami-version', '3.8.0')
+        runner = self.launch_runner('--image-version', '3.8.0')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          (_PRE_4_X_STREAMING_JAR, []))
 
     def test_4_x_ami(self):
-        runner = self.launch_runner('--ami-version', '4.0.0')
+        runner = self.launch_runner('--image-version', '4.0.0')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          (_4_X_INTERMEDIARY_JAR, ['hadoop-streaming']))
 
     def test_hadoop_streaming_jar_on_emr_on_pre_4_x_ami(self):
         runner = self.launch_runner(
-            '--ami-version', '3.8.0',
+            '--image-version', '3.8.0',
             '--hadoop-streaming-jar-on-emr', 'justice.jar')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          ('justice.jar', []))
@@ -3343,7 +3343,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
     def test_hadoop_streaming_jar_on_emr_on_4_x_ami(self):
         # don't use the intermediary jar if a jar is specified explicitly
         runner = self.launch_runner(
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--hadoop-streaming-jar-on-emr', 'justice.jar')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          ('justice.jar', []))
@@ -3353,7 +3353,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
         open(jar_path, 'w').close()
 
         runner = self.launch_runner(
-            '--ami-version', '3.8.0',
+            '--image-version', '3.8.0',
             '--hadoop-streaming-jar', jar_path)
 
         jar_uri = runner._upload_mgr.uri(jar_path)
@@ -3365,7 +3365,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
         open(jar_path, 'w').close()
 
         runner = self.launch_runner(
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--hadoop-streaming-jar', jar_path)
 
         jar_uri = runner._upload_mgr.uri(jar_path)
@@ -3757,34 +3757,34 @@ class BootstrapPythonTestCase(MockBotoTestCase):
     def test_ami_version_2_4_11(self):
         # this *really, really* probably won't work, but what can we do?
         self._assert_tries_to_install_python3_on_py3(
-            '--ami-version', '2.4.11')
+            '--image-version', '2.4.11')
 
     def test_ami_version_3_6_0(self):
         self._assert_tries_to_install_python3_on_py3(
-            '--ami-version', '3.6.0')
+            '--image-version', '3.6.0')
 
     def test_ami_version_3_7_0(self):
         # the first version where Python 3 is available
         self._assert_installs_python3_on_py3(
-            '--ami-version', '3.7.0')
+            '--image-version', '3.7.0')
 
     def test_ami_version_4_5_0(self):
         # the last version where Python 3 is not pre-installed
         self._assert_installs_python3_on_py3(
-            '--ami-version', '4.5.0')
+            '--image-version', '4.5.0')
 
     def test_ami_version_4_6_0(self):
         # from this point on, Python 3 is already installed
         self._assert_never_installs_python3(
-            '--ami-version', '4.6.0')
+            '--image-version', '4.6.0')
 
     def test_force_booststrap_python(self):
         self._assert_installs_python3_on_py3(
-            '--bootstrap-python', '--ami-version', '4.6.0')
+            '--bootstrap-python', '--image-version', '4.6.0')
 
     def test_force_no_bootstrap_python(self):
         self._assert_never_installs_python3(
-            '--no-bootstrap-python', '--ami-version', '3.7.0')
+            '--no-bootstrap-python', '--image-version', '3.7.0')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])
@@ -4021,9 +4021,9 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner._address_of_master',
             return_value='master'))
 
-        self.get_ami_version = self.start(patch(
-            'mrjob.emr.EMRJobRunner.get_ami_version',
-            return_value=_DEFAULT_AMI_VERSION))
+        self.get_image_version = self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_image_version',
+            return_value=_DEFAULT_IMAGE_VERSION))
 
         self.get_hadoop_version = self.start(patch(
             'mrjob.emr.EMRJobRunner.get_hadoop_version',
@@ -4083,12 +4083,12 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             action_num=None, expected_s3_dir_name='node')
 
     def _test_stream_history_log_dirs(
-            self, ssh, ami_version=_DEFAULT_AMI_VERSION,
+            self, ssh, image_version=_DEFAULT_IMAGE_VERSION,
             expected_dir_name='hadoop/history',
             expected_s3_dir_name='jobs'):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
-        self.get_ami_version.return_value = ami_version
+        self.get_image_version.return_value = image_version
 
         results = runner._stream_history_log_dirs()
 
@@ -4120,11 +4120,11 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def test_stream_history_log_dirs_from_2_x_amis_with_ssh(self):
         self._test_stream_history_log_dirs(
-            ami_version='2.4.11', ssh=True)
+            image_version='2.4.11', ssh=True)
 
     def test_stream_history_log_dirs_from_2_x_amis_without_ssh(self):
         self._test_stream_history_log_dirs(
-            ami_version='2.4.11', ssh=False)
+            image_version='2.4.11', ssh=False)
 
     def test_cant_stream_history_log_dirs_from_3_x_amis(self):
         runner = EMRJobRunner()
@@ -4134,11 +4134,11 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def test_stream_history_log_dirs_from_4_x_amis(self):
         # history log fetching is disabled until we fix
         # #1244 and #1253
-        runner = EMRJobRunner(ami_version='4.3.0')
+        runner = EMRJobRunner(image_version='4.3.0')
         results = runner._stream_history_log_dirs()
         self.assertRaises(StopIteration, next, results)
         #self._test_stream_history_log_dirs(
-        #    ssh=True, ami_version='4.3.0',
+        #    ssh=True, image_version='4.3.0',
         #    expected_dir_name='hadoop-mapreduce/history',
         #    expected_s3_dir_name='hadoop-mapreduce/history')
 
@@ -4182,7 +4182,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def _test_stream_task_log_dirs(
         self, ssh, bad_ssh_slave_hosts=False, application_id=None,
-        ami_version=_DEFAULT_AMI_VERSION,
+        image_version=_DEFAULT_IMAGE_VERSION,
         expected_local_path='/mnt/var/log/hadoop/userlogs',
         expected_dir_name='hadoop/userlogs',
         expected_s3_dir_name='task-attempts'
@@ -4190,7 +4190,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
         self.get_hadoop_version.return_value = '1.0.3'
-        self.get_ami_version.return_value = ami_version
+        self.get_image_version.return_value = image_version
 
         if bad_ssh_slave_hosts:
             self.ssh_slave_hosts.side_effect = IOError
@@ -4258,7 +4258,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def test_stream_task_log_dirs_from_4_x_amis(self):
         self._test_stream_task_log_dirs(
             ssh=True, application_id='application_1',
-            ami_version='4.3.0',
+            image_version='4.3.0',
             expected_dir_name='hadoop-yarn/containers/application_1',
             expected_s3_dir_name='containers/application_1')
 
@@ -4490,7 +4490,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
             self.assertEqual(applications, set(['hadoop']))
 
     def test_default_on_4_x_ami(self):
-        job = MRTwoStepJob(['-r', 'emr', '--ami-version', '4.3.0'])
+        job = MRTwoStepJob(['-r', 'emr', '--image-version', '4.3.0'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4514,7 +4514,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--ami-version', '4.3.0',
+            ['-r', 'emr', '--image-version', '4.3.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
         job.sandbox()
@@ -4532,7 +4532,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_implicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--ami-version', '4.3.0',
+            ['-r', 'emr', '--image-version', '4.3.0',
              '--emr-application', 'Mahout'])
         job.sandbox()
 
@@ -4551,7 +4551,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_api_param_serialization(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--ami-version', '4.3.0',
+            ['-r', 'emr', '--image-version', '4.3.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
         job.sandbox()
@@ -4594,7 +4594,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
             self, emr_configurations, expected_api_response=None):
 
         self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
-            ami_version='4.3.0',
+            image_version='4.3.0',
             emr_configurations=emr_configurations)))))
 
         job = MRTwoStepJob(['-r', 'emr'])
@@ -4635,7 +4635,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
 
     def test_normalization(self):
         self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
-            ami_version='4.3.0',
+            image_version='4.3.0',
             emr_configurations=[
                 HADOOP_ENV_EMR_CONFIGURATION_VARIANT])))))
 
@@ -4649,7 +4649,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
     def test_command_line_switch(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
-             '--ami-version', '4.3.0',
+             '--image-version', '4.3.0',
              '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
              '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
              ])
@@ -4662,7 +4662,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
 
     def test_combine_command_line_with_conf(self):
         self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
-            ami_version='4.3.0',
+            image_version='4.3.0',
             emr_configurations=[
                 CORE_SITE_EMR_CONFIGURATION])))))
 
@@ -5069,7 +5069,7 @@ class UseSudoOverSshTestCase(MockBotoTestCase):
     def test_ami_4_3_0_with_ssh_fs(self):
         job = MRTwoStepJob(
             ['-r', 'emr', '--ec2-key-pair-file', '/path/to/EMR.pem',
-             '--ami-version', '4.3.0']).sandbox()
+             '--image-version', '4.3.0']).sandbox()
 
         with job.make_runner() as runner:
             self.assertIsNotNone(runner._ssh_fs)
@@ -5083,7 +5083,7 @@ class UseSudoOverSshTestCase(MockBotoTestCase):
 
         job = MRTwoStepJob(
             ['-r', 'emr', '--ec2-key-pair-file', '/path/to/EMR.pem',
-             '--ami-version', '4.2.0']).sandbox()
+             '--image-version', '4.2.0']).sandbox()
 
         with job.make_runner() as runner:
             self.assertIsNotNone(runner._ssh_fs)
@@ -5097,7 +5097,7 @@ class UseSudoOverSshTestCase(MockBotoTestCase):
         # just make sure we don't cause an error trying to set up sudo
         # on a nonexistent filesystem
         job = MRTwoStepJob(
-            ['-r', 'emr', '--ami-version', '4.3.0']).sandbox()
+            ['-r', 'emr', '--image-version', '4.3.0']).sandbox()
 
         with job.make_runner() as runner:
             self.assertIsNone(runner._ssh_fs)
@@ -5194,21 +5194,21 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
         self.assertNotIn('-4', ssh_args)
 
     def test_2_x_ami(self):
-        ssh_args = self.get_ssh_args('--ami-version', '2.4.11')
+        ssh_args = self.get_ssh_args('--image-version', '2.4.11')
         params = self.parse_ssh_args(ssh_args)
 
         self.assertEqual(params['remote_port'], 9100)
         self.assertEqual(params['remote_host'], 'localhost')
 
     def test_3_x_ami(self):
-        ssh_args = self.get_ssh_args('--ami-version', '3.11.0')
+        ssh_args = self.get_ssh_args('--image-version', '3.11.0')
         params = self.parse_ssh_args(ssh_args)
 
         self.assertEqual(params['remote_port'], 9026)
         self.assertEqual(len(params['remote_host'].split('.')), 4)
 
     def test_4_x_ami(self):
-        ssh_args = self.get_ssh_args('--ami-version', '4.7.2')
+        ssh_args = self.get_ssh_args('--image-version', '4.7.2')
         params = self.parse_ssh_args(ssh_args)
 
         self.assertEqual(params['remote_port'], 8088)

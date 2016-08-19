@@ -65,7 +65,7 @@ share the same clusters. This means that the version of :py:mod:`mrjob` and
 bootstrap configuration. Other options that affect which cluster a job can
 join:
 
-* :mrjob-opt:`ami_version`\/:mrjob-opt:`release_label`: must match
+* :mrjob-opt:`image_version`\/:mrjob-opt:`release_label`: must match
 * :mrjob-opt:`emr_applications`: require *at least* these applications
   (extra ones okay)
 * :mrjob-opt:`emr_configurations`: must match

@@ -332,6 +332,10 @@ def _add_dataproc_emr_opts(opt_group):
             help='Type of GCE/EC2 core instance(s) to launch'),
 
         opt_group.add_option(
+            '--image-version', dest='image_version', default=None,
+            help='EMR/Dataproc machine image to launch clusters with'),
+
+        opt_group.add_option(
             '--instance-type', dest='instance_type', default=None,
             help=('Type of GCE/EC2 instance(s) to launch \n'
                   ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4 -'
@@ -390,10 +394,6 @@ def _add_dataproc_opts(opt_group):
         opt_group.add_option(
             '--gcp-project', dest='gcp_project', default=None,
             help='Project to run Dataproc jobs in.'),
-
-        opt_group.add_option(
-            '--image-version', dest='image_version', default=None,
-            help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
 
     ]
 
@@ -745,12 +745,12 @@ def _add_emr_instance_opts(opt_group):
         # AMI
         opt_group.add_option(
             '--ami-version', dest='ami_version', default=None,
-            help=('AMI Version to use, e.g. "2.4.11", "3.8.0", "4.0.0"')),
+            help='Deprecated alias for --image-version'),
 
         opt_group.add_option(
             '--release-label', dest='release_label', default=None,
             help=('Release Label (e.g. "emr-4.0.0"). Overrides'
-                  ' --ami-version')),
+                  ' --image-version')),
 
         # instance types (the non-deprecated options are in
         # _add_dataproc_emr_opts())

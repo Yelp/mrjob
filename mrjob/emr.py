@@ -121,7 +121,7 @@ from mrjob.util import random_identifier
 log = logging.getLogger(__name__)
 
 # how to set up the SSH tunnel for various AMI versions
-_AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
+_IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '2': dict(
         localhost=True,
         name='job tracker',
@@ -167,11 +167,11 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 _DEFAULT_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
-_DEFAULT_AMI_VERSION = '3.11.0'
+_DEFAULT_IMAGE_VERSION = '3.11.0'
 
 # EMR translates the dead/deprecated "latest" AMI version to 2.4.2
 # (2.4.2 isn't actually the latest version by a long shot)
-_AMI_VERSION_LATEST = '2.4.2'
+_IMAGE_VERSION_LATEST = '2.4.2'
 
 # Hadoop streaming jar on 1-3.x AMIs
 _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
@@ -356,7 +356,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'additional_emr_info',
-        'ami_version',
+        'image_version',
         'aws_access_key_id',
         'aws_secret_access_key',
         'aws_security_token',
@@ -470,13 +470,13 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         self._fix_emr_applications_opt()
         self._fix_emr_configurations_opt()
         self._fix_instance_opts()
-        self._fix_ami_version_latest()
+        self._fix_image_version_latest()
         self._fix_release_label_opt()
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
-            'ami_version': _DEFAULT_AMI_VERSION,
+            'image_version': _DEFAULT_IMAGE_VERSION,
             'region': _DEFAULT_REGION,
             'bootstrap_python': None,
             'check_cluster_every': 30,
@@ -590,21 +590,21 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 except ValueError:
                     pass  # maybe EMR will accept non-floats?
 
-    def _fix_ami_version_latest(self):
-        """Translate the dead/deprecated *ami_version* value ``latest``
+    def _fix_image_version_latest(self):
+        """Translate the dead/deprecated *image_version* value ``latest``
         to ``2.4.2`` up-front, so our code doesn't have to deal with
         non-numeric AMI versions."""
-        if self['ami_version'] == 'latest':
-            self['ami_version'] = _AMI_VERSION_LATEST
+        if self['image_version'] == 'latest':
+            self['image_version'] = _IMAGE_VERSION_LATEST
 
     def _fix_release_label_opt(self):
-        """If *release_label* is not set and *ami_version* is set to version
+        """If *release_label* is not set and *image_version* is set to version
         4 or higher (which the EMR API won't accept), set *release_label*
-        to "emr-" plus *ami_version*. (Leave *ami_version* as-is;
+        to "emr-" plus *image_version*. (Leave *image_version* as-is;
         *release_label* overrides it anyway.)"""
-        if (version_gte(self['ami_version'], '4') and
+        if (version_gte(self['image_version'], '4') and
                 not self['release_label']):
-            self['release_label'] = 'emr-' + self['ami_version']
+            self['release_label'] = 'emr-' + self['image_version']
 
     def _obfuscate(self, opt_key, opt_value):
         # don't need to obfuscate empty values
@@ -688,7 +688,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._output_dir = self._cloud_tmp_dir + 'output/'
 
         # check AMI version
-        if self._opts['ami_version'].startswith('1.'):
+        if self._opts['image_version'].startswith('1.'):
             log.warning('1.x AMIs will probably not work because they use'
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
 
@@ -766,7 +766,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # map from cluster ID to a dictionary containing cached info about
         # that cluster. Includes the following keys:
-        # - ami_version
+        # - image_version
         # - hadoop_version
         # - master_public_dns
         # - master_private_ip
@@ -804,14 +804,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return super(EMRJobRunner, self)._default_python_bin(local=local)
 
         if self._opts['release_label'] or version_gte(
-                self._opts['ami_version'], '3'):
+                self._opts['image_version'], '3'):
             # on 3.x and 4.x AMIs, both versions of Python work, so just
             # match whatever version we're using locally
             if sys.version_info >= (2, 7):
                 return ['python2.7']
             else:
                 return ['python2.6']
-        elif version_gte(self._opts['ami_version'], '2.4.3'):
+        elif version_gte(self._opts['image_version'], '2.4.3'):
             # on 2.4.3+, use python2.7 because the default python
             # doesn't have a working pip
             return ['python2.7']
@@ -1133,8 +1133,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         path: path to start page of job tracker/resource manager
         port: port job tracker/resource manager is running on.
         """
-        return map_version(self.get_ami_version(),
-                           _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
+        return map_version(self.get_image_version(),
+                           _IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG)
 
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
@@ -1432,7 +1432,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['release_label']:
             api_params['ReleaseLabel'] = self._opts['release_label']
         else:
-            args['ami_version'] = self._opts['ami_version']
+            args['ami_version'] = self._opts['image_version']
 
         if self._opts['zone']:
             args['availability_zone'] = self._opts['zone']
@@ -1706,7 +1706,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._upload_mgr.uri(self._opts['hadoop_streaming_jar']), []
         elif self._opts['hadoop_streaming_jar_on_emr']:
             return self._opts['hadoop_streaming_jar_on_emr'], []
-        elif version_gte(self.get_ami_version(), '4'):
+        elif version_gte(self.get_image_version(), '4'):
             # 4.x AMIs use an intermediary jar
             return _4_X_INTERMEDIARY_JAR, ['hadoop-streaming']
         else:
@@ -1760,7 +1760,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             emr_conn.add_tags(self._cluster_id, tags)
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
-        if self._ssh_fs and version_gte(self.get_ami_version(), '4.3.0'):
+        if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
     def _job_steps(self, max_steps=None):
@@ -2149,11 +2149,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # Unlike on 3.x, the history logs *are* available on S3, but they're
         # not useful enough to justify the wait when SSH is set up
 
-        # if version_gte(self.get_ami_version(), '4'):
+        # if version_gte(self.get_image_version(), '4'):
         #     # denied access on some 4.x AMIs by the yarn user, see #1244
         #     dir_name = 'hadoop-mapreduce/history'
         #     s3_dir_name = 'hadoop-mapreduce/history'
-        if version_gte(self.get_ami_version(), '3'):
+        if version_gte(self.get_image_version(), '3'):
             # on the 3.x AMIs, the history log lives inside HDFS and isn't
             # copied to S3. We don't need it anyway; everything relevant
             # is in the step log
@@ -2169,7 +2169,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Get lists of directories to look for the task logs in."""
-        if version_gte(self.get_ami_version(), '4'):
+        if version_gte(self.get_image_version(), '4'):
             # denied access on some 4.x AMIs by the yarn user, see #1244
             dir_name = 'hadoop-yarn/containers'
             s3_dir_name = 'containers'
@@ -2401,11 +2401,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # and warn if it's an AMI before 3.7.0
         if self._opts['bootstrap_python'] or (
                 self._opts['bootstrap_python'] is None and
-                not version_gte(self._opts['ami_version'], '4.6.0')):
+                not version_gte(self._opts['image_version'], '4.6.0')):
 
             # we have to have at least on AMI 3.7.0. But give it a shot
             if not (self._opts['release_label'] or
-                    version_gte(self._opts['ami_version'], '3.7.0')):
+                    version_gte(self._opts['image_version'], '3.7.0')):
                 log.warning(
                     'bootstrapping Python 3 will probably not work on'
                     ' AMIs prior to 3.7.0. For an alternative, see:'
@@ -2786,13 +2786,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     return
             else:
                 # match actual AMI version
-                ami_version = getattr(cluster, 'runningamiversion', '')
+                image_version = getattr(cluster, 'runningamiversion', '')
                 # Support partial matches, e.g. let a request for
                 # '2.4' pass if the version is '2.4.2'. The version
                 # extracted from the existing cluster should always
                 # be a full major.minor.patch, so checking matching
                 # prefixes should be sufficient.
-                if not ami_version.startswith(self._opts['ami_version']):
+                if not image_version.startswith(self._opts['image_version']):
                     return
 
             if self._opts['emr_applications']:
@@ -3055,9 +3055,23 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def get_ami_version(self):
         """Get the AMI that our cluster is running.
 
+        .. deprecated:: 0.5.4
+
+           Use :py:meth:`get_image_version` instead.
+
         .. versionadded:: 0.4.5
         """
-        return self._get_cluster_info('ami_version')
+        log.warning('get_ami_version() is a depreacated alias for'
+                    ' get_image_version() and will be removed in'
+                    ' mrjob v0.6.0')
+        return self.get_image_version()
+
+    def get_image_version(self):
+        """Get the AMI that our cluster is running.
+
+        .. versionadded:: 0.5.4
+        """
+        return self._get_cluster_info('image_version')
 
     def _address_of_master(self):
         """Get the address of the master node so we can SSH to it"""
@@ -3082,7 +3096,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return cache.get(key)
 
     def _store_cluster_info(self):
-        """Describe our cluster, and cache ami_version, hadoop_version,
+        """Describe our cluster, and cache image_version, hadoop_version,
         and master_public_dns"""
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
@@ -3093,11 +3107,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # AMI version might be in RunningAMIVersion (2.x, 3.x)
         # or ReleaseLabel (4.x)
-        cache['ami_version'] = getattr(cluster, 'runningamiversion', None)
-        if not cache['ami_version']:
+        cache['image_version'] = getattr(cluster, 'runningamiversion', None)
+        if not cache['image_version']:
             release_label = getattr(cluster, 'releaselabel', None)
             if release_label:
-                cache['ami_version'] = release_label.lstrip('emr-')
+                cache['image_version'] = release_label.lstrip('emr-')
 
         for a in cluster.applications:
             if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs

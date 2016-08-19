@@ -3797,39 +3797,39 @@ class BootstrapPythonTestCase(MockBotoTestCase):
 
 class EMRTagsTestCase(MockBotoTestCase):
 
-    def test_emr_tags_option_dict(self):
+    def test_tags_option_dict(self):
         job = MRWordCount([
             '-r', 'emr',
-            '--emr-tag', 'tag_one=foo',
-            '--emr-tag', 'tag_two=bar'])
+            '--tag', 'tag_one=foo',
+            '--tag', 'tag_two=bar'])
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_tags'],
+            self.assertEqual(runner._opts['tags'],
                              {'tag_one': 'foo', 'tag_two': 'bar'})
 
     def test_command_line_overrides_config(self):
-        EMR_TAGS_MRJOB_CONF = {'runners': {'emr': {
+        TAGS_MRJOB_CONF = {'runners': {'emr': {
             'check_cluster_every': 0.00,
             's3_sync_wait_time': 0.00,
-            'emr_tags': {
+            'tags': {
                 'tag_one': 'foo',
                 'tag_two': None,
                 'tag_three': 'bar',
             },
         }}}
 
-        job = MRWordCount(['-r', 'emr', '--emr-tag', 'tag_two=qwerty'])
+        job = MRWordCount(['-r', 'emr', '--tag', 'tag_two=qwerty'])
 
-        with mrjob_conf_patcher(EMR_TAGS_MRJOB_CONF):
+        with mrjob_conf_patcher(TAGS_MRJOB_CONF):
             with job.make_runner() as runner:
-                self.assertEqual(runner._opts['emr_tags'],
+                self.assertEqual(runner._opts['tags'],
                                  {'tag_one': 'foo',
                                   'tag_two': 'qwerty',
                                   'tag_three': 'bar'})
 
-    def test_emr_tags_get_created(self):
-        cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
-                                           '--emr-tag', 'tag_two=bar')
+    def test_tags_get_created(self):
+        cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
+                                           '--tag', 'tag_two=bar')
 
         # tags should be in alphabetical order by key
         self.assertEqual(cluster.tags, [
@@ -3838,8 +3838,8 @@ class EMRTagsTestCase(MockBotoTestCase):
         ])
 
     def test_blank_tag_value(self):
-        cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
-                                           '--emr-tag', 'tag_two=')
+        cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
+                                           '--tag', 'tag_two=')
 
         # tags should be in alphabetical order by key
         self.assertEqual(cluster.tags, [
@@ -3848,7 +3848,7 @@ class EMRTagsTestCase(MockBotoTestCase):
         ])
 
     def test_tag_values_can_be_none(self):
-        runner = EMRJobRunner(conf_paths=[], emr_tags={'tag_one': None})
+        runner = EMRJobRunner(conf_paths=[], tags={'tag_one': None})
         cluster_id = runner.make_persistent_cluster()
 
         mock_cluster = self.mock_emr_clusters[cluster_id]
@@ -3857,8 +3857,8 @@ class EMRTagsTestCase(MockBotoTestCase):
         ])
 
     def test_persistent_cluster(self):
-        args = ['--emr-tag', 'tag_one=foo',
-                '--emr-tag', 'tag_two=bar']
+        args = ['--tag', 'tag_one=foo',
+                '--tag', 'tag_two=bar']
 
         with self.make_runner(*args) as runner:
             cluster_id = runner.make_persistent_cluster()

@@ -51,7 +51,6 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'conf_paths': None,
                 'core_instance_bid_price': None,
                 'core_instance_type': None,
-                'instance_type': None,
                 'ec2_core_instance_bid_price': None,
                 'ec2_core_instance_type': None,
                 'ec2_instance_type': None,
@@ -60,20 +59,18 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'ec2_master_instance_type': None,
                 'ec2_task_instance_bid_price': None,
                 'ec2_task_instance_type': None,
-                'master_instance_bid_price': None,
-                'master_instance_type': None,
-                'task_instance_bid_price': None,
-                'task_instance_type': None,
                 'emr_api_params': {},
                 'emr_applications': [],
                 'emr_configurations': [],
                 'emr_endpoint': None,
-                'emr_tags': {},
                 'enable_emr_debugging': None,
                 'iam_endpoint': None,
                 'iam_instance_profile': None,
                 'iam_service_role': None,
+                'instance_type': None,
                 'label': None,
+                'master_instance_bid_price': None,
+                'master_instance_type': None,
                 'max_hours_idle': None,
                 'mins_to_end_of_hour': None,
                 'num_core_instances': None,
@@ -85,8 +82,8 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'pool_clusters': None,
                 'pool_emr_job_flows': None,
                 'pool_name': None,
-                'release_label': None,
                 'region': None,
+                'release_label': None,
                 's3_endpoint': None,
                 's3_log_uri': None,
                 's3_scratch_uri': None,
@@ -94,7 +91,11 @@ class ClusterInspectionTestCase(ToolTestCase):
                 's3_tmp_dir': None,
                 's3_upload_part_size': None,
                 'subnet': None,
+                'tags': {},
+                'task_instance_bid_price': None,
+                'task_instance_type': None,
                 'visible_to_all_users': None,
+                'zone': None,
              })
 
     def test_create_cluster(self):
@@ -109,16 +110,16 @@ class ClusterInspectionTestCase(ToolTestCase):
                          ['j-MOCKCLUSTER0'])
         self.assertEqual(sys.stdout.getvalue(), b'j-MOCKCLUSTER0\n')
 
-    # emr_tags was supported as a switch but not actually being applied
+    # --tag was supported as a switch but not actually being applied
     # to the cluster; see #1085
-    def test_emr_tags(self):
+    def test_tags(self):
         self.add_mock_s3_data({'walrus': {}})
         self.monkey_patch_argv(
             '--quiet', '--no-conf',
             '--s3-sync-wait-time', '0',
             '--s3-scratch-uri', 's3://walrus/tmp',
-            '--emr-tag', 'tag_one=foo',
-            '--emr-tag', 'tag_two=bar',
+            '--tag', 'tag_one=foo',
+            '--tag', 'tag_two=bar',
         )
         self.monkey_patch_stdout()
         create_cluster_main()

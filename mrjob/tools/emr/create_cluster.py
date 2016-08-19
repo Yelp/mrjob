@@ -217,7 +217,7 @@ def _runner_kwargs(cl_args=None):
     option_parser = _make_option_parser()
     options, args = option_parser.parse_args(cl_args)
 
-    # fix emr_api_params and emr_tags
+    # fix emr_api_params and tags
     _fix_custom_options(options, option_parser)
 
     if args:

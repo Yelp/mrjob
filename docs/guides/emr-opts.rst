@@ -227,8 +227,8 @@ Cluster creation and configuration
     Mostly exists as a workaround for network issues.
 
 .. mrjob-opt::
-    :config: emr_tags
-    :switch: --emr-tag
+    :config: tags
+    :switch: --tag
     :type: :ref:`dict <data-type-plain-dict>`
     :set: emr
     :default: ``{}``
@@ -241,21 +241,25 @@ Cluster creation and configuration
         http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-tags.html
 
     Tag names and values are strings. On the command line, to set a tag
-    use ``--emr-tag KEY=VALUE``:
+    use ``--tag KEY=VALUE``:
 
     .. code-block:: sh
 
-        --emr-tag team=development
+        --tag team=development
 
-    In the config file, ``emr_tags`` is a dict:
+    In the config file, ``tags`` is a dict:
 
     .. code-block:: yaml
 
         runners:
           emr:
-            emr_tags:
+            tags:
               team: development
               project: mrjob
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``emr_tags``
 
     .. versionadded:: 0.4.5
 

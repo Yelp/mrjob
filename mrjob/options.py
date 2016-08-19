@@ -560,12 +560,11 @@ def _add_emr_launch_opts(opt_group):
                   ' see http://docs.aws.amazon.com/ElasticMapReduce/latest/'
                   'ReleaseGuide/emr-configure-apps.html for examples.')),
 
+        # options.tags has a custom parser, so don't store in options.emr_tags
         opt_group.add_option(
-            '--emr-tag', dest='emr_tags',
+            '--emr-tag', dest='tags',
             default=[], action='append',
-            help='Metadata tags to apply to the EMR cluster; '
-                 'should take the form KEY=VALUE. You can use --emr-tag '
-                 'multiple times.'),
+            help='Deprecated alias for --tag'),
 
         opt_group.add_option(
             '--iam-endpoint', dest='iam_endpoint', default=None,
@@ -658,6 +657,13 @@ def _add_emr_launch_opts(opt_group):
             help=('ID of Amazon VPC subnet to launch cluster in (if not set'
                   ' or empty string, cluster is launched in the normal AWS'
                   ' cloud)')),
+
+        opt_group.add_option(
+            '--tag', dest='tags',
+            default=[], action='append',
+            help='Metadata tags to apply to the EMR cluster; '
+                 'should take the form KEY=VALUE. You can use --tag '
+                 'multiple times.'),
 
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',
@@ -900,11 +906,11 @@ def _fix_custom_options(options, option_parser):
 
         options.emr_configurations = decoded_configurations
 
-    if hasattr(options, 'emr_tags'):
-        emr_tag_err = '--emr-tag argument %r is not of the form KEY=VALUE'
-        options.emr_tags = parse_key_value_list(options.emr_tags,
-                                                emr_tag_err,
-                                                option_parser.error)
+    if hasattr(options, 'tags'):
+        tag_err = '--tag argument %r is not of the form KEY=VALUE'
+        options.tags = parse_key_value_list(options.tags,
+                                            tag_err,
+                                            option_parser.error)
 
     if hasattr(options, 'jobconf'):
         jobconf_err = '--jobconf argument %r is not of the form KEY=VALUE'

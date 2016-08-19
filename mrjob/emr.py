@@ -381,7 +381,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_applications',
         'emr_configurations',
         'emr_endpoint',
-        'emr_tags',
         'enable_emr_debugging',
         'hadoop_extra_args',
         'hadoop_streaming_jar',
@@ -410,6 +409,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ssh_tunnel',
         'ssh_tunnel_is_open',
         'subnet',
+        'tags',
         'task_instance_bid_price',
         'task_instance_type',
         'visible_to_all_users',
@@ -423,15 +423,15 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_files': combine_path_lists,
         'bootstrap_python_packages': combine_path_lists,
         'bootstrap_scripts': combine_path_lists,
+        'cloud_log_dir': combine_paths,
+        'cloud_tmp_dir': combine_paths,
         'ec2_key_pair_file': combine_paths,
         'emr_api_params': combine_dicts,
         'emr_applications': combine_lists,
         'emr_configurations': combine_lists,
-        'emr_tags': combine_dicts,
         'hadoop_extra_args': combine_lists,
-        'cloud_log_dir': combine_paths,
-        'cloud_tmp_dir': combine_paths,
         'ssh_bin': combine_cmds,
+        'tags': combine_dicts,
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
@@ -448,6 +448,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'ec2_task_instance_type': 'task_instance_type',
         'emr_job_flow_id': 'cluster_id',
         'emr_job_flow_pool_name': 'pool_name',
+        'emr_tags': 'tags',
         'num_ec2_core_instances': 'num_core_instances',
         'num_ec2_task_instances': 'num_task_instances',
         'pool_emr_job_flows': 'pool_clusters',
@@ -1388,7 +1389,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Create an empty cluster on EMR, and return the ID of that
         job.
 
-        If the ``emr_tags`` option is set, also tags the cluster (which
+        If the ``tags`` option is set, also tags the cluster (which
         is a separate API call).
 
         persistent -- if this is true, create the cluster with the keep_alive
@@ -1413,7 +1414,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('Cluster created with ID: %s' % cluster_id)
 
         # set EMR tags for the cluster, if any
-        tags = self._opts['emr_tags']
+        tags = self._opts['tags']
         if tags:
             log.info('Setting EMR tags: %s' % ', '.join(
                 '%s=%s' % (tag, value or '') for tag, value in tags.items()))
@@ -1750,7 +1751,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._emr_job_start = time.time()
 
         # set EMR tags for the job, if any
-        tags = self._opts['emr_tags']
+        tags = self._opts['tags']
         if tags:
             log.info('Setting EMR tags: %s' %
                      ', '.join('%s=%s' % (tag, value)

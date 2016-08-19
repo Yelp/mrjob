@@ -320,10 +320,42 @@ def _add_dataproc_emr_opts(opt_group):
             help='ID of an existing cluster to run our job on'),
 
         opt_group.add_option(
+            '--core-instance-type', dest='core_instance_type', default=None,
+            help='Type of GCE/EC2 core instance(s) to launch'),
+
+        opt_group.add_option(
+            '--instance-type', dest='instance_type', default=None,
+            help=('Type of GCE/EC2 instance(s) to launch \n'
+                  ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4 -'
+                  ' See https://cloud.google.com/compute/docs/machine-types\n'
+                  ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge -'
+                  ' See http://aws.amazon.com/ec2/instance-types/'
+                  )),
+
+        opt_group.add_option(
+            '--master-instance-type', dest='master_instance_type',
+            default=None,
+            help='Type of GCE/EC2 master instance(s) to launch'),
+
+        opt_group.add_option(
             '--max-hours-idle', dest='max_hours_idle',
             default=None, type='float',
             help=("If we create a cluster, have it automatically"
                   " terminate itself after it's been idle this many hours.")),
+
+        opt_group.add_option(
+            '--num-core-instances', dest='num_core_instances', default=None,
+            type='int',
+            help='Total number of Worker instances to launch '),
+
+        opt_group.add_option(
+            '--num-task-instances', dest='num_task_instances', default=None,
+            type='int',
+            help='Total number of preemptible Worker instances to launch '),
+
+        opt_group.add_option(
+            '--task-instance-type', dest='task_instance_type', default=None,
+            help='Type of GCE/EC2 task instance(s) to launch'),
     ]
 
 
@@ -345,40 +377,6 @@ def _add_dataproc_opts(opt_group):
         opt_group.add_option(
             '--image-version', dest='image_version', default=None,
             help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
-
-        # instance types
-        opt_group.add_option(
-            '--instance-type', dest='instance_type', default=None,
-            help=('Type of GCE/EC2 instance(s) to launch \n'
-                  ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4 -'
-                  ' See https://cloud.google.com/compute/docs/machine-types\n'
-                  ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge -'
-                  ' See http://aws.amazon.com/ec2/instance-types/'
-                  )),
-
-        opt_group.add_option(
-            '--master-instance-type', dest='master_instance_type',
-            default=None,
-            help='Type of GCE/EC2 master instance(s) to launch'),
-
-        opt_group.add_option(
-            '--core-instance-type', dest='core_instance_type', default=None,
-            help='Type of GCE/EC2 core instance(s) to launch'),
-
-        opt_group.add_option(
-            '--task-instance-type', dest='task_instance_type', default=None,
-            help='Type of GCE/EC2 task instance(s) to launch'),
-
-        opt_group.add_option(
-            '--num-core-instances', dest='num_core_instances', default=None,
-            type='int',
-            help='Total number of Worker instances to launch '),
-
-        opt_group.add_option(
-            '--num-task-instances', dest='num_task_instances', default=None,
-            type='int',
-            help='Total number of preemptible Worker instances to launch '),
-
 
         opt_group.add_option(
             '--cloud-fs-sync-secs', dest='cloud_fs_sync_secs', default=None,
@@ -740,64 +738,61 @@ def _add_emr_instance_opts(opt_group):
             help=('Release Label (e.g. "emr-4.0.0"). Overrides'
                   ' --ami-version')),
 
-        # instance types
+        # instance types (the non-deprecated options are in
+        # _add_dataproc_emr_opts())
+
         opt_group.add_option(
             '--ec2-core-instance-type', '--ec2-slave-instance-type',
             dest='ec2_core_instance_type', default=None,
-            help='Type of EC2 instance for core (or "slave") nodes only'),
+            help='Deprecated alias for --core-instance-type'),
 
         opt_group.add_option(
             '--ec2-instance-type', dest='ec2_instance_type', default=None,
-            help=('Type of EC2 instance(s) to launch (e.g. m1.medium,'
-                  ' c3.xlarge, r3.xlarge). See'
-                  ' http://aws.amazon.com/ec2/instance-types/ for the full'
-                  ' list.')),
+            help='Deprecated alias for --instance-type'),
 
         opt_group.add_option(
             '--ec2-master-instance-type', dest='ec2_master_instance_type',
             default=None,
-            help='Type of EC2 instance for master node only'),
+            help='Deprecated alias for --master-instance-type'),
 
         opt_group.add_option(
             '--ec2-task-instance-type', dest='ec2_task_instance_type',
             default=None,
-            help='Type of EC2 instance for task nodes only'),
+            help='Deprecated alias for --task-instance-type'),
 
-        # instance number
+        # instance number (the non-deprecated options are in
+        # _add_dataproc_emr_opts())
+
         opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,
             type='int',
-            help='Total number of EC2 instances to launch '),
+            help=('Deprecated: subtract one and pass that to '
+                  '--num-core-instances instead')),
 
-        # NB: EMR instance counts are only applicable for slave/core and
-        # task, since a master count > 1 causes the EMR API to return the
-        # ValidationError "A master instance group must specify a single
-        # instance".
         opt_group.add_option(
             '--num-ec2-core-instances', dest='num_ec2_core_instances',
             default=None, type='int',
-            help=('Number of EC2 instances to start as core (or "slave") '
-                  'nodes. Incompatible with --num-ec2-instances.')),
+            help='Deprecated alias for --num-core-instances'),
 
         opt_group.add_option(
             '--num-ec2-task-instances', dest='num_ec2_task_instances',
             default=None, type='int',
-            help=('Number of EC2 instances to start as task '
-                  'nodes. Incompatible with --num-ec2-instances.')),
+            help='Deprecated alias for --num-task-instances'),
 
-        # bid price
+        # bid price (this doesn't exist on Dataproc)
+
         opt_group.add_option(
-            '--ec2-core-instance-bid-price',
-            dest='ec2_core_instance_bid_price', default=None,
+            '--core-instance-bid-price',
+            dest='core_instance_bid_price', default=None,
             help=(
-                'Bid price to specify for core (or "slave") nodes when'
+                'Bid price to specify for core nodes when'
                 ' setting them up as EC2 spot instances (you probably only'
                 ' want to set a bid price for task instances).')
         ),
 
         opt_group.add_option(
-            '--ec2-master-instance-bid-price',
-            dest='ec2_master_instance_bid_price', default=None,
+            '--master-instance-bid-price',
+            dest='master_instance_bid_price', default=None,
             help=(
                 'Bid price to specify for the master node when setting it up '
                 'as an EC2 spot instance (you probably only want to set '
@@ -805,11 +800,29 @@ def _add_emr_instance_opts(opt_group):
         ),
 
         opt_group.add_option(
-            '--ec2-task-instance-bid-price',
-            dest='ec2_task_instance_bid_price', default=None,
+            '--task-instance-bid-price',
+            dest='task_instance_bid_price', default=None,
             help=(
                 'Bid price to specify for task nodes when '
                 'setting them up as EC2 spot instances.')
+        ),
+
+        opt_group.add_option(
+            '--ec2-core-instance-bid-price',
+            dest='ec2_core_instance_bid_price', default=None,
+            help='Deprecated alias for --core-instance-bid-price',
+        ),
+
+        opt_group.add_option(
+            '--ec2-master-instance-bid-price',
+            dest='ec2_master_instance_bid_price', default=None,
+            help='Deprecated alias for --master-instance-bid-price',
+        ),
+
+        opt_group.add_option(
+            '--ec2-task-instance-bid-price',
+            dest='ec2_task_instance_bid_price', default=None,
+            help='Deprecated alias for --task-instance-bid-price',
         ),
     ]
 

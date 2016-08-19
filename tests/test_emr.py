@@ -925,61 +925,61 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_single_instance(self):
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge'},
+            {'instance_type': 'c1.xlarge'},
             master=(1, 'c1.xlarge', None))
 
     def test_multiple_instances(self):
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge', 'num_ec2_instances': 3},
+            {'instance_type': 'c1.xlarge', 'num_ec2_instances': 3},
             core=(2, 'c1.xlarge', None),
             master=(1, 'm1.medium', None))
 
-    def test_explicit_master_and_slave_instance_types(self):
+    def test_explicit_master_and_core_instance_types(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large'},
+            {'master_instance_type': 'm1.large'},
             master=(1, 'm1.large', None))
 
         self._test_instance_groups(
-            {'ec2_slave_instance_type': 'm2.xlarge',
+            {'core_instance_type': 'm2.xlarge',
              'num_ec2_instances': 3},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_slave_instance_type': 'm2.xlarge',
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'm2.xlarge',
              'num_ec2_instances': 3},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge',
-             'ec2_master_instance_type': 'm1.large'},
+            {'instance_type': 'c1.xlarge',
+             'master_instance_type': 'm1.large'},
             master=(1, 'm1.large', None))
 
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge',
-             'ec2_master_instance_type': 'm1.large',
-             'ec2_slave_instance_type': 'm2.xlarge',
+            {'instance_type': 'c1.xlarge',
+             'master_instance_type': 'm1.large',
+             'core_instance_type': 'm2.xlarge',
              'num_ec2_instances': 3},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
 
     def test_cmd_line_opts_beat_mrjob_conf(self):
-        # set ec2_instance_type in mrjob.conf, 1 instance
-        self.set_in_mrjob_conf(ec2_instance_type='c1.xlarge')
+        # set instance_type in mrjob.conf, 1 instance
+        self.set_in_mrjob_conf(instance_type='c1.xlarge')
 
         self._test_instance_groups(
             {},
             master=(1, 'c1.xlarge', None))
 
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large'},
+            {'master_instance_type': 'm1.large'},
             master=(1, 'm1.large', None))
 
-        # set ec2_instance_type in mrjob.conf, 3 instances
-        self.set_in_mrjob_conf(ec2_instance_type='c1.xlarge',
+        # set instance_type in mrjob.conf, 3 instances
+        self.set_in_mrjob_conf(instance_type='c1.xlarge',
                                num_ec2_instances=3)
 
         self._test_instance_groups(
@@ -988,25 +988,25 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_slave_instance_type': 'm2.xlarge'},
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'm2.xlarge'},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
 
         # set master in mrjob.conf, 1 instance
-        self.set_in_mrjob_conf(ec2_master_instance_type='m1.large')
+        self.set_in_mrjob_conf(master_instance_type='m1.large')
 
         self._test_instance_groups(
             {},
             master=(1, 'm1.large', None))
 
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge'},
+            {'instance_type': 'c1.xlarge'},
             master=(1, 'c1.xlarge', None))
 
         # set master and slave in mrjob.conf, 2 instances
-        self.set_in_mrjob_conf(ec2_master_instance_type='m1.large',
-                               ec2_slave_instance_type='m2.xlarge',
+        self.set_in_mrjob_conf(master_instance_type='m1.large',
+                               core_instance_type='m2.xlarge',
                                num_ec2_instances=3)
 
         self._test_instance_groups(
@@ -1015,48 +1015,40 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             master=(1, 'm1.large', None))
 
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge'},
+            {'instance_type': 'c1.xlarge'},
             core=(2, 'c1.xlarge', None),
             master=(1, 'm1.large', None))
 
     def test_zero_core_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 0},
+            {'master_instance_type': 'c1.medium',
+             'num_core_instances': 0},
             master=(1, 'c1.medium', None))
 
     def test_core_spot_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances': 5},
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'core_instance_bid_price': '0.20',
+             'num_core_instances': 5},
             core=(5, 'c1.medium', '0.20'),
             master=(1, 'm1.large', None))
 
     def test_core_on_demand_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 5},
-            core=(5, 'c1.medium', None),
-            master=(1, 'm1.large', None))
-
-        # Test the ec2_slave_instance_type alias
-        self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_slave_instance_type': 'c1.medium',
-             'num_ec2_instances': 6},
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'num_core_instances': 5},
             core=(5, 'c1.medium', None),
             master=(1, 'm1.large', None))
 
     def test_core_and_task_on_demand_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 5,
-             'ec2_task_instance_type': 'm2.xlarge',
-             'num_ec2_task_instances': 20,
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'num_core_instances': 5,
+             'task_instance_type': 'm2.xlarge',
+             'num_task_instances': 20,
              },
             core=(5, 'c1.medium', None),
             master=(1, 'm1.large', None),
@@ -1064,25 +1056,25 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_core_and_task_spot_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances': 10,
-             'ec2_task_instance_type': 'm2.xlarge',
-             'ec2_task_instance_bid_price': '1.00',
-             'num_ec2_task_instances': 20,
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'core_instance_bid_price': '0.20',
+             'num_core_instances': 10,
+             'task_instance_type': 'm2.xlarge',
+             'task_instance_bid_price': '1.00',
+             'num_task_instances': 20,
              },
             core=(10, 'c1.medium', '0.20'),
             master=(1, 'm1.large', None),
             task=(20, 'm2.xlarge', '1.00'))
 
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 10,
-             'ec2_task_instance_type': 'm2.xlarge',
-             'ec2_task_instance_bid_price': '1.00',
-             'num_ec2_task_instances': 20,
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'num_core_instances': 10,
+             'task_instance_type': 'm2.xlarge',
+             'task_instance_bid_price': '1.00',
+             'num_task_instances': 20,
              },
             core=(10, 'c1.medium', None),
             master=(1, 'm1.large', None),
@@ -1090,39 +1082,39 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_master_and_core_spot_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_master_instance_bid_price': '0.50',
-             'ec2_core_instance_type': 'c1.medium',
-             'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances': 10,
+            {'master_instance_type': 'm1.large',
+             'master_instance_bid_price': '0.50',
+             'core_instance_type': 'c1.medium',
+             'core_instance_bid_price': '0.20',
+             'num_core_instances': 10,
              },
             core=(10, 'c1.medium', '0.20'),
             master=(1, 'm1.large', '0.50'))
 
     def test_master_spot_instance(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_master_instance_bid_price': '0.50',
+            {'master_instance_type': 'm1.large',
+             'master_instance_bid_price': '0.50',
              },
             master=(1, 'm1.large', '0.50'))
 
     def test_zero_or_blank_bid_price_means_on_demand(self):
         self._test_instance_groups(
-            {'ec2_master_instance_bid_price': '0',
+            {'master_instance_bid_price': '0',
              },
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
-            {'num_ec2_core_instances': 3,
-             'ec2_core_instance_bid_price': '0.00',
+            {'num_core_instances': 3,
+             'core_instance_bid_price': '0.00',
              },
             core=(3, 'm1.medium', None),
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
-            {'num_ec2_core_instances': 3,
-             'num_ec2_task_instances': 5,
-             'ec2_task_instance_bid_price': '',
+            {'num_core_instances': 3,
+             'num_task_instances': 5,
+             'task_instance_bid_price': '',
              },
             core=(3, 'm1.medium', None),
             master=(1, 'm1.medium', None),
@@ -1132,13 +1124,13 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         self.assertRaises(
             boto.exception.EmrResponseError,
             self._test_instance_groups,
-            {'ec2_master_instance_bid_price': 'all the gold in California'})
+            {'master_instance_bid_price': 'all the gold in California'})
 
     def test_task_type_defaults_to_core_type(self):
         self._test_instance_groups(
-            {'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 5,
-             'num_ec2_task_instances': 20,
+            {'core_instance_type': 'c1.medium',
+             'num_core_instances': 5,
+             'num_task_instances': 20,
              },
             core=(5, 'c1.medium', None),
             master=(1, 'm1.medium', None),
@@ -1150,7 +1142,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
                 {'num_ec2_instances': 4,
-                 'num_ec2_core_instances': 10},
+                 'num_core_instances': 10},
                 core=(10, 'm1.medium', None),
                 master=(1, 'm1.medium', None))
 
@@ -1158,8 +1150,8 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_mixing_instance_number_opts_in_mrjob_conf(self):
         self.set_in_mrjob_conf(num_ec2_instances=3,
-                               num_ec2_core_instances=5,
-                               num_ec2_task_instances=9)
+                               num_core_instances=5,
+                               num_task_instances=9)
 
         stderr = StringIO()
         with no_handlers_for_logger():
@@ -1173,8 +1165,8 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         self.assertIn('does not make sense', stderr.getvalue())
 
     def test_cmd_line_instance_numbers_beat_mrjob_conf(self):
-        self.set_in_mrjob_conf(num_ec2_core_instances=5,
-                               num_ec2_task_instances=9)
+        self.set_in_mrjob_conf(num_core_instances=5,
+                               num_task_instances=9)
 
         stderr = StringIO()
         with no_handlers_for_logger():
@@ -2039,146 +2031,145 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
     def test_join_pool_with_same_instance_type_and_count(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='m2.4xlarge',
-            num_ec2_instances=20)
+            instance_type='m2.4xlarge',
+            num_core_instances=20)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '20'])
+            '--instance-type', 'm2.4xlarge',
+            '--num-core-instances', '20'])
 
     def test_join_pool_with_more_of_same_instance_type(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='m2.4xlarge',
-            num_ec2_instances=20)
+            instance_type='m2.4xlarge',
+            num_core_instances=20)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '5'])
+            '--instance-type', 'm2.4xlarge',
+            '--num-core-instances', '5'])
 
     def test_join_cluster_with_bigger_instances(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='m2.4xlarge',
-            num_ec2_instances=20)
+            instance_type='m2.4xlarge',
+            num_core_instances=20)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm1.medium',
-            '--num-ec2-instances', '20'])
+            '--instance-type', 'm1.medium',
+            '--num-core-instances', '20'])
 
     def test_join_cluster_with_enough_cpu_and_memory(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='c1.xlarge',
-            num_ec2_instances=3)
+            instance_type='c1.xlarge',
+            num_core_instances=3)
 
         # join the pooled cluster even though it has less instances total,
         # since they're have enough memory and CPU
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm1.medium',
-            '--num-ec2-instances', '10'])
+            '--instance-type', 'm1.medium',
+            '--num-core-instances', '10'])
 
     def test_dont_join_cluster_with_instances_with_too_little_memory(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='c1.xlarge',
-            num_ec2_instances=20)
+            instance_type='c1.xlarge',
+            num_core_instances=20)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '2'])
+            '--instance-type', 'm2.4xlarge',
+            '--num-core-instances', '2'])
 
     def test_master_instance_has_to_be_big_enough(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='c1.xlarge',
-            num_ec2_instances=10)
+            instance_type='c1.xlarge',
+            num_core_instances=10)
 
         # We implicitly want a MASTER instance with c1.xlarge. The pooled
         # cluster has an m1.medium master instance and 9 c1.xlarge core
         # instances, which doesn't match.
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'c1.xlarge',
-            '--num-ec2-instances', '1'])
+            '--instance-type', 'c1.xlarge'])
 
     def test_unknown_instance_type_against_matching_pool(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='a1.sauce',
-            num_ec2_instances=10)
+            instance_type='a1.sauce',
+            num_core_instances=10)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10'])
+            '--instance-type', 'a1.sauce',
+            '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_pool_with_more_instances(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='a1.sauce',
-            num_ec2_instances=20)
+            instance_type='a1.sauce',
+            num_core_instances=20)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10'])
+            '--instance-type', 'a1.sauce',
+            '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_pool_with_less_instances(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='a1.sauce',
-            num_ec2_instances=5)
+            instance_type='a1.sauce',
+            num_core_instances=5)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10'])
+            '--instance-type', 'a1.sauce',
+            '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_other_instance_types(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='m2.4xlarge',
-            num_ec2_instances=100)
+            instance_type='m2.4xlarge',
+            num_core_instances=100)
 
         # for all we know, "a1.sauce" instances have even more memory and CPU
         # than m2.4xlarge
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '2'])
+            '--instance-type', 'a1.sauce',
+            '--num-core-instances', '2'])
 
     def test_can_join_cluster_with_same_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_master_instance_bid_price='0.25')
+            master_instance_bid_price='0.25')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-master-instance-bid-price', '0.25'])
+            '--master-instance-bid-price', '0.25'])
 
     def test_can_join_cluster_with_higher_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_master_instance_bid_price='25.00')
+            master_instance_bid_price='25.00')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-master-instance-bid-price', '0.25'])
+            '--master-instance-bid-price', '0.25'])
 
     def test_cant_join_cluster_with_lower_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_master_instance_bid_price='0.25',
-            num_ec2_instances=100)
+            master_instance_bid_price='0.25',
+            num_core_instances=100)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-master-instance-bid-price', '25.00'])
+            '--master-instance-bid-price', '25.00'])
 
     def test_on_demand_satisfies_any_bid_price(self):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-master-instance-bid-price', '25.00'])
+            '--master-instance-bid-price', '25.00'])
 
     def test_no_bid_price_satisfies_on_demand(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_master_instance_bid_price='25.00')
+            master_instance_bid_price='25.00')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters'])
@@ -2186,19 +2177,19 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_core_and_task_instance_types(self):
         # a tricky test that mixes and matches different criteria
         _, cluster_id = self.make_pooled_cluster(
-            ec2_core_instance_bid_price='0.25',
-            ec2_task_instance_bid_price='25.00',
-            ec2_task_instance_type='c1.xlarge',
-            num_ec2_core_instances=2,
-            num_ec2_task_instances=3)
+            core_instance_bid_price='0.25',
+            task_instance_bid_price='25.00',
+            task_instance_type='c1.xlarge',
+            num_core_instances=2,
+            num_task_instances=3)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--num-ec2-core-instances', '2',
             '--num-ec2-task-instances', '10',  # more instances, but smaller
-            '--ec2-core-instance-bid-price', '0.10',
-            '--ec2-master-instance-bid-price', '77.77',
-            '--ec2-task-instance-bid-price', '22.00'])
+            '--core-instance-bid-price', '0.10',
+            '--master-instance-bid-price', '77.77',
+            '--task-instance-bid-price', '22.00'])
 
     def test_dont_join_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()
@@ -2413,10 +2404,10 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_sorting_by_cpu_hours(self):
         _, cluster_id_1 = self.make_pooled_cluster('pool1',
                                                    minutes_ago=40,
-                                                   num_ec2_instances=2)
+                                                   num_core_instances=2)
         _, cluster_id_2 = self.make_pooled_cluster('pool1',
                                                    minutes_ago=20,
-                                                   num_ec2_instances=1)
+                                                   num_core_instances=1)
 
         runner_1 = self.make_simple_runner('pool1')
         runner_2 = self.make_simple_runner('pool1')
@@ -2582,7 +2573,7 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
 
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable
-        cluster1_id = self.make_pooled_cluster(num_ec2_instances=20)
+        cluster1_id = self.make_pooled_cluster(num_core_instances=20)
         self.mock_emr_self_termination.add(cluster1_id)
         cluster2_id = self.make_pooled_cluster()
 

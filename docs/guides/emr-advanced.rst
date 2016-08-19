@@ -11,10 +11,10 @@ running multiple jobs, you may find it convenient to reuse a single cluster.
 
 :py:mod:`mrjob` includes a utility to create persistent clusters without
 running a job. For example, this command will create a cluster with 12 EC2
-instances (1 master and 11 slaves), taking all other options from
+instances (1 master and 11 core), taking all other options from
 :py:mod:`mrjob.conf`::
 
-    $ mrjob create-cluster --num-ec2-instances=12 --max-hours-idle 1
+    $ mrjob create-cluster --num-core-instances=11 --max-hours-idle 1
     ...
     j-CLUSTERID
 
@@ -114,8 +114,8 @@ by using the spot market. The catch is that if someone bids more for instances
 that you're using, they can be taken away from your cluster. If this happens,
 you aren't charged, but your job may fail.
 
-You can specify spot market bid prices using the *ec2_core_instance_bid_price*,
-*ec2_master_instance_bid_price*, and *ec2_task_instance_bid_price* options to
+You can specify spot market bid prices using the *core_instance_bid_price*,
+*master_instance_bid_price*, and *task_instance_bid_price* options to
 specify a price in US dollars. For example, on the command line::
 
     --ec2-task-instance-bid-price 0.42
@@ -124,7 +124,7 @@ or in :py:mod:`mrjob.conf`::
 
     runners:
       emr:
-        ec2_task_instance_bid_price: '0.42'
+        task_instance_bid_price: '0.42'
 
 (Note the quotes; bid prices are strings, not floats!)
 

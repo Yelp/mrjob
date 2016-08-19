@@ -35,7 +35,7 @@ runners:
     ec2_key_pair: EMR
     ec2_key_pair_file: $BT/config/EMR.pem
     # use beefier instances in production
-    ec2_instance_type: c1.xlarge
+    instance_type: c1.xlarge
     # but only use one unless overridden
     num_ec2_instances: 1
     # alternate tmp dir

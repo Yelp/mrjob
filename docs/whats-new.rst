@@ -126,7 +126,7 @@ mrjob now fully supports the 3.x and 4.x Elastic MapReduce AMIs, including SSH t
 
 The default :mrjob-opt:`ami_version` is now ``3.11.0``. Our plan is to continue updating this to the lastest (non-broken) 3.x AMI for each 0.5.x release of mrjob.
 
-The default :mrjob-opt:`ec2_instance_type` is now ``m1.medium`` (``m1.small`` is too small for the 3.x and 4.x AMIs)
+The default :mrjob-opt:`instance_type` is now ``m1.medium`` (``m1.small`` is too small for the 3.x and 4.x AMIs)
 
 You can specify 4.x AMIs with either the new :mrjob-opt:`release_label` option, or continue using :mrjob-opt:`ami_version`; both work.
 
@@ -545,13 +545,13 @@ You can now :ref:`include one config file from another
 
 The EMR instance type/number options have changed to support spot instances:
 
-* *ec2_core_instance_bid_price*
-* *ec2_core_instance_type*
-* *ec2_master_instance_bid_price*
-* *ec2_master_instance_type*
-* *ec2_slave_instance_type* (alias for *ec2_core_instance_type*)
-* *ec2_task_instance_bid_price*
-* *ec2_task_instance_type*
+* *core_instance_bid_price*
+* *core_instance_type*
+* *master_instance_bid_price*
+* *master_instance_type*
+* *slave_instance_type* (alias for *core_instance_type*)
+* *task_instance_bid_price*
+* *task_instance_type*
 
 There is also a new *ami_version* option to change the AMI your job flow uses
 for its nodes.
@@ -726,7 +726,7 @@ Changes and Deprecations
 
         The default Hadoop version on EMR is now 0.20 (was 0.18).
 
-        The ``ec2_instance_type`` option only sets the instance type for slave
+        The ``instance_type`` option only sets the instance type for slave
         nodes when there are multiple EC2 instance. This is because the master
         node can usually remain small without affecting the performance of the
         job.

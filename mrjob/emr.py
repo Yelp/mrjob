@@ -371,16 +371,15 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_scripts',
         'check_cluster_every',
         'cluster_id',
-        'ec2_core_instance_bid_price',
-        'ec2_core_instance_type',
-        'ec2_instance_type',
+        'core_instance_bid_price',
+        'core_instance_type',
+        'instance_type',
         'ec2_key_pair',
         'ec2_key_pair_file',
-        'ec2_master_instance_bid_price',
-        'ec2_master_instance_type',
-        'ec2_slave_instance_type',
-        'ec2_task_instance_bid_price',
-        'ec2_task_instance_type',
+        'master_instance_bid_price',
+        'master_instance_type',
+        'task_instance_bid_price',
+        'task_instance_type',
         'emr_action_on_failure',
         'emr_api_params',
         'emr_applications',
@@ -397,9 +396,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'iam_service_role',
         'max_hours_idle',
         'mins_to_end_of_hour',
-        'num_ec2_core_instances',
+        'num_core_instances',
         'num_ec2_instances',
-        'num_ec2_task_instances',
+        'num_task_instances',
         'pool_clusters',
         'pool_name',
         'pool_wait_minutes',
@@ -437,8 +436,18 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
         'check_emr_status_every': 'check_cluster_every',
+        'ec2_core_instance_bid_price': 'core_instance_bid_price',
+        'ec2_core_instance_type': 'core_instance_type',
+        'ec2_instance_type': 'instance_type',
+        'ec2_master_instance_bid_price': 'master_instance_bid_price',
+        'ec2_master_instance_type': 'master_instance_type',
+        'ec2_slave_instance_type': 'core_instance_type',
+        'ec2_task_instance_bid_price': 'task_instance_bid_price',
+        'ec2_task_instance_type': 'task_instance_type',
         'emr_job_flow_id': 'cluster_id',
         'emr_job_flow_pool_name': 'pool_name',
+        'num_ec2_core_instances': 'num_core_instances',
+        'num_ec2_task_instances': 'num_task_instances',
         'pool_emr_job_flows': 'pool_clusters',
         's3_log_uri': 'cloud_log_dir',
         's3_scratch_uri': 'cloud_tmp_dir',
@@ -456,7 +465,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
         self._fix_emr_applications_opt()
         self._fix_emr_configurations_opt()
-        self._fix_ec2_instance_opts()
+        self._fix_instance_opts()
         self._fix_ami_version_latest()
         self._fix_release_label_opt()
 
@@ -468,12 +477,12 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
-            'ec2_core_instance_type': 'm1.medium',
-            'ec2_master_instance_type': 'm1.medium',
+            'core_instance_type': 'm1.medium',
+            'master_instance_type': 'm1.medium',
             'mins_to_end_of_hour': 5.0,
-            'num_ec2_core_instances': 0,
+            'num_core_instances': 0,
             'num_ec2_instances': 1,
-            'num_ec2_task_instances': 0,
+            'num_task_instances': 0,
             'pool_name': 'default',
             'pool_wait_minutes': 0,
             's3_sync_wait_time': 5.0,
@@ -502,8 +511,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         self['emr_configurations'] = [
             _fix_configuration_opt(c) for c in self['emr_configurations']]
 
-    def _fix_ec2_instance_opts(self):
-        """If the *ec2_instance_type* option is set, override instance
+    def _fix_instance_opts(self):
+        """If the *instance_type* option is set, override instance
         type for the nodes that actually run tasks (see Issue #66). Allow
         command-line arguments to override defaults and arguments
         in mrjob.conf (see Issue #311).
@@ -512,77 +521,60 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         total number of instances matches number of master, core, and task
         instances, and that bid prices of zero are converted to None.
         """
-        # Make sure slave and core instance type have the same value
-        # Within EMRJobRunner we only ever use ec2_core_instance_type,
-        # but we want ec2_slave_instance_type to be correct in the
-        # options dictionary.
-        if (self['ec2_slave_instance_type'] and
-            (self._opt_priority['ec2_slave_instance_type'] >
-             self._opt_priority['ec2_core_instance_type'])):
-            self['ec2_core_instance_type'] = (
-                self['ec2_slave_instance_type'])
-        else:
-            self['ec2_slave_instance_type'] = (
-                self['ec2_core_instance_type'])
-
         # If task instance type is not set, use core instance type
         # (This is mostly so that we don't inadvertently join a pool
         # with task instance types with too little memory.)
-        if not self['ec2_task_instance_type']:
-            self['ec2_task_instance_type'] = (
-                self['ec2_core_instance_type'])
+        if not self['task_instance_type']:
+            self['task_instance_type'] = (
+                self['core_instance_type'])
 
-        # Within EMRJobRunner, we use num_ec2_core_instances and
-        # num_ec2_task_instances, not num_ec2_instances. (Number
+        # Within EMRJobRunner, we use num_core_instances and
+        # num_task_instances, not num_ec2_instances. (Number
         # of master instances is always 1.)
         if (self._opt_priority['num_ec2_instances'] >
-            max(self._opt_priority['num_ec2_core_instances'],
-                self._opt_priority['num_ec2_task_instances'])):
+            max(self._opt_priority['num_core_instances'],
+                self._opt_priority['num_task_instances'])):
             # assume 1 master, n - 1 core, 0 task
-            self['num_ec2_core_instances'] = (
-                self['num_ec2_instances'] - 1)
-            self['num_ec2_task_instances'] = 0
+            self['num_core_instances'] = self['num_ec2_instances'] - 1
+            self['num_task_instances'] = 0
+
+            log.warning('num_ec2_instances is deprecated; set'
+                        ' num_core_instances to %d instead' % (
+                            self['num_core_instances']))
         else:
             # issue a warning if we used both kinds of instance number
             # options on the command line or in mrjob.conf
             if (self._opt_priority['num_ec2_instances'] >= 2 and
                 self._opt_priority['num_ec2_instances'] <=
-                max(self._opt_priority['num_ec2_core_instances'],
-                    self._opt_priority['num_ec2_task_instances'])):
+                max(self._opt_priority['num_core_instances'],
+                    self._opt_priority['num_task_instances'])):
                 log.warning('Mixing num_ec2_instances and'
-                            ' num_ec2_{core,task}_instances does not make'
+                            ' num_{core,task}_instances does not make'
                             ' sense; ignoring num_ec2_instances')
-            # recalculate number of EC2 instances
-            self['num_ec2_instances'] = (
-                1 +
-                self['num_ec2_core_instances'] +
-                self['num_ec2_task_instances'])
 
         # Allow ec2 instance type to override other instance types
-        ec2_instance_type = self['ec2_instance_type']
-        if ec2_instance_type:
-            # core (slave) instances
-            if (self._opt_priority['ec2_instance_type'] >
-                max(self._opt_priority['ec2_core_instance_type'],
-                    self._opt_priority['ec2_slave_instance_type'])):
-                self['ec2_core_instance_type'] = ec2_instance_type
-                self['ec2_slave_instance_type'] = ec2_instance_type
+        instance_type = self['instance_type']
+        if instance_type:
+            # core instances
+            if (self._opt_priority['instance_type'] >
+                    self._opt_priority['core_instance_type']):
+                self['core_instance_type'] = instance_type
 
             # master instance only does work when it's the only instance
-            if (self['num_ec2_core_instances'] <= 0 and
-                self['num_ec2_task_instances'] <= 0 and
-                (self._opt_priority['ec2_instance_type'] >
-                 self._opt_priority['ec2_master_instance_type'])):
-                self['ec2_master_instance_type'] = ec2_instance_type
+            if (self['num_core_instances'] <= 0 and
+                self['num_task_instances'] <= 0 and
+                (self._opt_priority['instance_type'] >
+                 self._opt_priority['master_instance_type'])):
+                self['master_instance_type'] = instance_type
 
             # task instances
-            if (self._opt_priority['ec2_instance_type'] >
-                    self._opt_priority['ec2_task_instance_type']):
-                self['ec2_task_instance_type'] = ec2_instance_type
+            if (self._opt_priority['instance_type'] >
+                    self._opt_priority['task_instance_type']):
+                self['task_instance_type'] = instance_type
 
         # convert a bid price of '0' to None
         for role in ('core', 'master', 'task'):
-            opt_name = 'ec2_%s_instance_bid_price' % role
+            opt_name = '%s_instance_bid_price' % role
             if not self[opt_name]:
                 self[opt_name] = None
             else:
@@ -1361,9 +1353,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _create_instance_group(self, role, instance_type, count, bid_price):
         """Helper method for creating instance groups. For use when
-        creating a cluster using a list of InstanceGroups, instead
-        of the typical triumverate of
-        num_instances/master_instance_type/slave_instance_type.
+        creating a cluster using a list of InstanceGroups
 
             - Role is either 'master', 'core', or 'task'.
             - instance_type is an EC2 instance type
@@ -1374,8 +1364,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
 
         if not instance_type:
-            if self._opts['ec2_instance_type']:
-                instance_type = self._opts['ec2_instance_type']
+            if self._opts['instance_type']:
+                instance_type = self._opts['instance_type']
             else:
                 raise ValueError('Missing instance type for %s node(s)' % role)
 
@@ -1444,42 +1434,41 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             args['availability_zone'] = self._opts['aws_availability_zone']
         # The old, simple API, available if we're not using task instances
         # or bid prices
-        if not (self._opts['num_ec2_task_instances'] or
-                self._opts['ec2_core_instance_bid_price'] or
-                self._opts['ec2_master_instance_bid_price'] or
-                self._opts['ec2_task_instance_bid_price']):
-            args['num_instances'] = self._opts['num_ec2_core_instances'] + 1
-            args['master_instance_type'] = (
-                self._opts['ec2_master_instance_type'])
-            args['slave_instance_type'] = self._opts['ec2_core_instance_type']
+        if not (self._opts['num_task_instances'] or
+                self._opts['core_instance_bid_price'] or
+                self._opts['master_instance_bid_price'] or
+                self._opts['task_instance_bid_price']):
+            args['num_instances'] = self._opts['num_core_instances'] + 1
+            args['master_instance_type'] = self._opts['master_instance_type']
+            args['slave_instance_type'] = self._opts['core_instance_type']
         else:
             # Create a list of InstanceGroups
             args['instance_groups'] = [
                 self._create_instance_group(
                     'MASTER',
-                    self._opts['ec2_master_instance_type'],
+                    self._opts['master_instance_type'],
                     1,
-                    self._opts['ec2_master_instance_bid_price']
+                    self._opts['master_instance_bid_price']
                 ),
             ]
 
-            if self._opts['num_ec2_core_instances']:
+            if self._opts['num_core_instances']:
                 args['instance_groups'].append(
                     self._create_instance_group(
                         'CORE',
-                        self._opts['ec2_core_instance_type'],
-                        self._opts['num_ec2_core_instances'],
-                        self._opts['ec2_core_instance_bid_price']
+                        self._opts['core_instance_type'],
+                        self._opts['num_core_instances'],
+                        self._opts['core_instance_bid_price']
                     )
                 )
 
-            if self._opts['num_ec2_task_instances']:
+            if self._opts['num_task_instances']:
                 args['instance_groups'].append(
                     self._create_instance_group(
                         'TASK',
-                        self._opts['ec2_task_instance_type'],
-                        self._opts['num_ec2_task_instances'],
-                        self._opts['ec2_task_instance_bid_price']
+                        self._opts['task_instance_type'],
+                        self._opts['num_task_instances'],
+                        self._opts['task_instance_bid_price']
                     )
                 )
 
@@ -2733,17 +2722,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         role_to_req_bid_price = {}
 
         for role in ('core', 'master', 'task'):
-            instance_type = self._opts['ec2_%s_instance_type' % role]
+            instance_type = self._opts['%s_instance_type' % role]
             if role == 'master':
                 num_instances = 1
             else:
-                num_instances = self._opts['num_ec2_%s_instances' % role]
+                num_instances = self._opts['num_%s_instances' % role]
 
             role_to_req_instance_type[role] = instance_type
             role_to_req_num_instances[role] = num_instances
 
             role_to_req_bid_price[role] = (
-                self._opts['ec2_%s_instance_bid_price' % role])
+                self._opts['%s_instance_bid_price' % role])
 
             # unknown instance types can only match themselves
             role_to_req_mem[role] = (

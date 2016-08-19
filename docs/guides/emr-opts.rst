@@ -538,32 +538,41 @@ Number and type of instances
 ----------------------------
 
 .. mrjob-opt::
-    :config: ec2_instance_type
-    :switch: --ec2-instance-type
+    :config: instance_type
+    :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'m1.medium'``
 
     What sort of EC2 instance(s) to use on the nodes that actually run tasks
     (see http://aws.amazon.com/ec2/instance-types/).  When you run multiple
-    instances (see :mrjob-opt:`num_ec2_instances`), the master node is just
+    instances (see :mrjob-opt:`num_core_instances`), the master node is just
     coordinating the other nodes, so usually the default instance type
     (``m1.medium``) is fine, and using larger instances is wasteful.
 
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_instance_type``.
+
 .. mrjob-opt::
-    :config: ec2_core_instance_type
-    :switch: --ec2-core-instance-type
+    :config: core_instance_type
+    :switch: --core-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'m1.medium'``
 
-    like :mrjob-opt:`ec2_instance_type`, but only for the core (also know as
-    "slave") Hadoop nodes; these nodes run tasks and host HDFS. Usually you
-    just want to use :mrjob-opt:`ec2_instance_type`.
+    like :mrjob-opt:`instance_type`, but only for the core Hadoop nodes; these
+    nodes run tasks and host HDFS. Usually you just want to use
+    :mrjob-opt:`instance_type`.
+
+    .. versionchanged:: 0.5.4
+
+       This replaces the ``ec2_core_instance_type`` and
+       ``ec2_slave_instance_type`` options.
 
 .. mrjob-opt::
-    :config: ec2_core_instance_bid_price
-    :switch: --ec2-core-instance-bid-price
+    :config: core_instance_bid_price
+    :switch: --core-instance-bid-price
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
@@ -572,20 +581,28 @@ Number and type of instances
     instances at this bid price.  You usually only want to set bid price for
     task instances.
 
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_core_instance_bid_price``.
+
 .. mrjob-opt::
-    :config: ec2_master_instance_type
-    :switch: --ec2-master-instance-type
+    :config: master_instance_type
+    :switch: --master-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'m1.medium'``
 
-    like :mrjob-opt:`ec2_instance_type`, but only for the master Hadoop node.
+    like :mrjob-opt:`instance_type`, but only for the master Hadoop node.
     This node hosts the task tracker and HDFS, and runs tasks if there are no
-    other nodes. Usually you just want to use :mrjob-opt:`ec2_instance_type`.
+    other nodes. Usually you just want to use :mrjob-opt:`instance_type`.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_master_instance_type``.
 
 .. mrjob-opt::
-    :config: ec2_master_instance_bid_price
-    :switch: --ec2-master-instance-bid-price
+    :config: master_instance_bid_price
+    :switch: --master-instance-bid-price
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
@@ -594,30 +611,28 @@ Number and type of instances
     instance at this bid price. You usually only want to set bid price for
     task instances unless the master instance is your only instance.
 
-.. mrjob-opt::
-    :config: ec2_slave_instance_type
-    :switch: --ec2-slave-instance-type
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: value of :mrjob-opt:`ec2_core_instance_type`
+    .. versionchanged:: 0.5.4
 
-    An alias for :mrjob-opt:`ec2_core_instance_type`, for consistency with the
-    EMR API.
+       This option used to be named ``ec2_master_instance_bid_price``.
 
 .. mrjob-opt::
-    :config: ec2_task_instance_type
-    :switch: --ec2-task-instance-type
+    :config: task_instance_type
+    :switch: --task-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: value of :mrjob-opt:`ec2_core_instance_type`
+    :default: value of :mrjob-opt:`core_instance_type`
 
-    like :mrjob-opt:`ec2_instance_type`, but only for the task Hadoop nodes;
+    like :mrjob-opt:`instance_type`, but only for the task Hadoop nodes;
     these nodes run tasks but do not host HDFS. Usually you just want to use
-    :mrjob-opt:`ec2_instance_type`.
+    :mrjob-opt:`instance_type`.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_task_instance_type``.
 
 .. mrjob-opt::
-    :config: ec2_task_instance_bid_price
-    :switch: --ec2-task-instance-bid-price
+    :config: task_instance_bid_price
+    :switch: --task-instance-bid-price
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
@@ -626,16 +641,23 @@ Number and type of instances
     instance at this bid price.  (You usually only want to set bid price for
     task instances.)
 
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_task_instance_bid_price``.
+
 .. mrjob-opt::
-    :config: num_ec2_core_instances
-    :switch: --num-ec2-core-instances
+    :config: num_core_instances
+    :switch: --num-core-instances
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: 0
 
-    Number of core (or "slave") instances to start up. These run your job and
-    host HDFS. Incompatible with :mrjob-opt:`num_ec2_instances`. This is in
-    addition to the single master instance.
+    Number of core instances to start up. These run your job and
+    host HDFS. This is in addition to the single master instance.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``num_ec2_core_instances``.
 
 .. mrjob-opt::
     :config: num_ec2_instances
@@ -646,21 +668,29 @@ Number and type of instances
 
     Total number of instances to start up; basically the number of core
     instance you want, plus 1 (there is always one master instance).
-    Incompatible with :mrjob-opt:`num_ec2_core_instances` and
-    :mrjob-opt:`num_ec2_task_instances`.
+    Incompatible with :mrjob-opt:`num_core_instances` and
+    :mrjob-opt:`num_task_instances`.
+
+    .. deprecated:: 0.5.4
+
+       Just subtract one and pass that to :mrjob-opt:`num_core_instances`.
 
 .. mrjob-opt::
-    :config: num_ec2_task_instances
-    :switch: --num-ec2-task-instances
+    :config: num_task_instances
+    :switch: --num-task-instances
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: 0
 
     Number of task instances to start up.  These run your job but do not host
     HDFS. Incompatible with :mrjob-opt:`num_ec2_instances`. If you use this,
-    you must set :mrjob-opt:`num_ec2_core_instances`; EMR does not allow you to
+    you must set :mrjob-opt:`num_core_instances`; EMR does not allow you to
     run task instances without core instances (because there's nowhere to host
     HDFS).
+
+    .. versionchanged:: 0.5.4
+
+       This used to be called ``num_ec2_task_instances``.
 
 Choosing/creating a cluster to join
 ------------------------------------

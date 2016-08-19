@@ -2,6 +2,29 @@ v0.5.4, 2016-08-??? -- ???
  * jobs:
    * pass_through_option(), for existing command-line options (#1075)
      * MRJob.options.runner now defaults to None, not 'inline' or 'local'
+ * runners:
+   * EMR:
+     * many option names are now more generic (#1247)
+       * ami_version -> image_version
+       * aws_availability_zone -> zone
+       * aws_region -> region
+       * check_emr_status_every -> check_cluster_every
+       * ec2_core_instance_bid_price -> core_instance_bid_price
+       * ec2_core_instance_type -> core_instance_type
+       * ec2_instance_type -> instance_type
+       * ec2_master_instance_bid_price -> master_instance_bid_price
+       * ec2_master_instance_type -> master_instance_type
+       * ec2_task_instance_bid_price -> task_instance_bid_price
+       * ec2_task_instance_type -> task_instance_type
+       * emr_tags -> tags
+       * num_ec2_core_instances -> num_core_instances
+       * num_ec2_task_instances -> num_task_instances
+       * s3_log_uri -> cloud_log_dir
+       * s3_sync_wait_time -> cloud_fs_sync_secs
+       * s3_tmp_dir -> cloud_tmp_dir
+       * s3_upload_part_size -> cloud_upload_part_size
+     * num_ec2_instances is deprecated (use num_core_instances)
+     * ec2_slave_instance_type is deprecated (use core_instance_type)
 
 v0.5.3, 2016-07-15 -- libjars
  * jobs:

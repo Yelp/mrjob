@@ -31,7 +31,7 @@ _HADOOP_LOG4J_LINE_ALTERNATE_RE = re.compile(
     r'\s+(?P<level>[A-Z]+)'
     r'(\s+\[(?P<thread>.*?)\])'
     r'\s+(?P<logger>\S+)'
-    r'(\s+\((?P<caller_location>\S+)\))'
+    r'(\s+\((?P<caller_location>\S+)\))?'
     r'( - |: )'
     r'(?P<message>.*?)$')
 

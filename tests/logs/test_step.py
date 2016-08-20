@@ -234,6 +234,7 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
             records,
             [
                 dict(
+                    caller_location='',
                     level='',
                     logger='',
                     message=('packageJobJar: [/mnt/var/lib/hadoop/tmp/hadoop'
@@ -246,6 +247,7 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
                     timestamp='',
                 ),
                 dict(
+                    caller_location='',
                     level='INFO',
                     logger='mapreduce.Job',
                     message='Running job: job_1449857544442_0002',
@@ -255,6 +257,7 @@ class InterpretHadoopJarCommandStderrTestCase(TestCase):
                     timestamp='15/12/11 13:33:11',
                 ),
                 dict(
+                    caller_location='',
                     level='',
                     logger='',
                     message='Streaming Command Failed!',

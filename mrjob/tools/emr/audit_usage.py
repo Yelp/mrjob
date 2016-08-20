@@ -19,6 +19,7 @@ Usage::
     mrjob audit-emr-usage > report
 
 Options::
+
   -h, --help            show this help message and exit
   -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from

@@ -25,16 +25,14 @@ Suggested usage: run this as a cron job with the ``-q`` option::
 Options::
 
   -h, --help            show this help message and exit
-  --aws-region=AWS_REGION
-                        Region to connect to S3 and EMR on (e.g. us-west-1).
   -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
   --dry-run             Don't actually kill idle jobs; just log that we would
   --emr-endpoint=EMR_ENDPOINT
-                        Optional host to connect to when communicating with S3
-                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
-                        Default is to infer this from aws_region.
+                        Force mrjob to connect to EMR on this endpoint (e.g.
+                        us-west-1.elasticmapreduce.amazonaws.com). Default is
+                        to infer this from region.
   --max-hours-idle=MAX_HOURS_IDLE
                         Max number of hours a cluster can go without
                         bootstrapping, running a step, or having a new step
@@ -53,10 +51,13 @@ Options::
                         Only terminate clusters in the given named pool.
   --pooled-only         Only terminate pooled clusters
   -q, --quiet           Don't print anything to stderr
+  --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --aws-region=REGION   Deprecated alias for --region
   --s3-endpoint=S3_ENDPOINT
-                        Host to connect to when communicating with S3 (e.g. s3
-                        -us-west-1.amazonaws.com). Default is to infer this
-                        from region (see --aws-region).
+                        Force mrjob to connect to S3 on this endpoint (e.g. s3
+                        -us-west-1.amazonaws.com). You usually shouldn't set
+                        this; by default mrjob will choose the correct
+                        endpoint for each S3 bucket based on its location.
   --unpooled-only       Only terminate un-pooled clusters
   -v, --verbose         print more messages to stderr
 """

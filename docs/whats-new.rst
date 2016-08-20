@@ -124,11 +124,11 @@ mrjob has been updated to fully support Hadoop 2 (YARN), including many updates 
 
 mrjob now fully supports the 3.x and 4.x Elastic MapReduce AMIs, including SSH tunneling to the resource mananager, fetching counters and finding probable cause of job failure.
 
-The default :mrjob-opt:`ami_version` is now ``3.11.0``. Our plan is to continue updating this to the lastest (non-broken) 3.x AMI for each 0.5.x release of mrjob.
+The default `ami_version` (see :mrjob-opt:`image_version`) is now ``3.11.0``. Our plan is to continue updating this to the lastest (non-broken) 3.x AMI for each 0.5.x release of mrjob.
 
 The default :mrjob-opt:`instance_type` is now ``m1.medium`` (``m1.small`` is too small for the 3.x and 4.x AMIs)
 
-You can specify 4.x AMIs with either the new :mrjob-opt:`release_label` option, or continue using :mrjob-opt:`ami_version`; both work.
+You can specify 4.x AMIs with either the new :mrjob-opt:`release_label` option, or continue using `ami_version`; both work.
 
 mrjob continues to support 2.x AMIs. However:
 
@@ -141,7 +141,7 @@ Please, please switch if you haven't already.
 AWS Regions
 ^^^^^^^^^^^
 
-The new default :mrjob-opt:`aws_region` is ``us-west-2`` (Oregon). This both matches the default in the EMR console and, according to Amazon, is `carbon neutral <https://aws.amazon.com/about-aws/sustainability/>`__.
+The new default `aws_region` (see :mrjob-opt:`region`) is ``us-west-2`` (Oregon). This both matches the default in the EMR console and, according to Amazon, is `carbon neutral <https://aws.amazon.com/about-aws/sustainability/>`__.
 
 An edge case that might affect you: EC2 key pairs (i.e. SSH credentials) are region-specific, so if you've set up SSH but not explicitly specified a region, you may get an error saying your key pair is invalid. The fix is simply to :ref:`create new SSH keys <ssh-tunneling>` for the ``us-west-2`` (Oregon) region.
 
@@ -322,8 +322,8 @@ new API and will be removed in v0.5.0.
 Added an :mrjob-opt:`aws_security_token` option to allow you to run
 mrjob on EMR using temporary AWS credentials.
 
-Added an :mrjob-opt:`emr_tags` option to allow you to tag EMR job flows
-at creation time.
+Added an `emr_tags` (see :mrjob-opt:`tags`) option to allow you to tag EMR job
+flows at creation time.
 
 :py:class:`~mrjob.emr.EMRJobRunner` now has a
 :py:meth:`~mrjob.emr.EMRJobRunner.get_ami_version` method.

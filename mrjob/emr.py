@@ -3053,14 +3053,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return self._get_cluster_info('hadoop_version')
 
     def get_ami_version(self):
-        """Get the AMI that our cluster is running.
-
-        .. deprecated:: 0.5.4
-
-           Use :py:meth:`get_image_version` instead.
-
-        .. versionadded:: 0.4.5
-        """
         log.warning('get_ami_version() is a depreacated alias for'
                     ' get_image_version() and will be removed in'
                     ' mrjob v0.6.0')
@@ -3069,7 +3061,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def get_image_version(self):
         """Get the AMI that our cluster is running.
 
-        .. versionadded:: 0.5.4
+        .. versionchanged:: 0.5.4
+
+           This used to be called :py:meth:`get_ami_version`
+
+        .. versionadded:: 0.4.5
         """
         return self._get_cluster_info('image_version')
 

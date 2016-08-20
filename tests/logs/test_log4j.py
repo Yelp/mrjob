@@ -31,6 +31,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
                 dict(
+                    caller_location='',
                     level='INFO',
                     logger='client.RMProxy',
                     message='Connecting to ResourceManager at /0.0.0.0:8032',
@@ -40,6 +41,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                     timestamp='15/12/11 13:26:07',
                 ),
                 dict(
+                    caller_location='',
                     level='ERROR',
                     logger='streaming.StreamJob',
                     message=('Error Launching job :'
@@ -57,6 +59,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
                 dict(
+                    caller_location='',
                     level='INFO',
                     logger='client.RMProxy',
                     message='Connecting to ResourceManager at /0.0.0.0:8032',
@@ -75,13 +78,35 @@ class ParseHadoopLog4JRecordsCase(TestCase):
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
                 dict(
-                    timestamp='2015-08-22 00:46:18,411',
+                    caller_location='',
                     level='INFO',
                     logger='amazon.emr.metrics.MetricsSaver',
+                    message='Thread 1 created MetricsLockFreeSaver 1',
                     num_lines=1,
                     start_line=0,
                     thread='main',
-                    message='Thread 1 created MetricsLockFreeSaver 1',
+                    timestamp='2015-08-22 00:46:18,411',
+                )
+            ])
+
+    def test_caller_location(self):
+        # tests fix for #1406
+        lines = StringIO(
+            '  2016-08-19 13:30:03,816 INFO  [main] impl.YarnClientImpl (YarnClientImpl.java:submitApplication(251)) - Submitted application application_1468316211405_1354')
+
+        self.assertEqual(
+            list(_parse_hadoop_log4j_records(lines)), [
+                dict(
+                    caller_location=(
+                        'YarnClientImpl.java:submitApplication(251)'),
+                    level='INFO',
+                    logger='impl.YarnClientImpl',
+                    message=('Submitted application'
+                             ' application_1468316211405_1354'),
+                    num_lines=1,
+                    start_line=0,
+                    thread='main',
+                    timestamp='2016-08-19 13:30:03,816',
                 )
             ])
 
@@ -95,6 +120,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
                 dict(
+                    caller_location='',
                     level='INFO',
                     logger='org.apache.hadoop.mapreduce.Job',
                     # strip \r's, no trailing \n
@@ -119,6 +145,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [
                 dict(
+                    caller_location='',
                     level='',
                     logger='',
                     message='foo',
@@ -128,6 +155,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                     timestamp='',
                 ),
                 dict(
+                    caller_location='',
                     level='',
                     logger='',
                     message='bar',
@@ -137,6 +165,7 @@ class ParseHadoopLog4JRecordsCase(TestCase):
                     timestamp='',
                 ),
                 dict(
+                    caller_location='',
                     level='ERROR',
                     logger='streaming.StreamJob',
                     # no way to know that Streaming Command Failed! wasn't part

@@ -18,19 +18,22 @@ from logging import getLogger
 
 # log line format output by hadoop jar command
 _HADOOP_LOG4J_LINE_RE = re.compile(
-    r'^(?P<timestamp>.*?)'
+    r'^\s*(?P<timestamp>.*?)'
     r'\s+(?P<level>[A-Z]+)'
     r'\s+(?P<logger>\S+)'
     r'(\s+\((?P<thread>.*?)\))?'
-    r': (?P<message>.*?)$')
+    r'( - |: )'
+    r'(?P<message>.*?)$')
 
 # log line format output to Hadoop syslog
 _HADOOP_LOG4J_LINE_ALTERNATE_RE = re.compile(
-    r'^(?P<timestamp>.*?)'
+    r'^\s*(?P<timestamp>.*?)'
     r'\s+(?P<level>[A-Z]+)'
     r'(\s+\[(?P<thread>.*?)\])'
     r'\s+(?P<logger>\S+)'
-    r': (?P<message>.*?)$')
+    r'(\s+\((?P<caller_location>\S+)\))?'
+    r'( - |: )'
+    r'(?P<message>.*?)$')
 
 log = getLogger(__name__)
 
@@ -39,6 +42,7 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
     """Parse lines from a hadoop log into log4j records.
 
     Yield dictionaries with the following keys:
+    caller_location -- e.g. 'YarnClientImpl.java:submitApplication(251)'
     level -- e.g. 'INFO'
     logger -- e.g. 'amazon.emr.metrics.MetricsSaver'
     message -- the actual message. If this is a multi-line message (e.g.
@@ -65,6 +69,7 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
 
         def fake_record():
             return dict(
+                caller_location='',
                 level='',
                 logger='',
                 message=line,
@@ -99,6 +104,7 @@ def _parse_hadoop_log4j_records(lines, pre_filter=None):
                 yield last_record
 
             last_record = m.groupdict()
+            last_record.setdefault('caller_location', '')
             last_record['thread'] = last_record['thread'] or ''
             last_record['start_line'] = line_num
         else:

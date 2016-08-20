@@ -81,48 +81,6 @@ Cluster creation and configuration
     structures in the config file (which is itself basically JSON).
 
 .. mrjob-opt::
-    :config: ami_version
-    :switch: --ami-version
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: ``'3.11.0'``
-
-    EMR AMI version to use. This controls which Hadoop version(s) are
-    available and which version of Python is installed, among other things;
-    see `the AWS docs on specifying the AMI version`_.  for details.
-
-    .. _`the AWS docs on specifying the AMI version`:
-        http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
-
-    This works for 4.x AMIs as well; mrjob will just prepend ``emr-`` and
-    use that as the :mrjob-opt:`release_label`.
-
-    .. warning::
-
-        The 1.x series of AMIs is no longer supported because they use Python
-        2.5.
-
-.. mrjob-opt::
-    :config: aws_availability_zone
-    :switch: --aws-availability-zone
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: AWS default
-
-    Availability zone to run the job in
-
-.. mrjob-opt::
-    :config: aws_region
-    :switch: --aws-region
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: ``'us-west-2'``
-
-    region to run EMR jobs on (e.g.  ``us-west-1``). Also used by mrjob
-    to create temporary buckets if you don't set :mrjob-opt:`s3_tmp_dir`
-    explicitly.
-
-.. mrjob-opt::
     :config: emr_api_params
     :switch: --emr-api-param, --no-emr-api-param
     :type: :ref:`dict <data-type-plain-dict>`
@@ -211,45 +169,12 @@ Cluster creation and configuration
     :switch: --emr-endpoint
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: infer from :mrjob-opt:`aws_region`
+    :default: infer from :mrjob-opt:`region`
 
     Force mrjob to connect to EMR on this endpoint (e.g.
     ``us-west-1.elasticmapreduce.amazonaws.com``).
 
     Mostly exists as a workaround for network issues.
-
-.. mrjob-opt::
-    :config: emr_tags
-    :switch: --emr-tag
-    :type: :ref:`dict <data-type-plain-dict>`
-    :set: emr
-    :default: ``{}``
-
-    Metadata tags to apply to the EMR cluster after its
-    creation. See `Tagging Amazon EMR Clusters`_ for more information
-    on applying metadata tags to EMR clusters.
-
-    .. _`Tagging Amazon EMR Clusters`:
-        http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-tags.html
-
-    Tag names and values are strings. On the command line, to set a tag
-    use ``--emr-tag KEY=VALUE``:
-
-    .. code-block:: sh
-
-        --emr-tag team=development
-
-    In the config file, ``emr_tags`` is a dict:
-
-    .. code-block:: yaml
-
-        runners:
-          emr:
-            emr_tags:
-              team: development
-              project: mrjob
-
-    .. versionadded:: 0.4.5
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar_on_emr
@@ -301,6 +226,33 @@ Cluster creation and configuration
     .. versionadded:: 0.4.4
 
 .. mrjob-opt::
+    :config: image_version
+    :switch: --image-version
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: ``'3.11.0'``
+
+    EMR AMI (Amazon Machine Image) version to use. This controls which Hadoop
+    version(s) are available and which version of Python is installed, among
+    other things; see `the AWS docs on specifying the AMI version`_.  for
+    details.
+
+    .. _`the AWS docs on specifying the AMI version`:
+        http://docs.amazonwebservices.com/ElasticMapReduce/latest/DeveloperGuide/EnvironmentConfig_AMIVersion.html
+
+    This works for 4.x AMIs as well; mrjob will just prepend ``emr-`` and
+    use that as the :mrjob-opt:`release_label`.
+
+    .. versionchanged:: 0.5.4
+
+       This used to be called *ami_version*
+
+    .. warning::
+
+        The 1.x series of AMIs is no longer supported because they use Python
+        2.5.
+
+.. mrjob-opt::
     :config: max_hours_idle
     :switch: --max-hours-idle
     :type: :ref:`string <data-type-string>`
@@ -326,6 +278,21 @@ Cluster creation and configuration
     .. versionadded:: 0.4.1
 
 .. mrjob-opt::
+    :config: region
+    :switch: --region
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: ``'us-west-2'``
+
+    region to run EMR jobs on (e.g.  ``us-west-1``). Also used by mrjob
+    to create temporary buckets if you don't set :mrjob-opt:`cloud_tmp_dir`
+    explicitly.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``aws_region``.
+
+.. mrjob-opt::
     :config: release_label
     :switch: --release-label
     :type: :ref:`string <data-type-string>`
@@ -333,7 +300,7 @@ Cluster creation and configuration
     :default: ``None``
 
     EMR Release to use (e.g. ``emr-4.0.0``). This overrides
-    :mrjob-opt:`ami_version`.
+    :mrjob-opt:`image_version`.
 
     For more information about Release Labels, see
     `Differences Introduced in 4.x`_.
@@ -357,6 +324,43 @@ Cluster creation and configuration
    .. versionadded:: 0.5.3
 
 .. mrjob-opt::
+    :config: tags
+    :switch: --tag
+    :type: :ref:`dict <data-type-plain-dict>`
+    :set: emr
+    :default: ``{}``
+
+    Metadata tags to apply to the EMR cluster after its
+    creation. See `Tagging Amazon EMR Clusters`_ for more information
+    on applying metadata tags to EMR clusters.
+
+    .. _`Tagging Amazon EMR Clusters`:
+        http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-plan-tags.html
+
+    Tag names and values are strings. On the command line, to set a tag
+    use ``--tag KEY=VALUE``:
+
+    .. code-block:: sh
+
+        --tag team=development
+
+    In the config file, ``tags`` is a dict:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            tags:
+              team: development
+              project: mrjob
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``emr_tags``
+
+    .. versionadded:: 0.4.5
+
+.. mrjob-opt::
     :config: visible_to_all_users
     :switch: --visible-to-all-users, --no-visible-to-all-users
     :type: boolean
@@ -376,6 +380,19 @@ Cluster creation and configuration
         able to shut them down when they become idle.
 
     .. versionadded:: 0.4.1
+
+.. mrjob-opt::
+    :config: zone
+    :switch: zone
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: AWS default
+
+    Availability zone to run the job in
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``aws_availability_zone``
 
 Bootstrapping
 -------------
@@ -512,14 +529,18 @@ Monitoring the cluster
 -----------------------
 
 .. mrjob-opt::
-    :config: check_emr_status_every
-    :switch: --check-emr-status-every
+    :config: check_cluster_every
+    :switch: --check-cluster-every
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: 30
 
     How often to check on the status of EMR jobs in seconds. If you set this
     too low, AWS will throttle you.
+
+    .. versionchanged:: 0.5.4
+
+       This used to be called *check_emr_status_every*
 
 .. mrjob-opt::
     :config: enable_emr_debugging
@@ -534,32 +555,41 @@ Number and type of instances
 ----------------------------
 
 .. mrjob-opt::
-    :config: ec2_instance_type
-    :switch: --ec2-instance-type
+    :config: instance_type
+    :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'m1.medium'``
 
     What sort of EC2 instance(s) to use on the nodes that actually run tasks
     (see http://aws.amazon.com/ec2/instance-types/).  When you run multiple
-    instances (see :mrjob-opt:`num_ec2_instances`), the master node is just
+    instances (see :mrjob-opt:`num_core_instances`), the master node is just
     coordinating the other nodes, so usually the default instance type
     (``m1.medium``) is fine, and using larger instances is wasteful.
 
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_instance_type``.
+
 .. mrjob-opt::
-    :config: ec2_core_instance_type
-    :switch: --ec2-core-instance-type
+    :config: core_instance_type
+    :switch: --core-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'m1.medium'``
 
-    like :mrjob-opt:`ec2_instance_type`, but only for the core (also know as
-    "slave") Hadoop nodes; these nodes run tasks and host HDFS. Usually you
-    just want to use :mrjob-opt:`ec2_instance_type`.
+    like :mrjob-opt:`instance_type`, but only for the core Hadoop nodes; these
+    nodes run tasks and host HDFS. Usually you just want to use
+    :mrjob-opt:`instance_type`.
+
+    .. versionchanged:: 0.5.4
+
+       This replaces the ``ec2_core_instance_type`` and
+       ``ec2_slave_instance_type`` options.
 
 .. mrjob-opt::
-    :config: ec2_core_instance_bid_price
-    :switch: --ec2-core-instance-bid-price
+    :config: core_instance_bid_price
+    :switch: --core-instance-bid-price
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
@@ -568,20 +598,28 @@ Number and type of instances
     instances at this bid price.  You usually only want to set bid price for
     task instances.
 
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_core_instance_bid_price``.
+
 .. mrjob-opt::
-    :config: ec2_master_instance_type
-    :switch: --ec2-master-instance-type
+    :config: master_instance_type
+    :switch: --master-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``'m1.medium'``
 
-    like :mrjob-opt:`ec2_instance_type`, but only for the master Hadoop node.
+    like :mrjob-opt:`instance_type`, but only for the master Hadoop node.
     This node hosts the task tracker and HDFS, and runs tasks if there are no
-    other nodes. Usually you just want to use :mrjob-opt:`ec2_instance_type`.
+    other nodes. Usually you just want to use :mrjob-opt:`instance_type`.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_master_instance_type``.
 
 .. mrjob-opt::
-    :config: ec2_master_instance_bid_price
-    :switch: --ec2-master-instance-bid-price
+    :config: master_instance_bid_price
+    :switch: --master-instance-bid-price
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
@@ -590,30 +628,28 @@ Number and type of instances
     instance at this bid price. You usually only want to set bid price for
     task instances unless the master instance is your only instance.
 
-.. mrjob-opt::
-    :config: ec2_slave_instance_type
-    :switch: --ec2-slave-instance-type
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: value of :mrjob-opt:`ec2_core_instance_type`
+    .. versionchanged:: 0.5.4
 
-    An alias for :mrjob-opt:`ec2_core_instance_type`, for consistency with the
-    EMR API.
+       This option used to be named ``ec2_master_instance_bid_price``.
 
 .. mrjob-opt::
-    :config: ec2_task_instance_type
-    :switch: --ec2-task-instance-type
+    :config: task_instance_type
+    :switch: --task-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: value of :mrjob-opt:`ec2_core_instance_type`
+    :default: value of :mrjob-opt:`core_instance_type`
 
-    like :mrjob-opt:`ec2_instance_type`, but only for the task Hadoop nodes;
+    like :mrjob-opt:`instance_type`, but only for the task Hadoop nodes;
     these nodes run tasks but do not host HDFS. Usually you just want to use
-    :mrjob-opt:`ec2_instance_type`.
+    :mrjob-opt:`instance_type`.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_task_instance_type``.
 
 .. mrjob-opt::
-    :config: ec2_task_instance_bid_price
-    :switch: --ec2-task-instance-bid-price
+    :config: task_instance_bid_price
+    :switch: --task-instance-bid-price
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
@@ -622,16 +658,23 @@ Number and type of instances
     instance at this bid price.  (You usually only want to set bid price for
     task instances.)
 
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``ec2_task_instance_bid_price``.
+
 .. mrjob-opt::
-    :config: num_ec2_core_instances
-    :switch: --num-ec2-core-instances
+    :config: num_core_instances
+    :switch: --num-core-instances
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: 0
 
-    Number of core (or "slave") instances to start up. These run your job and
-    host HDFS. Incompatible with :mrjob-opt:`num_ec2_instances`. This is in
-    addition to the single master instance.
+    Number of core instances to start up. These run your job and
+    host HDFS. This is in addition to the single master instance.
+
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``num_ec2_core_instances``.
 
 .. mrjob-opt::
     :config: num_ec2_instances
@@ -642,24 +685,42 @@ Number and type of instances
 
     Total number of instances to start up; basically the number of core
     instance you want, plus 1 (there is always one master instance).
-    Incompatible with :mrjob-opt:`num_ec2_core_instances` and
-    :mrjob-opt:`num_ec2_task_instances`.
+    Incompatible with :mrjob-opt:`num_core_instances` and
+    :mrjob-opt:`num_task_instances`.
+
+    .. deprecated:: 0.5.4
+
+       Just subtract one and pass that to :mrjob-opt:`num_core_instances`.
 
 .. mrjob-opt::
-    :config: num_ec2_task_instances
-    :switch: --num-ec2-task-instances
+    :config: num_task_instances
+    :switch: --num-task-instances
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: 0
 
     Number of task instances to start up.  These run your job but do not host
     HDFS. Incompatible with :mrjob-opt:`num_ec2_instances`. If you use this,
-    you must set :mrjob-opt:`num_ec2_core_instances`; EMR does not allow you to
+    you must set :mrjob-opt:`num_core_instances`; EMR does not allow you to
     run task instances without core instances (because there's nowhere to host
     HDFS).
 
+    .. versionchanged:: 0.5.4
+
+       This used to be called *num_ec2_task_instances*.
+
 Choosing/creating a cluster to join
 ------------------------------------
+
+.. mrjob-opt::
+    :config: cluster_id
+    :switch: --cluster-id
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: automatically create a cluster and use it
+
+    The ID of a persistent EMR cluster to run jobs in.  It's fine for other
+    jobs to be using the cluster; we give our job's steps a unique ID.
 
 .. mrjob-opt::
     :config: emr_action_on_failure
@@ -680,16 +741,6 @@ Choosing/creating a cluster to join
     :mrjob-opt:`cluster_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
 
     .. versionadded:: 0.4.3
-
-.. mrjob-opt::
-    :config: cluster_id
-    :switch: --cluster-id
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: automatically create a cluster and use it
-
-    The ID of a persistent EMR cluster to run jobs in.  It's fine for other
-    jobs to be using the cluster; we give our job's steps a unique ID.
 
 .. mrjob-opt::
     :config: pool_name
@@ -735,35 +786,23 @@ S3 paths and options
 MRJob uses boto to manipulate/access S3.
 
 .. mrjob-opt::
-    :config: s3_endpoint
-    :switch: --s3-endpoint
+    :config: cloud_log_dir
+    :switch: --cloud-log-dir
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: (automatic)
-
-    Force mrjob to connect to S3 on this endpoint, rather than letting it
-    choose the appropriate endpoint for each S3 bucket.
-
-    Mostly exists as a workaround for network issues.
-
-    .. warning:: If you set this to a region-specific endpoint
-                 (e.g. ``'s3-us-west-1.amazonaws.com'``) mrjob will not
-                 be able to access buckets located in other regions.
-
-.. mrjob-opt::
-    :config: s3_log_uri
-    :switch: --s3-log-uri
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: append ``logs`` to :mrjob-opt:`s3_tmp_dir`
+    :default: append ``logs`` to :mrjob-opt:`cloud_tmp_dir`
 
     Where on S3 to put logs, for example ``s3://yourbucket/logs/``. Logs for
     your cluster will go into a subdirectory, e.g.
     ``s3://yourbucket/logs/j-CLUSTERID/``.
 
+    .. versionchanged:: 0.5.4
+
+       This option used to be named ``s3_log_uri``
+
 .. mrjob-opt::
-    :config: s3_tmp_dir
-    :switch: --s3-tmp-dir
+    :config: cloud_tmp_dir
+    :switch: --cloud-tmp-dir
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: (automatic)
@@ -772,17 +811,21 @@ MRJob uses boto to manipulate/access S3.
     ``s3://yourbucket/tmp/``.
 
     By default, mrjob looks for a bucket belong to you whose name starts with
-    ``mrjob-`` and which matches :mrjob-opt:`aws_region`. If it can't find
+    ``mrjob-`` and which matches :mrjob-opt:`region`. If it can't find
     one, it creates one with a random name. This option is then set to `tmp/`
     in this bucket (e.g. ``s3://mrjob-01234567890abcdef/tmp/``).
 
+    .. versionchanged:: 0.5.4
+
+       This used to be called *s3_tmp_dir*.
+
     .. versionchanged:: 0.5.0
 
-       This option used to be called ``s3_scratch_uri``.
+       This used to be called *s3_scratch_uri*.
 
 .. mrjob-opt::
-    :config: s3_sync_wait_time
-    :switch: --s3-sync-wait-time
+    :config: cloud_fs_sync_secs
+    :switch: --cloud_fs_sync_secs
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: 5.0
@@ -790,9 +833,13 @@ MRJob uses boto to manipulate/access S3.
     How long to wait for S3 to reach eventual consistency. This is typically
     less than a second (zero in U.S. West), but the default is 5.0 to be safe.
 
+    .. versionchanged:: 0.5.4
+
+       This used to be called *s3_sync_wait_time*
+
 .. mrjob-opt::
-   :config: s3_upload_part_size
-   :switch: --s3-upload-part-size
+   :config: cloud_upload_part_size
+   :switch: --cloud-upload-part-size
    :type: integer
    :set: emr
    :default: 100
@@ -811,6 +858,27 @@ MRJob uses boto to manipulate/access S3.
        http://docs.aws.amazon.com/AmazonS3/latest/dev/UploadingObjects.html
    .. _`requires parts to be between 5 MiB and 5 GiB`:
        http://docs.aws.amazon.com/AmazonS3/latest/dev/qfacts.html
+
+   .. versionchanged:: 0.5.4
+
+      This used to be called *s3_upload_part_size*.
+
+.. mrjob-opt::
+    :config: s3_endpoint
+    :switch: --s3-endpoint
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: (automatic)
+
+    Force mrjob to connect to S3 on this endpoint, rather than letting it
+    choose the appropriate endpoint for each S3 bucket.
+
+    Mostly exists as a workaround for network issues.
+
+    .. warning:: If you set this to a region-specific endpoint
+                 (e.g. ``'s3-us-west-1.amazonaws.com'``) mrjob will not
+                 be able to access buckets located in other regions.
+
 
 SSH access and tunneling
 ------------------------

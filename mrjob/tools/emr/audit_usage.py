@@ -21,24 +21,25 @@ Usage::
 Options::
 
   -h, --help            show this help message and exit
-  --aws-region=AWS_REGION
-                        Region to connect to S3 and EMR on (e.g. us-west-1).
   -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
   --emr-endpoint=EMR_ENDPOINT
-                        Optional host to connect to when communicating with S3
-                        (e.g. us-west-1.elasticmapreduce.amazonaws.com).
-                        Default is to infer this from aws_region.
+                        Force mrjob to connect to EMR on this endpoint (e.g.
+                        us-west-1.elasticmapreduce.amazonaws.com). Default is
+                        to infer this from region.
   --max-days-ago=MAX_DAYS_AGO
                         Max number of days ago to look at jobs. By default, we
                         go back as far as EMR supports (currently about 2
                         months)
   -q, --quiet           Don't print anything to stderr
+  --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --aws-region=REGION   Deprecated alias for --region
   --s3-endpoint=S3_ENDPOINT
-                        Host to connect to when communicating with S3 (e.g. s3
-                        -us-west-1.amazonaws.com). Default is to infer this
-                        from region (see --aws-region).
+                        Force mrjob to connect to S3 on this endpoint (e.g. s3
+                        -us-west-1.amazonaws.com). You usually shouldn't set
+                        this; by default mrjob will choose the correct
+                        endpoint for each S3 bucket based on its location.
   -v, --verbose         print more messages to stderr
 """
 # This just approximates EMR billing rules. For the actual rules, see:
@@ -60,6 +61,7 @@ from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
+from mrjob.options import _add_dataproc_emr_connect_opts
 from mrjob.options import _add_emr_connect_opts
 from mrjob.options import _alphabetize_options
 from mrjob.parse import iso8601_to_datetime
@@ -113,6 +115,7 @@ def _make_option_parser():
               ' as far as EMR supports (currently about 2 months)'))
 
     _add_basic_opts(option_parser)
+    _add_dataproc_emr_connect_opts(option_parser)
     _add_emr_connect_opts(option_parser)
 
     _alphabetize_options(option_parser)

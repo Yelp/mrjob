@@ -29,7 +29,7 @@ import mrjob
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _4_X_INTERMEDIARY_JAR
-from mrjob.emr import _DEFAULT_AMI_VERSION
+from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
@@ -139,8 +139,8 @@ HADOOP_ENV_EMR_CONFIGURATION_VARIANT = dict(
 class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_emr_status_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'check_cluster_every': 0.00,
+        'cloud_fs_sync_secs': 0.00,
         'additional_emr_info': {'key': 'value'}
     }}}
 
@@ -296,8 +296,8 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         mr_job.sandbox(stdin=stdin)
 
         with mr_job.make_runner() as runner:
-            s3_tmp_dir = runner._opts['s3_tmp_dir']
-            tmp_bucket, _ = parse_s3_uri(s3_tmp_dir)
+            cloud_tmp_dir = runner._opts['cloud_tmp_dir']
+            tmp_bucket, _ = parse_s3_uri(cloud_tmp_dir)
 
             runner.run()
 
@@ -436,8 +436,8 @@ class VisibleToAllUsersTestCase(MockBotoTestCase):
         self.assertTrue(cluster.visibletoallusers, 'true')
 
         VISIBLE_MRJOB_CONF = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'check_cluster_every': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'visible_to_all_users': 1,  # should be True
         }}}
 
@@ -613,8 +613,8 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
         # can't override a param set on the command line
 
         API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'check_cluster_every': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'emr_api_params': {
                 'Instances.Ec2SubnetId': 'someID',
                 'VisibleToAllUsers': None,
@@ -638,8 +638,8 @@ class EMRAPIParamsTestCase(MockBotoTestCase):
         # we can now serialize data structures from mrjob.conf
 
         API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'check_cluster_every': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'emr_api_params': {
                 'Foo': {'Bar': ['Baz', {'Qux': ['Quux', 'Quuux']}]}
             },
@@ -666,46 +666,46 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
     def test_default(self):
         with self.make_runner() as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), _DEFAULT_AMI_VERSION)
+            self.assertEqual(runner.get_image_version(), _DEFAULT_IMAGE_VERSION)
             self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
     def test_ami_version_1_0_no_longer_supported(self):
-        with self.make_runner('--ami-version', '1.0') as runner:
+        with self.make_runner('--image-version', '1.0') as runner:
             self.assertRaises(boto.exception.EmrResponseError,
                               runner._launch)
 
     def test_ami_version_2_0(self):
-        with self.make_runner('--ami-version', '2.0') as runner:
+        with self.make_runner('--image-version', '2.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '2.0.6')
+            self.assertEqual(runner.get_image_version(), '2.0.6')
             self.assertEqual(runner.get_hadoop_version(), '0.20.205')
 
     def test_latest_ami_version(self):
         # "latest" is no longer actually the latest version
-        with self.make_runner('--ami-version', 'latest') as runner:
+        with self.make_runner('--image-version', 'latest') as runner:
             # we should translate "latest" ourselves (see #1269)
-            self.assertEqual(runner._opts['ami_version'], '2.4.2')
+            self.assertEqual(runner._opts['image_version'], '2.4.2')
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '2.4.2')
+            self.assertEqual(runner.get_image_version(), '2.4.2')
             self.assertEqual(runner.get_hadoop_version(), '1.0.3')
 
     def test_ami_version_3_0(self):
-        with self.make_runner('--ami-version', '3.0') as runner:
+        with self.make_runner('--image-version', '3.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '3.0.4')
+            self.assertEqual(runner.get_image_version(), '3.0.4')
             self.assertEqual(runner.get_hadoop_version(), '2.2.0')
 
     def test_ami_version_3_8_0(self):
-        with self.make_runner('--ami-version', '3.8.0') as runner:
+        with self.make_runner('--image-version', '3.8.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '3.8.0')
+            self.assertEqual(runner.get_image_version(), '3.8.0')
             self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
     def test_ami_version_4_0_0_via_release_label_option(self):
         # the way EMR wants us to set 4.x AMI versions
         with self.make_runner('--release-label', 'emr-4.0.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '4.0.0')
+            self.assertEqual(runner.get_image_version(), '4.0.0')
             self.assertEqual(runner.get_hadoop_version(), '2.6.0')
 
             cluster = runner._describe_cluster()
@@ -714,11 +714,11 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
             self.assertEqual(getattr(cluster, 'requestedamiversion', ''), '')
             self.assertEqual(getattr(cluster, 'runningamiversion', ''), '')
 
-    def test_ami_version_4_0_0_via_ami_version_option(self):
+    def test_ami_version_4_0_0_via_image_version_option(self):
         # mrjob should also be smart enough to handle this
-        with self.make_runner('--ami-version', '4.0.0') as runner:
+        with self.make_runner('--image-version', '4.0.0') as runner:
             runner.run()
-            self.assertEqual(runner.get_ami_version(), '4.0.0')
+            self.assertEqual(runner.get_image_version(), '4.0.0')
             self.assertEqual(runner.get_hadoop_version(), '2.6.0')
 
             cluster = runner._describe_cluster()
@@ -731,17 +731,17 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
         with logger_disabled('mrjob.emr'):
             with self.make_runner('--hadoop-version', '1.2.3.4') as runner:
                 runner.run()
-                self.assertEqual(runner.get_ami_version(),
-                                 _DEFAULT_AMI_VERSION)
+                self.assertEqual(runner.get_image_version(),
+                                 _DEFAULT_IMAGE_VERSION)
                 self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
 
 class AvailabilityZoneTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_emr_status_every': 0.00,
-        's3_sync_wait_time': 0.00,
-        'aws_availability_zone': 'PUPPYLAND',
+        'check_cluster_every': 0.00,
+        'cloud_fs_sync_secs': 0.00,
+        'zone': 'PUPPYLAND',
     }}}
 
     def test_availability_zone_config(self):
@@ -769,15 +769,15 @@ class RegionTestCase(MockBotoTestCase):
 
     def test_default(self):
         runner = EMRJobRunner()
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_explicit_region(self):
-        runner = EMRJobRunner(aws_region='us-east-1')
-        self.assertEqual(runner._opts['aws_region'], 'us-east-1')
+        runner = EMRJobRunner(region='us-east-1')
+        self.assertEqual(runner._opts['region'], 'us-east-1')
 
     def test_cannot_be_empty(self):
-        runner = EMRJobRunner(aws_region='')
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        runner = EMRJobRunner(region='')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
 
 class TmpBucketTestCase(MockBotoTestCase):
@@ -792,7 +792,7 @@ class TmpBucketTestCase(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[], **runner_kwargs)
         runner._create_s3_tmp_bucket_if_needed()
 
-        bucket_name, path = parse_s3_uri(runner._opts['s3_tmp_dir'])
+        bucket_name, path = parse_s3_uri(runner._opts['cloud_tmp_dir'])
 
         self.assertTrue(bucket_name.startswith('mrjob-'))
         self.assertNotIn(bucket_name, existing_bucket_names)
@@ -805,18 +805,18 @@ class TmpBucketTestCase(MockBotoTestCase):
 
     def test_us_west_1(self):
         self.assert_new_tmp_bucket('us-west-1',
-                                   aws_region='us-west-1')
+                                   region='us-west-1')
 
     def test_us_east_1(self):
         # location should be blank
         self.assert_new_tmp_bucket('',
-                                   aws_region='us-east-1')
+                                   region='us-east-1')
 
     def test_reuse_mrjob_bucket_in_same_region(self):
         self.add_mock_s3_data({'mrjob-1': {}}, location='us-west-2')
 
         runner = EMRJobRunner()
-        self.assertEqual(runner._opts['s3_tmp_dir'],
+        self.assertEqual(runner._opts['cloud_tmp_dir'],
                          's3://mrjob-1/tmp/')
 
     def test_ignore_mrjob_bucket_in_different_region(self):
@@ -835,30 +835,30 @@ class TmpBucketTestCase(MockBotoTestCase):
         # buckets is '', not 'us-east-1'
         self.add_mock_s3_data({'mrjob-1': {}}, location='')
 
-        runner = EMRJobRunner(aws_region='us-east-1')
+        runner = EMRJobRunner(region='us-east-1')
 
-        self.assertEqual(runner._opts['s3_tmp_dir'],
+        self.assertEqual(runner._opts['cloud_tmp_dir'],
                          's3://mrjob-1/tmp/')
 
     def test_explicit_tmp_uri(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
 
-        runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp/')
+        runner = EMRJobRunner(cloud_tmp_dir='s3://walrus/tmp/')
 
-        self.assertEqual(runner._opts['s3_tmp_dir'],
+        self.assertEqual(runner._opts['cloud_tmp_dir'],
                          's3://walrus/tmp/')
 
     def test_cross_region_explicit_tmp_uri(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
 
-        runner = EMRJobRunner(aws_region='us-west-1',
-                              s3_tmp_dir='s3://walrus/tmp/')
+        runner = EMRJobRunner(region='us-west-1',
+                              cloud_tmp_dir='s3://walrus/tmp/')
 
-        self.assertEqual(runner._opts['s3_tmp_dir'],
+        self.assertEqual(runner._opts['cloud_tmp_dir'],
                          's3://walrus/tmp/')
 
-        # tmp bucket shouldn't influence aws_region (it did in 0.4.x)
-        self.assertEqual(runner._opts['aws_region'], 'us-west-1')
+        # tmp bucket shouldn't influence region (it did in 0.4.x)
+        self.assertEqual(runner._opts['region'], 'us-west-1')
 
 
 class EC2InstanceGroupTestCase(MockBotoTestCase):
@@ -925,61 +925,61 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_single_instance(self):
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge'},
+            {'instance_type': 'c1.xlarge'},
             master=(1, 'c1.xlarge', None))
 
     def test_multiple_instances(self):
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge', 'num_ec2_instances': 3},
+            {'instance_type': 'c1.xlarge', 'num_ec2_instances': 3},
             core=(2, 'c1.xlarge', None),
             master=(1, 'm1.medium', None))
 
-    def test_explicit_master_and_slave_instance_types(self):
+    def test_explicit_master_and_core_instance_types(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large'},
+            {'master_instance_type': 'm1.large'},
             master=(1, 'm1.large', None))
 
         self._test_instance_groups(
-            {'ec2_slave_instance_type': 'm2.xlarge',
+            {'core_instance_type': 'm2.xlarge',
              'num_ec2_instances': 3},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_slave_instance_type': 'm2.xlarge',
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'm2.xlarge',
              'num_ec2_instances': 3},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge',
-             'ec2_master_instance_type': 'm1.large'},
+            {'instance_type': 'c1.xlarge',
+             'master_instance_type': 'm1.large'},
             master=(1, 'm1.large', None))
 
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge',
-             'ec2_master_instance_type': 'm1.large',
-             'ec2_slave_instance_type': 'm2.xlarge',
+            {'instance_type': 'c1.xlarge',
+             'master_instance_type': 'm1.large',
+             'core_instance_type': 'm2.xlarge',
              'num_ec2_instances': 3},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
 
     def test_cmd_line_opts_beat_mrjob_conf(self):
-        # set ec2_instance_type in mrjob.conf, 1 instance
-        self.set_in_mrjob_conf(ec2_instance_type='c1.xlarge')
+        # set instance_type in mrjob.conf, 1 instance
+        self.set_in_mrjob_conf(instance_type='c1.xlarge')
 
         self._test_instance_groups(
             {},
             master=(1, 'c1.xlarge', None))
 
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large'},
+            {'master_instance_type': 'm1.large'},
             master=(1, 'm1.large', None))
 
-        # set ec2_instance_type in mrjob.conf, 3 instances
-        self.set_in_mrjob_conf(ec2_instance_type='c1.xlarge',
+        # set instance_type in mrjob.conf, 3 instances
+        self.set_in_mrjob_conf(instance_type='c1.xlarge',
                                num_ec2_instances=3)
 
         self._test_instance_groups(
@@ -988,25 +988,25 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_slave_instance_type': 'm2.xlarge'},
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'm2.xlarge'},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
 
         # set master in mrjob.conf, 1 instance
-        self.set_in_mrjob_conf(ec2_master_instance_type='m1.large')
+        self.set_in_mrjob_conf(master_instance_type='m1.large')
 
         self._test_instance_groups(
             {},
             master=(1, 'm1.large', None))
 
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge'},
+            {'instance_type': 'c1.xlarge'},
             master=(1, 'c1.xlarge', None))
 
         # set master and slave in mrjob.conf, 2 instances
-        self.set_in_mrjob_conf(ec2_master_instance_type='m1.large',
-                               ec2_slave_instance_type='m2.xlarge',
+        self.set_in_mrjob_conf(master_instance_type='m1.large',
+                               core_instance_type='m2.xlarge',
                                num_ec2_instances=3)
 
         self._test_instance_groups(
@@ -1015,48 +1015,40 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             master=(1, 'm1.large', None))
 
         self._test_instance_groups(
-            {'ec2_instance_type': 'c1.xlarge'},
+            {'instance_type': 'c1.xlarge'},
             core=(2, 'c1.xlarge', None),
             master=(1, 'm1.large', None))
 
     def test_zero_core_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 0},
+            {'master_instance_type': 'c1.medium',
+             'num_core_instances': 0},
             master=(1, 'c1.medium', None))
 
     def test_core_spot_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances': 5},
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'core_instance_bid_price': '0.20',
+             'num_core_instances': 5},
             core=(5, 'c1.medium', '0.20'),
             master=(1, 'm1.large', None))
 
     def test_core_on_demand_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 5},
-            core=(5, 'c1.medium', None),
-            master=(1, 'm1.large', None))
-
-        # Test the ec2_slave_instance_type alias
-        self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_slave_instance_type': 'c1.medium',
-             'num_ec2_instances': 6},
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'num_core_instances': 5},
             core=(5, 'c1.medium', None),
             master=(1, 'm1.large', None))
 
     def test_core_and_task_on_demand_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 5,
-             'ec2_task_instance_type': 'm2.xlarge',
-             'num_ec2_task_instances': 20,
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'num_core_instances': 5,
+             'task_instance_type': 'm2.xlarge',
+             'num_task_instances': 20,
              },
             core=(5, 'c1.medium', None),
             master=(1, 'm1.large', None),
@@ -1064,25 +1056,25 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_core_and_task_spot_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances': 10,
-             'ec2_task_instance_type': 'm2.xlarge',
-             'ec2_task_instance_bid_price': '1.00',
-             'num_ec2_task_instances': 20,
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'core_instance_bid_price': '0.20',
+             'num_core_instances': 10,
+             'task_instance_type': 'm2.xlarge',
+             'task_instance_bid_price': '1.00',
+             'num_task_instances': 20,
              },
             core=(10, 'c1.medium', '0.20'),
             master=(1, 'm1.large', None),
             task=(20, 'm2.xlarge', '1.00'))
 
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 10,
-             'ec2_task_instance_type': 'm2.xlarge',
-             'ec2_task_instance_bid_price': '1.00',
-             'num_ec2_task_instances': 20,
+            {'master_instance_type': 'm1.large',
+             'core_instance_type': 'c1.medium',
+             'num_core_instances': 10,
+             'task_instance_type': 'm2.xlarge',
+             'task_instance_bid_price': '1.00',
+             'num_task_instances': 20,
              },
             core=(10, 'c1.medium', None),
             master=(1, 'm1.large', None),
@@ -1090,39 +1082,39 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_master_and_core_spot_instances(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_master_instance_bid_price': '0.50',
-             'ec2_core_instance_type': 'c1.medium',
-             'ec2_core_instance_bid_price': '0.20',
-             'num_ec2_core_instances': 10,
+            {'master_instance_type': 'm1.large',
+             'master_instance_bid_price': '0.50',
+             'core_instance_type': 'c1.medium',
+             'core_instance_bid_price': '0.20',
+             'num_core_instances': 10,
              },
             core=(10, 'c1.medium', '0.20'),
             master=(1, 'm1.large', '0.50'))
 
     def test_master_spot_instance(self):
         self._test_instance_groups(
-            {'ec2_master_instance_type': 'm1.large',
-             'ec2_master_instance_bid_price': '0.50',
+            {'master_instance_type': 'm1.large',
+             'master_instance_bid_price': '0.50',
              },
             master=(1, 'm1.large', '0.50'))
 
     def test_zero_or_blank_bid_price_means_on_demand(self):
         self._test_instance_groups(
-            {'ec2_master_instance_bid_price': '0',
+            {'master_instance_bid_price': '0',
              },
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
-            {'num_ec2_core_instances': 3,
-             'ec2_core_instance_bid_price': '0.00',
+            {'num_core_instances': 3,
+             'core_instance_bid_price': '0.00',
              },
             core=(3, 'm1.medium', None),
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
-            {'num_ec2_core_instances': 3,
-             'num_ec2_task_instances': 5,
-             'ec2_task_instance_bid_price': '',
+            {'num_core_instances': 3,
+             'num_task_instances': 5,
+             'task_instance_bid_price': '',
              },
             core=(3, 'm1.medium', None),
             master=(1, 'm1.medium', None),
@@ -1132,13 +1124,13 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         self.assertRaises(
             boto.exception.EmrResponseError,
             self._test_instance_groups,
-            {'ec2_master_instance_bid_price': 'all the gold in California'})
+            {'master_instance_bid_price': 'all the gold in California'})
 
     def test_task_type_defaults_to_core_type(self):
         self._test_instance_groups(
-            {'ec2_core_instance_type': 'c1.medium',
-             'num_ec2_core_instances': 5,
-             'num_ec2_task_instances': 20,
+            {'core_instance_type': 'c1.medium',
+             'num_core_instances': 5,
+             'num_task_instances': 20,
              },
             core=(5, 'c1.medium', None),
             master=(1, 'm1.medium', None),
@@ -1150,7 +1142,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             log_to_stream('mrjob.emr', stderr)
             self._test_instance_groups(
                 {'num_ec2_instances': 4,
-                 'num_ec2_core_instances': 10},
+                 'num_core_instances': 10},
                 core=(10, 'm1.medium', None),
                 master=(1, 'm1.medium', None))
 
@@ -1158,8 +1150,8 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_mixing_instance_number_opts_in_mrjob_conf(self):
         self.set_in_mrjob_conf(num_ec2_instances=3,
-                               num_ec2_core_instances=5,
-                               num_ec2_task_instances=9)
+                               num_core_instances=5,
+                               num_task_instances=9)
 
         stderr = StringIO()
         with no_handlers_for_logger():
@@ -1173,8 +1165,8 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         self.assertIn('does not make sense', stderr.getvalue())
 
     def test_cmd_line_instance_numbers_beat_mrjob_conf(self):
-        self.set_in_mrjob_conf(num_ec2_core_instances=5,
-                               num_ec2_task_instances=9)
+        self.set_in_mrjob_conf(num_core_instances=5,
+                               num_task_instances=9)
 
         stderr = StringIO()
         with no_handlers_for_logger():
@@ -1238,64 +1230,64 @@ class TestEMREndpoints(MockBotoTestCase):
         runner = EMRJobRunner(conf_paths=[])
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-2.amazonaws.com')
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_none_region(self):
         # blank region should be treated the same as no region
-        runner = EMRJobRunner(conf_paths=[], aws_region=None)
+        runner = EMRJobRunner(conf_paths=[], region=None)
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-2.amazonaws.com')
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_blank_region(self):
         # blank region should be treated the same as no region
-        runner = EMRJobRunner(conf_paths=[], aws_region='')
+        runner = EMRJobRunner(conf_paths=[], region='')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-2.amazonaws.com')
-        self.assertEqual(runner._opts['aws_region'], 'us-west-2')
+        self.assertEqual(runner._opts['region'], 'us-west-2')
 
     def test_eu(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='EU')
+        runner = EMRJobRunner(conf_paths=[], region='EU')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.eu-west-1.amazonaws.com')
 
     def test_eu_case_insensitive(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='eu')
+        runner = EMRJobRunner(conf_paths=[], region='eu')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.eu-west-1.amazonaws.com')
 
     def test_us_east_1(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='us-east-1')
+        runner = EMRJobRunner(conf_paths=[], region='us-east-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-east-1.amazonaws.com')
 
     def test_us_west_1(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
+        runner = EMRJobRunner(conf_paths=[], region='us-west-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-1.amazonaws.com')
 
     def test_us_west_1_case_insensitive(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='US-West-1')
+        runner = EMRJobRunner(conf_paths=[], region='US-West-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.us-west-1.amazonaws.com')
 
     def test_ap_southeast_1(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='ap-southeast-1')
+        runner = EMRJobRunner(conf_paths=[], region='ap-southeast-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.ap-southeast-1.amazonaws.com')
 
     def test_previously_unknown_region(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='lolcatnia-1')
+        runner = EMRJobRunner(conf_paths=[], region='lolcatnia-1')
         self.assertEqual(runner.make_emr_conn().host,
                          'elasticmapreduce.lolcatnia-1.amazonaws.com')
 
     def test_explicit_endpoints(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='EU',
+        runner = EMRJobRunner(conf_paths=[], region='EU',
                               s3_endpoint='s3-proxy', emr_endpoint='emr-proxy')
         self.assertEqual(runner.make_emr_conn().host, 'emr-proxy')
 
     def test_ssl_fallback_host(self):
-        runner = EMRJobRunner(conf_paths=[], aws_region='us-west-1')
+        runner = EMRJobRunner(conf_paths=[], region='us-west-1')
 
         with patch.object(MockEmrConnection, 'STRICT_SSL', True):
             emr_conn = runner.make_emr_conn()
@@ -1372,7 +1364,7 @@ class TestNoBoto(TestCase):
 
     def test_init(self):
         # merely creating an EMRJobRunner should raise an exception
-        # because it'll need to connect to S3 to set s3_tmp_dir
+        # because it'll need to connect to S3 to set cloud_tmp_dir
         self.assertRaises(ImportError, EMRJobRunner, conf_paths=[])
 
 
@@ -1394,7 +1386,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
     def _test_create_master_bootstrap_script(
-            self, ami_version=None, expected_python_bin=PYTHON_BIN,
+            self, image_version=None, expected_python_bin=PYTHON_BIN,
             expect_pip_binary=None):
 
         if expect_pip_binary is None:
@@ -1410,7 +1402,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
-                              ami_version=ami_version,
+                              image_version=image_version,
                               bootstrap=[
                                   expected_python_bin + ' ' +
                                   foo_py_path + '#bar.py',
@@ -1495,13 +1487,13 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='2.4.11',
+            image_version='2.4.11',
             expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
             expect_pip_binary=False)
 
     def test_create_master_bootstrap_script_on_2_4_2_ami(self):
         self._test_create_master_bootstrap_script(
-            ami_version='2.4.2',
+            image_version='2.4.2',
             expected_python_bin=('python2.6' if PY2 else PYTHON_BIN),
             expect_pip_binary=PY2)
 
@@ -1540,7 +1532,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_actions=bootstrap_actions,
-                              s3_sync_wait_time=0.00)
+                              cloud_fs_sync_secs=0.00)
 
         cluster_id = runner.make_persistent_cluster()
 
@@ -1594,7 +1586,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_actions=bootstrap_actions,
-                              s3_sync_wait_time=0.00)
+                              cloud_fs_sync_secs=0.00)
 
         cluster_id = runner.make_persistent_cluster()
 
@@ -1813,48 +1805,48 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--pool-name', 'pool1'])
 
     def test_join_anyway_if_i_say_so(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.0')
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--cluster-id', cluster_id,
-            '--ami-version', '2.2'])
+            '--image-version', '2.2'])
 
-    def test_pooling_with_ami_version(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.0')
-
-        self.assertJoins(cluster_id, [
-            '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2.0'])
-
-    def test_pooling_with_ami_version_prefix_major_minor(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.0.0')
+    def test_pooling_with_image_version(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2.0'])
+            '--image-version', '2.0'])
 
-    def test_pooling_with_ami_version_prefix_major(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.0.0')
+    def test_pooling_with_image_version_prefix_major_minor(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2'])
+            '--image-version', '2.0'])
 
-    def test_dont_join_pool_with_wrong_ami_version(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.2')
+    def test_pooling_with_image_version_prefix_major(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.0.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--image-version', '2'])
+
+    def test_dont_join_pool_with_wrong_image_version(self):
+        _, cluster_id = self.make_pooled_cluster(image_version='2.2')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2.0'])
+            '--image-version', '2.0'])
 
     def test_pooling_with_4_x_ami_version(self):
         # this actually uses release label internally
-        _, cluster_id = self.make_pooled_cluster(ami_version='4.0.0')
+        _, cluster_id = self.make_pooled_cluster(image_version='4.0.0')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0'])
+            '--image-version', '4.0.0'])
 
     def test_pooling_with_release_label(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
@@ -1871,7 +1863,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--release-label', 'emr-4.0.0'])
 
     def test_dont_join_pool_without_release_label(self):
-        _, cluster_id = self.make_pooled_cluster(ami_version='2.2')
+        _, cluster_id = self.make_pooled_cluster(image_version='2.2')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -1882,14 +1874,14 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0'])
+            '--image-version', '4.0.0'])
 
     def test_non_matching_release_label_and_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '2.2'])
+            '--image-version', '2.2'])
 
     def test_release_label_hides_ami_version(self):
         _, cluster_id = self.make_pooled_cluster(release_label='emr-4.0.0')
@@ -1897,87 +1889,87 @@ class PoolMatchingTestCase(MockBotoTestCase):
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--release-label', 'emr-4.0.0',
-            '--ami-version', '1.0.0'])
+            '--image-version', '1.0.0'])
 
     def test_matching_emr_applications(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', emr_applications=['Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-application', 'Mahout'])
 
     def test_extra_emr_applications_okay(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0', emr_applications=['Ganglia', 'Mahout'])
+            image_version='4.0.0', emr_applications=['Ganglia', 'Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-application', 'Mahout'])
 
     def test_missing_emr_applications_not_okay(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', emr_applications=['Mahout'])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-application', 'Ganglia',
             '--emr-application', 'Mahout'])
 
     def test_matching_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0',
+            image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
         ])
 
     def test_missing_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0',
+            image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
         ])
 
     def test_extra_emr_configuration(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0')
+            image_version='4.0.0')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
         ])
 
     def test_wrong_emr_configuration(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0',
+            image_version='4.0.0',
             emr_configurations=[HADOOP_ENV_EMR_CONFIGURATION])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
         ])
 
     def test_wrong_emr_configuration_ordering(self):
         _, cluster_id = self.make_pooled_cluster(
-            ami_version='4.0.0',
+            image_version='4.0.0',
             emr_configurations=[CORE_SITE_EMR_CONFIGURATION,
                                 HADOOP_ENV_EMR_CONFIGURATION])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '--pool-clusters',
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
             '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
         ])
@@ -2039,146 +2031,145 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
     def test_join_pool_with_same_instance_type_and_count(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='m2.4xlarge',
-            num_ec2_instances=20)
+            instance_type='m2.4xlarge',
+            num_core_instances=20)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '20'])
+            '--instance-type', 'm2.4xlarge',
+            '--num-core-instances', '20'])
 
     def test_join_pool_with_more_of_same_instance_type(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='m2.4xlarge',
-            num_ec2_instances=20)
+            instance_type='m2.4xlarge',
+            num_core_instances=20)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '5'])
+            '--instance-type', 'm2.4xlarge',
+            '--num-core-instances', '5'])
 
     def test_join_cluster_with_bigger_instances(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='m2.4xlarge',
-            num_ec2_instances=20)
+            instance_type='m2.4xlarge',
+            num_core_instances=20)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm1.medium',
-            '--num-ec2-instances', '20'])
+            '--instance-type', 'm1.medium',
+            '--num-core-instances', '20'])
 
     def test_join_cluster_with_enough_cpu_and_memory(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='c1.xlarge',
-            num_ec2_instances=3)
+            instance_type='c1.xlarge',
+            num_core_instances=3)
 
         # join the pooled cluster even though it has less instances total,
         # since they're have enough memory and CPU
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm1.medium',
-            '--num-ec2-instances', '10'])
+            '--instance-type', 'm1.medium',
+            '--num-core-instances', '10'])
 
     def test_dont_join_cluster_with_instances_with_too_little_memory(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='c1.xlarge',
-            num_ec2_instances=20)
+            instance_type='c1.xlarge',
+            num_core_instances=20)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'm2.4xlarge',
-            '--num-ec2-instances', '2'])
+            '--instance-type', 'm2.4xlarge',
+            '--num-core-instances', '2'])
 
     def test_master_instance_has_to_be_big_enough(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='c1.xlarge',
-            num_ec2_instances=10)
+            instance_type='c1.xlarge',
+            num_core_instances=10)
 
         # We implicitly want a MASTER instance with c1.xlarge. The pooled
         # cluster has an m1.medium master instance and 9 c1.xlarge core
         # instances, which doesn't match.
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'c1.xlarge',
-            '--num-ec2-instances', '1'])
+            '--instance-type', 'c1.xlarge'])
 
     def test_unknown_instance_type_against_matching_pool(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='a1.sauce',
-            num_ec2_instances=10)
+            instance_type='a1.sauce',
+            num_core_instances=10)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10'])
+            '--instance-type', 'a1.sauce',
+            '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_pool_with_more_instances(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='a1.sauce',
-            num_ec2_instances=20)
+            instance_type='a1.sauce',
+            num_core_instances=20)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10'])
+            '--instance-type', 'a1.sauce',
+            '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_pool_with_less_instances(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='a1.sauce',
-            num_ec2_instances=5)
+            instance_type='a1.sauce',
+            num_core_instances=5)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '10'])
+            '--instance-type', 'a1.sauce',
+            '--num-core-instances', '10'])
 
     def test_unknown_instance_type_against_other_instance_types(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_instance_type='m2.4xlarge',
-            num_ec2_instances=100)
+            instance_type='m2.4xlarge',
+            num_core_instances=100)
 
         # for all we know, "a1.sauce" instances have even more memory and CPU
         # than m2.4xlarge
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-instance-type', 'a1.sauce',
-            '--num-ec2-instances', '2'])
+            '--instance-type', 'a1.sauce',
+            '--num-core-instances', '2'])
 
     def test_can_join_cluster_with_same_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_master_instance_bid_price='0.25')
+            master_instance_bid_price='0.25')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-master-instance-bid-price', '0.25'])
+            '--master-instance-bid-price', '0.25'])
 
     def test_can_join_cluster_with_higher_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_master_instance_bid_price='25.00')
+            master_instance_bid_price='25.00')
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-master-instance-bid-price', '0.25'])
+            '--master-instance-bid-price', '0.25'])
 
     def test_cant_join_cluster_with_lower_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_master_instance_bid_price='0.25',
-            num_ec2_instances=100)
+            master_instance_bid_price='0.25',
+            num_core_instances=100)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-master-instance-bid-price', '25.00'])
+            '--master-instance-bid-price', '25.00'])
 
     def test_on_demand_satisfies_any_bid_price(self):
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--ec2-master-instance-bid-price', '25.00'])
+            '--master-instance-bid-price', '25.00'])
 
     def test_no_bid_price_satisfies_on_demand(self):
         _, cluster_id = self.make_pooled_cluster(
-            ec2_master_instance_bid_price='25.00')
+            master_instance_bid_price='25.00')
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters'])
@@ -2186,19 +2177,19 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_core_and_task_instance_types(self):
         # a tricky test that mixes and matches different criteria
         _, cluster_id = self.make_pooled_cluster(
-            ec2_core_instance_bid_price='0.25',
-            ec2_task_instance_bid_price='25.00',
-            ec2_task_instance_type='c1.xlarge',
-            num_ec2_core_instances=2,
-            num_ec2_task_instances=3)
+            core_instance_bid_price='0.25',
+            task_instance_bid_price='25.00',
+            task_instance_type='c1.xlarge',
+            num_core_instances=2,
+            num_task_instances=3)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--num-ec2-core-instances', '2',
             '--num-ec2-task-instances', '10',  # more instances, but smaller
-            '--ec2-core-instance-bid-price', '0.10',
-            '--ec2-master-instance-bid-price', '77.77',
-            '--ec2-task-instance-bid-price', '22.00'])
+            '--core-instance-bid-price', '0.10',
+            '--master-instance-bid-price', '77.77',
+            '--task-instance-bid-price', '22.00'])
 
     def test_dont_join_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()
@@ -2413,10 +2404,10 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_sorting_by_cpu_hours(self):
         _, cluster_id_1 = self.make_pooled_cluster('pool1',
                                                    minutes_ago=40,
-                                                   num_ec2_instances=2)
+                                                   num_core_instances=2)
         _, cluster_id_2 = self.make_pooled_cluster('pool1',
                                                    minutes_ago=20,
-                                                   num_ec2_instances=1)
+                                                   num_core_instances=1)
 
         runner_1 = self.make_simple_runner('pool1')
         runner_2 = self.make_simple_runner('pool1')
@@ -2582,7 +2573,7 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
 
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable
-        cluster1_id = self.make_pooled_cluster(num_ec2_instances=20)
+        cluster1_id = self.make_pooled_cluster(num_core_instances=20)
         self.mock_emr_self_termination.add(cluster1_id)
         cluster2_id = self.make_pooled_cluster()
 
@@ -2694,8 +2685,8 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
 class PoolingDisablingTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_emr_status_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'check_cluster_every': 0.00,
+        'cloud_fs_sync_secs': 0.00,
         'pool_clusters': True,
     }}}
 
@@ -2870,7 +2861,7 @@ class TestCatFallback(MockBotoTestCase):
                         'two': b'two_text',
                         'three': b'three_text'}})
 
-        runner = EMRJobRunner(s3_tmp_dir='s3://walrus/tmp',
+        runner = EMRJobRunner(cloud_tmp_dir='s3://walrus/tmp',
                               conf_paths=[])
 
         self.assertEqual(list(runner.fs.cat('s3://walrus/one')), [b'one_text'])
@@ -3084,8 +3075,8 @@ class PoolWaitMinutesOptionTestCase(MockBotoTestCase):
     def test_pool_wait_minutes_from_mrjob_conf(self):
         # tests issue #1070
         MRJOB_CONF_WITH_POOL_WAIT_MINUTES = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
-            's3_sync_wait_time': 0.00,
+            'check_cluster_every': 0.00,
+            'cloud_fs_sync_secs': 0.00,
             'pool_wait_minutes': 11,
         }}}
 
@@ -3112,7 +3103,7 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
             return_value='output'))
 
         self.start(patch(
-            'mrjob.emr.EMRJobRunner.get_ami_version',
+            'mrjob.emr.EMRJobRunner.get_image_version',
             return_value='3.7.0'))
 
         self.start(patch(
@@ -3290,7 +3281,7 @@ class DefaultPythonBinTestCase(MockBotoTestCase):
     def test_default_ami(self):
         # this tests 3.x AMIs
         runner = EMRJobRunner()
-        self.assertTrue(runner._opts['ami_version'].startswith('3.'))
+        self.assertTrue(runner._opts['image_version'].startswith('3.'))
         self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_4_x_release_label(self):
@@ -3298,14 +3289,14 @@ class DefaultPythonBinTestCase(MockBotoTestCase):
         self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_2_4_3_ami(self):
-        runner = EMRJobRunner(ami_version='2.4.3')
+        runner = EMRJobRunner(image_version='2.4.3')
         if PY2:
             self.assertEqual(runner._default_python_bin(), ['python2.7'])
         else:
             self.assertEqual(runner._default_python_bin(), ['python3'])
 
     def test_2_4_2_ami(self):
-        runner = EMRJobRunner(ami_version='2.4.3')
+        runner = EMRJobRunner(image_version='2.4.3')
         if PY2:
             self.assertEqual(runner._default_python_bin(), ['python2.7'])
         else:
@@ -3333,18 +3324,18 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
                          (_PRE_4_X_STREAMING_JAR, []))
 
     def test_pre_4_x_ami(self):
-        runner = self.launch_runner('--ami-version', '3.8.0')
+        runner = self.launch_runner('--image-version', '3.8.0')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          (_PRE_4_X_STREAMING_JAR, []))
 
     def test_4_x_ami(self):
-        runner = self.launch_runner('--ami-version', '4.0.0')
+        runner = self.launch_runner('--image-version', '4.0.0')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          (_4_X_INTERMEDIARY_JAR, ['hadoop-streaming']))
 
     def test_hadoop_streaming_jar_on_emr_on_pre_4_x_ami(self):
         runner = self.launch_runner(
-            '--ami-version', '3.8.0',
+            '--image-version', '3.8.0',
             '--hadoop-streaming-jar-on-emr', 'justice.jar')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          ('justice.jar', []))
@@ -3352,7 +3343,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
     def test_hadoop_streaming_jar_on_emr_on_4_x_ami(self):
         # don't use the intermediary jar if a jar is specified explicitly
         runner = self.launch_runner(
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--hadoop-streaming-jar-on-emr', 'justice.jar')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          ('justice.jar', []))
@@ -3362,7 +3353,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
         open(jar_path, 'w').close()
 
         runner = self.launch_runner(
-            '--ami-version', '3.8.0',
+            '--image-version', '3.8.0',
             '--hadoop-streaming-jar', jar_path)
 
         jar_uri = runner._upload_mgr.uri(jar_path)
@@ -3374,7 +3365,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
         open(jar_path, 'w').close()
 
         runner = self.launch_runner(
-            '--ami-version', '4.0.0',
+            '--image-version', '4.0.0',
             '--hadoop-streaming-jar', jar_path)
 
         jar_uri = runner._upload_mgr.uri(jar_path)
@@ -3398,8 +3389,8 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
 class JarStepTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_emr_status_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'check_cluster_every': 0.00,
+        'cloud_fs_sync_secs': 0.00,
     }}}
 
     def test_local_jar_gets_uploaded(self):
@@ -3626,21 +3617,21 @@ class MultiPartUploadTestCase(MockBotoTestCase):
     def test_large_file(self):
         # Real S3 has a minimum chunk size of 5MB, but I'd rather not
         # store that in memory (in our mock S3 filesystem)
-        runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
+        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
         data = b'Mew' * 20
         self.assert_upload_succeeds(runner, data, expect_multipart=True)
 
     def test_file_size_equals_part_size(self):
-        runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
+        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
         data = b'o' * 50
         self.assert_upload_succeeds(runner, data, expect_multipart=False)
 
     def test_disable_multipart(self):
-        runner = EMRJobRunner(s3_upload_part_size=0)
+        runner = EMRJobRunner(cloud_upload_part_size=0)
         self.assertEqual(runner._get_upload_part_size(), 0)
 
         data = b'Mew' * 20
@@ -3648,7 +3639,7 @@ class MultiPartUploadTestCase(MockBotoTestCase):
 
     def test_no_filechunkio(self):
         with patch.object(mrjob.emr, 'filechunkio', None):
-            runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
+            runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
             self.assertEqual(runner._get_upload_part_size(), 50)
 
             data = b'Mew' * 20
@@ -3659,7 +3650,7 @@ class MultiPartUploadTestCase(MockBotoTestCase):
     @skipIf(filechunkio is None, 'need filechunkio')
     def test_exception_while_uploading_large_file(self):
 
-        runner = EMRJobRunner(s3_upload_part_size=self.PART_SIZE_IN_MB)
+        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
         self.assertEqual(runner._get_upload_part_size(), 50)
 
         data = b'Mew' * 20
@@ -3766,34 +3757,34 @@ class BootstrapPythonTestCase(MockBotoTestCase):
     def test_ami_version_2_4_11(self):
         # this *really, really* probably won't work, but what can we do?
         self._assert_tries_to_install_python3_on_py3(
-            '--ami-version', '2.4.11')
+            '--image-version', '2.4.11')
 
     def test_ami_version_3_6_0(self):
         self._assert_tries_to_install_python3_on_py3(
-            '--ami-version', '3.6.0')
+            '--image-version', '3.6.0')
 
     def test_ami_version_3_7_0(self):
         # the first version where Python 3 is available
         self._assert_installs_python3_on_py3(
-            '--ami-version', '3.7.0')
+            '--image-version', '3.7.0')
 
     def test_ami_version_4_5_0(self):
         # the last version where Python 3 is not pre-installed
         self._assert_installs_python3_on_py3(
-            '--ami-version', '4.5.0')
+            '--image-version', '4.5.0')
 
     def test_ami_version_4_6_0(self):
         # from this point on, Python 3 is already installed
         self._assert_never_installs_python3(
-            '--ami-version', '4.6.0')
+            '--image-version', '4.6.0')
 
     def test_force_booststrap_python(self):
         self._assert_installs_python3_on_py3(
-            '--bootstrap-python', '--ami-version', '4.6.0')
+            '--bootstrap-python', '--image-version', '4.6.0')
 
     def test_force_no_bootstrap_python(self):
         self._assert_never_installs_python3(
-            '--no-bootstrap-python', '--ami-version', '3.7.0')
+            '--no-bootstrap-python', '--image-version', '3.7.0')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])
@@ -3806,39 +3797,39 @@ class BootstrapPythonTestCase(MockBotoTestCase):
 
 class EMRTagsTestCase(MockBotoTestCase):
 
-    def test_emr_tags_option_dict(self):
+    def test_tags_option_dict(self):
         job = MRWordCount([
             '-r', 'emr',
-            '--emr-tag', 'tag_one=foo',
-            '--emr-tag', 'tag_two=bar'])
+            '--tag', 'tag_one=foo',
+            '--tag', 'tag_two=bar'])
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_tags'],
+            self.assertEqual(runner._opts['tags'],
                              {'tag_one': 'foo', 'tag_two': 'bar'})
 
     def test_command_line_overrides_config(self):
-        EMR_TAGS_MRJOB_CONF = {'runners': {'emr': {
-            'check_emr_status_every': 0.00,
-            's3_sync_wait_time': 0.00,
-            'emr_tags': {
+        TAGS_MRJOB_CONF = {'runners': {'emr': {
+            'check_cluster_every': 0.00,
+            'cloud_fs_sync_secs': 0.00,
+            'tags': {
                 'tag_one': 'foo',
                 'tag_two': None,
                 'tag_three': 'bar',
             },
         }}}
 
-        job = MRWordCount(['-r', 'emr', '--emr-tag', 'tag_two=qwerty'])
+        job = MRWordCount(['-r', 'emr', '--tag', 'tag_two=qwerty'])
 
-        with mrjob_conf_patcher(EMR_TAGS_MRJOB_CONF):
+        with mrjob_conf_patcher(TAGS_MRJOB_CONF):
             with job.make_runner() as runner:
-                self.assertEqual(runner._opts['emr_tags'],
+                self.assertEqual(runner._opts['tags'],
                                  {'tag_one': 'foo',
                                   'tag_two': 'qwerty',
                                   'tag_three': 'bar'})
 
-    def test_emr_tags_get_created(self):
-        cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
-                                           '--emr-tag', 'tag_two=bar')
+    def test_tags_get_created(self):
+        cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
+                                           '--tag', 'tag_two=bar')
 
         # tags should be in alphabetical order by key
         self.assertEqual(cluster.tags, [
@@ -3847,8 +3838,8 @@ class EMRTagsTestCase(MockBotoTestCase):
         ])
 
     def test_blank_tag_value(self):
-        cluster = self.run_and_get_cluster('--emr-tag', 'tag_one=foo',
-                                           '--emr-tag', 'tag_two=')
+        cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
+                                           '--tag', 'tag_two=')
 
         # tags should be in alphabetical order by key
         self.assertEqual(cluster.tags, [
@@ -3857,7 +3848,7 @@ class EMRTagsTestCase(MockBotoTestCase):
         ])
 
     def test_tag_values_can_be_none(self):
-        runner = EMRJobRunner(conf_paths=[], emr_tags={'tag_one': None})
+        runner = EMRJobRunner(conf_paths=[], tags={'tag_one': None})
         cluster_id = runner.make_persistent_cluster()
 
         mock_cluster = self.mock_emr_clusters[cluster_id]
@@ -3866,8 +3857,8 @@ class EMRTagsTestCase(MockBotoTestCase):
         ])
 
     def test_persistent_cluster(self):
-        args = ['--emr-tag', 'tag_one=foo',
-                '--emr-tag', 'tag_two=bar']
+        args = ['--tag', 'tag_one=foo',
+                '--tag', 'tag_two=bar']
 
         with self.make_runner(*args) as runner:
             cluster_id = runner.make_persistent_cluster()
@@ -4030,9 +4021,9 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner._address_of_master',
             return_value='master'))
 
-        self.get_ami_version = self.start(patch(
-            'mrjob.emr.EMRJobRunner.get_ami_version',
-            return_value=_DEFAULT_AMI_VERSION))
+        self.get_image_version = self.start(patch(
+            'mrjob.emr.EMRJobRunner.get_image_version',
+            return_value=_DEFAULT_IMAGE_VERSION))
 
         self.get_hadoop_version = self.start(patch(
             'mrjob.emr.EMRJobRunner.get_hadoop_version',
@@ -4092,12 +4083,12 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             action_num=None, expected_s3_dir_name='node')
 
     def _test_stream_history_log_dirs(
-            self, ssh, ami_version=_DEFAULT_AMI_VERSION,
+            self, ssh, image_version=_DEFAULT_IMAGE_VERSION,
             expected_dir_name='hadoop/history',
             expected_s3_dir_name='jobs'):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
-        self.get_ami_version.return_value = ami_version
+        self.get_image_version.return_value = image_version
 
         results = runner._stream_history_log_dirs()
 
@@ -4129,11 +4120,11 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def test_stream_history_log_dirs_from_2_x_amis_with_ssh(self):
         self._test_stream_history_log_dirs(
-            ami_version='2.4.11', ssh=True)
+            image_version='2.4.11', ssh=True)
 
     def test_stream_history_log_dirs_from_2_x_amis_without_ssh(self):
         self._test_stream_history_log_dirs(
-            ami_version='2.4.11', ssh=False)
+            image_version='2.4.11', ssh=False)
 
     def test_cant_stream_history_log_dirs_from_3_x_amis(self):
         runner = EMRJobRunner()
@@ -4143,11 +4134,11 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def test_stream_history_log_dirs_from_4_x_amis(self):
         # history log fetching is disabled until we fix
         # #1244 and #1253
-        runner = EMRJobRunner(ami_version='4.3.0')
+        runner = EMRJobRunner(image_version='4.3.0')
         results = runner._stream_history_log_dirs()
         self.assertRaises(StopIteration, next, results)
         #self._test_stream_history_log_dirs(
-        #    ssh=True, ami_version='4.3.0',
+        #    ssh=True, image_version='4.3.0',
         #    expected_dir_name='hadoop-mapreduce/history',
         #    expected_s3_dir_name='hadoop-mapreduce/history')
 
@@ -4191,7 +4182,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def _test_stream_task_log_dirs(
         self, ssh, bad_ssh_slave_hosts=False, application_id=None,
-        ami_version=_DEFAULT_AMI_VERSION,
+        image_version=_DEFAULT_IMAGE_VERSION,
         expected_local_path='/mnt/var/log/hadoop/userlogs',
         expected_dir_name='hadoop/userlogs',
         expected_s3_dir_name='task-attempts'
@@ -4199,7 +4190,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
         self.get_hadoop_version.return_value = '1.0.3'
-        self.get_ami_version.return_value = ami_version
+        self.get_image_version.return_value = image_version
 
         if bad_ssh_slave_hosts:
             self.ssh_slave_hosts.side_effect = IOError
@@ -4267,7 +4258,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def test_stream_task_log_dirs_from_4_x_amis(self):
         self._test_stream_task_log_dirs(
             ssh=True, application_id='application_1',
-            ami_version='4.3.0',
+            image_version='4.3.0',
             expected_dir_name='hadoop-yarn/containers/application_1',
             expected_s3_dir_name='containers/application_1')
 
@@ -4499,7 +4490,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
             self.assertEqual(applications, set(['hadoop']))
 
     def test_default_on_4_x_ami(self):
-        job = MRTwoStepJob(['-r', 'emr', '--ami-version', '4.3.0'])
+        job = MRTwoStepJob(['-r', 'emr', '--image-version', '4.3.0'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4523,7 +4514,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--ami-version', '4.3.0',
+            ['-r', 'emr', '--image-version', '4.3.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
         job.sandbox()
@@ -4541,7 +4532,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_implicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--ami-version', '4.3.0',
+            ['-r', 'emr', '--image-version', '4.3.0',
              '--emr-application', 'Mahout'])
         job.sandbox()
 
@@ -4560,7 +4551,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_api_param_serialization(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--ami-version', '4.3.0',
+            ['-r', 'emr', '--image-version', '4.3.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
         job.sandbox()
@@ -4603,7 +4594,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
             self, emr_configurations, expected_api_response=None):
 
         self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
-            ami_version='4.3.0',
+            image_version='4.3.0',
             emr_configurations=emr_configurations)))))
 
         job = MRTwoStepJob(['-r', 'emr'])
@@ -4644,7 +4635,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
 
     def test_normalization(self):
         self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
-            ami_version='4.3.0',
+            image_version='4.3.0',
             emr_configurations=[
                 HADOOP_ENV_EMR_CONFIGURATION_VARIANT])))))
 
@@ -4658,7 +4649,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
     def test_command_line_switch(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
-             '--ami-version', '4.3.0',
+             '--image-version', '4.3.0',
              '--emr-configuration', json.dumps(CORE_SITE_EMR_CONFIGURATION),
              '--emr-configuration', json.dumps(HADOOP_ENV_EMR_CONFIGURATION),
              ])
@@ -4671,7 +4662,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
 
     def test_combine_command_line_with_conf(self):
         self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
-            ami_version='4.3.0',
+            image_version='4.3.0',
             emr_configurations=[
                 CORE_SITE_EMR_CONFIGURATION])))))
 
@@ -5078,7 +5069,7 @@ class UseSudoOverSshTestCase(MockBotoTestCase):
     def test_ami_4_3_0_with_ssh_fs(self):
         job = MRTwoStepJob(
             ['-r', 'emr', '--ec2-key-pair-file', '/path/to/EMR.pem',
-             '--ami-version', '4.3.0']).sandbox()
+             '--image-version', '4.3.0']).sandbox()
 
         with job.make_runner() as runner:
             self.assertIsNotNone(runner._ssh_fs)
@@ -5092,7 +5083,7 @@ class UseSudoOverSshTestCase(MockBotoTestCase):
 
         job = MRTwoStepJob(
             ['-r', 'emr', '--ec2-key-pair-file', '/path/to/EMR.pem',
-             '--ami-version', '4.2.0']).sandbox()
+             '--image-version', '4.2.0']).sandbox()
 
         with job.make_runner() as runner:
             self.assertIsNotNone(runner._ssh_fs)
@@ -5106,7 +5097,7 @@ class UseSudoOverSshTestCase(MockBotoTestCase):
         # just make sure we don't cause an error trying to set up sudo
         # on a nonexistent filesystem
         job = MRTwoStepJob(
-            ['-r', 'emr', '--ami-version', '4.3.0']).sandbox()
+            ['-r', 'emr', '--image-version', '4.3.0']).sandbox()
 
         with job.make_runner() as runner:
             self.assertIsNone(runner._ssh_fs)
@@ -5203,21 +5194,21 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
         self.assertNotIn('-4', ssh_args)
 
     def test_2_x_ami(self):
-        ssh_args = self.get_ssh_args('--ami-version', '2.4.11')
+        ssh_args = self.get_ssh_args('--image-version', '2.4.11')
         params = self.parse_ssh_args(ssh_args)
 
         self.assertEqual(params['remote_port'], 9100)
         self.assertEqual(params['remote_host'], 'localhost')
 
     def test_3_x_ami(self):
-        ssh_args = self.get_ssh_args('--ami-version', '3.11.0')
+        ssh_args = self.get_ssh_args('--image-version', '3.11.0')
         params = self.parse_ssh_args(ssh_args)
 
         self.assertEqual(params['remote_port'], 9026)
         self.assertEqual(len(params['remote_host'].split('.')), 4)
 
     def test_4_x_ami(self):
-        ssh_args = self.get_ssh_args('--ami-version', '4.7.2')
+        ssh_args = self.get_ssh_args('--image-version', '4.7.2')
         params = self.parse_ssh_args(ssh_args)
 
         self.assertEqual(params['remote_port'], 8088)

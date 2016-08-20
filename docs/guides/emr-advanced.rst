@@ -11,10 +11,10 @@ running multiple jobs, you may find it convenient to reuse a single cluster.
 
 :py:mod:`mrjob` includes a utility to create persistent clusters without
 running a job. For example, this command will create a cluster with 12 EC2
-instances (1 master and 11 slaves), taking all other options from
+instances (1 master and 11 core), taking all other options from
 :py:mod:`mrjob.conf`::
 
-    $ mrjob create-cluster --num-ec2-instances=12 --max-hours-idle 1
+    $ mrjob create-cluster --num-core-instances=11 --max-hours-idle 1
     ...
     j-CLUSTERID
 
@@ -65,7 +65,7 @@ share the same clusters. This means that the version of :py:mod:`mrjob` and
 bootstrap configuration. Other options that affect which cluster a job can
 join:
 
-* :mrjob-opt:`ami_version`\/:mrjob-opt:`release_label`: must match
+* :mrjob-opt:`image_version`\/:mrjob-opt:`release_label`: must match
 * :mrjob-opt:`emr_applications`: require *at least* these applications
   (extra ones okay)
 * :mrjob-opt:`emr_configurations`: must match
@@ -92,7 +92,8 @@ cluster. This is somewhat ugly but works in practice, and avoids
 
 .. warning::
 
-    If S3 eventual consistency takes longer than *s3_sync_wait_time*, then you
+    If S3 eventual consistency takes longer than
+    :mrjob-opt:`cloud_fs_sync_secs`, then you
     may encounter race conditions when using pooling, e.g. two jobs claiming
     the same cluster at the same time, or the idle cluster killer shutting
     down your job before it has started to run. Regions with read-after-write
@@ -114,8 +115,8 @@ by using the spot market. The catch is that if someone bids more for instances
 that you're using, they can be taken away from your cluster. If this happens,
 you aren't charged, but your job may fail.
 
-You can specify spot market bid prices using the *ec2_core_instance_bid_price*,
-*ec2_master_instance_bid_price*, and *ec2_task_instance_bid_price* options to
+You can specify spot market bid prices using the *core_instance_bid_price*,
+*master_instance_bid_price*, and *task_instance_bid_price* options to
 specify a price in US dollars. For example, on the command line::
 
     --ec2-task-instance-bid-price 0.42
@@ -124,7 +125,7 @@ or in :py:mod:`mrjob.conf`::
 
     runners:
       emr:
-        ec2_task_instance_bid_price: '0.42'
+        task_instance_bid_price: '0.42'
 
 (Note the quotes; bid prices are strings, not floats!)
 

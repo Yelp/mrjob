@@ -247,8 +247,8 @@ accomplish this, use the ``include`` option:
     include: ~/.mrjob.base.conf
     runners:
       emr:
-        num_ec2_core_instances: 20
-        ec2_core_instance_type: m1.xlarge
+        num_core_instances: 20
+        core_instance_type: m1.xlarge
 
 :file:`~/mrjob.very-small.conf`:
 
@@ -257,8 +257,8 @@ accomplish this, use the ``include`` option:
     include: $HOME/.mrjob.base.conf
     runners:
       emr:
-        num_ec2_core_instances: 2
-        ec2_core_instance_type: m1.small
+        num_core_instances: 2
+        core_instance_type: m1.small
 
 :file:`~/.mrjob.base.conf`:
 
@@ -267,8 +267,8 @@ accomplish this, use the ``include`` option:
     runners:
       emr:
         aws_access_key_id: HADOOPHADOOPBOBADOOP
-        aws_region: us-west-1
         aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
+        region: us-west-1
 
 Options that are lists, commands, dictionaries, etc. combine the same way they
 do between the config files and the command line (with combiner functions).
@@ -297,10 +297,10 @@ will be equivalent to this one:
     runners:
       emr:
         aws_access_key_id: HADOOPHADOOPBOBADOOP
-        aws_region: us-west-1
         aws_secret_access_key: MEMIMOMADOOPBANANAFANAFOFADOOPHADOOP
-        ec2_core_instance_type: m1.xlarge
-        num_ec2_core_instances: 20
+        core_instance_type: m1.xlarge
+        num_core_instances: 20
+        region: us-west-1
 
 In this case, :file:`~/.mrjob.very-large.conf` has taken precedence over
 :file:`~/.mrjob.very-small.conf`.

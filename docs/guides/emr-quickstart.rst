@@ -137,26 +137,24 @@ Here are some things to consider when tuning your instance settings:
   (and more memory).
 
 The basic way to control type and number of instances is with the
-*ec2_instance_type* and *num_ec2_instances* options, on the command line like
+*instance_type* and *num_core_instances* options, on the command line like
 this::
 
-    --ec2-instance-type c1.medium --num-ec2-instances 5
+    --instance-type c1.medium --num-core-instances 4
 
 or in :py:mod:`mrjob.conf`, like this::
 
     runners:
       emr:
-        ec2_instance_type: c1.medium
-        num_ec2_instances: 5
+        instance_type: c1.medium
+        num_core_instances: 4
 
 In most cases, your master instance type doesn't need to be larger
-than ``m1.medium`` to schedule tasks, so *ec2_instance_type* only applies to
-instances that actually run tasks. (In this example, there are 1 ``m1.medium``
-master instance, and 4 ``c1.medium`` core instances.) You *will* need a larger
+than ``m1.medium`` to schedule tasks, so *instance_type* only applies to
+the 4 instances that actually run tasks. You *will* need a larger
 master instance if you have a very large number of input files; in this case,
-use the *ec2_master_instance_type* option.
+use the *master_instance_type* option.
 
-If you want to run task instances, you instead must specify the number of core
-and task instances directly with the *num_ec2_core_instances* and
-*num_ec2_task_instances* options. There are also *ec2_core_instance_type* and
-*ec2_task_instance_type* options if you want to set these directly.
+The *num_task_instances* option can be used to run 1 or more task instances
+(these run tasks but don't host HDFS). There are also *core_instance_type* and
+*task_instance_type* options if you want to set these directly.

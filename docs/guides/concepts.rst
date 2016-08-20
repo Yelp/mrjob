@@ -22,10 +22,11 @@ Typically both the input and the output of the job are stored in a file system
 shared by all processing nodes. The framework takes care of scheduling tasks,
 monitoring them, and re-executing the failed tasks.
 
-The MapReduce framework consists of a single master "job tracker" and one slave
-"task tracker" per cluster-node. The master is responsible for scheduling the
-jobs' component tasks on the slaves, monitoring them and re-executing the
-failed tasks. The slaves execute the tasks as directed by the master.
+The MapReduce framework consists of a single master "job tracker" (Hadoop 1)
+or "resource manager" (Hadoop 2) and a number of worker nodes. The master
+The master is responsible for scheduling the jobs' component tasks on the
+worker nodes and re-executing the failed tasks. The worker nodes execute the
+tasks as directed by the master.
 
 As the job author, you write :term:`map <mapper>`, :term:`combine <combiner>`,
 and :term:`reduce <reducer>` functions that are submitted to the job tracker
@@ -96,7 +97,7 @@ original key and the sum of the values.
 
     reducer input: ("round", [2, 4, 2])
     reducer output:
-        "round", 8 
+        "round", 8
 
 The final output is collected::
 

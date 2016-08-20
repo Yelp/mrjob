@@ -30,16 +30,17 @@ Usage::
 Options::
 
   -h, --help            show this help message and exit
-  --aws-region=AWS_REGION
-                        Region to connect to S3 and EMR on (e.g. us-west-1).
   -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
   -q, --quiet           Don't print anything to stderr
+  --aws-region=REGION   Deprecated alias for --region
+  --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
   --s3-endpoint=S3_ENDPOINT
-                        Host to connect to when communicating with S3 (e.g. s3
-                        -us-west-1.amazonaws.com). Default is to infer this
-                        from region (see --aws-region).
+                        Force mrjob to connect to S3 on this endpoint (e.g. s3
+                        -us-west-1.amazonaws.com). You usually shouldn't set
+                        this; by default mrjob will choose the correct
+                        endpoint for each S3 bucket based on its location.
   -t, --test            Don't actually delete any files; just log that we
                         would
   -v, --verbose         print more messages to stderr
@@ -143,7 +144,7 @@ def _make_option_parser():
 
     _add_basic_opts(option_parser)
     scrape_options_into_new_groups(MRJob().all_option_groups(), {
-        option_parser: ('aws_region', 's3_endpoint'),
+        option_parser: ('region', 's3_endpoint'),
     })
 
     _alphabetize_options(option_parser)

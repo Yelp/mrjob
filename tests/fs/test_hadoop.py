@@ -26,7 +26,6 @@ from tests.fs import MockSubprocessTestCase
 from tests.mockhadoop import get_mock_hdfs_root
 from tests.mockhadoop import main as mock_hadoop_main
 from tests.py2 import MagicMock
-from tests.py2 import Mock
 from tests.py2 import patch
 
 from tests.quiet import no_handlers_for_logger

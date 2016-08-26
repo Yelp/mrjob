@@ -80,7 +80,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'task_instance_type': None,
                 'visible_to_all_users': None,
                 'zone': None,
-             })
+            })
 
     def test_create_cluster(self):
         self.add_mock_s3_data({'walrus': {}})

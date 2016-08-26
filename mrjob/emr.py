@@ -185,6 +185,7 @@ _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
 
+
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
     pass
@@ -872,7 +873,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 log.debug("using existing temp bucket %s" %
                           tmp_bucket_name)
                 self._opts['cloud_tmp_dir'] = ('s3://%s/tmp/' %
-                                            tmp_bucket_name)
+                                               tmp_bucket_name)
                 return
 
         # That may have all failed. If so, pick a name.
@@ -1304,7 +1305,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # delete all the files we created on S3
         if self._cloud_tmp_dir:
             try:
-                log.info('Removing s3 temp directory %s...' % self._cloud_tmp_dir)
+                log.info('Removing s3 temp directory %s...' %
+                         self._cloud_tmp_dir)
                 self.fs.rm(self._cloud_tmp_dir)
                 self._cloud_tmp_dir = None
             except Exception as e:

@@ -521,8 +521,8 @@ def _add_emr_launch_opts(opt_group):
             help='Deprecated alias for --zone'),
 
         opt_group.add_option(
-             '--cloud-log-dir', dest='cloud_log_dir', default=None,
-             help='URI on remote FS to write logs into'),
+            '--cloud-log-dir', dest='cloud_log_dir', default=None,
+            help='URI on remote FS to write logs into'),
 
         opt_group.add_option(
             '--cloud-upload-part-size', dest='cloud_upload_part_size',
@@ -759,7 +759,12 @@ def _add_emr_instance_opts(opt_group):
         # _add_dataproc_emr_opts())
 
         opt_group.add_option(
-            '--ec2-core-instance-type', '--ec2-slave-instance-type',
+            '--ec2-core-instance-type',
+            dest='core_instance_type', default=None,
+            help='Deprecated alias for --core-instance-type'),
+
+        opt_group.add_option(
+            '--ec2-slave-instance-type',
             dest='core_instance_type', default=None,
             help='Deprecated alias for --core-instance-type'),
 

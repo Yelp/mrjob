@@ -65,7 +65,6 @@ from tests.mr_no_mapper import MRNoMapper
 from tests.mr_sort_values import MRSortValues
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
-from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import call
@@ -666,7 +665,8 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
     def test_default(self):
         with self.make_runner() as runner:
             runner.run()
-            self.assertEqual(runner.get_image_version(), _DEFAULT_IMAGE_VERSION)
+            self.assertEqual(runner.get_image_version(),
+                             _DEFAULT_IMAGE_VERSION)
             self.assertEqual(runner.get_hadoop_version(), '2.4.0')
 
     def test_ami_version_1_0_no_longer_supported(self):
@@ -2524,7 +2524,6 @@ class PoolMatchingTestCase(MockBotoTestCase):
             ['-r', 'emr', '--pool-clusters'])
 
 
-
 class PoolingRecoveryTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {'pool_clusters': True}}}
@@ -2660,7 +2659,6 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
             self.assertRaises(StepFailedException, runner.run)
 
             self.assertEqual(runner.get_cluster_id(), cluster_id)
-
 
     def test_cluster_info_cache_gets_cleared(self):
         cluster_id = self.make_pooled_cluster()

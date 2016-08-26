@@ -563,7 +563,6 @@ class StreamTaskLogDirsTestCase(StreamingLogDirsTestCase):
         self.assertRaises(StopIteration, next, results)
 
 
-
 class MockHadoopTestCase(SandboxedTestCase):
 
     def setUp(self):

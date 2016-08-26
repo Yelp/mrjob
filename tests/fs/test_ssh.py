@@ -100,7 +100,6 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.assertEqual(list(self.fs.ls('ssh://testmaster/')),
                          ['ssh://testmaster/f'])
 
-
     def test_slave_ls(self):
         self.add_slave()
         self.make_slave_file(1, 'f', 'foo\nfoo\n')

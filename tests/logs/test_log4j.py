@@ -92,7 +92,9 @@ class ParseHadoopLog4JRecordsCase(TestCase):
     def test_caller_location(self):
         # tests fix for #1406
         lines = StringIO(
-            '  2016-08-19 13:30:03,816 INFO  [main] impl.YarnClientImpl (YarnClientImpl.java:submitApplication(251)) - Submitted application application_1468316211405_1354')
+            '  2016-08-19 13:30:03,816 INFO  [main] impl.YarnClientImpl'
+            ' (YarnClientImpl.java:submitApplication(251)) - Submitted'
+            ' application application_1468316211405_1354')
 
         self.assertEqual(
             list(_parse_hadoop_log4j_records(lines)), [

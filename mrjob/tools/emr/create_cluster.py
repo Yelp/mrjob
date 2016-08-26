@@ -112,7 +112,9 @@ Options::
                         set a bid price for task instances).
   --ec2-core-instance-bid-price=CORE_INSTANCE_BID_PRICE
                         Deprecated alias for --core-instance-bid-price
-  --ec2-core-instance-type=CORE_INSTANCE_TYPE, --ec2-slave-instance-type=CORE_INSTANCE_TYPE
+  --ec2-core-instance-type=CORE_INSTANCE_TYPE
+                        Deprecated alias for --core-instance-type
+  --ec2-slave-instance-type=CORE_INSTANCE_TYPE
                         Deprecated alias for --core-instance-type
   --core-instance-type=CORE_INSTANCE_TYPE
                         Type of GCE/EC2 core instance(s) to launch

@@ -56,7 +56,6 @@ __credits__ = [
     'Tom Hennigan <tomhennigan@gmail.com>',
     'Brett Hoerner <brett@bretthoerner.com>',
     'Ya-Lin Huang <yalinh@yelp.com>',
-    'Evan Klitzke <evan@eklitzke.org>',
     'Tom Janofsky <tjanofsky@monetate.com>',
     'Tim Jenks <tim.jenks@eegeo.com>',
     'Stephen Johnson <steve@steveasleep.com>',

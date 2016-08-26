@@ -237,7 +237,9 @@ def _add_hadoop_emr_opts(opt_group):
         opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
             default=None,
-            help='Path of your hadoop streaming jar (locally, or on S3/HDFS)'),
+            help='Path of your hadoop streaming jar (locally, or on S3/HDFS).'
+                 ' In EMR, use a file:// URI to refer to a jar on the master'
+                 ' node of your cluster.'),
 
         opt_group.add_option(
             '--label', dest='label', default=None,
@@ -453,8 +455,9 @@ def _add_emr_run_opts(opt_group):
         opt_group.add_option(
             '--hadoop-streaming-jar-on-emr',
             dest='hadoop_streaming_jar_on_emr', default=None,
-            help=('Local path of the hadoop streaming jar on the EMR node.'
-                  ' Rarely necessary.')),
+            help=("Deprecated: prepend 'file://' and pass that to"
+                  ' --hadoop-streaming-jar instead'),
+        ),
 
         opt_group.add_option(
             '--no-ssh-tunnel', dest='ssh_tunnel',

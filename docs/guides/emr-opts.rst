@@ -183,9 +183,10 @@ Cluster creation and configuration
     :set: emr
     :default: AWS default
 
-    Like :mrjob-opt:`hadoop_streaming_jar`, except that it points to a path on
-    the EMR instance, rather than to a local file or one on S3. Rarely
-    necessary to set this by hand.
+    .. deprecated:: 0.5.4
+
+       Prepend ``file://`` and pass that to :mrjob-opt:`hadoop_streaming_jar`
+       instead.
 
 .. mrjob-opt::
     :config: iam_endpoint

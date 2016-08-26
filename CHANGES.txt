@@ -1,9 +1,21 @@
-v0.5.4, 2016-08-??? -- ???
+v0.5.4, 2016-08-26 -- pooling auto-recovery
  * jobs:
    * pass_through_option(), for existing command-line options (#1075)
      * MRJob.options.runner now defaults to None, not 'inline' or 'local'
  * runners:
+   * all:
+     * names of uploaded files now never start with . or _ (#1200)
+   * Hadoop:
+     * log parsing:
+       * handles more log4j patterns (#1405)
+       * gracefully handles IOError from exists() (#1355)
    * EMR:
+     * pooling auto-recovers from joining a cluster that self-terminated (#708)
+     * log fetching uses sudo on 4.3.0+ AMIs (#1244)
+     * fixed broken --ssh-bind-ports switch (#1402)
+     * idle termination script now only runs on master node (#1398)
+     * ssh tunnel connects to internal IP of resource manager (#1397)
+     * AWS credentials no longer logged in verbose mode (#1353)
      * many option names are now more generic (#1247)
        * ami_version -> image_version
        * aws_availability_zone -> zone
@@ -25,6 +37,10 @@ v0.5.4, 2016-08-??? -- ???
        * s3_upload_part_size -> cloud_upload_part_size
      * num_ec2_instances is deprecated (use num_core_instances)
      * ec2_slave_instance_type is deprecated (use core_instance_type)
+     * hadoop_streaming_jar_on_emr is deprecated (#1405)
+       * hadoop_streaming_jar handles this instead with file:// URIs
+     * bootstrap_python does nothing on AMI 4.6.0+, as not needed (#1358)
+ * mrjob audit-emr-usage should show less/no API throttling warnings (#1091)
 
 v0.5.3, 2016-07-15 -- libjars
  * jobs:

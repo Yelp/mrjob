@@ -68,8 +68,7 @@ Options available to hadoop and emr runners
     Path to a custom hadoop streaming jar.
 
     On EMR, this can be either a local path or a URI (``s3://...``). If you
-    want to use a jar at a path on the master node, use
-    :mrjob-opt:`hadoop_streaming_jar_on_emr`.
+    want to use a jar at a path on the master node, use a ``file://`` URI.
 
     On Hadoop, mrjob tries its best to find your hadoop streaming jar,
     searching these directories (recursively) for a ``.jar`` file with

@@ -469,6 +469,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
         self._fix_emr_applications_opt()
         self._fix_emr_configurations_opt()
+        self._fix_hadoop_streaming_jar_on_emr_opt()
         self._fix_instance_opts()
         self._fix_image_version_latest()
         self._fix_release_label_opt()
@@ -514,6 +515,17 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         """
         self['emr_configurations'] = [
             _fix_configuration_opt(c) for c in self['emr_configurations']]
+
+    def _fix_hadoop_streaming_jar_on_emr_opt(self):
+        """Translate hadoop_streaming_jar_on_emr to hadoop_streaming_jar
+        and issue a warning."""
+        if self['hadoop_streaming_jar_on_emr']:
+            jar = 'file://' + self['hadoop_streaming_jar_on_emr']
+            log.warn('hadoop_streaming_jar_on_emr is deprecated'
+                     ' and will be removed in v0.6.0.'
+                     ' Set hadoop_streaming_jar to %s instead' % jar)
+            if not self['hadoop_streaming_jar']:
+                self['hadoop_streaming_jar'] = jar
 
     def _fix_instance_opts(self):
         """If the *instance_type* option is set, override instance
@@ -1703,9 +1715,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _get_streaming_jar_and_step_arg_prefix(self):
         if self._opts['hadoop_streaming_jar']:
-            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar']), []
-        elif self._opts['hadoop_streaming_jar_on_emr']:
-            return self._opts['hadoop_streaming_jar_on_emr'], []
+            if self._opts['hadoop_streaming_jar'].startswith('file://'):
+                # special case: jar is already on EMR
+                # relative paths are OK (though maybe not useful)
+                return self._opts['hadoop_streaming_jar'][7:], []
+            else:
+                return self._upload_mgr.uri(
+                    self._opts['hadoop_streaming_jar']), []
         elif version_gte(self.get_image_version(), '4'):
             # 4.x AMIs use an intermediary jar
             return _4_X_INTERMEDIARY_JAR, ['hadoop-streaming']

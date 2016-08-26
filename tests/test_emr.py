@@ -3333,57 +3333,59 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          (_4_X_INTERMEDIARY_JAR, ['hadoop-streaming']))
 
-    def test_hadoop_streaming_jar_on_emr_on_pre_4_x_ami(self):
-        runner = self.launch_runner(
-            '--image-version', '3.8.0',
-            '--hadoop-streaming-jar-on-emr', 'justice.jar')
-        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
-                         ('justice.jar', []))
-
-    def test_hadoop_streaming_jar_on_emr_on_4_x_ami(self):
-        # don't use the intermediary jar if a jar is specified explicitly
-        runner = self.launch_runner(
-            '--image-version', '4.0.0',
-            '--hadoop-streaming-jar-on-emr', 'justice.jar')
-        self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
-                         ('justice.jar', []))
-
-    def test_hadoop_streaming_jar_on_pre_4_x_ami(self):
+    def test_local_hadoop_streaming_jar(self):
         jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
         open(jar_path, 'w').close()
 
         runner = self.launch_runner(
-            '--image-version', '3.8.0',
             '--hadoop-streaming-jar', jar_path)
 
         jar_uri = runner._upload_mgr.uri(jar_path)
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          (jar_uri, []))
 
-    def test_hadoop_streaming_jar_on_4_x_ami(self):
-        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
-        open(jar_path, 'w').close()
-
+    def test_hadoop_streaming_jar_on_emr_absolute_path(self):
         runner = self.launch_runner(
-            '--image-version', '4.0.0',
-            '--hadoop-streaming-jar', jar_path)
-
-        jar_uri = runner._upload_mgr.uri(jar_path)
+            '--hadoop-streaming-jar', 'file:///path/to/victory.jar')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
-                         (jar_uri, []))
+                         ('/path/to/victory.jar', []))
 
-    def test_local_streaming_jar_beats_jar_on_emr(self):
-        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
-        open(jar_path, 'w').close()
-
+    def test_hadoop_streaming_jar_on_emr_relative_path(self):
         runner = self.launch_runner(
-            '--hadoop-streaming-jar', jar_path,
-            '--hadoop-streaming-jar-on-emr', 'justice.jar')
-
-        jar_uri = runner._upload_mgr.uri(jar_path)
-
+            '--hadoop-streaming-jar', 'file://justice.jar')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
-                         (jar_uri, []))
+                         ('justice.jar', []))
+
+
+class DeprecatedHadoopStreamingJarOnEMROptionTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(DeprecatedHadoopStreamingJarOnEMROptionTestCase, self).setUp()
+        self.log = self.start(patch('mrjob.emr.log'))
+
+    def assert_deprecation_warning(self):
+        self.assertTrue(self.log.warn.called)
+        self.assertIn('hadoop_streaming_jar_on_emr is deprecated',
+                      self.log.warn.call_args[0][0])
+
+    def test_absolute_path(self):
+        runner = EMRJobRunner(hadoop_streaming_jar_on_emr='/fridge/pickle.jar')
+        self.assert_deprecation_warning()
+        self.assertEqual(runner._opts['hadoop_streaming_jar'],
+                         'file:///fridge/pickle.jar')
+
+    def test_relative_path(self):
+        runner = EMRJobRunner(hadoop_streaming_jar_on_emr='mason.jar')
+        self.assert_deprecation_warning()
+        self.assertEqual(runner._opts['hadoop_streaming_jar'],
+                         'file://mason.jar')
+
+    def test_dont_override_hadoop_streaming_jar(self):
+        runner = EMRJobRunner(hadoop_streaming_jar='s3://bucket/nice.jar',
+                              hadoop_streaming_jar_on_emr='/path/to/bad.jar')
+        self.assert_deprecation_warning()
+        self.assertEqual(runner._opts['hadoop_streaming_jar'],
+                         's3://bucket/nice.jar')
 
 
 class JarStepTestCase(MockBotoTestCase):

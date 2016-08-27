@@ -20,6 +20,7 @@ import os.path
 import pipes
 import posixpath
 import random
+import re
 import signal
 import socket
 import sys
@@ -120,7 +121,7 @@ from mrjob.util import random_identifier
 log = logging.getLogger(__name__)
 
 # how to set up the SSH tunnel for various AMI versions
-_AMI_VERSION_TO_SSH_TUNNEL_CONFIG = {
+_IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG = {
     '2': dict(
         localhost=True,
         name='job tracker',
@@ -163,14 +164,14 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 
 # default AWS region to use for EMR. Using us-west-2 because it is the default
 # for new (since October 10, 2012) accounts (see #1025)
-_DEFAULT_AWS_REGION = 'us-west-2'
+_DEFAULT_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
-_DEFAULT_AMI_VERSION = '3.11.0'
+_DEFAULT_IMAGE_VERSION = '3.11.0'
 
 # EMR translates the dead/deprecated "latest" AMI version to 2.4.2
 # (2.4.2 isn't actually the latest version by a long shot)
-_AMI_VERSION_LATEST = '2.4.2'
+_IMAGE_VERSION_LATEST = '2.4.2'
 
 # Hadoop streaming jar on 1-3.x AMIs
 _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
@@ -191,6 +192,16 @@ _EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
 _S3_LOG_WAIT_MINUTES = 10
 
 
+# used to bail out and retry when a pooled cluster self-terminates
+class _PooledClusterSelfTerminatedException(Exception):
+    pass
+
+# mildly flexible regex to detect cluster self-termination. Termination of
+# non-master nodes won't shut down the cluster, so don't need to match that.
+_CLUSTER_SELF_TERMINATED_RE = re.compile(
+    '^.*The master node was terminated.*$', re.I)
+
+
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
@@ -202,9 +213,18 @@ def _repeat(api_call, *args, **kwargs):
 
     Yields one or more responses.
     """
+    # the _delay kwarg sleeps that many seconds before each API call
+    # (including the first). This was added for audit-emr-usage; should
+    # re-visit if we need to use more generally. See #1091
+
     marker = None
 
+    _delay = kwargs.pop('_delay', None)
+
     while True:
+        if _delay:
+            time.sleep(_delay)
+
         resp = api_call(*args, marker=marker, **kwargs)
         yield resp
 
@@ -282,9 +302,9 @@ def _step_ids_for_job(steps, job_key):
     return step_ids
 
 
-def _make_lock_uri(s3_tmp_dir, cluster_id, step_num):
+def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
     """Generate the URI to lock the cluster ``cluster_id``"""
-    return s3_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
+    return cloud_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
 
 
 def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
@@ -343,10 +363,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'additional_emr_info',
-        'ami_version',
+        'image_version',
         'aws_access_key_id',
-        'aws_availability_zone',
-        'aws_region',
         'aws_secret_access_key',
         'aws_security_token',
         'bootstrap',
@@ -356,52 +374,53 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_python',
         'bootstrap_python_packages',
         'bootstrap_scripts',
-        'check_emr_status_every',
+        'check_cluster_every',
+        'cloud_fs_sync_secs',
+        'cloud_log_dir',
+        'cloud_tmp_dir',
+        'cloud_upload_part_size',
         'cluster_id',
-        'ec2_core_instance_bid_price',
-        'ec2_core_instance_type',
-        'ec2_instance_type',
+        'core_instance_bid_price',
+        'core_instance_type',
         'ec2_key_pair',
         'ec2_key_pair_file',
-        'ec2_master_instance_bid_price',
-        'ec2_master_instance_type',
-        'ec2_slave_instance_type',
-        'ec2_task_instance_bid_price',
-        'ec2_task_instance_type',
         'emr_action_on_failure',
         'emr_api_params',
         'emr_applications',
         'emr_configurations',
         'emr_endpoint',
-        'emr_tags',
         'enable_emr_debugging',
         'hadoop_extra_args',
         'hadoop_streaming_jar',
         'hadoop_streaming_jar_on_emr',
         'hadoop_version',
-        'iam_instance_profile',
         'iam_endpoint',
+        'iam_instance_profile',
         'iam_service_role',
+        'instance_type',
+        'master_instance_bid_price',
+        'master_instance_type',
         'max_hours_idle',
         'mins_to_end_of_hour',
-        'num_ec2_core_instances',
+        'num_core_instances',
         'num_ec2_instances',
-        'num_ec2_task_instances',
+        'num_task_instances',
         'pool_clusters',
         'pool_name',
         'pool_wait_minutes',
+        'region',
         'release_label',
         's3_endpoint',
-        's3_log_uri',
-        's3_sync_wait_time',
-        's3_tmp_dir',
-        's3_upload_part_size',
         'ssh_bin',
         'ssh_bind_ports',
         'ssh_tunnel',
         'ssh_tunnel_is_open',
         'subnet',
+        'tags',
+        'task_instance_bid_price',
+        'task_instance_type',
         'visible_to_all_users',
+        'zone',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -411,56 +430,75 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_files': combine_path_lists,
         'bootstrap_python_packages': combine_path_lists,
         'bootstrap_scripts': combine_path_lists,
+        'cloud_log_dir': combine_paths,
+        'cloud_tmp_dir': combine_paths,
         'ec2_key_pair_file': combine_paths,
         'emr_api_params': combine_dicts,
         'emr_applications': combine_lists,
         'emr_configurations': combine_lists,
-        'emr_tags': combine_dicts,
         'hadoop_extra_args': combine_lists,
-        's3_log_uri': combine_paths,
-        's3_tmp_dir': combine_paths,
         'ssh_bin': combine_cmds,
+        'tags': combine_dicts,
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
+        'aws_availability_zone': 'zone',
+        'aws_region': 'region',
+        'check_emr_status_every': 'check_cluster_every',
+        'ec2_core_instance_bid_price': 'core_instance_bid_price',
+        'ec2_core_instance_type': 'core_instance_type',
+        'ec2_instance_type': 'instance_type',
+        'ec2_master_instance_bid_price': 'master_instance_bid_price',
+        'ec2_master_instance_type': 'master_instance_type',
+        'ec2_slave_instance_type': 'core_instance_type',
+        'ec2_task_instance_bid_price': 'task_instance_bid_price',
+        'ec2_task_instance_type': 'task_instance_type',
         'emr_job_flow_id': 'cluster_id',
         'emr_job_flow_pool_name': 'pool_name',
+        'emr_tags': 'tags',
+        'num_ec2_core_instances': 'num_core_instances',
+        'num_ec2_task_instances': 'num_task_instances',
         'pool_emr_job_flows': 'pool_clusters',
-        's3_scratch_uri': 's3_tmp_dir',
+        's3_log_uri': 'cloud_log_dir',
+        's3_scratch_uri': 'cloud_tmp_dir',
+        's3_sync_wait_time': 'cloud_fs_sync_secs',
+        's3_tmp_dir': 'cloud_tmp_dir',
+        's3_upload_part_size': 'cloud_upload_part_size',
         'ssh_tunnel_to_job_tracker': 'ssh_tunnel',
     })
 
     def __init__(self, alias, opts, conf_paths):
         super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_paths)
 
-        # don't allow aws_region to be ''
-        if not self['aws_region']:
-            self['aws_region'] = _DEFAULT_AWS_REGION
+        # don't allow region to be ''
+        if not self['region']:
+            self['region'] = _DEFAULT_REGION
 
         self._fix_emr_applications_opt()
         self._fix_emr_configurations_opt()
-        self._fix_ec2_instance_opts()
-        self._fix_ami_version_latest()
+        self._fix_hadoop_streaming_jar_on_emr_opt()
+        self._fix_instance_opts()
+        self._fix_image_version_latest()
         self._fix_release_label_opt()
 
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
-            'ami_version': _DEFAULT_AMI_VERSION,
-            'aws_region': _DEFAULT_AWS_REGION,
+            'image_version': _DEFAULT_IMAGE_VERSION,
+            'region': _DEFAULT_REGION,
             'bootstrap_python': None,
-            'check_emr_status_every': 30,
+            'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
-            'ec2_core_instance_type': 'm1.medium',
-            'ec2_master_instance_type': 'm1.medium',
+            'core_instance_type': 'm1.medium',
+            'master_instance_type': 'm1.medium',
             'mins_to_end_of_hour': 5.0,
-            'num_ec2_core_instances': 0,
+            'num_core_instances': 0,
             'num_ec2_instances': 1,
-            'num_ec2_task_instances': 0,
+            'num_task_instances': 0,
             'pool_name': 'default',
             'pool_wait_minutes': 0,
-            's3_sync_wait_time': 5.0,
-            's3_upload_part_size': 100,  # 100 MB
+            'cloud_fs_sync_secs': 5.0,
+            'cloud_upload_part_size': 100,  # 100 MB
             'sh_bin': ['/bin/sh', '-ex'],
             'ssh_bin': ['ssh'],
             # don't use a list because it makes it hard to read option values
@@ -485,8 +523,19 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         self['emr_configurations'] = [
             _fix_configuration_opt(c) for c in self['emr_configurations']]
 
-    def _fix_ec2_instance_opts(self):
-        """If the *ec2_instance_type* option is set, override instance
+    def _fix_hadoop_streaming_jar_on_emr_opt(self):
+        """Translate hadoop_streaming_jar_on_emr to hadoop_streaming_jar
+        and issue a warning."""
+        if self['hadoop_streaming_jar_on_emr']:
+            jar = 'file://' + self['hadoop_streaming_jar_on_emr']
+            log.warn('hadoop_streaming_jar_on_emr is deprecated'
+                     ' and will be removed in v0.6.0.'
+                     ' Set hadoop_streaming_jar to %s instead' % jar)
+            if not self['hadoop_streaming_jar']:
+                self['hadoop_streaming_jar'] = jar
+
+    def _fix_instance_opts(self):
+        """If the *instance_type* option is set, override instance
         type for the nodes that actually run tasks (see Issue #66). Allow
         command-line arguments to override defaults and arguments
         in mrjob.conf (see Issue #311).
@@ -495,77 +544,60 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         total number of instances matches number of master, core, and task
         instances, and that bid prices of zero are converted to None.
         """
-        # Make sure slave and core instance type have the same value
-        # Within EMRJobRunner we only ever use ec2_core_instance_type,
-        # but we want ec2_slave_instance_type to be correct in the
-        # options dictionary.
-        if (self['ec2_slave_instance_type'] and
-            (self._opt_priority['ec2_slave_instance_type'] >
-             self._opt_priority['ec2_core_instance_type'])):
-            self['ec2_core_instance_type'] = (
-                self['ec2_slave_instance_type'])
-        else:
-            self['ec2_slave_instance_type'] = (
-                self['ec2_core_instance_type'])
-
         # If task instance type is not set, use core instance type
         # (This is mostly so that we don't inadvertently join a pool
         # with task instance types with too little memory.)
-        if not self['ec2_task_instance_type']:
-            self['ec2_task_instance_type'] = (
-                self['ec2_core_instance_type'])
+        if not self['task_instance_type']:
+            self['task_instance_type'] = (
+                self['core_instance_type'])
 
-        # Within EMRJobRunner, we use num_ec2_core_instances and
-        # num_ec2_task_instances, not num_ec2_instances. (Number
+        # Within EMRJobRunner, we use num_core_instances and
+        # num_task_instances, not num_ec2_instances. (Number
         # of master instances is always 1.)
         if (self._opt_priority['num_ec2_instances'] >
-            max(self._opt_priority['num_ec2_core_instances'],
-                self._opt_priority['num_ec2_task_instances'])):
+            max(self._opt_priority['num_core_instances'],
+                self._opt_priority['num_task_instances'])):
             # assume 1 master, n - 1 core, 0 task
-            self['num_ec2_core_instances'] = (
-                self['num_ec2_instances'] - 1)
-            self['num_ec2_task_instances'] = 0
+            self['num_core_instances'] = self['num_ec2_instances'] - 1
+            self['num_task_instances'] = 0
+
+            log.warning('num_ec2_instances is deprecated; set'
+                        ' num_core_instances to %d instead' % (
+                            self['num_core_instances']))
         else:
             # issue a warning if we used both kinds of instance number
             # options on the command line or in mrjob.conf
             if (self._opt_priority['num_ec2_instances'] >= 2 and
                 self._opt_priority['num_ec2_instances'] <=
-                max(self._opt_priority['num_ec2_core_instances'],
-                    self._opt_priority['num_ec2_task_instances'])):
+                max(self._opt_priority['num_core_instances'],
+                    self._opt_priority['num_task_instances'])):
                 log.warning('Mixing num_ec2_instances and'
-                            ' num_ec2_{core,task}_instances does not make'
+                            ' num_{core,task}_instances does not make'
                             ' sense; ignoring num_ec2_instances')
-            # recalculate number of EC2 instances
-            self['num_ec2_instances'] = (
-                1 +
-                self['num_ec2_core_instances'] +
-                self['num_ec2_task_instances'])
 
         # Allow ec2 instance type to override other instance types
-        ec2_instance_type = self['ec2_instance_type']
-        if ec2_instance_type:
-            # core (slave) instances
-            if (self._opt_priority['ec2_instance_type'] >
-                max(self._opt_priority['ec2_core_instance_type'],
-                    self._opt_priority['ec2_slave_instance_type'])):
-                self['ec2_core_instance_type'] = ec2_instance_type
-                self['ec2_slave_instance_type'] = ec2_instance_type
+        instance_type = self['instance_type']
+        if instance_type:
+            # core instances
+            if (self._opt_priority['instance_type'] >
+                    self._opt_priority['core_instance_type']):
+                self['core_instance_type'] = instance_type
 
             # master instance only does work when it's the only instance
-            if (self['num_ec2_core_instances'] <= 0 and
-                self['num_ec2_task_instances'] <= 0 and
-                (self._opt_priority['ec2_instance_type'] >
-                 self._opt_priority['ec2_master_instance_type'])):
-                self['ec2_master_instance_type'] = ec2_instance_type
+            if (self['num_core_instances'] <= 0 and
+                self['num_task_instances'] <= 0 and
+                (self._opt_priority['instance_type'] >
+                 self._opt_priority['master_instance_type'])):
+                self['master_instance_type'] = instance_type
 
             # task instances
-            if (self._opt_priority['ec2_instance_type'] >
-                    self._opt_priority['ec2_task_instance_type']):
-                self['ec2_task_instance_type'] = ec2_instance_type
+            if (self._opt_priority['instance_type'] >
+                    self._opt_priority['task_instance_type']):
+                self['task_instance_type'] = instance_type
 
         # convert a bid price of '0' to None
         for role in ('core', 'master', 'task'):
-            opt_name = 'ec2_%s_instance_bid_price' % role
+            opt_name = '%s_instance_bid_price' % role
             if not self[opt_name]:
                 self[opt_name] = None
             else:
@@ -577,21 +609,21 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 except ValueError:
                     pass  # maybe EMR will accept non-floats?
 
-    def _fix_ami_version_latest(self):
-        """Translate the dead/deprecated *ami_version* value ``latest``
+    def _fix_image_version_latest(self):
+        """Translate the dead/deprecated *image_version* value ``latest``
         to ``2.4.2`` up-front, so our code doesn't have to deal with
         non-numeric AMI versions."""
-        if self['ami_version'] == 'latest':
-            self['ami_version'] = _AMI_VERSION_LATEST
+        if self['image_version'] == 'latest':
+            self['image_version'] = _IMAGE_VERSION_LATEST
 
     def _fix_release_label_opt(self):
-        """If *release_label* is not set and *ami_version* is set to version
+        """If *release_label* is not set and *image_version* is set to version
         4 or higher (which the EMR API won't accept), set *release_label*
-        to "emr-" plus *ami_version*. (Leave *ami_version* as-is;
+        to "emr-" plus *image_version*. (Leave *image_version* as-is;
         *release_label* overrides it anyway.)"""
-        if (version_gte(self['ami_version'], '4') and
+        if (version_gte(self['image_version'], '4') and
                 not self['release_label']):
-            self['release_label'] = 'emr-' + self['ami_version']
+            self['release_label'] = 'emr-' + self['image_version']
 
     def _obfuscate(self, opt_key, opt_value):
         # don't need to obfuscate empty values
@@ -666,22 +698,22 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._fix_s3_tmp_and_log_uri_opts()
 
         # use job key to make a unique tmp dir
-        self._s3_tmp_dir = self._opts['s3_tmp_dir'] + self._job_key + '/'
+        self._cloud_tmp_dir = self._opts['cloud_tmp_dir'] + self._job_key + '/'
 
         # pick/validate output dir
         if self._output_dir:
             self._output_dir = self._check_and_fix_s3_dir(self._output_dir)
         else:
-            self._output_dir = self._s3_tmp_dir + 'output/'
+            self._output_dir = self._cloud_tmp_dir + 'output/'
 
         # check AMI version
-        if self._opts['ami_version'].startswith('1.'):
+        if self._opts['image_version'].startswith('1.'):
             log.warning('1.x AMIs will probably not work because they use'
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
-        s3_files_dir = self._s3_tmp_dir + 'files/'
+        s3_files_dir = self._cloud_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
 
         # manage working dir for bootstrap script
@@ -733,6 +765,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # the ID assigned by EMR to this job (might be None)
         self._cluster_id = self._opts['cluster_id']
+        # did we create this cluster?
+        self._created_cluster = False
 
         # when did our particular task start?
         self._emr_job_start = None
@@ -743,19 +777,19 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
 
-        # cache for SSH address
-        self._address = None
-        self._ssh_slave_addrs = None
-
         # store the (tunneled) URL of the job tracker/resource manager
         self._tunnel_url = None
 
         # turn off tracker progress until tunnel is up
         self._show_tracker_progress = False
 
-        # init hadoop, ami version caches
-        self._ami_version = None
-        self._hadoop_version = None
+        # map from cluster ID to a dictionary containing cached info about
+        # that cluster. Includes the following keys:
+        # - image_version
+        # - hadoop_version
+        # - master_public_dns
+        # - master_private_ip
+        self._cluster_to_cache = defaultdict(dict)
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task'. These will also always
@@ -789,14 +823,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return super(EMRJobRunner, self)._default_python_bin(local=local)
 
         if self._opts['release_label'] or version_gte(
-                self._opts['ami_version'], '3'):
+                self._opts['image_version'], '3'):
             # on 3.x and 4.x AMIs, both versions of Python work, so just
             # match whatever version we're using locally
             if sys.version_info >= (2, 7):
                 return ['python2.7']
             else:
                 return ['python2.6']
-        elif version_gte(self._opts['ami_version'], '2.4.3'):
+        elif version_gte(self._opts['image_version'], '2.4.3'):
             # on 2.4.3+, use python2.7 because the default python
             # doesn't have a working pip
             return ['python2.7']
@@ -806,52 +840,52 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return ['python2.6']
 
     def _fix_s3_tmp_and_log_uri_opts(self):
-        """Fill in s3_tmp_dir and s3_log_uri (in self._opts) if they
+        """Fill in cloud_tmp_dir and cloud_log_dir (in self._opts) if they
         aren't already set.
 
         Helper for __init__.
         """
-        # set s3_tmp_dir by checking for existing buckets
-        if not self._opts['s3_tmp_dir']:
-            self._set_s3_tmp_dir()
+        # set cloud_tmp_dir by checking for existing buckets
+        if not self._opts['cloud_tmp_dir']:
+            self._set_cloud_tmp_dir()
             log.info('Using %s as our temp dir on S3' %
-                     self._opts['s3_tmp_dir'])
+                     self._opts['cloud_tmp_dir'])
 
-        self._opts['s3_tmp_dir'] = self._check_and_fix_s3_dir(
-            self._opts['s3_tmp_dir'])
+        self._opts['cloud_tmp_dir'] = self._check_and_fix_s3_dir(
+            self._opts['cloud_tmp_dir'])
 
-        # set s3_log_uri
-        if self._opts['s3_log_uri']:
-            self._opts['s3_log_uri'] = self._check_and_fix_s3_dir(
-                self._opts['s3_log_uri'])
+        # set cloud_log_dir
+        if self._opts['cloud_log_dir']:
+            self._opts['cloud_log_dir'] = self._check_and_fix_s3_dir(
+                self._opts['cloud_log_dir'])
         else:
-            self._opts['s3_log_uri'] = self._opts['s3_tmp_dir'] + 'logs/'
+            self._opts['cloud_log_dir'] = self._opts['cloud_tmp_dir'] + 'logs/'
 
-    def _set_s3_tmp_dir(self):
+    def _set_cloud_tmp_dir(self):
         """Helper for _fix_s3_tmp_and_log_uri_opts"""
         buckets = self.fs.get_all_buckets()
         mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
 
         # Loop over buckets until we find one that is not region-
-        #   restricted, matches aws_region, or can be used to
-        #   infer aws_region if no aws_region is specified
+        #   restricted, matches region, or can be used to
+        #   infer region if no region is specified
         for tmp_bucket in mrjob_buckets:
             tmp_bucket_name = tmp_bucket.name
 
             if (tmp_bucket.get_location() == s3_location_constraint_for_region(
-                    self._opts['aws_region'])):
+                    self._opts['region'])):
 
                 # Regions are both specified and match
                 log.debug("using existing temp bucket %s" %
                           tmp_bucket_name)
-                self._opts['s3_tmp_dir'] = ('s3://%s/tmp/' %
-                                            tmp_bucket_name)
+                self._opts['cloud_tmp_dir'] = ('s3://%s/tmp/' %
+                                               tmp_bucket_name)
                 return
 
         # That may have all failed. If so, pick a name.
         tmp_bucket_name = 'mrjob-' + random_identifier()
         self._s3_tmp_bucket_to_create = tmp_bucket_name
-        self._opts['s3_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
+        self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
         log.info('Auto-created temp S3 bucket %s' % tmp_bucket_name)
         self._wait_for_s3_eventual_consistency()
 
@@ -872,7 +906,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.debug('creating S3 bucket %r to use as temp space' %
                       self._s3_tmp_bucket_to_create)
             location = s3_location_constraint_for_region(
-                self._opts['aws_region'])
+                self._opts['region'])
             self.fs.create_bucket(
                 self._s3_tmp_bucket_to_create, location=location)
             self._s3_tmp_bucket_to_create = None
@@ -913,13 +947,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _run(self):
         self._launch()
-        self._wait_for_steps_to_complete()
+        self._finish_run()
 
-    def _launch(self):
-        self._prepare_for_launch()
-        self._launch_emr_job()
+    def _finish_run(self):
+        while True:
+            try:
+                self._wait_for_steps_to_complete()
+                break
+            except _PooledClusterSelfTerminatedException:
+                self._relaunch()
 
     def _prepare_for_launch(self):
+        """Set up files needed for the job."""
         self._check_input_exists()
         self._check_output_not_exists()
         self._create_setup_wrapper_script()
@@ -927,6 +966,19 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_s3()
+
+    def _launch(self):
+        """Set up files and then launch our job on EMR."""
+        self._prepare_for_launch()
+        self._launch_emr_job()
+
+    def _relaunch(self):
+        # files are already in place; just start with a fresh cluster
+        assert not self._opts['cluster_id']
+        self._cluster_id = None
+        self._created_cluster = False
+
+        self._launch_emr_job()
 
     def _check_input_exists(self):
         """Make sure all input exists before continuing with our job.
@@ -1076,7 +1128,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB
-        return int((self._opts['s3_upload_part_size'] or 0) * 1024 * 1024)
+        return int((self._opts['cloud_upload_part_size'] or 0) * 1024 * 1024)
 
     def _should_use_multipart_upload(self, fsize, part_size, path):
         """Decide if we want to use multipart uploading.
@@ -1102,10 +1154,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         path: path to start page of job tracker/resource manager
         port: port job tracker/resource manager is running on.
         """
-        return map_version(self.get_ami_version(),
-                           _AMI_VERSION_TO_SSH_TUNNEL_CONFIG)
+        return map_version(self.get_image_version(),
+                           _IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG)
 
-    # TODO: this currently has no automated tests (see #1281)
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
@@ -1116,6 +1167,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         host = self._address_of_master()
         if not host:
             return
+
+        # look up what we're supposed to do on this AMI version
+        tunnel_config = self._ssh_tunnel_config()
+
+        if tunnel_config['localhost']:
+            # Issue #1311: on the 2.x AMIs, we want to tunnel to the job
+            # tracker on localhost; otherwise it won't
+            # work on some VPC setups.
+            remote_host = 'localhost'
+        else:
+            # Issue #1397: on the 3.x and 4.x AMIs we want to tunnel to the
+            # resource manager on the master node's *internal* IP; otherwise
+            # it work won't work on some VPC setups
+            remote_host = self._master_private_ip()
 
         REQUIRED_OPTS = ['ec2_key_pair', 'ec2_key_pair_file', 'ssh_bind_ports']
         for opt_name in REQUIRED_OPTS:
@@ -1137,9 +1202,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                             ' %d, restarting...' % self._ssh_proc.returncode)
                 self._ssh_proc = None
 
-        # look up what we're supposed to do on this AMI version
-        tunnel_config = self._ssh_tunnel_config()
-
         log.info('  Opening ssh tunnel to %s...' % tunnel_config['name'])
 
         # if ssh detects that a host key has changed, it will silently not
@@ -1154,13 +1216,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('Created empty ssh known-hosts file: %s' % (
             fake_known_hosts_file,))
 
-        # Issue #1311: on the 2.x AMIs, we want to connect to the job
-        # tracker/resource manager through localhost; otherwise it won't work
-        # on VPCs. However, on the 3.x and 4.x AMIs, we *can't* reach the
-        # resource manager via localhost (and the VPC issues appear to be
-        # worked out, as *host* actually maps to an internal IP).
-        tunnel_host = 'localhost' if tunnel_config['localhost'] else host
-
         bind_port = None
         for bind_port in self._pick_ssh_bind_ports():
             args = self._opts['ssh_bin'] + [
@@ -1169,7 +1224,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '-o', 'ExitOnForwardFailure=yes',
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
                 '-L', '%d:%s:%d' % (
-                    bind_port, tunnel_host, tunnel_config['port']),
+                    bind_port, remote_host, tunnel_config['port']),
                 '-N', '-n', '-q',  # no shell, no input, no output
                 '-i', self._opts['ec2_key_pair_file'],
             ]
@@ -1256,11 +1311,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _cleanup_cloud_tmp(self):
         # delete all the files we created on S3
-        if self._s3_tmp_dir:
+        if self._cloud_tmp_dir:
             try:
-                log.info('Removing s3 temp directory %s...' % self._s3_tmp_dir)
-                self.fs.rm(self._s3_tmp_dir)
-                self._s3_tmp_dir = None
+                log.info('Removing s3 temp directory %s...' %
+                         self._cloud_tmp_dir)
+                self.fs.rm(self._cloud_tmp_dir)
+                self._cloud_tmp_dir = None
             except Exception as e:
                 log.exception(e)
 
@@ -1296,8 +1352,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Sleep for a little while, to give S3 a chance to sync up.
         """
         log.debug('Waiting %.1fs for S3 eventual consistency...' %
-                  self._opts['s3_sync_wait_time'])
-        time.sleep(self._opts['s3_sync_wait_time'])
+                  self._opts['cloud_fs_sync_secs'])
+        time.sleep(self._opts['cloud_fs_sync_secs'])
 
     def _wait_for_cluster_to_terminate(self, cluster=None):
         if not cluster:
@@ -1318,14 +1374,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     'TERMINATED', 'TERMINATED_WITH_ERRORS'):
                 return
 
-            time.sleep(self._opts['check_emr_status_every'])
+            time.sleep(self._opts['check_cluster_every'])
             cluster = self._describe_cluster()
 
     def _create_instance_group(self, role, instance_type, count, bid_price):
         """Helper method for creating instance groups. For use when
-        creating a cluster using a list of InstanceGroups, instead
-        of the typical triumverate of
-        num_instances/master_instance_type/slave_instance_type.
+        creating a cluster using a list of InstanceGroups
 
             - Role is either 'master', 'core', or 'task'.
             - instance_type is an EC2 instance type
@@ -1336,8 +1390,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
 
         if not instance_type:
-            if self._opts['ec2_instance_type']:
-                instance_type = self._opts['ec2_instance_type']
+            if self._opts['instance_type']:
+                instance_type = self._opts['instance_type']
             else:
                 raise ValueError('Missing instance type for %s node(s)' % role)
 
@@ -1358,7 +1412,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Create an empty cluster on EMR, and return the ID of that
         job.
 
-        If the ``emr_tags`` option is set, also tags the cluster (which
+        If the ``tags`` option is set, also tags the cluster (which
         is a separate API call).
 
         persistent -- if this is true, create the cluster with the keep_alive
@@ -1372,10 +1426,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         emr_conn = self.make_emr_conn()
         log.debug('Calling run_jobflow(%r, %r, %s)' % (
-            self._job_key, self._opts['s3_log_uri'],
+            self._job_key, self._opts['cloud_log_dir'],
             ', '.join('%s=%r' % (k, v) for k, v in args.items())))
         cluster_id = emr_conn.run_jobflow(
-            self._job_key, self._opts['s3_log_uri'], **args)
+            self._job_key, self._opts['cloud_log_dir'], **args)
 
          # keep track of when we started our job
         self._emr_job_start = time.time()
@@ -1383,7 +1437,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('Cluster created with ID: %s' % cluster_id)
 
         # set EMR tags for the cluster, if any
-        tags = self._opts['emr_tags']
+        tags = self._opts['tags']
         if tags:
             log.info('Setting EMR tags: %s' % ', '.join(
                 '%s=%s' % (tag, value or '') for tag, value in tags.items()))
@@ -1400,48 +1454,47 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['release_label']:
             api_params['ReleaseLabel'] = self._opts['release_label']
         else:
-            args['ami_version'] = self._opts['ami_version']
+            args['ami_version'] = self._opts['image_version']
 
-        if self._opts['aws_availability_zone']:
-            args['availability_zone'] = self._opts['aws_availability_zone']
+        if self._opts['zone']:
+            args['availability_zone'] = self._opts['zone']
         # The old, simple API, available if we're not using task instances
         # or bid prices
-        if not (self._opts['num_ec2_task_instances'] or
-                self._opts['ec2_core_instance_bid_price'] or
-                self._opts['ec2_master_instance_bid_price'] or
-                self._opts['ec2_task_instance_bid_price']):
-            args['num_instances'] = self._opts['num_ec2_core_instances'] + 1
-            args['master_instance_type'] = (
-                self._opts['ec2_master_instance_type'])
-            args['slave_instance_type'] = self._opts['ec2_core_instance_type']
+        if not (self._opts['num_task_instances'] or
+                self._opts['core_instance_bid_price'] or
+                self._opts['master_instance_bid_price'] or
+                self._opts['task_instance_bid_price']):
+            args['num_instances'] = self._opts['num_core_instances'] + 1
+            args['master_instance_type'] = self._opts['master_instance_type']
+            args['slave_instance_type'] = self._opts['core_instance_type']
         else:
             # Create a list of InstanceGroups
             args['instance_groups'] = [
                 self._create_instance_group(
                     'MASTER',
-                    self._opts['ec2_master_instance_type'],
+                    self._opts['master_instance_type'],
                     1,
-                    self._opts['ec2_master_instance_bid_price']
+                    self._opts['master_instance_bid_price']
                 ),
             ]
 
-            if self._opts['num_ec2_core_instances']:
+            if self._opts['num_core_instances']:
                 args['instance_groups'].append(
                     self._create_instance_group(
                         'CORE',
-                        self._opts['ec2_core_instance_type'],
-                        self._opts['num_ec2_core_instances'],
-                        self._opts['ec2_core_instance_bid_price']
+                        self._opts['core_instance_type'],
+                        self._opts['num_core_instances'],
+                        self._opts['core_instance_bid_price']
                     )
                 )
 
-            if self._opts['num_ec2_task_instances']:
+            if self._opts['num_task_instances']:
                 args['instance_groups'].append(
                     self._create_instance_group(
                         'TASK',
-                        self._opts['ec2_task_instance_type'],
-                        self._opts['num_ec2_task_instances'],
-                        self._opts['ec2_task_instance_bid_price']
+                        self._opts['task_instance_type'],
+                        self._opts['num_task_instances'],
+                        self._opts['task_instance_bid_price']
                     )
                 )
 
@@ -1734,10 +1787,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _get_streaming_jar_and_step_arg_prefix(self):
         if self._opts['hadoop_streaming_jar']:
-            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar']), []
-        elif self._opts['hadoop_streaming_jar_on_emr']:
-            return self._opts['hadoop_streaming_jar_on_emr'], []
-        elif version_gte(self.get_ami_version(), '4'):
+            if self._opts['hadoop_streaming_jar'].startswith('file://'):
+                # special case: jar is already on EMR
+                # relative paths are OK (though maybe not useful)
+                return self._opts['hadoop_streaming_jar'][7:], []
+            else:
+                return self._upload_mgr.uri(
+                    self._opts['hadoop_streaming_jar']), []
+        elif version_gte(self.get_image_version(), '4'):
             # 4.x AMIs use an intermediary jar
             return _4_X_INTERMEDIARY_JAR, ['hadoop-streaming']
         else:
@@ -1754,13 +1811,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _launch_emr_job(self):
         """Create an empty cluster on EMR, and set self._cluster_id to
-        its ID."""
+        its ID.
+        """
         self._create_s3_tmp_bucket_if_needed()
         emr_conn = self.make_emr_conn()
 
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
-        if self._opts['pool_clusters'] and not self._cluster_id:
+        if (self._opts['pool_clusters'] and not self._cluster_id):
             # master node setup script is an additional step
             num_steps = self._num_steps()
             if self._master_node_setup_script_path:
@@ -1774,6 +1832,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if not self._cluster_id:
             self._cluster_id = self._create_cluster(
                 persistent=False)
+            self._created_cluster = True
             log.info('Created new cluster %s' % self._cluster_id)
         else:
             log.info('Adding our job to existing cluster %s' %
@@ -1789,7 +1848,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._emr_job_start = time.time()
 
         # set EMR tags for the job, if any
-        tags = self._opts['emr_tags']
+        tags = self._opts['tags']
         if tags:
             log.info('Setting EMR tags: %s' %
                      ', '.join('%s=%s' % (tag, value)
@@ -1797,7 +1856,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             emr_conn.add_tags(self._cluster_id, tags)
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
-        if self._ssh_fs and version_gte(self.get_ami_version(), '4.3.0'):
+        if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
     def _job_steps(self, max_steps=None):
@@ -1893,8 +1952,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         while True:
             # don't antagonize EMR's throttling
             log.debug('Waiting %.1f seconds...' %
-                      self._opts['check_emr_status_every'])
-            time.sleep(self._opts['check_emr_status_every'])
+                      self._opts['check_cluster_every'])
+            time.sleep(self._opts['check_cluster_every'])
 
             step = _patched_describe_step(emr_conn, self._cluster_id, step_id)
 
@@ -1958,6 +2017,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
                 if cluster.status.state in (
                         'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                    # was it caused by a pooled cluster self-terminating?
+                    # (if so, raise _PooledClusterSelfTerminatedException)
+                    self._check_for_pooled_cluster_self_termination(
+                        cluster, step)
                     # was it caused by IAM roles?
                     self._check_for_missing_default_iam_roles(cluster)
                     # was it caused by a key pair from the wrong region?
@@ -2026,6 +2089,45 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if tunnel_handle is not None:
                 tunnel_handle.close()
 
+    def _check_for_pooled_cluster_self_termination(self, cluster, step):
+        """If failure could have been due to a pooled cluster self-terminating,
+        raise _PooledClusterSelfTerminatedException"""
+        # this check might not even be relevant
+        if not self._opts['pool_clusters']:
+            return
+
+        if self._opts['cluster_id']:
+            return
+
+        # if a cluster we created self-terminated, something is wrong with
+        # the way self-termination is set up (e.g. very low idle time)
+        if self._created_cluster:
+            return
+
+        # don't check for max_hours_idle because it's possible to
+        # join a self-terminating cluster without having max_hours_idle set
+        # on this runner (pooling only cares about the master bootstrap script,
+        # not other bootstrap actions)
+
+        # our step should be CANCELLED (not failed)
+        if step.status.state != 'CANCELLED':
+            return
+
+        # we *could* check if the step had a chance to start by checking if
+        # step.status.timeline.startdatetime is set. This shouldn't happen in
+        # practice, and if it did, we'd still be fine as long as the script
+        # didn't write data to the output dir, so it's not worth the extra
+        # code.
+
+        # cluster should have stopped because master node failed
+        # could also check for
+        # cluster.status.statechangereason.code == 'INSTANCE_FAILURE'
+        if not _CLUSTER_SELF_TERMINATED_RE.match(_get_reason(cluster)):
+            return
+
+        log.info('Pooled cluster self-terminated, trying again...')
+        raise _PooledClusterSelfTerminatedException
+
     def _check_for_missing_default_iam_roles(self, cluster):
         """If cluster couldn't start due to missing IAM roles, tell
         user what to do."""
@@ -2047,7 +2149,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Help users tripped up by the default AWS region changing
         in mrjob v0.5.0 (see #1111) by pointing them to the
         docs for creating EC2 key pairs."""
-        if not self._opts.is_default('aws_region'):
+        if not self._opts.is_default('region'):
             return
 
         reason = _get_reason(cluster)
@@ -2058,7 +2160,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 ' %s by following:\n\n'
                 '    https://pythonhosted.org/mrjob/guides'
                 '/emr-quickstart.html#configuring-ssh-credentials\n' %
-                (_DEFAULT_AWS_REGION, _DEFAULT_AWS_REGION))
+                (_DEFAULT_REGION, _DEFAULT_REGION))
 
     def _step_input_uris(self, step_num):
         """Get the s3:// URIs for input for the given step."""
@@ -2143,11 +2245,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # Unlike on 3.x, the history logs *are* available on S3, but they're
         # not useful enough to justify the wait when SSH is set up
 
-        # if version_gte(self.get_ami_version(), '4'):
+        # if version_gte(self.get_image_version(), '4'):
         #     # denied access on some 4.x AMIs by the yarn user, see #1244
         #     dir_name = 'hadoop-mapreduce/history'
         #     s3_dir_name = 'hadoop-mapreduce/history'
-        if version_gte(self.get_ami_version(), '3'):
+        if version_gte(self.get_image_version(), '3'):
             # on the 3.x AMIs, the history log lives inside HDFS and isn't
             # copied to S3. We don't need it anyway; everything relevant
             # is in the step log
@@ -2163,7 +2265,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _stream_task_log_dirs(self, application_id=None, output_dir=None):
         """Get lists of directories to look for the task logs in."""
-        if version_gte(self.get_ami_version(), '4'):
+        if version_gte(self.get_image_version(), '4'):
             # denied access on some 4.x AMIs by the yarn user, see #1244
             dir_name = 'hadoop-yarn/containers'
             s3_dir_name = 'containers'
@@ -2255,9 +2357,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         s3_dir_name = s3_dir_name or dir_name
 
         if s3_dir_name and self._s3_log_dir():
-            s3_log_uri = posixpath.join(self._s3_log_dir(), s3_dir_name)
-            log.info('Looking for %s in %s...' % (log_desc, s3_log_uri))
-            yield [s3_log_uri]
+            cloud_log_dir = posixpath.join(self._s3_log_dir(), s3_dir_name)
+            log.info('Looking for %s in %s...' % (log_desc, cloud_log_dir))
+            yield [cloud_log_dir]
 
     def _wait_for_logs_on_s3(self):
         """If the cluster is already terminating, wait for it to terminate,
@@ -2395,11 +2497,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # and warn if it's an AMI before 3.7.0
         if self._opts['bootstrap_python'] or (
                 self._opts['bootstrap_python'] is None and
-                not version_gte(self._opts['ami_version'], '4.6.0')):
+                not version_gte(self._opts['image_version'], '4.6.0')):
 
             # we have to have at least on AMI 3.7.0. But give it a shot
             if not (self._opts['release_label'] or
-                    version_gte(self._opts['ami_version'], '3.7.0')):
+                    version_gte(self._opts['image_version'], '3.7.0')):
                 log.warning(
                     'bootstrapping Python 3 will probably not work on'
                     ' AMIs prior to 3.7.0. For an alternative, see:'
@@ -2634,7 +2736,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _script_runner_jar_uri(self):
         return (
             's3://%s.elasticmapreduce/libs/script-runner/script-runner.jar' %
-            self._opts['aws_region'])
+            self._opts['region'])
 
     ### EMR JOB MANAGEMENT UTILS ###
 
@@ -2720,17 +2822,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         role_to_req_bid_price = {}
 
         for role in ('core', 'master', 'task'):
-            instance_type = self._opts['ec2_%s_instance_type' % role]
+            instance_type = self._opts['%s_instance_type' % role]
             if role == 'master':
                 num_instances = 1
             else:
-                num_instances = self._opts['num_ec2_%s_instances' % role]
+                num_instances = self._opts['num_%s_instances' % role]
 
             role_to_req_instance_type[role] = instance_type
             role_to_req_num_instances[role] = num_instances
 
             role_to_req_bid_price[role] = (
-                self._opts['ec2_%s_instance_bid_price' % role])
+                self._opts['%s_instance_bid_price' % role])
 
             # unknown instance types can only match themselves
             role_to_req_mem[role] = (
@@ -2780,13 +2882,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     return
             else:
                 # match actual AMI version
-                ami_version = getattr(cluster, 'runningamiversion', '')
+                image_version = getattr(cluster, 'runningamiversion', '')
                 # Support partial matches, e.g. let a request for
                 # '2.4' pass if the version is '2.4.2'. The version
                 # extracted from the existing cluster should always
                 # be a full major.minor.patch, so checking matching
                 # prefixes should be sufficient.
-                if not ami_version.startswith(self._opts['ami_version']):
+                if not image_version.startswith(self._opts['image_version']):
                     return
 
             if self._opts['emr_applications']:
@@ -2930,7 +3032,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 cluster_id, num_steps = cluster_info_list[-1]
                 status = _attempt_to_acquire_lock(
                     self.fs, self._lock_uri(cluster_id, num_steps),
-                    self._opts['s3_sync_wait_time'], self._job_key)
+                    self._opts['cloud_fs_sync_secs'], self._job_key)
                 if status:
                     return cluster_id
                 else:
@@ -2950,7 +3052,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return None
 
     def _lock_uri(self, cluster_id, num_steps):
-        return _make_lock_uri(self._opts['s3_tmp_dir'],
+        return _make_lock_uri(self._opts['cloud_tmp_dir'],
                               cluster_id,
                               num_steps + 1)
 
@@ -3012,14 +3114,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
                 region=boto.regioninfo.RegionInfo(
-                    name=self._opts['aws_region'], endpoint=endpoint,
+                    name=self._opts['region'], endpoint=endpoint,
                     connection_cls=boto.emr.connection.EmrConnection),
                 security_token=self._opts['aws_security_token'])
 
             return conn
 
         endpoint = (self._opts['emr_endpoint'] or
-                    emr_endpoint_for_region(self._opts['aws_region']))
+                    emr_endpoint_for_region(self._opts['region']))
 
         log.debug('creating EMR connection (to %s)' % endpoint)
         conn = emr_conn_for_endpoint(endpoint)
@@ -3029,7 +3131,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # that matches the SSL cert
         if not self._opts['emr_endpoint']:
 
-            ssl_host = emr_ssl_host_for_region(self._opts['aws_region'])
+            ssl_host = emr_ssl_host_for_region(self._opts['region'])
             fallback_conn = emr_conn_for_endpoint(ssl_host)
 
             conn = RetryGoRound(
@@ -3044,47 +3146,93 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return _patched_describe_cluster(emr_conn, self._cluster_id)
 
     def get_hadoop_version(self):
-        if self._hadoop_version is None:
-            self._store_cluster_info()
-        return self._hadoop_version
+        return self._get_cluster_info('hadoop_version')
 
     def get_ami_version(self):
+        log.warning('get_ami_version() is a depreacated alias for'
+                    ' get_image_version() and will be removed in'
+                    ' mrjob v0.6.0')
+        return self.get_image_version()
+
+    def get_image_version(self):
         """Get the AMI that our cluster is running.
+
+        .. versionchanged:: 0.5.4
+
+           This used to be called :py:meth:`get_ami_version`
 
         .. versionadded:: 0.4.5
         """
-        if self._ami_version is None:
-            self._store_cluster_info()
-        return self._ami_version
+        return self._get_cluster_info('image_version')
 
     def _address_of_master(self):
         """Get the address of the master node so we can SSH to it"""
-        if not self._address:
-            self._store_cluster_info()
+        return self._get_cluster_info('master_public_dns')
 
-        return self._address
+    def _master_private_ip(self):
+        """Get the internal ("private") address of the master node, so we
+        can direct our SSH tunnel to it."""
+        return self._get_cluster_info('master_private_ip')
 
-    def _store_cluster_info(self):
-        """Set self._ami_version and self._hadoop_version."""
+    def _get_cluster_info(self, key):
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
+        cache = self._cluster_to_cache[self._cluster_id]
+
+        if not cache.get(key):
+            if key == 'master_private_ip':
+                self._store_master_instance_info()
+            else:
+                self._store_cluster_info()
+
+        return cache.get(key)
+
+    def _store_cluster_info(self):
+        """Describe our cluster, and cache image_version, hadoop_version,
+        and master_public_dns"""
+        if not self._cluster_id:
+            raise AssertionError('cluster has not yet been created')
+
+        cache = self._cluster_to_cache[self._cluster_id]
 
         cluster = self._describe_cluster()
 
         # AMI version might be in RunningAMIVersion (2.x, 3.x)
         # or ReleaseLabel (4.x)
-        self._ami_version = getattr(cluster, 'runningamiversion', None)
-        if not self._ami_version:
+        cache['image_version'] = getattr(cluster, 'runningamiversion', None)
+        if not cache['image_version']:
             release_label = getattr(cluster, 'releaselabel', None)
             if release_label:
-                self._ami_version = release_label.lstrip('emr-')
+                cache['image_version'] = release_label.lstrip('emr-')
 
         for a in cluster.applications:
             if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs
-                self._hadoop_version = a.version
+                cache['hadoop_version'] = a.version
 
         if cluster.status.state in ('RUNNING', 'WAITING'):
-            self._address = cluster.masterpublicdnsname
+            cache['master_public_dns'] = cluster.masterpublicdnsname
+
+    def _store_master_instance_info(self):
+        """List master instance for our cluster, and cache
+        master_private_ip."""
+        if not self._cluster_id:
+            raise AssertionError('cluster has not yet been created')
+
+        cache = self._cluster_to_cache[self._cluster_id]
+
+        emr_conn = self.make_emr_conn()
+
+        instances = emr_conn.list_instances(
+            self._cluster_id, instance_group_types=['MASTER']).instances
+
+        if not instances:
+            return
+
+        master = instances[0]
+
+        # can also get private DNS and public IP/DNS, but we don't use this
+        if hasattr(master, 'privateipaddress'):
+            cache['master_private_ip'] = master.privateipaddress
 
     def make_iam_conn(self):
         """Create a connection to S3.

@@ -212,12 +212,14 @@ def parse_legacy_hash_path(type, path, must_name=None):
     return {'path': path, 'name': name, 'type': type}
 
 
-def name_uniquely(path, names_taken=(), proposed_name=None):
+def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False):
     """Come up with a unique name for *path*.
 
     :param names_taken: a dictionary or set of names not to use.
     :param proposed_name: name to use if it is not taken. If this is not set,
                           we propose a name based on the filename.
+    :param unhide: make sure final name doesn't start with periods or
+                   underscores
 
     If the proposed name is taken, we add a number to the end of the
     filename, keeping the extension the same. For example:
@@ -226,19 +228,29 @@ def name_uniquely(path, names_taken=(), proposed_name=None):
     'foo-1.tar.gz'
     """
     if not proposed_name:
-        proposed_name = os.path.basename(path) or '_'
+        proposed_name = os.path.basename(path)
 
-    if proposed_name not in names_taken:
-        return proposed_name
+    if unhide:
+        proposed_name = proposed_name.lstrip('.').lstrip('_')
 
-    dot_idx = proposed_name.find('.', 1)
+    # don't treat initial . as part of file extension (but unhide
+    # would have already handled this)
+    dot_idx = proposed_name.find('.', 0 if unhide else 1)
     if dot_idx == -1:
         prefix, suffix = proposed_name, ''
     else:
         prefix, suffix = proposed_name[:dot_idx], proposed_name[dot_idx:]
 
+    if prefix and proposed_name not in names_taken:
+        return proposed_name
+
     for i in itertools.count(1):
-        name = '%s-%d%s' % (prefix, i, suffix)
+        if prefix:
+            name = '%s-%d%s' % (prefix, i, suffix)
+        else:
+            # if no prefix is left (due to empty filename or unhiding)
+            # just use numbers; don't start filenames with '-'
+            name = '%d%s' % (i, suffix)
         if name not in names_taken:
             return name
 
@@ -276,7 +288,10 @@ class UploadDirManager(object):
             return path
 
         if path not in self._path_to_name:
-            name = name_uniquely(path, names_taken=self._names_taken)
+            # use unhide so that input files won't be hidden from Hadoop,
+            # see #1200
+            name = name_uniquely(
+                path, names_taken=self._names_taken, unhide=True)
             self._names_taken.add(name)
             self._path_to_name[path] = name
 

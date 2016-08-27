@@ -11,10 +11,10 @@ running multiple jobs, you may find it convenient to reuse a single cluster.
 
 :py:mod:`mrjob` includes a utility to create persistent clusters without
 running a job. For example, this command will create a cluster with 12 EC2
-instances (1 master and 11 slaves), taking all other options from
+instances (1 master and 11 core), taking all other options from
 :py:mod:`mrjob.conf`::
 
-    $ mrjob create-cluster --num-ec2-instances=12 --max-hours-idle 1
+    $ mrjob create-cluster --num-core-instances=11 --max-hours-idle 1
     ...
     j-CLUSTERID
 
@@ -50,22 +50,18 @@ cluster and add the job to it rather than creating a new one.
 
 .. warning::
 
-    If you use cluster pools, keep
-    :command:`mrjob terminate-idle-clusters` in your crontab!
+    If you use cluster pools, either set :mrjob-opt:`max_hours_idle`
+    in your config file (recommended), or
+    keep :command:`mrjob terminate-idle-clusters` in your crontab.
     Otherwise you may forget to terminate your clusters and waste a lot of
     money.
-
-Alternatively, you may use the :mrjob-opt:`max_hours_idle` option to create
-self-terminating clusters; the disadvantage is that pooled jobs may
-occasionally join clusters with out knowing they are about to self-terminate
-(this is better for development than production).
 
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
 share the same clusters. This means that the version of :py:mod:`mrjob` and
 bootstrap configuration. Other options that affect which cluster a job can
 join:
 
-* :mrjob-opt:`ami_version`\/:mrjob-opt:`release_label`: must match
+* :mrjob-opt:`image_version`\/:mrjob-opt:`release_label`: must match
 * :mrjob-opt:`emr_applications`: require *at least* these applications
   (extra ones okay)
 * :mrjob-opt:`emr_configurations`: must match
@@ -75,7 +71,7 @@ join:
   lack thereof)
 
 Pooled jobs will also only use clusters with the same **pool name**, so you
-can use the :mrjob-opt:`pool_name` to partition your clusters into
+can use the :mrjob-opt:`pool_name` option to partition your clusters into
 separate pools.
 
 Pooling is flexible about instance type and number of instances; it will
@@ -92,7 +88,8 @@ cluster. This is somewhat ugly but works in practice, and avoids
 
 .. warning::
 
-    If S3 eventual consistency takes longer than *s3_sync_wait_time*, then you
+    If S3 eventual consistency takes longer than
+    :mrjob-opt:`cloud_fs_sync_secs`, then you
     may encounter race conditions when using pooling, e.g. two jobs claiming
     the same cluster at the same time, or the idle cluster killer shutting
     down your job before it has started to run. Regions with read-after-write
@@ -101,8 +98,8 @@ cluster. This is somewhat ugly but works in practice, and avoids
 
 You can allow jobs to wait for an available cluster instead of immediately
 starting a new one by specifying a value for `--pool-wait-minutes`. mrjob will
-try to find a cluster every 30 seconds for **pool_wait_minutes**. If none is
-found during that time, mrjob will start a new one.
+try to find a cluster every 30 seconds for :mrjob-opt:`pool_wait_minutes`. If
+none is found during that time, mrjob will start a new one.
 
 .. _spot-instances:
 
@@ -114,8 +111,8 @@ by using the spot market. The catch is that if someone bids more for instances
 that you're using, they can be taken away from your cluster. If this happens,
 you aren't charged, but your job may fail.
 
-You can specify spot market bid prices using the *ec2_core_instance_bid_price*,
-*ec2_master_instance_bid_price*, and *ec2_task_instance_bid_price* options to
+You can specify spot market bid prices using the *core_instance_bid_price*,
+*master_instance_bid_price*, and *task_instance_bid_price* options to
 specify a price in US dollars. For example, on the command line::
 
     --ec2-task-instance-bid-price 0.42
@@ -124,7 +121,7 @@ or in :py:mod:`mrjob.conf`::
 
     runners:
       emr:
-        ec2_task_instance_bid_price: '0.42'
+        task_instance_bid_price: '0.42'
 
 (Note the quotes; bid prices are strings, not floats!)
 

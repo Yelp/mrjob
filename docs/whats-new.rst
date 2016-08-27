@@ -4,6 +4,119 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.4:
+
+0.5.4
+-----
+
+Pooling and idle cluster self-termination
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This release resolves a long-standing EMR API race condition that made it
+difficult to use :ref:`cluster pooling <pooling-clusters>` and idle cluster
+self-termination (see :mrjob-opt:`max_hours_idle`) together. Now if your
+pooled job unknowingly runs on a cluster that was in the process of shutting
+down, it will detect that and re-launch the job on a different cluster.
+
+This means pretty much *everyone* running jobs on EMR should now enable
+pooling, with a configuration like this:
+
+.. code-block:: yaml
+
+   runners:
+     emr:
+       max_hours_idle: 1
+       pool_clusters: true
+
+You may *also* run the :ref:`terminate-idle-clusters` script periodically, but
+(barring any bugs) this shouldn't be necessary.
+
+.. _generic-emr-option-names:
+
+Generic EMR option names
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Many options to the :doc:`EMR runner <guides/emr-quickstart>` have been
+made more generic, to make it easier to share code with the
+:doc:`Dataproc runner <guides/dataproc-quickstart>`
+(in most cases, the new names are also shorter and easier to remember):
+
+=============================== ======================================
+ old option name                 new option name
+=============================== ======================================
+*ami_version*                   :mrjob-opt:`image_version`
+*aws_availablity_zone*          :mrjob-opt:`zone`
+*aws_region*                    :mrjob-opt:`region`
+*check_emr_status_every*        :mrjob-opt:`check_cluster_every`
+*ec2_core_instance_bid_price*   :mrjob-opt:`core_instance_bid_price`
+*ec2_core_instance_type*        :mrjob-opt:`core_instance_type`
+*ec2_instance_type*             :mrjob-opt:`instance_type`
+*ec2_master_instance_bid_price* :mrjob-opt:`master_instance_bid_price`
+*ec2_master_instance_type*      :mrjob-opt:`master_instance_type`
+*ec2_slave_instance_type*       :mrjob-opt:`core_instance_type`
+*ec2_task_instance_bid_price*   :mrjob-opt:`task_instance_bid_price`
+*ec2_task_instance_type*        :mrjob-opt:`task_instance_type`
+*emr_tags*                      :mrjob-opt:`tags`
+*num_ec2_core_instances*        :mrjob-opt:`num_core_instances`
+*num_ec2_task_instances*        :mrjob-opt:`num_task_instances`
+*s3_log_uri*                    :mrjob-opt:`cloud_log_dir`
+*s3_sync_wait_time*             :mrjob-opt:`cloud_fs_sync_secs`
+*s3_tmp_dir*                    :mrjob-opt:`cloud_tmp_dir`
+*s3_upload_part_size*           :mrjob-opt:`cloud_upload_part_size`
+=============================== ======================================
+
+The old option names and command-line switches are now deprecated but will
+continue to work until v0.6.0.
+
+:mrjob-opt:`num_ec2_instances` has simply been deprecated (it's just
+:mrjob-opt:`num_core_instances` plus one).
+
+:mrjob-opt:`hadoop_streaming_jar_on_emr` has also been deprecated; in its
+place, you can now pass a ``file://`` URI to :mrjob-opt:`hadoop_streaming_jar`
+to reference a path on the master node.
+
+Log interpretation
+^^^^^^^^^^^^^^^^^^
+
+Log interpretation (counters and probable cause of job failure) on Hadoop is
+more robust, handing a wider variety of log4j formats and recovering more
+gracefully from permissions errors. This includes fixing a crash that
+could happen on Python 3 when attempting to read data from HDFS.
+
+Log interpretation used to be partially broken on EMR AMI 4.3.0 and later
+due to a permissions issue; this is now fixed.
+
+pass_through_option()
+^^^^^^^^^^^^^^^^^^^^^
+
+You can now pass through *existing* command-line switches to your job;
+for example, you can tell a job which runner launched it. See
+:py:meth:`~mrjob.job.MRJob.pass_through_option` for details.
+
+If you *don't* do this, ``self.options.runner`` will now always be ``None``
+in your job (it used to confusingly default to ``'inline'``).
+
+Other improvements and bugfixes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ssh tunnel to the resource manager on EMR (see :mrjob-opt:`ssh_tunnel`)
+now connects to its correct *internal* IP; this resolves a firewall issue that
+existed on some VPC setups.
+
+Uploaded files will no longer be given names starting with ``_`` or ``.``,
+since Hadoop's input processing treats these files as "hidden".
+
+The EMR idle cluster self-termination script (see :mrjob-opt:`max_hours_idle`)
+now only runs on the master node.
+
+The :ref:`audit-emr-usage` command-line tool should no longer constantly
+trigger throttling warnings.
+
+:mrjob-opt:`bootstrap_python` no longer bothers trying to install Python 3
+on EMR AMI 4.6.0 and later, since it is already installed.
+
+The ``--ssh-bind-ports`` command-line switch was broken (starting in
+:ref:`v0.4.5`!), and is now fixed.
 
 .. _v0.5.3:
 
@@ -124,11 +237,11 @@ mrjob has been updated to fully support Hadoop 2 (YARN), including many updates 
 
 mrjob now fully supports the 3.x and 4.x Elastic MapReduce AMIs, including SSH tunneling to the resource mananager, fetching counters and finding probable cause of job failure.
 
-The default :mrjob-opt:`ami_version` is now ``3.11.0``. Our plan is to continue updating this to the lastest (non-broken) 3.x AMI for each 0.5.x release of mrjob.
+The default `ami_version` (see :mrjob-opt:`image_version`) is now ``3.11.0``. Our plan is to continue updating this to the lastest (non-broken) 3.x AMI for each 0.5.x release of mrjob.
 
-The default :mrjob-opt:`ec2_instance_type` is now ``m1.medium`` (``m1.small`` is too small for the 3.x and 4.x AMIs)
+The default :mrjob-opt:`instance_type` is now ``m1.medium`` (``m1.small`` is too small for the 3.x and 4.x AMIs)
 
-You can specify 4.x AMIs with either the new :mrjob-opt:`release_label` option, or continue using :mrjob-opt:`ami_version`; both work.
+You can specify 4.x AMIs with either the new :mrjob-opt:`release_label` option, or continue using `ami_version`; both work.
 
 mrjob continues to support 2.x AMIs. However:
 
@@ -141,7 +254,7 @@ Please, please switch if you haven't already.
 AWS Regions
 ^^^^^^^^^^^
 
-The new default :mrjob-opt:`aws_region` is ``us-west-2`` (Oregon). This both matches the default in the EMR console and, according to Amazon, is `carbon neutral <https://aws.amazon.com/about-aws/sustainability/>`__.
+The new default `aws_region` (see :mrjob-opt:`region`) is ``us-west-2`` (Oregon). This both matches the default in the EMR console and, according to Amazon, is `carbon neutral <https://aws.amazon.com/about-aws/sustainability/>`__.
 
 An edge case that might affect you: EC2 key pairs (i.e. SSH credentials) are region-specific, so if you've set up SSH but not explicitly specified a region, you may get an error saying your key pair is invalid. The fix is simply to :ref:`create new SSH keys <ssh-tunneling>` for the ``us-west-2`` (Oregon) region.
 
@@ -233,7 +346,7 @@ If you want to get ahead of the game, here is a list of things that are deprecat
     - *emr_job_flow_pool_name* is now :mrjob-opt:`pool_name`
     - *hdfs_scratch_dir* is now :mrjob-opt:`hadoop_tmp_dir`
     - *pool_emr_job_flows* is now :mrjob-opt:`pool_clusters`
-    - *s3_scratch_uri* is now :mrjob-opt:`s3_tmp_dir`
+    - *s3_scratch_uri* is now :mrjob-opt:`cloud_tmp_dir`
     - *ssh_tunnel_to_job_tracker* is now simply :mrjob-opt:`ssh_tunnel`
 
   - functions and methods:
@@ -287,6 +400,7 @@ as single-item lists. See :ref:`this example <configs-list-example>`.
 Fixed a bug that kept the ``pool_wait_minutes`` option from being loaded from
 config files.
 
+.. _v0.4.5:
 
 0.4.5
 -----
@@ -322,8 +436,8 @@ new API and will be removed in v0.5.0.
 Added an :mrjob-opt:`aws_security_token` option to allow you to run
 mrjob on EMR using temporary AWS credentials.
 
-Added an :mrjob-opt:`emr_tags` option to allow you to tag EMR job flows
-at creation time.
+Added an `emr_tags` (see :mrjob-opt:`tags`) option to allow you to tag EMR job
+flows at creation time.
 
 :py:class:`~mrjob.emr.EMRJobRunner` now has a
 :py:meth:`~mrjob.emr.EMRJobRunner.get_ami_version` method.
@@ -545,13 +659,13 @@ You can now :ref:`include one config file from another
 
 The EMR instance type/number options have changed to support spot instances:
 
-* *ec2_core_instance_bid_price*
-* *ec2_core_instance_type*
-* *ec2_master_instance_bid_price*
-* *ec2_master_instance_type*
-* *ec2_slave_instance_type* (alias for *ec2_core_instance_type*)
-* *ec2_task_instance_bid_price*
-* *ec2_task_instance_type*
+* *core_instance_bid_price*
+* *core_instance_type*
+* *master_instance_bid_price*
+* *master_instance_type*
+* *slave_instance_type* (alias for *core_instance_type*)
+* *task_instance_bid_price*
+* *task_instance_type*
 
 There is also a new *ami_version* option to change the AMI your job flow uses
 for its nodes.
@@ -726,7 +840,7 @@ Changes and Deprecations
 
         The default Hadoop version on EMR is now 0.20 (was 0.18).
 
-        The ``ec2_instance_type`` option only sets the instance type for slave
+        The ``instance_type`` option only sets the instance type for slave
         nodes when there are multiple EC2 instance. This is because the master
         node can usually remain small without affecting the performance of the
         job.

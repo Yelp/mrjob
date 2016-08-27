@@ -3,6 +3,7 @@
 # Copyright 2013 Lyft
 # Copyright 2014 Alex Konradi
 # Copyright 2015 Yelp and Contributors
+# Copyright 2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -51,6 +52,8 @@ if [ -z "$MAX_SECS_IDLE" ]; then MAX_SECS_IDLE=1800; fi
 MIN_SECS_TO_END_OF_HOUR=$2
 if [ -z "$MIN_SECS_TO_END_OF_HOUR" ]; then MIN_SECS_TO_END_OF_HOUR=300; fi
 
+# exit if this isn't the master node
+grep -q 'isMaster.*false' /mnt/var/lib/info/instance.json && exit 0
 
 (
 while true  # the only way out is to SHUT DOWN THE MACHINE

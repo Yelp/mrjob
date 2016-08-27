@@ -24,6 +24,7 @@ __credits__ = [
     'Jordan Andersen <jordandandersen@gmail.com>',
     'Tom Arnfeld <tarnfeld@me.com>',
     'Martin Baeuml <baeuml@kit.edu>',
+    'Étienne Batise <etienne.batise@gmail.com>',
     'Edward Betts <edward@4angle.com>',
     'Hunter Blanks <hblanks@monetate.com>',
     'Jim Blomo <jblomo@yelp.com>',
@@ -55,7 +56,6 @@ __credits__ = [
     'Tom Hennigan <tomhennigan@gmail.com>',
     'Brett Hoerner <brett@bretthoerner.com>',
     'Ya-Lin Huang <yalinh@yelp.com>',
-    'Evan Klitzke <evan@eklitzke.org>',
     'Tom Janofsky <tjanofsky@monetate.com>',
     'Tim Jenks <tim.jenks@eegeo.com>',
     'Stephen Johnson <steve@steveasleep.com>',
@@ -121,4 +121,4 @@ __credits__ = [
     'Andrea Zonca <andrea.zonca@gmail.com>',
 ]
 
-__version__ = '0.5.3.dev0'
+__version__ = '0.5.5.dev0'

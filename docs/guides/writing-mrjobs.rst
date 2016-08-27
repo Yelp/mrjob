@@ -659,6 +659,37 @@ command string.
     don't need to limit yourself to certain option types. However, your default
     values need to be compatible with :py:func:`copy.deepcopy`.
 
+Passing through existing options
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Occasionally, it'll be useful for mappers, reducers, etc. to be able to see
+the value of other command-line options. For this, use
+:py:meth:`~mrjob.job.MRJob.pass_through_option` with the corresponding
+command-line switch.
+
+For example, you might wish to fetch supporting data for your job from
+different locations, depending on whether your job is running on EMR or
+locally::
+
+    class MRRunnerAwareJob(MRJob):
+
+        def configure_options(self):
+            super(MRRunnerAwareJob, self).configure_options()
+
+            self.pass_through_option('--runner')
+
+        def mapper_init(self):
+            if self.options.runner == 'emr':
+                self.data = ...  # load from S3
+            else:
+                self.data = ... # load from local FS
+
+.. note::
+
+   Keep in mind that ``self.options.runner`` (and the values of most options)
+   will be ``None`` unless the user explicitly set them with a command-line
+   switch.
+
 .. _writing-file-options:
 
 File options

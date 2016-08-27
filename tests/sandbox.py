@@ -1,6 +1,6 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 David Marin
-# Copyright 2015 Yelp
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -35,8 +35,8 @@ EMPTY_MRJOB_CONF = {'runners': {
         'label': 'test_job',
     },
     'emr': {
-        'check_emr_status_every': 0.00,
-        's3_sync_wait_time': 0.00,
+        'check_cluster_every': 0.00,
+        'cloud_fs_sync_secs': 0.00,
     },
     'hadoop': {
         'label': 'test_job',

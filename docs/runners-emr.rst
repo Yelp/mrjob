@@ -11,8 +11,8 @@ Job Runner
 EMR Utilities
 -------------
 
-.. automethod:: EMRJobRunner.get_ami_version
 .. automethod:: EMRJobRunner.get_cluster_id
+.. automethod:: EMRJobRunner.get_image_version
 .. automethod:: EMRJobRunner.make_emr_conn
 
 S3 Utilities

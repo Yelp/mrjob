@@ -7,7 +7,7 @@ simplify the debugging process by automatically scanning logs for probable
 causes of failure.
 
 In addition to looking at S3, :py:mod:`mrjob` can be configured to
-also use SSH to fetch error logs directly from the master and slave nodes.
+also use SSH to fetch error logs directly from the master and worker nodes.
 This can speed up debugging significantly (EMR only transfers logs to S3
 every five minutes).
 

@@ -265,9 +265,9 @@ class HadoopFilesystem(Filesystem):
         cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
 
         def cleanup():
-            # there shouldn't be any stderr
+            # this does someties happen; see #1396
             for line in cat_proc.stderr:
-                log.error('STDERR: ' + line)
+                log.error('STDERR: ' + to_string(line.rstrip(b'\r\n')))
 
             cat_proc.stdout.close()
             cat_proc.stderr.close()

@@ -362,8 +362,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         if 'now' not in kwargs:
             kwargs['now'] = self.now
 
-        kwargs['s3_tmp_dir'] = 's3://my_bucket/'
-        kwargs['s3_sync_wait_time'] = 0
+        kwargs['cloud_tmp_dir'] = 's3://my_bucket/'
+        kwargs['cloud_fs_sync_secs'] = 0
         kwargs['max_mins_locked'] = 1
 
         # don't print anything out

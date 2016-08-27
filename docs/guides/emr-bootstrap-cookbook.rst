@@ -86,7 +86,7 @@ Installing System Packages
 ==========================
 
 EMR gives you access to a variety of different Amazon Machine Images, or AMIs
-for short (see :mrjob-opt:`ami_version`).
+for short (see :mrjob-opt:`image_version`).
 
 3.x and 4.x AMIs
 ----------------

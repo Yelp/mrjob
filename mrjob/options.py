@@ -79,7 +79,7 @@ def _add_basic_opts(opt_group):
     ]
 
 
-def _add_runner_opts(opt_group, default_runner='local'):
+def _add_runner_opts(opt_group):
     """Options for all runners."""
     return [
         opt_group.add_option(
@@ -176,12 +176,10 @@ def _add_runner_opts(opt_group, default_runner='local'):
                   ' include arguments, e.g. --python-bin "python -v"')),
 
         opt_group.add_option(
-            '-r', '--runner', dest='runner', default=default_runner,
+            '-r', '--runner', dest='runner', default=None,
             choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
-            help=('Where to run the job: local to run locally, hadoop to run'
-                  ' on your Hadoop cluster, emr to run on Amazon'
-                  ' ElasticMapReduce, and inline for local debugging. Default'
-                  ' is %s.' % default_runner)),
+            help=('Where to run the job; one of dataproc, emr, hadoop, inline,'
+                  ' or local')),
 
         opt_group.add_option(
             '--setup', dest='setup', action='append',
@@ -239,7 +237,9 @@ def _add_hadoop_emr_opts(opt_group):
         opt_group.add_option(
             '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
             default=None,
-            help='Path of your hadoop streaming jar (locally, or on S3/HDFS)'),
+            help='Path of your hadoop streaming jar (locally, or on S3/HDFS).'
+                 ' In EMR, use a file:// URI to refer to a jar on the master'
+                 ' node of your cluster.'),
 
         opt_group.add_option(
             '--label', dest='label', default=None,
@@ -287,7 +287,7 @@ def _add_hadoop_opts(opt_group):
             help='Temp space on HDFS (default is tmp/mrjob)'),
 
         opt_group.add_option(
-            '--hdfs-scratch-dir', dest='hdfs_scratch_dir',
+            '--hdfs-scratch-dir', dest='hadoop_tmp_dir',
             default=None,
             help='Deprecated alias for --hadoop-tmp-dir'),
     ]
@@ -295,10 +295,6 @@ def _add_hadoop_opts(opt_group):
 
 def _add_dataproc_emr_opts(opt_group):
     return [
-        opt_group.add_option(
-            '--cluster-id', dest='cluster_id', default=None,
-            help='ID of an existing cluster to run our job on'),
-
         opt_group.add_option(
             '--bootstrap', dest='bootstrap', action='append',
             help=('A shell command to set up libraries etc. before any steps'
@@ -314,37 +310,33 @@ def _add_dataproc_emr_opts(opt_group):
                   ' for Python 3, for which it is enabled by default.')),
 
         opt_group.add_option(
-            '--max-hours-idle', dest='max_hours_idle',
-            default=None, type='float',
-            help=("If we create a cluster, have it automatically"
-                  " terminate itself after it's been idle this many hours.")),
-    ]
-
-
-def _add_dataproc_opts(opt_group):
-    """Options for ``dataproc`` runner"""
-    return [
-        opt_group.add_option(
-            '--gcp-project', dest='gcp_project', default=None,
-            help='Project to run Dataproc jobs in.'),
-
-        opt_group.add_option(
-            '--region', dest='region',
-            help='GCE region to run Dataproc/EMR jobs in.'),
-
-        opt_group.add_option(
-            '--zone', dest='zone', default=None,
-            help='GCE zone to run Dataproc/EMR jobs in.'),
-
-        opt_group.add_option(
-            '--image-version', dest='image_version', default=None,
-            help='EMR/Dataproc image to run Dataproc/EMR jobs with.  '),
-
-        opt_group.add_option(
             '--check-cluster-every', dest='check_cluster_every', default=None,
             help='How often (in seconds) to check status of your job/cluster'),
 
-        # instance types
+        opt_group.add_option(
+            '--cloud-fs-sync-secs', dest='cloud_fs_sync_secs', default=None,
+            type='float',
+            help=('How long to wait for remote FS to reach eventual'
+                  ' consistency. This'
+                  ' is typically less than a second but the'
+                  ' default is 5.0 to be safe.')),
+
+        opt_group.add_option(
+            '--cloud-tmp-dir', dest='cloud_tmp_dir', default=None,
+            help='URI on remote FS to use as our temp directory.'),
+
+        opt_group.add_option(
+            '--cluster-id', dest='cluster_id', default=None,
+            help='ID of an existing cluster to run our job on'),
+
+        opt_group.add_option(
+            '--core-instance-type', dest='core_instance_type', default=None,
+            help='Type of GCE/EC2 core instance(s) to launch'),
+
+        opt_group.add_option(
+            '--image-version', dest='image_version', default=None,
+            help='EMR/Dataproc machine image to launch clusters with'),
+
         opt_group.add_option(
             '--instance-type', dest='instance_type', default=None,
             help=('Type of GCE/EC2 instance(s) to launch \n'
@@ -360,12 +352,10 @@ def _add_dataproc_opts(opt_group):
             help='Type of GCE/EC2 master instance(s) to launch'),
 
         opt_group.add_option(
-            '--core-instance-type', dest='core_instance_type', default=None,
-            help='Type of GCE/EC2 core instance(s) to launch'),
-
-        opt_group.add_option(
-            '--task-instance-type', dest='task_instance_type', default=None,
-            help='Type of GCE/EC2 task instance(s) to launch'),
+            '--max-hours-idle', dest='max_hours_idle',
+            default=None, type='float',
+            help=("If we create a cluster, have it automatically"
+                  " terminate itself after it's been idle this many hours.")),
 
         opt_group.add_option(
             '--num-core-instances', dest='num_core_instances', default=None,
@@ -377,18 +367,35 @@ def _add_dataproc_opts(opt_group):
             type='int',
             help='Total number of preemptible Worker instances to launch '),
 
+        opt_group.add_option(
+            '--task-instance-type', dest='task_instance_type', default=None,
+            help='Type of GCE/EC2 task instance(s) to launch'),
 
         opt_group.add_option(
-            '--cloud-fs-sync-secs', dest='cloud_fs_sync_secs', default=None,
-            type='float',
-            help=('How long to wait for remote FS to reach eventual'
-                  ' consistency. This'
-                  ' is typically less than a second but the'
-                  ' default is 5.0 to be safe.')),
+            '--zone', dest='zone', default=None,
+            help=('GCE zone/AWS availability zone to run Dataproc/EMR jobs'
+                  ' in.')),
+    ] + (
+        _add_dataproc_emr_connect_opts(opt_group)
+    )
 
+
+def _add_dataproc_emr_connect_opts(opt_group):
+    """Options for ``dataproc`` and ``emr`` runner used for connecting
+    to the API."""
+    return [
         opt_group.add_option(
-            '--cloud-tmp-dir', dest='cloud_tmp_dir', default=None,
-            help='URI on remote FS to use as our temp directory.'),
+            '--region', dest='region',
+            help='GCE/AWS region to run Dataproc/EMR jobs in.'),
+    ]
+
+
+def _add_dataproc_opts(opt_group):
+    """Options for ``dataproc`` runner"""
+    return [
+        opt_group.add_option(
+            '--gcp-project', dest='gcp_project', default=None,
+            help='Project to run Dataproc jobs in.'),
 
     ]
 
@@ -404,14 +411,14 @@ def _add_emr_connect_opts(opt_group):
     """Options for connecting to the EMR API."""
     return [
         opt_group.add_option(
-            '--aws-region', dest='aws_region', default=None,
-            help=('Region to run EMR jobs in. Default is us-west-2')),
+            '--aws-region', dest='region', default=None,
+            help='Deprecated alias for --region'),
 
         opt_group.add_option(
             '--emr-endpoint', dest='emr_endpoint', default=None,
             help=('Force mrjob to connect to EMR on this endpoint'
                   ' (e.g. us-west-1.elasticmapreduce.amazonaws.com). Default'
-                  ' is to infer this from aws_region.')),
+                  ' is to infer this from region.')),
 
         opt_group.add_option(
             '--s3-endpoint', dest='s3_endpoint', default=None,
@@ -426,9 +433,9 @@ def _add_emr_run_opts(opt_group):
     """Options for running and monitoring a job on EMR."""
     return [
         opt_group.add_option(
-            '--check-emr-status-every', dest='check_emr_status_every',
+            '--check-emr-status-every', dest='check_cluster_every',
             default=None, type='int',
-            help='How often (in seconds) to check status of your EMR job'),
+            help='Deprecated alias for --check-cluster-every'),
 
         # --ec2-key-pair is used to launch the job, not to monitor it
         opt_group.add_option(
@@ -442,14 +449,15 @@ def _add_emr_run_opts(opt_group):
                   ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)')),
 
         opt_group.add_option(
-            '--emr-job-flow-id', dest='emr_job_flow_id', default=None,
+            '--emr-job-flow-id', dest='cluster_id', default=None,
             help='Deprecated alias for --cluster-id'),
 
         opt_group.add_option(
             '--hadoop-streaming-jar-on-emr',
             dest='hadoop_streaming_jar_on_emr', default=None,
-            help=('Local path of the hadoop streaming jar on the EMR node.'
-                  ' Rarely necessary.')),
+            help=("Deprecated: prepend 'file://' and pass that to"
+                  ' --hadoop-streaming-jar instead'),
+        ),
 
         opt_group.add_option(
             '--no-ssh-tunnel', dest='ssh_tunnel',
@@ -494,7 +502,7 @@ def _add_emr_run_opts(opt_group):
                   ' localhost).')),
 
         opt_group.add_option(
-            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel_to_job_tracker',
+            '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel',
             default=None, action='store_true',
             help='Deprecated alias for --ssh-tunnel'),
     ]
@@ -508,9 +516,21 @@ def _add_emr_launch_opts(opt_group):
             help='A JSON string for selecting additional features on EMR'),
 
         opt_group.add_option(
-            '--aws-availability-zone', dest='aws_availability_zone',
+            '--aws-availability-zone', dest='zone',
             default=None,
-            help='Availability zone to run the cluster on'),
+            help='Deprecated alias for --zone'),
+
+        opt_group.add_option(
+            '--cloud-log-dir', dest='cloud_log_dir', default=None,
+            help='URI on remote FS to write logs into'),
+
+        opt_group.add_option(
+            '--cloud-upload-part-size', dest='cloud_upload_part_size',
+            default=None,
+            type='float',
+            help=('Upload files to S3 in parts no bigger than this many'
+                  ' megabytes. Default is 100 MiB. Set to 0 to disable'
+                  ' multipart uploading entirely.')),
 
         opt_group.add_option(
             '--ec2-key-pair', dest='ec2_key_pair', default=None,
@@ -545,11 +565,9 @@ def _add_emr_launch_opts(opt_group):
                   'ReleaseGuide/emr-configure-apps.html for examples.')),
 
         opt_group.add_option(
-            '--emr-tag', dest='emr_tags',
+            '--emr-tag', dest='tags',
             default=[], action='append',
-            help='Metadata tags to apply to the EMR cluster; '
-                 'should take the form KEY=VALUE. You can use --emr-tag '
-                 'multiple times.'),
+            help='Deprecated alias for --tag'),
 
         opt_group.add_option(
             '--iam-endpoint', dest='iam_endpoint', default=None,
@@ -587,7 +605,7 @@ def _add_emr_launch_opts(opt_group):
             help="Don't run our job on a pooled cluster (the default)."),
 
         opt_group.add_option(
-            '--no-pool-emr-job-flows', dest='pool_emr_job_flows',
+            '--no-pool-emr-job-flows', dest='pool_clusters',
             action='store_false',
             help="Deprecated alias for --no-pool-clusters"),
 
@@ -603,7 +621,7 @@ def _add_emr_launch_opts(opt_group):
                  ' clusters left idle can quickly become expensive!'),
 
         opt_group.add_option(
-            '--pool-emr-job-flows', dest='pool_emr_job_flows',
+            '--pool-emr-job-flows', dest='pool_clusters',
             action='store_true',
             help='Deprecated alias for --pool-clusters'),
 
@@ -614,36 +632,40 @@ def _add_emr_launch_opts(opt_group):
                   ' specified.')),
 
         opt_group.add_option(
-            '--s3-log-uri', dest='s3_log_uri', default=None,
-            help='URI on S3 to write logs into'),
+            '--s3-log-uri', dest='cloud_log_dir', default=None,
+            help='Deprecated alias for --cloud-log-dir'),
 
         opt_group.add_option(
-            '--s3-scratch-uri', dest='s3_scratch_uri', default=None,
-            help='Deprecated alias for --s3-tmp-dir.'),
+            '--s3-scratch-uri', dest='cloud_tmp_dir', default=None,
+            help='Deprecated alias for --cloud-tmp-dir'),
 
         opt_group.add_option(
-            '--s3-sync-wait-time', dest='s3_sync_wait_time', default=None,
+            '--s3-tmp-dir', dest='cloud_tmp_dir', default=None,
+            help='Deprecated alias for --cloud-tmp-dir'),
+
+        opt_group.add_option(
+            '--s3-sync-wait-time', dest='cloud_fs_sync_secs', default=None,
             type='float',
-            help=('How long to wait for S3 to reach eventual consistency. This'
-                  ' is typically less than a second (zero in us-west) but the'
-                  ' default is 5.0 to be safe.')),
+            help='Deprecated alias for --cloud-fs-sync-secs'),
 
         opt_group.add_option(
-            '--s3-tmp-dir', dest='s3_tmp_dir', default=None,
-            help='URI on S3 to use as our temp directory.'),
-
-        opt_group.add_option(
-            '--s3-upload-part-size', dest='s3_upload_part_size', default=None,
+            '--s3-upload-part-size', dest='cloud_upload_part_size',
+            default=None,
             type='float',
-            help=('Upload files to S3 in parts no bigger than this many'
-                  ' megabytes. Default is 100 MiB. Set to 0 to disable'
-                  ' multipart uploading entirely.')),
+            help='Deprecated alias for --cloud-upload-part-size'),
 
         opt_group.add_option(
             '--subnet', dest='subnet', default=None,
             help=('ID of Amazon VPC subnet to launch cluster in (if not set'
                   ' or empty string, cluster is launched in the normal AWS'
                   ' cloud)')),
+
+        opt_group.add_option(
+            '--tag', dest='tags',
+            default=[], action='append',
+            help='Metadata tags to apply to the EMR cluster; '
+                 'should take the form KEY=VALUE. You can use --tag '
+                 'multiple times.'),
 
         opt_group.add_option(
             '--visible-to-all-users', dest='visible_to_all_users',
@@ -725,72 +747,74 @@ def _add_emr_instance_opts(opt_group):
     return [
         # AMI
         opt_group.add_option(
-            '--ami-version', dest='ami_version', default=None,
-            help=('AMI Version to use, e.g. "2.4.11", "3.8.0", "4.0.0"')),
+            '--ami-version', dest='image_version', default=None,
+            help='Deprecated alias for --image-version'),
 
         opt_group.add_option(
             '--release-label', dest='release_label', default=None,
             help=('Release Label (e.g. "emr-4.0.0"). Overrides'
-                  ' --ami-version')),
+                  ' --image-version')),
 
-        # instance types
-        opt_group.add_option(
-            '--ec2-core-instance-type', '--ec2-slave-instance-type',
-            dest='ec2_core_instance_type', default=None,
-            help='Type of EC2 instance for core (or "slave") nodes only'),
+        # instance types (the non-deprecated options are in
+        # _add_dataproc_emr_opts())
 
         opt_group.add_option(
-            '--ec2-instance-type', dest='ec2_instance_type', default=None,
-            help=('Type of EC2 instance(s) to launch (e.g. m1.medium,'
-                  ' c3.xlarge, r3.xlarge). See'
-                  ' http://aws.amazon.com/ec2/instance-types/ for the full'
-                  ' list.')),
+            '--ec2-core-instance-type',
+            dest='core_instance_type', default=None,
+            help='Deprecated alias for --core-instance-type'),
 
         opt_group.add_option(
-            '--ec2-master-instance-type', dest='ec2_master_instance_type',
+            '--ec2-slave-instance-type',
+            dest='core_instance_type', default=None,
+            help='Deprecated alias for --core-instance-type'),
+
+        opt_group.add_option(
+            '--ec2-instance-type', dest='instance_type', default=None,
+            help='Deprecated alias for --instance-type'),
+
+        opt_group.add_option(
+            '--ec2-master-instance-type', dest='master_instance_type',
             default=None,
-            help='Type of EC2 instance for master node only'),
+            help='Deprecated alias for --master-instance-type'),
 
         opt_group.add_option(
-            '--ec2-task-instance-type', dest='ec2_task_instance_type',
+            '--ec2-task-instance-type', dest='task_instance_type',
             default=None,
-            help='Type of EC2 instance for task nodes only'),
+            help='Deprecated alias for --task-instance-type'),
 
-        # instance number
+        # instance number (the non-deprecated options are in
+        # _add_dataproc_emr_opts())
+
         opt_group.add_option(
             '--num-ec2-instances', dest='num_ec2_instances', default=None,
             type='int',
-            help='Total number of EC2 instances to launch '),
+            help=('Deprecated: subtract one and pass that to '
+                  '--num-core-instances instead')),
 
-        # NB: EMR instance counts are only applicable for slave/core and
-        # task, since a master count > 1 causes the EMR API to return the
-        # ValidationError "A master instance group must specify a single
-        # instance".
         opt_group.add_option(
-            '--num-ec2-core-instances', dest='num_ec2_core_instances',
+            '--num-ec2-core-instances', dest='num_core_instances',
             default=None, type='int',
-            help=('Number of EC2 instances to start as core (or "slave") '
-                  'nodes. Incompatible with --num-ec2-instances.')),
+            help='Deprecated alias for --num-core-instances'),
 
         opt_group.add_option(
-            '--num-ec2-task-instances', dest='num_ec2_task_instances',
+            '--num-ec2-task-instances', dest='num_task_instances',
             default=None, type='int',
-            help=('Number of EC2 instances to start as task '
-                  'nodes. Incompatible with --num-ec2-instances.')),
+            help='Deprecated alias for --num-task-instances'),
 
-        # bid price
+        # bid price (this doesn't exist on Dataproc)
+
         opt_group.add_option(
-            '--ec2-core-instance-bid-price',
-            dest='ec2_core_instance_bid_price', default=None,
+            '--core-instance-bid-price',
+            dest='core_instance_bid_price', default=None,
             help=(
-                'Bid price to specify for core (or "slave") nodes when'
+                'Bid price to specify for core nodes when'
                 ' setting them up as EC2 spot instances (you probably only'
                 ' want to set a bid price for task instances).')
         ),
 
         opt_group.add_option(
-            '--ec2-master-instance-bid-price',
-            dest='ec2_master_instance_bid_price', default=None,
+            '--master-instance-bid-price',
+            dest='master_instance_bid_price', default=None,
             help=(
                 'Bid price to specify for the master node when setting it up '
                 'as an EC2 spot instance (you probably only want to set '
@@ -798,11 +822,29 @@ def _add_emr_instance_opts(opt_group):
         ),
 
         opt_group.add_option(
-            '--ec2-task-instance-bid-price',
-            dest='ec2_task_instance_bid_price', default=None,
+            '--task-instance-bid-price',
+            dest='task_instance_bid_price', default=None,
             help=(
                 'Bid price to specify for task nodes when '
                 'setting them up as EC2 spot instances.')
+        ),
+
+        opt_group.add_option(
+            '--ec2-core-instance-bid-price',
+            dest='core_instance_bid_price', default=None,
+            help='Deprecated alias for --core-instance-bid-price',
+        ),
+
+        opt_group.add_option(
+            '--ec2-master-instance-bid-price',
+            dest='master_instance_bid_price', default=None,
+            help='Deprecated alias for --master-instance-bid-price',
+        ),
+
+        opt_group.add_option(
+            '--ec2-task-instance-bid-price',
+            dest='task_instance_bid_price', default=None,
+            help='Deprecated alias for --task-instance-bid-price',
         ),
     ]
 
@@ -871,11 +913,11 @@ def _fix_custom_options(options, option_parser):
 
         options.emr_configurations = decoded_configurations
 
-    if hasattr(options, 'emr_tags'):
-        emr_tag_err = '--emr-tag argument %r is not of the form KEY=VALUE'
-        options.emr_tags = parse_key_value_list(options.emr_tags,
-                                                emr_tag_err,
-                                                option_parser.error)
+    if hasattr(options, 'tags'):
+        tag_err = '--tag argument %r is not of the form KEY=VALUE'
+        options.tags = parse_key_value_list(options.tags,
+                                            tag_err,
+                                            option_parser.error)
 
     if hasattr(options, 'jobconf'):
         jobconf_err = '--jobconf argument %r is not of the form KEY=VALUE'
@@ -889,4 +931,5 @@ def _fix_custom_options(options, option_parser):
         except ValueError as e:
             option_parser.error('invalid port range list %r: \n%s' %
                                 (options.ssh_bind_ports, e.args[0]))
-            options.ssh_bind_ports = ports
+
+        options.ssh_bind_ports = ports

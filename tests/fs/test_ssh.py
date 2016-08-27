@@ -1,4 +1,4 @@
-# Copyright 2009-2013 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -99,7 +99,6 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
         self.assertEqual(list(self.fs.ls('ssh://testmaster/')),
                          ['ssh://testmaster/f'])
-
 
     def test_slave_ls(self):
         self.add_slave()

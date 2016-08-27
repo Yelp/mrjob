@@ -42,10 +42,10 @@ from mrjob.parse import _RFC1123
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 
-
 from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import MagicMock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
@@ -151,7 +151,8 @@ class MockBotoTestCase(SandboxedTestCase):
 
     def setUp(self):
         # patch boto
-        self.mock_emr_failures = {}
+        self.mock_emr_failures = set()
+        self.mock_emr_self_termination = set()
         self.mock_emr_clusters = {}
         self.mock_emr_output = {}
         self.mock_iam_instance_profiles = {}
@@ -230,10 +231,12 @@ class MockBotoTestCase(SandboxedTestCase):
 
         # Tell the runner to use the fake binary
         runner._opts['ssh_bin'] = [self.ssh_bin]
-        # Inject master node hostname so it doesn't try to 'emr --describe' it
-        runner._address = 'testmaster'
         # Also pretend to have an SSH key pair file
         runner._opts['ec2_key_pair_file'] = self.keyfile_path
+
+        # use fake hostname
+        runner._address_of_master = MagicMock(return_value='testmaster')
+        runner._master_private_ip = MagicMock(return_value='172.172.172.172')
 
         # re-initialize fs
         runner._fs = None
@@ -287,6 +290,7 @@ class MockBotoTestCase(SandboxedTestCase):
         kwargs['mock_s3_fs'] = self.mock_s3_fs
         kwargs['mock_emr_clusters'] = self.mock_emr_clusters
         kwargs['mock_emr_failures'] = self.mock_emr_failures
+        kwargs['mock_emr_self_termination'] = self.mock_emr_self_termination
         kwargs['mock_emr_output'] = self.mock_emr_output
         return MockEmrConnection(*args, **kwargs)
 
@@ -602,7 +606,9 @@ class MockEmrConnection(object):
                  https_connection_factory=None, region=None,
                  security_token=None,
                  mock_s3_fs=None, mock_emr_clusters=None,
-                 mock_emr_failures=None, mock_emr_output=None,
+                 mock_emr_failures=None,
+                 mock_emr_self_termination=None,
+                 mock_emr_output=None,
                  max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED,
                  max_steps_returned=DEFAULT_MAX_STEPS_RETURNED):
         """Create a mock version of EmrConnection. Most of these args are
@@ -627,6 +633,9 @@ class MockEmrConnection(object):
                                  and ``_steps`` fields.
         :param mock_emr_failures: a set of ``(cluster ID, step_num)`` for steps
                                   that should fail.
+        :param mock_emr_self_termination: a set of cluster IDs that should
+                                          simulate master node termination
+                                          once cluster is up
         :param mock_emr_output: a map from ``(cluster ID, step_num)`` to a
                                 list of ``str``s representing file contents to
                                 output when the job completes
@@ -650,7 +659,9 @@ class MockEmrConnection(object):
 
         self.mock_s3_fs = combine_values({}, mock_s3_fs)
         self.mock_emr_clusters = combine_values({}, mock_emr_clusters)
-        self.mock_emr_failures = combine_values({}, mock_emr_failures)
+        self.mock_emr_failures = combine_values(set(), mock_emr_failures)
+        self.mock_emr_self_termination = combine_values(
+            set(), mock_emr_self_termination)
         self.mock_emr_output = combine_values({}, mock_emr_output)
         self.max_clusters_returned = max_clusters_returned
         self.max_steps_returned = max_steps_returned
@@ -837,7 +848,7 @@ class MockEmrConnection(object):
             id=cluster_id,
             loguri=log_uri,
             # TODO: set this later, once cluster is running
-            masterpublicdnsname='mockmaster',
+            masterpublicdnsname='mockmaster%d' % len(self.mock_emr_clusters),
             name=name,
             normalizedinstancehours='0',
             releaselabel=release_label,
@@ -1164,6 +1175,35 @@ class MockEmrConnection(object):
 
         return MockEmrObject(clusters=cluster_summaries, marker=cluster_marker)
 
+    def list_instances(self, cluster_id, instance_group_id=None,
+                       instance_group_types=None, marker=None):
+        """really bare-bones simulation of list_instances() to support
+        SSH tunneling; only works for the master instance, and only includes
+        the privateipaddress field.
+        """
+        self._enforce_strict_ssl()
+
+        if instance_group_id is not None:
+            raise NotImplementedError(
+                'instance_group_id not simulated for ListInstances')
+
+        if not (instance_group_types and
+                list(instance_group_types) == ['MASTER']):
+            raise NotImplementedError(
+                'ListInstances only simulated for master group')
+
+        if marker is not None:
+            raise NotImplementedError(
+                'marker not simulated for ListInstances')
+
+        cluster = self._get_mock_cluster(cluster_id)
+
+        master = MockEmrObject()
+        if cluster.status.state != 'STARTING':
+            master.privateipaddress = '172.172.172.172'
+
+        return MockEmrObject(instances=[master])
+
     def list_instance_groups(self, cluster_id, marker=None):
         self._enforce_strict_ssl()
 
@@ -1173,7 +1213,7 @@ class MockEmrConnection(object):
 
         if marker is not None:
             raise NotImplementedError(
-                'marker not simulated for ListBootstrapActions')
+                'marker not simulated for ListInstanceGroups')
 
         cluster = self._get_mock_cluster(cluster_id)
 
@@ -1278,7 +1318,7 @@ class MockEmrConnection(object):
             code = getattr(getattr(cluster.status, 'statechangereason', None),
                            'code', None)
 
-            if code == 'STEP_FAILURE':
+            if code and code.endswith('_FAILURE'):
                 cluster.status.state = 'TERMINATED_WITH_ERRORS'
             else:
                 cluster.status.state = 'TERMINATED'
@@ -1297,6 +1337,20 @@ class MockEmrConnection(object):
 
         # at this point, should be RUNNING or WAITING
         assert cluster.status.state in ('RUNNING', 'WAITING')
+
+        # simulate self-termination
+        if cluster_id in self.mock_emr_self_termination:
+            cluster.status.state = 'TERMINATING'
+            cluster.status.statechangereason = MockEmrObject(
+                code='INSTANCE_FAILURE',
+                message='The master node was terminated. ',  # sic
+            )
+
+            for step in cluster._steps:
+                if step.status.state in ('PENDING', 'RUNNING'):
+                    step.status.state = 'CANCELLED'  # not INTERRUPTED
+
+            return
 
         # try to find the next step, and advance it
 

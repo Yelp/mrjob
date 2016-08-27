@@ -96,6 +96,23 @@ for example, you can tell a job which runner launched it. See
 If you *don't* do this, ``self.options.runner`` will now always be ``None``
 in your job (it used to confusingly default to ``'inline'``).
 
+Stop logging credentials
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+When mrjob is run in verbose mode (the ``-v`` option), the values of all
+runner options are debug-logged to stderr. This has been the case since
+the very early days of mrjob.
+
+Unfortunately, this means that if you set your AWS credentials in
+:file:`mrjob.conf`, they get logged as well, creating a surprising potential
+security vulnerability. (This doesn't happen for AWS credentials set through
+environment variables.)
+
+Starting in this version, the values of :mrjob-opt:`aws_secret_access_key`
+and :mrjob-opt:`aws_security_token` are shown as ``'...'`` if they are set,
+and all but the last four characters of :mrjob-opt:`aws_access_key_id` are
+blanked out as well (e.g. ``'...YNDR'``).
+
 Other improvements and bugfixes
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

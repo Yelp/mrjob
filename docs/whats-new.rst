@@ -80,7 +80,8 @@ Log interpretation
 
 Log interpretation (counters and probable cause of job failure) on Hadoop is
 more robust, handing a wider variety of log4j formats and recovering more
-gracefully from permissions errors.
+gracefully from permissions errors. This includes fixing a crash that
+could happen on Python 3 when attempting to read data from HDFS.
 
 Log interpretation used to be partially broken on EMR AMI 4.3.0 and later
 due to a permissions issue; this is now fixed.
@@ -110,9 +111,6 @@ now only runs on the master node.
 
 The :ref:`audit-emr-usage` command-line tool should no longer constantly
 trigger throttling warnings.
-
-Fixed a crash that could happen in Python 3 when attempting to read data from
-HDFS.
 
 :mrjob-opt:`bootstrap_python` no longer bothers trying to install Python 3
 on EMR AMI 4.6.0 and later, since it is already installed.

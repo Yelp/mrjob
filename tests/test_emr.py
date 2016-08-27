@@ -30,12 +30,8 @@ import mrjob.emr
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_INTERMEDIARY_JAR
-<<<<<<< HEAD
-from mrjob.emr import _DEFAULT_AMI_VERSION
-from mrjob.emr import _EMR_SPARK_ARGS
-=======
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
->>>>>>> master
+from mrjob.emr import _EMR_SPARK_ARGS
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock

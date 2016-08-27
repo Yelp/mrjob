@@ -406,11 +406,11 @@ class MRJobLauncher(object):
                 if self.options.runner == 'emr':
                     ...
 
-         *opt_str* can be a long option switch like ``--runner`` or a short
-         one like ``-r``.
+        *opt_str* can be a long option switch like ``--runner`` or a short
+        one like ``-r``.
 
-         .. versionadded:: 0.5.4
-         """
+        .. versionadded:: 0.5.4
+        """
         self._passthrough_options.append(
             self.option_parser.get_option(opt_str))
 

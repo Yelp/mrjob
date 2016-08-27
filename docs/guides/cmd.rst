@@ -16,6 +16,8 @@ The :command:`mrjob` command comes with Python-version-specific aliases (e.g.
 EMR tools
 ---------
 
+.. _audit-emr-usage:
+
 audit-emr-usage
 ^^^^^^^^^^^^^^^
 
@@ -45,6 +47,8 @@ terminate-cluster
 ^^^^^^^^^^^^^^^^^
 
     .. automodule:: mrjob.tools.emr.terminate_cluster
+
+.. _terminate-idle-clusters:
 
 terminate-idle-clusters
 ^^^^^^^^^^^^^^^^^^^^^^^

@@ -4,6 +4,115 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.4:
+
+0.5.4
+-----
+
+Pooling and idle cluster self-termination
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+This release resolve a long-standing EMR API race condition that made it
+difficult to use pooling (see :mrjob-opt:`pool_clusters`) and idle cluster
+self-termination (see :mrjob-opt:`max_hours_idle`) together. Now if your
+pooled job unknowingly runs on a cluster that was in the process of shutting
+down, it will detect that and re-launch the job on a different cluster.
+
+This means pretty much *everyone* running jobs on EMR should now enable
+pooling, with a configuration like this:
+
+.. code-block:: yaml
+
+   runners:
+     emr:
+       max_hours_idle: 1
+       pool_clusters: true
+
+You may *also* run the :ref:`terminate-idle-clusters` script periodically, but
+(barring any bugs) this shouldn't be necessary.
+
+.. _generic-emr-option-names:
+
+Generic EMR option names
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+Many options to the :doc:`EMR runner <guides/emr-quickstart>` have been
+made more generic, to make it easier to share code with the
+:doc:`Dataproc runner <guides/dataproc-quickstart>`
+(in most cases, the new names are also shorter and easier to remember):
+
+=============================== ======================================
+ old option name                 new option name
+=============================== ======================================
+*ami_version*                   :mrjob-opt:`image_version`
+*aws_availablity_zone*          :mrjob-opt:`zone`
+*aws_region*                    :mrjob-opt:`region`
+*check_emr_status_every*        :mrjob-opt:`check_cluster_every`
+*ec2_core_instance_bid_price*   :mrjob-opt:`core_instance_bid_price`
+*ec2_core_instance_type*        :mrjob-opt:`core_instance_type`
+*ec2_instance_type*             :mrjob-opt:`instance_type`
+*ec2_master_instance_bid_price* :mrjob-opt:`master_instance_bid_price`
+*ec2_master_instance_type*      :mrjob-opt:`master_instance_type`
+*ec2_slave_instance_type*       :mrjob-opt:`core_instance_type`
+*ec2_task_instance_bid_price*   :mrjob-opt:`task_instance_bid_price`
+*ec2_task_instance_type*        :mrjob-opt:`task_instance_type`
+*emr_tags*                      :mrjob-opt:`tags`
+*num_ec2_core_instances*        :mrjob-opt:`num_core_instances`
+*num_ec2_task_instances*        :mrjob-opt:`num_task_instances`
+*s3_log_uri*                    :mrjob-opt:`cloud_log_dir`
+*s3_sync_wait_time*             :mrjob-opt:`cloud_fs_sync_secs`
+*s3_tmp_dir*                    :mrjob-opt:`cloud_tmp_dir`
+*s3_upload_part_size*           :mrjob-opt:`cloud_upload_part_size`
+=============================== ======================================
+
+The old option names and switches are now deprecated but will continue
+to work until v0.6.0.
+
+:mrjob-opt:`num_ec2_instances` has simply been deprecated (it's just
+:mrjob-opt:`num_core_instances` plus one).
+
+:mrjob-opt:`hadoop_streaming_jar_on_emr` has also been deprecated; in its
+place, you can now pass a ``file://`` URI to :mrjob-opt:`hadoop_streaming_jar`
+to reference a path on the master node.
+
+Log interpretation
+^^^^^^^^^^^^^^^^^^
+
+Log interpretation (counters and probable cause of job failure) on Hadoop is
+more robust, handing a wider variety of log4j formats and recovering more
+gracefully from permissions errors.
+
+Log interpretation used to be partially broken on EMR AMI 4.3.0 and later
+due to a permissions issue; this is now fixed.
+
+pass_through_option()
+^^^^^^^^^^^^^^^^^^^^^
+
+You can now pass through *existing* command-line switches to your job;
+for example, you can tell a job which runner launched it. See
+:py:meth:`~mrjob.job.MRJob.pass_through_option` for details.
+
+If you *don't* do this, ``self.options.runner`` will now always be ``None``
+in your job (it used to confusingly default to ``'inline'``).
+
+Other improvements and bugfixes
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The ssh tunnel to the resource manager on EMR (see :mrjob-opt:`ssh_tunnel`)
+now connects to its correct *internal* IP; this resolves a firewall issue that
+existed on some VPC setups.
+
+Uploaded files will no longer be given names starting with ``_`` or ``.``,
+since Hadoop's input processing treats these files as "hidden".
+
+The EMR idle cluster self-termination script (see :mrjob-opt:`max_hours_idle`)
+now only runs on the master node.
+
+The :ref:`audit-emr-usage` command-line tool should no longer constantly
+trigger throttling warnings.
+
+The ``--ssh-bind-ports`` command-line switch was broken (starting in
+:ref:`v0.4.5`!), and is now fixed.
 
 .. _v0.5.3:
 
@@ -287,6 +396,7 @@ as single-item lists. See :ref:`this example <configs-list-example>`.
 Fixed a bug that kept the ``pool_wait_minutes`` option from being loaded from
 config files.
 
+.. _v0.4.5:
 
 0.4.5
 -----

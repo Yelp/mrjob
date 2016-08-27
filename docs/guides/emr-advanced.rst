@@ -50,15 +50,11 @@ cluster and add the job to it rather than creating a new one.
 
 .. warning::
 
-    If you use cluster pools, keep
-    :command:`mrjob terminate-idle-clusters` in your crontab!
+    If you use cluster pools, either set :mrjob-opt:`max_hours_idle`
+    in your config file (recommended), or
+    keep :command:`mrjob terminate-idle-clusters` in your crontab.
     Otherwise you may forget to terminate your clusters and waste a lot of
     money.
-
-Alternatively, you may use the :mrjob-opt:`max_hours_idle` option to create
-self-terminating clusters; the disadvantage is that pooled jobs may
-occasionally join clusters with out knowing they are about to self-terminate
-(this is better for development than production).
 
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
 share the same clusters. This means that the version of :py:mod:`mrjob` and
@@ -75,7 +71,7 @@ join:
   lack thereof)
 
 Pooled jobs will also only use clusters with the same **pool name**, so you
-can use the :mrjob-opt:`pool_name` to partition your clusters into
+can use the :mrjob-opt:`pool_name` option to partition your clusters into
 separate pools.
 
 Pooling is flexible about instance type and number of instances; it will
@@ -102,8 +98,8 @@ cluster. This is somewhat ugly but works in practice, and avoids
 
 You can allow jobs to wait for an available cluster instead of immediately
 starting a new one by specifying a value for `--pool-wait-minutes`. mrjob will
-try to find a cluster every 30 seconds for **pool_wait_minutes**. If none is
-found during that time, mrjob will start a new one.
+try to find a cluster every 30 seconds for :mrjob-opt:`pool_wait_minutes`. If
+none is found during that time, mrjob will start a new one.
 
 .. _spot-instances:
 

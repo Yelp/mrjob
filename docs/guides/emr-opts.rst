@@ -766,7 +766,7 @@ Choosing/creating a cluster to join
     cluster.
 
     .. warning:: Do not run this without either setting
-        :mrjob-opt:`max_hours_idle` or putting
+        :mrjob-opt:`max_hours_idle` (recommended) or putting
         :command:`mrjob terminate-idle-clusters` in your crontab;
         clusters left idle can quickly become expensive!
 

@@ -12,8 +12,8 @@ For a complete list of changes, see `CHANGES.txt
 Pooling and idle cluster self-termination
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-This release resolve a long-standing EMR API race condition that made it
-difficult to use pooling (see :mrjob-opt:`pool_clusters`) and idle cluster
+This release resolves a long-standing EMR API race condition that made it
+difficult to use :ref:`cluster pooling <pooling-clusters>` and idle cluster
 self-termination (see :mrjob-opt:`max_hours_idle`) together. Now if your
 pooled job unknowingly runs on a cluster that was in the process of shutting
 down, it will detect that and re-launch the job on a different cluster.
@@ -65,8 +65,8 @@ made more generic, to make it easier to share code with the
 *s3_upload_part_size*           :mrjob-opt:`cloud_upload_part_size`
 =============================== ======================================
 
-The old option names and switches are now deprecated but will continue
-to work until v0.6.0.
+The old option names and command-line switches are now deprecated but will
+continue to work until v0.6.0.
 
 :mrjob-opt:`num_ec2_instances` has simply been deprecated (it's just
 :mrjob-opt:`num_core_instances` plus one).

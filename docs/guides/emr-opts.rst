@@ -770,6 +770,11 @@ Choosing/creating a cluster to join
         :command:`mrjob terminate-idle-clusters` in your crontab;
         clusters left idle can quickly become expensive!
 
+    .. versionchanged:: 0.5.4
+
+       Pooling now gracefully recovers from joining a cluster that was
+       in the process of shutting down (see :mrjob-opt:`max_hours_idle`).
+
 .. mrjob-opt::
     :config: pool_wait_minutes
     :switch: --pool-wait-minutes

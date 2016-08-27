@@ -114,6 +114,9 @@ trigger throttling warnings.
 Fixed a crash that could happen in Python 3 when attempting to read data from
 HDFS.
 
+:mrjob-opt:`bootstrap_python` no longer bothers trying to install Python 3
+on EMR AMI 4.6.0 and later, since it is already installed.
+
 The ``--ssh-bind-ports`` command-line switch was broken (starting in
 :ref:`v0.4.5`!), and is now fixed.
 

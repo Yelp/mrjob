@@ -111,6 +111,9 @@ now only runs on the master node.
 The :ref:`audit-emr-usage` command-line tool should no longer constantly
 trigger throttling warnings.
 
+Fixed a crash that could happen in Python 3 when attempting to read data from
+HDFS.
+
 The ``--ssh-bind-ports`` command-line switch was broken (starting in
 :ref:`v0.4.5`!), and is now fixed.
 

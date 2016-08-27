@@ -9,6 +9,7 @@ v0.5.4, 2016-08-26 -- pooling auto-recovery
      * log parsing:
        * handles more log4j patterns (#1405)
        * gracefully handles IOError from exists() (#1355)
+     * fixed crash bug in Hadoop FS on Python 3 (#1396)
    * EMR:
      * pooling auto-recovers from joining a cluster that self-terminated (#708)
      * log fetching uses sudo on 4.3.0+ AMIs (#1244)

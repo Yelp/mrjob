@@ -19,9 +19,9 @@ mappings.
 
 ### EC2 Instances ###
 
-# map from instance type to number of compute units
-# from http://aws.amazon.com/ec2/instance-types/
-# and http://aws.amazon.com/ec2/previous-generation/
+# map from instance type to number of compute units, from:
+# - https://aws.amazon.com/ec2/pricing/
+# - http://aws.amazon.com/ec2/previous-generation/
 EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     'c1.medium': 5,
     'c1.xlarge': 20,
@@ -36,22 +36,23 @@ EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     'c4.large': 8,
     'c4.xlarge': 16,
     'cc1.4xlarge': 33.5,
-    'cc2.8xlarge': 32,
+    'cc2.8xlarge': 88,
     'cg1.4xlarge': 33.5,
-    'cr1.8xlarge': 32,
-    'd2.2xlarge': 28,
+    'cr1.8xlarge': 88,
+    'd2.2xlarge': 27,
     'd2.4xlarge': 56,
     'd2.8xlarge': 116,
     'd2.xlarge': 14,
     'g2.2xlarge': 26,
-    'hi1.4xlarge': 16,
-    'hs2.8xlarge': 17,
+    'g2.8xlarge': 104,
+    'hi1.4xlarge': 35,
+    'hs1.8xlarge': 35,
     'i2.2xlarge': 27,
     'i2.4xlarge': 53,
     'i2.8xlarge': 104,
     'i2.xlarge': 14,
     'm1.large': 4,
-    'm1.medium': 1,
+    'm1.medium': 2,
     'm1.small': 1,
     'm1.xlarge': 8,
     'm2.2xlarge': 13,
@@ -61,6 +62,11 @@ EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     'm3.large': 6.5,
     'm3.medium': 3,
     'm3.xlarge': 13,
+    'm4.10xlarge': 124.5,
+    'm4.2xlarge': 26,
+    'm4.4xlarge': 53.5,
+    'm4.large': 6.5,
+    'm4.xlarge': 13,
     'r3.2xlarge': 26,
     'r3.4xlarge': 52,
     'r3.8xlarge': 104,
@@ -70,9 +76,12 @@ EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS = {
     # t2 units are "burstable", and receive a certain number of "credits"
     # (CPU-minutes) per hour. MapReduce usage is pretty much continuous, so
     # just rating them by how much they can use in one hour.
+    't2.large': 0.6,
     't2.medium': 0.4,
     't2.micro': 0.1,
+    't2.nano': 0.05,
     't2.small': 0.2,
+    'x1.32xlarge': 349,
 }
 
 # map from instance type to GB of memory
@@ -93,13 +102,14 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'c4.xlarge': 7.5,
     'cc1.4xlarge': 23,
     'cc2.8xlarge': 60.5,
-    'cg1.4xlarge': 22,
+    'cg1.4xlarge': 22.5,
     'cr1.8xlarge': 244,
     'd2.2xlarge': 61,
     'd2.4xlarge': 122,
     'd2.8xlarge': 244,
     'd2.xlarge': 30.5,
     'g2.2xlarge': 15,
+    'g2.8xlarge': 60,
     'hi1.4xlarge': 60.5,
     'hs1.8xlarge': 117,
     'i2.2xlarge': 61,
@@ -109,7 +119,7 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'm1.large': 7.5,
     'm1.medium': 3.75,
     'm1.small': 1.7,
-    'm1.xlarge': 15,
+    'm1.xlarge': 17.1,
     'm2.2xlarge': 34.2,
     'm2.4xlarge': 68.4,
     'm2.xlarge': 17.5,
@@ -117,15 +127,23 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
     'm3.large': 7.5,
     'm3.medium': 3.75,
     'm3.xlarge': 15,
+    'm4.10xlarge': 160,
+    'm4.2xlarge': 32,
+    'm4.4xlarge': 64,
+    'm4.large': 8,
+    'm4.xlarge': 16,
     'r3.2xlarge': 61,
     'r3.4xlarge': 122,
     'r3.8xlarge': 244,
     'r3.large': 15,
     'r3.xlarge': 30.5,
     't1.micro': 0.615,
+    't2.large': 8,
     't2.medium': 4,
     't2.micro': 1,
+    't2.nano': 0.5,
     't2.small': 2,
+    'x1.32xlarge': 1952,
 }
 
 

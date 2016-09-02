@@ -45,7 +45,6 @@ v0.5.4, 2016-08-26 -- pooling auto-recovery
        * hadoop_streaming_jar handles this instead with file:// URIs
      * bootstrap_python does nothing on AMI 4.6.0+, as not needed (#1358)
  * mrjob audit-emr-usage should show less/no API throttling warnings (#1091)
->>>>>>> master
 
 v0.5.3, 2016-07-15 -- libjars
  * jobs:

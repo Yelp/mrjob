@@ -1392,7 +1392,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _cheapest_manager_instance_type(self):
         """What's the cheapest instance type we can get away with
         for the master node (when it's not also running jobs)?"""
-        if version_gte(self._opt['image_version'], '3'):
+        if version_gte(self._opts['image_version'], '3'):
             return _CHEAPEST_INSTANCE_TYPE
         else:
             return _CHEAPEST_2_X_INSTANCE_TYPE
@@ -1415,15 +1415,22 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts[role + '_instance_type']:
             return self._opts[role + '_instance_type']
 
-        # otherwise fall back to instance_type (if appropriate)
-        # or use the cheapest type that will work
-        if (role == 'master' and not (
-                self._opts['num_core_instances'] or
-                self._opts['num_task_instance'])):
-            return self._cheapest_manager_instance_type()
-        else:
+        elif self._instance_is_worker(role):
             return (self._opts['instance_type'] or
                     self._cheapest_worker_instance_type())
+
+        else:
+            return self._cheapest_manager_instance_type()
+
+    def _instance_is_worker(self, role):
+        """Do instances of the given role run tasks? True for non-master
+        instances and sole master instance."""
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
+
+        return (role != 'master' or
+                sum(self._num_instances(role)
+                    for role in _INSTANCE_ROLES) == 1)
 
     def _num_instances(self, role):
         """How many of the given instance type do we want?"""
@@ -3295,6 +3302,32 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return wrap_aws_conn(raw_iam_conn)
 
+    # Spark
+
+    def _uses_spark(self):
+        """Does this runner use Spark, based on steps, bootstrap actions,
+        and EMR applications? If so, we'll need more memory."""
+        return (self._has_spark_steps() or
+                self._has_spark_install_bootstrap_action() or
+                self._has_spark_emr_application())
+
+    def _has_spark_steps(self):
+        """Are any of our steps Spark steps (either spark or spark_script)"""
+        return (any(step['type'].split('_')[0] == 'spark')
+                for step in self._get_steps())
+
+    def _has_spark_install_bootstrap_action(self):
+        """Does it look like this runner has a spark bootstrap install
+        action set? (Anything ending in "/install-spark" counts.)"""
+        return any(ba['path'].endswith('/install-spark')
+                   for ba in self._bootstrap_actions)
+
+    def _has_spark_emr_application(self):
+        """Does this runner have "Spark" in its *emr_applications* option?"""
+        return any(a.lower() == 'spark'
+                   for a in self._opts['emr_applications'])
+
+
 
 def _encode_emr_api_params(x):
     """Recursively unpack parameters to the EMR API."""
@@ -3405,30 +3438,3 @@ def _decode_configurations_from_api(configurations):
         results.append(result)
 
     return results
-
-
-
-    # Spark
-
-    def _uses_spark(self):
-        """Does this runner use Spark, based on steps, bootstrap actions,
-        and EMR applications? If so, we'll need more memory."""
-        return (self._has_spark_steps() or
-                self._has_spark_install_bootstrap_action() or
-                self._has_spark_emr_application())
-
-    def _has_spark_steps(self):
-        """Are any of our steps Spark steps (either spark or spark_script)"""
-        return (any(step['type'].split('_')[0] == 'spark')
-                for step in self._get_steps())
-
-    def _has_spark_install_bootstrap_action(self):
-        """Does it look like this runner has a spark bootstrap install
-        action set? (Anything ending in "/install-spark" counts.)"""
-        return any(ba['path'].endswith('/install-spark')
-                   for ba in self._bootstrap_actions)
-
-    def _has_spark_emr_application(self):
-        """Does this runner have "Spark" in its *emr_applications* option?"""
-        return any(a.lower() == 'spark'
-                   for a in self._opts['emr_applications'])

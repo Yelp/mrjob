@@ -49,7 +49,7 @@ Options available to hadoop and emr runners
 
 .. mrjob-opt::
     :config: hadoop_extra_args
-    :switch: --hadoop-extra-arg
+    :switch: --hadoop-arg
     :type: :ref:`string list <data-type-string-list>`
     :set: all
     :default: ``[]``

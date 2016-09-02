@@ -1609,6 +1609,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             return 'TERMINATE_CLUSTER'
 
+    def _has_spark_steps(self):
+        """Does the job have Spark steps? If so, we'll need more memory."""
+        return any(step['type'].startswith('spark')
+                   for step in self._get_steps())
+
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
         steps we want to run."""

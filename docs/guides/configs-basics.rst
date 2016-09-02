@@ -316,21 +316,21 @@ Relative includes
 
 For example, you could do this:
 
-:file:`~/.mrjob/base.conf`
+:file:`~/.mrjob/base.conf`:
 
 .. code-block:: yaml
 
     runners:
       ...
 
-:file:`~/.mrjob/default.conf`
+:file:`~/.mrjob/default.conf`:
 
 .. code-block:: yaml
 
     include: base.conf
 
 You could then load your configs via a symlink :file:`~/.mrjob.conf` to
-:file:`~/.mrjob/default.conf` and file:`~/.mrjob/base.conf` would still be
+:file:`~/.mrjob/default.conf` and :file:`~/.mrjob/base.conf` would still be
 included (even though it's not in the same directory as the symlink).
 
 .. _clearing-configs:

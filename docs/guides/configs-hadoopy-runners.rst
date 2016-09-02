@@ -49,14 +49,14 @@ Options available to hadoop and emr runners
 
 .. mrjob-opt::
     :config: hadoop_extra_args
-    :switch: --hadoop-extra-arg
+    :switch: --hadoop-arg
     :type: :ref:`string list <data-type-string-list>`
     :set: all
     :default: ``[]``
 
     Extra arguments to pass to hadoop streaming. This option is called
     **extra_args** when passed as a keyword argument to
-    :py:class:`MRJobRunner`.
+    :py:class:`~mrjob.runner.MRJobRunner`.
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar

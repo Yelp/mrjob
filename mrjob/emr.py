@@ -1449,7 +1449,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return self._opts[role + '_instance_bid_price']
 
-    def _create_instance_group(self, role, instance_type, count, bid_price):
+    def _create_instance_group(
+            self, role, instance_type, num_instances, bid_price):
         """Helper method for creating instance groups. For use when
         creating a cluster using a list of InstanceGroups
 
@@ -1464,7 +1465,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             raise ValueError
 
         if not instance_type:
-            raise ValueError('Missing instance type for %s node(s)' % role)
+            raise ValueError
+
+        if not num_instances:
+            raise ValueError
 
         if bid_price:
             market = 'SPOT'
@@ -1473,11 +1477,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             market = 'ON_DEMAND'
             bid_price = None
 
-        # Just name the groups "master", "task", and "core"
-        name = role.lower()
-
         return boto.emr.instance_group.InstanceGroup(
-            count, role, instance_type, market, name, bidprice=bid_price)
+            num_instances=num_instances,
+            role=role.upper(),
+            type=instance_type,
+            market=market,
+            name=role,  # just name the groups "core", "master", and "task"
+            bidprice=bid_price)
 
     def _create_cluster(self, persistent=False, steps=None):
         """Create an empty cluster on EMR, and return the ID of that
@@ -1542,12 +1548,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             args['instance_groups'] = []
 
             for role in _INSTANCE_ROLES:
-                args['instance_groups'].append(
-                    self._create_instance_group(
-                        role.upper(),
-                        self._instance_type(role),
-                        self._num_instances(role),
-                        self._instance_bid_price(role)))
+                num_instances = self._num_instances(role)
+
+                if num_instances:
+                    args['instance_groups'].append(
+                        self._create_instance_group(
+                            role=role,
+                            instance_type=self._instance_type(role),
+                            num_instances=self._num_instances(role),
+                            bid_price=self._instance_bid_price(role)))
 
         # bootstrap actions
         bootstrap_action_args = []

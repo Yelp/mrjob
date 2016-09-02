@@ -191,6 +191,19 @@ _EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
 
+# cheapest instance type that can run Spark
+_CHEAPEST_SPARK_INSTANCE_TYPE = 'm1.large'
+
+# cheapest instance type that can run resource manager and non-Spark tasks
+# on 3.x AMI and above
+_CHEAPEST_INSTANCE_TYPE = 'm1.medium'
+
+# cheapest instance type that can run on 2.x AMIs
+_CHEAPEST_2_X_INSTANCE_TYPE = 'm1.small'
+
+# these are the only kinds of instance roles that exist
+_INSTANCE_ROLES = ('master', 'core', 'task')
+
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -489,8 +502,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
-            'core_instance_type': 'm1.medium',
-            'master_instance_type': 'm1.medium',
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
             'num_ec2_instances': 1,
@@ -594,7 +605,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 self['task_instance_type'] = instance_type
 
         # convert a bid price of '0' to None
-        for role in ('core', 'master', 'task'):
+        for role in _INSTANCE_ROLES:
             opt_name = '%s_instance_bid_price' % role
             if not self[opt_name]:
                 self[opt_name] = None
@@ -1375,6 +1386,62 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             time.sleep(self._opts['check_cluster_every'])
             cluster = self._describe_cluster()
 
+
+    # instance types
+
+    def _cheapest_manager_instance_type(self):
+        """What's the cheapest instance type we can get away with
+        for the master node (when it's not also running jobs)?"""
+        if version_gte(self._opt['image_version'], '3'):
+            return _CHEAPEST_INSTANCE_TYPE
+        else:
+            return _CHEAPEST_2_X_INSTANCE_TYPE
+
+    def _cheapest_worker_instance_type(self):
+        """What's the cheapest instance type we can get away with
+        running tasks on?"""
+        if self._uses_spark():
+            return _CHEAPEST_SPARK_INSTANCE_TYPE
+        else:
+            return self._cheapest_manager_instance_type()
+
+    def _instance_type(self, role):
+        """What instance type should we use for the given role?
+        (one of 'master', 'core', 'task')"""
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
+
+        # explicitly set
+        if self._opts[role + '_instance_type']:
+            return self._opts[role + '_instance_type']
+
+        # otherwise fall back to instance_type (if appropriate)
+        # or use the cheapest type that will work
+        if (role == 'master' and not (
+                self._opts['num_core_instances'] or
+                self._opts['num_task_instance'])):
+            return self._cheapest_manager_instance_type()
+        else:
+            return (self._opts['instance_type'] or
+                    self._cheapest_worker_instance_type())
+
+    def _num_instances(self, role):
+        """How many of the given instance type do we want?"""
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
+
+        if role == 'master':
+            return 1  # there can be only one
+        else:
+            return self._opts['num_' + role + '_instances']
+
+    def _instance_bid_price(self, role):
+        """What's the bid price for the given role (if any)?"""
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
+
+        return self._opts[role + '_instance_bid_price']
+
     def _create_instance_group(self, role, instance_type, count, bid_price):
         """Helper method for creating instance groups. For use when
         creating a cluster using a list of InstanceGroups
@@ -1386,12 +1453,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
               this instance group will be use the ON-DEMAND market
               instead of the SPOT market.
         """
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
 
         if not instance_type:
-            if self._opts['instance_type']:
-                instance_type = self._opts['instance_type']
-            else:
-                raise ValueError('Missing instance type for %s node(s)' % role)
+            raise ValueError('Missing instance type for %s node(s)' % role)
 
         if bid_price:
             market = 'SPOT'
@@ -1458,43 +1524,23 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             args['availability_zone'] = self._opts['zone']
         # The old, simple API, available if we're not using task instances
         # or bid prices
-        if not (self._opts['num_task_instances'] or
-                self._opts['core_instance_bid_price'] or
-                self._opts['master_instance_bid_price'] or
-                self._opts['task_instance_bid_price']):
-            args['num_instances'] = self._opts['num_core_instances'] + 1
-            args['master_instance_type'] = self._opts['master_instance_type']
-            args['slave_instance_type'] = self._opts['core_instance_type']
+        if not (self._num_instances('task') or
+                any(self._instance_bid_price(role)
+                    for role in _INSTANCE_ROLES)):
+            args['num_instances'] = self._num_instances('core') + 1
+            args['master_instance_type'] = self._instance_type('master')
+            args['slave_instance_type'] = self._instance_type('core')
         else:
             # Create a list of InstanceGroups
-            args['instance_groups'] = [
-                self._create_instance_group(
-                    'MASTER',
-                    self._opts['master_instance_type'],
-                    1,
-                    self._opts['master_instance_bid_price']
-                ),
-            ]
+            args['instance_groups'] = []
 
-            if self._opts['num_core_instances']:
+            for role in _INSTANCE_ROLES:
                 args['instance_groups'].append(
                     self._create_instance_group(
-                        'CORE',
-                        self._opts['core_instance_type'],
-                        self._opts['num_core_instances'],
-                        self._opts['core_instance_bid_price']
-                    )
-                )
-
-            if self._opts['num_task_instances']:
-                args['instance_groups'].append(
-                    self._create_instance_group(
-                        'TASK',
-                        self._opts['task_instance_type'],
-                        self._opts['num_task_instances'],
-                        self._opts['task_instance_bid_price']
-                    )
-                )
+                        role.upper(),
+                        self._instance_type(role),
+                        self._num_instances(role),
+                        self._instance_bid_price(role)))
 
         # bootstrap actions
         bootstrap_action_args = []
@@ -2819,18 +2865,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         role_to_req_cu = {}
         role_to_req_bid_price = {}
 
-        for role in ('core', 'master', 'task'):
-            instance_type = self._opts['%s_instance_type' % role]
-            if role == 'master':
-                num_instances = 1
-            else:
-                num_instances = self._opts['num_%s_instances' % role]
+        for role in _INSTANCE_ROLES:
+            instance_type = self._instance_type(role)
+            num_instances = self._num_instances(role)
 
             role_to_req_instance_type[role] = instance_type
             role_to_req_num_instances[role] = num_instances
-
-            role_to_req_bid_price[role] = (
-                self._opts['%s_instance_bid_price' % role])
+            role_to_req_bid_price[role] = self._instance_bid_price(role)
 
             # unknown instance types can only match themselves
             role_to_req_mem[role] = (

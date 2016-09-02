@@ -540,9 +540,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         command-line arguments to override defaults and arguments
         in mrjob.conf (see Issue #311).
 
-        Also, make sure that core and slave instance type are the same,
-        total number of instances matches number of master, core, and task
-        instances, and that bid prices of zero are converted to None.
+        Also, make sure that bid prices of zero are converted to None.
         """
         # If task instance type is not set, use core instance type
         # (This is mostly so that we don't inadvertently join a pool
@@ -1608,11 +1606,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return 'CANCEL_AND_WAIT'
         else:
             return 'TERMINATE_CLUSTER'
-
-    def _has_spark_steps(self):
-        """Does the job have Spark steps? If so, we'll need more memory."""
-        return any(step['type'].startswith('spark')
-                   for step in self._get_steps())
 
     def _build_steps(self):
         """Return a list of boto Step objects corresponding to the
@@ -3371,3 +3364,30 @@ def _decode_configurations_from_api(configurations):
         results.append(result)
 
     return results
+
+
+
+    # Spark
+
+    def _uses_spark(self):
+        """Does this runner use Spark, based on steps, bootstrap actions,
+        and EMR applications? If so, we'll need more memory."""
+        return (self._has_spark_steps() or
+                self._has_spark_install_bootstrap_action() or
+                self._has_spark_emr_application())
+
+    def _has_spark_steps(self):
+        """Are any of our steps Spark steps (either spark or spark_script)"""
+        return (any(step['type'].split('_')[0] == 'spark')
+                for step in self._get_steps())
+
+    def _has_spark_install_bootstrap_action(self):
+        """Does it look like this runner has a spark bootstrap install
+        action set? (Anything ending in "/install-spark" counts.)"""
+        return any(ba['path'].endswith('/install-spark')
+                   for ba in self._bootstrap_actions)
+
+    def _has_spark_emr_application(self):
+        """Does this runner have "Spark" in its *emr_applications* option?"""
+        return any(a.lower() == 'spark'
+                   for a in self._opts['emr_applications'])

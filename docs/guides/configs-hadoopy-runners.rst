@@ -56,7 +56,7 @@ Options available to hadoop and emr runners
 
     Extra arguments to pass to hadoop streaming. This option is called
     **extra_args** when passed as a keyword argument to
-    :py:class:`MRJobRunner`.
+    :py:class:`~mrjob.runner.MRJobRunner`.
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar

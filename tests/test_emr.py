@@ -1919,6 +1919,15 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--emr-application', 'Ganglia',
             '--emr-application', 'Mahout'])
 
+    def test_emr_application_matching_is_case_insensitive(self):
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='4.0.0', emr_applications=['Mahout'])
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--image-version', '4.0.0',
+            '--emr-application', 'mahout'])
+
     def test_matching_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
             image_version='4.0.0',

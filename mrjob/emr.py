@@ -2892,8 +2892,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     return
 
             if self._opts['emr_applications']:
-                applications = set(a.name for a in cluster.applications)
-                if not self._opts['emr_applications'] <= applications:
+                # use case-insensitive mapping (see #1417)
+                applications = set(
+                    a.name.lower() for a in cluster.applications)
+
+                expected_applications = set(
+                    a.lower() for a in self._opts['emr_applications'])
+
+                if not expected_applications <= applications:
                     return
 
             emr_configurations = _decode_configurations_from_api(

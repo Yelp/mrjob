@@ -5481,3 +5481,13 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
 
         self.assertEqual(self.mock_Popen.call_count, 3)
         self.assertEqual(params['local_port'], 10003)
+
+
+class UsesSparkTestCase(MockBotoTestCase):
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())

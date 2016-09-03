@@ -925,11 +925,6 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             {},
             master=(1, 'm1.medium', None))
 
-        self._test_instance_groups(
-            {'num_ec2_instances': 3},
-            core=(2, 'm1.medium', None),
-            master=(1, 'm1.medium', None))
-
     def test_single_instance(self):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge'},
@@ -937,7 +932,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
     def test_multiple_instances(self):
         self._test_instance_groups(
-            {'instance_type': 'c1.xlarge', 'num_ec2_instances': 3},
+            {'instance_type': 'c1.xlarge', 'num_core_instances': 2},
             core=(2, 'c1.xlarge', None),
             master=(1, 'm1.medium', None))
 
@@ -948,14 +943,14 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
         self._test_instance_groups(
             {'core_instance_type': 'm2.xlarge',
-             'num_ec2_instances': 3},
+             'num_core_instances': 2},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.medium', None))
 
         self._test_instance_groups(
             {'master_instance_type': 'm1.large',
              'core_instance_type': 'm2.xlarge',
-             'num_ec2_instances': 3},
+             'num_core_instances': 2},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
 
@@ -969,7 +964,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             {'instance_type': 'c1.xlarge',
              'master_instance_type': 'm1.large',
              'core_instance_type': 'm2.xlarge',
-             'num_ec2_instances': 3},
+             'num_core_instances': 2},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
 
@@ -987,7 +982,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
         # set instance_type in mrjob.conf, 3 instances
         self.set_in_mrjob_conf(instance_type='c1.xlarge',
-                               num_ec2_instances=3)
+                               num_core_instances=2)
 
         self._test_instance_groups(
             {},
@@ -1014,7 +1009,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
         # set master and slave in mrjob.conf, 2 instances
         self.set_in_mrjob_conf(master_instance_type='m1.large',
                                core_instance_type='m2.xlarge',
-                               num_ec2_instances=3)
+                               num_core_instances=2)
 
         self._test_instance_groups(
             {},
@@ -1143,7 +1138,13 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             master=(1, 'm1.medium', None),
             task=(20, 'c1.medium', None))
 
-    def test_mixing_instance_number_opts_on_cmd_line(self):
+    def test_deprecated_num_ec2_instances(self):
+        self._test_instance_groups(
+            {'num_ec2_instances': 3},
+            core=(2, 'm1.medium', None),
+            master=(1, 'm1.medium', None))
+
+    def test_deprecated_num_ec2_instances_conflict_on_cmd_line(self):
         stderr = StringIO()
         with no_handlers_for_logger():
             log_to_stream('mrjob.emr', stderr)
@@ -1155,7 +1156,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
         self.assertIn('does not make sense', stderr.getvalue())
 
-    def test_mixing_instance_number_opts_in_mrjob_conf(self):
+    def test_deprecated_num_ec2_instances_conflict_in_mrjob_conf(self):
         self.set_in_mrjob_conf(num_ec2_instances=3,
                                num_core_instances=5,
                                num_task_instances=9)
@@ -1171,7 +1172,7 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
 
         self.assertIn('does not make sense', stderr.getvalue())
 
-    def test_cmd_line_instance_numbers_beat_mrjob_conf(self):
+    def test_deprecated_num_ec2_instances_cmd_line_beats_mrjob_conf(self):
         self.set_in_mrjob_conf(num_core_instances=5,
                                num_task_instances=9)
 

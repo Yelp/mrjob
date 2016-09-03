@@ -1416,6 +1416,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._opts[role + '_instance_type']
 
         elif self._instance_is_worker(role):
+            # using *instance_type* here is defensive programming;
+            # if set, it should have already been popped into the worker
+            # instance type option(s) by _fix_instance_opts() above
             return (self._opts['instance_type'] or
                     self._cheapest_worker_instance_type())
 

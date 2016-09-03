@@ -926,12 +926,12 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             {},
             master=(1, 'm1.medium', None))
 
-    def test_single_instance(self):
+    def test_instance_type_single_instance(self):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge'},
             master=(1, 'c1.xlarge', None))
 
-    def test_multiple_instances(self):
+    def test_instance_type_multiple_instances(self):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge', 'num_core_instances': 2},
             core=(2, 'c1.xlarge', None),
@@ -954,6 +954,33 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
              'num_core_instances': 2},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
+
+    def test_2_x_ami_defaults_single_node(self):
+        # m1.small still works with Hadoop 1, and it's cheaper
+        self._test_instance_groups(
+            dict(ami_version='2.4.11'),
+            master=(1, 'm1.small', None))
+
+    def test_2_x_ami_defaults_multiple_nodes(self):
+        self._test_instance_groups(
+            dict(ami_version='2.4.11', num_core_instances=2),
+            core=(2, 'm1.small', None),
+            master=(1, 'm1.small', None))
+
+    def test_spark_defaults_single_node(self):
+        # Spark needs at least m1.large
+        self._test_instance_groups(
+            dict(ami_version='4.0.0', emr_applications=['Spark']),
+            master=(1, 'm1.large', None))
+
+    def test_spark_defaults_multiple_nodes(self):
+        # Spark can get away with m1.medium for the resource manager
+        self._test_instance_groups(
+            dict(ami_version='4.0.0',
+                 emr_applications=['Spark'],
+                 num_core_instances=2),
+            core=(1, 'm1.large', None),
+            master=(1, 'm1.medium', None))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(

@@ -3324,7 +3324,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         and EMR applications? If so, we'll need more memory."""
         return (self._has_spark_steps() or
                 self._has_spark_install_bootstrap_action() or
-                self._has_spark_emr_application())
+                self._has_spark_application())
 
     def _has_spark_steps(self):
         """Are any of our steps Spark steps (either spark or spark_script)"""
@@ -3337,7 +3337,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return any(ba['path'].endswith('/install-spark')
                    for ba in self._bootstrap_actions)
 
-    def _has_spark_emr_application(self):
+    def _has_spark_application(self):
         """Does this runner have "Spark" in its *emr_applications* option?"""
         return any(a.lower() == 'spark'
                    for a in self._opts['emr_applications'])

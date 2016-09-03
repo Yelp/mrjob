@@ -70,6 +70,7 @@ from tests.mr_null_spark import MRNullSpark
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_sort_values import MRSortValues
 from tests.mr_spark_script import MRSparkScript
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -5491,3 +5492,142 @@ class UsesSparkTestCase(MockBotoTestCase):
 
         with job.make_runner() as runner:
             self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_steps())
+            self.assertFalse(runner._has_spark_install_bootstrap_action())
+            self.assertFalse(runner._has_spark_application())
+
+    def test_spark_step(self):
+        job = MRNullSpark(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_spark_script_step(self):
+        job = MRSparkScript(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_streaming_and_spark_steps(self):
+        job = MRStreamingAndSpark(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_s3_spark_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://support.elasticmapreduce/spark/install-spark',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_file_spark_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            'file:///usr/share/aws/emr/install-spark/install-spark',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_s3_ganglia_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://beta.elasticmapreduce/bootstrap-actions/install-ganglia',
+        ])
+
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_install_bootstrap_action())
+
+    def test_s3_ganglia_and_spark_bootstrap_actions(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://support.elasticmapreduce/spark/install-spark',
+            's3://beta.elasticmapreduce/bootstrap-actions/install-ganglia',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_spark_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_spark_application_lowercase(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_other_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Mahout'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())
+
+    def test_spark_and_other_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Mahout',
+                            '--emr-application', 'Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_ignores_new_supported_products_api_param(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--emr-api-param',
+                            'NewSupportedProducts.member.1.Name=spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())
+
+    def test_ignores_application_api_param(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-api-param',
+                            'Application.member.1.Name=Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())

@@ -4,6 +4,19 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.5:
+
+0.5.5
+-----
+
+Functionally equivalent to :ref:`v0.5.4`, except that it restores
+the deprecated *ami_version* as an alias for :mrjob-opt:`image_version`,
+making it easier to upgrade from earlier versions of mrjob.
+
+Also slightly improves :ref:`EMR cluster pooling <pooling-clusters>` with
+updated information on memory and CPU power of various EC2 instance types, and
+by treating application names (e.g. "Spark") as case-insensitive.
+
 .. _v0.5.4:
 
 0.5.4
@@ -11,6 +24,12 @@ For a complete list of changes, see `CHANGES.txt
 
 Pooling and idle cluster self-termination
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. warning::
+
+   This release accidentally removed the *ami_version* option instead
+   of merely deprecating it. If you are upgrading from an earlier version
+   of mrjob, use version :ref:`v0.5.5` or later.
 
 This release resolves a long-standing EMR API race condition that made it
 difficult to use :ref:`cluster pooling <pooling-clusters>` and idle cluster
@@ -66,7 +85,8 @@ made more generic, to make it easier to share code with the
 =============================== ======================================
 
 The old option names and command-line switches are now deprecated but will
-continue to work until v0.6.0.
+continue to work until v0.6.0. (Exception: *ami_version* was accidentally
+removed; if you need it, use :ref:`v0.5.5` or later.)
 
 :mrjob-opt:`num_ec2_instances` has simply been deprecated (it's just
 :mrjob-opt:`num_core_instances` plus one).

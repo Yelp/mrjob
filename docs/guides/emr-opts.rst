@@ -246,7 +246,16 @@ Cluster creation and configuration
 
     .. versionchanged:: 0.5.4
 
-       This used to be called *ami_version*
+       This used to be called *ami_version*.
+
+    .. warning::
+
+       The deprecated *ami_version* alias for this option is completely
+       ignored by mrjob 0.5.4 (it works in later 0.5.x versions).
+
+    .. warning::
+
+       The 2.x series of AMIs is deprecated by Amazon and not recommended.
 
     .. warning::
 

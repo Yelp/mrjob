@@ -1,3 +1,9 @@
+v0.5.5, 2016-09-05 -- missing ami_version option
+ * EMR runner:
+   * deprecated, don't remove ami_version option in v0.5.4 (#1421)
+   * update memory/CPU stats for EC2 instances for pooling (#1414)
+   * pooling treats application names as case-insensitive (#1417)
+
 v0.5.4, 2016-08-26 -- pooling auto-recovery
  * jobs:
    * pass_through_option(), for existing command-line options (#1075)
@@ -19,6 +25,7 @@ v0.5.4, 2016-08-26 -- pooling auto-recovery
      * AWS credentials no longer logged in verbose mode (#1353)
      * many option names are now more generic (#1247)
        * ami_version -> image_version
+         * accidentally removed ami_version option entirely (fixed in v0.4.5)
        * aws_availability_zone -> zone
        * aws_region -> region
        * check_emr_status_every -> check_cluster_every

@@ -5256,3 +5256,20 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
 
         self.assertEqual(self.mock_Popen.call_count, 3)
         self.assertEqual(params['local_port'], 10003)
+
+
+class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):
+    # regression test for #1421
+
+    def test_ami_version_4_0_0(self):
+        runner = EMRJobRunner(ami_version='4.0.0')
+        runner.make_persistent_cluster()
+
+        self.assertEqual(runner.get_image_version(), '4.0.0')
+
+        cluster = runner._describe_cluster()
+        self.assertEqual(cluster.releaselabel, 'emr-4.0.0')
+        self.assertFalse(hasattr(cluster, 'runningamiversion'))
+
+        self.assertEqual(runner._opts['image_version'], '4.0.0')
+        self.assertEqual(runner._opts['release_label'], 'emr-4.0.0')

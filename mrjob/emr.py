@@ -363,7 +363,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
     ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
         'additional_emr_info',
-        'image_version',
         'aws_access_key_id',
         'aws_secret_access_key',
         'aws_security_token',
@@ -397,6 +396,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',
+        'image_version',
         'instance_type',
         'master_instance_bid_price',
         'master_instance_type',
@@ -442,6 +442,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
+        'ami_version': 'image_version',
         'aws_availability_zone': 'zone',
         'aws_region': 'region',
         'check_emr_status_every': 'check_cluster_every',

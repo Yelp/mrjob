@@ -179,30 +179,11 @@ _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 # intermediary jar used on 4.x AMIs
 _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 
-# path to spark-submit on 3.x AMIs. (On 4.x, it's just 'spark-submit')
-_3_X_SPARK_SUBMIT = '/home/hadoop/spark/bin/spark-submit'
-
-# always use these args with spark-submit
-_EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
-
 # we have to wait this many minutes for logs to transfer to S3 (or wait
 # for the cluster to terminate). Docs say logs are transferred every 5
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
-
-# cheapest instance type that can run Spark
-_CHEAPEST_SPARK_INSTANCE_TYPE = 'm1.large'
-
-# cheapest instance type that can run resource manager and non-Spark tasks
-# on 3.x AMI and above
-_CHEAPEST_INSTANCE_TYPE = 'm1.medium'
-
-# cheapest instance type that can run on 2.x AMIs
-_CHEAPEST_2_X_INSTANCE_TYPE = 'm1.small'
-
-# these are the only kinds of instance roles that exist
-_INSTANCE_ROLES = ('master', 'core', 'task')
 
 
 # used to bail out and retry when a pooled cluster self-terminates
@@ -503,6 +484,8 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
+            'core_instance_type': 'm1.medium',
+            'master_instance_type': 'm1.medium',
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
             'num_ec2_instances': 1,
@@ -552,7 +535,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         command-line arguments to override defaults and arguments
         in mrjob.conf (see Issue #311).
 
-        Also, make sure that bid prices of zero are converted to None.
+        Also, make sure that core and slave instance type are the same,
+        total number of instances matches number of master, core, and task
+        instances, and that bid prices of zero are converted to None.
         """
         # If task instance type is not set, use core instance type
         # (This is mostly so that we don't inadvertently join a pool
@@ -606,7 +591,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 self['task_instance_type'] = instance_type
 
         # convert a bid price of '0' to None
-        for role in _INSTANCE_ROLES:
+        for role in ('core', 'master', 'task'):
             opt_name = '%s_instance_bid_price' % role
             if not self[opt_name]:
                 self[opt_name] = None
@@ -1082,11 +1067,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
-        # upload JARs and (Python) scripts run by steps
         for step in self._get_steps():
-            for key in 'jar', 'script':
-                if step.get(key):
-                    self._upload_mgr.add(step[key])
+            if step.get('jar'):
+                self._upload_mgr.add(step['jar'])
 
     def _upload_local_files_to_s3(self):
         """Copy local files tracked by self._upload_mgr to S3."""
@@ -1387,74 +1370,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             time.sleep(self._opts['check_cluster_every'])
             cluster = self._describe_cluster()
 
-
-    # instance types
-
-    def _cheapest_manager_instance_type(self):
-        """What's the cheapest instance type we can get away with
-        for the master node (when it's not also running jobs)?"""
-        if version_gte(self._opts['image_version'], '3'):
-            return _CHEAPEST_INSTANCE_TYPE
-        else:
-            return _CHEAPEST_2_X_INSTANCE_TYPE
-
-    def _cheapest_worker_instance_type(self):
-        """What's the cheapest instance type we can get away with
-        running tasks on?"""
-        if self._uses_spark():
-            return _CHEAPEST_SPARK_INSTANCE_TYPE
-        else:
-            return self._cheapest_manager_instance_type()
-
-    def _instance_type(self, role):
-        """What instance type should we use for the given role?
-        (one of 'master', 'core', 'task')"""
-        if role not in _INSTANCE_ROLES:
-            raise ValueError
-
-        # explicitly set
-        if self._opts[role + '_instance_type']:
-            return self._opts[role + '_instance_type']
-
-        elif self._instance_is_worker(role):
-            # using *instance_type* here is defensive programming;
-            # if set, it should have already been popped into the worker
-            # instance type option(s) by _fix_instance_opts() above
-            return (self._opts['instance_type'] or
-                    self._cheapest_worker_instance_type())
-
-        else:
-            return self._cheapest_manager_instance_type()
-
-    def _instance_is_worker(self, role):
-        """Do instances of the given role run tasks? True for non-master
-        instances and sole master instance."""
-        if role not in _INSTANCE_ROLES:
-            raise ValueError
-
-        return (role != 'master' or
-                sum(self._num_instances(role)
-                    for role in _INSTANCE_ROLES) == 1)
-
-    def _num_instances(self, role):
-        """How many of the given instance type do we want?"""
-        if role not in _INSTANCE_ROLES:
-            raise ValueError
-
-        if role == 'master':
-            return 1  # there can be only one
-        else:
-            return self._opts['num_' + role + '_instances']
-
-    def _instance_bid_price(self, role):
-        """What's the bid price for the given role (if any)?"""
-        if role not in _INSTANCE_ROLES:
-            raise ValueError
-
-        return self._opts[role + '_instance_bid_price']
-
-    def _create_instance_group(
-            self, role, instance_type, num_instances, bid_price):
+    def _create_instance_group(self, role, instance_type, count, bid_price):
         """Helper method for creating instance groups. For use when
         creating a cluster using a list of InstanceGroups
 
@@ -1465,14 +1381,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
               this instance group will be use the ON-DEMAND market
               instead of the SPOT market.
         """
-        if role not in _INSTANCE_ROLES:
-            raise ValueError
 
         if not instance_type:
-            raise ValueError
-
-        if not num_instances:
-            raise ValueError
+            if self._opts['instance_type']:
+                instance_type = self._opts['instance_type']
+            else:
+                raise ValueError('Missing instance type for %s node(s)' % role)
 
         if bid_price:
             market = 'SPOT'
@@ -1481,13 +1395,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             market = 'ON_DEMAND'
             bid_price = None
 
+        # Just name the groups "master", "task", and "core"
+        name = role.lower()
+
         return boto.emr.instance_group.InstanceGroup(
-            num_instances=num_instances,
-            role=role.upper(),
-            type=instance_type,
-            market=market,
-            name=role,  # just name the groups "core", "master", and "task"
-            bidprice=bid_price)
+            count, role, instance_type, market, name, bidprice=bid_price)
 
     def _create_cluster(self, persistent=False, steps=None):
         """Create an empty cluster on EMR, and return the ID of that
@@ -1541,26 +1453,43 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             args['availability_zone'] = self._opts['zone']
         # The old, simple API, available if we're not using task instances
         # or bid prices
-        if not (self._num_instances('task') or
-                any(self._instance_bid_price(role)
-                    for role in _INSTANCE_ROLES)):
-            args['num_instances'] = self._num_instances('core') + 1
-            args['master_instance_type'] = self._instance_type('master')
-            args['slave_instance_type'] = self._instance_type('core')
+        if not (self._opts['num_task_instances'] or
+                self._opts['core_instance_bid_price'] or
+                self._opts['master_instance_bid_price'] or
+                self._opts['task_instance_bid_price']):
+            args['num_instances'] = self._opts['num_core_instances'] + 1
+            args['master_instance_type'] = self._opts['master_instance_type']
+            args['slave_instance_type'] = self._opts['core_instance_type']
         else:
             # Create a list of InstanceGroups
-            args['instance_groups'] = []
+            args['instance_groups'] = [
+                self._create_instance_group(
+                    'MASTER',
+                    self._opts['master_instance_type'],
+                    1,
+                    self._opts['master_instance_bid_price']
+                ),
+            ]
 
-            for role in _INSTANCE_ROLES:
-                num_instances = self._num_instances(role)
+            if self._opts['num_core_instances']:
+                args['instance_groups'].append(
+                    self._create_instance_group(
+                        'CORE',
+                        self._opts['core_instance_type'],
+                        self._opts['num_core_instances'],
+                        self._opts['core_instance_bid_price']
+                    )
+                )
 
-                if num_instances:
-                    args['instance_groups'].append(
-                        self._create_instance_group(
-                            role=role,
-                            instance_type=self._instance_type(role),
-                            num_instances=self._num_instances(role),
-                            bid_price=self._instance_bid_price(role)))
+            if self._opts['num_task_instances']:
+                args['instance_groups'].append(
+                    self._create_instance_group(
+                        'TASK',
+                        self._opts['task_instance_type'],
+                        self._opts['num_task_instances'],
+                        self._opts['task_instance_bid_price']
+                    )
+                )
 
         # bootstrap actions
         bootstrap_action_args = []
@@ -1696,10 +1625,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._build_jar_step(step_num)
-        elif step['type'] == 'spark':
-            return self._build_spark_step(step_num)
-        elif step['type'] == 'spark_script':
-            return self._build_spark_script_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -1735,92 +1660,34 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _build_jar_step(self, step_num):
         step = self._get_step(step_num)
 
-        jar = self._upload_uri_or_remote_path(step['jar'])
-        step_args = self._interpolate_input_and_output(step['args'], step_num)
+        # special case to allow access to jars inside EMR
+        if step['jar'].startswith('file:///'):
+            jar = step['jar'][7:]  # keep leading slash
+        else:
+            jar = self._upload_mgr.uri(step['jar'])
+
+        def interpolate(arg):
+            if arg == mrjob.step.JarStep.INPUT:
+                return ','.join(self._step_input_uris(step_num))
+            elif arg == mrjob.step.JarStep.OUTPUT:
+                return self._step_output_uri(step_num)
+            else:
+                return arg
+
+        step_args = step['args']
+        if step_args:
+            step_args = [interpolate(arg) for arg in step_args]
 
         # -libjars comes before jar-specific args
         step_args = self._libjar_step_args() + step_args
 
         return boto.emr.JarStep(
-            name=self._step_name(step_num),
+            name='%s: Step %d of %d' % (
+                self._job_key, step_num + 1, self._num_steps()),
             jar=jar,
             main_class=step['main_class'],
             step_args=step_args,
             action_on_failure=self._action_on_failure())
-
-    def _build_spark_step(self, step_num):
-        step = self._get_step(step_num)
-
-        return self._build_spark_step_helper(
-            step_num=step_num,
-            spark_args=step['spark_args'],
-            script=self._script_path,
-            script_args=[
-                '--step-num=%d' % step_num,
-                '--spark',
-                mrjob.step.INPUT,
-                mrjob.step.OUTPUT,
-            ],
-        )
-
-    def _build_spark_script_step(self, step_num):
-        step = self._get_step(step_num)
-
-        return self._build_spark_step_helper(
-            step_num=step_num,
-            spark_args=step['spark_args'],
-            script=step['script'],
-            script_args=step['args'])
-
-    def _build_spark_step_helper(
-            self, step_num, spark_args, script, script_args):
-        """Common code for _build_spark_step() and _build_spark_script_step()
-
-        Interpolates :py:data:`~mrjob.step.INPUT` and
-        :py:data:`~mrjob.step.OUTPUT` into *script_args*, and looks up
-        upload URI of *script*
-        """
-        script = self._upload_uri_or_remote_path(script)
-        script_args = self._interpolate_input_and_output(script_args, step_num)
-
-        jar, step_arg_prefix = self._get_spark_jar_and_step_arg_prefix()
-
-        # have to use `--deploy-mode cluster` to reference s3:// URIs
-        step_args = (
-            step_arg_prefix +
-            _EMR_SPARK_ARGS +
-            spark_args + [script] + script_args)
-
-        return boto.emr.JarStep(
-            name=self._step_name(step_num),
-            jar=jar,
-            step_args=step_args,
-            action_on_failure=self._action_on_failure())
-
-    def _step_name(self, step_num):
-        """Return something like: ``'mr_your_job Step X of Y'``"""
-        return '%s: Step %d of %d' % (
-            self._job_key, step_num + 1, self._num_steps())
-
-    def _upload_uri_or_remote_path(self, path):
-        """Return where *path* will be uploaded, or, if it starts with
-        ``'file:///'``, a local path."""
-        if path.startswith('file:///'):
-            return path[7:]  # keep leading slash
-        else:
-            return self._upload_mgr.uri(path)
-
-    def _interpolate_input_and_output(self, args, step_num):
-
-        def interpolate(arg):
-            if arg == mrjob.step.INPUT:
-                return ','.join(self._step_input_uris(step_num))
-            elif arg == mrjob.step.OUTPUT:
-                return self._step_output_uri(step_num)
-            else:
-                return arg
-
-        return [interpolate(arg) for arg in args]
 
     def _build_master_node_setup_step(self):
         name = '%s: Master node setup' % self._job_key
@@ -1864,14 +1731,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             # 2.x and 3.x AMIs just use a regular old streaming jar
             return _PRE_4_X_STREAMING_JAR, []
-
-    def _get_spark_jar_and_step_arg_prefix(self):
-        # TODO: add spark_submit_bin option
-
-        if version_gte(self.get_ami_version(), '4'):
-            return (_4_X_INTERMEDIARY_JAR, ['spark-submit'])
-        else:
-            return (self._script_runner_jar_uri(), [_3_X_SPARK_SUBMIT])
 
     def _launch_emr_job(self):
         """Create an empty cluster on EMR, and set self._cluster_id to
@@ -2885,13 +2744,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         role_to_req_cu = {}
         role_to_req_bid_price = {}
 
-        for role in _INSTANCE_ROLES:
-            instance_type = self._instance_type(role)
-            num_instances = self._num_instances(role)
+        for role in ('core', 'master', 'task'):
+            instance_type = self._opts['%s_instance_type' % role]
+            if role == 'master':
+                num_instances = 1
+            else:
+                num_instances = self._opts['num_%s_instances' % role]
 
             role_to_req_instance_type[role] = instance_type
             role_to_req_num_instances[role] = num_instances
-            role_to_req_bid_price[role] = self._instance_bid_price(role)
+
+            role_to_req_bid_price[role] = (
+                self._opts['%s_instance_bid_price' % role])
 
             # unknown instance types can only match themselves
             role_to_req_mem[role] = (
@@ -3320,32 +3184,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             security_token=self._opts['aws_security_token'])
 
         return wrap_aws_conn(raw_iam_conn)
-
-    # Spark
-
-    def _uses_spark(self):
-        """Does this runner use Spark, based on steps, bootstrap actions,
-        and EMR applications? If so, we'll need more memory."""
-        return (self._has_spark_steps() or
-                self._has_spark_install_bootstrap_action() or
-                self._has_spark_application())
-
-    def _has_spark_steps(self):
-        """Are any of our steps Spark steps (either spark or spark_script)"""
-        return any(step['type'].split('_')[0] == 'spark'
-                   for step in self._get_steps())
-
-    def _has_spark_install_bootstrap_action(self):
-        """Does it look like this runner has a spark bootstrap install
-        action set? (Anything ending in "/install-spark" counts.)"""
-        return any(ba['path'].endswith('/install-spark')
-                   for ba in self._bootstrap_actions)
-
-    def _has_spark_application(self):
-        """Does this runner have "Spark" in its *emr_applications* option?"""
-        return any(a.lower() == 'spark'
-                   for a in self._opts['emr_applications'])
-
 
 
 def _encode_emr_api_params(x):

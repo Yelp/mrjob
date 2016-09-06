@@ -10,7 +10,7 @@ For a complete list of changes, see `CHANGES.txt
 -----
 
 Functionally equivalent to :ref:`v0.5.4`, except that it restores
-the deprecated *ami_version* option as an alias for :mrjob-opt:`image_version`,
+the deprecated *ami_version* as an alias for :mrjob-opt:`image_version`,
 making it easier to upgrade from earlier versions of mrjob.
 
 Also slightly improves :ref:`EMR cluster pooling <pooling-clusters>` with

@@ -28,7 +28,6 @@ One-step jobs
 .. automethod:: MRJob.mapper_pre_filter
 .. automethod:: MRJob.reducer_pre_filter
 .. automethod:: MRJob.combiner_pre_filter
-.. automethod:: MRJob.spark
 
 Multi-step jobs
 ---------------

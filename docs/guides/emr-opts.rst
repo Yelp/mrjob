@@ -300,7 +300,7 @@ Cluster creation and configuration
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *aws_region*.
+       This option used to be named ``aws_region``.
 
 .. mrjob-opt::
     :config: release_label
@@ -366,7 +366,7 @@ Cluster creation and configuration
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *emr_tags*
+       This option used to be named ``emr_tags``
 
     .. versionadded:: 0.4.5
 
@@ -402,7 +402,7 @@ Cluster creation and configuration
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *aws_availability_zone*
+       This option used to be named ``aws_availability_zone``
 
 Bootstrapping
 -------------
@@ -569,37 +569,24 @@ Number and type of instances
     :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: (automatic)
+    :default: ``'m1.medium'``
 
-    By default, mrjob picks the cheapest instance type that will work at all.
-    This is usually ``m1.medium``, with two exceptions:
-
-    * ``m1.large`` if you're running Spark (see :ref:`spark-auto-detection`)
-    * ``m1.small`` if you're running on the (deprecated) 2.x AMIs
-
-    Once you've tested a job and want to run it at scale, it's usually a good
-    idea to use instances larger than the default; see
-    http://aws.amazon.com/ec2/instance-types/ for options.
-
-    If you're running multiple nodes (see :mrjob-opt:`num_core_instances`),
-    this option *doesn't* apply to the master node because it's just
-    coordinating tasks, not running them. Use :mrjob-opt:`master_instance_type`
-    instead.
-
-    .. versionchanged:: 0.5.6
-
-       Used to default to ``m1.medium`` in all cases.
+    What sort of EC2 instance(s) to use on the nodes that actually run tasks
+    (see http://aws.amazon.com/ec2/instance-types/).  When you run multiple
+    instances (see :mrjob-opt:`num_core_instances`), the master node is just
+    coordinating the other nodes, so usually the default instance type
+    (``m1.medium``) is fine, and using larger instances is wasteful.
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *ec2_instance_type*.
+       This option used to be named ``ec2_instance_type``.
 
 .. mrjob-opt::
     :config: core_instance_type
     :switch: --core-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: value of :mrjob-opt:`instance_type`
+    :default: ``'m1.medium'``
 
     like :mrjob-opt:`instance_type`, but only for the core Hadoop nodes; these
     nodes run tasks and host HDFS. Usually you just want to use
@@ -623,30 +610,22 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *ec2_core_instance_bid_price*.
+       This option used to be named ``ec2_core_instance_bid_price``.
 
 .. mrjob-opt::
     :config: master_instance_type
     :switch: --master-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: (automatic)
+    :default: ``'m1.medium'``
 
     like :mrjob-opt:`instance_type`, but only for the master Hadoop node.
-    This node hosts the task tracker/resource manager and HDFS, and runs tasks
-    if there are no other nodes.
-
-    If you're running a single node (no :mrjob-opt:`num_core_instances` or
-    :mrjob-opt:`num_task_instances`), this will default to the value of
-    :mrjob-opt:`instance_type`.
-
-    Otherwise, defaults to ``m1.medium`` (exception: ``m1.small`` on the
-    deprecated 2.x AMIs), which is usually adequate for all but the largest
-    jobs.
+    This node hosts the task tracker and HDFS, and runs tasks if there are no
+    other nodes. Usually you just want to use :mrjob-opt:`instance_type`.
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *ec2_master_instance_type*.
+       This option used to be named ``ec2_master_instance_type``.
 
 .. mrjob-opt::
     :config: master_instance_bid_price
@@ -661,7 +640,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *ec2_master_instance_bid_price*.
+       This option used to be named ``ec2_master_instance_bid_price``.
 
 .. mrjob-opt::
     :config: task_instance_type
@@ -676,7 +655,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *ec2_task_instance_type*.
+       This option used to be named ``ec2_task_instance_type``.
 
 .. mrjob-opt::
     :config: task_instance_bid_price
@@ -691,7 +670,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *ec2_task_instance_bid_price*.
+       This option used to be named ``ec2_task_instance_bid_price``.
 
 .. mrjob-opt::
     :config: num_core_instances
@@ -705,7 +684,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *num_ec2_core_instances*.
+       This option used to be named ``num_ec2_core_instances``.
 
 .. mrjob-opt::
     :config: num_ec2_instances
@@ -834,7 +813,7 @@ MRJob uses boto to manipulate/access S3.
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named *s3_log_uri*
+       This option used to be named ``s3_log_uri``
 
 .. mrjob-opt::
     :config: cloud_tmp_dir
@@ -954,7 +933,7 @@ SSH access and tunneling
 
     .. versionchanged:: 0.5.0
 
-       This option used to be named *ssh_tunnel_to_job_tracker*.
+       This option used to be named ``ssh_tunnel_to_job_tracker``.
 
 .. mrjob-opt::
     :config: ssh_tunnel_is_open

@@ -21,10 +21,8 @@ of the example jar.
 """
 from mrjob.job import MRJob
 from mrjob.protocol import RawProtocol
-from mrjob.step import INPUT
 from mrjob.step import JarStep
 from mrjob.step import MRStep
-from mrjob.step import OUTPUT
 
 # use the file:// trick to access a jar hosted on the EMR machines
 HADOOP_EXAMPLES_JAR = 'file:///home/hadoop/hadoop-examples.jar'
@@ -38,7 +36,7 @@ class MRJarStepExample(MRJob):
         return [
             JarStep(
                 jar=HADOOP_EXAMPLES_JAR,
-                args=['wordcount', INPUT, OUTPUT]),
+                args=['wordcount', JarStep.INPUT, JarStep.OUTPUT]),
             MRStep(
                 mapper=self.mapper, combiner=self.reducer,
                 reducer=self.reducer)

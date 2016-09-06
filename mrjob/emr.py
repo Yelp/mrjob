@@ -191,6 +191,19 @@ _EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
 # 5 minutes plus time to copy the logs, or something like that.
 _S3_LOG_WAIT_MINUTES = 10
 
+# cheapest instance type that can run Spark
+_CHEAPEST_SPARK_INSTANCE_TYPE = 'm1.large'
+
+# cheapest instance type that can run resource manager and non-Spark tasks
+# on 3.x AMI and above
+_CHEAPEST_INSTANCE_TYPE = 'm1.medium'
+
+# cheapest instance type that can run on 2.x AMIs
+_CHEAPEST_2_X_INSTANCE_TYPE = 'm1.small'
+
+# these are the only kinds of instance roles that exist
+_INSTANCE_ROLES = ('master', 'core', 'task')
+
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -490,8 +503,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
-            'core_instance_type': 'm1.medium',
-            'master_instance_type': 'm1.medium',
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
             'num_ec2_instances': 1,
@@ -541,9 +552,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         command-line arguments to override defaults and arguments
         in mrjob.conf (see Issue #311).
 
-        Also, make sure that core and slave instance type are the same,
-        total number of instances matches number of master, core, and task
-        instances, and that bid prices of zero are converted to None.
+        Also, make sure that bid prices of zero are converted to None.
         """
         # If task instance type is not set, use core instance type
         # (This is mostly so that we don't inadvertently join a pool
@@ -597,7 +606,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                 self['task_instance_type'] = instance_type
 
         # convert a bid price of '0' to None
-        for role in ('core', 'master', 'task'):
+        for role in _INSTANCE_ROLES:
             opt_name = '%s_instance_bid_price' % role
             if not self[opt_name]:
                 self[opt_name] = None
@@ -1378,7 +1387,74 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             time.sleep(self._opts['check_cluster_every'])
             cluster = self._describe_cluster()
 
-    def _create_instance_group(self, role, instance_type, count, bid_price):
+
+    # instance types
+
+    def _cheapest_manager_instance_type(self):
+        """What's the cheapest instance type we can get away with
+        for the master node (when it's not also running jobs)?"""
+        if version_gte(self._opts['image_version'], '3'):
+            return _CHEAPEST_INSTANCE_TYPE
+        else:
+            return _CHEAPEST_2_X_INSTANCE_TYPE
+
+    def _cheapest_worker_instance_type(self):
+        """What's the cheapest instance type we can get away with
+        running tasks on?"""
+        if self._uses_spark():
+            return _CHEAPEST_SPARK_INSTANCE_TYPE
+        else:
+            return self._cheapest_manager_instance_type()
+
+    def _instance_type(self, role):
+        """What instance type should we use for the given role?
+        (one of 'master', 'core', 'task')"""
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
+
+        # explicitly set
+        if self._opts[role + '_instance_type']:
+            return self._opts[role + '_instance_type']
+
+        elif self._instance_is_worker(role):
+            # using *instance_type* here is defensive programming;
+            # if set, it should have already been popped into the worker
+            # instance type option(s) by _fix_instance_opts() above
+            return (self._opts['instance_type'] or
+                    self._cheapest_worker_instance_type())
+
+        else:
+            return self._cheapest_manager_instance_type()
+
+    def _instance_is_worker(self, role):
+        """Do instances of the given role run tasks? True for non-master
+        instances and sole master instance."""
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
+
+        return (role != 'master' or
+                sum(self._num_instances(role)
+                    for role in _INSTANCE_ROLES) == 1)
+
+    def _num_instances(self, role):
+        """How many of the given instance type do we want?"""
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
+
+        if role == 'master':
+            return 1  # there can be only one
+        else:
+            return self._opts['num_' + role + '_instances']
+
+    def _instance_bid_price(self, role):
+        """What's the bid price for the given role (if any)?"""
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
+
+        return self._opts[role + '_instance_bid_price']
+
+    def _create_instance_group(
+            self, role, instance_type, num_instances, bid_price):
         """Helper method for creating instance groups. For use when
         creating a cluster using a list of InstanceGroups
 
@@ -1389,12 +1465,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
               this instance group will be use the ON-DEMAND market
               instead of the SPOT market.
         """
+        if role not in _INSTANCE_ROLES:
+            raise ValueError
 
         if not instance_type:
-            if self._opts['instance_type']:
-                instance_type = self._opts['instance_type']
-            else:
-                raise ValueError('Missing instance type for %s node(s)' % role)
+            raise ValueError
+
+        if not num_instances:
+            raise ValueError
 
         if bid_price:
             market = 'SPOT'
@@ -1403,11 +1481,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             market = 'ON_DEMAND'
             bid_price = None
 
-        # Just name the groups "master", "task", and "core"
-        name = role.lower()
-
         return boto.emr.instance_group.InstanceGroup(
-            count, role, instance_type, market, name, bidprice=bid_price)
+            num_instances=num_instances,
+            role=role.upper(),
+            type=instance_type,
+            market=market,
+            name=role,  # just name the groups "core", "master", and "task"
+            bidprice=bid_price)
 
     def _create_cluster(self, persistent=False, steps=None):
         """Create an empty cluster on EMR, and return the ID of that
@@ -1461,43 +1541,26 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             args['availability_zone'] = self._opts['zone']
         # The old, simple API, available if we're not using task instances
         # or bid prices
-        if not (self._opts['num_task_instances'] or
-                self._opts['core_instance_bid_price'] or
-                self._opts['master_instance_bid_price'] or
-                self._opts['task_instance_bid_price']):
-            args['num_instances'] = self._opts['num_core_instances'] + 1
-            args['master_instance_type'] = self._opts['master_instance_type']
-            args['slave_instance_type'] = self._opts['core_instance_type']
+        if not (self._num_instances('task') or
+                any(self._instance_bid_price(role)
+                    for role in _INSTANCE_ROLES)):
+            args['num_instances'] = self._num_instances('core') + 1
+            args['master_instance_type'] = self._instance_type('master')
+            args['slave_instance_type'] = self._instance_type('core')
         else:
             # Create a list of InstanceGroups
-            args['instance_groups'] = [
-                self._create_instance_group(
-                    'MASTER',
-                    self._opts['master_instance_type'],
-                    1,
-                    self._opts['master_instance_bid_price']
-                ),
-            ]
+            args['instance_groups'] = []
 
-            if self._opts['num_core_instances']:
-                args['instance_groups'].append(
-                    self._create_instance_group(
-                        'CORE',
-                        self._opts['core_instance_type'],
-                        self._opts['num_core_instances'],
-                        self._opts['core_instance_bid_price']
-                    )
-                )
+            for role in _INSTANCE_ROLES:
+                num_instances = self._num_instances(role)
 
-            if self._opts['num_task_instances']:
-                args['instance_groups'].append(
-                    self._create_instance_group(
-                        'TASK',
-                        self._opts['task_instance_type'],
-                        self._opts['num_task_instances'],
-                        self._opts['task_instance_bid_price']
-                    )
-                )
+                if num_instances:
+                    args['instance_groups'].append(
+                        self._create_instance_group(
+                            role=role,
+                            instance_type=self._instance_type(role),
+                            num_instances=self._num_instances(role),
+                            bid_price=self._instance_bid_price(role)))
 
         # bootstrap actions
         bootstrap_action_args = []
@@ -2822,18 +2885,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         role_to_req_cu = {}
         role_to_req_bid_price = {}
 
-        for role in ('core', 'master', 'task'):
-            instance_type = self._opts['%s_instance_type' % role]
-            if role == 'master':
-                num_instances = 1
-            else:
-                num_instances = self._opts['num_%s_instances' % role]
+        for role in _INSTANCE_ROLES:
+            instance_type = self._instance_type(role)
+            num_instances = self._num_instances(role)
 
             role_to_req_instance_type[role] = instance_type
             role_to_req_num_instances[role] = num_instances
-
-            role_to_req_bid_price[role] = (
-                self._opts['%s_instance_bid_price' % role])
+            role_to_req_bid_price[role] = self._instance_bid_price(role)
 
             # unknown instance types can only match themselves
             role_to_req_mem[role] = (
@@ -3262,6 +3320,32 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             security_token=self._opts['aws_security_token'])
 
         return wrap_aws_conn(raw_iam_conn)
+
+    # Spark
+
+    def _uses_spark(self):
+        """Does this runner use Spark, based on steps, bootstrap actions,
+        and EMR applications? If so, we'll need more memory."""
+        return (self._has_spark_steps() or
+                self._has_spark_install_bootstrap_action() or
+                self._has_spark_application())
+
+    def _has_spark_steps(self):
+        """Are any of our steps Spark steps (either spark or spark_script)"""
+        return any(step['type'].split('_')[0] == 'spark'
+                   for step in self._get_steps())
+
+    def _has_spark_install_bootstrap_action(self):
+        """Does it look like this runner has a spark bootstrap install
+        action set? (Anything ending in "/install-spark" counts.)"""
+        return any(ba['path'].endswith('/install-spark')
+                   for ba in self._bootstrap_actions)
+
+    def _has_spark_application(self):
+        """Does this runner have "Spark" in its *emr_applications* option?"""
+        return any(a.lower() == 'spark'
+                   for a in self._opts['emr_applications'])
+
 
 
 def _encode_emr_api_params(x):

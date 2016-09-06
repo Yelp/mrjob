@@ -70,6 +70,7 @@ from tests.mr_null_spark import MRNullSpark
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_sort_values import MRSortValues
 from tests.mr_spark_script import MRSparkScript
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -925,12 +926,12 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             {},
             master=(1, 'm1.medium', None))
 
-    def test_single_instance(self):
+    def test_instance_type_single_instance(self):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge'},
             master=(1, 'c1.xlarge', None))
 
-    def test_multiple_instances(self):
+    def test_instance_type_multiple_instances(self):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge', 'num_core_instances': 2},
             core=(2, 'c1.xlarge', None),
@@ -953,6 +954,33 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
              'num_core_instances': 2},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
+
+    def test_2_x_ami_defaults_single_node(self):
+        # m1.small still works with Hadoop 1, and it's cheaper
+        self._test_instance_groups(
+            dict(image_version='2.4.11'),
+            master=(1, 'm1.small', None))
+
+    def test_2_x_ami_defaults_multiple_nodes(self):
+        self._test_instance_groups(
+            dict(image_version='2.4.11', num_core_instances=2),
+            core=(2, 'm1.small', None),
+            master=(1, 'm1.small', None))
+
+    def test_spark_defaults_single_node(self):
+        # Spark needs at least m1.large
+        self._test_instance_groups(
+            dict(image_version='4.0.0', emr_applications=['Spark']),
+            master=(1, 'm1.large', None))
+
+    def test_spark_defaults_multiple_nodes(self):
+        # Spark can get away with m1.medium for the resource manager
+        self._test_instance_groups(
+            dict(image_version='4.0.0',
+                 emr_applications=['Spark'],
+                 num_core_instances=2),
+            core=(2, 'm1.large', None),
+            master=(1, 'm1.medium', None))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(
@@ -5482,6 +5510,155 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
 
         self.assertEqual(self.mock_Popen.call_count, 3)
         self.assertEqual(params['local_port'], 10003)
+
+
+class UsesSparkTestCase(MockBotoTestCase):
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_steps())
+            self.assertFalse(runner._has_spark_install_bootstrap_action())
+            self.assertFalse(runner._has_spark_application())
+
+    def test_spark_step(self):
+        job = MRNullSpark(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_spark_script_step(self):
+        job = MRSparkScript(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_streaming_and_spark_steps(self):
+        job = MRStreamingAndSpark(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_s3_spark_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://support.elasticmapreduce/spark/install-spark',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_file_spark_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            'file:///usr/share/aws/emr/install-spark/install-spark',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_s3_ganglia_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://beta.elasticmapreduce/bootstrap-actions/install-ganglia',
+        ])
+
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_install_bootstrap_action())
+
+    def test_s3_ganglia_and_spark_bootstrap_actions(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://support.elasticmapreduce/spark/install-spark',
+            's3://beta.elasticmapreduce/bootstrap-actions/install-ganglia',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_spark_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_spark_application_lowercase(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_other_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Mahout'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())
+
+    def test_spark_and_other_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Mahout',
+                            '--emr-application', 'Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_ignores_new_supported_products_api_param(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--emr-api-param',
+                            'NewSupportedProducts.member.1.Name=spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())
+
+    def test_ignores_application_api_param(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-api-param',
+                            'Application.member.1.Name=Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())
 
 
 class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):

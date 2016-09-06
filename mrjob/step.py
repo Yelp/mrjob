@@ -442,7 +442,7 @@ class SparkScriptStep(object):
                    can also be an ``s3://`` URI, or ``file://`` to reference a
                    jar on the local filesystem of your EMR instance(s).
     :param args: (optional) A list of arguments to the script. Use
-                  :py:data:`mrjob.step.INPUT` and :py:data:`OUTPUT` to
+                 :py:data:`mrjob.step.INPUT` and :py:data:`OUTPUT` to
                  interpolate input and output paths.
     :param spark_args: (optional) an array of arguments to pass to spark-submit
                        (e.g. ``['--executor-memory', '2G']``).

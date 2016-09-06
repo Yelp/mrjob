@@ -569,13 +569,26 @@ Number and type of instances
     :switch: --instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'m1.medium'``
+    :default: (automatic)
 
-    What sort of EC2 instance(s) to use on the nodes that actually run tasks
-    (see http://aws.amazon.com/ec2/instance-types/).  When you run multiple
-    instances (see :mrjob-opt:`num_core_instances`), the master node is just
-    coordinating the other nodes, so usually the default instance type
-    (``m1.medium``) is fine, and using larger instances is wasteful.
+    By default, mrjob picks the cheapest instance type that will work at all.
+    This is usually ``m1.medium``, with two exceptions:
+
+    * ``m1.large`` if you're running Spark (see :ref:`spark-auto-detection`)
+    * ``m1.small`` if you're running on the (deprecated) 2.x AMIs
+
+    Once you've tested a job and want to run it at scale, it's usually a good
+    idea to use instances larger than the default; see
+    http://aws.amazon.com/ec2/instance-types/ for options.
+
+    If you're running multiple nodes (see :mrjob-opt:`num_core_instances`),
+    this option *doesn't* apply to the master node because it's just
+    coordinating tasks, not running them. Use :mrjob-opt:`master_instance_type`
+    instead.
+
+    .. versionchanged:: 0.5.6
+
+       Used to default to ``m1.medium`` in all cases.
 
     .. versionchanged:: 0.5.4
 
@@ -586,7 +599,7 @@ Number and type of instances
     :switch: --core-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'m1.medium'``
+    :default: value of :mrjob-opt:`instance_type`
 
     like :mrjob-opt:`instance_type`, but only for the core Hadoop nodes; these
     nodes run tasks and host HDFS. Usually you just want to use
@@ -617,11 +630,19 @@ Number and type of instances
     :switch: --master-instance-type
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'m1.medium'``
+    :default: (automatic)
 
     like :mrjob-opt:`instance_type`, but only for the master Hadoop node.
-    This node hosts the task tracker and HDFS, and runs tasks if there are no
-    other nodes. Usually you just want to use :mrjob-opt:`instance_type`.
+    This node hosts the task tracker/resource manager and HDFS, and runs tasks
+    if there are no other nodes.
+
+    If you're running a single node (no :mrjob-opt:`num_core_instances` or
+    :mrjob-opt:`num_task_instances`), this will default to the value of
+    :mrjob-opt:`instance_type`.
+
+    Otherwise, defaults to ``m1.medium`` (exception: ``m1.small`` on the
+    deprecated 2.x AMIs), which is usually adequate for all but the largest
+    jobs.
 
     .. versionchanged:: 0.5.4
 

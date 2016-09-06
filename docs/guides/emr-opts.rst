@@ -300,7 +300,7 @@ Cluster creation and configuration
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``aws_region``.
+       This option used to be named *aws_region*.
 
 .. mrjob-opt::
     :config: release_label
@@ -366,7 +366,7 @@ Cluster creation and configuration
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``emr_tags``
+       This option used to be named *emr_tags*
 
     .. versionadded:: 0.4.5
 
@@ -402,7 +402,7 @@ Cluster creation and configuration
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``aws_availability_zone``
+       This option used to be named *aws_availability_zone*
 
 Bootstrapping
 -------------
@@ -592,7 +592,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``ec2_instance_type``.
+       This option used to be named *ec2_instance_type*.
 
 .. mrjob-opt::
     :config: core_instance_type
@@ -623,7 +623,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``ec2_core_instance_bid_price``.
+       This option used to be named *ec2_core_instance_bid_price*.
 
 .. mrjob-opt::
     :config: master_instance_type
@@ -646,7 +646,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``ec2_master_instance_type``.
+       This option used to be named *ec2_master_instance_type*.
 
 .. mrjob-opt::
     :config: master_instance_bid_price
@@ -661,7 +661,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``ec2_master_instance_bid_price``.
+       This option used to be named *ec2_master_instance_bid_price*.
 
 .. mrjob-opt::
     :config: task_instance_type
@@ -676,7 +676,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``ec2_task_instance_type``.
+       This option used to be named *ec2_task_instance_type*.
 
 .. mrjob-opt::
     :config: task_instance_bid_price
@@ -691,7 +691,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``ec2_task_instance_bid_price``.
+       This option used to be named *ec2_task_instance_bid_price*.
 
 .. mrjob-opt::
     :config: num_core_instances
@@ -705,7 +705,7 @@ Number and type of instances
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``num_ec2_core_instances``.
+       This option used to be named *num_ec2_core_instances*.
 
 .. mrjob-opt::
     :config: num_ec2_instances
@@ -834,7 +834,7 @@ MRJob uses boto to manipulate/access S3.
 
     .. versionchanged:: 0.5.4
 
-       This option used to be named ``s3_log_uri``
+       This option used to be named *s3_log_uri*
 
 .. mrjob-opt::
     :config: cloud_tmp_dir
@@ -954,7 +954,7 @@ SSH access and tunneling
 
     .. versionchanged:: 0.5.0
 
-       This option used to be named ``ssh_tunnel_to_job_tracker``.
+       This option used to be named *ssh_tunnel_to_job_tracker*.
 
 .. mrjob-opt::
     :config: ssh_tunnel_is_open

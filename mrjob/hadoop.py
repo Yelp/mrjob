@@ -542,9 +542,9 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # TODO: merge with logic in mrjob/emr.py
         def interpolate(arg):
-            if arg == mrjob.step.JarStep.INPUT:
+            if arg == mrjob.step.INPUT:
                 return ','.join(self._hdfs_step_input_files(step_num))
-            elif arg == mrjob.step.JarStep.OUTPUT:
+            elif arg == mrjob.step.OUTPUT:
                 return self._hdfs_step_output_dir(step_num)
             else:
                 return arg

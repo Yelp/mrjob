@@ -27,14 +27,16 @@ from optparse import OptionGroup
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
-from mrjob.protocol import JSONProtocol
-from mrjob.protocol import RawValueProtocol
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.step import MRStep
-from mrjob.step import _JOB_STEP_FUNC_PARAMS
+from mrjob.protocol import JSONProtocol
+from mrjob.protocol import RawValueProtocol
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
+from mrjob.step import MRStep
+from mrjob.step import SparkStep
+from mrjob.step import _JOB_STEP_FUNC_PARAMS
+from mrjob.step import _SPARK_STEP_KWARGS
 from mrjob.util import expand_path
 from mrjob.util import read_input
 
@@ -102,7 +104,7 @@ class MRJob(MRJobLauncher):
     def _usage(cls):
         return "usage: %prog [options] [input files]"
 
-    ### Defining one-step jobs ###
+    ### Defining one-step streaming jobs ###
 
     def mapper(self, key, value):
         """Re-define this to define the mapper for a one-step job.
@@ -309,6 +311,18 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
+    ### Defining one-step Spark jobs ###
+
+    def spark(self, input_path, output_path):
+        """Re-define this with Spark code to run. You can read input
+        with *input_path* and output with *output_path*.
+        """
+        raise NotImplementedError
+
+    def spark_args(self):
+        """Redefine this to pass custom arguments to Spark."""
+        return []
+
     ### Defining multi-step jobs ###
 
     def steps(self):
@@ -331,9 +345,19 @@ class MRJob(MRJobLauncher):
         # only include methods that have been redefined
         kwargs = dict(
             (func_name, getattr(self, func_name))
-            for func_name in _JOB_STEP_FUNC_PARAMS
+            for func_name in _JOB_STEP_FUNC_PARAMS + ('spark',)
             if (_im_func(getattr(self, func_name)) is not
                 _im_func(getattr(MRJob, func_name))))
+
+        # special case for spark()
+        # TODO: support jobconf as well
+        if 'spark' in kwargs:
+            if sorted(kwargs) != ['spark']:
+                raise ValueError(
+                    "Can't mix spark() and streaming functions")
+            return [SparkStep(
+                spark=kwargs['spark'],
+                spark_args=self.spark_args())]
 
         # MRStep takes commands as strings, but the user defines them in the
         # class as functions that return strings, so call the functions.
@@ -443,6 +467,9 @@ class MRJob(MRJobLauncher):
         elif self.options.run_reducer:
             self.run_reducer(self.options.step_num)
 
+        elif self.options.run_spark:
+            self.run_spark(self.options.step_num)
+
         else:
             super(MRJob, self).execute()
 
@@ -453,7 +480,8 @@ class MRJob(MRJobLauncher):
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
         bad_words = (
-            '--steps', '--mapper', '--reducer', '--combiner', '--step-num')
+            '--steps', '--mapper', '--reducer', '--combiner', '--step-num',
+            '--spark')
         for w in bad_words:
             if w in sys.argv:
                 raise UsageError("make_runner() was called with %s. This"
@@ -470,6 +498,16 @@ class MRJob(MRJobLauncher):
 
         return super(MRJob, self).make_runner()
 
+    def _get_step(self, step_num, expected_type):
+        """Helper for run_* methods"""
+        steps = self.steps()
+        if not 0 <= step_num < len(steps):
+            raise ValueError('Out-of-range step: %d' % step_num)
+        step = steps[step_num]
+        if not isinstance(step, expected_type):
+            raise TypeError('Step %d is not a %s', expected_type.__name__)
+        return step
+
     def run_mapper(self, step_num=0):
         """Run the mapper and final mapper action for the given step.
 
@@ -484,10 +522,8 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        steps = self.steps()
-        if not 0 <= step_num < len(steps):
-            raise ValueError('Out-of-range step: %d' % step_num)
-        step = steps[step_num]
+        step = self._get_step(step_num, MRStep)
+
         mapper = step['mapper']
         mapper_init = step['mapper_init']
         mapper_final = step['mapper_final']
@@ -522,10 +558,8 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        steps = self.steps()
-        if not 0 <= step_num < len(steps):
-            raise ValueError('Out-of-range step: %d' % step_num)
-        step = steps[step_num]
+        step = self._get_step(step_num, MRStep)
+
         reducer = step['reducer']
         reducer_init = step['reducer_init']
         reducer_final = step['reducer_final']
@@ -567,10 +601,8 @@ class MRJob(MRJobLauncher):
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """
-        steps = self.steps()
-        if not 0 <= step_num < len(steps):
-            raise ValueError('Out-of-range step: %d' % step_num)
-        step = steps[step_num]
+        step = self._get_step(step_num, MRStep)
+
         combiner = step['combiner']
         combiner_init = step['combiner_init']
         combiner_final = step['combiner_final']
@@ -597,6 +629,24 @@ class MRJob(MRJobLauncher):
         if combiner_final:
             for out_key, out_value in combiner_final() or ():
                 write_line(out_key, out_value)
+
+    def run_spark(self, step_num):
+        """Run the Spark code for the given step.
+
+        :type step_num: int
+        :param step_num: which step to run (0-indexed)
+
+        Called from :py:meth:`run`. You'd probably only want to call this
+        directly from automated tests.
+        """
+        step = self._get_step(step_num, SparkStep)
+
+        if len(self.args) != 2:
+            raise ValueError('Wrong number of args')
+        input_path, output_path = self.args
+
+        spark_method = step.spark
+        spark_method(input_path, output_path)
 
     def show_steps(self):
         """Print information about how many steps there are, and whether
@@ -828,6 +878,12 @@ class MRJob(MRJobLauncher):
             '--reducer', dest='run_reducer', action='store_true',
             default=False, help='run a reducer')
 
+        # To run spark steps
+        self.mux_opt_group.add_option(
+            '--spark', dest='run_spark', action='store_true', default=False,
+            help='run Spark code')
+
+        # To choose step number
         self.mux_opt_group.add_option(
             '--step-num', dest='step_num', type='int', default=0,
             help='which step to execute (default is 0)')
@@ -842,14 +898,15 @@ class MRJob(MRJobLauncher):
         return super(MRJob, self).all_option_groups() + (self.mux_opt_group,)
 
     def is_task(self):
-        """True if this is a mapper, combiner, or reducer.
+        """True if this is a mapper, combiner, reducer, or Spark script.
 
         This is mostly useful inside :py:meth:`load_options`, to disable
-        loading options when we aren't running inside Hadoop Streaming.
+        loading options when we aren't running inside Hadoop.
         """
         return (self.options.run_mapper or
                 self.options.run_combiner or
-                self.options.run_reducer)
+                self.options.run_reducer or
+                self.options.run_spark)
 
     def _process_args(self, args):
         """mrjob.launch takes the first arg as the script path, but mrjob.job

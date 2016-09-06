@@ -1,3 +1,9 @@
+v0.5.?, 2016-??-?? -- Spark
+ * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
+ * runners:
+   * EMR:
+     * default to cheapest instance type that will work (#1369)
+
 v0.5.5, 2016-09-05 -- missing ami_version option
  * EMR runner:
    * deprecate, don't remove ami_version option in v0.5.4 (#1421)

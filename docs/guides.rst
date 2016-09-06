@@ -18,6 +18,7 @@ Guides
     guides/testing.rst
     guides/dataproc.rst
     guides/emr.rst
+    guides/spark.rst
     guides/py2-vs-py3.rst
     guides/contributing.rst
     guides/runner-job-interactions.rst

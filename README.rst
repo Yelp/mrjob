@@ -24,18 +24,18 @@ Some important features:
 * Write multi-step jobs (one map-reduce step feeds into the next)
 * Duplicate your production environment inside Hadoop
 
-    * Upload your source tree and put it in your job's ``$PYTHONPATH``
-    * Run make and other setup scripts
-    * Set environment variables (e.g. ``$TZ``)
-    * Easily install python packages from tarballs (EMR only)
-    * Setup handled transparently by ``mrjob.conf`` config file
+  * Upload your source tree and put it in your job's ``$PYTHONPATH``
+  * Run make and other setup scripts
+  * Set environment variables (e.g. ``$TZ``)
+  * Easily install python packages from tarballs (EMR only)
+  * Setup handled transparently by ``mrjob.conf`` config file
 * Automatically interpret error logs (EMR only)
 * SSH tunnel to hadoop job tracker (EMR only)
 * Minimal setup
 
-    * To run on EMR, set ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY``
-    * To run on Dataproc, set up your Google account and credentials (see `Dataproc Quickstart <http://pythonhosted.org/mrjob/guides/dataproc-quickstart.html>`_).
-    * To run on your Hadoop cluster, just make sure ``$HADOOP_HOME`` is set.
+  * To run on EMR, set ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY``
+  * To run on Dataproc, set up your Google account and credentials (see `Dataproc Quickstart <http://pythonhosted.org/mrjob/guides/dataproc-quickstart.html>`_).
+  * To run on your Hadoop cluster, just make sure ``$HADOOP_HOME`` is set.
 
 Installation
 ------------

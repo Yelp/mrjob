@@ -290,6 +290,10 @@ def _add_hadoop_opts(opt_group):
             '--hdfs-scratch-dir', dest='hadoop_tmp_dir',
             default=None,
             help='Deprecated alias for --hadoop-tmp-dir'),
+
+        opt_group.add_option(
+            '--spark-submit-bin', dest='spark_submit_bin', default=None,
+            help='path to spark-submit binary'),
     ]
 
 

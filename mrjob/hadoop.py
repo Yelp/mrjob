@@ -124,6 +124,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hadoop_log_dirs',
         'hadoop_streaming_jar',
         'hadoop_tmp_dir',
+        'spark_submit_bin',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {

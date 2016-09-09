@@ -1122,7 +1122,7 @@ class MRJobRunner(object):
             return [self._upload_mgr.uri(path)
                     for path in self._get_input_paths()]
         else:
-            return self._intermediate_output_uri(step_num - 1)
+            return [self._intermediate_output_uri(step_num - 1)]
 
     def _step_output_uri(self, step_num):
         """URI to use as output for the given step. This is either an

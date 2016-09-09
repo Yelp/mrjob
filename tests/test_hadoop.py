@@ -772,9 +772,9 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                                 return_value=['<upload args>']))
         self.start(patch.object(self.runner, '_hadoop_args_for_step',
                                 return_value=['<hadoop args for step>']))
-        self.start(patch.object(self.runner, '_hdfs_step_input_files',
+        self.start(patch.object(self.runner, '_step_input_uris',
                                 return_value=['<hdfs step input files>']))
-        self.start(patch.object(self.runner, '_hdfs_step_output_dir',
+        self.start(patch.object(self.runner, '_step_output_uri',
                                 return_value='<hdfs step output dir>'))
         self.start(patch.object(HadoopFilesystem, 'get_hadoop_version',
                                 return_value='2.7.1'))

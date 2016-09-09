@@ -504,6 +504,10 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._args_for_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._args_for_jar_step(step_num)
+        elif step['type'] == 'spark':
+            return self._args_for_spark_step(step_num)
+        elif step['type'] == 'spark_script':
+            return self._args_for_spark_script_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -590,6 +594,12 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             args.extend(interpolate(arg) for arg in step['args'])
 
         return args
+
+    def _args_for_spark_step(self, step_num):
+        pass
+
+    def _args_for_spark_script_step(self, step_num):
+        pass
 
     def _hdfs_step_input_files(self, step_num):
         """Get the hdfs:// URI for input for the given step."""

@@ -438,7 +438,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             # make sure output_dir is filled
             if 'output_dir' not in step_interpretation:
                 step_interpretation['output_dir'] = (
-                    self._hdfs_step_output_dir(step_num))
+                    self._step_output_uri(step_num))
 
             log_interpretation['step'] = step_interpretation
 
@@ -503,12 +503,12 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         args.extend(self._hadoop_args_for_step(step_num))
 
         # set up input
-        for input_uri in self._hdfs_step_input_files(step_num):
+        for input_uri in self._step_input_uris(step_num):
             args.extend(['-input', input_uri])
 
         # set up output
         args.append('-output')
-        args.append(self._hdfs_step_output_dir(step_num))
+        args.append(self._step_output_uri(step_num))
 
         args.append('-mapper')
         args.append(mapper)
@@ -543,9 +543,9 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         # TODO: merge with logic in mrjob/emr.py
         def interpolate(arg):
             if arg == mrjob.step.JarStep.INPUT:
-                return ','.join(self._hdfs_step_input_files(step_num))
+                return ','.join(self._step_input_uris(step_num))
             elif arg == mrjob.step.JarStep.OUTPUT:
-                return self._hdfs_step_output_dir(step_num)
+                return self._step_output_uri(step_num)
             else:
                 return arg
 
@@ -554,25 +554,9 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return args
 
-    def _hdfs_step_input_files(self, step_num):
-        """Get the hdfs:// URI for input for the given step."""
-        if step_num == 0:
-            return [self._upload_mgr.uri(p)
-                    for p in self._get_input_paths()]
-        else:
-            return [posixpath.join(
-                self._hadoop_tmp_dir,
-                'step-output/%04d' % (step_num - 1)
-            )]
-
-    def _hdfs_step_output_dir(self, step_num):
-        if step_num == len(self._get_steps()) - 1:
-            return self._output_dir
-        else:
-            return posixpath.join(
-                self._hadoop_tmp_dir,
-                'step-output/%04d' % step_num
-            )
+    def _intermediate_output_uri(self, step_num):
+        return posixpath.join(self._hadoop_tmp_dir,
+                              'step-output/%04d' % step_num)
 
     def _cleanup_hadoop_tmp(self):
         if self._hadoop_tmp_dir:

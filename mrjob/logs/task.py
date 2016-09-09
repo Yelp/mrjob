@@ -99,7 +99,8 @@ def _match_task_syslog_path(path, application_id=None, job_id=None):
 def _interpret_task_logs(fs, matches, partial=True, stderr_callback=None):
     """Look for errors in task syslog/stderr.
 
-    If *partial* is true (the default), stop when we find the first error.
+    If *partial* is true (the default), stop when we find the first error
+    that includes a *task_error*.
 
     If *stderr_callback* is set, every time we're about to parse a stderr
         file, call it with a single argument, the path of that file
@@ -158,7 +159,7 @@ def _interpret_task_logs(fs, matches, partial=True, stderr_callback=None):
         result.setdefault('errors', [])
         result['errors'].append(error)
 
-        if partial:
+        if partial and task_error:
             result['partial'] = True
             break
 

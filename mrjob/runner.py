@@ -1109,6 +1109,30 @@ class MRJobRunner(object):
 
         return [self._stdin_path if p == '-' else p for p in self._input_paths]
 
+    def _intermediate_output_uri(self, step_num):
+        """A URI for intermediate output for the given step number.
+        Define this in your runner subclass."""
+        raise NotImplementedError
+
+    def _step_input_uris(self, step_num):
+        """A list of URIs to use as input for the given step. For all
+        except the first step, this list will have a single item (a
+        directory)."""
+        if step_num == 0:
+            return [self._upload_mgr.uri(path)
+                    for path in self._get_input_paths()]
+        else:
+            return [self._intermediate_output_uri(step_num - 1)]
+
+    def _step_output_uri(self, step_num):
+        """URI to use as output for the given step. This is either an
+        intermediate dir (see :py:meth:`intermediate_output_uri`) or
+        ``self._output_dir`` for the final step."""
+        if step_num == len(self._get_steps()) - 1:
+            return self._output_dir
+        else:
+            return self._intermediate_output_uri(step_num)
+
     def _create_mrjob_tar_gz(self):
         """Make a tarball of the mrjob library, without .pyc or .pyo files,
         This will also set ``self._mrjob_tar_gz_path`` and return it.

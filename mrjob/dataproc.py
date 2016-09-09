@@ -803,22 +803,10 @@ class DataprocJobRunner(MRJobRunner):
 
             raise StepFailedException(step_num=step_num, num_steps=num_steps)
 
-    def _step_input_uris(self, step_num):
-        """Get the gs:// URIs for input for the given step."""
-        if step_num == 0:
-            return [self._upload_mgr.uri(path)
-                    for path in self._get_input_paths()]
-        else:
-            # put intermediate data in HDFS
-            return ['hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
-                self._job_key, step_num)]
-
-    def _step_output_uri(self, step_num):
-        if step_num == len(self._get_steps()) - 1:
-            return self._output_dir
-        else:
-            # put intermediate data in HDFS
-            return 'hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
+    def _intermediate_output_uri(self, step_num):
+        # TODO: davidmarin @ mtai: noticed this is 1-indexed and uses
+        # %05d instead of %04d. Any particular reason?
+        return 'hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
                 self._job_key, step_num + 1)
 
     def counters(self):

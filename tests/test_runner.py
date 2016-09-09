@@ -949,3 +949,31 @@ class FSPassthroughTestCase(TestCase):
             self.assertIn(
                 'deprecated: access HadoopJobRunner.fs._hadoop_bin directly',
                 stderr.getvalue())
+
+
+class StepInputAndOutputURIsTestCase(SandboxedTestCase):
+
+    def test_two_step_job(self):
+        input1_path = self.makefile('input1')
+        input2_path = self.makefile('input2')
+
+        job = MRTwoStepJob([
+            '-r', 'hadoop',
+            '--hadoop-bin', 'false',  # shouldn't run; just in case
+            input1_path, input2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            input_uris_0 = runner._step_input_uris(0)
+            self.assertEqual([os.path.basename(uri) for uri in input_uris_0],
+                             ['input1', 'input2'])
+
+            output_uri_0 = runner._step_output_uri(0)
+            input_uris_1 = runner._step_input_uris(1)
+
+            self.assertEqual(input_uris_1, [output_uri_0])
+
+            output_uri_1 = runner._step_output_uri(1)
+            self.assertEqual(output_uri_1, runner._output_dir)

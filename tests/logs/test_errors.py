@@ -47,7 +47,7 @@ class PickErrorTestCase(TestCase):
             dict(
                 container_id='container_1450486922681_0005_01_000004',
                 hadoop_error=dict(message='elephant problems'),
-            ),
+            )
         )
 
     def test_task_error_beats_recency(self):
@@ -73,7 +73,32 @@ class PickErrorTestCase(TestCase):
                 container_id='container_1450486922681_0005_01_000003',
                 hadoop_error=dict(message='BOOM'),
                 task_error=dict(message='things exploding'),
+            )
+        )
+
+    def test_timestamp_beats_task_error(self):
+        log_interpretation = dict(
+            history=dict(
+                errors=[
+                    dict(
+                        container_id='container_1450486922681_0005_01_000003',
+                        hadoop_error=dict(message='BOOM'),
+                        task_error=dict(message='things exploding'),
+                    ),
+                    dict(
+                        container_id='container_1450489999999_0005_01_000004',
+                        hadoop_error=dict(message='elephant problems'),
+                    ),
+                ],
             ),
+        )
+
+        self.assertEqual(
+            _pick_error(log_interpretation),
+            dict(
+                container_id='container_1450489999999_0005_01_000004',
+                hadoop_error=dict(message='elephant problems'),
+            )
         )
 
     def test_merge_order(self):
@@ -129,7 +154,7 @@ class PickErrorTestCase(TestCase):
                     message='exploding snakes, now?!',
                     path='some_stderr',
                 ),
-            ),
+            )
         )
 
     def test_container_to_attempt_id(self):

@@ -554,25 +554,9 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return args
 
-    def _step_input_uris(self, step_num):
-        """Get the hdfs:// URI for input for the given step."""
-        if step_num == 0:
-            return [self._upload_mgr.uri(p)
-                    for p in self._get_input_paths()]
-        else:
-            return [posixpath.join(
-                self._hadoop_tmp_dir,
-                'step-output/%04d' % (step_num - 1)
-            )]
-
-    def _step_output_uri(self, step_num):
-        if step_num == len(self._get_steps()) - 1:
-            return self._output_dir
-        else:
-            return posixpath.join(
-                self._hadoop_tmp_dir,
-                'step-output/%04d' % step_num
-            )
+    def _intermediate_output_uri(self, step_num):
+        return posixpath.join(self._hadoop_tmp_dir,
+                              'step-output/%04d' % step_num)
 
     def _cleanup_hadoop_tmp(self):
         if self._hadoop_tmp_dir:

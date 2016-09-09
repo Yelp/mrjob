@@ -189,7 +189,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000001',
                 ),
             ],
-            partial=True,
         ))
 
     def test_syslog_with_error_and_split(self):
@@ -214,7 +213,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000001',
                 ),
             ],
-            partial=True,
         ))
 
     def test_syslog_with_corresponding_stderr(self):
@@ -274,7 +272,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     ),
                 ),
             ],
-            partial=True,
         ))
 
     def test_error_in_stderr_only(self):

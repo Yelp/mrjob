@@ -195,7 +195,6 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # Keep track of where the spark-submit binary is
         self._spark_submit_bin = self._opts['spark_submit_bin']
-        self._searched_for_spark_submit_bin = False
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task' ('step' will always
@@ -334,29 +333,37 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             yield path
 
     def get_spark_submit_bin(self):
-        # TODO: this is almost identical to get_hadoop_bin()
-        if not (self._spark_submit_bin or
-                self._searched_for_spark_submit_bin):
-
+        if not self._spark_submit_bin:
             self._spark_submit_bin = self._find_spark_submit_bin()
-
-            if self._spark_submit_bin:
-                log.info('Found Hadoop streaming jar: %s' %
-                         self._spark_submit_bin)
-            else:
-                log.warning('Hadoop streaming jar not found. Use'
-                            ' --hadoop-streaming-jar')
-
-            self._searched_for_spark_submit_bin = True
-
         return self._spark_submit_bin
 
-    # TODO: fill these methods (see #1366)
     def _find_spark_submit_bin(self):
-        pass
+        # TODO: this is very similar to _find_hadoop_bin() (in fs)
+        for path in unique(self._spark_submit_bin_dirs()):
+            log.info('Looking for spark-submit binary in %s...' % (
+                path or '$PATH'))
+
+            spark_submit_bin = which('hadoop', path=path)
+
+            if spark_submit_bin:
+                log.info('Found spark-submit binary: %s' % spark_submit_bin)
+                return [spark_submit_bin]
+        else:
+            log.info("Falling back to 'spark-submit'")
+            return ['spark-submit']
 
     def _spark_submit_bin_dirs(self):
-        return ()
+        # $SPARK_HOME
+        spark_home = os.environ.get('SPARK_HOME')
+        if spark_home:
+            yield spark_home
+
+        yield None  # use $PATH
+
+        # some other places recommended by install docs (see #1366)
+        yield '/usr/lib/spark/bin'
+        yield '/usr/local/spark/bin'
+        yield '/usr/local/lib/spark/bin'
 
     def _run(self):
         self._check_input_exists()

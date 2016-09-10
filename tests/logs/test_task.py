@@ -658,6 +658,55 @@ class ParseTaskStderrTestCase(TestCase):
             )
         )
 
+    def test_subprocess_failed_stack_trace(self):
+        # real example, with fanciful error code
+        lines = [
+            'java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+            ' subprocess failed with code ^^vv<><>BA',
+            '    at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+            '(PipeMapRed.java:372)',
+            '    at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished'
+            '(PipeMapRed.java:586)',
+            # ...
+        ]
+
+        self.assertEqual(_parse_task_stderr(lines), None)
+
+    def test_error_followed_by_subprocess_failed_stack_trace(self):
+        # real example, from #1430
+        lines = [
+            'Traceback (most recent call last):',
+            '  File "mr_boom.py", line 10, in <module>',
+            '    MRBoom.run()',
+            # ...
+            'Exception: BOOM',
+            'java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+            ' subprocess failed with code 1',
+            '    at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+            '(PipeMapRed.java:372)',
+            '    at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished'
+            '(PipeMapRed.java:586)',
+            # ...
+        ]
+
+        self.assertEqual(
+            _parse_task_stderr(lines),
+            dict(
+                message=(
+                    'Traceback (most recent call last):\n'
+                    '  File "mr_boom.py", line 10, in <module>\n'
+                    '    MRBoom.run()\n'
+                    'Exception: BOOM'),
+                start_line=0,
+                num_lines=4,
+            )
+        )
+
+
+
+
+
+
 
 class SyslogToStderrPathTestCase(TestCase):
 

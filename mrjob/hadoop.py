@@ -26,6 +26,7 @@ try:
 except ImportError:
     pty = None
 
+import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_cmds
@@ -102,6 +103,9 @@ _HADOOP_STDOUT_RE = re.compile(br'^packageJobJar: ')
 # match the filename of a hadoop streaming jar
 _HADOOP_STREAMING_JAR_RE = re.compile(
     r'^hadoop.*streaming.*(?<!-sources)\.jar$')
+
+# always use these args with spark-submit
+_HADOOP_SPARK_ARGS = ['--master', 'yarn']
 
 
 def fully_qualify_hdfs_path(path):
@@ -587,10 +591,41 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         return args
 
     def _args_for_spark_step(self, step_num):
-        pass
+        step = self._get_step(step_num)
+
+        return self._args_for_spark_step_helper(
+            step_num=step_num,
+            spark_args=step['spark_args'],
+            script=self._script_path,
+            script_args=[
+                '--step-num=%d' % step_num,
+                '--spark',
+                mrjob.step.INPUT,
+                mrjob.step.OUTPUT,
+            ],
+        )
 
     def _args_for_spark_script_step(self, step_num):
-        pass
+        step = self._get_step(step_num)
+
+        return self._args_for_spark_step_helper(
+            step_num=step_num,
+            spark_args=step['spark_args'],
+            script=step['script'],
+            script_args=step['args']
+        )
+
+    def _args_for_spark_step_helper(
+            self, step_num, spark_args, script, script_args):
+        """Common code for _args_for_spark_step() and
+        _args_for_spark_script_step()."""
+        script_args = self._interpolate_input_and_output(script_args, step_num)
+
+        return (self.get_spark_submit_bin() +
+                _HADOOP_SPARK_ARGS +
+                spark_args +
+                [script] +
+                self._interpolate_input_and_output(script_args, step_num))
 
     def _intermediate_output_uri(self, step_num):
         return posixpath.join(self._hadoop_tmp_dir,

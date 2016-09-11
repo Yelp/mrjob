@@ -1810,18 +1810,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             return self._upload_mgr.uri(path)
 
-    def _interpolate_input_and_output(self, args, step_num):
-
-        def interpolate(arg):
-            if arg == mrjob.step.INPUT:
-                return ','.join(self._step_input_uris(step_num))
-            elif arg == mrjob.step.OUTPUT:
-                return self._step_output_uri(step_num)
-            else:
-                return arg
-
-        return [interpolate(arg) for arg in args]
-
     def _build_master_node_setup_step(self):
         name = '%s: Master node setup' % self._job_key
         jar = self._script_runner_jar_uri()

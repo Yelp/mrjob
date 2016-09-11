@@ -26,7 +26,6 @@ try:
 except ImportError:
     pty = None
 
-import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_cmds
@@ -581,17 +580,9 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         if step.get('main_class'):
             args.append(step['main_class'])
 
-        # TODO: merge with logic in mrjob/emr.py
-        def interpolate(arg):
-            if arg == mrjob.step.INPUT:
-                return ','.join(self._step_input_uris(step_num))
-            elif arg == mrjob.step.OUTPUT:
-                return self._step_output_uri(step_num)
-            else:
-                return arg
-
         if step.get('args'):
-            args.extend(interpolate(arg) for arg in step['args'])
+            args.extend(
+                self._interpolate_input_and_output(step['args'], step_num))
 
         return args
 

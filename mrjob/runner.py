@@ -33,6 +33,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 
+import mrjob.step
 from mrjob.compat import translate_jobconf_dict
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -1132,6 +1133,25 @@ class MRJobRunner(object):
             return self._output_dir
         else:
             return self._intermediate_output_uri(step_num)
+
+    def _interpolate_input_and_output(self, args, step_num):
+        """Replace :py:data:`~mrjob.step.INPUT` and
+        :py:data:`~mrjob.step.OUTPUT` in arguments to a jar or Spark
+        step.
+
+        If there are multiple input paths (i.e. on the first step), they'll
+        be joined with a comma.
+        """
+
+        def interpolate(arg):
+            if arg == mrjob.step.INPUT:
+                return ','.join(self._step_input_uris(step_num))
+            elif arg == mrjob.step.OUTPUT:
+                return self._step_output_uri(step_num)
+            else:
+                return arg
+
+        return [interpolate(arg) for arg in args]
 
     def _create_mrjob_tar_gz(self):
         """Make a tarball of the mrjob library, without .pyc or .pyo files,

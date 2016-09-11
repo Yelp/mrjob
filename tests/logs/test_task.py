@@ -189,7 +189,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000001',
                 ),
             ],
-            partial=True,
         ))
 
     def test_syslog_with_error_and_split(self):
@@ -214,7 +213,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000001',
                 ),
             ],
-            partial=True,
         ))
 
     def test_syslog_with_corresponding_stderr(self):
@@ -274,7 +272,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     ),
                 ),
             ],
-            partial=True,
         ))
 
     def test_error_in_stderr_only(self):
@@ -292,28 +289,52 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         # never even looked at stderr, because no error in syslog
         self.assertEqual(self.mock_paths_catted, [syslog_path])
 
+    maxDiff = None
+
     # indirectly tests _ls_task_syslogs() and its ability to sort by recency
     def test_multiple_logs(self):
         syslog1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+        stderr2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/stderr'
         syslog2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/syslog'
+        stderr3_path = '/userlogs/attempt_201512232143_0008_m_000003_3/stderr'
         syslog3_path = '/userlogs/attempt_201512232143_0008_m_000003_3/syslog'
+        syslog4_path = '/userlogs/attempt_201512232143_0008_m_000004_3/syslog'
 
-        self.mock_paths = [syslog1_path, syslog2_path, syslog3_path]
+        self.mock_paths = [syslog1_path,
+                           stderr2_path,
+                           syslog2_path,
+                           stderr3_path,
+                           syslog3_path,
+                           syslog4_path]
 
         self.path_to_mock_result = {
             syslog1_path: dict(hadoop_error=dict(message='BOOM1')),
             syslog2_path: dict(hadoop_error=dict(message='BOOM2')),
-            # no error for syslog3_path
+            stderr2_path: dict(message='BoomException'),
+            syslog3_path: dict(hadoop_error=dict(message='BOOM3')),
+            # no errors for stderr3_path or syslog4_path
         }
 
         # we should read from syslog2_path first (later task number)
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000003_3',
+                    hadoop_error=dict(
+                        message='BOOM3',
+                        path=syslog3_path,
+                    ),
+                    task_id='task_201512232143_0008_m_000003',
+                ),
+                dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
                         message='BOOM2',
                         path=syslog2_path,
+                    ),
+                    task_error=dict(
+                        message='BoomException',
+                        path=stderr2_path,
                     ),
                     task_id='task_201512232143_0008_m_000002',
                 ),
@@ -322,7 +343,11 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         ))
 
         # shouldn't even bother with syslog1_path
-        self.assertEqual(self.mock_paths_catted, [syslog3_path, syslog2_path])
+        self.assertEqual(self.mock_paths_catted, [
+            syslog4_path,
+            syslog3_path, stderr3_path,
+            syslog2_path, stderr2_path,
+        ])
 
         # try again, with partial=False
         self.mock_paths_catted = []
@@ -331,10 +356,22 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.assertEqual(self.interpret_task_logs(partial=False), dict(
             errors=[
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000003_3',
+                    hadoop_error=dict(
+                        message='BOOM3',
+                        path=syslog3_path,
+                    ),
+                    task_id='task_201512232143_0008_m_000003',
+                ),
+                dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
                         message='BOOM2',
                         path=syslog2_path,
+                    ),
+                    task_error=dict(
+                        message='BoomException',
+                        path=stderr2_path,
                     ),
                     task_id='task_201512232143_0008_m_000002',
                 ),
@@ -350,7 +387,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         ))
 
         self.assertEqual(self.mock_paths_catted,
-                         [syslog3_path, syslog2_path, syslog1_path])
+                         list(reversed(self.mock_paths)))
 
     def test_pre_yarn_sorting(self):
         # NOTE: we currently don't have to handle errors from multiple
@@ -620,6 +657,55 @@ class ParseTaskStderrTestCase(TestCase):
                 num_lines=2,
             )
         )
+
+    def test_subprocess_failed_stack_trace(self):
+        # real example, with fanciful error code
+        lines = [
+            'java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+            ' subprocess failed with code ^^vv<><>BA',
+            '    at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+            '(PipeMapRed.java:372)',
+            '    at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished'
+            '(PipeMapRed.java:586)',
+            # ...
+        ]
+
+        self.assertEqual(_parse_task_stderr(lines), None)
+
+    def test_error_followed_by_subprocess_failed_stack_trace(self):
+        # real example, from #1430
+        lines = [
+            'Traceback (most recent call last):',
+            '  File "mr_boom.py", line 10, in <module>',
+            '    MRBoom.run()',
+            # ...
+            'Exception: BOOM',
+            'java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+            ' subprocess failed with code 1',
+            '    at org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+            '(PipeMapRed.java:372)',
+            '    at org.apache.hadoop.streaming.PipeMapRed.mapRedFinished'
+            '(PipeMapRed.java:586)',
+            # ...
+        ]
+
+        self.assertEqual(
+            _parse_task_stderr(lines),
+            dict(
+                message=(
+                    'Traceback (most recent call last):\n'
+                    '  File "mr_boom.py", line 10, in <module>\n'
+                    '    MRBoom.run()\n'
+                    'Exception: BOOM'),
+                start_line=0,
+                num_lines=4,
+            )
+        )
+
+
+
+
+
 
 
 class SyslogToStderrPathTestCase(TestCase):

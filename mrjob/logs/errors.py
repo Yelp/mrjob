@@ -57,8 +57,15 @@ def _merge_and_sort_errors(errors, container_to_attempt_id=None):
         key_to_error.setdefault(key, {})
         key_to_error[key].update(error)
 
+    # wrap sort key to prioritize task errors. See #1429
+    def sort_key(key_and_error):
+        key, error = key_and_error
+
+        # key[0] is step number
+        return (key[0], bool(error.get('task_error')), key[1:])
+
     return [error for key, error in
-            sorted(key_to_error.items(), reverse=True)]
+            sorted(key_to_error.items(), key=sort_key, reverse=True)]
 
 
 def _format_error(error):

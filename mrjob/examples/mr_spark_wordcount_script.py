@@ -15,6 +15,8 @@ from os.path import dirname
 from os.path import join
 
 from mrjob.job import MRJob
+from mrjob.step import INPUT
+from mrjob.step import OUTPUT
 from mrjob.step import SparkScriptStep
 
 
@@ -24,7 +26,7 @@ class MRSparkScriptWordcount(MRJob):
         return [
             SparkScriptStep(
                 script=join(dirname(__file__), 'spark_wordcount_script.py'),
-                args=[SparkScriptStep.INPUT, SparkScriptStep.OUTPUT],
+                args=[INPUT, OUTPUT],
             ),
         ]
 

@@ -46,6 +46,12 @@ _PRE_YARN_TASK_SYSLOG_PATH_RE = re.compile(
 # ignore warnings about initializing log4j in task stderr
 _TASK_STDERR_IGNORE_RE = re.compile(r'^log4j:WARN .*$')
 
+# this is the start of a Java stacktrace that Hadoop 1 always logs to
+# stderr when tasks fail (see #1430)
+_SUBPROCESS_FAILED_STACK_TRACE_START = re.compile(
+    r'^java\.lang\.RuntimeException: PipeMapRed\.waitOutputThreads\(\):'
+    r' subprocess failed with code .*$')
+
 # message telling us about a (input) split. Looks like this:
 #
 # Processing split: hdfs://ddf64167693a:9000/path/to/bootstrap.sh:0+335
@@ -99,7 +105,8 @@ def _match_task_syslog_path(path, application_id=None, job_id=None):
 def _interpret_task_logs(fs, matches, partial=True, stderr_callback=None):
     """Look for errors in task syslog/stderr.
 
-    If *partial* is true (the default), stop when we find the first error.
+    If *partial* is true (the default), stop when we find the first error
+    that includes a *task_error*.
 
     If *stderr_callback* is set, every time we're about to parse a stderr
         file, call it with a single argument, the path of that file
@@ -158,7 +165,7 @@ def _interpret_task_logs(fs, matches, partial=True, stderr_callback=None):
         result.setdefault('errors', [])
         result['errors'].append(error)
 
-        if partial:
+        if partial and task_error:
             result['partial'] = True
             break
 
@@ -235,9 +242,23 @@ def _parse_task_stderr(lines):
     num_lines: how may lines the message takes up
     """
     task_error = None
+    stack_trace_start_line = None
 
     for line_num, line in enumerate(lines):
         line = line.rstrip('\r\n')
+
+        # ignore "subprocess failed" stack trace
+        if _SUBPROCESS_FAILED_STACK_TRACE_START.match(line):
+            stack_trace_start_line = line_num
+            continue
+
+        # once we detect a stack trace, keep ignoring lines until
+        # we find a non-indented one
+        if stack_trace_start_line is not None:
+            if line.lstrip() != line:
+                continue
+            else:
+                stack_trace_start_line = None
 
         # ignore warnings about initializing log4j
         if _TASK_STDERR_IGNORE_RE.match(line):
@@ -254,7 +275,8 @@ def _parse_task_stderr(lines):
 
     if task_error:
         if 'num_lines' not in task_error:
-            task_error['num_lines'] = line_num + 1 - task_error['start_line']
+            end_line = stack_trace_start_line or (line_num + 1)
+            task_error['num_lines'] = end_line - task_error['start_line']
         return task_error
     else:
         return None

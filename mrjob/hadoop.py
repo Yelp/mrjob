@@ -346,7 +346,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('Looking for spark-submit binary in %s...' % (
                 path or '$PATH'))
 
-            spark_submit_bin = which('hadoop', path=path)
+            spark_submit_bin = which('spark-submit', path=path)
 
             if spark_submit_bin:
                 log.info('Found spark-submit binary: %s' % spark_submit_bin)

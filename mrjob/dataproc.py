@@ -815,7 +815,7 @@ class DataprocJobRunner(MRJobRunner):
         # TODO: davidmarin @ mtai: noticed this is 1-indexed and uses
         # %05d instead of %04d. Any particular reason?
         return 'hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
-                self._job_key, step_num + 1)
+            self._job_key, step_num + 1)
 
     def counters(self):
         # TODO - mtai @ davidmarin - Counters are currently always empty as we

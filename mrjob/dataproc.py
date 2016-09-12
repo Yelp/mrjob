@@ -40,6 +40,7 @@ except ImportError:
     import configparser
 
 import mrjob
+from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
@@ -99,9 +100,16 @@ _DATAPROC_JOB_STATES_ACTIVE = frozenset(
 
 _DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
 
+# Dataproc images where Hadoop version changed (we use map_version() on this)
+#
+# This will need to be updated by hand if we want it to be fully accurate
+# (it doesn't really matter to mrjob though, which only cares about
+# major version)
+#
+# See https://cloud.google.com/dataproc/docs/concepts/dataproc-versions
+# for the full list.
 _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '0.1': '2.7.1',
-    '0.2': '2.7.1',
     '1.0': '2.7.2'
 }
 
@@ -837,8 +845,10 @@ class DataprocJobRunner(MRJobRunner):
         cluster = self._api_cluster_get(self._cluster_id)
         self._image_version = (
             cluster['config']['softwareConfig']['imageVersion'])
-        self._hadoop_version = (
-            _DATAPROC_IMAGE_TO_HADOOP_VERSION[self._image_version])
+        # protect against new versions, including patch versions
+        # we didn't explicitly request. See #1428
+        self._hadoop_version = map_version(
+            self._image_version, _DATAPROC_IMAGE_TO_HADOOP_VERSION)
 
     ### Bootstrapping ###
 

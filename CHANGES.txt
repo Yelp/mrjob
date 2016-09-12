@@ -1,3 +1,10 @@
+v0.5.5, 2016-09-12 -- dataproc crash fix
+ * Dataproc runner:
+   * fix Hadoop version crash on unknown image version (#1428)
+ * EMR and Hadoop runners:
+   * prioritize task errors as probable cause of failure (#1429)
+   * ignore Java stack trace in task stderr logs (#1430)
+
 v0.5.5, 2016-09-05 -- missing ami_version option
  * EMR runner:
    * deprecate, don't remove ami_version option in v0.5.4 (#1421)

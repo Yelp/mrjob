@@ -1,4 +1,4 @@
-v0.5.5, 2016-09-12 -- dataproc crash fix
+v0.5.6, 2016-09-12 -- dataproc crash fix
  * Dataproc runner:
    * fix Hadoop version crash on unknown image version (#1428)
  * EMR and Hadoop runners:

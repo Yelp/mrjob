@@ -4,6 +4,22 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.6:
+
+0.5.6
+-----
+
+Fixed a critical bug that caused Dataproc runner to always crash when
+determining Hadoop version.
+
+Log interpretation now prioritizes task errors (e.g. a traceback from
+your Python script) as probable cause of failure, even if they aren't the most
+recent error. Log interpretation will now continue to download and parse
+task logs until it finds a non-empty stderr log.
+
+Log interpretation also strips the "subprocess failed" Java stack trace
+that appears in task stderr logs from Hadoop 1.
+
 .. _v0.5.5:
 
 0.5.5

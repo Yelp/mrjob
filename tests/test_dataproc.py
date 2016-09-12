@@ -341,6 +341,13 @@ class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
     def test_image_1_0(self):
         self._assert_cloud_hadoop_version('1.0', '2.7.2')
 
+    def test_image_1_0_11(self):
+        # regression test for #1428
+        self._assert_cloud_hadoop_version('1.0.11', '2.7.2')
+
+    def test_future_proofing(self):
+        self._assert_cloud_hadoop_version('5.0', '2.7.2')
+
     def _assert_cloud_hadoop_version(self, image_version, hadoop_version):
         with self.make_runner('--image-version', image_version) as runner:
             runner.run()

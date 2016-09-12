@@ -100,9 +100,16 @@ _DATAPROC_JOB_STATES_ACTIVE = frozenset(
 
 _DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
 
+# Dataproc images where Hadoop version changed (we use map_version() on this)
+#
+# This will need to be updated by hand if we want it to be fully accurate
+# (it doesn't really matter to mrjob though, which only cares about
+# major version)
+#
+# See https://cloud.google.com/dataproc/docs/concepts/dataproc-versions
+# for the full list.
 _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '0.1': '2.7.1',
-    '0.2': '2.7.1',
     '1.0': '2.7.2'
 }
 

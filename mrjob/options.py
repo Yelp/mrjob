@@ -525,6 +525,16 @@ def _add_emr_launch_opts(opt_group):
             help='Deprecated alias for --zone'),
 
         opt_group.add_option(
+            '--bootstrap-spark', dest='bootstrap_spark',
+            action='store_true', default=None,
+            help="Auto-install Spark on the cluster (even if not needed)."),
+
+        opt_group.add_option(
+            '--no-bootstrap-spark', dest='bootstrap_spark',
+            action='store_false', default=None,
+            help="Don't auto-install Spark on the cluster."),
+
+        opt_group.add_option(
             '--cloud-log-dir', dest='cloud_log_dir', default=None,
             help='URI on remote FS to write logs into'),
 

@@ -386,6 +386,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'bootstrap_python',
         'bootstrap_python_packages',
         'bootstrap_scripts',
+        'bootstrap_spark',
         'check_cluster_every',
         'cloud_fs_sync_secs',
         'cloud_log_dir',
@@ -2553,6 +2554,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             ]]
         else:
             return []
+
+    def _should_bootstrap_spark(self):
+        """Return *bootstrap_spark* option if set; otherwise return
+        true if our job has Spark steps."""
+        if self._opts['bootstrap_spark'] is None:
+            return self._has_spark_steps()
+        else:
+            return self._opts['bootstrap_spark']
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with

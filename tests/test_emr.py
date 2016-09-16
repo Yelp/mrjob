@@ -4059,6 +4059,49 @@ class BootstrapPythonTestCase(MockBotoTestCase):
                 self.EXPECTED_BOOTSTRAP + [['true']])
 
 
+class ShouldBoostrapSparkTestCase(MockBotoTestCase):
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), False)
+
+    def test_explicit_true(self):
+        job = MRTwoStepJob(['-r', 'emr', '--bootstrap-spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), True)
+
+    def test_spark_job(self):
+        job = MRNullSpark(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), True)
+
+    def test_spark_script_job(self):
+        job = MRSparkScript(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), True)
+
+    def test_explicit_false(self):
+        job = MRNullSpark(['-r', 'emr', '--no-bootstrap-spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), False)
+
+
 class EMRTagsTestCase(MockBotoTestCase):
 
     def test_tags_option_dict(self):

@@ -182,6 +182,14 @@ _4_X_INTERMEDIARY_JAR = 'command-runner.jar'
 # path to spark-submit on 3.x AMIs. (On 4.x, it's just 'spark-submit')
 _3_X_SPARK_SUBMIT = '/home/hadoop/spark/bin/spark-submit'
 
+# bootstrap action to install Spark on 3.x AMIs (On 4.x+, we use
+# Applications instead)
+_3_X_SPARK_BOOTSTRAP_ACTION = (
+    'file:///usr/share/aws/emr/install-spark/install-spark')
+
+# first AMI version to support Spark
+_MIN_SPARK_AMI_VERSION = '3.8.0'
+
 # always use these args with spark-submit
 _EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
 
@@ -722,18 +730,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # manage working dir for bootstrap script
         self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
 
-        # add the bootstrap files to a list of files to upload
-        self._bootstrap_actions = []
-        for action in self._opts['bootstrap_actions']:
-            args = shlex_split(action)
-            if not args:
-                raise ValueError('bad bootstrap action: %r' % (action,))
-            # don't use _add_bootstrap_file() because this is a raw bootstrap
-            self._bootstrap_actions.append({
-                'path': args[0],
-                'args': args[1:],
-            })
-
         if self._opts['bootstrap_files']:
             log.warning(
                 "bootstrap_files is deprecated since v0.4.2 and will be"
@@ -1035,7 +1031,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._upload_mgr.add(self._master_bootstrap_script_path)
 
         # make sure bootstrap action scripts are on S3
-        for bootstrap_action in self._bootstrap_actions:
+        for bootstrap_action in self._bootstrap_actions():
             self._upload_mgr.add(bootstrap_action['path'])
 
         # Add max-hours-idle script if we need it
@@ -1558,7 +1554,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # bootstrap actions
         bootstrap_action_args = []
 
-        for i, bootstrap_action in enumerate(self._bootstrap_actions):
+        for i, bootstrap_action in enumerate(self._bootstrap_actions()):
             s3_uri = self._upload_mgr.uri(bootstrap_action['path'])
             bootstrap_action_args.append(
                 boto.emr.BootstrapAction(
@@ -2561,14 +2557,43 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         in ``Hadoop`` and ``Spark`` as needed."""
         applications = set(self._opts['emr_applications'])
 
-        if (self._should_bootstrap_spark() and version_gte(
-                self.get_hadoop_version(), '4') and not
-                self._has_spark_application()):
+        # release_label implies 4.x AMI and later
+        if self._should_bootstrap_spark() and self._opts['release_label']:
             applications.add('Spark')
 
-        # patch in "Hadoop" unless applications are empty
+        # patch in "Hadoop" unless applications is empty (e.g. 3.x AMIs)
         if applications:
             applications.add('Hadoop')
+
+        return applications
+
+    def _bootstrap_actions(self, include_spark=True):
+        """Parse *bootstrap_actions* option into dictionaries with
+        keys *path*, *args*, adding Spark bootstrap action if needed.
+
+        (This doesn't handle the master bootstrap script.)
+        """
+        actions = self._opts['bootstrap_actions']
+
+        # no release_label implies AMIs prior to 4.x
+        if (include_spark and self._should_bootstrap_spark() and
+                not self._opts['release_label']):
+            if version_gte(self._opts['image_version'],
+                           _MIN_SPARK_AMI_VERSION):
+                actions.append(_3_X_SPARK_BOOTSTRAP_ACTION)
+            else:
+                log.warning("Spark isn't available on AMI versions prior"
+                            "to %s" % _MIN_SPARK_AMI_VERSION)
+
+        results = []
+        for action in actions:
+            args = shlex_split(action)
+            if not args:
+                raise ValueError('bad bootstrap action: %r' % (action,))
+
+            results.append(dict(path=args[0], args=args[1:]))
+
+        return results
 
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with
@@ -3137,7 +3162,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not path == self._mrjob_tar_gz_path),
             self._opts['additional_emr_info'],
             self._bootstrap,
-            self._bootstrap_actions,
+            self._bootstrap_actions(),
             self._opts['bootstrap_cmds'],
             self._bootstrap_mrjob(),
         ]
@@ -3323,12 +3348,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 self._has_spark_install_bootstrap_action() or
                 self._has_spark_application())
 
-
     def _has_spark_install_bootstrap_action(self):
         """Does it look like this runner has a spark bootstrap install
         action set? (Anything ending in "/install-spark" counts.)"""
         return any(ba['path'].endswith('/install-spark')
-                   for ba in self._bootstrap_actions)
+                   for ba in self._bootstrap_actions(include_spark=False))
 
     def _has_spark_application(self):
         """Does this runner have "Spark" in its *emr_applications* option?"""

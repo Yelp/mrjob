@@ -384,7 +384,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         (This is just for user-interaction purposes; these would otherwise
         lazy-load as needed.)
         """
-        self.get_hadoop_bin()
+        # this triggers looking for Hadoop binary
+        self.get_hadoop_version()
 
         if self._has_streaming_steps():
             self.get_hadoop_streaming_jar()

@@ -1282,8 +1282,8 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
     def setUp(self):
         super(FindBinariesAndJARsTestCase, self).setUp()
 
-        self.get_hadoop_bin = self.start(patch(
-            'mrjob.hadoop.HadoopJobRunner.get_hadoop_bin'))
+        self.get_hadoop_version = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner.get_hadoop_version'))
 
         self.get_hadoop_streaming_jar = self.start(patch(
             'mrjob.hadoop.HadoopJobRunner.get_hadoop_streaming_jar'))
@@ -1291,12 +1291,12 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
         self.get_spark_submit_bin = self.start(patch(
             'mrjob.hadoop.HadoopJobRunner.get_spark_submit_bin'))
 
-    def test_always_call_get_hadoop_bin(self):
+    def test_always_call_get_hadoop_version(self):
         runner = HadoopJobRunner()
 
         runner._find_binaries_and_jars()
 
-        self.assertTrue(self.get_hadoop_bin.called)
+        self.assertTrue(self.get_hadoop_version.called)
         self.assertFalse(self.get_hadoop_streaming_jar.called)
         self.assertFalse(self.get_spark_submit_bin.called)
 
@@ -1307,7 +1307,7 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             runner._find_binaries_and_jars()
 
-            self.assertTrue(self.get_hadoop_bin.called)
+            self.assertTrue(self.get_hadoop_version.called)
             self.assertTrue(self.get_hadoop_streaming_jar.called)
             self.assertFalse(self.get_spark_submit_bin.called)
 
@@ -1318,7 +1318,7 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             runner._find_binaries_and_jars()
 
-            self.assertTrue(self.get_hadoop_bin.called)
+            self.assertTrue(self.get_hadoop_version.called)
             self.assertFalse(self.get_hadoop_streaming_jar.called)
             self.assertTrue(self.get_spark_submit_bin.called)
 
@@ -1329,6 +1329,6 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             runner._find_binaries_and_jars()
 
-            self.assertTrue(self.get_hadoop_bin.called)
+            self.assertTrue(self.get_hadoop_version.called)
             self.assertTrue(self.get_hadoop_streaming_jar.called)
             self.assertTrue(self.get_spark_submit_bin.called)

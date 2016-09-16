@@ -2580,7 +2580,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 not self._opts['release_label']):
             if version_gte(self._opts['image_version'],
                            _MIN_SPARK_AMI_VERSION):
-                actions.append(_3_X_SPARK_BOOTSTRAP_ACTION)
+                # running this action twice apparently breaks Spark's
+                # ability to output to S3 (see #1367)
+                if not self._has_spark_install_bootstrap_action():
+                    actions.append(_3_X_SPARK_BOOTSTRAP_ACTION)
             else:
                 log.warning("Spark isn't available on AMI versions prior"
                             "to %s" % _MIN_SPARK_AMI_VERSION)

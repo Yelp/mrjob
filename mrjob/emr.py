@@ -489,7 +489,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         if not self['region']:
             self['region'] = _DEFAULT_REGION
 
-        self._fix_emr_applications_opt()
         self._fix_emr_configurations_opt()
         self._fix_hadoop_streaming_jar_on_emr_opt()
         self._fix_instance_opts()
@@ -521,13 +520,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'ssh_tunnel_is_open': False,
             'visible_to_all_users': True,
         })
-
-    def _fix_emr_applications_opt(self):
-        """Convert emr_applications to a set. If it's nonempty, make sure that
-        Hadoop is included."""
-        self['emr_applications'] = set(self['emr_applications'])
-        if self['emr_applications']:
-            self['emr_applications'].add('Hadoop')
 
     def _fix_emr_configurations_opt(self):
         """Normalize emr_configurations, raising an exception if we find
@@ -1619,9 +1611,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         api_params['JobFlowRole'] = self._instance_profile()
         api_params['ServiceRole'] = self._service_role()
 
-        if self._opts['emr_applications']:
+        applications = self._applications()
+        if applications:
             api_params['Applications'] = [
-                dict(Name=a) for a in sorted(self._opts['emr_applications'])]
+                dict(Name=a) for a in sorted(applications)]
 
         if self._opts['emr_configurations']:
             # Properties will be automatically converted to KeyValue objects
@@ -2563,6 +2556,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             return self._opts['bootstrap_spark']
 
+    def _applications(self):
+        """Returns applications (*emr_applications* option) as a set. Adds
+        in ``Hadoop`` and ``Spark`` as needed."""
+        applications = set(self._opts['emr_applications'])
+
+        if (self._should_bootstrap_spark() and version_gte(
+                self.get_hadoop_version(), '4') and not
+                self._has_spark_application()):
+            applications.add('Spark')
+
+        # patch in "Hadoop" unless applications are empty
+        if applications:
+            applications.add('Hadoop')
+
     def _parse_bootstrap(self):
         """Parse the *bootstrap* option with
         :py:func:`mrjob.setup.parse_setup_cmd()`.
@@ -2935,15 +2942,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not image_version.startswith(self._opts['image_version']):
                     return
 
-            if self._opts['emr_applications']:
+            applications = self._applications()
+            if applications:
                 # use case-insensitive mapping (see #1417)
-                applications = set(
+                cluster_applications = set(
                     a.name.lower() for a in cluster.applications)
 
                 expected_applications = set(
-                    a.lower() for a in self._opts['emr_applications'])
+                    a.lower() for a in applications)
 
-                if not expected_applications <= applications:
+                if not expected_applications <= cluster_applications:
                     return
 
             emr_configurations = _decode_configurations_from_api(

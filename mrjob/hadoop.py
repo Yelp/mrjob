@@ -359,7 +359,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         # $SPARK_HOME
         spark_home = os.environ.get('SPARK_HOME')
         if spark_home:
-            yield spark_home
+            yield os.path.join(spark_home, 'bin')
 
         yield None  # use $PATH
 

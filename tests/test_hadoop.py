@@ -28,6 +28,7 @@ from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
 from mrjob.step import StepFailedException
 from mrjob.util import bash_wrap
+from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters
 from tests.mockhadoop import add_mock_hadoop_output
@@ -1136,3 +1137,77 @@ class LibjarsTestCase(MockHadoopTestCase):
 
             self.assertIn('-libjars', args)
             self.assertIn('/path/to/a.jar,/path/to/b.jar', args)
+
+
+class FindSparkSubmitBinTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(FindSparkSubmitBinTestCase, self).setUp()
+
+        # track calls to which()
+        self.which = self.start(patch('mrjob.hadoop.which', wraps=which))
+
+        # keep which() from searching in /bin, etc.
+        os.environ['PATH'] = self.tmp_dir
+
+        # create basic runner (okay to overwrite)
+        self.runner = HadoopJobRunner()
+
+    def test_do_nothing_on_init(self):
+        self.assertFalse(self.which.called)
+
+    def test_option_short_circuits_search(self):
+        self.runner = HadoopJobRunner(
+            spark_submit_bin=['/path/to/spark-submit', '-v'])
+
+        self.assertEqual(self.runner.get_spark_submit_bin(),
+                         ['/path/to/spark-submit', '-v'])
+
+        self.assertFalse(self.which.called)
+
+    def test_fallback_and_hard_coded_dirs(self):
+        # don't get caught by real spark install
+        self.which.return_value = None
+
+        os.environ['SPARK_HOME'] = '/spark/home'
+
+        self.assertEqual(self.runner.get_spark_submit_bin(), ['spark-submit'])
+
+        which_paths = [
+            kwargs.get('path') for args, kwargs in self.which.call_args_list]
+
+        self.assertEqual(which_paths, [
+            '/spark/home/bin',
+            None,
+            '/usr/lib/spark/bin',
+            '/usr/local/spark/bin',
+            '/usr/local/lib/spark/bin',
+        ])
+
+    def test_find_in_spark_home(self):
+        spark_submit_bin = self.makefile(
+            os.path.join(self.tmp_dir, 'spark', 'bin', 'spark-submit'),
+            executable=True)
+
+        os.environ['SPARK_HOME'] = os.path.join(self.tmp_dir, 'spark')
+
+        self.runner.get_spark_submit_bin()
+
+        self.assertEqual(self.runner.get_spark_submit_bin(),
+                         [spark_submit_bin])
+
+        self.assertEqual(self.which.call_count, 1)
+
+    def test_find_in_path(self):
+        spark_submit_bin = self.makefile(
+            os.path.join(self.tmp_dir, 'bin', 'spark-submit'),
+            executable=True)
+
+        os.environ['PATH'] = os.path.join(self.tmp_dir, 'bin')
+
+        # don't get caught by real $SPARK_HOME
+        if 'SPARK_HOME' in os.environ:
+            del os.environ['SPARK_HOME']
+
+        self.assertEqual(self.runner.get_spark_submit_bin(),
+                         [spark_submit_bin])

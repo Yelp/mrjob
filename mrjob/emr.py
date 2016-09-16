@@ -1846,7 +1846,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _get_spark_jar_and_step_arg_prefix(self):
         # TODO: add spark_submit_bin option
 
-        if version_gte(self.get_ami_version(), '4'):
+        if version_gte(self.get_image_version(), '4'):
             return (_4_X_INTERMEDIARY_JAR, ['spark-submit'])
         else:
             return (self._script_runner_jar_uri(), [_3_X_SPARK_SUBMIT])

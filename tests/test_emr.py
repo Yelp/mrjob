@@ -4745,7 +4745,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_applications'], set())
+            self.assertEqual(runner._applications(), set())
 
             runner._launch()
             cluster = runner._describe_cluster()
@@ -4758,7 +4758,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_applications'], set())
+            self.assertEqual(runner._applications(), set())
 
             runner._launch()
             cluster = runner._describe_cluster()
@@ -4784,7 +4784,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_applications'],
+            self.assertEqual(runner._applications(),
                              set(['Hadoop', 'Mahout']))
 
             runner._launch()
@@ -4803,7 +4803,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
         with job.make_runner() as runner:
             # we explicitly add Hadoop so we can see Hadoop version in
             # the cluster description from the API
-            self.assertEqual(runner._opts['emr_applications'],
+            self.assertEqual(runner._applications(),
                              set(['Hadoop', 'Mahout']))
 
             runner._launch()

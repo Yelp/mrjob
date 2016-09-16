@@ -22,12 +22,14 @@ import pty
 from io import BytesIO
 from subprocess import check_call
 
+import mrjob.step
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
 from mrjob.step import StepFailedException
 from mrjob.util import bash_wrap
+from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters
 from tests.mockhadoop import add_mock_hadoop_output
@@ -36,6 +38,9 @@ from tests.mockhadoop import get_mock_hadoop_cmd_args
 from tests.mockhadoop import get_mock_hdfs_root
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
+from tests.mr_null_spark import MRNullSpark
+from tests.mr_spark_script import MRSparkScript
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -983,6 +988,66 @@ class JarStepTestCase(MockHadoopTestCase):
             self.assertEqual(jar_output_arg, streaming_input_arg)
 
 
+class SparkStepArgsTestCase(SandboxedTestCase):
+
+    MRJOB_CONF_CONTENTS = dict(runners=dict(hadoop=dict(
+        spark_submit_bin='spark-submit')))
+
+    def test_spark_step(self):
+        job = MRNullSpark([
+            '-r', 'hadoop',
+            '--extra-spark-arg', 'foo',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            self.assertEqual(runner._args_for_step(0), [
+                'spark-submit',
+                '--master', 'yarn',
+                'foo',
+                runner._script_path,
+                '--step-num=0',
+                '--spark',
+                ','.join(runner._step_input_uris(0)),
+                runner._step_output_uri(0)
+            ])
+
+    def test_spark_streaming_step(self):
+        job = MRSparkScript([
+            '-r', 'hadoop',
+            '--script', '/path/to/spark_script.py',
+            '--script-arg', 'foo',
+            '--script-arg', mrjob.step.OUTPUT,
+            '--script-arg', mrjob.step.INPUT,
+            '--script-spark-arg', 'bar',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            self.assertEqual(runner._args_for_step(0), [
+                'spark-submit',
+                '--master', 'yarn',
+                'bar',
+                '/path/to/spark_script.py',
+                'foo',
+                runner._step_output_uri(0),
+                ','.join(runner._step_input_uris(0)),
+            ])
+
+
+
+
+
+
+
+
+
+
+
 class SetupLineEncodingTestCase(MockHadoopTestCase):
 
     def test_setup_wrapper_script_uses_local_line_endings(self):
@@ -1136,3 +1201,134 @@ class LibjarsTestCase(MockHadoopTestCase):
 
             self.assertIn('-libjars', args)
             self.assertIn('/path/to/a.jar,/path/to/b.jar', args)
+
+
+class FindSparkSubmitBinTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(FindSparkSubmitBinTestCase, self).setUp()
+
+        # track calls to which()
+        self.which = self.start(patch('mrjob.hadoop.which', wraps=which))
+
+        # keep which() from searching in /bin, etc.
+        os.environ['PATH'] = self.tmp_dir
+
+        # create basic runner (okay to overwrite)
+        self.runner = HadoopJobRunner()
+
+    def test_do_nothing_on_init(self):
+        self.assertFalse(self.which.called)
+
+    def test_option_short_circuits_search(self):
+        self.runner = HadoopJobRunner(
+            spark_submit_bin=['/path/to/spark-submit', '-v'])
+
+        self.assertEqual(self.runner.get_spark_submit_bin(),
+                         ['/path/to/spark-submit', '-v'])
+
+        self.assertFalse(self.which.called)
+
+    def test_fallback_and_hard_coded_dirs(self):
+        # don't get caught by real spark install
+        self.which.return_value = None
+
+        os.environ['SPARK_HOME'] = '/spark/home'
+
+        self.assertEqual(self.runner.get_spark_submit_bin(), ['spark-submit'])
+
+        which_paths = [
+            kwargs.get('path') for args, kwargs in self.which.call_args_list]
+
+        self.assertEqual(which_paths, [
+            '/spark/home/bin',
+            None,
+            '/usr/lib/spark/bin',
+            '/usr/local/spark/bin',
+            '/usr/local/lib/spark/bin',
+        ])
+
+    def test_find_in_spark_home(self):
+        spark_submit_bin = self.makefile(
+            os.path.join(self.tmp_dir, 'spark', 'bin', 'spark-submit'),
+            executable=True)
+
+        os.environ['SPARK_HOME'] = os.path.join(self.tmp_dir, 'spark')
+
+        self.runner.get_spark_submit_bin()
+
+        self.assertEqual(self.runner.get_spark_submit_bin(),
+                         [spark_submit_bin])
+
+        self.assertEqual(self.which.call_count, 1)
+
+    def test_find_in_path(self):
+        spark_submit_bin = self.makefile(
+            os.path.join(self.tmp_dir, 'bin', 'spark-submit'),
+            executable=True)
+
+        os.environ['PATH'] = os.path.join(self.tmp_dir, 'bin')
+
+        # don't get caught by real $SPARK_HOME
+        if 'SPARK_HOME' in os.environ:
+            del os.environ['SPARK_HOME']
+
+        self.assertEqual(self.runner.get_spark_submit_bin(),
+                         [spark_submit_bin])
+
+
+class FindBinariesAndJARsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(FindBinariesAndJARsTestCase, self).setUp()
+
+        self.get_hadoop_version = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner.get_hadoop_version'))
+
+        self.get_hadoop_streaming_jar = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner.get_hadoop_streaming_jar'))
+
+        self.get_spark_submit_bin = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner.get_spark_submit_bin'))
+
+    def test_always_call_get_hadoop_version(self):
+        runner = HadoopJobRunner()
+
+        runner._find_binaries_and_jars()
+
+        self.assertTrue(self.get_hadoop_version.called)
+        self.assertFalse(self.get_hadoop_streaming_jar.called)
+        self.assertFalse(self.get_spark_submit_bin.called)
+
+    def test_streaming_steps(self):
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._find_binaries_and_jars()
+
+            self.assertTrue(self.get_hadoop_version.called)
+            self.assertTrue(self.get_hadoop_streaming_jar.called)
+            self.assertFalse(self.get_spark_submit_bin.called)
+
+    def test_spark_steps(self):
+        job = MRNullSpark(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._find_binaries_and_jars()
+
+            self.assertTrue(self.get_hadoop_version.called)
+            self.assertFalse(self.get_hadoop_streaming_jar.called)
+            self.assertTrue(self.get_spark_submit_bin.called)
+
+    def test_streaming_and_spark(self):
+        job = MRStreamingAndSpark(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._find_binaries_and_jars()
+
+            self.assertTrue(self.get_hadoop_version.called)
+            self.assertTrue(self.get_hadoop_streaming_jar.called)
+            self.assertTrue(self.get_spark_submit_bin.called)

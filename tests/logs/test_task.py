@@ -703,11 +703,6 @@ class ParseTaskStderrTestCase(TestCase):
         )
 
 
-
-
-
-
-
 class SyslogToStderrPathTestCase(TestCase):
 
     def test_empty(self):

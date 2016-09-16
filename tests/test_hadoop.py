@@ -22,6 +22,7 @@ import pty
 from io import BytesIO
 from subprocess import check_call
 
+import mrjob.step
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
@@ -38,6 +39,7 @@ from tests.mockhadoop import get_mock_hdfs_root
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_spark_script import MRSparkScript
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
@@ -984,6 +986,66 @@ class JarStepTestCase(MockHadoopTestCase):
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class SparkStepArgsTestCase(SandboxedTestCase):
+
+    MRJOB_CONF_CONTENTS = dict(runners=dict(hadoop=dict(
+        spark_submit_bin='spark-submit')))
+
+    def test_spark_step(self):
+        job = MRNullSpark([
+            '-r', 'hadoop',
+            '--extra-spark-arg', 'foo',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            self.assertEqual(runner._args_for_step(0), [
+                'spark-submit',
+                '--master', 'yarn',
+                'foo',
+                runner._script_path,
+                '--step-num=0',
+                '--spark',
+                ','.join(runner._step_input_uris(0)),
+                runner._step_output_uri(0)
+            ])
+
+    def test_spark_streaming_step(self):
+        job = MRSparkScript([
+            '-r', 'hadoop',
+            '--script', '/path/to/spark_script.py',
+            '--script-arg', 'foo',
+            '--script-arg', mrjob.step.OUTPUT,
+            '--script-arg', mrjob.step.INPUT,
+            '--script-spark-arg', 'bar',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            self.assertEqual(runner._args_for_step(0), [
+                'spark-submit',
+                '--master', 'yarn',
+                'bar',
+                '/path/to/spark_script.py',
+                'foo',
+                runner._step_output_uri(0),
+                ','.join(runner._step_input_uris(0)),
+            ])
+
+
+
+
+
+
+
+
+
 
 
 class SetupLineEncodingTestCase(MockHadoopTestCase):

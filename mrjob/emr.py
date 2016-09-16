@@ -1555,10 +1555,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         bootstrap_action_args = []
 
         for i, bootstrap_action in enumerate(self._bootstrap_actions()):
-            s3_uri = self._upload_mgr.uri(bootstrap_action['path'])
+            uri = self._upload_mgr.uri(bootstrap_action['path'])
             bootstrap_action_args.append(
                 boto.emr.BootstrapAction(
-                    'action %d' % i, s3_uri, bootstrap_action['args']))
+                    'action %d' % i, uri, bootstrap_action['args']))
 
         if self._master_bootstrap_script_path:
             master_bootstrap_script_args = []
@@ -2550,7 +2550,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._opts['bootstrap_spark'] is None:
             return self._has_spark_steps()
         else:
-            return self._opts['bootstrap_spark']
+            return bool(self._opts['bootstrap_spark'])
 
     def _applications(self):
         """Returns applications (*emr_applications* option) as a set. Adds
@@ -2573,7 +2573,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         (This doesn't handle the master bootstrap script.)
         """
-        actions = self._opts['bootstrap_actions']
+        actions = list(self._opts['bootstrap_actions'])
 
         # no release_label implies AMIs prior to 4.x
         if (include_spark and self._should_bootstrap_spark() and

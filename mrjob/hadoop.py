@@ -369,11 +369,27 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         yield '/usr/local/lib/spark/bin'
 
     def _run(self):
+        self._find_binaries_and_jars()
         self._check_input_exists()
         self._create_setup_wrapper_script()
         self._add_job_files_for_upload()
         self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()
+
+    def _find_binaries_and_jars(self):
+        """Find hadoop and (if needed) spark-submit bin up-front, before
+        continuing with the job.
+
+        (This is just for user-interaction purposes; these would otherwise
+        lazy-load as needed.)
+        """
+        self.get_hadoop_bin()
+
+        if self._has_streaming_steps():
+            self.get_hadoop_streaming_jar()
+
+        if self._has_spark_steps():
+            self.get_spark_submit_bin()
 
     def _check_input_exists(self):
         """Make sure all input exists before continuing with our job.

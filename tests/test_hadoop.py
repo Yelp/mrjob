@@ -37,6 +37,8 @@ from tests.mockhadoop import get_mock_hadoop_cmd_args
 from tests.mockhadoop import get_mock_hdfs_root
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
+from tests.mr_null_spark import MRNullSpark
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -1211,3 +1213,60 @@ class FindSparkSubmitBinTestCase(SandboxedTestCase):
 
         self.assertEqual(self.runner.get_spark_submit_bin(),
                          [spark_submit_bin])
+
+
+class FindBinariesAndJARsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(FindBinariesAndJARsTestCase, self).setUp()
+
+        self.get_hadoop_bin = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner.get_hadoop_bin'))
+
+        self.get_hadoop_streaming_jar = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner.get_hadoop_streaming_jar'))
+
+        self.get_spark_submit_bin = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner.get_spark_submit_bin'))
+
+    def test_always_call_get_hadoop_bin(self):
+        runner = HadoopJobRunner()
+
+        runner._find_binaries_and_jars()
+
+        self.assertTrue(self.get_hadoop_bin.called)
+        self.assertFalse(self.get_hadoop_streaming_jar.called)
+        self.assertFalse(self.get_spark_submit_bin.called)
+
+    def test_streaming_steps(self):
+        job = MRTwoStepJob(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._find_binaries_and_jars()
+
+            self.assertTrue(self.get_hadoop_bin.called)
+            self.assertTrue(self.get_hadoop_streaming_jar.called)
+            self.assertFalse(self.get_spark_submit_bin.called)
+
+    def test_spark_steps(self):
+        job = MRNullSpark(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._find_binaries_and_jars()
+
+            self.assertTrue(self.get_hadoop_bin.called)
+            self.assertFalse(self.get_hadoop_streaming_jar.called)
+            self.assertTrue(self.get_spark_submit_bin.called)
+
+    def test_streaming_and_spark(self):
+        job = MRStreamingAndSpark(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._find_binaries_and_jars()
+
+            self.assertTrue(self.get_hadoop_bin.called)
+            self.assertTrue(self.get_hadoop_streaming_jar.called)
+            self.assertTrue(self.get_spark_submit_bin.called)

@@ -3306,10 +3306,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 self._has_spark_install_bootstrap_action() or
                 self._has_spark_application())
 
-    def _has_spark_steps(self):
-        """Are any of our steps Spark steps (either spark or spark_script)"""
-        return any(step['type'].split('_')[0] == 'spark'
-                   for step in self._get_steps())
 
     def _has_spark_install_bootstrap_action(self):
         """Does it look like this runner has a spark bootstrap install

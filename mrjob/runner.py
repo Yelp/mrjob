@@ -773,6 +773,16 @@ class MRJobRunner(object):
         """Get the number of steps (calls :py:meth:`get_steps`)."""
         return len(self._get_steps())
 
+    def _has_streaming_steps(self):
+        """Are any of our steps Hadoop streaming steps?"""
+        return any(step['type'] == 'streaming'
+                   for step in self._get_steps())
+
+    def _has_spark_steps(self):
+        """Are any of our steps Spark steps (either spark or spark_script)"""
+        return any(step['type'].split('_')[0] == 'spark'
+                   for step in self._get_steps())
+
     def _interpreter(self, steps=False):
         if steps:
             return (self._opts['steps_interpreter'] or

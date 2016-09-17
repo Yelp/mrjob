@@ -2566,7 +2566,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # patch in "Hadoop" unless applications is empty (e.g. 3.x AMIs)
         if applications:
-            applications.add('Hadoop')
+            # don't add both "Hadoop" and "hadoop"
+            if not any(a.lower() == 'hadoop' for a in applications):
+                applications.add('Hadoop')
 
         return applications
 

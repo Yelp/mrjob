@@ -2552,14 +2552,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             return bool(self._opts['bootstrap_spark'])
 
-    def _applications(self):
+    def _applications(self, add_spark=True):
         """Returns applications (*emr_applications* option) as a set. Adds
         in ``Hadoop`` and ``Spark`` as needed."""
         applications = set(self._opts['emr_applications'])
 
         # release_label implies 4.x AMI and later
         if self._should_bootstrap_spark() and self._opts['release_label']:
-            applications.add('Spark')
+            # EMR allows us to have both "spark" and "Spark" applications,
+            # which is probably not what we want
+            if not self._has_spark_application():
+                applications.add('Spark')
 
         # patch in "Hadoop" unless applications is empty (e.g. 3.x AMIs)
         if applications:
@@ -2567,7 +2570,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return applications
 
-    def _bootstrap_actions(self, include_spark=True):
+    def _bootstrap_actions(self, add_spark=True):
         """Parse *bootstrap_actions* option into dictionaries with
         keys *path*, *args*, adding Spark bootstrap action if needed.
 
@@ -3355,12 +3358,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Does it look like this runner has a spark bootstrap install
         action set? (Anything ending in "/install-spark" counts.)"""
         return any(ba['path'].endswith('/install-spark')
-                   for ba in self._bootstrap_actions(include_spark=False))
+                   for ba in self._bootstrap_actions(add_spark=False))
 
     def _has_spark_application(self):
         """Does this runner have "Spark" in its *emr_applications* option?"""
         return any(a.lower() == 'spark'
-                   for a in self._opts['emr_applications'])
+                   for a in self._applications(add_spark=False))
 
 
 

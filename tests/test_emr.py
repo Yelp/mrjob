@@ -28,6 +28,7 @@ from io import BytesIO
 import mrjob
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
+from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_INTERMEDIARY_JAR
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
@@ -4058,8 +4059,87 @@ class BootstrapPythonTestCase(MockBotoTestCase):
                 runner._bootstrap,
                 self.EXPECTED_BOOTSTRAP + [['true']])
 
+class BootstrapSparkTestCase(MockBotoTestCase):
 
-class ShouldBoostrapSparkTestCase(MockBotoTestCase):
+    def setUp(self):
+        super(BootstrapSparkTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+    def get_cluster(self, *args):
+        job = MRNullSpark(['-r', 'emr'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._should_bootstrap_spark())
+            runner.run()
+            # include bootstrap actions
+            return self.mock_emr_clusters[runner.get_cluster_id()]
+
+    def ran_spark_bootstrap_action(
+            self, cluster, uri=_3_X_SPARK_BOOTSTRAP_ACTION):
+
+        return any(ba.scriptpath == uri for ba in cluster._bootstrapactions)
+
+    def installed_spark_application(self, cluster, name='Spark'):
+        return any(a.name == name for a in cluster.applications)
+
+    def test_default_ami(self):
+        cluster = self.get_cluster()
+
+        self.assertTrue(self.ran_spark_bootstrap_action(cluster))
+        self.assertFalse(self.installed_spark_application(cluster))
+
+    def test_default_ami(self):
+        cluster = self.get_cluster('--image-version', '3.11.0')
+
+        self.assertTrue(self.ran_spark_bootstrap_action(cluster))
+        self.assertFalse(self.installed_spark_application(cluster))
+
+    def test_3_7_0_ami(self):
+        cluster = self.get_cluster('--image-version', '3.7.0')
+        self.assertTrue(self.log.warning.called)
+        self.assertTrue(
+            any('Spark' in args[0]
+                for args, kwargs in self.log.warning.call_args_list))
+
+        # try bootstrapping Spark anyway
+        self.assertTrue(self.ran_spark_bootstrap_action(cluster))
+        self.assertFalse(self.installed_spark_application(cluster))
+
+    def test_4_7_2_ami(self):
+        cluster = self.get_cluster('--image-version', '4.7.2')
+
+        self.assertTrue(self.installed_spark_application(cluster))
+        self.assertFalse(self.ran_spark_bootstrap_action(cluster))
+
+    def test_dont_run_install_spark_twice(self):
+
+        cluster = self.get_cluster(
+            '--image-version', '3.11.0',
+            '--bootstrap-action', 's3://bucket/install-spark')
+
+        # should run the custom bootstrap action but not the default one
+        self.assertTrue(self.ran_spark_bootstrap_action(
+            cluster, 's3://bucket/install-spark'))
+        self.assertFalse(
+            self.ran_spark_bootstrap_action(
+                cluster, _3_X_SPARK_BOOTSTRAP_ACTION))
+        self.assertFalse(self.installed_spark_application(cluster))
+
+    def test_dont_add_two_spark_applications(self):
+
+        cluster = self.get_cluster(
+            '--image-version', '4.7.2',
+            '--emr-application', 'spark')
+
+        # shouldn't add "Spark" application on top of "spark"
+        self.assertTrue(self.installed_spark_application(cluster, 'spark'))
+        self.assertFalse(self.installed_spark_application(cluster, 'Spark'))
+        self.assertFalse(self.ran_spark_bootstrap_action(cluster))
+
+
+class ShouldBootstrapSparkTestCase(MockBotoTestCase):
 
     def test_default(self):
         job = MRTwoStepJob(['-r', 'emr'])

@@ -2558,7 +2558,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         applications = set(self._opts['emr_applications'])
 
         # release_label implies 4.x AMI and later
-        if self._should_bootstrap_spark() and self._opts['release_label']:
+        if (add_spark and self._should_bootstrap_spark() and
+                self._opts['release_label']):
             # EMR allows us to have both "spark" and "Spark" applications,
             # which is probably not what we want
             if not self._has_spark_application():
@@ -2581,17 +2582,21 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         actions = list(self._opts['bootstrap_actions'])
 
         # no release_label implies AMIs prior to 4.x
-        if (include_spark and self._should_bootstrap_spark() and
+        if (add_spark and self._should_bootstrap_spark() and
                 not self._opts['release_label']):
-            if version_gte(self._opts['image_version'],
-                           _MIN_SPARK_AMI_VERSION):
-                # running this action twice apparently breaks Spark's
-                # ability to output to S3 (see #1367)
-                if not self._has_spark_install_bootstrap_action():
-                    actions.append(_3_X_SPARK_BOOTSTRAP_ACTION)
-            else:
-                log.warning("Spark isn't available on AMI versions prior"
-                            "to %s" % _MIN_SPARK_AMI_VERSION)
+            # running this action twice apparently breaks Spark's
+            # ability to output to S3 (see #1367)
+            if not self._has_spark_install_bootstrap_action():
+                actions.append(_3_X_SPARK_BOOTSTRAP_ACTION)
+
+                if not version_gte(self._opts['image_version'],
+                                   _MIN_SPARK_AMI_VERSION):
+                    log.warning(
+                        "Bootstrapping Spark probably won't work; not"
+                        " available on AMI version less than %s" %
+                        _MIN_SPARK_AMI_VERSION)
+
+
 
         results = []
         for action in actions:

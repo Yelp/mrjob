@@ -37,7 +37,6 @@ from mrjob.options import _add_runner_opts
 from mrjob.options import _alphabetize_options
 from mrjob.options import _fix_custom_options
 from mrjob.options import _print_help_for_groups
-from mrjob.py2 import PY2
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
@@ -118,15 +117,15 @@ class MRJobLauncher(object):
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
         #
-        # These should always read/write bytes, not unicode
-        if PY2:
-            self.stdin = sys.stdin
-            self.stdout = sys.stdout
-            self.stderr = sys.stderr
-        else:
-            self.stdin = sys.stdin.buffer
-            self.stdout = sys.stdout.buffer
-            self.stderr = sys.stderr.buffer
+        # These should always read/write bytes, not unicode. Generally,
+        # on Python 2, sys.std* can read and write bytes, whereas on Python 3,
+        # you need to use sys.std*.buffer (which doesn't exist on Python 2).
+        #
+        # However, certain Python 3 environments, such as Jupyter notebook,
+        # act more like Python 2. See #1441.
+        self.stdin = getattr(sys.stdin, 'buffer', sys.stdin)
+        self.stdout = getattr(sys.stdout, 'buffer', sys.stdout)
+        self.stderr = getattr(sys.stderr, 'buffer', sys.stderr)
 
     @classmethod
     def _usage(cls):

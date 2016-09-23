@@ -26,6 +26,7 @@ from subprocess import PIPE
 from mrjob.conf import combine_envs
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
+from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 
@@ -352,3 +353,39 @@ class TestPassThroughRunner(TestCase):
         self.assertEqual(self.get_value(MRRunner()), None)
         self.assertEqual(self.get_value(MRRunner(['-r', 'inline'])), 'inline')
         self.assertEqual(self.get_value(MRRunner(['-r', 'local'])), 'local')
+
+
+class StdStreamTestCase(TestCase):
+
+    def test_normal_python(self):
+        launcher = MRJobLauncher(args=['/path/to/script'])
+
+        if PY2:
+            self.assertEqual(launcher.stdin, sys.stdin)
+            self.assertEqual(launcher.stdout, sys.stdout)
+            self.assertEqual(launcher.stderr, sys.stderr)
+        else:
+            self.assertEqual(launcher.stdin, sys.stdin.buffer)
+            self.assertEqual(launcher.stdout, sys.stdout.buffer)
+            self.assertEqual(launcher.stderr, sys.stderr.buffer)
+
+    def test_python3_jupyter_notebook(self):
+        # regression test for #1441
+
+        # this actually works on any Python platform, since we use mocks
+        mock_stdin = Mock()
+        mock_stdin.buffer = Mock()
+
+        mock_stdout = Mock()
+        del mock_stdout.buffer
+
+        mock_stderr = Mock()
+        del mock_stderr.buffer
+
+        with patch.multiple(sys, stdin=mock_stdin,
+                            stdout=mock_stdout, stderr=mock_stderr):
+            launcher = MRJobLauncher(args=['/path/to/script'])
+
+        self.assertEqual(launcher.stdin, mock_stdin.buffer)
+        self.assertEqual(launcher.stdout, mock_stdout)
+        self.assertEqual(launcher.stderr, mock_stderr)

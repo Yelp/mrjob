@@ -33,6 +33,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import check_call
 
+import mrjob.step
 from mrjob.compat import translate_jobconf_dict
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -772,6 +773,16 @@ class MRJobRunner(object):
         """Get the number of steps (calls :py:meth:`get_steps`)."""
         return len(self._get_steps())
 
+    def _has_streaming_steps(self):
+        """Are any of our steps Hadoop streaming steps?"""
+        return any(step['type'] == 'streaming'
+                   for step in self._get_steps())
+
+    def _has_spark_steps(self):
+        """Are any of our steps Spark steps (either spark or spark_script)"""
+        return any(step['type'].split('_')[0] == 'spark'
+                   for step in self._get_steps())
+
     def _interpreter(self, steps=False):
         if steps:
             return (self._opts['steps_interpreter'] or
@@ -1133,6 +1144,25 @@ class MRJobRunner(object):
         else:
             return self._intermediate_output_uri(step_num)
 
+    def _interpolate_input_and_output(self, args, step_num):
+        """Replace :py:data:`~mrjob.step.INPUT` and
+        :py:data:`~mrjob.step.OUTPUT` in arguments to a jar or Spark
+        step.
+
+        If there are multiple input paths (i.e. on the first step), they'll
+        be joined with a comma.
+        """
+
+        def interpolate(arg):
+            if arg == mrjob.step.INPUT:
+                return ','.join(self._step_input_uris(step_num))
+            elif arg == mrjob.step.OUTPUT:
+                return self._step_output_uri(step_num)
+            else:
+                return arg
+
+        return [interpolate(arg) for arg in args]
+
     def _create_mrjob_tar_gz(self):
         """Make a tarball of the mrjob library, without .pyc or .pyo files,
         This will also set ``self._mrjob_tar_gz_path`` and return it.
@@ -1204,8 +1234,6 @@ class MRJobRunner(object):
         This doesn't handle input, output, mappers, reducers, or uploading
         files.
         """
-        assert 0 <= step_num < self._num_steps()
-
         args = []
 
         # translate the jobconf configuration names to match
@@ -1237,6 +1265,34 @@ class MRJobRunner(object):
         # hadoop_output_format
         if (step_num == self._num_steps() - 1 and self._hadoop_output_format):
             args.extend(['-outputformat', self._hadoop_output_format])
+
+        return args
+
+    def _spark_args_for_step(self, step_num):
+        """Build a list of extra args to the spark-submit binary for
+        the given spark or spark_script step."""
+        step = self._get_step(step_num)
+
+        args = []
+
+        # --conf arguments include python bin, cmdenv, jobconf. Make sure
+        # that we can always override these manually
+        cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
+        cmdenv.update(self._opts['cmdenv'])
+
+        jobconf = {}
+        for key, value in cmdenv.items():
+            jobconf['spark.executorEnv.%s' % key] = value
+            jobconf['spark.yarn.appMasterEnv.%s' % key] = value
+
+        jobconf.update(self._jobconf_for_step(step_num))
+
+        for key, value in sorted(jobconf.items()):
+            if value is not None:
+                args.extend(['--conf', '%s=%s' % (key, value)])
+
+        # step spark_args
+        args.extend(step['spark_args'])
 
         return args
 

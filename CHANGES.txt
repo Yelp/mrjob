@@ -1,3 +1,9 @@
+v0.5.?, 2016-??-?? -- Spark
+ * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
+ * runners:
+   * EMR:
+     * default to cheapest instance type that will work (#1369)
+
 v0.5.6, 2016-09-12 -- dataproc crash fix
  * Dataproc runner:
    * fix Hadoop version crash on unknown image version (#1428)

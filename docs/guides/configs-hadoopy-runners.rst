@@ -142,9 +142,9 @@ Options available to hadoop runner only
     :set: hadoop
     :default: (automatic)
 
-    Name/path of your hadoop program (may include arguments).
+    Name/path of your :command:`hadoop` binary (may include arguments).
 
-    mrjob tries its best to find your hadoop binary, checking all of the
+    mrjob tries its best to find :command:`hadoop`, checking all of the
     following places for an executable file named ``hadoop``:
 
     * :mrjob-opt:`hadoop_home`/``bin`` (deprecated)
@@ -217,3 +217,26 @@ Options available to hadoop runner only
     .. versionchanged:: 0.5.0
 
        This option used to be named ``hdfs_scratch_dir``.
+
+.. mrjob-opt::
+    :config: spark_submit_bin
+    :switch: --spark-submit-bin
+    :type: :ref:`command <data-type-command>`
+    :set: hadoop
+    :default: (automatic)
+
+    Name/path of your :command:`spark-submit` binary (may include arguments).
+
+    mrjob tries its best to find :command:`spark-submit`, checking all of the
+    following places for an executable file named ``spark-submit``:
+
+    * ``$SPARK_HOME/bin``
+    * ``$PATH``
+    * ``/usr/lib/spark/bin``
+    * ``/usr/local/spark/bin``
+    * ``/usr/local/lib/spark/bin``
+
+    If all else fails, we just use ``spark-submit`` and hope for the best.
+
+    .. TODO: update versionadded for spark release
+    .. versionadded:: 0.5.8

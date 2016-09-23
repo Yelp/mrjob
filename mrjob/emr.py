@@ -2593,10 +2593,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                                    _MIN_SPARK_AMI_VERSION):
                     log.warning(
                         "Bootstrapping Spark probably won't work; not"
-                        " available on AMI version less than %s" %
+                        " available AMIs before %s" %
                         _MIN_SPARK_AMI_VERSION)
-
-
 
         results = []
         for action in actions:

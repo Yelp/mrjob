@@ -3623,6 +3623,14 @@ class JarStepTestCase(MockBotoTestCase):
 
 class SparkStepTestCase(MockBotoTestCase):
 
+    def setUp(self):
+        super(SparkStepTestCase, self).setUp()
+
+        # _spark_args_for_step() is tested elsewhere
+        self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_args_for_step',
+            return_value=['<spark args for step>']))
+
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
     def test_3_x_ami(self):
@@ -3683,40 +3691,13 @@ class SparkStepTestCase(MockBotoTestCase):
                 step_args[1:],
                 _EMR_SPARK_ARGS +
                 [
+                    '<spark args for step>',
                     script_uri,
                     '--step-num=0',
                     '--spark',
                     input1_uri + ',' + input2_uri,
                     runner._output_dir,
                 ])
-
-    maxDiff = None
-
-    def test_spark_args_in_step(self):
-        job = MRNullSpark(['-r', 'emr', '--extra-spark-arg', 'ARGH'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner.run()
-
-            emr_conn = runner.make_emr_conn()
-            script_uri = runner._upload_mgr.uri(runner._script_path)
-
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
-            step_args = [a.value for a in steps[0].config.args]
-
-            # the first arg is spark-submit and varies by AMI
-            self.assertEqual(
-                step_args[1:],
-                _EMR_SPARK_ARGS + [
-                    'ARGH',
-                    script_uri,
-                    '--step-num=0',
-                    '--spark',
-                    ','.join(runner._step_input_uris(0)),
-                    runner._output_dir,
-                ]
-            )
 
 
 class SparkScriptStepTestCase(MockBotoTestCase):
@@ -3726,6 +3707,11 @@ class SparkScriptStepTestCase(MockBotoTestCase):
 
         self.fake_script = os.path.join(self.tmp_dir, 'fake.py')
         open(self.fake_script, 'w').close()
+
+        # _spark_args_for_step() is tested elsewhere
+        self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_args_for_step',
+            return_value=['<spark args for step>']))
 
     def test_script_gets_uploaded(self):
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script])
@@ -3744,7 +3730,9 @@ class SparkScriptStepTestCase(MockBotoTestCase):
             self.assertEqual(len(steps), 1)
             step_args = [a.value for a in steps[0].config.args]
             # the first arg is spark-submit and varies by AMI
-            self.assertEqual(step_args[1:], _EMR_SPARK_ARGS + [script_uri])
+            self.assertEqual(
+                step_args[1:],
+                _EMR_SPARK_ARGS + ['<spark args for step>', script_uri])
 
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
@@ -3812,31 +3800,12 @@ class SparkScriptStepTestCase(MockBotoTestCase):
                 step_args[1:],
                 _EMR_SPARK_ARGS +
                 [
+                    '<spark args for step>',
                     script_uri,
                     input1_uri + ',' + input2_uri,
                     '-o',
                     runner._output_dir,
                 ]
-            )
-
-    def test_spark_args_in_step(self):
-        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
-                             '--script-spark-arg', 'ARGH'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner.run()
-
-            script_uri = runner._upload_mgr.uri(self.fake_script)
-
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
-
-            step_args = [a.value for a in steps[0].config.args]
-            # the first arg is spark-submit and varies by AMI
-            self.assertEqual(
-                step_args[1:],
-                _EMR_SPARK_ARGS + ['ARGH', script_uri]
             )
 
 

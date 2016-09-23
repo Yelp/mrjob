@@ -504,6 +504,21 @@ and install another Python binary.
       no longer installs Python 3 on AMI version 4.6.0+ by default
 
 .. mrjob-opt::
+   :config: bootstrap_spark
+   :switch: --bootstrap-spark, --no-bootstrap-spark
+   :type: boolean
+   :set: emr
+   :default: (automatic)
+
+   Install Spark on the cluster. This works on AMI version 3.x and later.
+
+   By default, we automatically install Spark only if our job has Spark steps.
+
+   .. TODO: update versionadded for spark release
+   .. versionadded:: 0.5.8
+
+
+.. mrjob-opt::
     :config: bootstrap_python_packages
     :switch: --bootstrap-python-package
     :type: :ref:`path list <data-type-path-list>`

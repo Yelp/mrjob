@@ -1739,11 +1739,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             action_on_failure=self._action_on_failure())
 
     def _build_spark_step(self, step_num):
-        step = self._get_step(step_num)
-
         return self._build_spark_step_helper(
             step_num=step_num,
-            spark_args=step['spark_args'],
             script=self._script_path,
             script_args=[
                 '--step-num=%d' % step_num,
@@ -1758,12 +1755,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return self._build_spark_step_helper(
             step_num=step_num,
-            spark_args=step['spark_args'],
             script=step['script'],
             script_args=step['args'])
 
     def _build_spark_step_helper(
-            self, step_num, spark_args, script, script_args):
+            self, step_num, script, script_args):
         """Common code for _build_spark_step() and _build_spark_script_step()
 
         Interpolates :py:data:`~mrjob.step.INPUT` and
@@ -1774,6 +1770,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         script_args = self._interpolate_input_and_output(script_args, step_num)
 
         jar, step_arg_prefix = self._get_spark_jar_and_step_arg_prefix()
+
+        spark_args = self._spark_args_for_step(step_num)
 
         # have to use `--deploy-mode cluster` to reference s3:// URIs
         step_args = (

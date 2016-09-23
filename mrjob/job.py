@@ -36,7 +36,6 @@ from mrjob.py2 import string_types
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
-from mrjob.step import _SPARK_STEP_KWARGS
 from mrjob.util import expand_path
 from mrjob.util import read_input
 

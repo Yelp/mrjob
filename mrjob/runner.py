@@ -1275,25 +1275,18 @@ class MRJobRunner(object):
 
         args = []
 
-        # --conf arguments. Apply these so that the user can always
-        # override these manually
+        # --conf arguments include python bin, cmdenv, jobconf. Make sure
+        # that we can always override these manually
+        cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
+        cmdenv.update(self._opts['cmdenv'])
 
-        # python_bin (see #1370)
-        python_bin = self._python_bin()
-        args.extend([
-            '--conf', 'spark.executorEnv.PYSPARK_PYTHON=%s' % python_bin,
-            '--conf', 'spark.yarn.appMasterEnv.PYSPARK_PYTHON=%s' % python_bin
-        ])
+        jobconf = {}
+        for key, value in cmdenv.items():
+            jobconf['spark.executorEnv.%s' % key] = value
+            jobconf['spark.yarn.appMasterEnv.%s' % key] = value
 
-        # cmdenv (see #1371)
-        for key, value in sorted(self._opts['cmdenv'].items()):
-            args.extend([
-                '--conf', 'spark.executorEnv.%s=%s' % (key, value),
-                '--conf', 'spark.yarn.appMasterEnv.%s=%s' % (key, value)
-            ])
+        jobconf.update(self._jobconf_for_step(step_num))
 
-        # jobconf (see #1372)
-        jobconf = self._jobconf_for_step(step_num)
         for key, value in sorted(jobconf.items()):
             if value is not None:
                 args.extend(['--conf', '%s=%s' % (key, value)])

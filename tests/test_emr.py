@@ -2569,6 +2569,55 @@ class PoolMatchingTestCase(MockBotoTestCase):
             cluster_id,
             ['-r', 'emr', '--pool-clusters'])
 
+    def test_dont_join_cluster_without_spark(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters'],
+            job_class=MRNullSpark)
+
+    def test_join_cluster_with_spark_3_x_ami(self):
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='3.11.0',
+            bootstrap_actions=[_3_X_SPARK_BOOTSTRAP_ACTION])
+
+        self.assertJoins(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters', '--image-version', '3.11.0'],
+            job_class=MRNullSpark)
+
+    def test_join_cluster_with_spark_4_x_ami(self):
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='4.7.2',
+            emr_applications=['Spark'])
+
+        self.assertJoins(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters', '--image-version', '4.7.2'],
+            job_class=MRNullSpark)
+
+    def test_ignore_spark_bootstrap_action_on_4_x_ami(self):
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='4.7.2',
+            bootstrap_actions=[_3_X_SPARK_BOOTSTRAP_ACTION])
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters', '--image-version', '4.7.2'],
+            job_class=MRNullSpark)
+
+    def test_other_install_spark_bootstrap_action_on_3_x_ami(self):
+        # has to be exactly the install-spark bootstrap action we expected
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='3.11.0',
+            bootstrap_actions=['s3://bucket/install-spark'])
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters', '--image-version', '3.11.0'],
+            job_class=MRNullSpark)
+
 
 class PoolingRecoveryTestCase(MockBotoTestCase):
 

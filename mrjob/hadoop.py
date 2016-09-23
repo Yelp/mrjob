@@ -629,8 +629,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             script_args=step['args']
         )
 
-    def _args_for_spark_step_helper(
-            self, step_num, spark_args, script, script_args):
+    def _args_for_spark_step_helper(self, step_num, script, script_args):
         """Common code for _args_for_spark_step() and
         _args_for_spark_script_step()."""
         spark_args = self._spark_args_for_step(step_num)

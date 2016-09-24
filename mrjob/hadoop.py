@@ -609,11 +609,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         return args
 
     def _args_for_spark_step(self, step_num):
-        step = self._get_step(step_num)
-
         return self._args_for_spark_step_helper(
             step_num=step_num,
-            spark_args=step['spark_args'],
             script=self._script_path,
             script_args=[
                 '--step-num=%d' % step_num,
@@ -628,15 +625,15 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return self._args_for_spark_step_helper(
             step_num=step_num,
-            spark_args=step['spark_args'],
             script=step['script'],
             script_args=step['args']
         )
 
-    def _args_for_spark_step_helper(
-            self, step_num, spark_args, script, script_args):
+    def _args_for_spark_step_helper(self, step_num, script, script_args):
         """Common code for _args_for_spark_step() and
         _args_for_spark_script_step()."""
+        spark_args = self._spark_args_for_step(step_num)
+
         script_args = self._interpolate_input_and_output(script_args, step_num)
 
         return (self.get_spark_submit_bin() +

@@ -993,10 +993,17 @@ class SparkStepArgsTestCase(SandboxedTestCase):
     MRJOB_CONF_CONTENTS = dict(runners=dict(hadoop=dict(
         spark_submit_bin='spark-submit')))
 
+    def setUp(self):
+        super(SparkStepArgsTestCase, self).setUp()
+
+        # _spark_args_for_step() is tested elsewhere
+        self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_args_for_step',
+            return_value=['<spark args for step>']))
+
     def test_spark_step(self):
         job = MRNullSpark([
             '-r', 'hadoop',
-            '--extra-spark-arg', 'foo',
         ])
         job.sandbox()
 
@@ -1006,7 +1013,7 @@ class SparkStepArgsTestCase(SandboxedTestCase):
             self.assertEqual(runner._args_for_step(0), [
                 'spark-submit',
                 '--master', 'yarn',
-                'foo',
+                '<spark args for step>',
                 runner._script_path,
                 '--step-num=0',
                 '--spark',
@@ -1021,7 +1028,6 @@ class SparkStepArgsTestCase(SandboxedTestCase):
             '--script-arg', 'foo',
             '--script-arg', mrjob.step.OUTPUT,
             '--script-arg', mrjob.step.INPUT,
-            '--script-spark-arg', 'bar',
         ])
         job.sandbox()
 
@@ -1031,21 +1037,12 @@ class SparkStepArgsTestCase(SandboxedTestCase):
             self.assertEqual(runner._args_for_step(0), [
                 'spark-submit',
                 '--master', 'yarn',
-                'bar',
+                '<spark args for step>',
                 '/path/to/spark_script.py',
                 'foo',
                 runner._step_output_uri(0),
                 ','.join(runner._step_input_uris(0)),
             ])
-
-
-
-
-
-
-
-
-
 
 
 class SetupLineEncodingTestCase(MockHadoopTestCase):

@@ -1234,8 +1234,6 @@ class MRJobRunner(object):
         This doesn't handle input, output, mappers, reducers, or uploading
         files.
         """
-        assert 0 <= step_num < self._num_steps()
-
         args = []
 
         # translate the jobconf configuration names to match
@@ -1267,6 +1265,34 @@ class MRJobRunner(object):
         # hadoop_output_format
         if (step_num == self._num_steps() - 1 and self._hadoop_output_format):
             args.extend(['-outputformat', self._hadoop_output_format])
+
+        return args
+
+    def _spark_args_for_step(self, step_num):
+        """Build a list of extra args to the spark-submit binary for
+        the given spark or spark_script step."""
+        step = self._get_step(step_num)
+
+        args = []
+
+        # --conf arguments include python bin, cmdenv, jobconf. Make sure
+        # that we can always override these manually
+        cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
+        cmdenv.update(self._opts['cmdenv'])
+
+        jobconf = {}
+        for key, value in cmdenv.items():
+            jobconf['spark.executorEnv.%s' % key] = value
+            jobconf['spark.yarn.appMasterEnv.%s' % key] = value
+
+        jobconf.update(self._jobconf_for_step(step_num))
+
+        for key, value in sorted(jobconf.items()):
+            if value is not None:
+                args.extend(['--conf', '%s=%s' % (key, value)])
+
+        # step spark_args
+        args.extend(step['spark_args'])
 
         return args
 

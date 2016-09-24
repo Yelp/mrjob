@@ -36,6 +36,7 @@ from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
+from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
@@ -533,6 +534,119 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-partitioner', partitioner])
+
+
+class SparkArgsForStepTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(SparkArgsForStepTestCase, self)
+
+        self.start(patch('mrjob.runner.MRJobRunner._python_bin',
+                         return_value=['mypy']))
+
+    def _expected_conf_args(self, cmdenv=None, jobconf=None):
+        conf = {}
+
+        if cmdenv:
+            for key, value in cmdenv.items():
+                conf['spark.executorEnv.%s' % key] = value
+                conf['spark.yarn.appMasterEnv.%s' % key] = value
+
+        if jobconf:
+            conf.update(jobconf)
+
+        args = []
+
+        for key, value in sorted(conf.items()):
+            args.extend(['--conf', '%s=%s' % (key, value)])
+
+        return args
+
+    def test_default(self):
+        job = MRNullSpark()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_args_for_step(0),
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
+    def test_cmdenv(self):
+        job = MRNullSpark(['--cmdenv', 'FOO=bar', '--cmdenv', 'BAZ=qux'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_args_for_step(0),
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy', FOO='bar', BAZ='qux')))
+
+    def test_cmdenv_can_override_python_bin(self):
+        job = MRNullSpark(['--cmdenv', 'PYSPARK_PYTHON=ourpy'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_args_for_step(0),
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='ourpy')))
+
+    def test_jobconf(self):
+        job = MRNullSpark(['--jobconf', 'spark.executor.memory=10g'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_args_for_step(0),
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy'),
+                    jobconf={'spark.executor.memory': '10g'}))
+
+    def test_jobconf_uses_jobconf_for_step(self):
+        job = MRNullSpark()
+
+        with job.make_runner() as runner:
+            with patch.object(
+                    runner, '_jobconf_for_step',
+                    return_value=dict(foo='bar')) as mock_jobconf_for_step:
+
+                self.assertEqual(
+                    runner._spark_args_for_step(0),
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy'),
+                        jobconf=dict(foo='bar')))
+
+                mock_jobconf_for_step.assert_called_once_with(0)
+
+    def test_jobconf_can_override_python_bin_and_cmdenv(self):
+        job = MRNullSpark(
+            ['--cmdenv', 'FOO=bar',
+             '--jobconf', 'spark.executorEnv.FOO=baz',
+             '--jobconf', 'spark.yarn.appMasterEnv.PYSPARK_PYTHON=ourpy'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_args_for_step(0),
+                self._expected_conf_args(
+                    jobconf={
+                        'spark.executorEnv.FOO': 'baz',
+                        'spark.executorEnv.PYSPARK_PYTHON': 'mypy',
+                        'spark.yarn.appMasterEnv.FOO': 'bar',
+                        'spark.yarn.appMasterEnv.PYSPARK_PYTHON': 'ourpy',
+                    }
+                )
+            )
+
+    def test_custom_spark_args(self):
+        job = MRNullSpark(['--extra-spark-arg', '-v'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_args_for_step(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')) +
+                    ['-v']
+                )
+            )
+
+
 
 
 class StrictProtocolsInConfTestCase(TestCase):

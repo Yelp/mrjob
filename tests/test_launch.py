@@ -18,7 +18,7 @@ import inspect
 import logging
 import os
 import sys
-
+from collections import defaultdict
 from optparse import OptionError
 from subprocess import Popen
 from subprocess import PIPE
@@ -412,7 +412,7 @@ class JobRunnerKwargsTestCase(TestCase):
         'stdin',
     ])
 
-    def _test_job_runner_kwargs(self, runner_class, no_switch_options=()):
+    def _test_job_runner_kwargs(self, runner_class, conf_only_options=()):
         launcher = MRJobLauncher(args=['/path/to/script'])
 
         method_name = '%s_job_runner_kwargs' % runner_class.alias
@@ -423,20 +423,17 @@ class JobRunnerKwargsTestCase(TestCase):
         self.assertEqual(
             option_names,
             (runner_class.OPTION_STORE_CLASS.ALLOWED_KEYS -
-             set(no_switch_options)))
+             set(conf_only_options)))
 
     def test_dataproc(self):
         self._test_job_runner_kwargs(DataprocJobRunner)
 
     def test_emr(self):
-        # these options are too sensitive to show in process description
-        NO_SWITCH_OPTIONS = [
+        self._test_job_runner_kwargs(EMRJobRunner, conf_only_options=[
             'aws_access_key_id',
             'aws_secret_access_key',
             'aws_security_token',
-        ]
-
-        self._test_job_runner_kwargs(EMRJobRunner, NO_SWITCH_OPTIONS)
+        ])
 
     def test_hadoop(self):
         self._test_job_runner_kwargs(HadoopJobRunner)
@@ -447,4 +444,22 @@ class JobRunnerKwargsTestCase(TestCase):
     def test_local(self):
         self._test_job_runner_kwargs(LocalMRJobRunner)
 
-    # TODO: test that all options with same dest appear in same opt group
+    def test_options_appear_in_single_opt_group(self):
+        launcher = MRJobLauncher(args=['/path/to/script'])
+
+        dest_to_groups = defaultdict(set)
+
+        for name, group in launcher.__dict__.items():
+            if not name.endswith('_opt_group'):
+                continue
+
+            for option in group.option_list:
+                dest_to_groups[option.dest].add(name)
+
+        dest_to_multiple_groups = dict(
+            (dest, groups) for dest, groups in dest_to_groups.items()
+            if len(groups) > 1)
+
+        self.assertEqual(dest_to_multiple_groups, {})
+
+    maxDiff = None

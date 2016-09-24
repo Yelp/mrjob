@@ -115,7 +115,6 @@ class RunnerOptionStore(OptionStore):
         'cleanup',
         'cleanup_on_failure',
         'cmdenv',
-        'hadoop_version',
         'interpreter',
         'jobconf',
         'label',

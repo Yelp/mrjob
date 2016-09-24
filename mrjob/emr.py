@@ -386,7 +386,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'hadoop_extra_args',
         'hadoop_streaming_jar',
         'hadoop_streaming_jar_on_emr',
-        'hadoop_version',
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',

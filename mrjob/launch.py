@@ -548,6 +548,7 @@ class MRJobLauncher(object):
             'setup': self.options.setup,
             'setup_cmds': self.options.setup_cmds,
             'setup_scripts': self.options.setup_scripts,
+            'sh_bin': self.options.sh_bin,
             'stdin': self.stdin,
             'steps_interpreter': self.options.steps_interpreter,
             'steps_python_bin': self.options.steps_python_bin,

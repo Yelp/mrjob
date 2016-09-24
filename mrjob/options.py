@@ -205,6 +205,11 @@ def _add_runner_opts(opt_group):
                   ' These are run after setup_cmds.')),
 
         opt_group.add_option(
+            '--sh-bin', dest='sh_bin', default=None,
+            help=('Alternate shell command for setup scripts. You may'
+                  ' include arguments, e.g. --sh-bin "bash -ex"')),
+
+        opt_group.add_option(
             '--steps-interpreter', dest='steps_interpreter', default=None,
             help=("Non-Python command to use to query the job about its"
                   " steps, if different from --interpreter.")),

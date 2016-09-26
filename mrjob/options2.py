@@ -1,7 +1,6 @@
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
-from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
@@ -72,7 +71,7 @@ _RUNNER_OPTS = dict(
                 help=('Set an environment variable for your job inside Hadoop '
                       'streaming. Must take the form KEY=VALUE. You can use'
                       ' --cmdenv multiple times.'),
-            ),
+            )),
         ],
     ),
     interpreter=dict(
@@ -191,8 +190,8 @@ _RUNNER_OPTS = dict(
         combiner=combine_cmds,
         switches=[
             (['--sh-bin'], dict(
-                help=(('Alternate shell command for setup scripts. You may'
-                       ' include arguments, e.g. --sh-bin "bash -ex"'),
+                help=('Alternate shell command for setup scripts. You may'
+                      ' include arguments, e.g. --sh-bin "bash -ex"'),
             )),
         ],
     ),
@@ -250,3 +249,14 @@ _RUNNER_OPTS = dict(
         ],
     ),
 )
+
+
+def _add_runner_options(parser, dest):
+    switches = _RUNNER_OPTS[dest].get(switches) or []
+
+    for args, kwargs in switches:
+        kwargs = dict(kwargs)
+        kwargs['dest'] = dest
+        kwargs.setdefault('default', None)  # no required args
+
+        parser.add_option(*args, **kwargs)

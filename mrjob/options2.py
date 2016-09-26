@@ -15,7 +15,7 @@ from mrjob.runner import CLEANUP_CHOICES
 
 _RUNNER_OPTS = dict(
     bootstrap_mrjob=dict(
-        role='launch',
+        cloud_role='launch',
         switches=[
             (['--bootstrap-mrjob'], dict(
                 action='store_true',
@@ -63,7 +63,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cmdenv=dict(
-        combiner=combine_envs,
+        combiner=combine_envs,  # combine_local_envs() in sim runners
         switches=[
             (['--cmdenv'], dict(
                 action='append',  # TODO: custom callback
@@ -73,13 +73,69 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    hadoop_bin=dict(
+        combiner=combine_cmds,
+        switches=[
+            (['--hadoop-bin'], dict(help='path to hadoop binary')),
+        ],
+    ),
+    hadoop_extra_args=dict(
+        combiner=combine_lists,
+        switches=[
+            (['--hadoop-arg'], dict(
+                action='append',
+                help=('Argument of any type to pass to hadoop '
+                      'streaming. You can use --hadoop-arg multiple times.'),
+            )),
+        ],
+    ),
+    hadoop_home=dict(
+        combiner=combine_paths,
+        deprecated=True,
+        switches=[
+            (['--hadoop-home'], dict(
+                help=('Deprecated hint about where to find hadoop binary and'
+                      ' streaming jar. In most cases mrjob will now find these'
+                      ' on its own. If not, use the --hadoop-bin and'
+                      ' --hadoop-streaming-jar switches.'),
+            )),
+        ],
+    ),
+    hadoop_log_dirs=dict(
+        combiner=combine_path_lists,
+        switches=[
+            (['--hadoop-log-dirs'], dict(
+                action='append',
+                help=('Directory to search for hadoop logs in. You can use'
+                      ' --hadoop-log-dir multiple times.'),
+            )),
+        ],
+    ),
+    hadoop_streaming_jar=dict(
+        combiner=combine_paths,
+        switches=[
+            (['--hadoop-streaming-jar'], dict(
+                help=('Path of your hadoop streaming jar (locally, or on'
+                      ' S3/HDFS). In EMR, use a file:// URI to refer to a jar'
+                      ' on the master node of your cluster.'),
+            )),
+        ],
+    ),
+    hadoop_tmp_dir=dict(
+        combiner=combine_paths,
+        switches=[
+            (['--hadoop-tmp-dir'], dict(
+                help='Temp space on HDFS (default is tmp/mrjob)',
+            )),
+        ],
+    ),
     hadoop_version=dict(
         switches=[
             (['--hadoop-version'], dict(
                 help='Specific version of Hadoop to simulate',
             )),
         ],
-    )
+    ),
     interpreter=dict(
         combiner=combine_cmds,
         switches=[
@@ -164,6 +220,7 @@ _RUNNER_OPTS = dict(
     ),
     setup_cmds=dict(
         combiner=combine_lists,
+        deprecated=True,
         switches=[
             (['--setup-cmd'], dict(
                 action='append',
@@ -177,6 +234,7 @@ _RUNNER_OPTS = dict(
     ),
     setup_scripts=dict(
         combiner=combine_path_lists,
+        deprecated=True,
         switches=[
             (['--setup-script'], dict(
                 action='append',
@@ -250,7 +308,7 @@ _RUNNER_OPTS = dict(
 
 
 def _add_runner_options(parser, dest):
-    switches = _RUNNER_OPTS[dest].get(switches) or []
+    switches = _RUNNER_OPTS[dest].get('switches') or []
 
     for args, kwargs in switches:
         kwargs = dict(kwargs)

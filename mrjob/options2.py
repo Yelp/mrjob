@@ -16,6 +16,7 @@ from mrjob.runner import CLEANUP_CHOICES
 
 _RUNNER_OPTS = dict(
     bootstrap_mrjob=dict(
+        role='launch',
         switches=[
             (['--bootstrap-mrjob'], dict(
                 action='store_true',
@@ -126,33 +127,126 @@ _RUNNER_OPTS = dict(
     ),
     python_archives=dict(
         combiner=combine_path_lists,
+        switches=[
+            (['--python-archive'], dict(
+                action='append',
+                default=[],
+                help=('Archive to unpack and add to the PYTHONPATH of the'
+                      ' MRJob script when it runs. You can use'
+                      ' --python-archives multiple times.'),
+            )),
+        ],
     ),
     python_bin=dict(
         combiner=combine_cmds,
+        switches=[
+            (['--python-bin'], dict(
+                help=('Alternate python command for Python mappers/reducers.'
+                      ' You can include arguments, e.g. --python-bin "python'
+                      ' -v"'),
+            )),
+        ],
     ),
     setup=dict(
         combiner=combine_lists,
+        switches=[
+            (['--setup'], dict(
+                action='append',
+                default=[],
+                help=('A command to run before each mapper/reducer step in the'
+                      ' shell ("touch foo"). You may interpolate files'
+                      ' available via URL or on your local filesystem using'
+                      ' Hadoop Distributed Cache syntax (". setup.sh#"). To'
+                      ' interpolate archives, use #/: "cd foo.tar.gz#/; make'),
+            )),
+        ],
     ),
     setup_cmds=dict(
         combiner=combine_lists,
+        switches=[
+            (['--setup-cmd'], dict(
+                action='append',
+                default=[],
+                help=('A command to run before each mapper/reducer step in the'
+                      ' shell (e.g. "cd my-src-tree; make") specified as a'
+                      ' string. You can use --setup-cmd more than once. Use'
+                      ' mrjob.conf to specify arguments as a list to be run'
+                      ' directly.'),
+            )),
+        ],
     ),
     setup_scripts=dict(
         combiner=combine_path_lists,
+        switches=[
+            (['--setup-script'], dict(
+                action='append',
+                default=[],
+                help=('Path to file to be copied into the local working'
+                      ' directory and then run. You can use --setup-script'
+                      ' more than once. These are run after setup_cmds.'),
+            )),
+        ],
     ),
     sh_bin=dict(
         combiner=combine_cmds,
+        switches=[
+            (['--sh-bin'], dict(
+                help=(('Alternate shell command for setup scripts. You may'
+                       ' include arguments, e.g. --sh-bin "bash -ex"'),
+            )),
+        ],
     ),
     steps_interpreter=dict(
         combiner=combine_cmds,
+        switches=[
+            (['--steps-interpreter'], dict(
+                help=("Non-Python command to use to query the job about its"
+                      " steps, if different from --interpreter."),
+            )),
+        ],
     ),
     steps_python_bin=dict(
         combiner=combine_cmds,
+        switches=[
+            (['--steps-python-bin'], dict(
+                help=('Name/path of alternate python command to use to'
+                      ' query the job about its steps, if different from the'
+                      ' current Python interpreter.'),
+            )),
+        ],
     ),
-    strict_protocols=dict(),
+    strict_protocols=dict(
+        switches=[
+            (['--strict-protocols'], dict(
+                help=('If something violates an input/output '
+                      'protocol then raise an exception (the default)'),
+            )),
+            (['--no-strict-protocols'], dict(
+                help=('If something violates an input/output '
+                      'protocol then increment a counter and continue'),
+            )),
+        ],
+    ),
     upload_archives=dict(
         combiner=combine_path_lists,
+        switches=[
+            (['--archive'], dict(
+                action='append',
+                default=[],
+                help=('Unpack archive in the working directory of this script.'
+                      ' You can use --archive multiple times.'),
+            )),
+        ],
     ),
     upload_files=dict(
         combiner=combine_path_lists,
+        switches=[
+            (['--file'], dict(
+                action='append',
+                default=[],
+                help=('Copy file to the working directory of this script. You'
+                      ' can use --file multiple times.'),
+            )),
+        ],
     ),
 )

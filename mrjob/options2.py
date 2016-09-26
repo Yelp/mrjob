@@ -66,14 +66,20 @@ _RUNNER_OPTS = dict(
         combiner=combine_envs,
         switches=[
             (['--cmdenv'], dict(
-                action='append',
-                default=[],  # TODO: custom callback
+                action='append',  # TODO: custom callback
                 help=('Set an environment variable for your job inside Hadoop '
                       'streaming. Must take the form KEY=VALUE. You can use'
                       ' --cmdenv multiple times.'),
             )),
         ],
     ),
+    hadoop_version=dict(
+        switches=[
+            (['--hadoop-version'], dict(
+                help='Specific version of Hadoop to simulate',
+            )),
+        ],
+    )
     interpreter=dict(
         combiner=combine_cmds,
         switches=[
@@ -87,7 +93,6 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--jobconf'], dict(
                 action='append',
-                default=[],
                 help=('-D arg to pass through to hadoop streaming; should'
                       ' take the form KEY=VALUE. You can use --jobconf'
                       ' multiple times.'),
@@ -106,7 +111,6 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--libjar'], dict(
                 action='append',
-                default=[],
                 help=('Path of a JAR to pass to Hadoop with -libjar. On EMR,'
                       ' this can also be a URI; use file:/// to reference JARs'
                       ' already on the EMR cluster'),
@@ -129,7 +133,6 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--python-archive'], dict(
                 action='append',
-                default=[],
                 help=('Archive to unpack and add to the PYTHONPATH of the'
                       ' MRJob script when it runs. You can use'
                       ' --python-archives multiple times.'),
@@ -151,7 +154,6 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--setup'], dict(
                 action='append',
-                default=[],
                 help=('A command to run before each mapper/reducer step in the'
                       ' shell ("touch foo"). You may interpolate files'
                       ' available via URL or on your local filesystem using'
@@ -165,7 +167,6 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--setup-cmd'], dict(
                 action='append',
-                default=[],
                 help=('A command to run before each mapper/reducer step in the'
                       ' shell (e.g. "cd my-src-tree; make") specified as a'
                       ' string. You can use --setup-cmd more than once. Use'
@@ -179,7 +180,6 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--setup-script'], dict(
                 action='append',
-                default=[],
                 help=('Path to file to be copied into the local working'
                       ' directory and then run. You can use --setup-script'
                       ' more than once. These are run after setup_cmds.'),
@@ -231,7 +231,6 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--archive'], dict(
                 action='append',
-                default=[],
                 help=('Unpack archive in the working directory of this script.'
                       ' You can use --archive multiple times.'),
             )),
@@ -242,7 +241,6 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--file'], dict(
                 action='append',
-                default=[],
                 help=('Copy file to the working directory of this script. You'
                       ' can use --file multiple times.'),
             )),
@@ -256,7 +254,12 @@ def _add_runner_options(parser, dest):
 
     for args, kwargs in switches:
         kwargs = dict(kwargs)
+
         kwargs['dest'] = dest
-        kwargs.setdefault('default', None)  # no required args
+
+        if kwargs.get('action') == 'append':
+            kwargs['default'] = []
+        else:
+            kwargs['default'] = None
 
         parser.add_option(*args, **kwargs)

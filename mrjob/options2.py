@@ -14,6 +14,37 @@ from mrjob.runner import CLEANUP_CHOICES
 
 
 _RUNNER_OPTS = dict(
+    additional_emr_info=dict(
+        cloud_role='launch',
+        switches=[
+            (['--additional-emr-info'], dict(
+                help='A JSON string for selecting additional features on EMR',
+            )),
+        ],
+    )
+    aws_access_key_id=dict(
+        cloud_role='connect',
+    ),
+    aws_secret_access_key=dict(
+        cloud_role='connect',
+    ),
+    aws_security_token=dict(
+        cloud_role='connect',
+    ),
+    bootstrap=dict(
+        cloud_role='launch',
+        combiner=combine_lists,
+        switches=[
+            (['--bootstrap'], dict(
+                action='append',
+                help=('A shell command to set up libraries etc. before any'
+                      ' steps (e.g. "sudo apt-get -qy install python3"). You'
+                      ' may interpolate files available via URL or locally'
+                      ' with Hadoop Distributed Cache syntax'
+                      ' ("sudo yum install -y foo.rpm#")'),
+            )),
+        ],
+    ),
     bootstrap_mrjob=dict(
         cloud_role='launch',
         switches=[

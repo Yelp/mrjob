@@ -447,7 +447,7 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_streaming_jar_on_emr=dict(
         deprecated=True,
-        runners=['emr', 'hadoop'],
+        runners=['emr'],
         switches=[
             (['--hadoop-streaming-jar-on-emr'], dict(
                 help=("Deprecated: prepend 'file://' and pass that to"

@@ -133,6 +133,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hadoop_home': combine_paths,
         'hadoop_log_dirs': combine_path_lists,
         'hadoop_tmp_dir': combine_paths,
+        'hadoop_streaming_jar': combine_paths,
         'libjars': combine_path_lists,
     })
 

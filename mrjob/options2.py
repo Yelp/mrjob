@@ -1,6 +1,7 @@
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
+from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
@@ -259,7 +260,11 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cmdenv=dict(
-        combiner=combine_envs,  # combine_local_envs() in sim runners
+        combiner=combine_envs,
+        runner_combiners=dict(
+            inline=combine_local_envs,
+            local=combine_local_envs,
+        ),
         switches=[
             (['--cmdenv'], dict(
                 action='append',  # TODO: custom callback
@@ -1000,10 +1005,19 @@ def _allowed_keys(runner_alias):
 
 
 def _combiners(runner_alias):
-    return dict(
-        (name, config['combiner']) for name, config in _RUNNER_OPTS.items()
-        if config.get('combiner') and _for_runner(config, runner_alias)
-    )
+    results = {}
+
+    for name, config in _RUNNER_OPTS.items():
+        if not _for_runner(config, runner_alias):
+            continue
+
+        combiner = (config.get('runner_combiners', {}).get(runner_alias) or
+                    config.get('combiner'))
+
+        if combiner:
+            results[name] = combiner
+
+    return results
 
 
 def _deprecated_aliases(runner_alias):

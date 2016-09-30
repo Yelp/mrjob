@@ -42,14 +42,15 @@ except ImportError:
 import mrjob
 from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
-from mrjob.conf import combine_lists
-from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.gcs import is_gcs_uri
+from mrjob.options2 import _allowed_keys
+from mrjob.options2 import _combiners
+from mrjob.options2 import _deprecated_aliases
 from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.runner import MRJobRunner
@@ -198,35 +199,9 @@ class DataprocException(Exception):
 
 
 class DataprocRunnerOptionStore(RunnerOptionStore):
-    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
-        'gcp_project',
-
-        'cluster_id',
-        'region',
-        'zone',
-        'image_version',
-        'check_cluster_every',
-
-        'instance_type',
-        'master_instance_type',
-        'core_instance_type',
-        'task_instance_type',
-
-        'num_core_instances',
-        'num_task_instances',
-
-        'cloud_fs_sync_secs',
-        'cloud_tmp_dir',
-
-        'bootstrap',
-        'bootstrap_python',
-        'max_hours_idle',
-    ]))
-
-    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
-        'bootstrap': combine_lists,
-        'cloud_tmp_dir': combine_paths,
-    })
+    ALLOWED_KEYS = _allowed_keys('dataproc')
+    COMBINERS = _combiners('dataproc')
+    DEPRECATED_ALIASES = _deprecated_aliases('dataproc')
 
     DEFAULT_FALLBACKS = {
         'core_instance_type': 'instance_type',

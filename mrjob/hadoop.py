@@ -29,11 +29,7 @@ except ImportError:
 import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
-from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
-from mrjob.conf import combine_lists
-from mrjob.conf import combine_path_lists
-from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
@@ -44,6 +40,9 @@ from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.wrap import _logs_exist
+from mrjob.options2 import _allowed_keys
+from mrjob.options2 import _combiners
+from mrjob.options2 import _deprecated_aliases
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
 from mrjob.runner import MRJobRunner
@@ -117,29 +116,9 @@ def fully_qualify_hdfs_path(path):
 
 class HadoopRunnerOptionStore(RunnerOptionStore):
 
-    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
-        'hadoop_bin',
-        'hadoop_extra_args',
-        'hadoop_home',
-        'hadoop_log_dirs',
-        'hadoop_streaming_jar',
-        'hadoop_tmp_dir',
-        'libjars',
-    ]))
-
-    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
-        'hadoop_bin': combine_cmds,
-        'hadoop_extra_args': combine_lists,
-        'hadoop_home': combine_paths,
-        'hadoop_log_dirs': combine_path_lists,
-        'hadoop_tmp_dir': combine_paths,
-        'hadoop_streaming_jar': combine_paths,
-        'libjars': combine_path_lists,
-    })
-
-    DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
-        'hdfs_scratch_dir': 'hadoop_tmp_dir',
-    })
+    ALLOWED_KEYS = _allowed_keys('hadoop')
+    COMBINERS = _combiners('hadoop')
+    DEPRECATED_ALIASES = _deprecated_aliases('hadoop')
 
     def default_options(self):
         super_opts = super(HadoopRunnerOptionStore, self).default_options()

@@ -34,17 +34,15 @@ from subprocess import PIPE
 from subprocess import check_call
 
 from mrjob.compat import translate_jobconf_dict
-from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
-from mrjob.conf import combine_envs
 from mrjob.conf import combine_local_envs
-from mrjob.conf import combine_lists
-from mrjob.conf import combine_paths
-from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
+from mrjob.options2 import _allowed_keys
+from mrjob.options2 import _combiners
+from mrjob.options2 import _deprecated_aliases
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
@@ -105,54 +103,11 @@ _BUFFER_SIZE = 4096
 
 
 class RunnerOptionStore(OptionStore):
-
-    # Test cases for this class live in tests.test_option_store rather than
-    # tests.test_runner.
-
-    ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
-        'bootstrap_mrjob',
-        'check_input_paths',
-        'cleanup',
-        'cleanup_on_failure',
-        'cmdenv',
-        'interpreter',
-        'jobconf',
-        'label',
-        'local_tmp_dir',
-        'owner',
-        'python_archives',
-        'python_bin',
-        'setup',
-        'setup_cmds',
-        'setup_scripts',
-        'sh_bin',
-        'steps_interpreter',
-        'steps_python_bin',
-        'strict_protocols',
-        'upload_archives',
-        'upload_files',
-    ]))
-
-    COMBINERS = combine_dicts(OptionStore.COMBINERS, {
-        'cmdenv': combine_envs,
-        'interpreter': combine_cmds,
-        'jobconf': combine_dicts,
-        'local_tmp_dir': combine_paths,
-        'python_archives': combine_path_lists,
-        'python_bin': combine_cmds,
-        'setup': combine_lists,
-        'setup_cmds': combine_lists,
-        'setup_scripts': combine_path_lists,
-        'sh_bin': combine_cmds,
-        'steps_interpreter': combine_cmds,
-        'steps_python_bin': combine_cmds,
-        'upload_archives': combine_path_lists,
-        'upload_files': combine_path_lists,
-    })
-
-    DEPRECATED_ALIASES = {
-        'base_tmp_dir': 'local_tmp_dir',
-    }
+    # 'base' is aritrary; if an option support all runners, it won't
+    # have "runners" set in _RUNNER_OPTS at all
+    ALLOWED_KEYS = _allowed_keys('base')
+    COMBINERS = _combiners('base')
+    DEPRECATED_ALIASES = _deprecated_aliases('base')
 
     def __init__(self, alias, opts, conf_paths):
         """

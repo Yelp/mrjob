@@ -11,8 +11,6 @@ from mrjob.runner import CLEANUP_CHOICES
 # TODO: handle no_emr_api_param
 
 
-
-
 _RUNNER_OPTS = dict(
     additional_emr_info=dict(
         cloud_role='launch',
@@ -722,6 +720,22 @@ _RUNNER_OPTS = dict(
     ),
     ssh_bin=dict(
         combiner=combine_cmds,
+        switches=[
+            (['--ssh-bin'], dict(
+                help=("Name/path of ssh binary. Arguments are allowed (e.g."
+                      " --ssh-bin 'ssh -v')"),
+            )),
+        ],
+    ),
+    ssh_bind_ports=dict(
+        switches=[
+            (['--ssh-bind-ports'], dict(
+                help=('A list of port ranges that are safe to listen on,'
+                      ' delimited by colons and commas, with syntax like'
+                      ' 2000[:2001][,2003,2005:2008,etc].'
+                      ' Defaults to 40001:40840.'),
+            )),
+        ],
     ),
     ssh_tunnel=dict(
         deprecated_aliases=['ssh_tunnel_to_job_tracker'],
@@ -737,6 +751,20 @@ _RUNNER_OPTS = dict(
                 deprecated_aliases=['--no-ssh-tunnel-to-job-tracker'],
                 help=("Don't open an SSH tunnel to the Hadoop job"
                       " tracker/resource manager (the default)"),
+            )),
+        ],
+    ),
+    ssh_tunnel_is_open=dict(
+        switches=[
+            (['---ssh-tunnel-is-open'], dict(
+                action='store_true',
+                help=('Make ssh tunnel accessible from remote hosts (not just'
+                      ' localhost)'),
+            )),
+            (['---ssh-tunnel-is-closed'], dict(
+                action='store_false',
+                help=('Make ssh tunnel accessible from localhost only (the'
+                      ' default)'),
             )),
         ],
     ),
@@ -768,6 +796,15 @@ _RUNNER_OPTS = dict(
             (['--no-strict-protocols'], dict(
                 help=('If something violates an input/output '
                       'protocol then increment a counter and continue'),
+            )),
+        ],
+    ),
+    subnet=dict(
+        switches=[
+            (['--subnet'], dict(
+                help=('ID of Amazon VPC subnet to launch cluster in. If not'
+                      ' set or empty string, cluster is launched in the normal'
+                      ' AWS cloud'),
             )),
         ],
     ),
@@ -828,8 +865,30 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    visible_to_all_users=dict(
+        switches=[
+            (['--visible-to-all-users'], dict(
+                action='store_true',
+                help=('Make your cluster is visible to all IAM users on the'
+                      ' same AWS account (the default)'),
+            )),
+            (['--no-visible-to-all-users'], dict(
+                action='store_false',
+                help=('Hide your cluster from other IAM users on the same AWS'
+                      ' account'),
+            )),
+        ],
+    ),
     zone=dict(
+        cloud_role='launch',
         deprecated_aliases=['aws_availability_zone'],
+        switches=[
+            (['--zone'], dict(
+                deprecated_aliases=['--aws-availability-zone'],
+                help=('GCE zone/AWS availability zone to run Dataproc/EMR jobs'
+                      ' in.'),
+            )),
+        ],
     ),
 )
 
@@ -859,4 +918,5 @@ def _add_runner_options(parser, dest):
                 ('es' if len(deprecated_aliases) > 1 else ''),
                 switches[-1])
             parser.add_option(
-                *args, **combine_dicts(kwargs, dict(help=help)))
+                *deprecated_aliases,
+                **combine_dicts(kwargs, dict(help=help)))

@@ -170,6 +170,7 @@ _RUNNER_OPTS = dict(
     check_cluster_every=dict(
         cloud_role='run',
         deprecated_aliases=['check_emr_status_every'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--check-cluster-every'], dict(
                 deprecated_aliases=['--check-emr-status-every'],
@@ -214,7 +215,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_paths,
         deprecated_aliases=['s3_log_uri'],
-        runners=['dataproc', 'emr'],
+        runners=['emr'],
         switches=[
             (['--cloud-log-dir'], dict(
                 deprecated_aliases=['--s3-log-uri'],
@@ -315,6 +316,7 @@ _RUNNER_OPTS = dict(
     ),
     emr_action_on_failure=dict(
         cloud_role='run',
+        runners=['emr'],
         switches=[
             (['--emr-action-on-failure'], dict(
                 help=('Action to take when a step fails'
@@ -382,6 +384,14 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    gcp_project=dict(
+        runners=['dataproc'],
+        switches=[
+            (['--gcp-project'], dict(
+                help='Project to run Dataproc jobs in'
+            )),
+        ],
+    ),
     hadoop_bin=dict(
         combiner=combine_cmds,
         runners=['hadoop'],
@@ -426,6 +436,7 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_streaming_jar=dict(
         combiner=combine_paths,
+        runners=['emr', 'hadoop'],
         switches=[
             (['--hadoop-streaming-jar'], dict(
                 help=('Path of your hadoop streaming jar (locally, or on'

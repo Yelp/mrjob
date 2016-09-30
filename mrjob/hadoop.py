@@ -124,6 +124,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hadoop_log_dirs',
         'hadoop_streaming_jar',
         'hadoop_tmp_dir',
+        'libjars',
     ]))
 
     COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
@@ -132,6 +133,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         'hadoop_home': combine_paths,
         'hadoop_log_dirs': combine_path_lists,
         'hadoop_tmp_dir': combine_paths,
+        'libjars': combine_path_lists,
     })
 
     DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {

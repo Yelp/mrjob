@@ -391,6 +391,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'iam_service_role',
         'image_version',
         'instance_type',
+        'libjars',
         'master_instance_bid_price',
         'master_instance_type',
         'max_hours_idle',
@@ -431,6 +432,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_configurations': combine_lists,
         'hadoop_extra_args': combine_lists,
         'hadoop_streaming_jar': combine_paths,
+        'libjars': combine_path_lists,
         'ssh_bin': combine_cmds,
         'tags': combine_dicts,
     })

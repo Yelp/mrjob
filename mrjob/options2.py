@@ -8,9 +8,9 @@ from mrjob.runner import CLEANUP_CHOICES
 
 # TODO: allow custom combiners per runner store (e.g. combine_local_envs)
 
-# TODO: connect and launch opts. this also depends on the runner (e.g.
-# bootstrap_mrjob is a launch opt on EMR and Dataproc, but a regular
-# job-running opt on the other runners
+# TODO: handle no_emr_api_param
+
+
 
 
 _RUNNER_OPTS = dict(
@@ -21,16 +21,10 @@ _RUNNER_OPTS = dict(
                 help='A JSON string for selecting additional features on EMR',
             )),
         ],
-    )
-    aws_access_key_id=dict(
-        cloud_role='connect',
     ),
-    aws_secret_access_key=dict(
-        cloud_role='connect',
-    ),
-    aws_security_token=dict(
-        cloud_role='connect',
-    ),
+    aws_access_key_id=dict(),
+    aws_secret_access_key=dict(),
+    aws_security_token=dict(),
     bootstrap=dict(
         cloud_role='launch',
         combiner=combine_lists,
@@ -42,6 +36,47 @@ _RUNNER_OPTS = dict(
                       ' may interpolate files available via URL or locally'
                       ' with Hadoop Distributed Cache syntax'
                       ' ("sudo yum install -y foo.rpm#")'),
+            )),
+        ],
+    ),
+    bootstrap_actions=dict(
+        cloud_role='launch',
+        combiner=combine_lists,
+        switches=[
+            (['--bootstrap-action'], dict(
+                action='append',
+                help=('Raw bootstrap action scripts to run before any of the'
+                      ' other bootstrap steps. You can use --bootstrap-action'
+                      ' more than once. Local scripts will be automatically'
+                      ' uploaded to S3. To add arguments, just use quotes:'
+                      ' "foo.sh arg1 arg2"'),
+            )),
+        ],
+    ),
+    bootstrap_cmds=dict(
+        cloud_role='launch',
+        combiner=combine_lists,
+        deprecated=True,
+        switches=[
+            (['--bootstrap-cmd'], dict(
+                action='append',
+                help=('Commands to run on the master node to set up libraries,'
+                      ' etc. You can use --bootstrap-cmd more than once. Use'
+                      ' mrjob.conf to specify arguments as a list to be run'
+                      ' directly.'),
+            )),
+        ],
+    ),
+    bootstrap_files=dict(
+        cloud_role='launch',
+        combiner=combine_path_lists,
+        deprecated=True,
+        switches=[
+            (['--bootstrap-file'], dict(
+                action='append',
+                help=('File to upload to the master node before running'
+                      ' bootstrap_cmds (for example, debian packages). You'
+                      ' can use --bootstrap-file more than once.'),
             )),
         ],
     ),
@@ -63,6 +98,35 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    bootstrap_python_packages=dict(
+        cloud_role='launch',
+        combiner=combine_path_lists,
+        deprecated=True,
+        switches=[
+            (['--bootstrap-python-package'], dict(
+                action='append',
+                help=('Path to a Python module to install on EMR. These should'
+                      ' be standard python module tarballs where you can cd'
+                      ' into a subdirectory and run ``sudo python setup.py'
+                      ' install``. You can use --bootstrap-python-package more'
+                      ' than once.'),
+            )),
+        ],
+    ),
+    bootstrap_scripts=dict(
+        cloud_role='launch',
+        combiner=combine_path_lists,
+        deprecated=True,
+        switches=[
+            (['--bootstrap-script'], dict(
+                action='append',
+                help=('Script to upload and then run on the master node (a'
+                      ' combination of bootstrap_cmds and bootstrap_files).'
+                      ' These are run after the command from bootstrap_cmds.'
+                      ' You can use --bootstrap-script more than once.'),
+            )),
+        ],
+    ),
     check_input_paths=dict(
         switches=[
             (['--check-input-paths'], dict(
@@ -72,6 +136,17 @@ _RUNNER_OPTS = dict(
             (['--no-check-input-paths'], dict(
                 action='store_false',
                 help='Skip the checks to ensure all input paths exist',
+            )),
+        ],
+    ),
+    check_cluster_every=dict(
+        cloud_role='run',
+        deprecated_aliases=['check_emr_status_every'],
+        switches=[
+            (['--check-cluster-every'], dict(
+                deprecated_aliases=['--check-emr-status-every'],
+                help=('How often (in seconds) to check status of your'
+                      ' job/cluster'),
             )),
         ],
     ),
@@ -93,6 +168,61 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    cloud_fs_sync_secs=dict(
+        deprecated_aliases=['s3_sync_wait_time'],
+        switches=[
+            (['--cloud-fs-sync-secs'], dict(
+                deprecated_aliases=['--s3-sync-wait-time'],
+                help=('How long to wait for remote FS to reach eventual'
+                      ' consistency. This'
+                      ' is typically less than a second but the'
+                      ' default is 5.0 to be safe.'),
+                type='float',
+            )),
+        ],
+    ),
+    cloud_log_dir=dict(
+        cloud_role='launch',
+        combiner=combine_paths,
+        deprecated_aliases=['s3_log_uri'],
+        switches=[
+            (['--cloud-log-dir'], dict(
+                deprecated_aliases=['--s3-log-uri'],
+                help='URI on remote FS to write logs into',
+            )),
+        ],
+    ),
+    cloud_tmp_dir=dict(
+        combiner=combine_paths,
+        deprecated_aliases=['s3_scratch_uri', 's3_tmp_dir'],
+        switches=[
+            (['--cloud-tmp-dir'], dict(
+                deprecated_aliases=['--s3-scratch-uri', '--s3-tmp-dir'],
+                help='URI on remote FS to use as our temp directory.',
+            )),
+        ],
+    ),
+    cloud_upload_part_size=dict(
+        switches=[
+            (['--cloud-upload-part-size'], dict(
+                deprecated_aliases=['--s3-upload-part-size'],
+                help=('Upload files to S3 in parts no bigger than this many'
+                      ' megabytes. Default is 100 MiB. Set to 0 to disable'
+                      ' multipart uploading entirely.'),
+                type='float',
+            )),
+        ],
+    ),
+    cluster_id=dict(
+        cloud_role='run',
+        deprecated_aliases=['emr_job_flow_id'],
+        switches=[
+            (['--cluster-id'], dict(
+                deprecated_aliases=['emr_job_flow_id'],
+                help='ID of an existing cluster to run our job on',
+            )),
+        ],
+    ),
     cmdenv=dict(
         combiner=combine_envs,  # combine_local_envs() in sim runners
         switches=[
@@ -101,6 +231,111 @@ _RUNNER_OPTS = dict(
                 help=('Set an environment variable for your job inside Hadoop '
                       'streaming. Must take the form KEY=VALUE. You can use'
                       ' --cmdenv multiple times.'),
+            )),
+        ],
+    ),
+    core_instance_bid_price=dict(
+        cloud_role='launch',
+        deprecated_aliases=['ec2_core_instance_bid_price'],
+        switches=[
+            (['--core-instance-bid-price'], dict(
+                deprecated_aliases=['--ec2-core-instance-bid-price'],
+                help=('Bid price to specify for core nodes when'
+                      ' setting them up as EC2 spot instances (you probably'
+                      ' only want to do this for task instances).'),
+            )),
+        ],
+    ),
+    core_instance_type=dict(
+        cloud_role='launch',
+        deprecated_aliases=[
+            'ec2_core_instance_type', 'ec2_slave_instance_type'],
+        switches=[
+            (['--core-instance-type'], dict(
+                deprecated_aliases=[
+                    '--ec2-core-instance-type', '--ec2-slave-instance-type'],
+                help='Type of GCE/EC2 core instance(s) to launch',
+            )),
+        ],
+    ),
+    ec2_key_pair=dict(
+        cloud_role='launch',
+        switches=[
+            (['--ec2-key-pair'], dict(
+                help='Name of the SSH key pair you set up for EMR',
+            )),
+        ],
+    ),
+    ec2_key_pair_file=dict(
+        cloud_role='run',
+        combiner=combine_paths,
+        switches=[
+            (['--ec2-key-pair-file'], dict(
+                help='Path to file containing SSH key for EMR',
+            )),
+        ],
+    ),
+    emr_action_on_failure=dict(
+        cloud_role='run',
+        switches=[
+            (['--emr-action-on-failure'], dict(
+                help=('Action to take when a step fails'
+                      ' (e.g. TERMINATE_CLUSTER, CANCEL_AND_WAIT, CONTINUE)'),
+            )),
+        ],
+    ),
+    emr_api_params=dict(
+        combiner=combine_dicts,
+        switches=[
+            (['--emr-api-param'], dict(
+                help=('Additional parameters to pass directly to the EMR'
+                      ' API when creating a cluster. Should take the form'
+                      ' KEY=VALUE. You can use --emr-api-param multiple'
+                      ' times'),
+            )),
+        ],
+    ),
+    emr_applications=dict(
+        combiner=combine_lists,
+        switches=[
+            (['--emr-application'], dict(
+                action='append',
+                help=('Additional applications to run on 4.x AMIs (e.g.'
+                      ' Ganglia, Mahout, Spark)'),
+            )),
+        ],
+    ),
+    emr_configurations=dict(
+        combiner=combine_lists,
+        switches=[
+            (['--emr-configuration'], dict(
+                action='append',
+                help=('Configuration to use on 4.x AMIs as a JSON-encoded'
+                      ' dict; see'
+                      ' http://docs.aws.amazon.com/ElasticMapReduce/latest/'
+                      'ReleaseGuide/emr-configure-apps.html for examples'),
+            )),
+        ],
+    ),
+    emr_endpoint=dict(
+        switches=[
+            (['--emr-endpoint'], dict(
+                help=('Force mrjob to connect to EMR on this endpoint'
+                      ' (e.g. us-west-1.elasticmapreduce.amazonaws.com).'
+                      ' Default is to infer this from region.'),
+            )),
+        ],
+    ),
+    enable_emr_debugging=dict(
+        switches=[
+            (['--enable-emr-debugging'], dict(
+                action='store_true',
+                help='Enable storage of Hadoop logs in SimpleDB',
+            )),
+            (['--disable-emr-debugging'], dict(
+                action='store_false',
+                help=('Disable storage of Hadoop logs in SimpleDB (the'
+                      ' default)'),
             )),
         ],
     ),
@@ -152,10 +387,21 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    hadoop_streaming_jar_on_emr=dict(
+        deprecated=True,
+        switches=[
+            (['--hadoop-streaming-jar-on-emr'], dict(
+                help=("Deprecated: prepend 'file://' and pass that to"
+                      " --hadoop-streaming-jar instead"),
+            )),
+        ],
+    ),
     hadoop_tmp_dir=dict(
         combiner=combine_paths,
+        deprecated_aliases=['hdfs_scratch_dir'],
         switches=[
             (['--hadoop-tmp-dir'], dict(
+                deprecated_aliases=['--hdfs-scratch-dir'],
                 help='Temp space on HDFS (default is tmp/mrjob)',
             )),
         ],
@@ -164,6 +410,54 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--hadoop-version'], dict(
                 help='Specific version of Hadoop to simulate',
+            )),
+        ],
+    ),
+    iam_endpoint=dict(
+        switches=[
+            (['--iam-endpoint'], dict(
+                help=('Force mrjob to connect to IAM on this endpoint'
+                      ' (e.g. iam.us-gov.amazonaws.com)'),
+            )),
+        ],
+    ),
+    iam_instance_profile=dict(
+        switches=[
+            (['--iam-instance-profile'], dict(
+                help=('EC2 instance profile to use for the EMR cluster -- see'
+                      ' "Configure IAM Roles for Amazon EMR" in AWS docs'),
+            )),
+        ],
+    ),
+    iam_service_role=dict(
+        switches=[
+            (['--iam-service-role'], dict(
+                help=('IAM service role to use for the EMR cluster -- see'
+                      ' "Configure IAM Roles for Amazon EMR" in AWS docs')
+            )),
+        ],
+    ),
+    image_version=dict(
+        deprecated_aliases=['ami_version'],
+        switches=[
+            (['--image-version'], dict(
+                deprecated_aliases=['--ami-version'],
+                help='EMR/Dataproc machine image to launch clusters with',
+            )),
+        ],
+    ),
+    instance_type=dict(
+        deprecated_aliases=['ec2_instance_type'],
+        switches=[
+            (['--instance-type'], dict(
+                deprecated_aliases=['--ec2-instance-type'],
+                help=('Type of GCE/EC2 instance(s) to launch \n'
+                      ' GCE - e.g. n1-standard-1, n1-highcpu-4, n1-highmem-4'
+                      ' -- See'
+                      ' https://cloud.google.com/compute/docs/machine-types\n'
+                      ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge '
+                      ' -- See http://aws.amazon.com/ec2/instance-types/'
+                ),
             )),
         ],
     ),
@@ -206,12 +500,127 @@ _RUNNER_OPTS = dict(
     ),
     local_tmp_dir=dict(
         combiner=combine_paths,
+        deprecated_aliases=['base_tmp_dir'],
         # no switches, use $TMPDIR etc.
+    ),
+    master_instance_bid_price=dict(
+        cloud_role='launch',
+        deprecated_aliases=['ec2_master_instance_bid_price'],
+        switches=[
+            (['--master-instance-bid-price'], dict(
+                deprecated_aliases=['--ec2-master-instance-bid-price'],
+                help=('Bid price to specify for the master node when'
+                      ' setting it up as an EC2 spot instance (you probably'
+                      ' only want to do this for task instances).'),
+            )),
+        ],
+    ),
+    master_instance_type=dict(
+        cloud_role='launch',
+        switches=[
+            (['--master-instance-type'], dict(
+                deprecated_aliases=['--ec2-master-instance-type'],
+                help='Type of GCE/EC2 master instance to launch',
+            )),
+        ],
+    ),
+    max_hours_idle=dict(
+        cloud_role='launch',
+        switches=[
+            (['--max-hours-idle'], dict(
+                default=None, type='float',
+                help=("If we create a cluster, have it automatically"
+                      " terminate itself after it's been idle this many"
+                      " hours"),
+            )),
+        ],
+    ),
+    mins_to_end_of_hour=dict(
+        cloud_role='launch',
+        switches=[
+            (['--mins-to-end-of-hour'], dict(
+                help=("If --max-hours-idle is set, control how close to the"
+                      " end of an hour the cluster can automatically"
+                      " terminate itself (default is 5 minutes)"),
+            )),
+        ],
+    ),
+    num_core_instances=dict(
+        cloud_role='launch',
+        deprecated_aliases=['num_ec2_core_instances'],
+        switches=[
+            (['--num-core-instances'], dict(
+                deprecated_aliases=['--num-ec2-core-instances'],
+                help='Total number of core instances to launch',
+                type='int',
+            )),
+        ],
+    ),
+    num_ec2_instances=dict(
+        cloud_role='launch',
+        deprecated=True,
+        switches=[
+            (['--num-ec2-instances'], dict(
+                help=('Deprecated: subtract one and pass that to '
+                      '--num-core-instances instead'),
+                type='int',
+            )),
+        ],
+    ),
+    num_task_instances=dict(
+        cloud_role='launch',
+        deprecated_aliases=['num_ec2_task_instances'],
+        switches=[
+            (['--num-task-instances'], dict(
+                deprecated_aliases=['--num-ec2-task-instances'],
+                help='Total number of task instances to launch',
+                type='int',
+            )),
+        ],
     ),
     owner=dict(
         switches=[
             (['--owner'], dict(
                 help='User who ran the job (default is the current user)',
+            )),
+        ],
+    ),
+    pool_clusters=dict(
+        cloud_role='launch',
+        deprecated_aliases=['pool_emr_job_flows'],
+        switches=[
+            (['--pool-clusters'], dict(
+                deprecated_aliases=['--pool-emr-job-flows'],
+                action='store_true',
+                help=('Add to an existing cluster or create a new one that'
+                      ' does not terminate when the job completes.\n'
+                      'WARNING: do not run this without --max-hours-idle or '
+                      ' with mrjob terminate-idle-clusters in your crontab;'
+                      ' clusters left idle can quickly become expensive!'),
+            )),
+            (['--no-pool-clusters'], dict(
+                deprecated_aliases=['--no-pool-emr-job-flows'],
+                action='store_false',
+                help="Don't run job on a pooled cluster (the default)",
+            )),
+        ],
+    ),
+    pool_name=dict(
+        deprecated_aliases=['emr_job_flow_pool_name'],
+        switches=[
+             (['--pool-name'], dict(
+                 deprecated_aliases=['--emr-job-flow-pool-name'],
+                help='Specify a pool name to join. Default is "default"',
+            )),
+        ],
+    ),
+    pool_wait_minutes=dict(
+        switches=[
+            (['--pool-wait-minutes'], dict(
+                help=('Wait for a number of minutes for a cluster to finish'
+                      ' if a job finishes, run job on its cluster. Otherwise'
+                      " create a new one. (0, the default, means don't wait)"),
+                type='int',
             )),
         ],
     ),
@@ -233,6 +642,33 @@ _RUNNER_OPTS = dict(
                 help=('Alternate python command for Python mappers/reducers.'
                       ' You can include arguments, e.g. --python-bin "python'
                       ' -v"'),
+            )),
+        ],
+    ),
+    region=dict(
+        deprecated_aliases=['aws_region'],
+        switches=[
+            (['--region'], dict(
+                deprecated_aliases=['--aws-region'],
+                help='GCE/AWS region to run Dataproc/EMR jobs in.',
+            )),
+        ],
+    ),
+    release_label=dict(
+        switches=[
+            (['--release-label'], dict(
+                help=('Release Label (e.g. "emr-4.0.0"). Overrides'
+                      ' --image-version'),
+            )),
+        ],
+    ),
+    s3_endpoint=dict(
+        switches=[
+            (['--s3-endpoint'], dict(
+                help=("Force mrjob to connect to S3 on this endpoint (e.g."
+                      " s3-us-west-1.amazonaws.com). You usually shouldn't"
+                      " set this; by default mrjob will choose the correct"
+                      " endpoint for each S3 bucket based on its location."),
             )),
         ],
     ),
@@ -284,6 +720,26 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    ssh_bin=dict(
+        combiner=combine_cmds,
+    ),
+    ssh_tunnel=dict(
+        deprecated_aliases=['ssh_tunnel_to_job_tracker'],
+        switches=[
+            (['--ssh-tunnel'], dict(
+                action='store_true',
+                deprecated_aliases=['--ssh-tunnel-to-job-tracker'],
+                help=('Open an SSH tunnel to the Hadoop job tracker/resource'
+                      ' manager'),
+            )),
+            (['--no-ssh-tunnel'], dict(
+                action='store_false',
+                deprecated_aliases=['--no-ssh-tunnel-to-job-tracker'],
+                help=("Don't open an SSH tunnel to the Hadoop job"
+                      " tracker/resource manager (the default)"),
+            )),
+        ],
+    ),
     steps_interpreter=dict(
         combiner=combine_cmds,
         switches=[
@@ -315,6 +771,43 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    tags=dict(
+        cloud_role='launch',
+        combiner=combine_dicts,
+        deprecated_aliases=['emr_tags'],
+        switches=[
+            (['--tag'], dict(
+                action='append',
+                deprecated_aliases=['--emr-tag'],
+                help=('Metadata tags to apply to the EMR cluster; '
+                      'should take the form KEY=VALUE. You can use --tag '
+                      'multiple times'),
+            )),
+        ],
+    ),
+    task_instance_bid_price=dict(
+        cloud_role='launch',
+        deprecated_aliases=['ec2_task_instance_bid_price'],
+        switches=[
+            (['--task-instance-bid-price'], dict(
+                deprecated_aliases=['--ec2-task-instance-bid-price'],
+                help=('Bid price to specify for task nodes when'
+                      ' setting them up as EC2 spot instances'),
+            )),
+        ],
+    ),
+    task_instance_type=dict(
+        cloud_role='launch',
+        deprecated_aliases=[
+            'ec2_task_instance_type', 'ec2_slave_instance_type'],
+        switches=[
+            (['--task-instance-type'], dict(
+                deprecated_aliases=[
+                    '--ec2-task-instance-type', '--ec2-slave-instance-type'],
+                help='Type of GCE/EC2 task instance(s) to launch',
+            )),
+        ],
+    ),
     upload_archives=dict(
         combiner=combine_path_lists,
         switches=[
@@ -335,14 +828,21 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    zone=dict(
+        deprecated_aliases=['aws_availability_zone'],
+    ),
 )
 
 
 def _add_runner_options(parser, dest):
+    # TODO: filter out switches whose option is deprecated
+
     switches = _RUNNER_OPTS[dest].get('switches') or []
 
     for args, kwargs in switches:
         kwargs = dict(kwargs)
+
+        deprecated_aliases = kwargs.pop('deprecated_aliases', None)
 
         kwargs['dest'] = dest
 
@@ -352,3 +852,11 @@ def _add_runner_options(parser, dest):
             kwargs['default'] = None
 
         parser.add_option(*args, **kwargs)
+
+        # add an option for deprecated aliases
+        if deprecated_aliases:
+            help = 'Deprecated alias%s for %s' % (
+                ('es' if len(deprecated_aliases) > 1 else ''),
+                switches[-1])
+            parser.add_option(
+                *args, **combine_dicts(kwargs, dict(help=help)))

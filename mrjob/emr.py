@@ -430,6 +430,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         'emr_applications': combine_lists,
         'emr_configurations': combine_lists,
         'hadoop_extra_args': combine_lists,
+        'hadoop_streaming_jar': combine_paths,
         'ssh_bin': combine_cmds,
         'tags': combine_dicts,
     })

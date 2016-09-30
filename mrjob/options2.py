@@ -14,18 +14,26 @@ from mrjob.runner import CLEANUP_CHOICES
 _RUNNER_OPTS = dict(
     additional_emr_info=dict(
         cloud_role='launch',
+        runners=['emr'],
         switches=[
             (['--additional-emr-info'], dict(
                 help='A JSON string for selecting additional features on EMR',
             )),
         ],
     ),
-    aws_access_key_id=dict(),
-    aws_secret_access_key=dict(),
-    aws_security_token=dict(),
+    aws_access_key_id=dict(
+        runners=['emr'],
+    ),
+    aws_secret_access_key=dict(
+        runners=['emr'],
+    ),
+    aws_security_token=dict(
+        runners=['emr'],
+    ),
     bootstrap=dict(
         cloud_role='launch',
         combiner=combine_lists,
+        runners=['dataproc', 'emr'],
         switches=[
             (['--bootstrap'], dict(
                 action='append',
@@ -40,6 +48,7 @@ _RUNNER_OPTS = dict(
     bootstrap_actions=dict(
         cloud_role='launch',
         combiner=combine_lists,
+        runners=['emr'],
         switches=[
             (['--bootstrap-action'], dict(
                 action='append',
@@ -55,6 +64,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_lists,
         deprecated=True,
+        runners=['emr'],
         switches=[
             (['--bootstrap-cmd'], dict(
                 action='append',
@@ -69,6 +79,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_path_lists,
         deprecated=True,
+        runners=['emr'],
         switches=[
             (['--bootstrap-file'], dict(
                 action='append',
@@ -96,10 +107,28 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    bootstrap_python=dict(
+        cloud_role='launch',
+        runners=['dataproc', 'emr'],
+        switches=[
+            (['--bootstrap-python'], dict(
+                action='store_true',
+                help=('Attempt to install a compatible version of Python'
+                      ' at bootstrap time. Currently this only does anything'
+                      ' for Python 3, for which it is enabled by default.'),
+            )),
+            (['--no-bootstrap-python'], dict(
+                action='store_false',
+                help=("Don't automatically try to install a compatible version"
+                      " of Python at bootstrap time."),
+            )),
+        ],
+    ),
     bootstrap_python_packages=dict(
         cloud_role='launch',
         combiner=combine_path_lists,
         deprecated=True,
+        runners=['emr'],
         switches=[
             (['--bootstrap-python-package'], dict(
                 action='append',
@@ -115,6 +144,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_path_lists,
         deprecated=True,
+        runners=['emr'],
         switches=[
             (['--bootstrap-script'], dict(
                 action='append',
@@ -168,6 +198,7 @@ _RUNNER_OPTS = dict(
     ),
     cloud_fs_sync_secs=dict(
         deprecated_aliases=['s3_sync_wait_time'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--cloud-fs-sync-secs'], dict(
                 deprecated_aliases=['--s3-sync-wait-time'],
@@ -183,6 +214,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_paths,
         deprecated_aliases=['s3_log_uri'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--cloud-log-dir'], dict(
                 deprecated_aliases=['--s3-log-uri'],
@@ -193,6 +225,7 @@ _RUNNER_OPTS = dict(
     cloud_tmp_dir=dict(
         combiner=combine_paths,
         deprecated_aliases=['s3_scratch_uri', 's3_tmp_dir'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--cloud-tmp-dir'], dict(
                 deprecated_aliases=['--s3-scratch-uri', '--s3-tmp-dir'],
@@ -201,6 +234,8 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cloud_upload_part_size=dict(
+        deprecated_aliases=['s3_upload_part_size'],
+        runners=['emr'],
         switches=[
             (['--cloud-upload-part-size'], dict(
                 deprecated_aliases=['--s3-upload-part-size'],
@@ -214,6 +249,7 @@ _RUNNER_OPTS = dict(
     cluster_id=dict(
         cloud_role='run',
         deprecated_aliases=['emr_job_flow_id'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--cluster-id'], dict(
                 deprecated_aliases=['emr_job_flow_id'],
@@ -235,6 +271,7 @@ _RUNNER_OPTS = dict(
     core_instance_bid_price=dict(
         cloud_role='launch',
         deprecated_aliases=['ec2_core_instance_bid_price'],
+        runners=['emr'],
         switches=[
             (['--core-instance-bid-price'], dict(
                 deprecated_aliases=['--ec2-core-instance-bid-price'],
@@ -248,6 +285,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         deprecated_aliases=[
             'ec2_core_instance_type', 'ec2_slave_instance_type'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--core-instance-type'], dict(
                 deprecated_aliases=[
@@ -258,6 +296,7 @@ _RUNNER_OPTS = dict(
     ),
     ec2_key_pair=dict(
         cloud_role='launch',
+        runners=['emr'],
         switches=[
             (['--ec2-key-pair'], dict(
                 help='Name of the SSH key pair you set up for EMR',
@@ -267,6 +306,7 @@ _RUNNER_OPTS = dict(
     ec2_key_pair_file=dict(
         cloud_role='run',
         combiner=combine_paths,
+        runners=['emr'],
         switches=[
             (['--ec2-key-pair-file'], dict(
                 help='Path to file containing SSH key for EMR',
@@ -284,6 +324,7 @@ _RUNNER_OPTS = dict(
     ),
     emr_api_params=dict(
         combiner=combine_dicts,
+        runners=['emr'],
         switches=[
             (['--emr-api-param'], dict(
                 help=('Additional parameters to pass directly to the EMR'
@@ -295,6 +336,7 @@ _RUNNER_OPTS = dict(
     ),
     emr_applications=dict(
         combiner=combine_lists,
+        runners=['emr'],
         switches=[
             (['--emr-application'], dict(
                 action='append',
@@ -305,6 +347,7 @@ _RUNNER_OPTS = dict(
     ),
     emr_configurations=dict(
         combiner=combine_lists,
+        runners=['emr'],
         switches=[
             (['--emr-configuration'], dict(
                 action='append',
@@ -316,6 +359,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     emr_endpoint=dict(
+        runners=['emr'],
         switches=[
             (['--emr-endpoint'], dict(
                 help=('Force mrjob to connect to EMR on this endpoint'
@@ -325,6 +369,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     enable_emr_debugging=dict(
+        runners=['emr'],
         switches=[
             (['--enable-emr-debugging'], dict(
                 action='store_true',
@@ -339,12 +384,14 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_bin=dict(
         combiner=combine_cmds,
+        runners=['hadoop'],
         switches=[
             (['--hadoop-bin'], dict(help='path to hadoop binary')),
         ],
     ),
     hadoop_extra_args=dict(
         combiner=combine_lists,
+        runners=['emr', 'hadoop'],
         switches=[
             (['--hadoop-arg'], dict(
                 action='append',
@@ -356,6 +403,7 @@ _RUNNER_OPTS = dict(
     hadoop_home=dict(
         combiner=combine_paths,
         deprecated=True,
+        runners=['hadoop'],
         switches=[
             (['--hadoop-home'], dict(
                 help=('Deprecated hint about where to find hadoop binary and'
@@ -367,6 +415,7 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_log_dirs=dict(
         combiner=combine_path_lists,
+        runners=['hadoop'],
         switches=[
             (['--hadoop-log-dirs'], dict(
                 action='append',
@@ -387,6 +436,7 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_streaming_jar_on_emr=dict(
         deprecated=True,
+        runners=['emr', 'hadoop'],
         switches=[
             (['--hadoop-streaming-jar-on-emr'], dict(
                 help=("Deprecated: prepend 'file://' and pass that to"
@@ -397,6 +447,7 @@ _RUNNER_OPTS = dict(
     hadoop_tmp_dir=dict(
         combiner=combine_paths,
         deprecated_aliases=['hdfs_scratch_dir'],
+        runners=['hadoop'],
         switches=[
             (['--hadoop-tmp-dir'], dict(
                 deprecated_aliases=['--hdfs-scratch-dir'],
@@ -405,6 +456,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     hadoop_version=dict(
+        runners=['inline', 'local'],
         switches=[
             (['--hadoop-version'], dict(
                 help='Specific version of Hadoop to simulate',
@@ -412,6 +464,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     iam_endpoint=dict(
+        runners=['emr'],
         switches=[
             (['--iam-endpoint'], dict(
                 help=('Force mrjob to connect to IAM on this endpoint'
@@ -420,6 +473,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     iam_instance_profile=dict(
+        runners=['emr'],
         switches=[
             (['--iam-instance-profile'], dict(
                 help=('EC2 instance profile to use for the EMR cluster -- see'
@@ -428,6 +482,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     iam_service_role=dict(
+        runners=['emr'],
         switches=[
             (['--iam-service-role'], dict(
                 help=('IAM service role to use for the EMR cluster -- see'
@@ -437,6 +492,7 @@ _RUNNER_OPTS = dict(
     ),
     image_version=dict(
         deprecated_aliases=['ami_version'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--image-version'], dict(
                 deprecated_aliases=['--ami-version'],
@@ -446,6 +502,7 @@ _RUNNER_OPTS = dict(
     ),
     instance_type=dict(
         deprecated_aliases=['ec2_instance_type'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--instance-type'], dict(
                 deprecated_aliases=['--ec2-instance-type'],
@@ -487,6 +544,7 @@ _RUNNER_OPTS = dict(
     ),
     libjars=dict(
         combiner=combine_path_lists,
+        runners=['emr', 'hadoop'],
         switches=[
             (['--libjar'], dict(
                 action='append',
@@ -504,6 +562,7 @@ _RUNNER_OPTS = dict(
     master_instance_bid_price=dict(
         cloud_role='launch',
         deprecated_aliases=['ec2_master_instance_bid_price'],
+        runners=['emr'],
         switches=[
             (['--master-instance-bid-price'], dict(
                 deprecated_aliases=['--ec2-master-instance-bid-price'],
@@ -514,7 +573,9 @@ _RUNNER_OPTS = dict(
         ],
     ),
     master_instance_type=dict(
+        deprecated_aliases=['ec2_master_instance_type'],
         cloud_role='launch',
+        runners=['dataproc', 'emr'],
         switches=[
             (['--master-instance-type'], dict(
                 deprecated_aliases=['--ec2-master-instance-type'],
@@ -524,6 +585,7 @@ _RUNNER_OPTS = dict(
     ),
     max_hours_idle=dict(
         cloud_role='launch',
+        runners=['dataproc', 'emr'],
         switches=[
             (['--max-hours-idle'], dict(
                 default=None, type='float',
@@ -535,6 +597,7 @@ _RUNNER_OPTS = dict(
     ),
     mins_to_end_of_hour=dict(
         cloud_role='launch',
+        runners=['emr'],
         switches=[
             (['--mins-to-end-of-hour'], dict(
                 help=("If --max-hours-idle is set, control how close to the"
@@ -546,6 +609,7 @@ _RUNNER_OPTS = dict(
     num_core_instances=dict(
         cloud_role='launch',
         deprecated_aliases=['num_ec2_core_instances'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--num-core-instances'], dict(
                 deprecated_aliases=['--num-ec2-core-instances'],
@@ -557,6 +621,7 @@ _RUNNER_OPTS = dict(
     num_ec2_instances=dict(
         cloud_role='launch',
         deprecated=True,
+        runners=['emr'],
         switches=[
             (['--num-ec2-instances'], dict(
                 help=('Deprecated: subtract one and pass that to '
@@ -568,6 +633,7 @@ _RUNNER_OPTS = dict(
     num_task_instances=dict(
         cloud_role='launch',
         deprecated_aliases=['num_ec2_task_instances'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--num-task-instances'], dict(
                 deprecated_aliases=['--num-ec2-task-instances'],
@@ -586,6 +652,7 @@ _RUNNER_OPTS = dict(
     pool_clusters=dict(
         cloud_role='launch',
         deprecated_aliases=['pool_emr_job_flows'],
+        runners=['emr'],
         switches=[
             (['--pool-clusters'], dict(
                 deprecated_aliases=['--pool-emr-job-flows'],
@@ -605,6 +672,7 @@ _RUNNER_OPTS = dict(
     ),
     pool_name=dict(
         deprecated_aliases=['emr_job_flow_pool_name'],
+        runners=['emr'],
         switches=[
              (['--pool-name'], dict(
                  deprecated_aliases=['--emr-job-flow-pool-name'],
@@ -613,6 +681,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     pool_wait_minutes=dict(
+        runners=['emr'],
         switches=[
             (['--pool-wait-minutes'], dict(
                 help=('Wait for a number of minutes for a cluster to finish'
@@ -645,6 +714,7 @@ _RUNNER_OPTS = dict(
     ),
     region=dict(
         deprecated_aliases=['aws_region'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--region'], dict(
                 deprecated_aliases=['--aws-region'],
@@ -653,6 +723,8 @@ _RUNNER_OPTS = dict(
         ],
     ),
     release_label=dict(
+        cloud_role='launch',
+        runners=['emr'],
         switches=[
             (['--release-label'], dict(
                 help=('Release Label (e.g. "emr-4.0.0"). Overrides'
@@ -661,6 +733,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     s3_endpoint=dict(
+        runners=['emr'],
         switches=[
             (['--s3-endpoint'], dict(
                 help=("Force mrjob to connect to S3 on this endpoint (e.g."
@@ -720,6 +793,7 @@ _RUNNER_OPTS = dict(
     ),
     ssh_bin=dict(
         combiner=combine_cmds,
+        runners=['emr'],
         switches=[
             (['--ssh-bin'], dict(
                 help=("Name/path of ssh binary. Arguments are allowed (e.g."
@@ -728,6 +802,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     ssh_bind_ports=dict(
+        runners=['emr'],
         switches=[
             (['--ssh-bind-ports'], dict(
                 help=('A list of port ranges that are safe to listen on,'
@@ -739,6 +814,7 @@ _RUNNER_OPTS = dict(
     ),
     ssh_tunnel=dict(
         deprecated_aliases=['ssh_tunnel_to_job_tracker'],
+        runners=['emr'],
         switches=[
             (['--ssh-tunnel'], dict(
                 action='store_true',
@@ -755,6 +831,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     ssh_tunnel_is_open=dict(
+        runners=['emr'],
         switches=[
             (['---ssh-tunnel-is-open'], dict(
                 action='store_true',
@@ -800,6 +877,8 @@ _RUNNER_OPTS = dict(
         ],
     ),
     subnet=dict(
+        cloud_role='launch',
+        runners=['emr'],
         switches=[
             (['--subnet'], dict(
                 help=('ID of Amazon VPC subnet to launch cluster in. If not'
@@ -812,6 +891,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         combiner=combine_dicts,
         deprecated_aliases=['emr_tags'],
+        runners=['emr'],
         switches=[
             (['--tag'], dict(
                 action='append',
@@ -825,6 +905,7 @@ _RUNNER_OPTS = dict(
     task_instance_bid_price=dict(
         cloud_role='launch',
         deprecated_aliases=['ec2_task_instance_bid_price'],
+        runners=['emr'],
         switches=[
             (['--task-instance-bid-price'], dict(
                 deprecated_aliases=['--ec2-task-instance-bid-price'],
@@ -837,6 +918,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         deprecated_aliases=[
             'ec2_task_instance_type', 'ec2_slave_instance_type'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--task-instance-type'], dict(
                 deprecated_aliases=[
@@ -866,6 +948,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     visible_to_all_users=dict(
+        runners=['emr'],
         switches=[
             (['--visible-to-all-users'], dict(
                 action='store_true',
@@ -882,6 +965,7 @@ _RUNNER_OPTS = dict(
     zone=dict(
         cloud_role='launch',
         deprecated_aliases=['aws_availability_zone'],
+        runners=['dataproc', 'emr'],
         switches=[
             (['--zone'], dict(
                 deprecated_aliases=['--aws-availability-zone'],
@@ -891,6 +975,39 @@ _RUNNER_OPTS = dict(
         ],
     ),
 )
+
+
+def _for_runner(config, runner_alias):
+    return not config.get('runners') or runner_alias in config['runners']
+
+
+def _allowed_keys(runner_alias):
+    return set(
+        name for name, config in _RUNNER_OPTS.items()
+        if _for_runner(config, runner_alias),
+    )
+
+
+def _combiners(runner_alias):
+    return dict(
+        (name, config['combiner']) for name, config in _RUNNER_OPTS.items()
+        if config.get('combiner') and _for_runner(config, runner_alias)
+    )
+
+
+def _deprecated_aliases(runner_alias):
+    results = {}
+
+    for name, config in _RUNNER_OPTS.items():
+        if not _for_runner(config, runner_alias):
+            continue
+
+        if config.get('deprecated_aliases'):
+            for alias in config['deprecated_aliases']:
+                results[alias] = name
+
+    return results
+
 
 
 def _add_runner_options(parser, dest):

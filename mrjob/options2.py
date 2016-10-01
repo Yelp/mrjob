@@ -5,12 +5,49 @@ from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
-from mrjob.runner import CLEANUP_CHOICES
 
 # TODO: allow custom combiners per runner store (e.g. combine_local_envs)
 
 # TODO: handle no_emr_api_param
 
+#: cleanup options:
+#:
+#: * ``'ALL'``: delete logs and local and remote temp files; stop cluster
+#:   if on EMR and the job is not done when cleanup is run.
+#: * ``'CLOUD_TMP'``: delete temp files on cloud storage (e.g. S3) only
+#: * ``'CLUSTER'``: terminate the cluster if on EMR and the job is not done
+#:    on cleanup
+#: * ``'HADOOP_TMP'``: delete temp files on HDFS only
+#: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
+#: * ``'LOCAL_TMP'``: delete local temp files only
+#: * ``'LOGS'``: delete logs only
+#: * ``'NONE'``: delete nothing
+#: * ``'TMP'``: delete local, HDFS, and cloud storage temp files, but not logs
+#:
+#: .. versionchanged:: 0.5.0
+#:
+#:     - ``LOCAL_TMP`` used to be ``LOCAL_SCRATCH``
+#:     - ``HADOOP_TMP`` is new (and used to be covered by ``LOCAL_SCRATCH``)
+#:     - ``CLOUD_TMP`` used to be ``REMOTE_SCRATCH``
+#:
+CLEANUP_CHOICES = [
+    'ALL',
+    'CLOUD_TMP',
+    'CLUSTER',
+    'HADOOP_TMP',
+    'JOB',
+    'LOCAL_TMP',
+    'LOGS',
+    'NONE',
+    'TMP',
+]
+
+_CLEANUP_DEPRECATED_ALIASES = {
+    'JOB_FLOW': 'CLUSTER',
+    'LOCAL_SCRATCH': 'LOCAL_TMP',
+    'REMOTE_SCRATCH': 'CLOUD_TMP',
+    'SCRATCH': 'TMP',
+}
 
 _RUNNER_OPTS = dict(
     additional_emr_info=dict(

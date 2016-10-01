@@ -43,6 +43,8 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.options2 import _allowed_keys
 from mrjob.options2 import _combiners
 from mrjob.options2 import _deprecated_aliases
+from mrjob.options2 import CLEANUP_CHOICES
+from mrjob.options2 import _CLEANUP_DEPRECATED_ALIASES
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
@@ -58,45 +60,6 @@ log = logging.getLogger(__name__)
 
 # use to detect globs and break into the part before and after the glob
 GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
-
-#: cleanup options:
-#:
-#: * ``'ALL'``: delete logs and local and remote temp files; stop cluster
-#:   if on EMR and the job is not done when cleanup is run.
-#: * ``'CLOUD_TMP'``: delete temp files on cloud storage (e.g. S3) only
-#: * ``'CLUSTER'``: terminate the cluster if on EMR and the job is not done
-#:    on cleanup
-#: * ``'HADOOP_TMP'``: delete temp files on HDFS only
-#: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
-#: * ``'LOCAL_TMP'``: delete local temp files only
-#: * ``'LOGS'``: delete logs only
-#: * ``'NONE'``: delete nothing
-#: * ``'TMP'``: delete local, HDFS, and cloud storage temp files, but not logs
-#:
-#: .. versionchanged:: 0.5.0
-#:
-#:     - ``LOCAL_TMP`` used to be ``LOCAL_SCRATCH``
-#:     - ``HADOOP_TMP`` is new (and used to be covered by ``LOCAL_SCRATCH``)
-#:     - ``CLOUD_TMP`` used to be ``REMOTE_SCRATCH``
-#:
-CLEANUP_CHOICES = [
-    'ALL',
-    'CLOUD_TMP',
-    'CLUSTER',
-    'HADOOP_TMP',
-    'JOB',
-    'LOCAL_TMP',
-    'LOGS',
-    'NONE',
-    'TMP',
-]
-
-_CLEANUP_DEPRECATED_ALIASES = {
-    'JOB_FLOW': 'CLUSTER',
-    'LOCAL_SCRATCH': 'LOCAL_TMP',
-    'REMOTE_SCRATCH': 'CLOUD_TMP',
-    'SCRATCH': 'TMP',
-}
 
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096

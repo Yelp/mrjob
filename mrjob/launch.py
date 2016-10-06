@@ -572,10 +572,10 @@ class MRJobLauncher(object):
         """Helper method that powers the *_job_runner_kwargs()
         methods."""
         # user can no longer silently ignore switches by overriding
-        # job_runner_kwargs_new()
+        # job_runner_kwargs()
         return combine_dicts(
             self._kwargs_from_switches(_allowed_keys(runner_alias)),
-            self.job_runner_kwargs_new(),
+            self.job_runner_kwargs(),
         )
 
     def job_runner_kwargs(self):

@@ -1070,11 +1070,14 @@ def _deprecated_aliases(runner_alias):
     return results
 
 
+def _add_option(parser, dest, exclude_deprecated=True):
+    """Add switches for a single option (*dest*) to the given parser."""
+    conf = _RUNNER_OPTS[dest]
 
-def _add_runner_options(parser, dest):
-    # TODO: filter out switches whose option is deprecated
+    if conf.get('deprecated') and not include_deprecated:
+        return
 
-    switches = _RUNNER_OPTS[dest].get('switches') or []
+    switches = conf.get('switches') or []
 
     for args, kwargs in switches:
         kwargs = dict(kwargs)
@@ -1090,8 +1093,8 @@ def _add_runner_options(parser, dest):
 
         parser.add_option(*args, **kwargs)
 
-        # add an option for deprecated aliases
-        if deprecated_aliases:
+        # add a switch for deprecated aliases
+        if deprecated_aliases and include_deprecated:
             help = 'Deprecated alias%s for %s' % (
                 ('es' if len(deprecated_aliases) > 1 else ''),
                 switches[-1])

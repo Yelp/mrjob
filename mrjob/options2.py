@@ -597,7 +597,6 @@ _RUNNER_OPTS = dict(
     ),
     libjars=dict(
         combiner=combine_path_lists,
-        runners=['emr', 'hadoop'],
         switches=[
             (['--libjar'], dict(
                 action='append',

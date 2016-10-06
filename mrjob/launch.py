@@ -753,6 +753,18 @@ class MRJobLauncher(object):
 
         return self
 
+    ### temporary, for debugging ###
+
+    def _opt_group_names(self):
+        return (name for name in dir(self) if name.endswith('_opt_group'))
+
+    def _opt_group_dests(self):
+        return dict(
+            (name, set(
+                s.dest for s in getattr(self, name).option_list))
+            for name in self._opt_group_names())
+
+
 
 if __name__ == '__main__':
     MRJobLauncher.run()

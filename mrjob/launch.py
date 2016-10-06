@@ -753,6 +753,20 @@ class MRJobLauncher(object):
 
         return self
 
+    ### deprecated option group methods ###
+
+    def _warn_opt_groups_are_deprecated(self):
+        if getattr(self, '_warned_about_opt_groups', None):
+            return
+
+        log.warning('*_opt_group attributes are deprecated and going away'
+                    ' in v0.6.0')
+
+        self._warned_about_opt_groups = True
+
+
+
+
     ### temporary, for debugging ###
 
     def _opt_group_names(self):

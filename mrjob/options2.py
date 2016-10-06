@@ -5,6 +5,7 @@ from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
+from mrjob.py2 import string_types
 
 # TODO: allow custom combiners per runner store (e.g. combine_local_envs)
 
@@ -49,6 +50,28 @@ _CLEANUP_DEPRECATED_ALIASES = {
     'SCRATCH': 'TMP',
 }
 
+# map from runner option name to dict with the following keys (all optional):
+# cloud_role:
+#   'connect' if needed when interacting with cloud services at all
+#   'launch' if needed when creating a new cluster
+#   (cloud runner options with no cloud role are only needed when running jobs)
+# combiner: combiner func from mrjob.conf used to combine option values.
+#   (if left blank, we use combine_values())
+# deprecated: if true, this option is deprecated and slated for removal
+# deprecated_aliases: list of old names for this option slated for removal
+# runner_combiners: map from runner alias to different combiner to use
+#   for that runner (we use this to get combine_local_envs() on sim runners)
+# runners: list of aliases of runners that support this option (leave out
+#   for options common to all runners
+# switches: list of switches to add to option parser for this option. Items
+#   have the format (['--switch-names', ...], dict(**kwargs)), where kwargs
+#   can be:
+#     action: action to pass to option parser (e.g. 'store_true')
+#     deprecated_aliases: list of old '--switch-names' slated for removal
+#     help: help string to pass to option parser
+#     type: option type for option parser to enforce (e.g. 'float')
+#   You can't set the option parser's default; we use [] if *action* is
+#   'append' and None otherwise.
 _RUNNER_OPTS = dict(
     additional_emr_info=dict(
         cloud_role='launch',
@@ -60,12 +83,15 @@ _RUNNER_OPTS = dict(
         ],
     ),
     aws_access_key_id=dict(
+        cloud_role='connect',
         runners=['emr'],
     ),
     aws_secret_access_key=dict(
+        cloud_role='connect',
         runners=['emr'],
     ),
     aws_security_token=dict(
+        cloud_role='connect',
         runners=['emr'],
     ),
     bootstrap=dict(
@@ -206,7 +232,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     check_cluster_every=dict(
-        cloud_role='run',
         deprecated_aliases=['check_emr_status_every'],
         runners=['dataproc', 'emr'],
         switches=[
@@ -236,6 +261,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cloud_fs_sync_secs=dict(
+        cloud_role='launch',
         deprecated_aliases=['s3_sync_wait_time'],
         runners=['dataproc', 'emr'],
         switches=[
@@ -262,6 +288,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cloud_tmp_dir=dict(
+        cloud_role='launch',
         combiner=combine_paths,
         deprecated_aliases=['s3_scratch_uri', 's3_tmp_dir'],
         runners=['dataproc', 'emr'],
@@ -273,6 +300,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cloud_upload_part_size=dict(
+        cloud_role='launch',
         deprecated_aliases=['s3_upload_part_size'],
         runners=['emr'],
         switches=[
@@ -286,7 +314,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cluster_id=dict(
-        cloud_role='run',
         deprecated_aliases=['emr_job_flow_id'],
         runners=['dataproc', 'emr'],
         switches=[
@@ -347,7 +374,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     ec2_key_pair_file=dict(
-        cloud_role='run',
         combiner=combine_paths,
         runners=['emr'],
         switches=[
@@ -357,7 +383,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     emr_action_on_failure=dict(
-        cloud_role='run',
         runners=['emr'],
         switches=[
             (['--emr-action-on-failure'], dict(
@@ -367,6 +392,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     emr_api_params=dict(
+        cloud_role='launch',
         combiner=combine_dicts,
         runners=['emr'],
         switches=[
@@ -379,6 +405,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     emr_applications=dict(
+        cloud_role='launch',
         combiner=combine_lists,
         runners=['emr'],
         switches=[
@@ -390,6 +417,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     emr_configurations=dict(
+        cloud_role='launch',
         combiner=combine_lists,
         runners=['emr'],
         switches=[
@@ -403,6 +431,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     emr_endpoint=dict(
+        cloud_role='connect',
         runners=['emr'],
         switches=[
             (['--emr-endpoint'], dict(
@@ -413,6 +442,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     enable_emr_debugging=dict(
+        cloud_role='launch',
         runners=['emr'],
         switches=[
             (['--enable-emr-debugging'], dict(
@@ -517,6 +547,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     iam_endpoint=dict(
+        cloud_role='launch',  # not 'connect'; only used to create clusters
         runners=['emr'],
         switches=[
             (['--iam-endpoint'], dict(
@@ -526,6 +557,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     iam_instance_profile=dict(
+        cloud_role='launch',
         runners=['emr'],
         switches=[
             (['--iam-instance-profile'], dict(
@@ -535,6 +567,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     iam_service_role=dict(
+        cloud_role='launch',
         runners=['emr'],
         switches=[
             (['--iam-service-role'], dict(
@@ -544,6 +577,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     image_version=dict(
+        cloud_role='launch',
         deprecated_aliases=['ami_version'],
         runners=['dataproc', 'emr'],
         switches=[
@@ -554,6 +588,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     instance_type=dict(
+        cloud_role='launch',
         deprecated_aliases=['ec2_instance_type'],
         runners=['dataproc', 'emr'],
         switches=[
@@ -640,10 +675,10 @@ _RUNNER_OPTS = dict(
         runners=['dataproc', 'emr'],
         switches=[
             (['--max-hours-idle'], dict(
-                default=None, type='float',
                 help=("If we create a cluster, have it automatically"
                       " terminate itself after it's been idle this many"
                       " hours"),
+                type='float',
             )),
         ],
     ),
@@ -723,6 +758,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     pool_name=dict(
+        cloud_role='launch',
         deprecated_aliases=['emr_job_flow_pool_name'],
         runners=['emr'],
         switches=[
@@ -733,6 +769,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     pool_wait_minutes=dict(
+        cloud_role='launch',
         runners=['emr'],
         switches=[
             (['--pool-wait-minutes'], dict(
@@ -765,6 +802,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     region=dict(
+        cloud_role='connect',
         deprecated_aliases=['aws_region'],
         runners=['dataproc', 'emr'],
         switches=[
@@ -785,6 +823,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     s3_endpoint=dict(
+        cloud_role='connect',
         runners=['emr'],
         switches=[
             (['--s3-endpoint'], dict(
@@ -1000,6 +1039,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     visible_to_all_users=dict(
+        cloud_role='launch',
         runners=['emr'],
         switches=[
             (['--visible-to-all-users'], dict(
@@ -1070,9 +1110,26 @@ def _deprecated_aliases(runner_alias):
     return results
 
 
-def _add_option(parser, dest, exclude_deprecated=True):
-    """Add switches for a single option (*dest*) to the given parser."""
-    conf = _RUNNER_OPTS[dest]
+def _pick_runner_opts(runner_alias=None, cloud_role=None):
+    """Return a set of option names that work for the given runner
+    (if specified) and fullfill the given cloud roles (if specified).
+
+    By convention, you can use runner_alias ``'base'`` to get options
+    available to all runners.
+    """
+    return set(
+        opt_name for opt_name, conf in _RUNNER_OPTS.items()
+        if ((runner_alias is None or
+             runner_alias in conf.get('runners', [])) and
+            (cloud_role is None or
+             cloud_role == conf.get('cloud_role')))
+    )
+
+
+
+def _add_runner_opt_options(parser, opt_name, exclude_deprecated=True):
+    """Add switches for a single option (*opt_name*) to the given parser."""
+    conf = _RUNNER_OPTS[opt_name]
 
     if conf.get('deprecated') and not include_deprecated:
         return
@@ -1084,7 +1141,7 @@ def _add_option(parser, dest, exclude_deprecated=True):
 
         deprecated_aliases = kwargs.pop('deprecated_aliases', None)
 
-        kwargs['dest'] = dest
+        kwargs['dest'] = opt_name
 
         if kwargs.get('action') == 'append':
             kwargs['default'] = []

@@ -218,6 +218,24 @@ def _add_runner_opts(opt_group):
               ' query the job about its steps, if different from the'
               ' current Python interpreter.'))
 
+    opt_group.add_option(
+        '--label', dest='label', default=None,
+        help='alternate label for the job, to help us identify it')
+
+    opt_group.add_option(
+        '--owner', dest='owner', default=None,
+        help='user who ran the job (if different from the current user)')
+
+    opt_group.add_option(
+        '--check-input-paths', dest='check_input_paths',
+        default=None, action='store_true',
+        help='Check input paths exist before running (the default)')
+
+    opt_group.add_option(
+        '--no-check-input-paths', dest='check_input_paths',
+        default=None, action='store_false',
+        help='Skip the checks to ensure all input paths exist')
+
     _add_job_opts(opt_group)
 
 
@@ -241,24 +259,6 @@ def _add_hadoop_emr_opts(opt_group):
         help='Path of your hadoop streaming jar (locally, or on S3/HDFS).'
              ' In EMR, use a file:// URI to refer to a jar on the master'
              ' node of your cluster.')
-
-    opt_group.add_option(
-        '--label', dest='label', default=None,
-        help='alternate label for the job, to help us identify it')
-
-    opt_group.add_option(
-        '--owner', dest='owner', default=None,
-        help='user who ran the job (if different from the current user)')
-
-    opt_group.add_option(
-        '--check-input-paths', dest='check_input_paths',
-        default=None, action='store_true',
-        help='Check input paths exist before running (the default)')
-
-    opt_group.add_option(
-        '--no-check-input-paths', dest='check_input_paths',
-        default=None, action='store_false',
-        help='Skip the checks to ensure all input paths exist')
 
 
 def _add_hadoop_opts(opt_group):

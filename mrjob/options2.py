@@ -253,7 +253,7 @@ _RUNNER_OPTS = dict(
     ),
     cleanup_on_failure=dict(
         switches=[
-            (['--cleanup'], dict(
+            (['--cleanup-on-failure'], dict(
                 help=('Comma-separated list of which directories to delete'
                       ' when a job fails, e.g. TMP,LOGS. Choices:'
                       ' %s (default: NONE)' % ', '.join(CLEANUP_CHOICES)),
@@ -1120,14 +1120,22 @@ def _pick_runner_opts(runner_alias=None, cloud_role=None):
     return set(
         opt_name for opt_name, conf in _RUNNER_OPTS.items()
         if ((runner_alias is None or
-             runner_alias in conf.get('runners', [])) and
+             conf.get('runners') is None or
+             runner_alias in conf['runners']) and
             (cloud_role is None or
              cloud_role == conf.get('cloud_role')))
     )
 
 
+def _add_runner_options(parser, opt_names, include_deprecated=True):
+    # add options (switches) for the given runner opts to the given
+    # options parser, alphabetically by destination.
+    for opt_name in sorted(opt_names):
+        _add_runner_options_for_opt(
+            parser, opt_name, include_deprecated=include_deprecated)
 
-def _add_runner_opt_options(parser, opt_name, exclude_deprecated=True):
+
+def _add_runner_options_for_opt(parser, opt_name, include_deprecated=True):
     """Add switches for a single option (*opt_name*) to the given parser."""
     conf = _RUNNER_OPTS[opt_name]
 

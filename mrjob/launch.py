@@ -31,6 +31,7 @@ from mrjob.options import _add_dataproc_opts
 from mrjob.options import _add_emr_opts
 from mrjob.options import _add_hadoop_emr_opts
 from mrjob.options import _add_hadoop_opts
+from mrjob.options import _add_job_opts
 from mrjob.options import _add_local_opts
 from mrjob.options import _add_protocol_opts
 from mrjob.options import _add_runner_opts
@@ -38,6 +39,8 @@ from mrjob.options import _alphabetize_options
 from mrjob.options import _fix_custom_options
 from mrjob.options import _print_help_for_groups
 from mrjob.options2 import _allowed_keys
+from mrjob.options2 import _add_runner_options
+from mrjob.options2 import _pick_runner_opts
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
@@ -92,6 +95,10 @@ class MRJobLauncher(object):
         self.option_parser = OptionParser(usage=self._usage(),
                                           option_class=self.OPTION_CLASS,
                                           add_help_option=False)
+
+        # temporary, for testing
+        self._option_parser = OptionParser()
+
         self.configure_options()
 
         for opt_group in self.all_option_groups():
@@ -285,15 +292,19 @@ class MRJobLauncher(object):
             self.option_parser, 'Protocols')
         self.option_parser.add_option_group(self.proto_opt_group)
 
-        _add_protocol_opts(self.proto_opt_group)
+        _add_runner_options(
+            self.proto_opt_group, set(['strict_protocols']))
 
-        # options for running the entire job
+        # options for running the job (any runner)
         self.runner_opt_group = OptionGroup(
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        _add_runner_opts(self.runner_opt_group)
         _add_basic_opts(self.runner_opt_group)
+        _add_job_opts(self.runner_opt_group)
+        _add_runner_options(
+            self.runner_opt_group,
+            _pick_runner_opts('base') - set(['strict_protocols']))
 
         # options for inline/local runners
         self.local_opt_group = OptionGroup(
@@ -755,29 +766,24 @@ class MRJobLauncher(object):
 
     ### deprecated option group methods ###
 
-    def _warn_opt_groups_are_deprecated(self):
-        if getattr(self, '_warned_about_opt_groups', None):
-            return
+    def _deprecated_option_group(self, opt_names, title):
+        if not getattr(self, '_warned_about_opt_groups', None):
+            log.warning('*_opt_group attributes are deprecated and going away'
+                        ' in v0.6.0')
+            self._warned_about_opt_groups = True
 
-        log.warning('*_opt_group attributes are deprecated and going away'
-                    ' in v0.6.0')
+        opt_group = OptionGroup(self._dummy_option_parser, title)
 
-        self._warned_about_opt_groups = True
-
-
-
+        _add_runner_options(opt_group, opt_names)
 
     ### temporary, for debugging ###
 
     def _opt_group_names(self):
-        return (name for name in dir(self) if name.endswith('_opt_group'))
+        return set(name for name in dir(self) if name.endswith('_opt_group'))
 
-    def _opt_group_dests(self):
-        return dict(
-            (name, set(
-                s.dest for s in getattr(self, name).option_list))
-            for name in self._opt_group_names())
 
+def _dests(opt_group):
+    return set(s.dest for s in opt_group.option_list)
 
 
 if __name__ == '__main__':

@@ -75,6 +75,31 @@ def _add_basic_opts(opt_group):
         action='store_true', help='print more messages to stderr')
 
 
+
+def _add_job_opts(opt_group):
+    opt_group.add_option(
+        '--no-output', dest='no_output',
+        default=None, action='store_true',
+        help="Don't stream output after job completion")
+
+    opt_group.add_option(
+        '-o', '--output-dir', dest='output_dir', default=None,
+        help='Where to put final job output. This must be an s3:// URL ' +
+        'for EMR, an HDFS path for Hadoop, and a system path for local,' +
+        'and must be empty')
+
+    opt_group.add_option(
+        '--partitioner', dest='partitioner', default=None,
+        help=('Hadoop partitioner class. Deprecated as of v0.5.1 and'
+              ' will be removed in v0.6.0 (specify in your job instead)'))
+
+    opt_group.add_option(
+        '-r', '--runner', dest='runner', default=None,
+        choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
+        help=('Where to run the job; one of dataproc, emr, hadoop, inline,'
+              ' or local'))
+
+
 def _add_runner_opts(opt_group):
     """Options for all runners."""
     opt_group.add_option(
@@ -142,22 +167,6 @@ def _add_runner_opts(opt_group):
               " mrjob on your Hadoop cluster."))
 
     opt_group.add_option(
-        '--no-output', dest='no_output',
-        default=None, action='store_true',
-        help="Don't stream output after job completion")
-
-    opt_group.add_option(
-        '-o', '--output-dir', dest='output_dir', default=None,
-        help='Where to put final job output. This must be an s3:// URL ' +
-        'for EMR, an HDFS path for Hadoop, and a system path for local,' +
-        'and must be empty')
-
-    opt_group.add_option(
-        '--partitioner', dest='partitioner', default=None,
-        help=('Hadoop partitioner class. Deprecated as of v0.5.1 and'
-              ' will be removed in v0.6.0 (specify in your job instead)'))
-
-    opt_group.add_option(
         '--python-archive', dest='python_archives', default=[],
         action='append',
         help=('Archive to unpack and add to the PYTHONPATH of the mr_job'
@@ -169,12 +178,6 @@ def _add_runner_opts(opt_group):
         help=('Alternate python command for Python'
               ' mappers/reducers. You can'
               ' include arguments, e.g. --python-bin "python -v"'))
-
-    opt_group.add_option(
-        '-r', '--runner', dest='runner', default=None,
-        choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
-        help=('Where to run the job; one of dataproc, emr, hadoop, inline,'
-              ' or local'))
 
     opt_group.add_option(
         '--setup', dest='setup', action='append',
@@ -214,6 +217,8 @@ def _add_runner_opts(opt_group):
         help=('Name/path of alternate python command to use to'
               ' query the job about its steps, if different from the'
               ' current Python interpreter.'))
+
+    _add_job_opts(opt_group)
 
 
 def _add_local_opts(opt_group):

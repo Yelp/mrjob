@@ -32,9 +32,6 @@ from mrjob.options import _add_emr_opts
 from mrjob.options import _add_hadoop_emr_opts
 from mrjob.options import _add_hadoop_opts
 from mrjob.options import _add_job_opts
-from mrjob.options import _add_local_opts
-from mrjob.options import _add_protocol_opts
-from mrjob.options import _add_runner_opts
 from mrjob.options import _alphabetize_options
 from mrjob.options import _fix_custom_options
 from mrjob.options import _print_help_for_groups

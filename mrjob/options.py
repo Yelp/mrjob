@@ -87,21 +87,6 @@ def _add_job_opts(opt_group):
               ' or local'))
 
 
-def _add_hadoop_emr_opts(opt_group):
-    """Options for ``hadoop`` and ``emr`` runners"""
-    opt_group.add_option(
-        '--hadoop-arg', dest='hadoop_extra_args', default=[],
-        action='append', help='Argument of any type to pass to hadoop '
-        'streaming. You can use --hadoop-arg multiple times.')
-
-    opt_group.add_option(
-        '--hadoop-streaming-jar', dest='hadoop_streaming_jar',
-        default=None,
-        help='Path of your hadoop streaming jar (locally, or on S3/HDFS).'
-             ' In EMR, use a file:// URI to refer to a jar on the master'
-             ' node of your cluster.')
-
-
 def _add_hadoop_opts(opt_group):
     """Options for ``hadoop`` runner"""
     opt_group.add_option(

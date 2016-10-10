@@ -29,7 +29,6 @@ from mrjob.options import _add_basic_opts
 from mrjob.options import _add_dataproc_emr_opts
 from mrjob.options import _add_dataproc_opts
 from mrjob.options import _add_emr_opts
-from mrjob.options import _add_hadoop_emr_opts
 from mrjob.options import _add_hadoop_opts
 from mrjob.options import _add_job_opts
 from mrjob.options import _alphabetize_options
@@ -320,7 +319,10 @@ class MRJobLauncher(object):
             ' -r emr)')
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
 
-        _add_hadoop_emr_opts(self.hadoop_emr_opt_group)
+        _add_runner_options(
+            self.hadoop_emr_opt_group,
+            ((_pick_runner_opts('emr') & _pick_runner_opts('hadoop')) -
+             _pick_runner_opts('base')))
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(

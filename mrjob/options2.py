@@ -958,10 +958,12 @@ _RUNNER_OPTS = dict(
     strict_protocols=dict(
         switches=[
             (['--strict-protocols'], dict(
+                action='store_true',
                 help=('If something violates an input/output '
                       'protocol then raise an exception (the default)'),
             )),
             (['--no-strict-protocols'], dict(
+                action='store_false',
                 help=('If something violates an input/output '
                       'protocol then increment a counter and continue'),
             )),

@@ -312,7 +312,9 @@ class MRJobLauncher(object):
             'Running locally (these apply when you set -r inline or -r local)')
         self.option_parser.add_option_group(self.local_opt_group)
 
-        _add_local_opts(self.local_opt_group)
+        _add_runner_options(
+            self.local_opt_group,
+            _pick_runner_opts('local') - _pick_runner_opts('base'))
 
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(

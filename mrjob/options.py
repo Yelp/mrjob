@@ -575,17 +575,6 @@ def _fix_custom_options(options, option_parser):
     if getattr(options, 'cleanup_on_failure', None):
         options.cleanup_on_failure = parse_commas(options.cleanup_on_failure)
 
-    if hasattr(options, 'emr_api_params'):
-        emr_api_err = (
-            '--emr-api-params argument %r is not of the form KEY=VALUE')
-        options.emr_api_params = parse_key_value_list(options.emr_api_params,
-                                                      emr_api_err,
-                                                      option_parser.error)
-
-        if hasattr(options, 'no_emr_api_params'):
-                for param in options.no_emr_api_params:
-                    options.emr_api_params[param] = None
-
     if hasattr(options, 'emr_configurations'):
         decoded_configurations = []
 

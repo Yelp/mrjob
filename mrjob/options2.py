@@ -691,6 +691,7 @@ _RUNNER_OPTS = dict(
                 help=("If --max-hours-idle is set, control how close to the"
                       " end of an hour the cluster can automatically"
                       " terminate itself (default is 5 minutes)"),
+                type='float',
             )),
         ],
     ),

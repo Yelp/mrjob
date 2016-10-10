@@ -26,10 +26,6 @@ from optparse import OptionParser
 
 from mrjob.conf import combine_dicts
 from mrjob.options import _add_basic_opts
-from mrjob.options import _add_dataproc_emr_opts
-from mrjob.options import _add_dataproc_opts
-from mrjob.options import _add_emr_opts
-from mrjob.options import _add_hadoop_opts
 from mrjob.options import _add_job_opts
 from mrjob.options import _alphabetize_options
 from mrjob.options import _fix_custom_options
@@ -330,7 +326,10 @@ class MRJobLauncher(object):
             'Running on Hadoop (these apply when you set -r hadoop)')
         self.option_parser.add_option_group(self.hadoop_opt_group)
 
-        _add_hadoop_opts(self.hadoop_opt_group)
+        _add_runner_options(
+            self.hadoop_opt_group,
+            (_pick_runner_opts('hadoop') -
+             _pick_runner_opts('emr') - _pick_runner_opts('base')))
 
         # options for running the job on Dataproc or EMR
         self.dataproc_emr_opt_group = OptionGroup(
@@ -339,7 +338,10 @@ class MRJobLauncher(object):
             ' or -r emr)')
         self.option_parser.add_option_group(self.dataproc_emr_opt_group)
 
-        _add_dataproc_emr_opts(self.dataproc_emr_opt_group)
+        _add_runner_options(
+            self.dataproc_emr_opt_group,
+            ((_pick_runner_opts('dataproc') & _pick_runner_opts('emr')) -
+             _pick_runner_opts('base')))
 
         # options for running the job on Dataproc
         self.dataproc_opt_group = OptionGroup(
@@ -347,7 +349,10 @@ class MRJobLauncher(object):
             'Running on Dataproc (these apply when you set -r dataproc)')
         self.option_parser.add_option_group(self.dataproc_opt_group)
 
-        _add_dataproc_opts(self.dataproc_opt_group)
+        _add_runner_options(
+            self.dataproc_opt_group,
+            (_pick_runner_opts('dataproc') -
+             _pick_runner_opts('emr') - _pick_runner_opts('base')))
 
         # options for running the job on EMR
         self.emr_opt_group = OptionGroup(
@@ -355,7 +360,10 @@ class MRJobLauncher(object):
             'Running on EMR (these apply when you set -r emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
 
-        _add_emr_opts(self.emr_opt_group)
+        _add_runner_options(
+            self.emr_opt_group,
+            (_pick_runner_opts('emr') - _pick_runner_opts('hadoop') -
+             _pick_runner_opts('dataproc') - _pick_runner_opts('base')))
 
     def all_option_groups(self):
         return (self.option_parser, self.proto_opt_group,

@@ -87,36 +87,6 @@ def _add_job_opts(opt_group):
               ' or local'))
 
 
-def _add_hadoop_opts(opt_group):
-    """Options for ``hadoop`` runner"""
-    opt_group.add_option(
-        '--hadoop-bin', dest='hadoop_bin', default=None,
-        help='path to hadoop binary')
-
-    opt_group.add_option(
-        '--hadoop-log-dir', dest='hadoop_log_dirs', default=[],
-        action='append', help='Directory to search for'
-        ' hadoop logs in. You can use --hadoop-log-dir multiple times.')
-
-    opt_group.add_option(
-        '--hadoop-home', dest='hadoop_home',
-        default=None,
-        help='Deprecated hint about where to find hadoop binary and'
-             ' streaming jar. In most cases mrjob will now find these on'
-             ' its own. If not, use the --hadoop-bin and'
-             ' --hadoop-streaming-jar switches.')
-
-    opt_group.add_option(
-        '--hadoop-tmp-dir', dest='hadoop_tmp_dir',
-        default=None,
-        help='Temp space on HDFS (default is tmp/mrjob)')
-
-    opt_group.add_option(
-        '--hdfs-scratch-dir', dest='hadoop_tmp_dir',
-        default=None,
-        help='Deprecated alias for --hadoop-tmp-dir')
-
-
 def _add_dataproc_emr_opts(opt_group):
     opt_group.add_option(
         '--bootstrap', dest='bootstrap', action='append',
@@ -210,20 +180,6 @@ def _add_dataproc_emr_connect_opts(opt_group):
         help='GCE/AWS region to run Dataproc/EMR jobs in.')
 
 
-def _add_dataproc_opts(opt_group):
-    """Options for ``dataproc`` runner"""
-    opt_group.add_option(
-        '--gcp-project', dest='gcp_project', default=None,
-        help='Project to run Dataproc jobs in.')
-
-
-def _add_emr_opts(opt_group):
-    """Options for ``emr`` runner"""
-    _add_emr_connect_opts(opt_group)
-    _add_emr_launch_opts(opt_group)
-    _add_emr_run_opts(opt_group)
-
-
 def _add_emr_connect_opts(opt_group):
     """Options for connecting to the EMR API."""
     opt_group.add_option(
@@ -242,83 +198,6 @@ def _add_emr_connect_opts(opt_group):
               " s3-us-west-1.amazonaws.com). You usually shouldn't"
               " set this; by default mrjob will choose the correct"
               " endpoint for each S3 bucket based on its location."))
-
-
-def _add_emr_run_opts(opt_group):
-    """Options for running and monitoring a job on EMR."""
-    opt_group.add_option(
-        '--check-emr-status-every', dest='check_cluster_every',
-        default=None, type='int',
-        help='Deprecated alias for --check-cluster-every')
-
-    # --ec2-key-pair is used to launch the job, not to monitor it
-    opt_group.add_option(
-        '--ec2-key-pair-file', dest='ec2_key_pair_file', default=None,
-        help='Path to file containing SSH key for EMR')
-
-    opt_group.add_option(
-        '--emr-action-on-failure', dest='emr_action_on_failure',
-        default=None,
-        help=('Action to take when a step fails'
-              ' (e.g. TERMINATE_CLUSTER | CANCEL_AND_WAIT | CONTINUE)'))
-
-    opt_group.add_option(
-        '--emr-job-flow-id', dest='cluster_id', default=None,
-        help='Deprecated alias for --cluster-id')
-
-    opt_group.add_option(
-        '--hadoop-streaming-jar-on-emr',
-        dest='hadoop_streaming_jar_on_emr', default=None,
-        help=("Deprecated: prepend 'file://' and pass that to"
-              ' --hadoop-streaming-jar instead')
-    )
-
-    opt_group.add_option(
-        '--no-ssh-tunnel', dest='ssh_tunnel',
-        default=None, action='store_false',
-        help=("Don't open an SSH tunnel to the Hadoop job"
-              " tracker/resource manager"))
-
-    opt_group.add_option(
-        '--pool-wait-minutes', dest='pool_wait_minutes', default=None,
-        type='int',
-        help=('Wait for a number of minutes for a cluster to finish'
-              ' if a job finishes, run job on its cluster. Otherwise'
-              " create a new one. (0, the default, means don't wait)"))
-
-    opt_group.add_option(
-        '--ssh-bin', dest='ssh_bin', default=None,
-        help=("Name/path of ssh binary. Arguments are allowed (e.g."
-              " --ssh-bin 'ssh -v')"))
-
-    opt_group.add_option(
-        '--ssh-bind-ports', dest='ssh_bind_ports', default=None,
-        help=('A list of port ranges that are safe to listen on, delimited'
-              ' by colons and commas, with syntax like'
-              ' 2000[:2001][,2003,2005:2008,etc].'
-              ' Defaults to 40001:40840.'))
-
-    opt_group.add_option(
-        '--ssh-tunnel', dest='ssh_tunnel',
-        default=None, action='store_true',
-        help=('Open an SSH tunnel to the Hadoop job tracker/resource'
-              ' manager'))
-
-    opt_group.add_option(
-        '--ssh-tunnel-is-closed', dest='ssh_tunnel_is_open',
-        default=None, action='store_false',
-        help='Make ssh tunnel accessible from localhost only')
-
-    opt_group.add_option(
-        '--ssh-tunnel-is-open', dest='ssh_tunnel_is_open',
-        default=None, action='store_true',
-        help=('Make ssh tunnel accessible from remote hosts (not just'
-              ' localhost).'))
-
-    opt_group.add_option(
-        '--ssh-tunnel-to-job-tracker', dest='ssh_tunnel',
-        default=None, action='store_true',
-        help='Deprecated alias for --ssh-tunnel')
 
 
 def _add_emr_launch_opts(opt_group):

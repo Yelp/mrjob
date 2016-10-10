@@ -318,7 +318,7 @@ _RUNNER_OPTS = dict(
         runners=['dataproc', 'emr'],
         switches=[
             (['--cluster-id'], dict(
-                deprecated_aliases=['emr_job_flow_id'],
+                deprecated_aliases=['--emr-job-flow-id'],
                 help='ID of an existing cluster to run our job on',
             )),
         ],
@@ -397,6 +397,7 @@ _RUNNER_OPTS = dict(
         runners=['emr'],
         switches=[
             (['--emr-api-param'], dict(
+                action='append',
                 help=('Additional parameters to pass directly to the EMR'
                       ' API when creating a cluster. Should take the form'
                       ' KEY=VALUE. You can use --emr-api-param multiple'
@@ -924,12 +925,12 @@ _RUNNER_OPTS = dict(
     ssh_tunnel_is_open=dict(
         runners=['emr'],
         switches=[
-            (['---ssh-tunnel-is-open'], dict(
+            (['--ssh-tunnel-is-open'], dict(
                 action='store_true',
                 help=('Make ssh tunnel accessible from remote hosts (not just'
                       ' localhost)'),
             )),
-            (['---ssh-tunnel-is-closed'], dict(
+            (['--ssh-tunnel-is-closed'], dict(
                 action='store_false',
                 help=('Make ssh tunnel accessible from localhost only (the'
                       ' default)'),
@@ -1014,8 +1015,7 @@ _RUNNER_OPTS = dict(
         runners=['dataproc', 'emr'],
         switches=[
             (['--task-instance-type'], dict(
-                deprecated_aliases=[
-                    '--ec2-task-instance-type', '--ec2-slave-instance-type'],
+                deprecated_aliases=['--ec2-task-instance-type'],
                 help='Type of GCE/EC2 task instance(s) to launch',
             )),
         ],

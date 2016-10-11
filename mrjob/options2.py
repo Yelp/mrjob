@@ -1214,7 +1214,7 @@ def _add_runner_options_for_opt(parser, opt_name, include_deprecated=True):
         if deprecated_aliases and include_deprecated:
             help = 'Deprecated alias%s for %s' % (
                 ('es' if len(deprecated_aliases) > 1 else ''),
-                switches[-1])
+                args[-1])
             parser.add_option(
                 *deprecated_aliases,
                 **combine_dicts(kwargs, dict(help=help)))

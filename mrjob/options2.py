@@ -433,7 +433,6 @@ _RUNNER_OPTS = dict(
             (['--emr-api-param'], dict(
                 action='callback',
                 callback=_key_value_callback,
-                default={},
                 help=('Additional parameter to pass directly to the EMR'
                       ' API when creating a cluster. Should take the form'
                       ' KEY=VALUE. You can use --emr-api-param multiple'

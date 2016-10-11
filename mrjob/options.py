@@ -545,6 +545,7 @@ def _alphabetize_options(opt_group):
     opt_group.option_list.sort(key=lambda opt: opt.dest or '')
 
 
+# TODO: phase this out
 def _fix_custom_options(options, option_parser):
     """Update *options* to handle KEY=VALUE options, etc."""
     if hasattr(options, 'cmdenv'):

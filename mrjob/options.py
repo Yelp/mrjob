@@ -28,7 +28,6 @@ from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.parse import _parse_port_range_list
-from mrjob.py2 import string_types
 
 #: cleanup options:
 #:
@@ -121,12 +120,12 @@ def _cleanup_callback(option, opt_str, value, parser):
         if choice in CLEANUP_CHOICES:
             result.append(choice)
         else:
-            option_parser.error(
+            parser.error(
                 '%s got %s, which is not one of: %s' %
                 opt_str, choice, ', '.join(CLEANUP_CHOICES))
 
         if 'NONE' in result and len(set(result)) > 1:
-            option_parser.error(
+            parser.error(
                 '%s: Cannot clean up both nothing and something!' % (
                     opt_str))
 
@@ -140,7 +139,7 @@ def _append_json_callback(option, opt_str, value, parser):
     try:
         j = json.loads(value)
     except ValueError as e:
-        option.parser.error('Malformed JSON passed to %s: %s' % (
+        parser.error('Malformed JSON passed to %s: %s' % (
             opt_str, str(e)))
 
     getattr(parser.values, option.dest).append(j)
@@ -149,10 +148,10 @@ def _append_json_callback(option, opt_str, value, parser):
 def _port_range_callback(option, opt_str, value, parser):
     """callback to parse --ssh-bind-ports"""
     try:
-        ports = parse_port_range_list(value)
+        ports = _parse_port_range_list(value)
     except ValueError as e:
-        option_parser.error('%s: invalid port range list %r: \n%s' %
-                            (opt_str, value, e.args[0]))
+        parser.error('%s: invalid port range list %r: \n%s' %
+                     (opt_str, value, e.args[0]))
 
     setattr(parser.values, option.dest, ports)
 

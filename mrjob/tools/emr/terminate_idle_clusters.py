@@ -76,9 +76,9 @@ from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
-from mrjob.options import _add_dataproc_emr_connect_opts
-from mrjob.options import _add_emr_connect_opts
+from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
+from mrjob.options import _pick_runner_opts
 from mrjob.parse import iso8601_to_datetime
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
@@ -416,10 +416,11 @@ def _make_option_parser():
         help="Don't actually kill idle jobs; just log that we would")
 
     _add_basic_opts(option_parser)
-    _add_dataproc_emr_connect_opts(option_parser)
-    _add_emr_connect_opts(option_parser)
-    _alphabetize_options(option_parser)
+    _add_runner_options(
+        option_parser,
+        _pick_runner_opts('emr', 'connect'))
 
+    _alphabetize_options(option_parser)
     return option_parser
 
 

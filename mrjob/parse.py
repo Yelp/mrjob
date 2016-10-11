@@ -126,8 +126,9 @@ def parse_port_range_list(range_list_str):
                 ' in v0.6.0')
     return _parse_port_range_list(range_list_str)
 
+
 # planning to move this into mrjob.options
-def _parse_port_range_list(range_list_str)
+def _parse_port_range_list(range_list_str):
     all_ranges = []
     for range_str in range_list_str.split(','):
         if ':' in range_str:

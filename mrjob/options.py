@@ -1299,7 +1299,7 @@ def _add_runner_options_for_opt(parser, opt_name, include_deprecated=True):
 
 ### non-runner switches ###
 
-def _add_basic_opts(opt_group):
+def _add_basic_options(opt_group):
     """Options for all command line tools"""
 
     opt_group.add_option(
@@ -1322,7 +1322,7 @@ def _add_basic_opts(opt_group):
         action='store_true', help='print more messages to stderr')
 
 
-def _add_job_opts(opt_group):
+def _add_job_options(opt_group):
     opt_group.add_option(
         '--no-output', dest='no_output',
         default=None, action='store_true',

@@ -25,8 +25,8 @@ from optparse import OptionGroup
 from optparse import OptionParser
 
 from mrjob.conf import combine_dicts
-from mrjob.options import _add_basic_opts
-from mrjob.options import _add_job_opts
+from mrjob.options import _add_basic_options
+from mrjob.options import _add_job_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _allowed_keys
 from mrjob.options import _alphabetize_options
@@ -291,8 +291,8 @@ class MRJobLauncher(object):
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        _add_basic_opts(self.runner_opt_group)
-        _add_job_opts(self.runner_opt_group)
+        _add_basic_options(self.runner_opt_group)
+        _add_job_options(self.runner_opt_group)
         _add_runner_options(
             self.runner_opt_group,
             _pick_runner_opts('base') - set(['strict_protocols']))

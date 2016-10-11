@@ -53,7 +53,7 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_opts
+from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.parse import parse_s3_uri
@@ -143,7 +143,7 @@ def _make_option_parser():
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
-    _add_basic_opts(option_parser)
+    _add_basic_options(option_parser)
     _add_runner_options(
         option_parser,
         set(['region', 's3_endpoint']),

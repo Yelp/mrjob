@@ -60,7 +60,7 @@ from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_opts
+from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
@@ -114,7 +114,7 @@ def _make_option_parser():
         help=('Max number of days ago to look at jobs. By default, we go back'
               ' as far as EMR supports (currently about 2 months)'))
 
-    _add_basic_opts(option_parser)
+    _add_basic_options(option_parser)
     _add_runner_options(
         option_parser,
         _pick_runner_opts('emr', 'connect'))

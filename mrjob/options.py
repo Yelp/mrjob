@@ -22,7 +22,6 @@ from optparse import SUPPRESS_USAGE
 
 from mrjob.parse import parse_key_value_list
 from mrjob.parse import parse_port_range_list
-from mrjob.runner import CLEANUP_CHOICES
 
 from .options2 import CLEANUP_CHOICES
 from .options2 import _CLEANUP_DEPRECATED_ALIASES

@@ -144,6 +144,9 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
     :param error_func: Function to call when a malformed string is encountered.
     :type error_func: function(str)
     """
+    log.warning('parse_key_value_list() is deprecated and will be removed'
+                ' in v0.6.0')
+
     ret = {}
     for value in kv_string_list:
         try:

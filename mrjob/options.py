@@ -20,7 +20,6 @@ import json
 from optparse import OptionParser
 from optparse import SUPPRESS_USAGE
 
-from mrjob.parse import parse_key_value_list
 from mrjob.parse import parse_port_range_list
 
 from .options2 import CLEANUP_CHOICES

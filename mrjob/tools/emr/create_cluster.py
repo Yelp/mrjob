@@ -27,11 +27,6 @@ Usage::
 Options::
 
   -h, --help            show this help message and exit
-  -c CONF_PATHS, --conf-path=CONF_PATHS
-                        Path to alternate mrjob.conf file to read from
-  --no-conf             Don't load mrjob.conf even if it's available
-  -q, --quiet           Don't print anything to stderr
-  -v, --verbose         print more messages to stderr
   --additional-emr-info=ADDITIONAL_EMR_INFO
                         A JSON string for selecting additional features on EMR
   --bootstrap=BOOTSTRAP
@@ -99,6 +94,9 @@ Options::
                         multipart uploading entirely.
   --s3-upload-part-size=CLOUD_UPLOAD_PART_SIZE
                         Deprecated alias for --cloud-upload-part-size
+  -c CONF_PATHS, --conf-path=CONF_PATHS
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
   --core-instance-bid-price=CORE_INSTANCE_BID_PRICE
                         Bid price to specify for core nodes when setting them
                         up as EC2 spot instances (you probably only want to do
@@ -199,6 +197,7 @@ Options::
                         Specify a pool name to join. Default is "default"
   --emr-job-flow-pool-name=POOL_NAME
                         Deprecated alias for --pool-name
+  -q, --quiet           Don't print anything to stderr
   --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
   --aws-region=REGION   Deprecated alias for --region
   --release-label=RELEASE_LABEL
@@ -224,6 +223,7 @@ Options::
                         Type of GCE/EC2 task instance(s) to launch
   --ec2-task-instance-type=TASK_INSTANCE_TYPE
                         Deprecated alias for --task-instance-type
+  -v, --verbose         print more messages to stderr
   --visible-to-all-users
                         Make your cluster is visible to all IAM users on the
                         same AWS account (the default)
@@ -242,6 +242,7 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
+from mrjob.options import _alphabetize_options
 from mrjob.options import _fix_custom_options
 from mrjob.options2 import _add_runner_options
 from mrjob.options2 import _pick_runner_opts
@@ -295,6 +296,7 @@ def _make_option_parser():
         (_pick_runner_opts('emr', 'connect') |
          _pick_runner_opts('emr', 'launch')))
 
+    _alphabetize_options(option_parser)
     return option_parser
 
 

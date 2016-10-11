@@ -431,17 +431,13 @@ _RUNNER_OPTS = dict(
         runners=['emr'],
         switches=[
             (['--emr-api-param'], dict(
-                action='callback',
                 callback=_key_value_callback,
                 help=('Additional parameter to pass directly to the EMR'
                       ' API when creating a cluster. Should take the form'
                       ' KEY=VALUE. You can use --emr-api-param multiple'
                       ' times'),
-                nargs=1,
-                type='string',
             )),
             (['--no-emr-api-param'], dict(
-                action='callback',
                 callback=_key_none_value_callback,
                 help=('Parameter to be unset when calling EMR API.'
                       ' You can use --no-emr-api-param multiple times.'),

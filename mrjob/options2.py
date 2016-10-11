@@ -365,7 +365,7 @@ _RUNNER_OPTS = dict(
         ),
         switches=[
             (['--cmdenv'], dict(
-                action='append',  # TODO: custom callback
+                callback=_key_value_callback,
                 help=('Set an environment variable for your job inside Hadoop '
                       'streaming. Must take the form KEY=VALUE. You can use'
                       ' --cmdenv multiple times.'),
@@ -656,7 +656,7 @@ _RUNNER_OPTS = dict(
         combiner=combine_dicts,
         switches=[
             (['--jobconf'], dict(
-                action='append',
+                callback=_key_value_callback,
                 help=('-D arg to pass through to hadoop streaming; should'
                       ' take the form KEY=VALUE. You can use --jobconf'
                       ' multiple times.'),
@@ -1029,7 +1029,7 @@ _RUNNER_OPTS = dict(
         runners=['emr'],
         switches=[
             (['--tag'], dict(
-                action='append',
+                callback=_key_value_callback,
                 deprecated_aliases=['--emr-tag'],
                 help=('Metadata tags to apply to the EMR cluster; '
                       'should take the form KEY=VALUE. You can use --tag '

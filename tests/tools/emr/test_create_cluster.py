@@ -73,7 +73,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'release_label': None,
                 's3_endpoint': None,
                 'subnet': None,
-                'tags': {},
+                'tags': None,
                 'task_instance_bid_price': None,
                 'task_instance_type': None,
                 'visible_to_all_users': None,

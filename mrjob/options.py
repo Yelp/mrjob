@@ -69,7 +69,6 @@ def _add_basic_opts(opt_group):
         action='store_true', help='print more messages to stderr')
 
 
-
 def _add_job_opts(opt_group):
     opt_group.add_option(
         '--no-output', dest='no_output',
@@ -108,11 +107,6 @@ def _alphabetize_options(opt_group):
 # TODO: phase this out
 def _fix_custom_options(options, option_parser):
     """Update *options* to handle KEY=VALUE options, etc."""
-    if hasattr(options, 'cmdenv'):
-        cmdenv_err = '--cmdenv argument %r is not of the form KEY=VALUE'
-        options.cmdenv = parse_key_value_list(options.cmdenv,
-                                              cmdenv_err,
-                                              option_parser.error)
 
     def parse_commas(cleanup_str):
         cleanup_error = ('cleanup option %s is not one of ' +
@@ -148,18 +142,6 @@ def _fix_custom_options(options, option_parser):
                         str(e)))
 
         options.emr_configurations = decoded_configurations
-
-    if hasattr(options, 'tags'):
-        tag_err = '--tag argument %r is not of the form KEY=VALUE'
-        options.tags = parse_key_value_list(options.tags,
-                                            tag_err,
-                                            option_parser.error)
-
-    if hasattr(options, 'jobconf'):
-        jobconf_err = '--jobconf argument %r is not of the form KEY=VALUE'
-        options.jobconf = parse_key_value_list(options.jobconf,
-                                               jobconf_err,
-                                               option_parser.error)
 
     if getattr(options, 'ssh_bind_ports', None):
         try:

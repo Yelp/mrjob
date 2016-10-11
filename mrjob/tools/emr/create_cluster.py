@@ -244,7 +244,6 @@ from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
-from mrjob.options import _fix_custom_options
 from mrjob.options import _pick_runner_opts
 
 
@@ -263,9 +262,6 @@ def _runner_kwargs(cl_args=None):
     # parser command-line args
     option_parser = _make_option_parser()
     options, args = option_parser.parse_args(cl_args)
-
-    # fix emr_api_params and tags
-    _fix_custom_options(options, option_parser)
 
     if args:
         option_parser.error('takes no arguments')

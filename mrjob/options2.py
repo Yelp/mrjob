@@ -6,6 +6,7 @@ from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.py2 import string_types
+from mrjob.util import _parse_port_range_list
 
 # TODO: allow custom combiners per runner store (e.g. combine_local_envs)
 
@@ -110,6 +111,18 @@ def _append_json_callback(option, opt_str, value, parser):
             opt_str, str(e)))
 
     getattr(parser.values, option.dest).append(j)
+
+
+def _port_range_callback(option, opt_str, value, parser):
+    """callback to parse --ssh-bind-ports"""
+    try:
+        ports = parse_port_range_list(value)
+    except ValueError as e:
+        option_parser.error('%s: invalid port range list %r: \n%s' %
+                            (opt_str, value, e.args[0]))
+
+    setattr(parser.values, option.dest, ports)
+
 
 
 # map from runner option name to dict with the following keys (all optional):
@@ -972,6 +985,7 @@ _RUNNER_OPTS = dict(
         runners=['emr'],
         switches=[
             (['--ssh-bind-ports'], dict(
+                callback=_port_range_callback,
                 help=('A list of port ranges that are safe to listen on,'
                       ' delimited by colons and commas, with syntax like'
                       ' 2000[:2001][,2003,2005:2008,etc].'

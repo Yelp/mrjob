@@ -122,6 +122,12 @@ def urlparse(urlstring, scheme='', allow_fragments=True, *args, **kwargs):
 
 def parse_port_range_list(range_list_str):
     """Parse a port range list of the form (start[:end])(,(start[:end]))*"""
+    log.warning('parse_key_value_list() is deprecated and will be removed'
+                ' in v0.6.0')
+    return _parse_port_range_list(range_list_str)
+
+# planning to move this into mrjob.options
+def _parse_port_range_list(range_list_str)
     all_ranges = []
     for range_str in range_list_str.split(','):
         if ':' in range_str:

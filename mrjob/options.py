@@ -101,17 +101,3 @@ def _print_help_for_groups(*args):
 
 def _alphabetize_options(opt_group):
     opt_group.option_list.sort(key=lambda opt: opt.dest or '')
-
-
-# TODO: phase this out
-def _fix_custom_options(options, option_parser):
-    """Update *options* to handle KEY=VALUE options, etc."""
-
-    if getattr(options, 'ssh_bind_ports', None):
-        try:
-            ports = parse_port_range_list(options.ssh_bind_ports)
-        except ValueError as e:
-            option_parser.error('invalid port range list %r: \n%s' %
-                                (options.ssh_bind_ports, e.args[0]))
-
-        options.ssh_bind_ports = ports

@@ -30,7 +30,6 @@ from mrjob.options import _add_job_opts
 from mrjob.options import _add_runner_options
 from mrjob.options import _allowed_keys
 from mrjob.options import _alphabetize_options
-from mrjob.options import _fix_custom_options
 from mrjob.options import _pick_runner_opts
 from mrjob.options import _print_help_for_groups
 from mrjob.step import StepFailedException
@@ -530,8 +529,6 @@ class MRJobLauncher(object):
             sys.exit(0)
 
         self._process_args(args)
-
-        _fix_custom_options(self.options, self.option_parser)
 
     def inline_job_runner_kwargs(self):
         """Keyword arguments to create create runners when

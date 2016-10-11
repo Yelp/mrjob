@@ -51,23 +51,32 @@ _CLEANUP_DEPRECATED_ALIASES = {
 }
 
 
+def _default_to(parser, dest, value):
+    """Helper function; set the given optino dest to *value* if it's None.
+
+    This lets us create callbacks that don't require default to be set
+    to a container."""
+    if getattr(parser.values, dest) is None:
+        setattr(parser.values, dest, value)
+
+
 def _key_value_callback(option, opt_str, value, parser):
-    """callback for KEY=VALUE pairs. use with
-    ``default={}, nargs=1, type='string'``"""
+    """callback for KEY=VALUE pairs"""
     try:
         k, v = value.split('=', 1)
     except ValueError:
         parser.error('%s argument %r is not of the form KEY=VALUE' % (
             opt_str, value))
 
+    _default_to(parser, option.dest, {})
     getattr(parser.values, option.dest)[k] = v
 
 
 # callback for options which set values to None (--no-emr-api-param)
 # use with default={}
 def _key_none_value_callback(option, opt_str, value, parser):
-    """callback for KEY=VALUE pairs. use with
-    ``default={}, nargs=1, type='string'``"""
+    """callback to set KEY to None"""
+    _default_to(parser, option.dest, {})
     getattr(parser.values, option.dest)[value] = None
 
 
@@ -88,12 +97,13 @@ def _key_none_value_callback(option, opt_str, value, parser):
 #   have the format (['--switch-names', ...], dict(**kwargs)), where kwargs
 #   can be:
 #     action: action to pass to option parser (e.g. 'store_true')
-#     callback: option parser callback when action is 'callback'
-#     default: default value (only need this for callbacks)
+#     callback: option parser callback when action is 'callback'. implies
+#       action='callback'
 #     deprecated_aliases: list of old '--switch-names' slated for removal
 #     help: help string to pass to option parser
-#     nargs: number of args for callback to parse
-#     type: option type for option parser to enforce (e.g. 'float')
+#     nargs: number of args for callback to parse (defaults to 1 for callback)
+#     type: option type for option parser to enforce (e.g. 'float'). defaults
+#        to 'string' for callback
 #   You can't set the option parser's default; we use [] if *action* is
 #   'append' and None otherwise.
 _RUNNER_OPTS = dict(
@@ -434,11 +444,8 @@ _RUNNER_OPTS = dict(
             (['--no-emr-api-param'], dict(
                 action='callback',
                 callback=_key_none_value_callback,
-                default={},
                 help=('Parameter to be unset when calling EMR API.'
                       ' You can use --no-emr-api-param multiple times.'),
-                nargs=1,
-                type='string',
             )),
         ],
     ),
@@ -1191,19 +1198,15 @@ def _add_runner_options_for_opt(parser, opt_name, include_deprecated=True):
 
         kwargs['dest'] = opt_name
 
-        if kwargs.get('action') == 'callback':
-            for k in ('callback', 'default', 'nargs'):
-                if k not in kwargs:
-                    raise ValueError(
-                        "must specify '%s' with action='callback'" % k)
+        if kwargs.get('callback'):
+            kwargs.setdefault('action', 'callback')
+            kwargs.setdefault('nargs', 1)
+            kwargs.setdefault('type', 'string')
 
-            if not kwargs.get('type'):
-                kwargs['type'] = 'string'
+        if kwargs.get('action') == 'append':
+            kwargs['default'] = []
         else:
-            if kwargs.get('action') == 'append':
-                kwargs['default'] = []
-            else:
-                kwargs['default'] = None
+            kwargs['default'] = None
 
         parser.add_option(*args, **kwargs)
 

@@ -108,19 +108,6 @@ def _alphabetize_options(opt_group):
 def _fix_custom_options(options, option_parser):
     """Update *options* to handle KEY=VALUE options, etc."""
 
-    if hasattr(options, 'emr_configurations'):
-        decoded_configurations = []
-
-        for c in options.emr_configurations:
-            try:
-                decoded_configurations.append(json.loads(c))
-            except ValueError as e:
-                option_parser.error(
-                    'Malformed JSON passed to --emr-configuration: %s' % (
-                        str(e)))
-
-        options.emr_configurations = decoded_configurations
-
     if getattr(options, 'ssh_bind_ports', None):
         try:
             ports = parse_port_range_list(options.ssh_bind_ports)

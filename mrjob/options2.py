@@ -62,6 +62,7 @@ def _default_to(parser, dest, value):
 
 def _key_value_callback(option, opt_str, value, parser):
     """callback for KEY=VALUE pairs"""
+    # used for --cmdenv, --emr-api-param, and more
     try:
         k, v = value.split('=', 1)
     except ValueError:
@@ -72,8 +73,6 @@ def _key_value_callback(option, opt_str, value, parser):
     getattr(parser.values, option.dest)[k] = v
 
 
-# callback for options which set values to None (--no-emr-api-param)
-# use with default={}
 def _key_none_value_callback(option, opt_str, value, parser):
     """callback to set KEY to None"""
     _default_to(parser, option.dest, {})
@@ -98,6 +97,19 @@ def _cleanup_callback(option, opt_str, value, parser):
                     opt_str))
 
     setattr(parser.values, option.dest, result)
+
+
+def _append_json_callback(option, opt_str, value, parser):
+    """callback to parse JSON and append it to a list."""
+    _default_to(parser, option.dest, [])
+
+    try:
+        j = json.loads(value)
+    except ValueError as e:
+        option.parser.error('Malformed JSON passed to %s: %s' % (
+            opt_str, str(e)))
+
+    getattr(parser.values, option.dest).append(j)
 
 
 # map from runner option name to dict with the following keys (all optional):
@@ -484,7 +496,7 @@ _RUNNER_OPTS = dict(
         runners=['emr'],
         switches=[
             (['--emr-configuration'], dict(
-                action='append',
+                callback=_append_json_callback,
                 help=('Configuration to use on 4.x AMIs as a JSON-encoded'
                       ' dict; see'
                       ' http://docs.aws.amazon.com/ElasticMapReduce/latest/'

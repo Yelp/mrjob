@@ -1,3 +1,10 @@
+v0.5.7, 2016-10-?? -- ???
+ * deprecated mrjob.parse.parse_*_list() functions
+ * deprecated mrjob.parse.scrape_options_into_new_groups()
+ * EMR and Hadoop runners:
+   * can use environment variables and ~ in hadoop_streaming_jar option
+
+
 v0.5.6, 2016-09-12 -- dataproc crash fix
  * Dataproc runner:
    * fix Hadoop version crash on unknown image version (#1428)

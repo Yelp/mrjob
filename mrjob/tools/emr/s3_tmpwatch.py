@@ -34,8 +34,8 @@ Options::
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
   -q, --quiet           Don't print anything to stderr
-  --aws-region=REGION   Deprecated alias for --region
   --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --aws-region=REGION   Deprecated alias for --region
   --s3-endpoint=S3_ENDPOINT
                         Force mrjob to connect to S3 on this endpoint (e.g. s3
                         -us-west-1.amazonaws.com). You usually shouldn't set
@@ -53,10 +53,10 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_opts
+from mrjob.options import _add_basic_options
+from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.parse import parse_s3_uri
-from mrjob.util import scrape_options_into_new_groups
 
 
 log = logging.getLogger(__name__)
@@ -142,10 +142,11 @@ def _make_option_parser():
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
-    _add_basic_opts(option_parser)
-    scrape_options_into_new_groups(MRJob().all_option_groups(), {
-        option_parser: ('region', 's3_endpoint'),
-    })
+    _add_basic_options(option_parser)
+    _add_runner_options(
+        option_parser,
+        set(['region', 's3_endpoint']),
+    )
 
     _alphabetize_options(option_parser)
 

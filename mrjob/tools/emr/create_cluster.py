@@ -33,8 +33,8 @@ Options::
                         A shell command to set up libraries etc. before any
                         steps (e.g. "sudo apt-get -qy install python3"). You
                         may interpolate files available via URL or locally
-                        with Hadoop Distributed Cache syntax ("sudo dpkg -i
-                        foo.deb#")
+                        with Hadoop Distributed Cache syntax ("sudo yum
+                        install -y foo.rpm#")
   --bootstrap-action=BOOTSTRAP_ACTIONS
                         Raw bootstrap action scripts to run before any of the
                         other bootstrap steps. You can use --bootstrap-action
@@ -48,10 +48,8 @@ Options::
                         be run directly.
   --bootstrap-file=BOOTSTRAP_FILES
                         File to upload to the master node before running
-                        bootstrap_cmds (for example, debian packages). These
-                        will be made public on S3 due to a limitation of the
-                        bootstrap feature. You can use --bootstrap-file more
-                        than once.
+                        bootstrap_cmds (for example, debian packages). You can
+                        use --bootstrap-file more than once.
   --bootstrap-mrjob     Automatically tar up the mrjob library and install it
                         when we run the mrjob. This is the default. Use --no-
                         bootstrap-mrjob if you've already installed mrjob on
@@ -59,12 +57,12 @@ Options::
   --no-bootstrap-mrjob  Don't automatically tar up the mrjob library and
                         install it when we run this job. Use this if you've
                         already installed mrjob on your Hadoop cluster.
-  --no-bootstrap-python
-                        Don't automatically try to install a compatible
-                        version of Python at bootstrap time.
   --bootstrap-python    Attempt to install a compatible version of Python at
                         bootstrap time. Currently this only does anything for
                         Python 3, for which it is enabled by default.
+  --no-bootstrap-python
+                        Don't automatically try to install a compatible
+                        version of Python at bootstrap time.
   --bootstrap-python-package=BOOTSTRAP_PYTHON_PACKAGES
                         Path to a Python module to install on EMR. These
                         should be standard python module tarballs where you
@@ -76,54 +74,48 @@ Options::
                         combination of bootstrap_cmds and bootstrap_files).
                         These are run after the command from bootstrap_cmds.
                         You can use --bootstrap-script more than once.
-  --check-cluster-every=CHECK_CLUSTER_EVERY
-                        How often (in seconds) to check status of your
-                        job/cluster
-  --s3-sync-wait-time=CLOUD_FS_SYNC_SECS
-                        Deprecated alias for --cloud-fs-sync-secs
   --cloud-fs-sync-secs=CLOUD_FS_SYNC_SECS
                         How long to wait for remote FS to reach eventual
                         consistency. This is typically less than a second but
                         the default is 5.0 to be safe.
+  --s3-sync-wait-time=CLOUD_FS_SYNC_SECS
+                        Deprecated alias for --cloud-fs-sync-secs
   --cloud-log-dir=CLOUD_LOG_DIR
                         URI on remote FS to write logs into
   --s3-log-uri=CLOUD_LOG_DIR
                         Deprecated alias for --cloud-log-dir
-  --s3-scratch-uri=CLOUD_TMP_DIR
-                        Deprecated alias for --cloud-tmp-dir
-  --s3-tmp-dir=CLOUD_TMP_DIR
-                        Deprecated alias for --cloud-tmp-dir
   --cloud-tmp-dir=CLOUD_TMP_DIR
                         URI on remote FS to use as our temp directory.
+  --s3-scratch-uri=CLOUD_TMP_DIR, --s3-tmp-dir=CLOUD_TMP_DIR
+                        Deprecated aliases for --cloud-tmp-dir
   --cloud-upload-part-size=CLOUD_UPLOAD_PART_SIZE
                         Upload files to S3 in parts no bigger than this many
                         megabytes. Default is 100 MiB. Set to 0 to disable
                         multipart uploading entirely.
   --s3-upload-part-size=CLOUD_UPLOAD_PART_SIZE
                         Deprecated alias for --cloud-upload-part-size
-  --cluster-id=CLUSTER_ID
-                        ID of an existing cluster to run our job on
   -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
   --core-instance-bid-price=CORE_INSTANCE_BID_PRICE
                         Bid price to specify for core nodes when setting them
-                        up as EC2 spot instances (you probably only want to
-                        set a bid price for task instances).
+                        up as EC2 spot instances (you probably only want to do
+                        this for task instances).
   --ec2-core-instance-bid-price=CORE_INSTANCE_BID_PRICE
                         Deprecated alias for --core-instance-bid-price
-  --ec2-core-instance-type=CORE_INSTANCE_TYPE
-                        Deprecated alias for --core-instance-type
-  --ec2-slave-instance-type=CORE_INSTANCE_TYPE
-                        Deprecated alias for --core-instance-type
   --core-instance-type=CORE_INSTANCE_TYPE
                         Type of GCE/EC2 core instance(s) to launch
+  --ec2-core-instance-type=CORE_INSTANCE_TYPE, --ec2-slave-instance-type=CORE_INSTANCE_TYPE
+                        Deprecated aliases for --core-instance-type
   --ec2-key-pair=EC2_KEY_PAIR
                         Name of the SSH key pair you set up for EMR
   --emr-api-param=EMR_API_PARAMS
-                        Additional parameters to pass directly to the EMR API
+                        Additional parameter to pass directly to the EMR API
                         when creating a cluster. Should take the form
-                        KEY=VALUE. You can use --emr-api-param multiple times.
+                        KEY=VALUE. You can use --emr-api-param multiple times
+  --no-emr-api-param=EMR_API_PARAMS
+                        Parameter to be unset when calling EMR API. You can
+                        use --no-emr-api-param multiple times.
   --emr-application=EMR_APPLICATIONS
                         Additional applications to run on 4.x AMIs (e.g.
                         Ganglia, Mahout, Spark)
@@ -131,87 +123,83 @@ Options::
                         Configuration to use on 4.x AMIs as a JSON-encoded
                         dict; see http://docs.aws.amazon.com/ElasticMapReduce/
                         latest/ReleaseGuide/emr-configure-apps.html for
-                        examples.
+                        examples
   --emr-endpoint=EMR_ENDPOINT
                         Force mrjob to connect to EMR on this endpoint (e.g.
                         us-west-1.elasticmapreduce.amazonaws.com). Default is
                         to infer this from region.
-  --disable-emr-debugging
-                        Disable storage of Hadoop logs in SimpleDB
   --enable-emr-debugging
                         Enable storage of Hadoop logs in SimpleDB
+  --disable-emr-debugging
+                        Disable storage of Hadoop logs in SimpleDB (the
+                        default)
   --iam-endpoint=IAM_ENDPOINT
                         Force mrjob to connect to IAM on this endpoint (e.g.
                         iam.us-gov.amazonaws.com)
   --iam-instance-profile=IAM_INSTANCE_PROFILE
-                        EC2 instance profile to use for the EMR cluster - see
+                        EC2 instance profile to use for the EMR cluster -- see
                         "Configure IAM Roles for Amazon EMR" in AWS docs
   --iam-service-role=IAM_SERVICE_ROLE
                         IAM service role to use for the EMR cluster -- see
                         "Configure IAM Roles for Amazon EMR" in AWS docs
-  --ami-version=IMAGE_VERSION
-                        Deprecated alias for --image-version
   --image-version=IMAGE_VERSION
                         EMR/Dataproc machine image to launch clusters with
-  --ec2-instance-type=INSTANCE_TYPE
-                        Deprecated alias for --instance-type
+  --ami-version=IMAGE_VERSION
+                        Deprecated alias for --image-version
   --instance-type=INSTANCE_TYPE
                         Type of GCE/EC2 instance(s) to launch   GCE - e.g.
-                        n1-standard-1, n1-highcpu-4, n1-highmem-4 - See
+                        n1-standard-1, n1-highcpu-4, n1-highmem-4 -- See
                         https://cloud.google.com/compute/docs/machine-types
-                        EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge - See
+                        EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge  -- See
                         http://aws.amazon.com/ec2/instance-types/
-  --label=LABEL         alternate label for the job, to help us identify it
+  --ec2-instance-type=INSTANCE_TYPE
+                        Deprecated alias for --instance-type
+  --label=LABEL         Alternate label for the job, to help us identify it.
   --master-instance-bid-price=MASTER_INSTANCE_BID_PRICE
                         Bid price to specify for the master node when setting
                         it up as an EC2 spot instance (you probably only want
-                        to set a bid price for task instances).
+                        to do this for task instances).
   --ec2-master-instance-bid-price=MASTER_INSTANCE_BID_PRICE
                         Deprecated alias for --master-instance-bid-price
+  --master-instance-type=MASTER_INSTANCE_TYPE
+                        Type of GCE/EC2 master instance to launch
   --ec2-master-instance-type=MASTER_INSTANCE_TYPE
                         Deprecated alias for --master-instance-type
-  --master-instance-type=MASTER_INSTANCE_TYPE
-                        Type of GCE/EC2 master instance(s) to launch
   --max-hours-idle=MAX_HOURS_IDLE
                         If we create a cluster, have it automatically
-                        terminate itself after it's been idle this many hours.
+                        terminate itself after it's been idle this many hours
   --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
                         If --max-hours-idle is set, control how close to the
                         end of an hour the cluster can automatically terminate
-                        itself (default is 5 minutes).
-  --no-emr-api-param=NO_EMR_API_PARAMS
-                        Parameters to be unset when calling EMR API. You can
-                        use --no-emr-api-param multiple times.
+                        itself (default is 5 minutes)
+  --num-core-instances=NUM_CORE_INSTANCES
+                        Total number of core instances to launch
   --num-ec2-core-instances=NUM_CORE_INSTANCES
                         Deprecated alias for --num-core-instances
-  --num-core-instances=NUM_CORE_INSTANCES
-                        Total number of Worker instances to launch
   --num-ec2-instances=NUM_EC2_INSTANCES
                         Deprecated: subtract one and pass that to --num-core-
                         instances instead
+  --num-task-instances=NUM_TASK_INSTANCES
+                        Total number of task instances to launch
   --num-ec2-task-instances=NUM_TASK_INSTANCES
                         Deprecated alias for --num-task-instances
-  --num-task-instances=NUM_TASK_INSTANCES
-                        Total number of preemptible Worker instances to launch
-  --owner=OWNER         user who ran the job (if different from the current
-                        user)
-  --no-pool-clusters    Don't run our job on a pooled cluster (the default).
-  --no-pool-emr-job-flows
-                        Deprecated alias for --no-pool-clusters
+  --owner=OWNER         User who ran the job (default is the current user)
   --pool-clusters       Add to an existing cluster or create a new one that
-                        does not terminate when the job completes. Overrides
-                        other  cluster-related options including EC2 instance
-                        configuration. Joins pool "default" if --pool-name is
-                        not specified. WARNING: do not run this without mrjob
+                        does not terminate when the job completes. WARNING: do
+                        not run this without --max-hours-idle or  with mrjob
                         terminate-idle-clusters in your crontab; clusters left
                         idle can quickly become expensive!
   --pool-emr-job-flows  Deprecated alias for --pool-clusters
+  --no-pool-clusters    Don't run job on a pooled cluster (the default)
+  --no-pool-emr-job-flows
+                        Deprecated alias for --no-pool-clusters
   --pool-name=POOL_NAME
-                        Specify a pool name to join. Set to "default" if not
-                        specified.
+                        Specify a pool name to join. Default is "default"
+  --emr-job-flow-pool-name=POOL_NAME
+                        Deprecated alias for --pool-name
   -q, --quiet           Don't print anything to stderr
-  --aws-region=REGION   Deprecated alias for --region
   --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --aws-region=REGION   Deprecated alias for --region
   --release-label=RELEASE_LABEL
                         Release Label (e.g. "emr-4.0.0"). Overrides --image-
                         version
@@ -220,32 +208,32 @@ Options::
                         -us-west-1.amazonaws.com). You usually shouldn't set
                         this; by default mrjob will choose the correct
                         endpoint for each S3 bucket based on its location.
-  --subnet=SUBNET       ID of Amazon VPC subnet to launch cluster in (if not
+  --subnet=SUBNET       ID of Amazon VPC subnet to launch cluster in. If not
                         set or empty string, cluster is launched in the normal
-                        AWS cloud)
-  --emr-tag=TAGS        Deprecated alias for --tag
+                        AWS cloud
   --tag=TAGS            Metadata tags to apply to the EMR cluster; should take
-                        the form KEY=VALUE. You can use --tag multiple times.
+                        the form KEY=VALUE. You can use --tag multiple times
+  --emr-tag=TAGS        Deprecated alias for --tag
   --task-instance-bid-price=TASK_INSTANCE_BID_PRICE
                         Bid price to specify for task nodes when setting them
-                        up as EC2 spot instances.
+                        up as EC2 spot instances
   --ec2-task-instance-bid-price=TASK_INSTANCE_BID_PRICE
                         Deprecated alias for --task-instance-bid-price
-  --ec2-task-instance-type=TASK_INSTANCE_TYPE
-                        Deprecated alias for --task-instance-type
   --task-instance-type=TASK_INSTANCE_TYPE
                         Type of GCE/EC2 task instance(s) to launch
+  --ec2-task-instance-type=TASK_INSTANCE_TYPE
+                        Deprecated alias for --task-instance-type
   -v, --verbose         print more messages to stderr
   --visible-to-all-users
                         Make your cluster is visible to all IAM users on the
-                        same AWS account (the default).
+                        same AWS account (the default)
   --no-visible-to-all-users
                         Hide your cluster from other IAM users on the same AWS
-                        account.
-  --aws-availability-zone=ZONE
-                        Deprecated alias for --zone
+                        account
   --zone=ZONE           GCE zone/AWS availability zone to run Dataproc/EMR
                         jobs in.
+  --aws-availability-zone=ZONE
+                        Deprecated alias for --zone
 """
 from __future__ import print_function
 
@@ -253,13 +241,10 @@ from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_opts
-from mrjob.options import _add_dataproc_emr_opts
-from mrjob.options import _add_emr_connect_opts
-from mrjob.options import _add_emr_launch_opts
+from mrjob.options import _add_basic_options
+from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
-from mrjob.options import _fix_custom_options
-from mrjob.util import scrape_options_into_new_groups
+from mrjob.options import _pick_runner_opts
 
 
 def main(args=None):
@@ -278,9 +263,6 @@ def _runner_kwargs(cl_args=None):
     option_parser = _make_option_parser()
     options, args = option_parser.parse_args(cl_args)
 
-    # fix emr_api_params and tags
-    _fix_custom_options(options, option_parser)
-
     if args:
         option_parser.error('takes no arguments')
 
@@ -291,7 +273,6 @@ def _runner_kwargs(cl_args=None):
 
     del kwargs['quiet']
     del kwargs['verbose']
-    del kwargs['no_emr_api_params']
 
     return kwargs
 
@@ -305,19 +286,11 @@ def _make_option_parser():
         ' crontab; clusters left idle can quickly become expensive!')
     option_parser = OptionParser(usage=usage, description=description)
 
-    _add_basic_opts(option_parser)
-    # these aren't nicely broken down, just scrape specific options
-    scrape_options_into_new_groups(MRJob().all_option_groups(), {
-        option_parser: (
-            'bootstrap_mrjob',
-            'label',
-            'owner',
-        ),
-    })
-
-    _add_emr_connect_opts(option_parser)
-    _add_emr_launch_opts(option_parser)
-    _add_dataproc_emr_opts(option_parser)
+    _add_basic_options(option_parser)
+    _add_runner_options(
+        option_parser,
+        (_pick_runner_opts('emr', 'connect') |
+         _pick_runner_opts('emr', 'launch')))
 
     _alphabetize_options(option_parser)
     return option_parser

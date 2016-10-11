@@ -25,17 +25,12 @@ from optparse import OptionGroup
 from optparse import OptionParser
 
 from mrjob.conf import combine_dicts
-from mrjob.options import _add_basic_opts
-from mrjob.options import _add_dataproc_emr_opts
-from mrjob.options import _add_dataproc_opts
-from mrjob.options import _add_emr_opts
-from mrjob.options import _add_hadoop_emr_opts
-from mrjob.options import _add_hadoop_opts
-from mrjob.options import _add_local_opts
-from mrjob.options import _add_protocol_opts
-from mrjob.options import _add_runner_opts
+from mrjob.options import _add_basic_options
+from mrjob.options import _add_job_options
+from mrjob.options import _add_runner_options
+from mrjob.options import _allowed_keys
 from mrjob.options import _alphabetize_options
-from mrjob.options import _fix_custom_options
+from mrjob.options import _pick_runner_opts
 from mrjob.options import _print_help_for_groups
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
@@ -91,6 +86,10 @@ class MRJobLauncher(object):
         self.option_parser = OptionParser(usage=self._usage(),
                                           option_class=self.OPTION_CLASS,
                                           add_help_option=False)
+
+        # temporary, for testing
+        self._option_parser = OptionParser()
+
         self.configure_options()
 
         for opt_group in self.all_option_groups():
@@ -284,15 +283,19 @@ class MRJobLauncher(object):
             self.option_parser, 'Protocols')
         self.option_parser.add_option_group(self.proto_opt_group)
 
-        _add_protocol_opts(self.proto_opt_group)
+        _add_runner_options(
+            self.proto_opt_group, set(['strict_protocols']))
 
-        # options for running the entire job
+        # options for running the job (any runner)
         self.runner_opt_group = OptionGroup(
             self.option_parser, 'Running the entire job')
         self.option_parser.add_option_group(self.runner_opt_group)
 
-        _add_runner_opts(self.runner_opt_group)
-        _add_basic_opts(self.runner_opt_group)
+        _add_basic_options(self.runner_opt_group)
+        _add_job_options(self.runner_opt_group)
+        _add_runner_options(
+            self.runner_opt_group,
+            _pick_runner_opts('base') - set(['strict_protocols']))
 
         # options for inline/local runners
         self.local_opt_group = OptionGroup(
@@ -300,7 +303,9 @@ class MRJobLauncher(object):
             'Running locally (these apply when you set -r inline or -r local)')
         self.option_parser.add_option_group(self.local_opt_group)
 
-        _add_local_opts(self.local_opt_group)
+        _add_runner_options(
+            self.local_opt_group,
+            _pick_runner_opts('local') - _pick_runner_opts('base'))
 
         # options common to Hadoop and EMR
         self.hadoop_emr_opt_group = OptionGroup(
@@ -309,7 +314,10 @@ class MRJobLauncher(object):
             ' -r emr)')
         self.option_parser.add_option_group(self.hadoop_emr_opt_group)
 
-        _add_hadoop_emr_opts(self.hadoop_emr_opt_group)
+        _add_runner_options(
+            self.hadoop_emr_opt_group,
+            ((_pick_runner_opts('emr') & _pick_runner_opts('hadoop')) -
+             _pick_runner_opts('base')))
 
         # options for running the job on Hadoop
         self.hadoop_opt_group = OptionGroup(
@@ -317,7 +325,10 @@ class MRJobLauncher(object):
             'Running on Hadoop (these apply when you set -r hadoop)')
         self.option_parser.add_option_group(self.hadoop_opt_group)
 
-        _add_hadoop_opts(self.hadoop_opt_group)
+        _add_runner_options(
+            self.hadoop_opt_group,
+            (_pick_runner_opts('hadoop') -
+             _pick_runner_opts('emr') - _pick_runner_opts('base')))
 
         # options for running the job on Dataproc or EMR
         self.dataproc_emr_opt_group = OptionGroup(
@@ -326,7 +337,10 @@ class MRJobLauncher(object):
             ' or -r emr)')
         self.option_parser.add_option_group(self.dataproc_emr_opt_group)
 
-        _add_dataproc_emr_opts(self.dataproc_emr_opt_group)
+        _add_runner_options(
+            self.dataproc_emr_opt_group,
+            ((_pick_runner_opts('dataproc') & _pick_runner_opts('emr')) -
+             _pick_runner_opts('base')))
 
         # options for running the job on Dataproc
         self.dataproc_opt_group = OptionGroup(
@@ -334,7 +348,10 @@ class MRJobLauncher(object):
             'Running on Dataproc (these apply when you set -r dataproc)')
         self.option_parser.add_option_group(self.dataproc_opt_group)
 
-        _add_dataproc_opts(self.dataproc_opt_group)
+        _add_runner_options(
+            self.dataproc_opt_group,
+            (_pick_runner_opts('dataproc') -
+             _pick_runner_opts('emr') - _pick_runner_opts('base')))
 
         # options for running the job on EMR
         self.emr_opt_group = OptionGroup(
@@ -342,7 +359,10 @@ class MRJobLauncher(object):
             'Running on EMR (these apply when you set -r emr)')
         self.option_parser.add_option_group(self.emr_opt_group)
 
-        _add_emr_opts(self.emr_opt_group)
+        _add_runner_options(
+            self.emr_opt_group,
+            (_pick_runner_opts('emr') - _pick_runner_opts('hadoop') -
+             _pick_runner_opts('dataproc') - _pick_runner_opts('base')))
 
     def all_option_groups(self):
         return (self.option_parser, self.proto_opt_group,
@@ -510,7 +530,70 @@ class MRJobLauncher(object):
 
         self._process_args(args)
 
-        _fix_custom_options(self.options, self.option_parser)
+    def inline_job_runner_kwargs(self):
+        """Keyword arguments to create create runners when
+        :py:meth:`make_runner` is called, when we run a job locally
+        (``-r inline``).
+
+        :return: map from arg name to value
+
+        Re-define this if you want finer control when running jobs locally.
+        """
+        return self._job_runner_kwargs_for_runner('inline')
+
+    def local_job_runner_kwargs(self):
+        """Keyword arguments to create create runners when
+        :py:meth:`make_runner` is called, when we run a job locally
+        (``-r local``).
+
+        :return: map from arg name to value
+
+        Re-define this if you want finer control when running jobs locally.
+        """
+        return self._job_runner_kwargs_for_runner('local')
+
+    def emr_job_runner_kwargs(self):
+        """Keyword arguments to create create runners when
+        :py:meth:`make_runner` is called, when we run a job on EMR
+        (``-r emr``).
+
+        :return: map from arg name to value
+
+        Re-define this if you want finer control when running jobs on EMR.
+        """
+        return self._job_runner_kwargs_for_runner('emr')
+
+    def dataproc_job_runner_kwargs(self):
+        """Keyword arguments to create create runners when
+        :py:meth:`make_runner` is called, when we run a job on EMR
+        (``-r emr``).
+
+        :return: map from arg name to value
+
+        Re-define this if you want finer control when running jobs on EMR.
+        """
+        return self._job_runner_kwargs_for_runner('dataproc')
+
+    def hadoop_job_runner_kwargs(self):
+        """Keyword arguments to create create runners when
+        :py:meth:`make_runner` is called, when we run a job on EMR
+        (``-r hadoop``).
+
+        :return: map from arg name to value
+
+        Re-define this if you want finer control when running jobs on hadoop.
+        """
+        return self._job_runner_kwargs_for_runner('hadoop')
+
+    def _job_runner_kwargs_for_runner(self, runner_alias):
+        """Helper method that powers the *_job_runner_kwargs()
+        methods."""
+        # user can no longer silently ignore switches by overriding
+        # job_runner_kwargs()
+        return combine_dicts(
+            self._kwargs_from_switches(_allowed_keys(runner_alias)),
+            self.job_runner_kwargs(),
+        )
 
     def job_runner_kwargs(self):
         """Keyword arguments used to create runners when
@@ -523,107 +606,46 @@ class MRJobLauncher(object):
         You might find :py:meth:`mrjob.conf.combine_dicts` useful if you
         want to add or change lots of keyword arguments.
         """
-        return {
-            'bootstrap_mrjob': self.options.bootstrap_mrjob,
-            'check_input_paths': self.options.check_input_paths,
-            'cleanup': self.options.cleanup,
-            'cleanup_on_failure': self.options.cleanup_on_failure,
-            'cmdenv': self.options.cmdenv,
-            'conf_paths': self.options.conf_paths,
-            'extra_args': self.generate_passthrough_arguments(),
-            'file_upload_args': self.generate_file_upload_args(),
-            'hadoop_input_format': self.hadoop_input_format(),
-            'hadoop_output_format': self.hadoop_output_format(),
-            'input_paths': self.args,
-            'interpreter': self.options.interpreter,
-            'jobconf': self.jobconf(),
-            'libjars': self.libjars(),
-            'mr_job_script': self._script_path,
-            'label': self.options.label,
-            'output_dir': self.options.output_dir,
-            'owner': self.options.owner,
-            'partitioner': self.partitioner() or self.options.partitioner,
-            'python_archives': self.options.python_archives,
-            'python_bin': self.options.python_bin,
-            'setup': self.options.setup,
-            'setup_cmds': self.options.setup_cmds,
-            'setup_scripts': self.options.setup_scripts,
-            'stdin': self.stdin,
-            'steps_interpreter': self.options.steps_interpreter,
-            'steps_python_bin': self.options.steps_python_bin,
-            'strict_protocols': self.options.strict_protocols,
-            'upload_archives': self.options.upload_archives,
-            'upload_files': self.options.upload_files,
-        }
-
-    def inline_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job locally
-        (``-r inline``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs locally.
-        """
         return combine_dicts(
-            self.job_runner_kwargs(),
-            self._get_kwargs_from_opt_group(self.local_opt_group))
+            self._non_option_kwargs(),
+            self._kwargs_from_switches(_allowed_keys('base')),
+            self._job_kwargs(),
+        )
 
-    def local_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job locally
-        (``-r local``).
+    def _non_option_kwargs(self):
+        """Keyword arguments to runner constructor that can't be set
+        in mrjob.conf.
 
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs locally.
+        These should match the (named) arguments to
+        :py:meth:`~mrjob.runner.MRJobRunner.__init__`.
         """
-        return combine_dicts(
-            self.job_runner_kwargs(),
-            self._get_kwargs_from_opt_group(self.local_opt_group))
+        return dict(
+            conf_paths=self.options.conf_paths,
+            extra_args=self.generate_passthrough_arguments(),
+            file_upload_args=self.generate_file_upload_args(),
+            hadoop_input_format=self.hadoop_input_format(),
+            hadoop_output_format=self.hadoop_output_format(),
+            input_paths=self.args,
+            mr_job_script=self._script_path,
+            output_dir=self.options.output_dir,
+            partitioner=self.partitioner(),
+            stdin=self.stdin,
+        )
 
-    def emr_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job on EMR
-        (``-r emr``).
+    def _kwargs_from_switches(self, keys):
+        return dict(
+            (key, getattr(self.options, key))
+            for key in keys if hasattr(self.options, key)
+        )
 
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs on EMR.
-        """
-        return combine_dicts(
-            self.job_runner_kwargs(),
-            self._get_kwargs_from_opt_group(self.dataproc_emr_opt_group),
-            self._get_kwargs_from_opt_group(self.emr_opt_group),
-            self._get_kwargs_from_opt_group(self.hadoop_emr_opt_group))
-
-    def dataproc_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job on EMR
-        (``-r emr``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs on EMR.
-        """
-        return combine_dicts(
-            self.job_runner_kwargs(),
-            self._get_kwargs_from_opt_group(self.dataproc_emr_opt_group),
-            self._get_kwargs_from_opt_group(self.dataproc_opt_group))
-
-    def hadoop_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job on EMR
-        (``-r hadoop``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs on hadoop.
-        """
-        return combine_dicts(
-            self.job_runner_kwargs(),
-            self._get_kwargs_from_opt_group(self.hadoop_emr_opt_group),
-            self._get_kwargs_from_opt_group(self.hadoop_opt_group))
+    def _job_kwargs(self):
+        """Keyword arguments to the runner class that can be specified
+        by the job/launcher itself."""
+        return dict(
+            jobconf=self.jobconf(),
+            libjars=self.libjars(),
+            partitioner=self.partitioner(),
+        )
 
     ### Default values for Hadoop stuff ###
 
@@ -651,15 +673,6 @@ class MRJobLauncher(object):
         return None
 
     ### More option stuff ###
-
-    def _get_kwargs_from_opt_group(self, opt_group):
-        """Helper function that returns a dictionary of the values of options
-        in the given options group (this works because the options and the
-        keyword args we want to set have identical names).
-        """
-        keys = set(opt.dest for opt in opt_group.option_list)
-        return dict((key, getattr(self.options, key)) for key in keys
-                    if key not in _FAKE_OPTIONS)
 
     def generate_passthrough_arguments(self):
         """Returns a list of arguments to pass to subprocesses, either on
@@ -756,6 +769,27 @@ class MRJobLauncher(object):
         self.stderr = stderr or BytesIO()
 
         return self
+
+    ### deprecated option group methods ###
+
+    def _deprecated_option_group(self, opt_names, title):
+        if not getattr(self, '_warned_about_opt_groups', None):
+            log.warning('*_opt_group attributes are deprecated and going away'
+                        ' in v0.6.0')
+            self._warned_about_opt_groups = True
+
+        opt_group = OptionGroup(self._dummy_option_parser, title)
+
+        _add_runner_options(opt_group, opt_names)
+
+    ### temporary, for debugging ###
+
+    def _opt_group_names(self):
+        return set(name for name in dir(self) if name.endswith('_opt_group'))
+
+
+def _dests(opt_group):
+    return set(s.dest for s in opt_group.option_list)
 
 
 if __name__ == '__main__':

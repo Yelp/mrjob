@@ -578,6 +578,9 @@ def scrape_options_into_new_groups(source_groups, assignments):
     :param assignments: map empty parsers/groups to lists of destination names
                         that they should contain options for
     """
+    log.warning('scrape_options_into_new_groups() is deprecated'
+                ' and will be removed in v0.6.0')
+
     all_options = scrape_options_and_index_by_dest(*source_groups)
     return populate_option_groups_with_options(assignments, all_options)
 

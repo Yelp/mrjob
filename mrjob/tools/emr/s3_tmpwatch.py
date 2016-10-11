@@ -57,7 +57,6 @@ from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.parse import parse_s3_uri
-from mrjob.util import scrape_options_into_new_groups
 
 
 log = logging.getLogger(__name__)

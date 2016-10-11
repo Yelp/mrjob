@@ -1,5 +1,6 @@
 v0.5.7, 2016-10-?? -- ???
  * deprecated mrjob.parse.parse_*_list() functions
+ * deprecated mrjob.parse.scrape_options_into_new_groups()
  * EMR and Hadoop runners:
    * can use environment variables and ~ in hadoop_streaming_jar option
 

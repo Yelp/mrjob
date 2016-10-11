@@ -61,7 +61,6 @@ from mrjob.py2 import to_string
 from mrjob.ssh import _ssh_copy_key
 from mrjob.ssh import _ssh_run_with_recursion
 from mrjob.util import random_identifier
-from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import shlex_split
 
 

@@ -50,7 +50,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'ec2_key_pair': None,
                 'emr_api_params': None,
                 'emr_applications': [],
-                'emr_configurations': [],
+                'emr_configurations': None,
                 'emr_endpoint': None,
                 'enable_emr_debugging': None,
                 'iam_endpoint': None,

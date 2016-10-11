@@ -122,12 +122,11 @@ def _cleanup_callback(option, opt_str, value, parser):
         else:
             parser.error(
                 '%s got %s, which is not one of: %s' %
-                opt_str, choice, ', '.join(CLEANUP_CHOICES))
+                (opt_str, choice, ', '.join(CLEANUP_CHOICES)))
 
         if 'NONE' in result and len(set(result)) > 1:
             parser.error(
-                '%s: Cannot clean up both nothing and something!' % (
-                    opt_str))
+                '%s: Cannot clean up both nothing and something!' % opt_str)
 
     setattr(parser.values, option.dest, result)
 

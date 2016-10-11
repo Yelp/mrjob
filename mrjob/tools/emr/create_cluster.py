@@ -254,12 +254,9 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
-from mrjob.options import _add_dataproc_emr_opts
-from mrjob.options import _add_emr_connect_opts
-from mrjob.options import _add_emr_launch_opts
-from mrjob.options import _alphabetize_options
 from mrjob.options import _fix_custom_options
-from mrjob.util import scrape_options_into_new_groups
+from mrjob.options2 import _add_runner_options
+from mrjob.options2 import _pick_runner_opts
 
 
 def main(args=None):
@@ -291,7 +288,6 @@ def _runner_kwargs(cl_args=None):
 
     del kwargs['quiet']
     del kwargs['verbose']
-    del kwargs['no_emr_api_params']
 
     return kwargs
 
@@ -306,20 +302,11 @@ def _make_option_parser():
     option_parser = OptionParser(usage=usage, description=description)
 
     _add_basic_opts(option_parser)
-    # these aren't nicely broken down, just scrape specific options
-    scrape_options_into_new_groups(MRJob().all_option_groups(), {
-        option_parser: (
-            'bootstrap_mrjob',
-            'label',
-            'owner',
-        ),
-    })
+    _add_runner_options(
+        option_parser,
+        (_pick_runner_opts('emr', 'connect') |
+         _pick_runner_opts('emr', 'launch')))
 
-    _add_emr_connect_opts(option_parser)
-    _add_emr_launch_opts(option_parser)
-    _add_dataproc_emr_opts(option_parser)
-
-    _alphabetize_options(option_parser)
     return option_parser
 
 

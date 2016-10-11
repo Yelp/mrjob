@@ -668,6 +668,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     label=dict(
+        cloud_role='launch',
         switches=[
             (['--label'], dict(
                 help='Alternate label for the job, to help us identify it.',
@@ -775,6 +776,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     owner=dict(
+        cloud_role='launch',
         switches=[
             (['--owner'], dict(
                 help='User who ran the job (default is the current user)',
@@ -814,7 +816,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     pool_wait_minutes=dict(
-        cloud_role='launch',
         runners=['emr'],
         switches=[
             (['--pool-wait-minutes'], dict(

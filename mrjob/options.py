@@ -108,28 +108,6 @@ def _alphabetize_options(opt_group):
 def _fix_custom_options(options, option_parser):
     """Update *options* to handle KEY=VALUE options, etc."""
 
-    def parse_commas(cleanup_str):
-        cleanup_error = ('cleanup option %s is not one of ' +
-                         ', '.join(CLEANUP_CHOICES))
-        new_cleanup_options = []
-        for choice in cleanup_str.split(','):
-            if choice in CLEANUP_CHOICES:
-                new_cleanup_options.append(choice)
-            else:
-                option_parser.error(cleanup_error % choice)
-        if ('NONE' in new_cleanup_options and
-                len(set(new_cleanup_options)) > 1):
-            option_parser.error(
-                'Cannot clean up both nothing and something!')
-
-        return new_cleanup_options
-
-    if getattr(options, 'cleanup', None):
-        options.cleanup = parse_commas(options.cleanup)
-
-    if getattr(options, 'cleanup_on_failure', None):
-        options.cleanup_on_failure = parse_commas(options.cleanup_on_failure)
-
     if hasattr(options, 'emr_configurations'):
         decoded_configurations = []
 

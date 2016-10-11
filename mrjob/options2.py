@@ -80,6 +80,26 @@ def _key_none_value_callback(option, opt_str, value, parser):
     getattr(parser.values, option.dest)[value] = None
 
 
+def _cleanup_callback(option, opt_str, value, parser):
+    """callback to parse a comma-separated list of cleanup constants."""
+    result = []
+
+    for choice in value.split(','):
+        if choice in CLEANUP_CHOICES:
+            result.append(choice)
+        else:
+            option_parser.error(
+                '%s got %s, which is not one of: %s' %
+                opt_str, choice, ', '.join(CLEANUP_CHOICES))
+
+        if 'NONE' in result and len(set(result)) > 1:
+            option_parser.error(
+                '%s: Cannot clean up both nothing and something!' % (
+                    opt_str))
+
+    setattr(parser.values, option.dest, result)
+
+
 # map from runner option name to dict with the following keys (all optional):
 # cloud_role:
 #   'connect' if needed when interacting with cloud services at all
@@ -279,6 +299,7 @@ _RUNNER_OPTS = dict(
     cleanup=dict(
         switches=[
             (['--cleanup'], dict(
+                callback=_cleanup_callback,
                 help=('Comma-separated list of which directories to delete'
                       ' when a job succeeds, e.g. TMP,LOGS. Choices:'
                       ' %s (default: ALL)' % ', '.join(CLEANUP_CHOICES)),
@@ -288,6 +309,7 @@ _RUNNER_OPTS = dict(
     cleanup_on_failure=dict(
         switches=[
             (['--cleanup-on-failure'], dict(
+                callback=_cleanup_callback,
                 help=('Comma-separated list of which directories to delete'
                       ' when a job fails, e.g. TMP,LOGS. Choices:'
                       ' %s (default: NONE)' % ', '.join(CLEANUP_CHOICES)),

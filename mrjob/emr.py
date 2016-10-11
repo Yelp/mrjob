@@ -85,9 +85,9 @@ from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _ls_emr_step_stderr_logs
 from mrjob.logs.step import _ls_emr_step_syslogs
-from mrjob.options2 import _allowed_keys
-from mrjob.options2 import _combiners
-from mrjob.options2 import _deprecated_aliases
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime

@@ -40,9 +40,9 @@ from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.wrap import _logs_exist
-from mrjob.options2 import _allowed_keys
-from mrjob.options2 import _combiners
-from mrjob.options2 import _deprecated_aliases
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_uri
 from mrjob.py2 import to_string
 from mrjob.runner import MRJobRunner

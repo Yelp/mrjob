@@ -40,11 +40,11 @@ from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.options2 import _allowed_keys
-from mrjob.options2 import _combiners
-from mrjob.options2 import _deprecated_aliases
-from mrjob.options2 import CLEANUP_CHOICES
-from mrjob.options2 import _CLEANUP_DEPRECATED_ALIASES
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
+from mrjob.options import CLEANUP_CHOICES
+from mrjob.options import _CLEANUP_DEPRECATED_ALIASES
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager

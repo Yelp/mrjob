@@ -48,9 +48,9 @@ from mrjob.fs.gcs import GCSFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.gcs import is_gcs_uri
-from mrjob.options2 import _allowed_keys
-from mrjob.options2 import _combiners
-from mrjob.options2 import _deprecated_aliases
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.runner import MRJobRunner

@@ -54,9 +54,9 @@ import sys
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
+from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
-from mrjob.options2 import _pick_runner_opts
-from mrjob.options2 import _add_runner_options
+from mrjob.options import _pick_runner_opts
 from mrjob.py2 import to_string
 from mrjob.ssh import _ssh_copy_key
 from mrjob.ssh import _ssh_run_with_recursion

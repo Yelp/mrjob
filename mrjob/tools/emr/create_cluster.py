@@ -242,10 +242,10 @@ from optparse import OptionParser
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
+from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _fix_custom_options
-from mrjob.options2 import _add_runner_options
-from mrjob.options2 import _pick_runner_opts
+from mrjob.options import _pick_runner_opts
 
 
 def main(args=None):

@@ -24,6 +24,14 @@ from mrjob.parse import parse_key_value_list
 from mrjob.parse import parse_port_range_list
 from mrjob.runner import CLEANUP_CHOICES
 
+from .options2 import CLEANUP_CHOICES
+from .options2 import _CLEANUP_DEPRECATED_ALIASES
+from .options2 import _add_runner_options
+from .options2 import _allowed_keys
+from .options2 import _combiners
+from .options2 import _deprecated_aliases
+from .options2 import _pick_runner_opts
+
 
 def _append_to_conf_paths(option, opt_str, value, parser):
     """conf_paths is None by default, but --no-conf or --conf-path should make

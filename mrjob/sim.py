@@ -26,9 +26,9 @@ from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_local_envs
 from mrjob.logs.counters import _format_counters
-from mrjob.options2 import _allowed_keys
-from mrjob.options2 import _combiners
-from mrjob.options2 import _deprecated_aliases
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import read_input

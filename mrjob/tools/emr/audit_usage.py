@@ -61,9 +61,9 @@ from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_opts
-from mrjob.options2 import _pick_runner_opts
-from mrjob.options2 import _add_runner_options
+from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
+from mrjob.options import _pick_runner_opts
 from mrjob.parse import iso8601_to_datetime
 from mrjob.patched_boto import _patched_describe_cluster
 from mrjob.util import strip_microseconds

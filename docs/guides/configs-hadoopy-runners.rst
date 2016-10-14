@@ -54,9 +54,7 @@ Options available to hadoop and emr runners
     :set: all
     :default: ``[]``
 
-    Extra arguments to pass to hadoop streaming. This option is called
-    **extra_args** when passed as a keyword argument to
-    :py:class:`~mrjob.runner.MRJobRunner`.
+    Extra arguments to pass to hadoop streaming.
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar
@@ -217,6 +215,18 @@ Options available to hadoop runner only
     .. versionchanged:: 0.5.0
 
        This option used to be named ``hdfs_scratch_dir``.
+
+.. mrjob-opt::
+    :config: spark_args
+    :switch: --spark-arg
+    :type: :ref:`string list <data-type-string-list>`
+    :set: all
+    :default: ``[]``
+
+    Extra arguments to pass to :command:`spark-submit`.
+
+    .. TODO: update versionadded for spark release
+    .. versionadded:: 0.5.8
 
 .. mrjob-opt::
     :config: spark_submit_bin

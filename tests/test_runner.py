@@ -634,7 +634,20 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                 )
             )
 
-    def test_custom_spark_args(self):
+    def test_option_spark_args(self):
+        job = MRNullSpark(['--spark-arg', '--name', '--spark-arg', 'Dave'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_args_for_step(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')) +
+                    ['--name', 'Dave']
+                )
+            )
+
+    def test_job_spark_args(self):
+        # --extra-spark-arg is a passthrough option for MRNullSpark
         job = MRNullSpark(['--extra-spark-arg', '-v'])
 
         with job.make_runner() as runner:
@@ -646,6 +659,19 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                 )
             )
 
+    def test_job_spark_args_come_after_option_spark_args(self):
+        job = MRNullSpark(
+            ['--extra-spark-arg', '-v',
+             '--spark-arg', '--name', '--spark-arg', 'Dave'])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_args_for_step(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')) +
+                    ['--name', 'Dave', '-v']
+                )
+            )
 
 
 

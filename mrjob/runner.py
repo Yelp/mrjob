@@ -698,6 +698,12 @@ class MRJobRunner(object):
         return any(step['type'].split('_')[0] == 'spark'
                    for step in self._get_steps())
 
+    def _has_non_spark_steps(self):
+        """Are any of our steps non-Spark steps?"""
+        # if so, we don't need to upload py_files
+        return any(step['type'].split('_')[0] != 'spark'
+                   for step in self._get_steps())
+
     def _interpreter(self, steps=False):
         if steps:
             return (self._opts['steps_interpreter'] or
@@ -1205,6 +1211,9 @@ class MRJobRunner(object):
         for key, value in sorted(jobconf.items()):
             if value is not None:
                 args.extend(['--conf', '%s=%s' % (key, value)])
+
+        # spark_args option
+        args.extend(self._opts['spark_args'])
 
         # step spark_args
         args.extend(step['spark_args'])

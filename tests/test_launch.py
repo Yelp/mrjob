@@ -18,14 +18,19 @@ import inspect
 import logging
 import os
 import sys
-
+from collections import defaultdict
 from optparse import OptionError
 from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.conf import combine_envs
+from mrjob.dataproc import DataprocJobRunner
+from mrjob.emr import EMRJobRunner
+from mrjob.hadoop import HadoopJobRunner
+from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
+from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
@@ -389,3 +394,77 @@ class StdStreamTestCase(TestCase):
         self.assertEqual(launcher.stdin, mock_stdin.buffer)
         self.assertEqual(launcher.stdout, mock_stdout)
         self.assertEqual(launcher.stderr, mock_stderr)
+
+
+class JobRunnerKwargsTestCase(TestCase):
+    # ensure that switches exist for every option passed to runners
+
+    NON_OPTION_KWARGS = set([
+        'conf_paths',
+        'extra_args',
+        'file_upload_args',
+        'hadoop_input_format',
+        'hadoop_output_format',
+        'input_paths',
+        'mr_job_script',
+        'output_dir',
+        'partitioner',
+        'stdin',
+    ])
+
+    CONF_ONLY_OPTIONS = set([
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        'aws_security_token',
+        'local_tmp_dir',
+    ])
+
+    def _test_job_runner_kwargs(self, runner_class, conf_only_options=()):
+        launcher = MRJobLauncher(args=['/path/to/script'])
+
+        method_name = '%s_job_runner_kwargs' % runner_class.alias
+        kwargs = getattr(launcher, method_name)()
+
+        option_names = set(kwargs) - self.NON_OPTION_KWARGS
+
+        self.assertEqual(
+            option_names,
+            (runner_class.OPTION_STORE_CLASS.ALLOWED_KEYS -
+             self.CONF_ONLY_OPTIONS)
+        )
+
+    def test_dataproc(self):
+        self._test_job_runner_kwargs(DataprocJobRunner)
+
+    def test_emr(self):
+        self._test_job_runner_kwargs(EMRJobRunner)
+
+    def test_hadoop(self):
+        self._test_job_runner_kwargs(HadoopJobRunner)
+
+    def test_inline(self):
+        self._test_job_runner_kwargs(InlineMRJobRunner)
+
+    def test_local(self):
+        self._test_job_runner_kwargs(LocalMRJobRunner)
+
+    # not sure this test is valid
+    def _test_options_appear_in_single_opt_group(self):
+        launcher = MRJobLauncher(args=['/path/to/script'])
+
+        dest_to_groups = defaultdict(set)
+
+        for name, group in launcher.__dict__.items():
+            if not name.endswith('_opt_group'):
+                continue
+
+            for option in group.option_list:
+                dest_to_groups[option.dest].add(name)
+
+        dest_to_multiple_groups = dict(
+            (dest, groups) for dest, groups in dest_to_groups.items()
+            if len(groups) > 1)
+
+        self.assertEqual(dest_to_multiple_groups, {})
+
+    maxDiff = None

@@ -55,10 +55,10 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_clusters
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_opts
-from mrjob.options import _add_dataproc_emr_connect_opts
-from mrjob.options import _add_emr_connect_opts
+from mrjob.options import _add_basic_options
+from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
+from mrjob.options import _pick_runner_opts
 from mrjob.parse import iso8601_to_datetime
 from mrjob.util import strip_microseconds
 
@@ -231,9 +231,11 @@ def _make_option_parser():
         help=('Minimum number of hours a job can run before we report it.'
               ' Default: %default'))
 
-    _add_basic_opts(option_parser)
-    _add_dataproc_emr_connect_opts(option_parser)
-    _add_emr_connect_opts(option_parser)
+    _add_basic_options(option_parser)
+    _add_runner_options(
+        option_parser,
+        _pick_runner_opts('emr', 'connect')
+    )
 
     _alphabetize_options(option_parser)
 

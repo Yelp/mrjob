@@ -35,17 +35,17 @@ from subprocess import check_call
 
 import mrjob.step
 from mrjob.compat import translate_jobconf_dict
-from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
-from mrjob.conf import combine_envs
 from mrjob.conf import combine_local_envs
-from mrjob.conf import combine_lists
-from mrjob.conf import combine_paths
-from mrjob.conf import combine_path_lists
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
+from mrjob.options import CLEANUP_CHOICES
+from mrjob.options import _CLEANUP_DEPRECATED_ALIASES
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
@@ -62,101 +62,16 @@ log = logging.getLogger(__name__)
 # use to detect globs and break into the part before and after the glob
 GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
-#: cleanup options:
-#:
-#: * ``'ALL'``: delete logs and local and remote temp files; stop cluster
-#:   if on EMR and the job is not done when cleanup is run.
-#: * ``'CLOUD_TMP'``: delete temp files on cloud storage (e.g. S3) only
-#: * ``'CLUSTER'``: terminate the cluster if on EMR and the job is not done
-#:    on cleanup
-#: * ``'HADOOP_TMP'``: delete temp files on HDFS only
-#: * ``'JOB'``: stop job if on EMR and the job is not done when cleanup runs
-#: * ``'LOCAL_TMP'``: delete local temp files only
-#: * ``'LOGS'``: delete logs only
-#: * ``'NONE'``: delete nothing
-#: * ``'TMP'``: delete local, HDFS, and cloud storage temp files, but not logs
-#:
-#: .. versionchanged:: 0.5.0
-#:
-#:     - ``LOCAL_TMP`` used to be ``LOCAL_SCRATCH``
-#:     - ``HADOOP_TMP`` is new (and used to be covered by ``LOCAL_SCRATCH``)
-#:     - ``CLOUD_TMP`` used to be ``REMOTE_SCRATCH``
-#:
-CLEANUP_CHOICES = [
-    'ALL',
-    'CLOUD_TMP',
-    'CLUSTER',
-    'HADOOP_TMP',
-    'JOB',
-    'LOCAL_TMP',
-    'LOGS',
-    'NONE',
-    'TMP',
-]
-
-_CLEANUP_DEPRECATED_ALIASES = {
-    'JOB_FLOW': 'CLUSTER',
-    'LOCAL_SCRATCH': 'LOCAL_TMP',
-    'REMOTE_SCRATCH': 'CLOUD_TMP',
-    'SCRATCH': 'TMP',
-}
-
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
 
 
 class RunnerOptionStore(OptionStore):
-
-    # Test cases for this class live in tests.test_option_store rather than
-    # tests.test_runner.
-
-    ALLOWED_KEYS = OptionStore.ALLOWED_KEYS.union(set([
-        'bootstrap_mrjob',
-        'check_input_paths',
-        'cleanup',
-        'cleanup_on_failure',
-        'cmdenv',
-        'hadoop_version',
-        'interpreter',
-        'jobconf',
-        'label',
-        'libjars',
-        'local_tmp_dir',
-        'owner',
-        'python_archives',
-        'python_bin',
-        'setup',
-        'setup_cmds',
-        'setup_scripts',
-        'sh_bin',
-        'steps_interpreter',
-        'steps_python_bin',
-        'strict_protocols',
-        'upload_archives',
-        'upload_files',
-    ]))
-
-    COMBINERS = combine_dicts(OptionStore.COMBINERS, {
-        'cmdenv': combine_envs,
-        'interpreter': combine_cmds,
-        'jobconf': combine_dicts,
-        'libjars': combine_path_lists,
-        'local_tmp_dir': combine_paths,
-        'python_archives': combine_path_lists,
-        'python_bin': combine_cmds,
-        'setup': combine_lists,
-        'setup_cmds': combine_lists,
-        'setup_scripts': combine_path_lists,
-        'sh_bin': combine_cmds,
-        'steps_interpreter': combine_cmds,
-        'steps_python_bin': combine_cmds,
-        'upload_archives': combine_path_lists,
-        'upload_files': combine_path_lists,
-    })
-
-    DEPRECATED_ALIASES = {
-        'base_tmp_dir': 'local_tmp_dir',
-    }
+    # 'base' is aritrary; if an option support all runners, it won't
+    # have "runners" set in _RUNNER_OPTS at all
+    ALLOWED_KEYS = _allowed_keys('base')
+    COMBINERS = _combiners('base')
+    DEPRECATED_ALIASES = _deprecated_aliases('base')
 
     def __init__(self, alias, opts, conf_paths):
         """

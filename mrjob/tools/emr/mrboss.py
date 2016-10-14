@@ -34,8 +34,8 @@ Options::
   -o OUTPUT_DIR, --output-dir=OUTPUT_DIR
                         Specify an output directory (default: CLUSTER_ID)
   -q, --quiet           Don't print anything to stderr
-  --aws-region=REGION   Deprecated alias for --region
   --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --aws-region=REGION   Deprecated alias for --region
   --s3-endpoint=S3_ENDPOINT
                         Force mrjob to connect to S3 on this endpoint (e.g. s3
                         -us-west-1.amazonaws.com). You usually shouldn't set
@@ -53,15 +53,14 @@ import sys
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_opts
-from mrjob.options import _add_dataproc_emr_connect_opts
-from mrjob.options import _add_emr_connect_opts
+from mrjob.options import _add_basic_options
+from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
+from mrjob.options import _pick_runner_opts
 from mrjob.py2 import to_string
 from mrjob.ssh import _ssh_copy_key
 from mrjob.ssh import _ssh_run_with_recursion
 from mrjob.util import random_identifier
-from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import shlex_split
 
 
@@ -75,12 +74,13 @@ def main(cl_args=None):
                              default=None,
                              help="Specify an output directory (default:"
                              " CLUSTER_ID)")
-    _add_basic_opts(option_parser)
-    _add_dataproc_emr_connect_opts(option_parser)
-    _add_emr_connect_opts(option_parser)
-    scrape_options_into_new_groups(MRJob().all_option_groups(), {
-        option_parser: ('ec2_key_pair_file', 'ssh_bin'),
-    })
+    _add_basic_options(option_parser)
+    _add_runner_options(
+        option_parser,
+        _pick_runner_opts('emr', 'connect') | set(
+            ['ssh_bin', 'ec2_key_pair_file'])
+    )
+
     _alphabetize_options(option_parser)
 
     options, args = option_parser.parse_args(cl_args)

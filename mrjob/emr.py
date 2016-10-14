@@ -64,11 +64,7 @@ from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
-from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
-from mrjob.conf import combine_lists
-from mrjob.conf import combine_path_lists
-from mrjob.conf import combine_paths
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
@@ -89,6 +85,9 @@ from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _ls_emr_step_stderr_logs
 from mrjob.logs.step import _ls_emr_step_syslogs
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import iso8601_to_datetime
@@ -380,115 +379,9 @@ def _get_reason(cluster_or_step):
 
 class EMRRunnerOptionStore(RunnerOptionStore):
 
-    # documentation of these options is in docs/guides/emr-opts.rst
-
-    ALLOWED_KEYS = RunnerOptionStore.ALLOWED_KEYS.union(set([
-        'additional_emr_info',
-        'aws_access_key_id',
-        'aws_secret_access_key',
-        'aws_security_token',
-        'bootstrap',
-        'bootstrap_actions',
-        'bootstrap_cmds',
-        'bootstrap_files',
-        'bootstrap_python',
-        'bootstrap_python_packages',
-        'bootstrap_scripts',
-        'bootstrap_spark',
-        'check_cluster_every',
-        'cloud_fs_sync_secs',
-        'cloud_log_dir',
-        'cloud_tmp_dir',
-        'cloud_upload_part_size',
-        'cluster_id',
-        'core_instance_bid_price',
-        'core_instance_type',
-        'ec2_key_pair',
-        'ec2_key_pair_file',
-        'emr_action_on_failure',
-        'emr_api_params',
-        'emr_applications',
-        'emr_configurations',
-        'emr_endpoint',
-        'enable_emr_debugging',
-        'hadoop_extra_args',
-        'hadoop_streaming_jar',
-        'hadoop_streaming_jar_on_emr',
-        'hadoop_version',
-        'iam_endpoint',
-        'iam_instance_profile',
-        'iam_service_role',
-        'image_version',
-        'instance_type',
-        'master_instance_bid_price',
-        'master_instance_type',
-        'max_hours_idle',
-        'mins_to_end_of_hour',
-        'num_core_instances',
-        'num_ec2_instances',
-        'num_task_instances',
-        'pool_clusters',
-        'pool_name',
-        'pool_wait_minutes',
-        'region',
-        'release_label',
-        's3_endpoint',
-        'ssh_bin',
-        'ssh_bind_ports',
-        'ssh_tunnel',
-        'ssh_tunnel_is_open',
-        'subnet',
-        'tags',
-        'task_instance_bid_price',
-        'task_instance_type',
-        'visible_to_all_users',
-        'zone',
-    ]))
-
-    COMBINERS = combine_dicts(RunnerOptionStore.COMBINERS, {
-        'bootstrap': combine_lists,
-        'bootstrap_actions': combine_lists,
-        'bootstrap_cmds': combine_lists,
-        'bootstrap_files': combine_path_lists,
-        'bootstrap_python_packages': combine_path_lists,
-        'bootstrap_scripts': combine_path_lists,
-        'cloud_log_dir': combine_paths,
-        'cloud_tmp_dir': combine_paths,
-        'ec2_key_pair_file': combine_paths,
-        'emr_api_params': combine_dicts,
-        'emr_applications': combine_lists,
-        'emr_configurations': combine_lists,
-        'hadoop_extra_args': combine_lists,
-        'ssh_bin': combine_cmds,
-        'tags': combine_dicts,
-    })
-
-    DEPRECATED_ALIASES = combine_dicts(RunnerOptionStore.DEPRECATED_ALIASES, {
-        'ami_version': 'image_version',
-        'aws_availability_zone': 'zone',
-        'aws_region': 'region',
-        'check_emr_status_every': 'check_cluster_every',
-        'ec2_core_instance_bid_price': 'core_instance_bid_price',
-        'ec2_core_instance_type': 'core_instance_type',
-        'ec2_instance_type': 'instance_type',
-        'ec2_master_instance_bid_price': 'master_instance_bid_price',
-        'ec2_master_instance_type': 'master_instance_type',
-        'ec2_slave_instance_type': 'core_instance_type',
-        'ec2_task_instance_bid_price': 'task_instance_bid_price',
-        'ec2_task_instance_type': 'task_instance_type',
-        'emr_job_flow_id': 'cluster_id',
-        'emr_job_flow_pool_name': 'pool_name',
-        'emr_tags': 'tags',
-        'num_ec2_core_instances': 'num_core_instances',
-        'num_ec2_task_instances': 'num_task_instances',
-        'pool_emr_job_flows': 'pool_clusters',
-        's3_log_uri': 'cloud_log_dir',
-        's3_scratch_uri': 'cloud_tmp_dir',
-        's3_sync_wait_time': 'cloud_fs_sync_secs',
-        's3_tmp_dir': 'cloud_tmp_dir',
-        's3_upload_part_size': 'cloud_upload_part_size',
-        'ssh_tunnel_to_job_tracker': 'ssh_tunnel',
-    })
+    ALLOWED_KEYS = _allowed_keys('emr')
+    COMBINERS = _combiners('emr')
+    DEPRECATED_ALIASES = _deprecated_aliases('emr')
 
     def __init__(self, alias, opts, conf_paths):
         super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_paths)

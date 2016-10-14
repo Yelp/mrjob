@@ -1206,6 +1206,9 @@ class MRJobRunner(object):
             if value is not None:
                 args.extend(['--conf', '%s=%s' % (key, value)])
 
+        # spark_args option
+        args.extend(self._opts['spark_args'])
+
         # step spark_args
         args.extend(step['spark_args'])
 

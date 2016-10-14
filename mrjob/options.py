@@ -1015,6 +1015,16 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    spark_args=dict(
+        combiner=combine_lists,
+        switches=[
+            (['--spark-arg'], dict(
+                action='append',
+                help=('Argument of any type to pass to spark-submit.'
+                      ' You can use --spark-arg multiple times.'),
+            )),
+        ],
+    ),
     spark_submit_bin=dict(
         combiner=combine_cmds,
         switches=[

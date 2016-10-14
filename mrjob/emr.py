@@ -2887,7 +2887,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 expected_applications = set(
                     a.lower() for a in applications)
 
-                if not expected_applications <= applications:
+                if not expected_applications <= cluster_applications:
                     log.debug('    missing applications: %s' % ', '.join(
                         sorted(expected_applications - cluster_applications)))
                     return

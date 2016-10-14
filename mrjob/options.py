@@ -913,6 +913,15 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    py_files=dict(
+        combiner=combine_path_lists,
+        switches=[
+            (['--py-file'], dict(
+                action='append',
+                help='.py file, .zip or .egg to add to PYTHONPATH'
+            )),
+        ],
+    ),
     python_archives=dict(
         combiner=combine_path_lists,
         switches=[

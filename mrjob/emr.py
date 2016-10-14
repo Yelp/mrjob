@@ -2650,7 +2650,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         key_cluster_steps_list = []
 
         def add_if_match(cluster):
-            log.debug('Considering %s', cluster.id)
+            log.debug('  Considering joining cluster %s...', cluster.id)
 
             # skip if user specified a key pair and it doesn't match
             if (self._opts['ec2_key_pair'] and
@@ -2658,17 +2658,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 getattr(getattr(cluster,
                                 'ec2instanceattributes', None),
                         'ec2keyname', None)):
-                log.debug('%s: ec2 key pair mismatch', cluster.id)
+                log.debug('    ec2 key pair mismatch')
                 return
 
             # this may be a retry due to locked clusters
             if cluster.id in exclude:
-                log.debug('%s: excluded', cluster.id)
+                log.debug('    excluded')
                 return
 
             # only take persistent clusters
             if cluster.autoterminate != 'false':
-                log.debug('%s: not persistent', cluster.id)
+                log.debug('    not persistent')
                 return
 
             # match pool name, and (bootstrap) hash
@@ -2677,11 +2677,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
 
             if req_hash != pool_hash:
-                log.debug('%s: pool hash mismatch', cluster.id)
+                log.debug('    pool hash mismatch')
                 return
 
             if self._opts['pool_name'] != pool_name:
-                log.debug('%s: pool name mismatch', cluster.id)
+                log.debug('    pool name mismatch')
                 return
 
             if self._opts['release_label']:
@@ -2690,7 +2690,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 release_label = getattr(cluster, 'releaselabel', '')
 
                 if release_label != self._opts['release_label']:
-                    log.debug('%s: release label mismatch', cluster.id)
+                    log.debug('    release label mismatch')
                     return
             else:
                 # match actual AMI version
@@ -2701,7 +2701,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # be a full major.minor.patch, so checking matching
                 # prefixes should be sufficient.
                 if not image_version.startswith(self._opts['image_version']):
-                    log.debug('%s: image version mismatch', cluster.id)
+                    log.debug('    image version mismatch')
                     return
 
             if self._opts['emr_applications']:
@@ -2713,26 +2713,27 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     a.lower() for a in self._opts['emr_applications'])
 
                 if not expected_applications <= applications:
-                    log.debug('%s: emr applications mismatch', cluster.id)
+                    log.debug('    missing applications: %s' % ', '.join(
+                        sorted(expected_applications - applications)))
                     return
 
             emr_configurations = _decode_configurations_from_api(
                 getattr(cluster, 'configurations', []))
             if self._opts['emr_configurations'] != emr_configurations:
-                log.debug('%s: emr configurations mismatch', cluster.id)
+                log.debug('    emr configurations mismatch')
                 return
 
             subnet = getattr(
                 cluster.ec2instanceattributes, 'ec2subnetid', None)
             if subnet != (self._opts['subnet'] or None):
-                log.debug('%s: subnet mismatch', cluster.id)
+                log.debug('    subnet mismatch')
                 return
 
             steps = _list_all_steps(emr_conn, cluster.id)
-            log.debug('%s: checking steps', cluster.id)
 
             # there is a hard limit of 256 steps per cluster
             if len(steps) + num_steps > _MAX_STEPS_PER_CLUSTER:
+                log.debug('    no room for our steps')
                 return
 
             # in rare cases, cluster can be WAITING *and* have incomplete
@@ -2746,6 +2747,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                      is None) and
                     getattr(step.status, 'state', None) not in
                         ('CANCELLED', 'INTERRUPTED')):
+                    log.debug('    unfinished steps')
                     return
 
             # total compute units per group
@@ -2753,8 +2755,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # total number of instances of the same type in each group.
             # This allows us to match unknown instance types.
             role_to_matched_instances = defaultdict(int)
-
-            log.debug('%s: checking compute/memory', cluster.id)
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
@@ -2765,6 +2765,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
                 # unknown, new kind of role; bail out!
                 if role not in ('core', 'master', 'task'):
+                    log.debug('    unknown instance group role: %s' % role)
                     return
 
                 req_instance_type = role_to_req_instance_type[role]
@@ -2773,6 +2774,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype, 0.0)
                     req_mem = role_to_req_mem.get(role, 0.0)
                     if mem < req_mem:
+                        log.debug('    too little memory')
                         return
 
                 # if bid price is too low, don't count compute units
@@ -2817,6 +2819,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if req_num_instances > role_to_matched_instances[role]:
                     cu = role_to_cu.get(role, 0.0)
                     if cu < req_cu:
+                        log.debug('    too few compute units')
                         return
 
             # make a sort key
@@ -2824,6 +2827,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         role_to_cu['master'],
                         _est_time_to_hour(cluster))
 
+            log.debug('    OK')
             key_cluster_steps_list.append((sort_key, cluster.id, len(steps)))
 
         for cluster_summary in _yield_all_clusters(
@@ -2853,17 +2857,21 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 emr_conn=emr_conn,
                 exclude=exclude,
                 num_steps=num_steps)
-            log.info('Found %d usable clusters.', len(cluster_info_list))
+            log.debug(
+                '  Found %d usable clusters%s%s' % (
+                    len(cluster_info_list),
+                    ': ' if cluster_info_list else '',
+                    ', '.join(c for c,n in reversed(cluster_info_list))))
             if cluster_info_list:
                 cluster_id, num_steps = cluster_info_list[-1]
                 status = _attempt_to_acquire_lock(
                     self.fs, self._lock_uri(cluster_id, num_steps),
                     self._opts['cloud_fs_sync_secs'], self._job_key)
                 if status:
-                    log.debug('Acquired lock on %s', cluster_id)
+                    log.debug('Acquired lock on cluster %s', cluster_id)
                     return cluster_id
                 else:
-                    log.debug('Unable to acquire lock on %s', cluster_id)
+                    log.debug("Can't acquire lock on cluster %s", cluster_id)
                     exclude.add(cluster_id)
             elif max_wait_time == 0:
                 return None
@@ -2872,7 +2880,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # lock that was previously unavailable.
                 exclude = set()
                 log.info('No clusters available in pool %r. Checking again'
-                         ' in %d seconds.' % (
+                         ' in %d seconds...' % (
                              self._opts['pool_name'],
                              int(_POOLING_SLEEP_INTERVAL)))
                 time.sleep(_POOLING_SLEEP_INTERVAL)

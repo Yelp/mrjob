@@ -133,6 +133,7 @@ def _interpret_task_logs(fs, matches, partial=True, stderr_callback=None):
     this dictionary will contain the key *partial*, set to True.
     """
     result = {}
+    task_error = None
 
     for match in matches:
         syslog_path = match['path']

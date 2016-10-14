@@ -122,14 +122,15 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             # default is None
             return self.path_to_mock_result.get(path_from_mock_cat_log)
 
-        # need to mock ls so that _ls_task_syslogs() can work
         def mock_exists(path):
-            return path in self.mock_paths
+            return path in self.mock_paths or path == 'MOCK_LOG_DIR'
 
+        # need to mock ls so that _ls_task_syslogs() can work
         def mock_ls(log_dir):
             return self.mock_paths
 
         self.mock_fs = Mock()
+        self.mock_fs.exists = Mock(side_effect=mock_exists)
         self.mock_fs.ls = Mock(side_effect=mock_ls)
 
         self.mock_cat_log = self.start(
@@ -141,7 +142,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                          side_effect=mock_parse_task_stderr))
 
     def mock_path_matches(self):
-        mock_log_dir_stream = [['']]  # needed to make _ls_logs() work
+        mock_log_dir_stream = [['MOCK_LOG_DIR']]  # _ls_logs() needs this
         return _ls_task_syslogs(self.mock_fs, mock_log_dir_stream)
 
     def interpret_task_logs(self, **kwargs):
@@ -245,6 +246,35 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     ),
                 ],
                 partial=True,
+            )
+        )
+
+        mock_stderr_callback.assert_called_once_with(stderr_path)
+
+    def test_syslog_with_empty_corresponding_stderr(self):
+        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+        stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
+        mock_stderr_callback = Mock()
+
+        self.mock_paths = [syslog_path, stderr_path]
+
+        self.path_to_mock_result = {
+            syslog_path: dict(hadoop_error=dict(message='BOOM')),
+        }
+
+        self.assertEqual(
+            self.interpret_task_logs(stderr_callback=mock_stderr_callback),
+            dict(
+                errors=[
+                    dict(
+                        attempt_id='attempt_201512232143_0008_m_000001_3',
+                        hadoop_error=dict(
+                            message='BOOM',
+                            path=syslog_path,
+                        ),
+                        task_id='task_201512232143_0008_m_000001',
+                    ),
+                ],
             )
         )
 

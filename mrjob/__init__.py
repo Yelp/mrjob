@@ -73,6 +73,7 @@ __credits__ = [
     'Robert Leftwich <rl.0x0@eml.cc>',
     'Andrew Lenards <andrew.lenards@gmail.com>',
     'Tianhui Michael Li <tianhuil@cs.princeton.edu>',
+    'James Lim <jim@affirm.com>',
     'Shusen Liu <liushusen.smart@gmail.com>',
     'Adrian Maceiras <amac425@utexas.edu>',
     'Dallas Marlow <dallas@vineapp.com>',

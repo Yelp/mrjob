@@ -69,6 +69,7 @@ __credits__ = [
     'Julian Krause <juliank@yelp.com>',
     'Pai-Wei Lai <paiwei@yelp.com>',
     'Boris Lau <boris.w.lau@gmail.com>',
+    'Jerome Leclanche <jerome@leclan.ch>',
     'Robert Leftwich <rl.0x0@eml.cc>',
     'Andrew Lenards <andrew.lenards@gmail.com>',
     'Tianhui Michael Li <tianhuil@cs.princeton.edu>',

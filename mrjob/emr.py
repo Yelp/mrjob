@@ -2824,7 +2824,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         key_cluster_steps_list = []
 
         def add_if_match(cluster):
-            log.debug('  Considering joining cluster %s...', cluster.id)
+            log.debug('  Considering joining cluster %s...' % cluster.id)
 
             # skip if user specified a key pair and it doesn't match
             if (self._opts['ec2_key_pair'] and

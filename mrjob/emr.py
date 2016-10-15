@@ -1684,7 +1684,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _spark_py_files(self):
         """In cluster mode, py_files can be anywhere, so point to their
         uploaded URIs."""
-        return self._arg_hash_paths('file', self._opts['py_files'])
+        # don't use hash paths with --py-files; see #1375
+        return [
+            self._upload_mgr.uri(path)
+            for path in sorted(self._opts['py_files'])
+        ]
 
     def _step_name(self, step_num):
         """Return something like: ``'mr_your_job Step X of Y'``"""

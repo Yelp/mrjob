@@ -920,6 +920,10 @@ class MRJobRunner(object):
 
         # py_files
         for path in self._opts['py_files']:
+            # Spark (at least v1.3.1) doesn't work with # and --py-files,
+            # see #1375
+            if '#' in path:
+                raise ValueError("py_files cannot contain '#'")
             path_dict = parse_legacy_hash_path('file', path)
             setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 

@@ -1216,6 +1216,11 @@ class MRJobRunner(object):
         # --files and --archives
         args.extend(self._spark_upload_args())
 
+        # --py-files
+        py_files_arg = ','.join(self._spark_py_files())
+        if py_files_arg:
+            args.extend(['--py-files', py_files_arg])
+
         # spark_args option
         args.extend(self._opts['spark_args'])
 
@@ -1226,11 +1231,19 @@ class MRJobRunner(object):
 
     def _spark_upload_args(self):
         # Spark only supports a limited subset of files in the working dir
-        files = set(self._file_upload_args + self._opts['upload_files'])
-        archives = set(self._opts['upload_archives'])
+        files = self._file_upload_args + self._opts['upload_files']
+        archives = self._opts['upload_archives']
 
         return self._upload_args_helper('--files', files,
                                         '--archives', archives)
+
+    def _spark_py_files(self):
+        """The list of files to pass to spark-submit with --py-files.
+
+        By default (cluster mode), Spark only accepts local files, so
+        we pass these as-is.
+        """
+        return self._opts['py_files']
 
     def _upload_args(self):
         # just upload every file and archive in the working dir manager
@@ -1254,10 +1267,15 @@ class MRJobRunner(object):
 
     def _arg_hash_paths(self, type, paths=None):
         """Helper function for the *upload_args methods."""
-        for name, path in self._working_dir_mgr.name_to_path(type).items():
-            if paths is None or path in paths:
-                uri = self._upload_mgr.uri(path)
-                yield '%s#%s' % (uri, name)
+        if paths is None:
+            paths = self._working_dir_mgr.paths(type)
+        else:
+            paths = set(paths)
+
+        for path in sorted(paths):
+            name = self._working_dir_mgr.name(type, path)
+            uri = self._upload_mgr.uri(path)
+            yield '%s#%s' % (uri, name)
 
     def _invoke_sort(self, input_paths, output_path):
         """Use the local sort command to sort one or more input files. Raise

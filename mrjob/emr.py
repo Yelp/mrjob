@@ -961,6 +961,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
+        for path in self._opts['py_files']:
+            self._upload_mgr.add(path)
+
         if self._opts['hadoop_streaming_jar']:
             self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
@@ -1677,6 +1680,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             jar=jar,
             step_args=step_args,
             action_on_failure=self._action_on_failure())
+
+    def _spark_py_files(self):
+        """In cluster mode, py_files can be anywhere, so point to their
+        uploaded URIs."""
+        return self._arg_hash_paths('file', self._opts['py_files'])
 
     def _step_name(self, step_num):
         """Return something like: ``'mr_your_job Step X of Y'``"""

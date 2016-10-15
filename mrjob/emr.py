@@ -1535,7 +1535,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         step_args = []
         step_args.extend(step_arg_prefix)  # add 'hadoop-streaming' for 4.x
-        step_args.extend(self._upload_args(self._upload_mgr))
+        step_args.extend(self._upload_args())
         step_args.extend(self._libjar_step_args())
         step_args.extend(self._hadoop_args_for_step(step_num))
 

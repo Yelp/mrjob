@@ -523,8 +523,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         args = self.get_hadoop_bin() + ['jar', hadoop_streaming_jar]
 
         # set up uploading from HDFS to the working dir
-        args.extend(
-            self._upload_args(self._upload_mgr))
+        args.extend(self._upload_args())
 
         # if no reducer, shut off reducer tasks. This has to come before
         # extra hadoop args, which could contain jar-specific args

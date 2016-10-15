@@ -918,7 +918,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--py-file'], dict(
                 action='append',
-                help='.py file, .zip or .egg to add to PYTHONPATH'
+                help='.zip or .egg file to add to PYTHONPATH'
             )),
         ],
     ),

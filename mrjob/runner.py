@@ -1213,6 +1213,9 @@ class MRJobRunner(object):
             if value is not None:
                 args.extend(['--conf', '%s=%s' % (key, value)])
 
+        # --files and --archives
+        args.extend(self._spark_upload_args())
+
         # spark_args option
         args.extend(self._opts['spark_args'])
 
@@ -1221,29 +1224,32 @@ class MRJobRunner(object):
 
         return args
 
+    def _spark_upload_args(self):
+        return self._upload_args_helper('--files', '--archives')
+
+    def _upload_args(self):
+        return self._upload_args_helper('-files', '-archives')
+
+    def _upload_args_helper(self, files_opt_str, archives_opt_str):
+        args = []
+
+        file_hash_paths = list(self._arg_hash_paths('file', upload_mgr))
+        if file_hash_paths:
+            args.append(files_opt_str)
+            args.append(','.join(file_hash_paths))
+
+        archive_hash_paths = list(self._arg_hash_paths('archive', upload_mgr))
+        if archive_hash_paths:
+            args.append(archives_opt_str)
+            args.append(','.join(archive_hash_paths))
+
+        return args
+
     def _arg_hash_paths(self, type):
         """Helper function for the *upload_args methods."""
         for name, path in self._working_dir_mgr.name_to_path(type).items():
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
-
-    def _upload_args(self):
-        args = []
-
-        # TODO: does Hadoop have a way of coping with paths that have
-        # commas in their names?
-
-        file_hash_paths = list(self._arg_hash_paths('file'))
-        if file_hash_paths:
-            args.append('-files')
-            args.append(','.join(file_hash_paths))
-
-        archive_hash_paths = list(self._arg_hash_paths('archive'))
-        if archive_hash_paths:
-            args.append('-archives')
-            args.append(','.join(archive_hash_paths))
-
-        return args
 
     def _invoke_sort(self, input_paths, output_path):
         """Use the local sort command to sort one or more input files. Raise

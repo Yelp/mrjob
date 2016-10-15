@@ -1168,16 +1168,12 @@ class MRJobRunner(object):
         # TODO: does Hadoop have a way of coping with paths that have
         # commas in their names?
 
-        file_hash_paths = list(
-            self._arg_hash_paths('file', self._upload_mgr))
-
+        file_hash_paths = list(self._arg_hash_paths('file'))
         if file_hash_paths:
             args.append('-files')
             args.append(','.join(file_hash_paths))
 
-        archive_hash_paths = list(
-            self._arg_hash_paths('archive', self._upload_mgr))
-
+        archive_hash_paths = list(self._arg_hash_paths('archive'))
         if archive_hash_paths:
             args.append('-archives')
             args.append(','.join(archive_hash_paths))

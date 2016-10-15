@@ -266,6 +266,7 @@ class MRJobRunner(object):
         self._fs = None
 
         self._working_dir_mgr = WorkingDirManager()
+        self._upload_mgr = None  # define in subclasses that use this
 
         self._script_path = mr_job_script
         if self._script_path:
@@ -1214,26 +1215,24 @@ class MRJobRunner(object):
 
         return args
 
-    def _arg_hash_paths(self, type, upload_mgr):
+    def _arg_hash_paths(self, type):
         """Helper function for the *upload_args methods."""
         for name, path in self._working_dir_mgr.name_to_path(type).items():
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
-    # TODO: upload_mgr is always self._upload_mgr, and _arg_hash_paths()
-    # hard-codes it anyway. Do we really want to pass it in?
-    def _upload_args(self, upload_mgr):
+    def _upload_args(self):
         args = []
 
         # TODO: does Hadoop have a way of coping with paths that have
         # commas in their names?
 
-        file_hash_paths = list(self._arg_hash_paths('file', upload_mgr))
+        file_hash_paths = list(self._arg_hash_paths('file'))
         if file_hash_paths:
             args.append('-files')
             args.append(','.join(file_hash_paths))
 
-        archive_hash_paths = list(self._arg_hash_paths('archive', upload_mgr))
+        archive_hash_paths = list(self._arg_hash_paths('archive'))
         if archive_hash_paths:
             args.append('-archives')
             args.append(','.join(archive_hash_paths))

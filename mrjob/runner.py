@@ -298,7 +298,7 @@ class MRJobRunner(object):
             self._working_dir_mgr.add(**parse_legacy_hash_path(
                 'archive', path, must_name='upload_archives'))
 
-        # python_archives, setup, setup_cmds, and setup_scripts
+        # py_files, python_archives, setup, setup_cmds, and setup_scripts
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmds() for details
         self._setup = self._parse_setup()
@@ -910,11 +910,18 @@ class MRJobRunner(object):
         true, create mrjob.tar.gz (if it doesn't exist already) and
         prepend a setup command that adds it to PYTHONPATH.
 
+        Patch in *py_files*.
+
         Also patch in the deprecated
         options *python_archives*, *setup_cmd*, and *setup_script*
         as setup commands.
         """
         setup = []
+
+        # py_files
+        for path in self._opts['py_files']:
+            path_dict = parse_legacy_hash_path('file', path)
+            setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
         # python_archives
         for path in self._opts['python_archives']:

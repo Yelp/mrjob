@@ -1251,10 +1251,6 @@ class MRJobRunner(object):
         return args
 
     def _spark_upload_args(self):
-        # Spark only supports a limited subset of files in the working dir
-        files = self._opts['upload_files']
-        archives = self._opts['upload_archives']
-
         return self._upload_args_helper('--files', self._spark_files,
                                         '--archives', self._spark_archives)
 

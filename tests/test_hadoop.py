@@ -1045,6 +1045,31 @@ class SparkStepArgsTestCase(SandboxedTestCase):
             ])
 
 
+class SparkPyFilesTestCase(MockHadoopTestCase):
+
+    def test_eggs(self):
+        egg1_path = self.makefile('dragon.egg')
+        egg2_path = self.makefile('horton.egg')
+
+        job = MRNullSpark([
+            '-r', 'hadoop',
+            '--py-file', egg1_path, '--py-file', egg2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            self.assertEqual(
+                runner._spark_py_files(),
+                [egg1_path, egg2_path]
+            )
+
+            # the py_files get uploaded anyway since they appear in
+            # _upload_dir_mgr.
+            self.assertIn(egg1_path, runner._upload_mgr.path_to_uri())
+            self.assertIn(egg2_path, runner._upload_mgr.path_to_uri())
+
+
 class SetupLineEncodingTestCase(MockHadoopTestCase):
 
     def test_setup_wrapper_script_uses_local_line_endings(self):

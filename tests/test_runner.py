@@ -563,17 +563,9 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         return args
 
-    def _mock_upload_mgr(self):
-        def mock_uri(path):
-            return '<uri of %s>' % path
-
-        m = Mock()
-        m.uri = Mock(side_effect=mock_uri)
-
-        return m
-
     def test_default(self):
         job = MRNullSpark()
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -583,6 +575,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_cmdenv(self):
         job = MRNullSpark(['--cmdenv', 'FOO=bar', '--cmdenv', 'BAZ=qux'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -592,6 +585,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_cmdenv_can_override_python_bin(self):
         job = MRNullSpark(['--cmdenv', 'PYSPARK_PYTHON=ourpy'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -601,6 +595,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_jobconf(self):
         job = MRNullSpark(['--jobconf', 'spark.executor.memory=10g'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -611,6 +606,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_jobconf_uses_jobconf_for_step(self):
         job = MRNullSpark()
+        job.sandbox()
 
         with job.make_runner() as runner:
             with patch.object(
@@ -630,6 +626,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
             ['--cmdenv', 'FOO=bar',
              '--jobconf', 'spark.executorEnv.FOO=baz',
              '--jobconf', 'spark.yarn.appMasterEnv.PYSPARK_PYTHON=ourpy'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -646,6 +643,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_option_spark_args(self):
         job = MRNullSpark(['--spark-arg', '--name', '--spark-arg', 'Dave'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -659,6 +657,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
     def test_job_spark_args(self):
         # --extra-spark-arg is a passthrough option for MRNullSpark
         job = MRNullSpark(['--extra-spark-arg', '-v'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -673,6 +672,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
         job = MRNullSpark(
             ['--extra-spark-arg', '-v',
              '--spark-arg', '--name', '--spark-arg', 'Dave'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -692,6 +692,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
             ['--file', foo1_path + '#foo1',
              '--file', foo2_path + '#bar',
              '--archive', baz_path])
+        job.sandbox()
 
         with job.make_runner() as runner:
             runner._upload_mgr = self._mock_upload_mgr()
@@ -710,8 +711,18 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                 )
             )
 
+    def _mock_upload_mgr(self):
+        def mock_uri(path):
+            return '<uri of %s>' % path
+
+        m = Mock()
+        m.uri = Mock(side_effect=mock_uri)
+
+        return m
+
     def test_py_files(self):
         job = MRNullSpark()
+        job.sandbox()
 
         with job.make_runner() as runner:
             runner._spark_py_files = Mock(
@@ -734,6 +745,7 @@ class SparkPyFilesTestCase(SandboxedTestCase):
 
     def test_default(self):
         job = MRNullSpark()
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(runner._spark_py_files(), [])
@@ -744,6 +756,7 @@ class SparkPyFilesTestCase(SandboxedTestCase):
         egg2_path = self.makefile('horton.egg')
 
         job = MRNullSpark(['--py-file', egg1_path, '--py-file', egg2_path])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(

@@ -711,9 +711,37 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
             )
 
     def test_py_files(self):
+        job = MRNullSpark()
+
+        with job.make_runner() as runner:
+            runner._spark_py_files = Mock(
+                return_value=['<first py_file>', '<second py_file>']
+            )
+
+            self.assertEqual(
+                runner._spark_args_for_step(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')
+                    ) + [
+                        '--py-files',
+                        '<first py_file>,<second py_file>'
+                    ]
+                )
+            )
+
+
+class SparkPyFilesTestCase(SandboxedTestCase):
+
+    def test_default(self):
+        job = MRNullSpark()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._spark_py_files(), [])
+
+    def test_eggs(self):
+        # by default, we pass py_files directly to Spark
         egg1_path = self.makefile('dragon.egg')
         egg2_path = self.makefile('horton.egg')
-
 
         job = MRNullSpark(['--py-file', egg1_path, '--py-file', egg2_path])
 
@@ -723,18 +751,8 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                 [egg1_path, egg2_path]
             )
 
-            self.assertEqual(
-                runner._spark_args_for_step(0), (
-                    self._expected_conf_args(
-                        cmdenv=dict(PYSPARK_PYTHON='mypy')
-                    ) + [
-                        # by default pass the py_files directly to Spark
-                        # (we only use _upload_mgr in the cloud)
-                        '--py-files',
-                        (egg1_path + ',' + egg2_path),
-                    ]
-                )
-            )
+
+
 
 
 class StrictProtocolsInConfTestCase(TestCase):

@@ -5802,6 +5802,32 @@ class UsesSparkTestCase(MockBotoTestCase):
             self.assertFalse(runner._has_spark_application())
 
 
+class SparkPyFilesTestCase(MockBotoTestCase):
+
+    def test_eggs(self):
+        egg1_path = self.makefile('dragon.egg')
+        egg2_path = self.makefile('horton.egg')
+
+        job = MRNullSpark([
+            '-r', 'emr',
+            '--py-file', egg1_path, '--py-file', egg2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            # in the cloud, we need to upload py_files to cloud storage
+            self.assertIn(egg1_path, runner._upload_mgr.path_to_uri())
+            self.assertIn(egg2_path, runner._upload_mgr.path_to_uri())
+
+            self.assertEqual(
+                runner._spark_py_files(),
+                [runner._upload_mgr.uri(egg1_path),
+                 runner._upload_mgr.uri(egg2_path)]
+            )
+
+
+
 class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):
     # regression test for #1421
 

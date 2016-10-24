@@ -1290,7 +1290,8 @@ class MRJobRunner(object):
         """Helper function for the *upload_args methods."""
         if named_paths is None:
             # just return everything managed by _working_dir_mgr
-            named_paths = self._working_dir_mgr.name_to_path(type).items()
+            named_paths = sorted(
+                self._working_dir_mgr.name_to_path(type).items())
 
         for name, path in named_paths:
             if not name:

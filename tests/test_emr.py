@@ -5664,6 +5664,7 @@ class UsesSparkTestCase(MockBotoTestCase):
             self.assertFalse(runner._has_spark_steps())
             self.assertFalse(runner._has_spark_install_bootstrap_action())
             self.assertFalse(runner._has_spark_application())
+            self.assertFalse(runner._opts['bootstrap_spark'])
 
     def test_spark_step(self):
         job = MRNullSpark(['-r', 'emr'])
@@ -5779,6 +5780,15 @@ class UsesSparkTestCase(MockBotoTestCase):
         with job.make_runner() as runner:
             self.assertTrue(runner._uses_spark())
             self.assertTrue(runner._has_spark_application())
+
+    def test_bootstrap_spark(self):
+        # tests #1465
+        job = MRTwoStepJob(['-r', 'emr', '--bootstrap-spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._opts['bootstrap_spark'])
 
     def test_ignores_new_supported_products_api_param(self):
         job = MRTwoStepJob(['-r', 'emr',

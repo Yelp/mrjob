@@ -3286,7 +3286,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         and EMR applications? If so, we'll need more memory."""
         return (self._has_spark_steps() or
                 self._has_spark_install_bootstrap_action() or
-                self._has_spark_application())
+                self._has_spark_application() or
+                self._opts['bootstrap_spark'])
 
     def _has_spark_install_bootstrap_action(self):
         """Does it look like this runner has a spark bootstrap install

@@ -766,8 +766,13 @@ class SparkPyFilesTestCase(SandboxedTestCase):
                 [egg1_path, egg2_path]
             )
 
+    def test_no_hash_paths(self):
+        egg_path = self.makefile('horton.egg')
 
+        job = MRNullSpark(['--py-file', egg_path + '#mayzie.egg'])
+        job.sandbox()
 
+        self.assertRaises(ValueError, job.make_runner)
 
 
 class StrictProtocolsInConfTestCase(TestCase):

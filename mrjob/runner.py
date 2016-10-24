@@ -938,9 +938,12 @@ class MRJobRunner(object):
             setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
         # python_archives
-        for path in self._opts['python_archives']:
-            path_dict = parse_legacy_hash_path('archive', path)
-            setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
+        if self._opts['python_archives']:
+            log.warning('python_archives is deprecated and will be removed'
+                        ' in v0.6.0. Try py_files instead')
+            for path in self._opts['python_archives']:
+                path_dict = parse_legacy_hash_path('archive', path)
+                setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
         # setup
         for cmd in self._opts['setup']:

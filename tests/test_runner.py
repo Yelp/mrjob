@@ -24,6 +24,8 @@ import tarfile
 import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
+from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED
 
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.inline import InlineMRJobRunner
@@ -839,9 +841,15 @@ class SetupTestCase(SandboxedTestCase):
         self.foo_tar_gz = os.path.join(self.tmp_dir, 'foo.tar.gz')
         tar_and_gzip(os.path.join(self.tmp_dir, 'foo'), self.foo_tar_gz)
 
+        self.foo_zip = os.path.join(self.tmp_dir, 'foo.zip')
+        zf = ZipFile(self.foo_zip, 'w', ZIP_DEFLATED)
+        zf.write(self.foo_py, 'foo.py')
+        zf.close()
+
         self.foo_py_size = os.path.getsize(self.foo_py)
         self.foo_sh_size = os.path.getsize(self.foo_sh)
         self.foo_tar_gz_size = os.path.getsize(self.foo_tar_gz)
+        self.foo_zip_size = os.path.getsize(self.foo_zip)
 
     def test_file_upload(self):
         job = MROSWalkJob(['-r', 'local',
@@ -941,6 +949,42 @@ class SetupTestCase(SandboxedTestCase):
         # double the number of bytes
         self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
                          self.foo_py_size * 2)
+
+    def test_python_zip_file(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'export PYTHONPATH=%s#:$PYTHONPATH' % self.foo_zip
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.zip'),
+                         self.foo_zip_size * 2)
+
+    def test_py_file(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--py-file', self.foo_zip,
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.zip'),
+                         self.foo_zip_size * 2)
 
     def test_setup_command(self):
         job = MROSWalkJob(

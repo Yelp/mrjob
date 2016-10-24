@@ -710,6 +710,32 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                 )
             )
 
+    def test_py_files(self):
+        egg1_path = self.makefile('dragon.egg')
+        egg2_path = self.makefile('horton.egg')
+
+
+        job = MRNullSpark(['--py-file', egg1_path, '--py-file', egg2_path])
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_py_files(),
+                [egg1_path, egg2_path]
+            )
+
+            self.assertEqual(
+                runner._spark_args_for_step(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')
+                    ) + [
+                        # by default pass the py_files directly to Spark
+                        # (we only use _upload_mgr in the cloud)
+                        '--py-files',
+                        (egg1_path + ',' + egg2_path),
+                    ]
+                )
+            )
+
 
 class StrictProtocolsInConfTestCase(TestCase):
     # regression tests for #1302, where command-line option's default

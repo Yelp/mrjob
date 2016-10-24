@@ -40,6 +40,7 @@ from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
@@ -539,7 +540,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
 class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def setUp(self):
-        super(SparkArgsForStepTestCase, self)
+        super(SparkArgsForStepTestCase, self).setUp()
 
         self.start(patch('mrjob.runner.MRJobRunner._python_bin',
                          return_value=['mypy']))
@@ -561,6 +562,15 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
             args.extend(['--conf', '%s=%s' % (key, value)])
 
         return args
+
+    def _mock_upload_mgr(self):
+        def mock_uri(path):
+            return '<uri of %s>' % path
+
+        m = Mock()
+        m.uri = Mock(side_effect=mock_uri)
+
+        return m
 
     def test_default(self):
         job = MRNullSpark()
@@ -673,6 +683,28 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                 )
             )
 
+    def test_file_args(self):
+        foo1_path = self.makefile('foo1')
+        foo2_path = self.makefile('foo2')
+
+        job = MRNullSpark(
+            ['--file', foo1_path + '#foo1',
+             '--file', foo2_path + '#bar'])
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = self._mock_upload_mgr()
+
+            self.assertEqual(
+                runner._spark_args_for_step(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')
+                    ) + [
+                        '--files',
+                        runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
+                        runner._upload_mgr.uri(foo2_path) + '#bar'
+                    ]
+                )
+            )
 
 
 class StrictProtocolsInConfTestCase(TestCase):

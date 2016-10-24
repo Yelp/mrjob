@@ -266,6 +266,12 @@ class MRJobRunner(object):
         self._fs = None
 
         self._working_dir_mgr = WorkingDirManager()
+
+        # track (name, path) of files and archives to upload to spark.
+        # these are a subset of those in self._working_dir_mgr
+        self._spark_files = []
+        self._spark_archives = []
+
         self._upload_mgr = None  # define in subclasses that use this
 
         self._script_path = mr_job_script
@@ -292,11 +298,15 @@ class MRJobRunner(object):
 
         # set up uploading
         for path in self._opts['upload_files']:
-            self._working_dir_mgr.add(**parse_legacy_hash_path(
-                'file', path, must_name='upload_files'))
+            uf = parse_legacy_hash_path('file', path, must_name='upload_files')
+            self._working_dir_mgr.add(**uf)
+            self._spark_files.append((uf['name'], uf['path']))
+
         for path in self._opts['upload_archives']:
-            self._working_dir_mgr.add(**parse_legacy_hash_path(
-                'archive', path, must_name='upload_archives'))
+            ua = parse_legacy_hash_path('archive', path,
+                                        must_name='upload_archives')
+            self._working_dir_mgr.add(*ua)
+            self._spark_archives.append((ua['name'], ua['path']))
 
         # py_files, python_archives, setup, setup_cmds, and setup_scripts
         # self._setup is a list of shell commands with path dicts
@@ -1242,11 +1252,11 @@ class MRJobRunner(object):
 
     def _spark_upload_args(self):
         # Spark only supports a limited subset of files in the working dir
-        files = self._file_upload_args + self._opts['upload_files']
+        files = self._opts['upload_files']
         archives = self._opts['upload_archives']
 
-        return self._upload_args_helper('--files', files,
-                                        '--archives', archives)
+        return self._upload_args_helper('--files', self._spark_files,
+                                        '--archives', self._spark_archives)
 
     def _spark_py_files(self):
         """The list of files to pass to spark-submit with --py-files.
@@ -1276,15 +1286,15 @@ class MRJobRunner(object):
 
         return args
 
-    def _arg_hash_paths(self, type, paths=None):
+    def _arg_hash_paths(self, type, named_paths=None):
         """Helper function for the *upload_args methods."""
-        if paths is None:
-            paths = self._working_dir_mgr.paths(type)
-        else:
-            paths = set(paths)
+        if named_paths is None:
+            # just return everything managed by _working_dir_mgr
+            named_paths = self._working_dir_mgr.name_to_path(type).items()
 
-        for path in sorted(paths):
-            name = self._working_dir_mgr.name(type, path)
+        for name, path in named_paths:
+            if not name:
+                name = self._working_dir_mgr.name(type, path)
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 

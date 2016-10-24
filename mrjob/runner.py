@@ -305,7 +305,7 @@ class MRJobRunner(object):
         for path in self._opts['upload_archives']:
             ua = parse_legacy_hash_path('archive', path,
                                         must_name='upload_archives')
-            self._working_dir_mgr.add(*ua)
+            self._working_dir_mgr.add(**ua)
             self._spark_archives.append((ua['name'], ua['path']))
 
         # py_files, python_archives, setup, setup_cmds, and setup_scripts

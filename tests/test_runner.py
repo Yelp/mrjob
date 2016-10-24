@@ -686,10 +686,12 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
     def test_file_args(self):
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
+        baz_path = self.makefile('baz.tar.gz')
 
         job = MRNullSpark(
             ['--file', foo1_path + '#foo1',
-             '--file', foo2_path + '#bar'])
+             '--file', foo2_path + '#bar',
+             '--archive', baz_path])
 
         with job.make_runner() as runner:
             runner._upload_mgr = self._mock_upload_mgr()
@@ -700,8 +702,10 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                         cmdenv=dict(PYSPARK_PYTHON='mypy')
                     ) + [
                         '--files',
-                        runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
-                        runner._upload_mgr.uri(foo2_path) + '#bar'
+                        (runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
+                         runner._upload_mgr.uri(foo2_path) + '#bar'),
+                        '--archives',
+                        runner._upload_mgr.uri(baz_path) + '#baz.tar.gz'
                     ]
                 )
             )

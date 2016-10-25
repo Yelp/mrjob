@@ -231,6 +231,11 @@ Job execution context
 
         --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
 
+    .. versionchanged:: 0.5.8.spark
+
+       This works with Spark too. In client mode (hadoop runner), these
+       environment variables are passed directly to :command:`spark-submit`.
+
 .. mrjob-opt::
     :config: interpreter
     :switch: --interpreter

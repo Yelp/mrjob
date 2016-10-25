@@ -225,8 +225,7 @@ Options available to hadoop runner only
 
     Extra arguments to pass to :command:`spark-submit`.
 
-    .. TODO: update versionadded for spark release
-    .. versionadded:: 0.5.8
+    .. versionadded:: 0.5.8.spark0
 
 .. mrjob-opt::
     :config: spark_submit_bin
@@ -248,5 +247,4 @@ Options available to hadoop runner only
 
     If all else fails, we just use ``spark-submit`` and hope for the best.
 
-    .. TODO: update versionadded for spark release
-    .. versionadded:: 0.5.8
+    .. versionadded:: 0.5.8.spark0

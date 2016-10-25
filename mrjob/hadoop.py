@@ -423,12 +423,14 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     def _run_job_in_hadoop(self):
         for step_num in range(self._num_steps()):
             step_args = self._args_for_step(step_num)
+            env = self._env_for_step(step_num)
 
             # log this *after* _args_for_step(), which can start a search
             # for the Hadoop streaming jar
             log.info('Running step %d of %d...' %
                      (step_num + 1, self._num_steps()))
             log.debug('> %s' % cmd_line(step_args))
+            log.debug('  with environment: %r' % sorted(env.items()))
 
             log_interpretation = {}
             self._log_interpretations.append(log_interpretation)
@@ -443,7 +445,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
                 # Hadoop is running
                 log.debug('No PTY available, using Popen() to invoke Hadoop')
 
-                step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)
+                step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
 
                 step_interpretation = _interpret_hadoop_jar_command_stderr(
                     step_proc.stderr,
@@ -460,7 +462,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             else:
                 # we have PTYs
                 if pid == 0:  # we are the child process
-                    os.execvp(step_args[0], step_args)
+                    os.execvpe(step_args[0], step_args, env)
                 else:
                     log.debug('Invoking Hadoop via PTY')
 
@@ -620,6 +622,17 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
                 spark_args +
                 [script] +
                 self._interpolate_input_and_output(script_args, step_num))
+
+    def _env_for_step(self, step_num):
+        step = self._get_step(step_num)
+
+        env = dict(os.environ)
+
+        # when running spark-submit, set its environment directly. See #1464
+        if step['type'].split('_')[0] == 'spark':
+            env.update(self._spark_cmdenv())
+
+        return env
 
     def _intermediate_output_uri(self, step_num):
         return posixpath.join(self._hadoop_tmp_dir,

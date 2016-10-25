@@ -24,6 +24,8 @@ import tarfile
 import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
+from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED
 
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.inline import InlineMRJobRunner
@@ -40,6 +42,7 @@ from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
@@ -539,7 +542,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
 class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def setUp(self):
-        super(SparkArgsForStepTestCase, self)
+        super(SparkArgsForStepTestCase, self).setUp()
 
         self.start(patch('mrjob.runner.MRJobRunner._python_bin',
                          return_value=['mypy']))
@@ -564,6 +567,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_default(self):
         job = MRNullSpark()
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -573,6 +577,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_cmdenv(self):
         job = MRNullSpark(['--cmdenv', 'FOO=bar', '--cmdenv', 'BAZ=qux'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -582,6 +587,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_cmdenv_can_override_python_bin(self):
         job = MRNullSpark(['--cmdenv', 'PYSPARK_PYTHON=ourpy'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -591,6 +597,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_jobconf(self):
         job = MRNullSpark(['--jobconf', 'spark.executor.memory=10g'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -601,6 +608,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_jobconf_uses_jobconf_for_step(self):
         job = MRNullSpark()
+        job.sandbox()
 
         with job.make_runner() as runner:
             with patch.object(
@@ -620,6 +628,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
             ['--cmdenv', 'FOO=bar',
              '--jobconf', 'spark.executorEnv.FOO=baz',
              '--jobconf', 'spark.yarn.appMasterEnv.PYSPARK_PYTHON=ourpy'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -636,6 +645,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
     def test_option_spark_args(self):
         job = MRNullSpark(['--spark-arg', '--name', '--spark-arg', 'Dave'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -649,6 +659,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
     def test_job_spark_args(self):
         # --extra-spark-arg is a passthrough option for MRNullSpark
         job = MRNullSpark(['--extra-spark-arg', '-v'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -663,6 +674,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
         job = MRNullSpark(
             ['--extra-spark-arg', '-v',
              '--spark-arg', '--name', '--spark-arg', 'Dave'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(
@@ -673,6 +685,94 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                 )
             )
 
+    def test_file_args(self):
+        foo1_path = self.makefile('foo1')
+        foo2_path = self.makefile('foo2')
+        baz_path = self.makefile('baz.tar.gz')
+
+        job = MRNullSpark(
+            ['--file', foo1_path + '#foo1',
+             '--file', foo2_path + '#bar',
+             '--archive', baz_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = self._mock_upload_mgr()
+
+            self.assertEqual(
+                runner._spark_args_for_step(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')
+                    ) + [
+                        '--files',
+                        (runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
+                         runner._upload_mgr.uri(foo2_path) + '#bar'),
+                        '--archives',
+                        runner._upload_mgr.uri(baz_path) + '#baz.tar.gz'
+                    ]
+                )
+            )
+
+    def _mock_upload_mgr(self):
+        def mock_uri(path):
+            return '<uri of %s>' % path
+
+        m = Mock()
+        m.uri = Mock(side_effect=mock_uri)
+
+        return m
+
+    def test_py_files(self):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._spark_py_files = Mock(
+                return_value=['<first py_file>', '<second py_file>']
+            )
+
+            self.assertEqual(
+                runner._spark_args_for_step(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')
+                    ) + [
+                        '--py-files',
+                        '<first py_file>,<second py_file>'
+                    ]
+                )
+            )
+
+
+class SparkPyFilesTestCase(SandboxedTestCase):
+
+    def test_default(self):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._spark_py_files(), [])
+
+    def test_eggs(self):
+        # by default, we pass py_files directly to Spark
+        egg1_path = self.makefile('dragon.egg')
+        egg2_path = self.makefile('horton.egg')
+
+        job = MRNullSpark(['--py-file', egg1_path, '--py-file', egg2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_py_files(),
+                [egg1_path, egg2_path]
+            )
+
+    def test_no_hash_paths(self):
+        egg_path = self.makefile('horton.egg')
+
+        job = MRNullSpark(['--py-file', egg_path + '#mayzie.egg'])
+        job.sandbox()
+
+        self.assertRaises(ValueError, job.make_runner)
 
 
 class StrictProtocolsInConfTestCase(TestCase):
@@ -746,9 +846,15 @@ class SetupTestCase(SandboxedTestCase):
         self.foo_tar_gz = os.path.join(self.tmp_dir, 'foo.tar.gz')
         tar_and_gzip(os.path.join(self.tmp_dir, 'foo'), self.foo_tar_gz)
 
+        self.foo_zip = os.path.join(self.tmp_dir, 'foo.zip')
+        zf = ZipFile(self.foo_zip, 'w', ZIP_DEFLATED)
+        zf.write(self.foo_py, 'foo.py')
+        zf.close()
+
         self.foo_py_size = os.path.getsize(self.foo_py)
         self.foo_sh_size = os.path.getsize(self.foo_sh)
         self.foo_tar_gz_size = os.path.getsize(self.foo_tar_gz)
+        self.foo_zip_size = os.path.getsize(self.foo_zip)
 
     def test_file_upload(self):
         job = MROSWalkJob(['-r', 'local',
@@ -848,6 +954,42 @@ class SetupTestCase(SandboxedTestCase):
         # double the number of bytes
         self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
                          self.foo_py_size * 2)
+
+    def test_python_zip_file(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'export PYTHONPATH=%s#:$PYTHONPATH' % self.foo_zip
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.zip'),
+                         self.foo_zip_size * 2)
+
+    def test_py_file(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--py-file', self.foo_zip,
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.zip'),
+                         self.foo_zip_size * 2)
 
     def test_setup_command(self):
         job = MROSWalkJob(

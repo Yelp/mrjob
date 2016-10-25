@@ -266,6 +266,12 @@ class MRJobRunner(object):
         self._fs = None
 
         self._working_dir_mgr = WorkingDirManager()
+
+        # track (name, path) of files and archives to upload to spark.
+        # these are a subset of those in self._working_dir_mgr
+        self._spark_files = []
+        self._spark_archives = []
+
         self._upload_mgr = None  # define in subclasses that use this
 
         self._script_path = mr_job_script
@@ -292,13 +298,17 @@ class MRJobRunner(object):
 
         # set up uploading
         for path in self._opts['upload_files']:
-            self._working_dir_mgr.add(**parse_legacy_hash_path(
-                'file', path, must_name='upload_files'))
-        for path in self._opts['upload_archives']:
-            self._working_dir_mgr.add(**parse_legacy_hash_path(
-                'archive', path, must_name='upload_archives'))
+            uf = parse_legacy_hash_path('file', path, must_name='upload_files')
+            self._working_dir_mgr.add(**uf)
+            self._spark_files.append((uf['name'], uf['path']))
 
-        # python_archives, setup, setup_cmds, and setup_scripts
+        for path in self._opts['upload_archives']:
+            ua = parse_legacy_hash_path('archive', path,
+                                        must_name='upload_archives')
+            self._working_dir_mgr.add(**ua)
+            self._spark_archives.append((ua['name'], ua['path']))
+
+        # py_files, python_archives, setup, setup_cmds, and setup_scripts
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmds() for details
         self._setup = self._parse_setup()
@@ -904,16 +914,30 @@ class MRJobRunner(object):
         true, create mrjob.tar.gz (if it doesn't exist already) and
         prepend a setup command that adds it to PYTHONPATH.
 
+        Patch in *py_files*.
+
         Also patch in the deprecated
         options *python_archives*, *setup_cmd*, and *setup_script*
         as setup commands.
         """
         setup = []
 
-        # python_archives
-        for path in self._opts['python_archives']:
-            path_dict = parse_legacy_hash_path('archive', path)
+        # py_files
+        for path in self._opts['py_files']:
+            # Spark (at least v1.3.1) doesn't work with # and --py-files,
+            # see #1375
+            if '#' in path:
+                raise ValueError("py_files cannot contain '#'")
+            path_dict = parse_legacy_hash_path('file', path)
             setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
+
+        # python_archives
+        if self._opts['python_archives']:
+            log.warning('python_archives is deprecated and will be removed'
+                        ' in v0.6.0. Try py_files instead')
+            for path in self._opts['python_archives']:
+                path_dict = parse_legacy_hash_path('archive', path)
+                setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
         # setup
         for cmd in self._opts['setup']:
@@ -1184,6 +1208,14 @@ class MRJobRunner(object):
 
         return args
 
+    def _spark_cmdenv(self):
+        """Returns a dictionary mapping environment variable to value,
+        including mapping PYSPARK_PYTHON to self._python_bin()
+        """
+        cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
+        cmdenv.update(self._opts['cmdenv'])
+        return cmdenv
+
     def _spark_args_for_step(self, step_num):
         """Build a list of extra args to the spark-submit binary for
         the given spark or spark_script step."""
@@ -1193,11 +1225,8 @@ class MRJobRunner(object):
 
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually
-        cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
-        cmdenv.update(self._opts['cmdenv'])
-
         jobconf = {}
-        for key, value in cmdenv.items():
+        for key, value in self._spark_cmdenv().items():
             jobconf['spark.executorEnv.%s' % key] = value
             jobconf['spark.yarn.appMasterEnv.%s' % key] = value
 
@@ -1207,6 +1236,14 @@ class MRJobRunner(object):
             if value is not None:
                 args.extend(['--conf', '%s=%s' % (key, value)])
 
+        # --files and --archives
+        args.extend(self._spark_upload_args())
+
+        # --py-files
+        py_files_arg = ','.join(self._spark_py_files())
+        if py_files_arg:
+            args.extend(['--py-files', py_files_arg])
+
         # spark_args option
         args.extend(self._opts['spark_args'])
 
@@ -1215,29 +1252,50 @@ class MRJobRunner(object):
 
         return args
 
-    def _arg_hash_paths(self, type):
-        """Helper function for the *upload_args methods."""
-        for name, path in self._working_dir_mgr.name_to_path(type).items():
-            uri = self._upload_mgr.uri(path)
-            yield '%s#%s' % (uri, name)
+    def _spark_upload_args(self):
+        return self._upload_args_helper('--files', self._spark_files,
+                                        '--archives', self._spark_archives)
+
+    def _spark_py_files(self):
+        """The list of files to pass to spark-submit with --py-files.
+
+        By default (cluster mode), Spark only accepts local files, so
+        we pass these as-is.
+        """
+        return self._opts['py_files']
 
     def _upload_args(self):
+        # just upload every file and archive in the working dir manager
+        return self._upload_args_helper('-files', None, '-archives', None)
+
+    def _upload_args_helper(
+            self, files_opt_str, files, archives_opt_str, archives):
         args = []
 
-        # TODO: does Hadoop have a way of coping with paths that have
-        # commas in their names?
-
-        file_hash_paths = list(self._arg_hash_paths('file'))
+        file_hash_paths = list(self._arg_hash_paths('file', files))
         if file_hash_paths:
-            args.append('-files')
+            args.append(files_opt_str)
             args.append(','.join(file_hash_paths))
 
-        archive_hash_paths = list(self._arg_hash_paths('archive'))
+        archive_hash_paths = list(self._arg_hash_paths('archive', archives))
         if archive_hash_paths:
-            args.append('-archives')
+            args.append(archives_opt_str)
             args.append(','.join(archive_hash_paths))
 
         return args
+
+    def _arg_hash_paths(self, type, named_paths=None):
+        """Helper function for the *upload_args methods."""
+        if named_paths is None:
+            # just return everything managed by _working_dir_mgr
+            named_paths = sorted(
+                self._working_dir_mgr.name_to_path(type).items())
+
+        for name, path in named_paths:
+            if not name:
+                name = self._working_dir_mgr.name(type, path)
+            uri = self._upload_mgr.uri(path)
+            yield '%s#%s' % (uri, name)
 
     def _invoke_sort(self, input_paths, output_path):
         """Use the local sort command to sort one or more input files. Raise

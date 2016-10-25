@@ -21,8 +21,10 @@ import os.path
 import pty
 from io import BytesIO
 from subprocess import check_call
+from subprocess import PIPE
 
 import mrjob.step
+from mrjob.conf import combine_dicts
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
@@ -1043,6 +1045,135 @@ class SparkStepArgsTestCase(SandboxedTestCase):
                 runner._step_output_uri(0),
                 ','.join(runner._step_input_uris(0)),
             ])
+
+
+class EnvForStepTestCase(MockHadoopTestCase):
+
+    def setUp(self):
+        super(EnvForStepTestCase, self).setUp()
+        os.environ.clear()  # for less noisy test failures
+
+    def test_streaming_step(self):
+        job = MRTwoStepJob(['-r', 'hadoop', '--cmdenv', 'FOO=bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._env_for_step(0),
+                dict(os.environ)
+            )
+
+    def test_jar_step(self):
+        job = MRJustAJar(['-r', 'hadoop', '--cmdenv', 'FOO=bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._env_for_step(0),
+                dict(os.environ)
+            )
+
+    def test_spark_step(self):
+        job = MRNullSpark(['-r', 'hadoop', '--cmdenv', 'FOO=bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._env_for_step(0),
+                combine_dicts(os.environ,
+                              dict(FOO='bar', PYSPARK_PYTHON=PYTHON_BIN))
+            )
+
+    def test_spark_script_step(self):
+        job = MRSparkScript(['-r', 'hadoop', '--cmdenv', 'FOO=bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._env_for_step(0),
+                combine_dicts(os.environ,
+                              dict(FOO='bar', PYSPARK_PYTHON=PYTHON_BIN))
+            )
+
+
+class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
+
+    def setUp(self):
+        super(RunJobInHadoopUsesEnvTestCase, self).setUp()
+
+        self.mock_num_steps = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner._num_steps',
+            return_value=1))
+
+        self.mock_args_for_step = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner._args_for_step',
+            return_value=['args', 'for', 'step']))
+
+        self.mock_env_for_step = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner._env_for_step',
+            return_value=dict(FOO='bar', BAZ='qux')))
+
+        self.mock_pty_fork = self.start(patch(
+            'pty.fork', return_value=(0, None)))
+
+        # end test once we invoke Popen or execvpe()
+        self.mock_Popen = self.start(patch(
+            'mrjob.hadoop.Popen', side_effect=StopIteration))
+
+        self.mock_execvpe = self.start(patch(
+            'os.execvpe', side_effect=StopIteration))
+
+    def test_with_pty(self):
+        job = MRNullSpark(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StopIteration, runner._run_job_in_hadoop)
+
+            self.mock_execvpe.assert_called_once_with(
+                'args', ['args', 'for', 'step'], dict(FOO='bar', BAZ='qux'))
+
+            self.assertFalse(self.mock_Popen.called)
+
+    def test_without_pty(self):
+        self.mock_pty_fork.side_effect = OSError
+
+        job = MRNullSpark(['-r', 'hadoop'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(StopIteration, runner._run_job_in_hadoop)
+
+            self.mock_Popen.assert_called_once_with(
+                ['args', 'for', 'step'],
+                stdout=PIPE, stderr=PIPE, env=dict(FOO='bar', BAZ='qux'))
+
+            self.assertFalse(self.mock_execvpe.called)
+
+
+class SparkPyFilesTestCase(MockHadoopTestCase):
+
+    def test_eggs(self):
+        egg1_path = self.makefile('dragon.egg')
+        egg2_path = self.makefile('horton.egg')
+
+        job = MRNullSpark([
+            '-r', 'hadoop',
+            '--py-file', egg1_path, '--py-file', egg2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            self.assertEqual(
+                runner._spark_py_files(),
+                [egg1_path, egg2_path]
+            )
+
+            # the py_files get uploaded anyway since they appear in
+            # _upload_dir_mgr.
+            self.assertIn(egg1_path, runner._upload_mgr.path_to_uri())
+            self.assertIn(egg2_path, runner._upload_mgr.path_to_uri())
 
 
 class SetupLineEncodingTestCase(MockHadoopTestCase):

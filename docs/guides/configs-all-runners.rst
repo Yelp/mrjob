@@ -48,6 +48,35 @@ options related to file uploading.
     Hadoop cluster or install it by some other method.
 
 .. mrjob-opt::
+   :config: py_files
+   :switch: --py-file
+   :type: :ref:`path list <data-type-path-list>`
+   :set: all
+   :default: ``[]``
+
+   List of ``.egg`` or ``.zip`` files to add to your job's ``PYTHONPATH``.
+
+   This is based on a Spark feature, but it works just as well with streaming
+   jobs.
+
+   .. versionadded:: 0.5.8.spark0
+
+.. mrjob-opt::
+    :config: python_archives
+    :switch: --python-archive
+    :type: :ref:`path list <data-type-path-list>`
+    :set: all
+    :default: ``[]``
+
+    Same as upload_archives, except they get added to the job's
+    :envvar:`PYTHONPATH`.
+
+    .. deprecated:: 0.5.8.spark0
+
+       Try :mrjob-opt:`py_files` with a `.zip` or `.egg` file instead. If you
+       must use an archive, see :ref:`cookbook-src-tree-pythonpath`.
+
+.. mrjob-opt::
     :config: upload_files
     :switch: --file
     :type: :ref:`path list <data-type-path-list>`
@@ -68,6 +97,10 @@ options related to file uploading.
 
         --file file_1.txt --file file_2.sqlite
 
+    .. versionchanged:: 0.5.8.spark0
+
+       This works with Spark as well.
+
 .. mrjob-opt::
     :config: upload_archives
     :switch: --archive
@@ -82,15 +115,10 @@ options related to file uploading.
     ``foo.tar.gz/``, and ``foo.tar.gz#stuff`` is unpacked to the directory
     ``stuff/``).
 
-.. mrjob-opt::
-    :config: python_archives
-    :switch: --python-archive
-    :type: :ref:`path list <data-type-path-list>`
-    :set: all
-    :default: ``[]``
+    .. versionchanged:: 0.5.8.spark0
 
-    Same as upload_archives, except they get added to the job's
-    :envvar:`PYTHONPATH`.
+       This works with Spark as well.
+
 
 Temp files and cleanup
 ======================
@@ -202,6 +230,11 @@ Job execution context
     On the command line::
 
         --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
+
+    .. versionchanged:: 0.5.8.spark
+
+       This works with Spark too. In client mode (hadoop runner), these
+       environment variables are passed directly to :command:`spark-submit`.
 
 .. mrjob-opt::
     :config: interpreter

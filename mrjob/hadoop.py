@@ -430,6 +430,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('Running step %d of %d...' %
                      (step_num + 1, self._num_steps()))
             log.debug('> %s' % cmd_line(step_args))
+            log.debug('  with environment: %r' % sorted(env.items()))
 
             log_interpretation = {}
             self._log_interpretations.append(log_interpretation)

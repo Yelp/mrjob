@@ -1208,6 +1208,14 @@ class MRJobRunner(object):
 
         return args
 
+    def _spark_cmdenv(self):
+        """Returns a dictionary mapping environment variable to value,
+        including mapping PYSPARK_PYTHON to self._python_bin()
+        """
+        cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
+        cmdenv.update(self._opts['cmdenv'])
+        return cmdenv
+
     def _spark_args_for_step(self, step_num):
         """Build a list of extra args to the spark-submit binary for
         the given spark or spark_script step."""
@@ -1217,11 +1225,8 @@ class MRJobRunner(object):
 
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually
-        cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
-        cmdenv.update(self._opts['cmdenv'])
-
         jobconf = {}
-        for key, value in cmdenv.items():
+        for key, value in self._spark_cmdenv().items():
             jobconf['spark.executorEnv.%s' % key] = value
             jobconf['spark.yarn.appMasterEnv.%s' % key] = value
 

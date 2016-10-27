@@ -189,6 +189,12 @@ _3_X_SPARK_BOOTSTRAP_ACTION = (
 # first AMI version to support Spark
 _MIN_SPARK_AMI_VERSION = '3.8.0'
 
+# first version of Spark that supports Python 3
+_MIN_SPARK_PY3_VERSION = '1.4.0'
+
+# first AMI version with Spark that supports Python 3
+_MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
+
 # always use these args with spark-submit
 _EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
 
@@ -1779,9 +1785,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 persistent=False)
             self._created_cluster = True
             log.info('Created new cluster %s' % self._cluster_id)
+
+            # warn if our bootstrapping is likely to fail
+            if self._should_bootstrap_spark() and not version_gte(
+                    self._opts['image_version'], _MIN_SPARK_AMI_VERSION):
+                log.warning(
+                    '  Installing Spark will probably fail; not'
+                    ' available on AMIs before %s' % _MIN_SPARK_AMI_VERSION)
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
+
+        # now that we know which cluster it is, check for Spark support
+        if self._has_spark_steps():
+            self._check_cluster_spark_support()
 
         # define our steps
         steps = self._build_steps()
@@ -2487,17 +2504,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # no release_label implies AMIs prior to 4.x
         if (add_spark and self._should_bootstrap_spark() and
                 not self._opts['release_label']):
+
             # running this action twice apparently breaks Spark's
             # ability to output to S3 (see #1367)
             if not self._has_spark_install_bootstrap_action():
                 actions.append(_3_X_SPARK_BOOTSTRAP_ACTION)
-
-                if not version_gte(self._opts['image_version'],
-                                   _MIN_SPARK_AMI_VERSION):
-                    log.warning(
-                        "Bootstrapping Spark probably won't work; not"
-                        " available AMIs before %s" %
-                        _MIN_SPARK_AMI_VERSION)
 
         results = []
         for action in actions:
@@ -2945,7 +2956,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
-            for ig in list(_yield_all_instance_groups(emr_conn, cluster.id)):
+            for ig in _yield_all_instance_groups(emr_conn, cluster.id):
                 # if you edit this code, please don't rely on any particular
                 # ordering of instance groups (see #1316)
                 role = ig.instancegrouptype.lower()
@@ -3169,7 +3180,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return _patched_describe_cluster(emr_conn, self._cluster_id)
 
     def get_hadoop_version(self):
-        return self._get_cluster_info('hadoop_version')
+        return self._get_app_versions().get('hadoop')
 
     def get_ami_version(self):
         log.warning('get_ami_version() is a depreacated alias for'
@@ -3196,6 +3207,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Get the internal ("private") address of the master node, so we
         can direct our SSH tunnel to it."""
         return self._get_cluster_info('master_private_ip')
+
+    def _get_app_versions(self):
+        """Returns a map from lowercase app name to version for our cluster."""
+        return self._get_cluster_info('app_versions')
 
     def _get_cluster_info(self, key):
         if not self._cluster_id:
@@ -3228,9 +3243,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if release_label:
                 cache['image_version'] = release_label.lstrip('emr-')
 
-        for a in cluster.applications:
-            if a.name.lower() == 'hadoop':  # 'Hadoop' on 4.x AMIs
-                cache['hadoop_version'] = a.version
+        cache['app_versions'] = dict(
+            (a.name.lower(), a.version) for a in cluster.applications)
 
         if cluster.status.state in ('RUNNING', 'WAITING'):
             cache['master_public_dns'] = cluster.masterpublicdnsname
@@ -3300,6 +3314,44 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return any(a.lower() == 'spark'
                    for a in self._applications(add_spark=False))
 
+    def _check_cluster_spark_support(self):
+        """Issue a warning if our cluster doesn't support Spark.
+
+        This should only be called if you are going to run one or more
+        Spark steps.
+        """
+        message = self._cluster_spark_support_warning()
+        if message:
+            log.warning(message)
+
+    def _cluster_spark_support_warning(self):
+        """Helper for _check_cluster_spark_support()."""
+        # TODO: this only works on AMI 4.x and later. on 3.x, the only
+        # application it will show is "hadoop"
+        spark_version = self._get_app_versions().get('spark')
+
+        if spark_version is None:
+            return '  Spark appears not to be installed!'
+
+        if not (PY2 or version_gte(spark_version, _MIN_SPARK_PY3_VERSION)):
+            return ('  Cluster is running Spark %s, which does not'
+                    ' support Python 3\n\n'
+                    '  Try AMI version %s or later' % (
+                        spark_version, _MIN_SPARK_PY3_AMI_VERSION))
+
+        # make sure there's enough memory to run Spark
+        for ig in _yield_all_instance_groups(
+                self.make_emr_conn(), self.get_cluster_id()):
+
+            if ig.instancegrouptype.lower() == 'master':
+                continue
+
+            mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype)
+            if mem and mem < _MIN_SPARK_INSTANCE_MEMORY:
+                return ('  instance type %s is too small for Spark;'
+                        ' your job may stall indefinitely')
+
+        return None
 
 
 def _encode_emr_api_params(x):

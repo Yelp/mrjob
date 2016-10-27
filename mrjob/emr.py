@@ -189,9 +189,6 @@ _3_X_SPARK_BOOTSTRAP_ACTION = (
 # first AMI version to support Spark
 _MIN_SPARK_AMI_VERSION = '3.8.0'
 
-# first version of Spark that supports Python 3
-_MIN_SPARK_PY3_VERSION = '1.4.0'
-
 # first AMI version with Spark that supports Python 3
 _MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
 
@@ -206,6 +203,13 @@ _S3_LOG_WAIT_MINUTES = 10
 
 # cheapest instance type that can run Spark
 _CHEAPEST_SPARK_INSTANCE_TYPE = 'm1.large'
+
+# minimum amount of memory to run spark jobs
+#
+# (it's possible that we could get by with slightly less memory, but
+# m1.medium definitely doesn't work)
+_MIN_SPARK_INSTANCE_MEMORY = (
+    EC2_INSTANCE_TYPE_TO_MEMORY[_CHEAPEST_SPARK_INSTANCE_TYPE])
 
 # cheapest instance type that can run resource manager and non-Spark tasks
 # on 3.x AMI and above
@@ -1785,13 +1789,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 persistent=False)
             self._created_cluster = True
             log.info('Created new cluster %s' % self._cluster_id)
-
-            # warn if our bootstrapping is likely to fail
-            if self._should_bootstrap_spark() and not version_gte(
-                    self._opts['image_version'], _MIN_SPARK_AMI_VERSION):
-                log.warning(
-                    '  Installing Spark will probably fail; not'
-                    ' available on AMIs before %s' % _MIN_SPARK_AMI_VERSION)
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)
@@ -3209,7 +3206,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return self._get_cluster_info('master_private_ip')
 
     def _get_app_versions(self):
-        """Returns a map from lowercase app name to version for our cluster."""
+        """Returns a map from lowercase app name to version for our cluster.
+
+        This only works for non-'hadoop' apps on 4.x AMIs and later.
+        """
         return self._get_cluster_info('app_versions')
 
     def _get_cluster_info(self, key):
@@ -3326,30 +3326,33 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _cluster_spark_support_warning(self):
         """Helper for _check_cluster_spark_support()."""
-        # TODO: this only works on AMI 4.x and later. on 3.x, the only
-        # application it will show is "hadoop"
-        spark_version = self._get_app_versions().get('spark')
+        image_version = self.get_image_version()
 
-        if spark_version is None:
-            return '  Spark appears not to be installed!'
-
-        if not (PY2 or version_gte(spark_version, _MIN_SPARK_PY3_VERSION)):
-            return ('  Cluster is running Spark %s, which does not'
-                    ' support Python 3\n\n'
-                    '  Try AMI version %s or later' % (
-                        spark_version, _MIN_SPARK_PY3_AMI_VERSION))
+        if PY2:
+            if not version_gte(image_version, _MIN_SPARK_AMI_VERSION):
+                return ('  AMI version %s does not support Spark;\n'
+                        '  (try --image-version %s or later)' % (
+                            image_version, _MIN_SPARK_AMI_VERSION))
+        else:
+            if not version_gte(image_version, _MIN_SPARK_PY3_AMI_VERSION):
+                return ('  AMI version %s does not support Python 3 on Spark\n'
+                        '  (try --image-version %s or later)' % (
+                            image_version, _MIN_SPARK_PY3_AMI_VERSION))
 
         # make sure there's enough memory to run Spark
-        for ig in _yield_all_instance_groups(
-                self.make_emr_conn(), self.get_cluster_id()):
+        instance_groups = list(_yield_all_instance_groups(
+            self.make_emr_conn(), self.get_cluster_id()))
 
-            if ig.instancegrouptype.lower() == 'master':
+        for ig in instance_groups:
+            # master doesn't matter if it's not running tasks
+            if ig.instancegrouptype.lower() == 'master' and (
+                    len(instance_groups) > 1):
                 continue
 
             mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype)
             if mem and mem < _MIN_SPARK_INSTANCE_MEMORY:
                 return ('  instance type %s is too small for Spark;'
-                        ' your job may stall indefinitely')
+                        ' your job may stall forever' % ig.instancetype)
 
         return None
 

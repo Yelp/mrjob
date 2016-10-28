@@ -538,6 +538,49 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-partitioner', partitioner])
 
+class ArgsForSparkStepTestCase(SandboxedTestCase):
+    # just test the structure of _args_for_spark_step()
+
+    def setUp(self):
+        self.mock_get_spark_submit_bin = self.start(patch(
+            'mrjob.runner.MRJobRunner.get_spark_submit_bin',
+            return_value=['<spark-submit bin>']))
+
+        self.mock_spark_submit_args = self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_submit_args',
+            return_value=['<spark submit args>']))
+
+        self.mock_spark_script_path = self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_script_path',
+            return_value='<spark script path>'))
+
+        self.mock_spark_script_args = self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_script_args',
+            return_value=['<spark script args>']))
+
+    def _test_step(self, step_num):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._args_for_spark_step(step_num),
+                ['<spark-submit bin>',
+                 '<spark submit args>',
+                 '<spark script path>',
+                 '<spark script args>'])
+
+            self.mock_get_spark_submit_bin.assert_called_once_with()
+            self.mock_spark_submit_args.assert_called_once_with(step_num)
+            self.mock_spark_script_path.assert_called_once_with(step_num)
+            self.mock_spark_script_args.assert_called_once_with(step_num)
+
+    def test_step_0(self):
+        self._test_step(0)
+
+    def test_step_1(self):
+        self._test_step(1)
+
 
 class SparkSubmitArgsTestCase(SandboxedTestCase):
 

@@ -35,6 +35,8 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.runner import MRJobRunner
+from mrjob.step import INPUT
+from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
@@ -915,7 +917,71 @@ class SparkScriptPathTestCase(SandboxedTestCase):
                 runner._spark_script_path, 0)
 
 
-class StrictProtocolsInConfTestCase(TestCase):
+class SparkScriptArgsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(SparkScriptArgsTestCase, self).setUp()
+
+        # don't bother with actual input/output URIs, which
+        # are tested elsewhere
+        def mock_interpolate_input_and_output(args, step_num):
+            def interpolate(arg):
+                if arg == INPUT:
+                    return '<step %d input>' % step_num
+                elif arg == OUTPUT:
+                    return '<step %d output>' % step_num
+                else:
+                    return arg
+
+            return [interpolate(arg) for arg in args]
+
+        self.start(patch(
+            'mrjob.runner.MRJobRunner._interpolate_input_and_output',
+            side_effect=mock_interpolate_input_and_output))
+
+    def test_spark_mr_job(self):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '<step 0 input>',
+                 '<step 0 output>'])
+
+    # test passthrough args here
+
+    def test_spark_script(self):
+        job = MRSparkScript(['--script-arg', 'foo', '--script-arg', 'bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['foo', 'bar'])
+
+    def test_spark_script_interpolation(self):
+        job = MRSparkScript(['--script-arg', OUTPUT, '--script-arg', INPUT])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['<step 0 output>', '<step 0 input>'])
+
+    def test_streaming_step_not_okay(self):
+        job = MRTwoStepJob()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(
+                TypeError,
+                runner._spark_script_args, 0)
+
+
+class StrictProtocolsInConfTestCase(SandboxedTestCase):
     # regression tests for #1302, where command-line option's default
     # overrode configs
 

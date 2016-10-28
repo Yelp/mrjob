@@ -951,7 +951,19 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                  '<step 0 input>',
                  '<step 0 output>'])
 
-    # test passthrough args here
+    def test_spark_passthrough_arg(self):
+        job = MRNullSpark(['--extra-spark-arg', '--verbose'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '--extra-spark-arg',
+                 '--verbose',
+                 '<step 0 input>',
+                 '<step 0 output>'])
 
     def test_spark_script(self):
         job = MRSparkScript(['--script-arg', 'foo', '--script-arg', 'bar'])

@@ -1240,12 +1240,15 @@ class MRJobRunner(object):
 
         if step['type'] == 'spark':
             # TODO: add in passthrough options
-            args = [
-                '--step-num=%d' % step_num,
-                '--spark',
-                mrjob.step.INPUT,
-                mrjob.step.OUTPUT,
-            ]
+            args = (
+                [
+                    '--step-num=%d' % step_num,
+                    '--spark',
+                ] + self._mr_job_extra_args() + [
+                    mrjob.step.INPUT,
+                    mrjob.step.OUTPUT,
+                ]
+            )
         elif step['type'] == 'spark_script':
             args = step['args']
         else:

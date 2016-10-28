@@ -769,12 +769,35 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
         baz_path = self.makefile('baz.tar.gz')
-        qux_path = self.makefile('qux')
 
         job = MRNullSpark([
             '--file', foo1_path + '#foo1',
             '--file', foo2_path + '#bar',
             '--archive', baz_path,
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._upload_mgr = self._mock_upload_mgr()
+
+            self.assertEqual(
+                runner._spark_submit_args(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')
+                    ) + [
+                        '--files',
+                        (runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
+                         runner._upload_mgr.uri(foo2_path) + '#bar'),
+                        '--archives',
+                        runner._upload_mgr.uri(baz_path) + '#baz.tar.gz'
+                    ]
+                )
+            )
+
+    def test_file_upload_args(self):
+        qux_path = self.makefile('qux')
+
+        job = MRNullSpark([
             '--extra-file', qux_path,  # file upload arg
         ])
         job.sandbox()
@@ -788,16 +811,12 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                         cmdenv=dict(PYSPARK_PYTHON='mypy')
                     ) + [
                         '--files',
-                        (runner._upload_mgr.uri(qux_path) + '#qux' + ',' +
-                         runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
-                         runner._upload_mgr.uri(foo2_path) + '#bar'),
-                        '--archives',
-                        runner._upload_mgr.uri(baz_path) + '#baz.tar.gz'
+                        runner._upload_mgr.uri(qux_path) + '#qux'
                     ]
                 )
             )
 
-    maxDiff = None
+
 
     def _mock_upload_mgr(self):
         def mock_uri(path):

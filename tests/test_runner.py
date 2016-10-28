@@ -14,6 +14,7 @@
 """Test the runner base class MRJobRunner"""
 import datetime
 import getpass
+import inspect
 import os
 import os.path
 import shutil
@@ -40,6 +41,7 @@ from mrjob.util import tar_and_gzip
 
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
+from tests.mr_spark_script import MRSparkScript
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -819,6 +821,26 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             )
 
 
+    def test_spark_script_step_okay(self):
+        job = MRSparkScript()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
+    def test_streaming_step_not_okay(self):
+        job = MRTwoStepJob()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(
+                TypeError,
+                runner._spark_submit_args, 0)
+
+
 class SparkPyFilesTestCase(SandboxedTestCase):
 
     def test_default(self):
@@ -849,6 +871,48 @@ class SparkPyFilesTestCase(SandboxedTestCase):
         job.sandbox()
 
         self.assertRaises(ValueError, job.make_runner)
+
+
+class SparkScriptPathTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(SparkScriptPathTestCase, self).setUp()
+
+        self.mock_interpolate_spark_script_path = self.start(patch(
+            'mrjob.runner.MRJobRunner._interpolate_spark_script_path'))
+
+    def test_spark_mr_job(self):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_path(0),
+                self.mock_interpolate_spark_script_path(
+                    inspect.getfile(MRNullSpark))
+            )
+
+    def test_spark_script(self):
+        self.fake_script = self.makefile('fake_script.py')
+
+        job = MRSparkScript(['--script', self.fake_script])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_path(0),
+                self.mock_interpolate_spark_script_path(
+                    self.fake_script)
+            )
+
+    def test_streaming_step_not_okay(self):
+        job = MRTwoStepJob()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertRaises(
+                TypeError,
+                runner._spark_script_path, 0)
 
 
 class StrictProtocolsInConfTestCase(TestCase):

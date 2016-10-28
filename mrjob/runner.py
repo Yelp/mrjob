@@ -1229,7 +1229,7 @@ class MRJobRunner(object):
         elif step['type'] == 'spark_script':
             path = step['script']
         else:
-            raise ValueError('Unknown spark step type: %r' % step['type'])
+            raise TypeError('Bad step type: %r' % step['type'])
 
         return self._interpolate_spark_script_path(path)
 
@@ -1249,7 +1249,7 @@ class MRJobRunner(object):
         elif step['type'] == 'spark_script':
             args = step['args']
         else:
-            raise ValueError('Unknown spark step type: %r' % step['type'])
+            raise TypeError('Bad step type: %r' % step['type'])
 
         return self._interpolate_input_and_output(args, step_num)
 
@@ -1280,6 +1280,9 @@ class MRJobRunner(object):
         """Build a list of extra args to the spark-submit binary for
         the given spark or spark_script step."""
         step = self._get_step(step_num)
+
+        if step['type'].split('_')[0] != 'spark':
+            raise TypeError('non-Spark step: %r' % step)
 
         args = []
 

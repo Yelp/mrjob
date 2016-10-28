@@ -539,10 +539,10 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
                              ['-partitioner', partitioner])
 
 
-class SparkArgsForStepTestCase(SandboxedTestCase):
+class SparkSubmitArgsTestCase(SandboxedTestCase):
 
     def setUp(self):
-        super(SparkArgsForStepTestCase, self).setUp()
+        super(SparkSubmitArgsTestCase, self).setUp()
 
         self.start(patch('mrjob.runner.MRJobRunner._python_bin',
                          return_value=['mypy']))
@@ -571,7 +571,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_args_for_step(0),
+                runner._spark_submit_args(0),
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
 
@@ -581,7 +581,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_args_for_step(0),
+                runner._spark_submit_args(0),
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy', FOO='bar', BAZ='qux')))
 
@@ -591,7 +591,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_args_for_step(0),
+                runner._spark_submit_args(0),
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='ourpy')))
 
@@ -601,7 +601,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_args_for_step(0),
+                runner._spark_submit_args(0),
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy'),
                     jobconf={'spark.executor.memory': '10g'}))
@@ -616,7 +616,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
                     return_value=dict(foo='bar')) as mock_jobconf_for_step:
 
                 self.assertEqual(
-                    runner._spark_args_for_step(0),
+                    runner._spark_submit_args(0),
                     self._expected_conf_args(
                         cmdenv=dict(PYSPARK_PYTHON='mypy'),
                         jobconf=dict(foo='bar')))
@@ -632,7 +632,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_args_for_step(0),
+                runner._spark_submit_args(0),
                 self._expected_conf_args(
                     jobconf={
                         'spark.executorEnv.FOO': 'baz',
@@ -649,7 +649,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_args_for_step(0), (
+                runner._spark_submit_args(0), (
                     self._expected_conf_args(
                         cmdenv=dict(PYSPARK_PYTHON='mypy')) +
                     ['--name', 'Dave']
@@ -663,7 +663,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_args_for_step(0), (
+                runner._spark_submit_args(0), (
                     self._expected_conf_args(
                         cmdenv=dict(PYSPARK_PYTHON='mypy')) +
                     ['-v']
@@ -678,7 +678,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertEqual(
-                runner._spark_args_for_step(0), (
+                runner._spark_submit_args(0), (
                     self._expected_conf_args(
                         cmdenv=dict(PYSPARK_PYTHON='mypy')) +
                     ['--name', 'Dave', '-v']
@@ -700,7 +700,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
             runner._upload_mgr = self._mock_upload_mgr()
 
             self.assertEqual(
-                runner._spark_args_for_step(0), (
+                runner._spark_submit_args(0), (
                     self._expected_conf_args(
                         cmdenv=dict(PYSPARK_PYTHON='mypy')
                     ) + [
@@ -732,7 +732,7 @@ class SparkArgsForStepTestCase(SandboxedTestCase):
             )
 
             self.assertEqual(
-                runner._spark_args_for_step(0), (
+                runner._spark_submit_args(0), (
                     self._expected_conf_args(
                         cmdenv=dict(PYSPARK_PYTHON='mypy')
                     ) + [

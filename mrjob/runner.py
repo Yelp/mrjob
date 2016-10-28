@@ -1215,7 +1215,7 @@ class MRJobRunner(object):
         """
         step = self._get_step(step_num)
 
-        spark_args = self._spark_args_for_step(step_num)
+        spark_args = self._spark_submit_args(step_num)
         script_path, script_args = self._spark_script_path_and_args(step_num)
 
         return (
@@ -1267,7 +1267,7 @@ class MRJobRunner(object):
         cmdenv.update(self._opts['cmdenv'])
         return cmdenv
 
-    def _spark_args_for_step(self, step_num):
+    def _spark_submit_args(self, step_num):
         """Build a list of extra args to the spark-submit binary for
         the given spark or spark_script step."""
         step = self._get_step(step_num)

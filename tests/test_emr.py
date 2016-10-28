@@ -3626,9 +3626,9 @@ class SparkStepTestCase(MockBotoTestCase):
     def setUp(self):
         super(SparkStepTestCase, self).setUp()
 
-        # _spark_args_for_step() is tested elsewhere
+        # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_args_for_step',
+            'mrjob.runner.MRJobRunner._spark_submit_args',
             return_value=['<spark args for step>']))
 
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
@@ -3708,9 +3708,9 @@ class SparkScriptStepTestCase(MockBotoTestCase):
         self.fake_script = os.path.join(self.tmp_dir, 'fake.py')
         open(self.fake_script, 'w').close()
 
-        # _spark_args_for_step() is tested elsewhere
+        # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_args_for_step',
+            'mrjob.runner.MRJobRunner._spark_submit_args',
             return_value=['<spark args for step>']))
 
     def test_script_gets_uploaded(self):

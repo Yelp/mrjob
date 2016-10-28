@@ -998,9 +998,9 @@ class SparkStepArgsTestCase(SandboxedTestCase):
     def setUp(self):
         super(SparkStepArgsTestCase, self).setUp()
 
-        # _spark_args_for_step() is tested elsewhere
+        # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_args_for_step',
+            'mrjob.runner.MRJobRunner._spark_submit_args',
             return_value=['<spark args for step>']))
 
     def test_spark_step(self):

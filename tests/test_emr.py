@@ -30,7 +30,7 @@ import mrjob.emr
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _3_X_SPARK_SUBMIT
-from mrjob.emr import _4_X_INTERMEDIARY_JAR
+from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _EMR_SPARK_ARGS
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
@@ -3424,7 +3424,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
     def test_4_x_ami(self):
         runner = self.launch_runner('--image-version', '4.0.0')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
-                         (_4_X_INTERMEDIARY_JAR, ['hadoop-streaming']))
+                         (_4_X_COMMAND_RUNNER_JAR, ['hadoop-streaming']))
 
     def test_local_hadoop_streaming_jar(self):
         jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
@@ -3662,7 +3662,7 @@ class SparkStepTestCase(MockBotoTestCase):
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
-                steps[0].config.jar, _4_X_INTERMEDIARY_JAR)
+                steps[0].config.jar, _4_X_COMMAND_RUNNER_JAR)
             self.assertEqual(
                 steps[0].config.args[0].value, 'spark-submit')
 
@@ -3767,7 +3767,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
-                steps[0].config.jar, _4_X_INTERMEDIARY_JAR)
+                steps[0].config.jar, _4_X_COMMAND_RUNNER_JAR)
             self.assertEqual(
                 steps[0].config.args[0].value, 'spark-submit')
 

@@ -1208,6 +1208,57 @@ class MRJobRunner(object):
 
         return args
 
+    def _args_for_spark_step(self, step_num):
+        """The actual arguments used to run the spark-submit command.
+
+        This handles both ``spark`` and ``spark_script`` step types.
+        """
+        step = self._get_step(step_num)
+
+        spark_args = self._spark_args_for_step(step_num)
+        script_path, script_args = self._spark_script_path_and_args(step_num)
+
+        return (
+            self.get_spark_submit_bin() +
+            self._spark_submit_arg_prefix() +
+            spark_args +
+            [self._interpolate_spark_script_path(script_path)] +
+            self._interpolate_input_and_output(script_args, step_num)
+        )
+
+    def _spark_script_path_and_args(self, step_num):
+        """Helper for _args_for_spark_step()."""
+        step = self._get_step(step_num)
+
+        if step['type'] == 'spark':
+            # TODO: add in passthrough options
+            script_args = [
+                '--step-num=%d' % step_num,
+                '--spark',
+                mrjob.step.INPUT,
+                mrjob.step.OUTPUT,
+            ]
+            return (self._script_path, script_args)
+        elif step['type'] == 'spark_script':
+            return (step['script'], step['args'])
+        else:
+            raise ValueError('Unknown spark step type: %r' % step['type'])
+
+    def get_spark_submit_bin(self):
+        """The spark-submit command, as a list of args. Re-define
+        this in your subclass for runner-specific behavior.
+        """
+        return self._opts['spark_submit_bin'] or ['spark-submit']
+
+    def _spark_submit_arg_prefix(self):
+        """Runner-specific args to spark submit (e.g. ['--master', 'yarn'])"""
+        return []
+
+    def _interpolate_spark_script_path(self, path):
+        """Redefine this in your subclass if the given path needs to be
+        translated to a URI when running spark (e.g. on EMR)."""
+        return path
+
     def _spark_cmdenv(self):
         """Returns a dictionary mapping environment variable to value,
         including mapping PYSPARK_PYTHON to self._python_bin()

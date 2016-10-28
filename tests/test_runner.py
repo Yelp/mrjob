@@ -816,8 +816,6 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 )
             )
 
-
-
     def _mock_upload_mgr(self):
         def mock_uri(path):
             return '<uri of %s>' % path

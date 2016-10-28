@@ -539,10 +539,6 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
                              ['-partitioner', partitioner])
 
 
-
-
-
-
 class SparkSubmitArgsTestCase(SandboxedTestCase):
 
     def setUp(self):
@@ -550,9 +546,6 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
         self.start(patch('mrjob.runner.MRJobRunner._python_bin',
                          return_value=['mypy']))
-
-        self.start(patch('mrjob.runner.MRJobRunner._spark_submit_arg_prefix',
-                         return_value=['<arg prefix>']))
 
     def _expected_conf_args(self, cmdenv=None, jobconf=None):
         conf = {}
@@ -565,7 +558,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         if jobconf:
             conf.update(jobconf)
 
-        args = ['<arg prefix>']
+        args = []
 
         for key, value in sorted(conf.items()):
             args.extend(['--conf', '%s=%s' % (key, value)])
@@ -579,6 +572,20 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
+    def test_spark_submit_arg_prefix(self):
+        self.start(patch('mrjob.runner.MRJobRunner._spark_submit_arg_prefix',
+                         return_value=['<arg prefix>']))
+
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                ['<arg prefix>'] +
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
 

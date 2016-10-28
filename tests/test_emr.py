@@ -3629,7 +3629,7 @@ class SparkStepTestCase(MockBotoTestCase):
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
             'mrjob.runner.MRJobRunner._spark_submit_args',
-            return_value=['<spark args for step>']))
+            return_value=['<spark submit args>']))
 
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
@@ -3689,9 +3689,8 @@ class SparkStepTestCase(MockBotoTestCase):
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],
-                _EMR_SPARK_ARGS +
                 [
-                    '<spark args for step>',
+                    '<spark submit args>',
                     script_uri,
                     '--step-num=0',
                     '--spark',
@@ -3711,7 +3710,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
             'mrjob.runner.MRJobRunner._spark_submit_args',
-            return_value=['<spark args for step>']))
+            return_value=['<spark submit args>']))
 
     def test_script_gets_uploaded(self):
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script])
@@ -3732,7 +3731,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],
-                _EMR_SPARK_ARGS + ['<spark args for step>', script_uri])
+                ['<spark submit args>', script_uri])
 
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
@@ -3798,9 +3797,8 @@ class SparkScriptStepTestCase(MockBotoTestCase):
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],
-                _EMR_SPARK_ARGS +
                 [
-                    '<spark args for step>',
+                    '<spark submit args>',
                     script_uri,
                     input1_uri + ',' + input2_uri,
                     '-o',

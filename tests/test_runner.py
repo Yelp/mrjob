@@ -547,6 +547,9 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         self.start(patch('mrjob.runner.MRJobRunner._python_bin',
                          return_value=['mypy']))
 
+        self.start(patch('mrjob.runner.MRJobRunner._spark_submit_arg_prefix',
+                         return_value=['<arg prefix>']))
+
     def _expected_conf_args(self, cmdenv=None, jobconf=None):
         conf = {}
 
@@ -558,7 +561,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         if jobconf:
             conf.update(jobconf)
 
-        args = []
+        args = ['<arg prefix>']
 
         for key, value in sorted(conf.items()):
             args.extend(['--conf', '%s=%s' % (key, value)])

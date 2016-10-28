@@ -1215,13 +1215,11 @@ class MRJobRunner(object):
         """
         step = self._get_step(step_num)
 
-        spark_args = self._spark_submit_args(step_num)
         script_path, script_args = self._spark_script_path_and_args(step_num)
 
         return (
             self.get_spark_submit_bin() +
-            self._spark_submit_arg_prefix() +
-            spark_args +
+            self._spark_submit_args(step_num) +
             [self._interpolate_spark_script_path(script_path)] +
             self._interpolate_input_and_output(script_args, step_num)
         )
@@ -1273,6 +1271,9 @@ class MRJobRunner(object):
         step = self._get_step(step_num)
 
         args = []
+
+        # add runner-specific args
+        args.extend(self._spark_submit_arg_prefix())
 
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually

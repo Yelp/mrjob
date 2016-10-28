@@ -1001,7 +1001,7 @@ class SparkStepArgsTestCase(SandboxedTestCase):
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
             'mrjob.runner.MRJobRunner._spark_submit_args',
-            return_value=['<spark args for step>']))
+            return_value=['<spark submit args>']))
 
     def test_spark_step(self):
         job = MRNullSpark([
@@ -1014,8 +1014,7 @@ class SparkStepArgsTestCase(SandboxedTestCase):
 
             self.assertEqual(runner._args_for_step(0), [
                 'spark-submit',
-                '--master', 'yarn',
-                '<spark args for step>',
+                '<spark submit args>',
                 runner._script_path,
                 '--step-num=0',
                 '--spark',
@@ -1038,8 +1037,7 @@ class SparkStepArgsTestCase(SandboxedTestCase):
 
             self.assertEqual(runner._args_for_step(0), [
                 'spark-submit',
-                '--master', 'yarn',
-                '<spark args for step>',
+                '<spark submit args>',
                 '/path/to/spark_script.py',
                 'foo',
                 runner._step_output_uri(0),

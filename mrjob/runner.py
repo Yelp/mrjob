@@ -1213,34 +1213,45 @@ class MRJobRunner(object):
 
         This handles both ``spark`` and ``spark_script`` step types.
         """
-        step = self._get_step(step_num)
-
-        script_path, script_args = self._spark_script_path_and_args(step_num)
-
         return (
             self.get_spark_submit_bin() +
             self._spark_submit_args(step_num) +
-            [self._interpolate_spark_script_path(script_path)] +
-            self._interpolate_input_and_output(script_args, step_num)
+            [self._spark_script_path(step_num)] +
+            self._spark_script_args(step_num)
         )
 
-    def _spark_script_path_and_args(self, step_num):
-        """Helper for _args_for_spark_step()."""
+    def _spark_script_path(self, step_num):
+        """The path of the spark script, used by _args_for_spark_step()."""
+        step = self._get_step(step_num)
+
+        if step['type'] == 'spark':
+            path = self._script_path
+        elif step['type'] == 'spark_script':
+            path = step['script']
+        else:
+            raise ValueError('Unknown spark step type: %r' % step['type'])
+
+        return self._interpolate_spark_script_path(path)
+
+    def _spark_script_args(self, step_num):
+        """A list of args to the spark script, used by
+        _args_for_spark_step()."""
         step = self._get_step(step_num)
 
         if step['type'] == 'spark':
             # TODO: add in passthrough options
-            script_args = [
+            args = [
                 '--step-num=%d' % step_num,
                 '--spark',
                 mrjob.step.INPUT,
                 mrjob.step.OUTPUT,
             ]
-            return (self._script_path, script_args)
         elif step['type'] == 'spark_script':
-            return (step['script'], step['args'])
+            args = step['args']
         else:
             raise ValueError('Unknown spark step type: %r' % step['type'])
+
+        return self._interpolate_input_and_output(args, step_num)
 
     def get_spark_submit_bin(self):
         """The spark-submit command, as a list of args. Re-define

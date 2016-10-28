@@ -582,6 +582,25 @@ class ArgsForSparkStepTestCase(SandboxedTestCase):
         self._test_step(1)
 
 
+class GetSparkSubmitBinTestCase(SandboxedTestCase):
+
+    def test_default(self):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner.get_spark_submit_bin(),
+                             ['spark-submit'])
+
+    def test_spark_submit_bin_option(self):
+        job = MRNullSpark(['--spark-submit-bin', 'spork-submit -kfc'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner.get_spark_submit_bin(),
+                             ['spork-submit', '-kfc'])
+
+
 class SparkSubmitArgsTestCase(SandboxedTestCase):
 
     def setUp(self):

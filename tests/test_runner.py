@@ -769,11 +769,14 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
         baz_path = self.makefile('baz.tar.gz')
+        qux_path = self.makefile('qux')
 
-        job = MRNullSpark(
-            ['--file', foo1_path + '#foo1',
-             '--file', foo2_path + '#bar',
-             '--archive', baz_path])
+        job = MRNullSpark([
+            '--file', foo1_path + '#foo1',
+            '--file', foo2_path + '#bar',
+            '--archive', baz_path,
+            '--extra-file', qux_path,  # file upload arg
+        ])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -785,13 +788,16 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                         cmdenv=dict(PYSPARK_PYTHON='mypy')
                     ) + [
                         '--files',
-                        (runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
+                        (runner._upload_mgr.uri(qux_path) + '#qux' + ',' +
+                         runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
                          runner._upload_mgr.uri(foo2_path) + '#bar'),
                         '--archives',
                         runner._upload_mgr.uri(baz_path) + '#baz.tar.gz'
                     ]
                 )
             )
+
+    maxDiff = None
 
     def _mock_upload_mgr(self):
         def mock_uri(path):
@@ -964,6 +970,26 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                  '--verbose',
                  '<step 0 input>',
                  '<step 0 output>'])
+
+    def test_spark_file_arg(self):
+        foo_path = self.makefile('foo')
+
+        job = MRNullSpark(['--extra-file', foo_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['--step-num=0',
+                 '--spark',
+                 '--extra-file',
+                 'foo',
+                 '<step 0 input>',
+                 '<step 0 output>'])
+
+            name_to_path = runner._working_dir_mgr.name_to_path('file')
+            self.assertIn('foo', name_to_path)
+            self.assertEqual(name_to_path['foo'], foo_path)
 
     def test_spark_script(self):
         job = MRSparkScript(['--script-arg', 'foo', '--script-arg', 'bar'])

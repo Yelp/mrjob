@@ -26,6 +26,9 @@ class MRNullSpark(MRJob):
             '--extra-spark-arg', dest='extra_spark_args',
             action='append', default=[])
 
+        self.add_file_option(
+            '--extra-file', dest='extra_file')
+
     def spark(self):
         pass
 

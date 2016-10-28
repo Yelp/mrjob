@@ -295,6 +295,7 @@ class MRJobRunner(object):
                 arg_file = parse_legacy_hash_path('file', path)
                 self._working_dir_mgr.add(**arg_file)
                 self._file_upload_args.append((arg, arg_file))
+                self._spark_files.append((arg_file['name'], arg_file['path']))
 
         # set up uploading
         for path in self._opts['upload_files']:

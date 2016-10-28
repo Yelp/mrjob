@@ -5853,3 +5853,117 @@ class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):
 
         self.assertEqual(runner._opts['image_version'], '4.0.0')
         self.assertEqual(runner._opts['release_label'], 'emr-4.0.0')
+
+
+class TestClusterSparkSupportWarning(MockBotoTestCase):
+
+    def test_okay(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNone(message)
+
+    def test_no_python_3(self):
+        if PY2:
+            return
+
+        job = MRNullSpark(['-r', 'emr'])  # default AMI is 3.11.0
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('Python 3', message)
+            self.assertIn('4.0.0', message)
+
+    def test_too_old(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '3.7.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('support Spark', message)
+            self.assertNotIn('Python 3', message)
+            # should suggest an AMI that works with this version of Python
+            if PY2:
+                self.assertIn('3.8.0', message)
+            else:
+                self.assertIn('4.0.0', message)
+
+    def test_master_instance_too_small(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--num-core-instances', '2',
+                           '--core-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_core_instances_too_small(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--num-core-instances', '2',
+                           '--core-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_task_instances_too_small(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--num-core-instances', '2',
+                           '--core-instance-type', 'm1.large',
+                           '--num-task-instances', '2',
+                           '--task-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_sole_master_instance_too_small(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--master-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_okay_with_core_instances_and_small_master(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--num-core-instances', '2',
+                           '--master-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNone(message)

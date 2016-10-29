@@ -507,10 +507,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._args_for_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._args_for_jar_step(step_num)
-        elif step['type'] == 'spark':
+        elif step['type'] in ('spark', 'spark_script'):
             return self._args_for_spark_step(step_num)
-        elif step['type'] == 'spark_script':
-            return self._args_for_spark_script_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -589,39 +587,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return args
 
-    def _args_for_spark_step(self, step_num):
-        return self._args_for_spark_step_helper(
-            step_num=step_num,
-            script=self._script_path,
-            script_args=[
-                '--step-num=%d' % step_num,
-                '--spark',
-                mrjob.step.INPUT,
-                mrjob.step.OUTPUT,
-            ],
-        )
-
-    def _args_for_spark_script_step(self, step_num):
-        step = self._get_step(step_num)
-
-        return self._args_for_spark_step_helper(
-            step_num=step_num,
-            script=step['script'],
-            script_args=step['args']
-        )
-
-    def _args_for_spark_step_helper(self, step_num, script, script_args):
-        """Common code for _args_for_spark_step() and
-        _args_for_spark_script_step()."""
-        spark_args = self._spark_args_for_step(step_num)
-
-        script_args = self._interpolate_input_and_output(script_args, step_num)
-
-        return (self.get_spark_submit_bin() +
-                _HADOOP_SPARK_ARGS +
-                spark_args +
-                [script] +
-                self._interpolate_input_and_output(script_args, step_num))
+    def _spark_submit_arg_prefix(self):
+        return _HADOOP_SPARK_ARGS
 
     def _env_for_step(self, step_num):
         step = self._get_step(step_num)

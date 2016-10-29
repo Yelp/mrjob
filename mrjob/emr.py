@@ -176,7 +176,7 @@ _IMAGE_VERSION_LATEST = '2.4.2'
 _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 
 # intermediary jar used on 4.x AMIs
-_4_X_INTERMEDIARY_JAR = 'command-runner.jar'
+_4_X_COMMAND_RUNNER_JAR = 'command-runner.jar'
 
 # path to spark-submit on 3.x AMIs. (On 4.x, it's just 'spark-submit')
 _3_X_SPARK_SUBMIT = '/home/hadoop/spark/bin/spark-submit'
@@ -1592,10 +1592,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._build_jar_step(step_num)
-        elif step['type'] == 'spark':
+        elif step['type'] in ('spark', 'spark_script'):
             return self._build_spark_step(step_num)
-        elif step['type'] == 'spark_script':
-            return self._build_spark_script_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -1645,51 +1643,33 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             action_on_failure=self._action_on_failure())
 
     def _build_spark_step(self, step_num):
-        return self._build_spark_step_helper(
-            step_num=step_num,
-            script=self._script_path,
-            script_args=[
-                '--step-num=%d' % step_num,
-                '--spark',
-                mrjob.step.INPUT,
-                mrjob.step.OUTPUT,
-            ],
-        )
-
-    def _build_spark_script_step(self, step_num):
-        step = self._get_step(step_num)
-
-        return self._build_spark_step_helper(
-            step_num=step_num,
-            script=step['script'],
-            script_args=step['args'])
-
-    def _build_spark_step_helper(
-            self, step_num, script, script_args):
-        """Common code for _build_spark_step() and _build_spark_script_step()
-
-        Interpolates :py:data:`~mrjob.step.INPUT` and
-        :py:data:`~mrjob.step.OUTPUT` into *script_args*, and looks up
-        upload URI of *script*
-        """
-        script = self._upload_uri_or_remote_path(script)
-        script_args = self._interpolate_input_and_output(script_args, step_num)
-
-        jar, step_arg_prefix = self._get_spark_jar_and_step_arg_prefix()
-
-        spark_args = self._spark_args_for_step(step_num)
-
-        # have to use `--deploy-mode cluster` to reference s3:// URIs
-        step_args = (
-            step_arg_prefix +
-            _EMR_SPARK_ARGS +
-            spark_args + [script] + script_args)
-
+        """Returns a boto.emr.JarStep suitable for running ``spark``
+        or ``spark_script`` step types."""
         return boto.emr.JarStep(
             name=self._step_name(step_num),
-            jar=jar,
-            step_args=step_args,
+            jar=self._spark_jar(),
+            step_args=self._args_for_spark_step(step_num),
             action_on_failure=self._action_on_failure())
+
+    def _interpolate_spark_script_path(self, path):
+        return self._upload_uri_or_remote_path(path)
+
+    def get_spark_submit_bin(self):
+        if self._opts['spark_submit_bin'] is not None:
+            return self._opts['spark_submit_bin']
+        elif version_gte(self.get_image_version(), '4'):
+            return ['spark-submit']
+        else:
+            return [_3_X_SPARK_SUBMIT]
+
+    def _spark_submit_arg_prefix(self):
+        return _EMR_SPARK_ARGS
+
+    def _spark_jar(self):
+        if version_gte(self.get_image_version(), '4'):
+            return _4_X_COMMAND_RUNNER_JAR
+        else:
+            return self._script_runner_jar_uri()
 
     def _spark_py_files(self):
         """In cluster mode, py_files can be anywhere, so point to their
@@ -1751,7 +1731,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     self._opts['hadoop_streaming_jar']), []
         elif version_gte(self.get_image_version(), '4'):
             # 4.x AMIs use an intermediary jar
-            return _4_X_INTERMEDIARY_JAR, ['hadoop-streaming']
+            return _4_X_COMMAND_RUNNER_JAR, ['hadoop-streaming']
         else:
             # 2.x and 3.x AMIs just use a regular old streaming jar
             return _PRE_4_X_STREAMING_JAR, []
@@ -1760,7 +1740,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # TODO: add spark_submit_bin option
 
         if version_gte(self.get_image_version(), '4'):
-            return (_4_X_INTERMEDIARY_JAR, ['spark-submit'])
+            return (_4_X_COMMAND_RUNNER_JAR, ['spark-submit'])
         else:
             return (self._script_runner_jar_uri(), [_3_X_SPARK_SUBMIT])
 

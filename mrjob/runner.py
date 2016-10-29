@@ -295,6 +295,7 @@ class MRJobRunner(object):
                 arg_file = parse_legacy_hash_path('file', path)
                 self._working_dir_mgr.add(**arg_file)
                 self._file_upload_args.append((arg, arg_file))
+                self._spark_files.append((arg_file['name'], arg_file['path']))
 
         # set up uploading
         for path in self._opts['upload_files']:
@@ -1208,6 +1209,69 @@ class MRJobRunner(object):
 
         return args
 
+    def _args_for_spark_step(self, step_num):
+        """The actual arguments used to run the spark-submit command.
+
+        This handles both ``spark`` and ``spark_script`` step types.
+        """
+        return (
+            self.get_spark_submit_bin() +
+            self._spark_submit_args(step_num) +
+            [self._spark_script_path(step_num)] +
+            self._spark_script_args(step_num)
+        )
+
+    def _spark_script_path(self, step_num):
+        """The path of the spark script, used by _args_for_spark_step()."""
+        step = self._get_step(step_num)
+
+        if step['type'] == 'spark':
+            path = self._script_path
+        elif step['type'] == 'spark_script':
+            path = step['script']
+        else:
+            raise TypeError('Bad step type: %r' % step['type'])
+
+        return self._interpolate_spark_script_path(path)
+
+    def _spark_script_args(self, step_num):
+        """A list of args to the spark script, used by
+        _args_for_spark_step()."""
+        step = self._get_step(step_num)
+
+        if step['type'] == 'spark':
+            # TODO: add in passthrough options
+            args = (
+                [
+                    '--step-num=%d' % step_num,
+                    '--spark',
+                ] + self._mr_job_extra_args() + [
+                    mrjob.step.INPUT,
+                    mrjob.step.OUTPUT,
+                ]
+            )
+        elif step['type'] == 'spark_script':
+            args = step['args']
+        else:
+            raise TypeError('Bad step type: %r' % step['type'])
+
+        return self._interpolate_input_and_output(args, step_num)
+
+    def get_spark_submit_bin(self):
+        """The spark-submit command, as a list of args. Re-define
+        this in your subclass for runner-specific behavior.
+        """
+        return self._opts['spark_submit_bin'] or ['spark-submit']
+
+    def _spark_submit_arg_prefix(self):
+        """Runner-specific args to spark submit (e.g. ['--master', 'yarn'])"""
+        return []
+
+    def _interpolate_spark_script_path(self, path):
+        """Redefine this in your subclass if the given path needs to be
+        translated to a URI when running spark (e.g. on EMR)."""
+        return path
+
     def _spark_cmdenv(self):
         """Returns a dictionary mapping environment variable to value,
         including mapping PYSPARK_PYTHON to self._python_bin()
@@ -1216,12 +1280,18 @@ class MRJobRunner(object):
         cmdenv.update(self._opts['cmdenv'])
         return cmdenv
 
-    def _spark_args_for_step(self, step_num):
+    def _spark_submit_args(self, step_num):
         """Build a list of extra args to the spark-submit binary for
         the given spark or spark_script step."""
         step = self._get_step(step_num)
 
+        if step['type'].split('_')[0] != 'spark':
+            raise TypeError('non-Spark step: %r' % step)
+
         args = []
+
+        # add runner-specific args
+        args.extend(self._spark_submit_arg_prefix())
 
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually

@@ -30,7 +30,7 @@ import mrjob.emr
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _3_X_SPARK_SUBMIT
-from mrjob.emr import _4_X_INTERMEDIARY_JAR
+from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _EMR_SPARK_ARGS
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
@@ -3424,7 +3424,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
     def test_4_x_ami(self):
         runner = self.launch_runner('--image-version', '4.0.0')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
-                         (_4_X_INTERMEDIARY_JAR, ['hadoop-streaming']))
+                         (_4_X_COMMAND_RUNNER_JAR, ['hadoop-streaming']))
 
     def test_local_hadoop_streaming_jar(self):
         jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
@@ -3626,10 +3626,10 @@ class SparkStepTestCase(MockBotoTestCase):
     def setUp(self):
         super(SparkStepTestCase, self).setUp()
 
-        # _spark_args_for_step() is tested elsewhere
+        # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_args_for_step',
-            return_value=['<spark args for step>']))
+            'mrjob.runner.MRJobRunner._spark_submit_args',
+            return_value=['<spark submit args>']))
 
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
@@ -3662,7 +3662,7 @@ class SparkStepTestCase(MockBotoTestCase):
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
-                steps[0].config.jar, _4_X_INTERMEDIARY_JAR)
+                steps[0].config.jar, _4_X_COMMAND_RUNNER_JAR)
             self.assertEqual(
                 steps[0].config.args[0].value, 'spark-submit')
 
@@ -3689,9 +3689,8 @@ class SparkStepTestCase(MockBotoTestCase):
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],
-                _EMR_SPARK_ARGS +
                 [
-                    '<spark args for step>',
+                    '<spark submit args>',
                     script_uri,
                     '--step-num=0',
                     '--spark',
@@ -3708,10 +3707,10 @@ class SparkScriptStepTestCase(MockBotoTestCase):
         self.fake_script = os.path.join(self.tmp_dir, 'fake.py')
         open(self.fake_script, 'w').close()
 
-        # _spark_args_for_step() is tested elsewhere
+        # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_args_for_step',
-            return_value=['<spark args for step>']))
+            'mrjob.runner.MRJobRunner._spark_submit_args',
+            return_value=['<spark submit args>']))
 
     def test_script_gets_uploaded(self):
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script])
@@ -3732,7 +3731,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],
-                _EMR_SPARK_ARGS + ['<spark args for step>', script_uri])
+                ['<spark submit args>', script_uri])
 
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
@@ -3767,7 +3766,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
-                steps[0].config.jar, _4_X_INTERMEDIARY_JAR)
+                steps[0].config.jar, _4_X_COMMAND_RUNNER_JAR)
             self.assertEqual(
                 steps[0].config.args[0].value, 'spark-submit')
 
@@ -3798,9 +3797,8 @@ class SparkScriptStepTestCase(MockBotoTestCase):
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],
-                _EMR_SPARK_ARGS +
                 [
-                    '<spark args for step>',
+                    '<spark submit args>',
                     script_uri,
                     input1_uri + ',' + input2_uri,
                     '-o',

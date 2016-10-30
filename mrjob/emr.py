@@ -1644,8 +1644,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             action_on_failure=self._action_on_failure())
 
     def _build_spark_step(self, step_num):
-        """Returns a boto.emr.JarStep suitable for running ``spark``
-        or ``spark_script`` step types."""
+        """Returns a boto.emr.JarStep suitable for running all Spark
+        step types (``spark``, ``spark_jar``, and ``spark_script``).
+        """
         return boto.emr.JarStep(
             name=self._step_name(step_num),
             jar=self._spark_jar(),

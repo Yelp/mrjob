@@ -452,7 +452,7 @@ class SparkJarStep(object):
     :param spark_args: (optional) an array of arguments to pass to spark-submit
                        (e.g. ``['--executor-memory', '2G']``).
 
-    *script* can also be passed as a positional argument
+    *jar* and *main_class* can also be passed as positional arguments
     """
     def __init__(self, jar, main_class, **kwargs):
         bad_kwargs = sorted(set(kwargs) - set(_SPARK_JAR_STEP_KWARGS))

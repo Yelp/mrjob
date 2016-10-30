@@ -574,4 +574,4 @@ class SparkScriptStep(object):
 
 def _is_spark_step_type(step_type):
     """Does the given step type indicate that it uses Spark?"""
-    return step_type[0].split('_') == 'spark'
+    return step_type.split('_')[0] == 'spark'

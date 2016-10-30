@@ -19,6 +19,7 @@ from mrjob.step import INPUT
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import OUTPUT
+from mrjob.step import SparkJarStep
 from mrjob.step import SparkStep
 from mrjob.step import SparkScriptStep
 from mrjob.step import StepFailedException
@@ -416,6 +417,61 @@ class SparkStepTestCase(TestCase):
         self.assertEqual(step1.description(0), step2.description(0))
 
 
+class SparkJarStepTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertRaises(TypeError, SparkJarStep)
+
+    def test_only_jar(self):
+        self.assertRaises(TypeError, SparkJarStep, 'dora.jar')
+
+    def test_defaults(self):
+        step = SparkJarStep(jar='dora.jar', main_class='backpack.Map')
+
+        self.assertEqual(step.jar, 'dora.jar')
+        self.assertEqual(step.main_class, 'backpack.Map')
+        self.assertEqual(step.args, [])
+        self.assertEqual(step.spark_args, [])
+        self.assertEqual(
+            step.description(0),
+            dict(
+                type='spark_jar',
+                jar='dora.jar',
+                main_class='backpack.Map',
+                args=[],
+                spark_args=[],
+             )
+        )
+
+    def test_all_args(self):
+        step = SparkJarStep(jar='dora.jar',
+                            main_class='backpack.Map',
+                            args=['ARGH', 'ARGH'],
+                            spark_args=['argh', 'argh'])
+
+        self.assertEqual(step.jar, 'dora.jar')
+        self.assertEqual(step.main_class, 'backpack.Map')
+        self.assertEqual(step.args, ['ARGH', 'ARGH'])
+        self.assertEqual(step.spark_args, ['argh', 'argh'])
+        self.assertEqual(
+            step.description(0),
+            dict(
+                type='spark_jar',
+                jar='dora.jar',
+                main_class='backpack.Map',
+                args=['ARGH', 'ARGH'],
+                spark_args=['argh', 'argh'],
+             )
+        )
+
+    def test_positional_args(self):
+        step1 = SparkJarStep('dora.jar', 'backpack.Map')
+        step2 = SparkJarStep(jar='dora.jar', main_class='backpack.Map')
+
+        self.assertEqual(step1, step2)
+        self.assertEqual(step1.description(0), step2.description(0))
+
+
 class SparkScriptStepTestCase(TestCase):
 
     def test_empty(self):
@@ -455,7 +511,7 @@ class SparkScriptStepTestCase(TestCase):
              )
         )
 
-    def test_positional_spark_arg(self):
+    def test_positional_args(self):
         step1 = SparkScriptStep('macbeth.py')
         step2 = SparkScriptStep(script='macbeth.py')
 

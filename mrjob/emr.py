@@ -112,6 +112,7 @@ from mrjob.setup import UploadDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.step import StepFailedException
+from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 from mrjob.util import random_identifier
@@ -1592,7 +1593,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._build_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._build_jar_step(step_num)
-        elif step['type'] in ('spark', 'spark_script'):
+        elif _is_spark_step_type(step['type']):
             return self._build_spark_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))

@@ -52,6 +52,7 @@ from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
+from mrjob.step import _is_spark_step_type
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import tar_and_gzip

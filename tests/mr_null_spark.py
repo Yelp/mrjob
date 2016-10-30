@@ -1,4 +1,5 @@
-# Copyright 2013 David Marin
+# -*- coding: utf-8 -*-
+# Copyright 2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,35 +12,29 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Job that runs an empty spark() method."""
+
 from mrjob.job import MRJob
-from mrjob.step import INPUT
-from mrjob.step import JarStep
-from mrjob.step import MRStep
-from mrjob.step import OUTPUT
 
 
-class MRJarAndStreaming(MRJob):
+class MRNullSpark(MRJob):
 
     def configure_options(self):
-        super(MRJarAndStreaming, self).configure_options()
+        super(MRNullSpark, self).configure_options()
 
-        self.add_passthrough_option('--jar')
+        self.add_passthrough_option(
+            '--extra-spark-arg', dest='extra_spark_args',
+            action='append', default=[])
 
-    def steps(self):
-        return [
-            JarStep(
-                jar=self.options.jar,
-                args=['stuff', INPUT, OUTPUT]
-            ),
-            MRStep(mapper=self.mapper, reducer=self.reducer)
-        ]
+        self.add_file_option(
+            '--extra-file', dest='extra_file')
 
-    def mapper(self, key, value):
+    def spark(self):
         pass
 
-    def reducer(self, key, value):
-        pass
+    def spark_args(self):
+        return self.options.extra_spark_args
 
 
 if __name__ == '__main__':
-    MRJarAndStreaming.run()
+    MRNullSpark.run()

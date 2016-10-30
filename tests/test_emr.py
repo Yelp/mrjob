@@ -28,8 +28,11 @@ from io import BytesIO
 import mrjob
 import mrjob.emr
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import _4_X_INTERMEDIARY_JAR
+from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
+from mrjob.emr import _3_X_SPARK_SUBMIT
+from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
+from mrjob.emr import _EMR_SPARK_ARGS
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
@@ -46,7 +49,10 @@ from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
+from mrjob.step import INPUT
+from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
+from mrjob.step import SparkScriptStep
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
@@ -61,8 +67,12 @@ from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
+from tests.mr_null_spark import MRNullSpark
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_sort_values import MRSortValues
+from tests.mr_spark_jar import MRSparkJar
+from tests.mr_spark_script import MRSparkScript
+from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
@@ -918,12 +928,12 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             {},
             master=(1, 'm1.medium', None))
 
-    def test_single_instance(self):
+    def test_instance_type_single_instance(self):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge'},
             master=(1, 'c1.xlarge', None))
 
-    def test_multiple_instances(self):
+    def test_instance_type_multiple_instances(self):
         self._test_instance_groups(
             {'instance_type': 'c1.xlarge', 'num_core_instances': 2},
             core=(2, 'c1.xlarge', None),
@@ -946,6 +956,33 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
              'num_core_instances': 2},
             core=(2, 'm2.xlarge', None),
             master=(1, 'm1.large', None))
+
+    def test_2_x_ami_defaults_single_node(self):
+        # m1.small still works with Hadoop 1, and it's cheaper
+        self._test_instance_groups(
+            dict(image_version='2.4.11'),
+            master=(1, 'm1.small', None))
+
+    def test_2_x_ami_defaults_multiple_nodes(self):
+        self._test_instance_groups(
+            dict(image_version='2.4.11', num_core_instances=2),
+            core=(2, 'm1.small', None),
+            master=(1, 'm1.small', None))
+
+    def test_spark_defaults_single_node(self):
+        # Spark needs at least m1.large
+        self._test_instance_groups(
+            dict(image_version='4.0.0', emr_applications=['Spark']),
+            master=(1, 'm1.large', None))
+
+    def test_spark_defaults_multiple_nodes(self):
+        # Spark can get away with m1.medium for the resource manager
+        self._test_instance_groups(
+            dict(image_version='4.0.0',
+                 emr_applications=['Spark'],
+                 num_core_instances=2),
+            core=(2, 'm1.large', None),
+            master=(1, 'm1.medium', None))
 
     def test_explicit_instance_types_take_precedence(self):
         self._test_instance_groups(
@@ -2533,6 +2570,55 @@ class PoolMatchingTestCase(MockBotoTestCase):
             cluster_id,
             ['-r', 'emr', '--pool-clusters'])
 
+    def test_dont_join_cluster_without_spark(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters'],
+            job_class=MRNullSpark)
+
+    def test_join_cluster_with_spark_3_x_ami(self):
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='3.11.0',
+            bootstrap_actions=[_3_X_SPARK_BOOTSTRAP_ACTION])
+
+        self.assertJoins(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters', '--image-version', '3.11.0'],
+            job_class=MRNullSpark)
+
+    def test_join_cluster_with_spark_4_x_ami(self):
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='4.7.2',
+            emr_applications=['Spark'])
+
+        self.assertJoins(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters', '--image-version', '4.7.2'],
+            job_class=MRNullSpark)
+
+    def test_ignore_spark_bootstrap_action_on_4_x_ami(self):
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='4.7.2',
+            bootstrap_actions=[_3_X_SPARK_BOOTSTRAP_ACTION])
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters', '--image-version', '4.7.2'],
+            job_class=MRNullSpark)
+
+    def test_other_install_spark_bootstrap_action_on_3_x_ami(self):
+        # has to be exactly the install-spark bootstrap action we expected
+        _, cluster_id = self.make_pooled_cluster(
+            image_version='3.11.0',
+            bootstrap_actions=['s3://bucket/install-spark'])
+
+        self.assertDoesNotJoin(
+            cluster_id,
+            ['-r', 'emr', '--pool-clusters', '--image-version', '3.11.0'],
+            job_class=MRNullSpark)
+
 
 class PoolingRecoveryTestCase(MockBotoTestCase):
 
@@ -3339,7 +3425,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
     def test_4_x_ami(self):
         runner = self.launch_runner('--image-version', '4.0.0')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
-                         (_4_X_INTERMEDIARY_JAR, ['hadoop-streaming']))
+                         (_4_X_COMMAND_RUNNER_JAR, ['hadoop-streaming']))
 
     def test_local_hadoop_streaming_jar(self):
         jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
@@ -3534,6 +3620,225 @@ class JarStepTestCase(MockBotoTestCase):
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class SparkStepTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(SparkStepTestCase, self).setUp()
+
+        # _spark_submit_args() is tested elsewhere
+        self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_submit_args',
+            return_value=['<spark submit args>']))
+
+    # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
+
+    def test_3_x_ami(self):
+        job = MRNullSpark(['-r', 'emr', '--ami-version', '3.11.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, runner._script_runner_jar_uri())
+            self.assertEqual(
+                steps[0].config.args[0].value,
+                _3_X_SPARK_SUBMIT)
+
+    def test_4_x_ami(self):
+        job = MRNullSpark(['-r', 'emr', '--ami-version', '4.7.2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, _4_X_COMMAND_RUNNER_JAR)
+            self.assertEqual(
+                steps[0].config.args[0].value, 'spark-submit')
+
+    def test_input_and_output_args(self):
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
+
+        job = MRNullSpark(['-r', 'emr', input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            script_uri = runner._upload_mgr.uri(runner._script_path)
+            input1_uri = runner._upload_mgr.uri(input1)
+            input2_uri = runner._upload_mgr.uri(input2)
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                [
+                    '<spark submit args>',
+                    script_uri,
+                    '--step-num=0',
+                    '--spark',
+                    input1_uri + ',' + input2_uri,
+                    runner._output_dir,
+                ])
+
+
+class SparkJarStepTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(SparkJarStepTestCase, self).setUp()
+
+        self.fake_jar = self.makefile('fake.jar')
+
+        # _spark_submit_args() is tested elsewhere
+        self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_submit_args',
+            return_value=['<spark submit args>']))
+
+    def test_jar_gets_uploaded(self):
+        job = MRSparkJar(['-r', 'emr', '--jar', self.fake_jar,
+                          '--jar-main-class', 'fake.Main'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(self.fake_jar, runner._upload_mgr.path_to_uri())
+            jar_uri = runner._upload_mgr.uri(self.fake_jar)
+            self.assertTrue(runner.fs.ls(jar_uri))
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                ['<spark submit args>', jar_uri])
+
+
+class SparkScriptStepTestCase(MockBotoTestCase):
+    # a lot of this is already tested in test_runner.py
+
+    def setUp(self):
+        super(SparkScriptStepTestCase, self).setUp()
+
+        self.fake_script = self.makefile('fake_script.py')
+
+        # _spark_submit_args() is tested elsewhere
+        self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_submit_args',
+            return_value=['<spark submit args>']))
+
+    def test_script_gets_uploaded(self):
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(self.fake_script, runner._upload_mgr.path_to_uri())
+            script_uri = runner._upload_mgr.uri(self.fake_script)
+            self.assertTrue(runner.fs.ls(script_uri))
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                ['<spark submit args>', script_uri])
+
+    def test_3_x_ami(self):
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
+                             '--ami-version', '3.11.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, runner._script_runner_jar_uri())
+            self.assertEqual(
+                steps[0].config.args[0].value,
+                _3_X_SPARK_SUBMIT)
+
+    def test_4_x_ami(self):
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
+                             '--ami-version', '4.7.2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(
+                steps[0].config.jar, _4_X_COMMAND_RUNNER_JAR)
+            self.assertEqual(
+                steps[0].config.args[0].value, 'spark-submit')
+
+    def test_arg_interpolation(self):
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
+
+        job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
+                             '--script-arg', INPUT,
+                             '--script-arg', '-o',
+                             '--script-arg', OUTPUT,
+                             input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            script_uri = runner._upload_mgr.uri(self.fake_script)
+            input1_uri = runner._upload_mgr.uri(input1)
+            input2_uri = runner._upload_mgr.uri(input2)
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                [
+                    '<spark submit args>',
+                    script_uri,
+                    input1_uri + ',' + input2_uri,
+                    '-o',
+                    runner._output_dir,
+                ]
+            )
 
 
 class BuildMasterNodeSetupStep(MockBotoTestCase):
@@ -3803,6 +4108,128 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             self.assertEqual(
                 runner._bootstrap,
                 self.EXPECTED_BOOTSTRAP + [['true']])
+
+class BootstrapSparkTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(BootstrapSparkTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+    def get_cluster(self, *args):
+        job = MRNullSpark(['-r', 'emr'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._should_bootstrap_spark())
+            runner.run()
+            # include bootstrap actions
+            return self.mock_emr_clusters[runner.get_cluster_id()]
+
+    def ran_spark_bootstrap_action(
+            self, cluster, uri=_3_X_SPARK_BOOTSTRAP_ACTION):
+
+        return any(ba.scriptpath == uri for ba in cluster._bootstrapactions)
+
+    def installed_spark_application(self, cluster, name='Spark'):
+        return any(a.name == name for a in cluster.applications)
+
+    def test_default_ami(self):
+        cluster = self.get_cluster()
+
+        self.assertTrue(self.ran_spark_bootstrap_action(cluster))
+        self.assertFalse(self.installed_spark_application(cluster))
+
+    def test_default_ami(self):
+        cluster = self.get_cluster('--image-version', '3.11.0')
+
+        self.assertTrue(self.ran_spark_bootstrap_action(cluster))
+        self.assertFalse(self.installed_spark_application(cluster))
+
+    def test_3_7_0_ami(self):
+        cluster = self.get_cluster('--image-version', '3.7.0')
+        self.assertTrue(self.log.warning.called)
+        self.assertTrue(
+            any('Spark' in args[0]
+                for args, kwargs in self.log.warning.call_args_list))
+
+        # try bootstrapping Spark anyway
+        self.assertTrue(self.ran_spark_bootstrap_action(cluster))
+        self.assertFalse(self.installed_spark_application(cluster))
+
+    def test_4_7_2_ami(self):
+        cluster = self.get_cluster('--image-version', '4.7.2')
+
+        self.assertTrue(self.installed_spark_application(cluster))
+        self.assertFalse(self.ran_spark_bootstrap_action(cluster))
+
+    def test_dont_run_install_spark_twice(self):
+
+        cluster = self.get_cluster(
+            '--image-version', '3.11.0',
+            '--bootstrap-action', 's3://bucket/install-spark')
+
+        # should run the custom bootstrap action but not the default one
+        self.assertTrue(self.ran_spark_bootstrap_action(
+            cluster, 's3://bucket/install-spark'))
+        self.assertFalse(
+            self.ran_spark_bootstrap_action(
+                cluster, _3_X_SPARK_BOOTSTRAP_ACTION))
+        self.assertFalse(self.installed_spark_application(cluster))
+
+    def test_dont_add_two_spark_applications(self):
+
+        cluster = self.get_cluster(
+            '--image-version', '4.7.2',
+            '--emr-application', 'spark')
+
+        # shouldn't add "Spark" application on top of "spark"
+        self.assertTrue(self.installed_spark_application(cluster, 'spark'))
+        self.assertFalse(self.installed_spark_application(cluster, 'Spark'))
+        self.assertFalse(self.ran_spark_bootstrap_action(cluster))
+
+
+class ShouldBootstrapSparkTestCase(MockBotoTestCase):
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), False)
+
+    def test_explicit_true(self):
+        job = MRTwoStepJob(['-r', 'emr', '--bootstrap-spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), True)
+
+    def test_spark_job(self):
+        job = MRNullSpark(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), True)
+
+    def test_spark_script_job(self):
+        job = MRSparkScript(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), True)
+
+    def test_explicit_false(self):
+        job = MRNullSpark(['-r', 'emr', '--no-bootstrap-spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._should_bootstrap_spark(), False)
 
 
 class EMRTagsTestCase(MockBotoTestCase):
@@ -4491,7 +4918,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_applications'], set())
+            self.assertEqual(runner._applications(), set())
 
             runner._launch()
             cluster = runner._describe_cluster()
@@ -4504,7 +4931,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_applications'], set())
+            self.assertEqual(runner._applications(), set())
 
             runner._launch()
             cluster = runner._describe_cluster()
@@ -4530,7 +4957,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_applications'],
+            self.assertEqual(runner._applications(),
                              set(['Hadoop', 'Mahout']))
 
             runner._launch()
@@ -4549,7 +4976,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
         with job.make_runner() as runner:
             # we explicitly add Hadoop so we can see Hadoop version in
             # the cluster description from the API
-            self.assertEqual(runner._opts['emr_applications'],
+            self.assertEqual(runner._applications(),
                              set(['Hadoop', 'Mahout']))
 
             runner._launch()
@@ -5258,6 +5685,191 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
         self.assertEqual(params['local_port'], 10003)
 
 
+class UsesSparkTestCase(MockBotoTestCase):
+
+    def test_default(self):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_steps())
+            self.assertFalse(runner._has_spark_install_bootstrap_action())
+            self.assertFalse(runner._has_spark_application())
+            self.assertFalse(runner._opts['bootstrap_spark'])
+
+    def test_spark_step(self):
+        job = MRNullSpark(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_spark_script_step(self):
+        job = MRSparkScript(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_streaming_and_spark_steps(self):
+        job = MRStreamingAndSpark(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_steps())
+
+    def test_s3_spark_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://support.elasticmapreduce/spark/install-spark',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_file_spark_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            'file:///usr/share/aws/emr/install-spark/install-spark',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_s3_ganglia_install_bootstrap_action(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://beta.elasticmapreduce/bootstrap-actions/install-ganglia',
+        ])
+
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_install_bootstrap_action())
+
+    def test_s3_ganglia_and_spark_bootstrap_actions(self):
+        job = MRTwoStepJob([
+            '-r', 'emr',
+            '--bootstrap-action',
+            's3://support.elasticmapreduce/spark/install-spark',
+            's3://beta.elasticmapreduce/bootstrap-actions/install-ganglia',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_install_bootstrap_action())
+
+    def test_spark_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_spark_application_lowercase(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_other_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Mahout'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())
+
+    def test_spark_and_other_application(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-application', 'Mahout',
+                            '--emr-application', 'Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._has_spark_application())
+
+    def test_bootstrap_spark(self):
+        # tests #1465
+        job = MRTwoStepJob(['-r', 'emr', '--bootstrap-spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertTrue(runner._uses_spark())
+            self.assertTrue(runner._opts['bootstrap_spark'])
+
+    def test_ignores_new_supported_products_api_param(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--emr-api-param',
+                            'NewSupportedProducts.member.1.Name=spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())
+
+    def test_ignores_application_api_param(self):
+        job = MRTwoStepJob(['-r', 'emr',
+                            '--ami-version', '4.0.0',
+                            '--emr-api-param',
+                            'Application.member.1.Name=Spark'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertFalse(runner._uses_spark())
+            self.assertFalse(runner._has_spark_application())
+
+
+class SparkPyFilesTestCase(MockBotoTestCase):
+
+    def test_eggs(self):
+        egg1_path = self.makefile('dragon.egg')
+        egg2_path = self.makefile('horton.egg')
+
+        job = MRNullSpark([
+            '-r', 'emr',
+            '--py-file', egg1_path, '--py-file', egg2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._add_job_files_for_upload()
+
+            # in the cloud, we need to upload py_files to cloud storage
+            self.assertIn(egg1_path, runner._upload_mgr.path_to_uri())
+            self.assertIn(egg2_path, runner._upload_mgr.path_to_uri())
+
+            self.assertEqual(
+                runner._spark_py_files(),
+                [runner._upload_mgr.uri(egg1_path),
+                 runner._upload_mgr.uri(egg2_path)]
+            )
+
+
+
 class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):
     # regression test for #1421
 
@@ -5273,3 +5885,117 @@ class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):
 
         self.assertEqual(runner._opts['image_version'], '4.0.0')
         self.assertEqual(runner._opts['release_label'], 'emr-4.0.0')
+
+
+class TestClusterSparkSupportWarning(MockBotoTestCase):
+
+    def test_okay(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNone(message)
+
+    def test_no_python_3(self):
+        if PY2:
+            return
+
+        job = MRNullSpark(['-r', 'emr'])  # default AMI is 3.11.0
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('Python 3', message)
+            self.assertIn('4.0.0', message)
+
+    def test_too_old(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '3.7.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('support Spark', message)
+            self.assertNotIn('Python 3', message)
+            # should suggest an AMI that works with this version of Python
+            if PY2:
+                self.assertIn('3.8.0', message)
+            else:
+                self.assertIn('4.0.0', message)
+
+    def test_master_instance_too_small(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--num-core-instances', '2',
+                           '--core-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_core_instances_too_small(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--num-core-instances', '2',
+                           '--core-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_task_instances_too_small(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--num-core-instances', '2',
+                           '--core-instance-type', 'm1.large',
+                           '--num-task-instances', '2',
+                           '--task-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_sole_master_instance_too_small(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--master-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_okay_with_core_instances_and_small_master(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0',
+                           '--num-core-instances', '2',
+                           '--master-instance-type', 'm1.medium'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNone(message)

@@ -1,4 +1,5 @@
-# Copyright 2013 David Marin
+# -*- coding: utf-8 -*-
+# Copyright 2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,35 +12,25 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""Job that runs (trivial) streaming and spark steps."""
+
 from mrjob.job import MRJob
-from mrjob.step import INPUT
-from mrjob.step import JarStep
 from mrjob.step import MRStep
-from mrjob.step import OUTPUT
+from mrjob.step import SparkStep
 
+class MRStreamingAndSpark(MRJob):
 
-class MRJarAndStreaming(MRJob):
+    def mapper(self):
+        return
 
-    def configure_options(self):
-        super(MRJarAndStreaming, self).configure_options()
-
-        self.add_passthrough_option('--jar')
+    def spark(self):
+        pass
 
     def steps(self):
-        return [
-            JarStep(
-                jar=self.options.jar,
-                args=['stuff', INPUT, OUTPUT]
-            ),
-            MRStep(mapper=self.mapper, reducer=self.reducer)
+        return[
+            MRStep(mapper=self.mapper),
+            SparkStep(self.spark),
         ]
 
-    def mapper(self, key, value):
-        pass
-
-    def reducer(self, key, value):
-        pass
-
-
 if __name__ == '__main__':
-    MRJarAndStreaming.run()
+    MRStreamingAndSpark.run()

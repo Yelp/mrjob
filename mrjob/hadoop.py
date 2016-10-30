@@ -26,7 +26,6 @@ try:
 except ImportError:
     pty = None
 
-import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_dicts
@@ -49,6 +48,7 @@ from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
+from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import unique
 from mrjob.util import which
@@ -102,6 +102,9 @@ _HADOOP_STDOUT_RE = re.compile(br'^packageJobJar: ')
 # match the filename of a hadoop streaming jar
 _HADOOP_STREAMING_JAR_RE = re.compile(
     r'^hadoop.*streaming.*(?<!-sources)\.jar$')
+
+# always use these args with spark-submit
+_HADOOP_SPARK_ARGS = ['--master', 'yarn']
 
 
 def fully_qualify_hdfs_path(path):
@@ -173,6 +176,9 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         # Keep track of where the hadoop streaming jar is
         self._hadoop_streaming_jar = self._opts['hadoop_streaming_jar']
         self._searched_for_hadoop_streaming_jar = False
+
+        # Keep track of where the spark-submit binary is
+        self._spark_submit_bin = self._opts['spark_submit_bin']
 
         # List of dicts (one for each step) potentially containing
         # the keys 'history', 'step', and 'task' ('step' will always
@@ -310,12 +316,62 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         for path in _FALLBACK_HADOOP_LOG_DIRS:
             yield path
 
+    def get_spark_submit_bin(self):
+        if not self._spark_submit_bin:
+            self._spark_submit_bin = self._find_spark_submit_bin()
+        return self._spark_submit_bin
+
+    def _find_spark_submit_bin(self):
+        # TODO: this is very similar to _find_hadoop_bin() (in fs)
+        for path in unique(self._spark_submit_bin_dirs()):
+            log.info('Looking for spark-submit binary in %s...' % (
+                path or '$PATH'))
+
+            spark_submit_bin = which('spark-submit', path=path)
+
+            if spark_submit_bin:
+                log.info('Found spark-submit binary: %s' % spark_submit_bin)
+                return [spark_submit_bin]
+        else:
+            log.info("Falling back to 'spark-submit'")
+            return ['spark-submit']
+
+    def _spark_submit_bin_dirs(self):
+        # $SPARK_HOME
+        spark_home = os.environ.get('SPARK_HOME')
+        if spark_home:
+            yield os.path.join(spark_home, 'bin')
+
+        yield None  # use $PATH
+
+        # some other places recommended by install docs (see #1366)
+        yield '/usr/lib/spark/bin'
+        yield '/usr/local/spark/bin'
+        yield '/usr/local/lib/spark/bin'
+
     def _run(self):
+        self._find_binaries_and_jars()
         self._check_input_exists()
         self._create_setup_wrapper_script()
         self._add_job_files_for_upload()
         self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()
+
+    def _find_binaries_and_jars(self):
+        """Find hadoop and (if needed) spark-submit bin up-front, before
+        continuing with the job.
+
+        (This is just for user-interaction purposes; these would otherwise
+        lazy-load as needed.)
+        """
+        # this triggers looking for Hadoop binary
+        self.get_hadoop_version()
+
+        if self._has_streaming_steps():
+            self.get_hadoop_streaming_jar()
+
+        if self._has_spark_steps():
+            self.get_spark_submit_bin()
 
     def _check_input_exists(self):
         """Make sure all input exists before continuing with our job.
@@ -367,12 +423,14 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     def _run_job_in_hadoop(self):
         for step_num in range(self._num_steps()):
             step_args = self._args_for_step(step_num)
+            env = self._env_for_step(step_num)
 
             # log this *after* _args_for_step(), which can start a search
             # for the Hadoop streaming jar
             log.info('Running step %d of %d...' %
                      (step_num + 1, self._num_steps()))
             log.debug('> %s' % cmd_line(step_args))
+            log.debug('  with environment: %r' % sorted(env.items()))
 
             log_interpretation = {}
             self._log_interpretations.append(log_interpretation)
@@ -387,7 +445,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
                 # Hadoop is running
                 log.debug('No PTY available, using Popen() to invoke Hadoop')
 
-                step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE)
+                step_proc = Popen(step_args, stdout=PIPE, stderr=PIPE, env=env)
 
                 step_interpretation = _interpret_hadoop_jar_command_stderr(
                     step_proc.stderr,
@@ -404,7 +462,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             else:
                 # we have PTYs
                 if pid == 0:  # we are the child process
-                    os.execvp(step_args[0], step_args)
+                    os.execvpe(step_args[0], step_args, env)
                 else:
                     log.debug('Invoking Hadoop via PTY')
 
@@ -449,6 +507,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._args_for_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._args_for_jar_step(step_num)
+        elif _is_spark_step_type(step['type']):
+            return self._args_for_spark_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
@@ -521,19 +581,25 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         if step.get('main_class'):
             args.append(step['main_class'])
 
-        # TODO: merge with logic in mrjob/emr.py
-        def interpolate(arg):
-            if arg == mrjob.step.JarStep.INPUT:
-                return ','.join(self._step_input_uris(step_num))
-            elif arg == mrjob.step.JarStep.OUTPUT:
-                return self._step_output_uri(step_num)
-            else:
-                return arg
-
         if step.get('args'):
-            args.extend(interpolate(arg) for arg in step['args'])
+            args.extend(
+                self._interpolate_input_and_output(step['args'], step_num))
 
         return args
+
+    def _spark_submit_arg_prefix(self):
+        return _HADOOP_SPARK_ARGS
+
+    def _env_for_step(self, step_num):
+        step = self._get_step(step_num)
+
+        env = dict(os.environ)
+
+        # when running spark-submit, set its environment directly. See #1464
+        if _is_spark_step_type(step['type']):
+            env.update(self._spark_cmdenv(step_num))
+
+        return env
 
     def _intermediate_output_uri(self, step_num):
         return posixpath.join(self._hadoop_tmp_dir,

@@ -390,6 +390,7 @@ class WorkingDirManagerTestCase(TestCase):
         wd = WorkingDirManager()
         self.assertEqual(wd.name_to_path('archive'), {})
         self.assertEqual(wd.name_to_path('file'), {})
+        self.assertEqual(wd.paths(), set())
 
     def test_simple(self):
         wd = WorkingDirManager()
@@ -399,6 +400,9 @@ class WorkingDirManagerTestCase(TestCase):
                          {'bar.py': 'foo/bar.py'})
         self.assertEqual(wd.name_to_path('archive'),
                          {'baz.tar.gz': 's3://bucket/path/to/baz.tar.gz'})
+        self.assertEqual(
+            wd.paths(),
+            set(['foo/bar.py', 's3://bucket/path/to/baz.tar.gz']))
 
     def test_explicit_name_collision(self):
         wd = WorkingDirManager()
@@ -419,6 +423,7 @@ class WorkingDirManagerTestCase(TestCase):
         self.assertEqual(wd.name_to_path('file'),
                          {'qux.py': 'foo/bar.py',
                           'bar.py': 'foo/bar.py'})
+        self.assertEqual(wd.paths(), set(['foo/bar.py']))
 
     def test_cant_give_same_path_different_types(self):
         wd = WorkingDirManager()

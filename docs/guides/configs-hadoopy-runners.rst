@@ -54,9 +54,7 @@ Options available to hadoop and emr runners
     :set: all
     :default: ``[]``
 
-    Extra arguments to pass to hadoop streaming. This option is called
-    **extra_args** when passed as a keyword argument to
-    :py:class:`~mrjob.runner.MRJobRunner`.
+    Extra arguments to pass to hadoop streaming.
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar
@@ -142,9 +140,9 @@ Options available to hadoop runner only
     :set: hadoop
     :default: (automatic)
 
-    Name/path of your hadoop program (may include arguments).
+    Name/path of your :command:`hadoop` binary (may include arguments).
 
-    mrjob tries its best to find your hadoop binary, checking all of the
+    mrjob tries its best to find :command:`hadoop`, checking all of the
     following places for an executable file named ``hadoop``:
 
     * :mrjob-opt:`hadoop_home`/``bin`` (deprecated)
@@ -217,3 +215,36 @@ Options available to hadoop runner only
     .. versionchanged:: 0.5.0
 
        This option used to be named ``hdfs_scratch_dir``.
+
+.. mrjob-opt::
+    :config: spark_args
+    :switch: --spark-arg
+    :type: :ref:`string list <data-type-string-list>`
+    :set: all
+    :default: ``[]``
+
+    Extra arguments to pass to :command:`spark-submit`.
+
+    .. versionadded:: 0.5.8.spark0
+
+.. mrjob-opt::
+    :config: spark_submit_bin
+    :switch: --spark-submit-bin
+    :type: :ref:`command <data-type-command>`
+    :set: hadoop
+    :default: (automatic)
+
+    Name/path of your :command:`spark-submit` binary (may include arguments).
+
+    mrjob tries its best to find :command:`spark-submit`, checking all of the
+    following places for an executable file named ``spark-submit``:
+
+    * ``$SPARK_HOME/bin``
+    * ``$PATH``
+    * ``/usr/lib/spark/bin``
+    * ``/usr/local/spark/bin``
+    * ``/usr/local/lib/spark/bin``
+
+    If all else fails, we just use ``spark-submit`` and hope for the best.
+
+    .. versionadded:: 0.5.8.spark0

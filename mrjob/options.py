@@ -92,7 +92,6 @@ def _append_to_conf_paths(option, opt_str, value, parser):
         parser.values.conf_paths.append(value)
 
 
-
 def _key_value_callback(option, opt_str, value, parser):
     """callback for KEY=VALUE pairs"""
     # used for --cmdenv, --emr-api-param, and more
@@ -326,6 +325,20 @@ _RUNNER_OPTS = dict(
                       ' combination of bootstrap_cmds and bootstrap_files).'
                       ' These are run after the command from bootstrap_cmds.'
                       ' You can use --bootstrap-script more than once.'),
+            )),
+        ],
+    ),
+    bootstrap_spark=dict(
+        cloud_role='launch',
+        runners=['emr', 'hadoop'],
+        switches=[
+            (['--bootstrap-spark'], dict(
+                action='store_true',
+                help="Auto-install Spark on the cluster (even if not needed)."
+            )),
+            (['--no-bootstrap-spark'], dict(
+                 action='store_false',
+                 help="Don't auto-install Spark on the cluster."
             )),
         ],
     ),
@@ -900,14 +913,24 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    py_files=dict(
+        combiner=combine_path_lists,
+        switches=[
+            (['--py-file'], dict(
+                action='append',
+                help='.zip or .egg file to add to PYTHONPATH'
+            )),
+        ],
+    ),
     python_archives=dict(
         combiner=combine_path_lists,
+        deprecated=True,
         switches=[
             (['--python-archive'], dict(
                 action='append',
                 help=('Archive to unpack and add to the PYTHONPATH of the'
-                      ' MRJob script when it runs. You can use'
-                      ' --python-archives multiple times.'),
+                      ' MRJob script when it runs. This is deprecated;'
+                      ' try --py-file instead'),
             )),
         ],
     ),
@@ -999,6 +1022,24 @@ _RUNNER_OPTS = dict(
             (['--sh-bin'], dict(
                 help=('Alternate shell command for setup scripts. You may'
                       ' include arguments, e.g. --sh-bin "bash -ex"'),
+            )),
+        ],
+    ),
+    spark_args=dict(
+        combiner=combine_lists,
+        switches=[
+            (['--spark-arg'], dict(
+                action='append',
+                help=('Argument of any type to pass to spark-submit.'
+                      ' You can use --spark-arg multiple times.'),
+            )),
+        ],
+    ),
+    spark_submit_bin=dict(
+        combiner=combine_cmds,
+        switches=[
+            (['--spark-submit-bin'], dict(
+                help='spark-submit binary. You may include arguments.'
             )),
         ],
     ),
@@ -1204,6 +1245,7 @@ def _allowed_keys(runner_alias):
 
 def _combiners(runner_alias):
     results = {}
+
 
     for name, config in _RUNNER_OPTS.items():
         if not _for_runner(config, runner_alias):

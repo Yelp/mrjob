@@ -1,3 +1,9 @@
+v0.5.?, 2016-??-?? -- Spark
+ * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
+ * runners:
+   * EMR:
+     * default to cheapest instance type that will work (#1369)
+
 v0.5.7, 2016-10-?? -- ???
  * deprecated mrjob.parse.parse_*_list() functions
  * deprecated mrjob.parse.scrape_options_into_new_groups()

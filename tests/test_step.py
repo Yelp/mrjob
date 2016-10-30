@@ -15,8 +15,13 @@
 # limitations under the License.
 """Tests for mrjob.step"""
 from mrjob.step import _IDENTITY_MAPPER
+from mrjob.step import INPUT
 from mrjob.step import JarStep
 from mrjob.step import MRStep
+from mrjob.step import OUTPUT
+from mrjob.step import SparkJarStep
+from mrjob.step import SparkStep
+from mrjob.step import SparkScriptStep
 from mrjob.step import StepFailedException
 
 from tests.py2 import TestCase
@@ -31,6 +36,10 @@ def identity_mapper(k=None, v=None):
 def identity_reducer(k, vals):
     for v in vals:
         yield k, v
+
+
+def spark_func(input_path, output_path):
+    pass
 
 
 class StepFailedExceptionTestCase(TestCase):
@@ -97,6 +106,10 @@ class JarStepTestCase(TestCase):
             'args': [],
         })
         self.assertEqual(JarStep(**kwargs).description(0), expected)
+
+    def test_deprecated_INPUT_and_OUTPUT_attrs(self):
+        self.assertEqual(JarStep.INPUT, INPUT)
+        self.assertEqual(JarStep.OUTPUT, OUTPUT)
 
 
 class MRStepInitTestCase(TestCase):
@@ -369,3 +382,138 @@ class MRStepDescriptionTestCase(TestCase):
                 }
             }
         )
+
+
+class SparkStepTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertRaises(TypeError, SparkStep)
+
+    def test_defaults(self):
+        step = SparkStep(spark=spark_func)
+
+        self.assertEqual(step.spark, spark_func)
+        self.assertEqual(step.spark_args, [])
+        self.assertEqual(
+            step.description(0),
+            dict(type='spark', spark_args=[]),
+        )
+
+    def test_all_args(self):
+        step = SparkStep(spark=spark_func, spark_args=['argh', 'argh'])
+
+        self.assertEqual(step.spark, spark_func)
+        self.assertEqual(step.spark_args, ['argh', 'argh'])
+        self.assertEqual(
+            step.description(0),
+            dict(type='spark', spark_args=['argh', 'argh']),
+        )
+
+    def test_positional_spark_arg(self):
+        step1 = SparkStep(spark_func)
+        step2 = SparkStep(spark=spark_func)
+
+        self.assertEqual(step1, step2)
+        self.assertEqual(step1.description(0), step2.description(0))
+
+
+class SparkJarStepTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertRaises(TypeError, SparkJarStep)
+
+    def test_only_jar(self):
+        self.assertRaises(TypeError, SparkJarStep, 'dora.jar')
+
+    def test_defaults(self):
+        step = SparkJarStep(jar='dora.jar', main_class='backpack.Map')
+
+        self.assertEqual(step.jar, 'dora.jar')
+        self.assertEqual(step.main_class, 'backpack.Map')
+        self.assertEqual(step.args, [])
+        self.assertEqual(step.spark_args, [])
+        self.assertEqual(
+            step.description(0),
+            dict(
+                type='spark_jar',
+                jar='dora.jar',
+                main_class='backpack.Map',
+                args=[],
+                spark_args=[],
+             )
+        )
+
+    def test_all_args(self):
+        step = SparkJarStep(jar='dora.jar',
+                            main_class='backpack.Map',
+                            args=['ARGH', 'ARGH'],
+                            spark_args=['argh', 'argh'])
+
+        self.assertEqual(step.jar, 'dora.jar')
+        self.assertEqual(step.main_class, 'backpack.Map')
+        self.assertEqual(step.args, ['ARGH', 'ARGH'])
+        self.assertEqual(step.spark_args, ['argh', 'argh'])
+        self.assertEqual(
+            step.description(0),
+            dict(
+                type='spark_jar',
+                jar='dora.jar',
+                main_class='backpack.Map',
+                args=['ARGH', 'ARGH'],
+                spark_args=['argh', 'argh'],
+             )
+        )
+
+    def test_positional_args(self):
+        step1 = SparkJarStep('dora.jar', 'backpack.Map')
+        step2 = SparkJarStep(jar='dora.jar', main_class='backpack.Map')
+
+        self.assertEqual(step1, step2)
+        self.assertEqual(step1.description(0), step2.description(0))
+
+
+class SparkScriptStepTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertRaises(TypeError, SparkScriptStep)
+
+    def test_defaults(self):
+        step = SparkScriptStep(script='macbeth.py')
+
+        self.assertEqual(step.script, 'macbeth.py')
+        self.assertEqual(step.args, [])
+        self.assertEqual(step.spark_args, [])
+        self.assertEqual(
+            step.description(0),
+            dict(
+                type='spark_script',
+                script='macbeth.py',
+                args=[],
+                spark_args=[],
+             )
+        )
+
+    def test_all_args(self):
+        step = SparkScriptStep(script='macbeth.py',
+                               args=['ARGH', 'ARGH'],
+                               spark_args=['argh', 'argh'])
+
+        self.assertEqual(step.script, 'macbeth.py')
+        self.assertEqual(step.args, ['ARGH', 'ARGH'])
+        self.assertEqual(step.spark_args, ['argh', 'argh'])
+        self.assertEqual(
+            step.description(0),
+            dict(
+                type='spark_script',
+                script='macbeth.py',
+                args=['ARGH', 'ARGH'],
+                spark_args=['argh', 'argh'],
+             )
+        )
+
+    def test_positional_args(self):
+        step1 = SparkScriptStep('macbeth.py')
+        step2 = SparkScriptStep(script='macbeth.py')
+
+        self.assertEqual(step1, step2)
+        self.assertEqual(step1.description(0), step2.description(0))

@@ -40,6 +40,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'bootstrap_python': None,
                 'bootstrap_python_packages': [],
                 'bootstrap_scripts': [],
+                'bootstrap_spark': None,
                 'cloud_fs_sync_secs': None,
                 'cloud_log_dir': None,
                 'cloud_tmp_dir': None,

@@ -941,6 +941,20 @@ class SparkScriptPathTestCase(SandboxedTestCase):
                     inspect.getfile(MRNullSpark))
             )
 
+    def test_spark_jar(self):
+        # _spark_script_path() also works with jars
+        self.fake_jar = self.makefile('fake.jar')
+
+        job = MRSparkJar(['--jar', self.fake_jar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_path(0),
+                self.mock_interpolate_spark_script_path(
+                    self.fake_jar)
+            )
+
     def test_spark_script(self):
         self.fake_script = self.makefile('fake_script.py')
 

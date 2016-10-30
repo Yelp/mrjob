@@ -1046,6 +1046,24 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
             self.assertIn('foo', name_to_path)
             self.assertEqual(name_to_path['foo'], foo_path)
 
+    def test_spark_jar(self):
+        job = MRSparkJar(['--jar-arg', 'foo', '--jar-arg', 'bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['foo', 'bar'])
+
+    def test_spark_jar_interpolation(self):
+        job = MRSparkJar(['--jar-arg', OUTPUT, '--jar-arg', INPUT])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_script_args(0),
+                ['<step 0 output>', '<step 0 input>'])
+
     def test_spark_script(self):
         job = MRSparkScript(['--script-arg', 'foo', '--script-arg', 'bar'])
         job.sandbox()

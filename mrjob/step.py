@@ -570,3 +570,8 @@ class SparkScriptStep(object):
             'script': self.script,
             'spark_args': self.spark_args,
         }
+
+
+def _is_spark_step_type(step_type):
+    """Does the given step type indicate that it uses Spark?"""
+    return step_type[0].split('_') == 'spark'

@@ -707,7 +707,7 @@ class MRJobRunner(object):
 
     def _has_spark_steps(self):
         """Are any of our steps Spark steps (either spark or spark_script)"""
-        return any(step['type'].split('_')[0] == 'spark'
+        return any(_is_spark_step_type(step['type'])
                    for step in self._get_steps())
 
     def _interpreter(self, steps=False):
@@ -1212,7 +1212,8 @@ class MRJobRunner(object):
     def _args_for_spark_step(self, step_num):
         """The actual arguments used to run the spark-submit command.
 
-        This handles both ``spark`` and ``spark_script`` step types.
+        This handles both all Spark step types (``spark``, ``spark_jar``,
+        and ``spark_script``).
         """
         return (
             self.get_spark_submit_bin() +
@@ -1222,11 +1223,14 @@ class MRJobRunner(object):
         )
 
     def _spark_script_path(self, step_num):
-        """The path of the spark script, used by _args_for_spark_step()."""
+        """The path of the spark script or har, used by
+        _args_for_spark_step()."""
         step = self._get_step(step_num)
 
         if step['type'] == 'spark':
             path = self._script_path
+        elif step['type'] == 'spark_jar':
+            path = step['jar']
         elif step['type'] == 'spark_script':
             path = step['script']
         else:
@@ -1235,7 +1239,7 @@ class MRJobRunner(object):
         return self._interpolate_spark_script_path(path)
 
     def _spark_script_args(self, step_num):
-        """A list of args to the spark script, used by
+        """A list of args to the spark script/jar, used by
         _args_for_spark_step()."""
         step = self._get_step(step_num)
 
@@ -1250,7 +1254,7 @@ class MRJobRunner(object):
                     mrjob.step.OUTPUT,
                 ]
             )
-        elif step['type'] == 'spark_script':
+        elif step['type'] in ('spark_jar', 'spark_script'):
             args = step['args']
         else:
             raise TypeError('Bad step type: %r' % step['type'])
@@ -1272,11 +1276,16 @@ class MRJobRunner(object):
         translated to a URI when running spark (e.g. on EMR)."""
         return path
 
-    def _spark_cmdenv(self):
+    def _spark_cmdenv(self, step_num):
         """Returns a dictionary mapping environment variable to value,
         including mapping PYSPARK_PYTHON to self._python_bin()
         """
-        cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
+        step = self._get_step(step_num)
+
+        cmdenv = {}
+
+        if step['type'] in ('spark', 'spark_script'):  # not spark_jar
+            cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
         cmdenv.update(self._opts['cmdenv'])
         return cmdenv
 
@@ -1285,7 +1294,7 @@ class MRJobRunner(object):
         the given spark or spark_script step."""
         step = self._get_step(step_num)
 
-        if step['type'].split('_')[0] != 'spark':
+        if not _is_spark_step_type(step['type']):
             raise TypeError('non-Spark step: %r' % step)
 
         args = []
@@ -1293,10 +1302,14 @@ class MRJobRunner(object):
         # add runner-specific args
         args.extend(self._spark_submit_arg_prefix())
 
+        # add --class (JAR steps)
+        if step.get('main_class'):
+            args.extend(['--class', step['main_class']])
+
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually
         jobconf = {}
-        for key, value in self._spark_cmdenv().items():
+        for key, value in self._spark_cmdenv(step_num).items():
             jobconf['spark.executorEnv.%s' % key] = value
             jobconf['spark.yarn.appMasterEnv.%s' % key] = value
 
@@ -1309,10 +1322,11 @@ class MRJobRunner(object):
         # --files and --archives
         args.extend(self._spark_upload_args())
 
-        # --py-files
-        py_files_arg = ','.join(self._spark_py_files())
-        if py_files_arg:
-            args.extend(['--py-files', py_files_arg])
+        # --py-files (Python only)
+        if step['type'] in ('spark', 'spark_script'):
+            py_files_arg = ','.join(self._spark_py_files())
+            if py_files_arg:
+                args.extend(['--py-files', py_files_arg])
 
         # spark_args option
         args.extend(self._opts['spark_args'])

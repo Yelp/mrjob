@@ -507,7 +507,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._args_for_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._args_for_jar_step(step_num)
-        elif step['type'] in ('spark', 'spark_script'):
+        elif _is_spark_step_type(step['type']):
             return self._args_for_spark_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))

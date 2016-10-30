@@ -43,6 +43,7 @@ from mrjob.util import tar_and_gzip
 
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
+from tests.mr_spark_jar import MRSparkJar
 from tests.mr_spark_script import MRSparkScript
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
@@ -845,8 +846,31 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 )
             )
 
+    def test_spark_jar_step(self):
+        job = MRSparkJar(['--jar-main-class', 'foo.Bar',
+                          '--cmdenv', 'BAZ=qux',
+                          '--jobconf', 'QUX=baz'])
+        job.sandbox()
 
-    def test_spark_script_step_okay(self):
+        with job.make_runner() as runner:
+            runner._spark_py_files = Mock(
+                return_value=['<first py_file>', '<second py_file>']
+            )
+
+
+            # should handle cmdenv and --class
+            # but not set PYSPARK_PYTHON or --py-file
+            self.assertEqual(
+                runner._spark_submit_args(0), (
+                    ['--class', 'foo.Bar'] +
+                    self._expected_conf_args(
+                        cmdenv=dict(BAZ='qux'),
+                        jobconf=dict(QUX='baz')
+                    )
+                )
+            )
+
+    def test_spark_script_step(self):
         job = MRSparkScript()
         job.sandbox()
 
@@ -856,7 +880,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
 
-    def test_streaming_step_not_okay(self):
+    def test_streaming_step_not_allowed(self):
         job = MRTwoStepJob()
         job.sandbox()
 

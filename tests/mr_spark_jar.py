@@ -26,7 +26,7 @@ class MRSparkJar(MRJob):
         self.add_passthrough_option(
             '--jar', dest='jar')
         self.add_passthrough_option(
-            '--class', dest='main_class')
+            '--jar-main-class', dest='jar_main_class')
         self.add_passthrough_option(
             '--jar-arg', dest='jar_args',
             action='append', default=[])
@@ -37,7 +37,7 @@ class MRSparkJar(MRJob):
     def steps(self):
         return [SparkJarStep(
             jar=self.options.jar,
-            main_class=self.options.main_class,
+            main_class=self.options.jar_main_class,
             args=self.options.jar_args,
             spark_args=self.options.jar_spark_args,
         )]

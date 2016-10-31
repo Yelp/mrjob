@@ -41,6 +41,7 @@ from tests.mockhadoop import get_mock_hdfs_root
 from tests.mr_jar_and_streaming import MRJarAndStreaming
 from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_spark_jar import MRSparkJar
 from tests.mr_spark_script import MRSparkScript
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
@@ -1080,6 +1081,16 @@ class EnvForStepTestCase(MockHadoopTestCase):
                 runner._env_for_step(0),
                 combine_dicts(os.environ,
                               dict(FOO='bar', PYSPARK_PYTHON=PYTHON_BIN))
+            )
+
+    def test_spark_jar_step(self):
+        job = MRSparkJar(['-r', 'hadoop', '--cmdenv', 'FOO=bar'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._env_for_step(0),
+                combine_dicts(os.environ, dict(FOO='bar'))
             )
 
     def test_spark_script_step(self):

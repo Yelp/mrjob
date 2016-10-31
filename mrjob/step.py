@@ -19,7 +19,7 @@ from mrjob.py2 import string_types
 from mrjob.util import cmd_line
 
 
-STEP_TYPES = ('jar', 'spark', 'spark_script', 'streaming')
+STEP_TYPES = ('jar', 'spark', 'spark_jar', 'spark_script', 'streaming')
 
 # Function names mapping to mapper, reducer, and combiner operations
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
@@ -38,11 +38,14 @@ _JOB_STEP_PARAMS = _JOB_STEP_FUNC_PARAMS + _HADOOP_OPTS
 # all allowable JarStep constructor keyword args
 _JAR_STEP_KWARGS = ['args', 'main_class']
 
-# all allowable SparkScriptStep constructor keyword args
-_SPARK_SCRIPT_STEP_KWARGS = ['args', 'script', 'spark_args']
-
 # all allowable SparkStep constructor keyword args
 _SPARK_STEP_KWARGS = ['spark', 'spark_args']
+
+# all allowable SparkJarStep constructor keyword args
+_SPARK_JAR_STEP_KWARGS = ['args', 'jar', 'main_class', 'spark_args']
+
+# all allowable SparkScriptStep constructor keyword args
+_SPARK_SCRIPT_STEP_KWARGS = ['args', 'script', 'spark_args']
 
 
 #: If passed as an argument to :py:class:`JarStep` or
@@ -433,6 +436,77 @@ class SparkStep(object):
         }
 
 
+class SparkJarStep(object):
+    """Represents a running a separate Jar through Spark
+
+    Accepts the following keyword arguments:
+
+    :param jar: The local path to the Python script to run. On EMR, this
+                   can also be an ``s3://`` URI, or ``file://`` to reference a
+                   jar on the local filesystem of your EMR instance(s).
+    :param main_class: Your application's main class (e.g.
+                       ``'org.apache.spark.examples.SparkPi'``)
+    :param args: (optional) A list of arguments to the script. Use
+                 :py:data:`mrjob.step.INPUT` and :py:data:`OUTPUT` to
+                 interpolate input and output paths.
+    :param spark_args: (optional) an array of arguments to pass to spark-submit
+                       (e.g. ``['--executor-memory', '2G']``).
+
+    *script* can also be passed as a positional argument
+    """
+    def __init__(self, jar, main_class, **kwargs):
+        bad_kwargs = sorted(set(kwargs) - set(_SPARK_JAR_STEP_KWARGS))
+        if bad_kwargs:
+            raise TypeError(
+                'SparkJarStep() got an unexpected keyword argument %r' %
+                bad_kwargs[0])
+
+        self.jar = jar
+        self.main_class = main_class
+
+        self.args = kwargs.get('args') or []
+        self.spark_args = kwargs.get('spark_args') or []
+
+    def __repr__(self):
+        repr_args = []
+        repr_args.append(repr(self.jar))
+        repr_args.append(repr(self.main_class))
+        if self.args:
+            repr_args.append('args=' + repr(self.args))
+        if self.spark_args:
+            repr_args.append('spark_args=' + repr(self.spark_args))
+
+        return 'SparkJarStep(%s)' % ', '.join(repr_args)
+
+    def __eq__(self, other):
+        return (isinstance(other, SparkJarStep) and
+                all(getattr(self, key) == getattr(other, key)
+                    for key in _SPARK_JAR_STEP_KWARGS))
+
+    def description(self, step_num):
+        """Returns a dictionary representation of this step:
+
+        .. code-block:: js
+
+            {
+                'type': 'spark_jar',
+                'jar': <path of the JAR>,
+                'main_class': <class of application>,
+                'args': <list of strings, args to the spark script>,
+                'spark_args': <list of strings, args to spark-submit>
+            }
+
+        See :ref:`steps-format` for examples.
+        """
+        return {
+            'type': 'spark_jar',
+            'args': self.args,
+            'jar': self.jar,
+            'main_class': self.main_class,
+            'spark_args': self.spark_args,
+        }
+
+
 class SparkScriptStep(object):
     """Represents a running a separate Python script through Spark
 
@@ -474,7 +548,7 @@ class SparkScriptStep(object):
     def __eq__(self, other):
         return (isinstance(other, SparkScriptStep) and
                 all(getattr(self, key) == getattr(other, key)
-                    for key in ('script', 'args', 'spark_args')))
+                    for key in _SPARK_SCRIPT_STEP_KWARGS))
 
     def description(self, step_num):
         """Returns a dictionary representation of this step:
@@ -496,3 +570,8 @@ class SparkScriptStep(object):
             'script': self.script,
             'spark_args': self.spark_args,
         }
+
+
+def _is_spark_step_type(step_type):
+    """Does the given step type indicate that it uses Spark?"""
+    return step_type.split('_')[0] == 'spark'

@@ -70,6 +70,7 @@ from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_sort_values import MRSortValues
+from tests.mr_spark_jar import MRSparkJar
 from tests.mr_spark_script import MRSparkScript
 from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_job import MRTwoStepJob
@@ -3699,13 +3700,48 @@ class SparkStepTestCase(MockBotoTestCase):
                 ])
 
 
+class SparkJarStepTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(SparkJarStepTestCase, self).setUp()
+
+        self.fake_jar = self.makefile('fake.jar')
+
+        # _spark_submit_args() is tested elsewhere
+        self.start(patch(
+            'mrjob.runner.MRJobRunner._spark_submit_args',
+            return_value=['<spark submit args>']))
+
+    def test_jar_gets_uploaded(self):
+        job = MRSparkJar(['-r', 'emr', '--jar', self.fake_jar,
+                          '--jar-main-class', 'fake.Main'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(self.fake_jar, runner._upload_mgr.path_to_uri())
+            jar_uri = runner._upload_mgr.uri(self.fake_jar)
+            self.assertTrue(runner.fs.ls(jar_uri))
+
+            emr_conn = runner.make_emr_conn()
+            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+
+            self.assertEqual(len(steps), 1)
+            step_args = [a.value for a in steps[0].config.args]
+            # the first arg is spark-submit and varies by AMI
+            self.assertEqual(
+                step_args[1:],
+                ['<spark submit args>', jar_uri])
+
+
 class SparkScriptStepTestCase(MockBotoTestCase):
+    # a lot of this is already tested in test_runner.py
 
     def setUp(self):
         super(SparkScriptStepTestCase, self).setUp()
 
-        self.fake_script = os.path.join(self.tmp_dir, 'fake.py')
-        open(self.fake_script, 'w').close()
+        self.fake_script = self.makefile('fake_script.py')
 
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
@@ -3732,8 +3768,6 @@ class SparkScriptStepTestCase(MockBotoTestCase):
             self.assertEqual(
                 step_args[1:],
                 ['<spark submit args>', script_uri])
-
-    # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
     def test_3_x_ami(self):
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,

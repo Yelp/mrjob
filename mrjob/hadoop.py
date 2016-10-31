@@ -26,7 +26,6 @@ try:
 except ImportError:
     pty = None
 
-import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_dicts
@@ -49,6 +48,7 @@ from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
+from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import unique
 from mrjob.util import which
@@ -507,7 +507,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             return self._args_for_streaming_step(step_num)
         elif step['type'] == 'jar':
             return self._args_for_jar_step(step_num)
-        elif step['type'] in ('spark', 'spark_script'):
+        elif _is_spark_step_type(step['type']):
             return self._args_for_spark_step(step_num)
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
@@ -596,8 +596,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         env = dict(os.environ)
 
         # when running spark-submit, set its environment directly. See #1464
-        if step['type'].split('_')[0] == 'spark':
-            env.update(self._spark_cmdenv())
+        if _is_spark_step_type(step['type']):
+            env.update(self._spark_cmdenv(step_num))
 
         return env
 

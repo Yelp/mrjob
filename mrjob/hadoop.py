@@ -119,7 +119,7 @@ def fully_qualify_hdfs_path(path):
     else:
          try:
             return 'wasb:///user/%s/%s' % (getpass.getuser(), path)
-        except:
+         except:
             return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
     # finish patch 
 

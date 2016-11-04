@@ -13,89 +13,110 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _ls_task_syslogs
-from mrjob.logs.task import _match_task_syslog_path
+from mrjob.logs.task import _ls_task_logs
+from mrjob.logs.task import _match_task_log_path
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog
-from mrjob.logs.task import _syslog_to_stderr_path
 
+from tests.py2 import call
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.sandbox import PatcherTestCase
 
 
-class MatchTaskSyslogPathTestCase(TestCase):
+class MatchTaskLogPathTestCase(TestCase):
 
-    PRE_YARN_PATH = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
+    PRE_YARN_STDERR_PATH = (
+        '/userlogs/attempt_201512232143_0008_m_000001_3/stderr')
+    PRE_YARN_SYSLOG_PATH = (
+        '/userlogs/attempt_201512232143_0008_m_000001_3/syslog')
 
-    YARN_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
-                 'container_1450486922681_0005_01_000003/syslog')
+    YARN_STDERR_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
+                        'container_1450486922681_0005_01_000003/stderr')
+    YARN_SYSLOG_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
+                        'container_1450486922681_0005_01_000003/syslog')
 
     def test_empty(self):
-        self.assertEqual(_match_task_syslog_path(''), None)
+        self.assertEqual(_match_task_log_path(''), None)
 
-    def test_pre_yarn(self):
+    def test_pre_yarn_syslog(self):
         self.assertEqual(
-            _match_task_syslog_path(self.PRE_YARN_PATH),
-            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
+            _match_task_log_path(self.PRE_YARN_SYSLOG_PATH),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3',
+                 log_type='syslog'))
 
-    def test_pre_yarn_gz(self):
+    def test_pre_yarn_syslog_gz(self):
         self.assertEqual(
-            _match_task_syslog_path(self.PRE_YARN_PATH + '.gz'),
-            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
+            _match_task_log_path(self.PRE_YARN_SYSLOG_PATH + '.gz'),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3',
+                 log_type='syslog'))
 
-    def test_dont_match_pre_yarn_stderr(self):
+    def test_pre_yarn_stderr(self):
         self.assertEqual(
-            _match_task_syslog_path(self.PRE_YARN_PATH[:-6] + 'stderr'),
-            None)
+            _match_task_log_path(self.PRE_YARN_STDERR_PATH),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3',
+                 log_type='stderr'))
 
     def test_pre_yarn_job_id_filter(self):
         self.assertEqual(
-            _match_task_syslog_path(
-                self.PRE_YARN_PATH,
+            _match_task_log_path(
+                self.PRE_YARN_SYSLOG_PATH,
                 job_id='job_201512232143_0008'),
-            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3',
+                 log_type='syslog'))
 
         self.assertEqual(
-            _match_task_syslog_path(
-                self.PRE_YARN_PATH,
+            _match_task_log_path(
+                self.PRE_YARN_SYSLOG_PATH,
                 job_id='job_201512232143_0009'),
             None)
 
-    def test_yarn(self):
+    def test_yarn_syslog(self):
         self.assertEqual(
-            _match_task_syslog_path(self.YARN_PATH),
+            _match_task_log_path(self.YARN_SYSLOG_PATH),
             dict(application_id='application_1450486922681_0004',
-                 container_id='container_1450486922681_0005_01_000003'))
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='syslog'))
 
-    def test_yarn_gz(self):
+    def test_yarn_syslog_gz(self):
         self.assertEqual(
-            _match_task_syslog_path(self.YARN_PATH + '.gz'),
+            _match_task_log_path(self.YARN_SYSLOG_PATH + '.gz'),
             dict(application_id='application_1450486922681_0004',
-                 container_id='container_1450486922681_0005_01_000003'))
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='syslog'))
 
-    def test_dont_match_yarn_stderr(self):
+    def test_dont_match_yarn_shuffle_syslog(self):
         self.assertEqual(
-            _match_task_syslog_path(self.YARN_PATH[:-6] + 'stderr'),
+            _match_task_log_path(self.YARN_SYSLOG_PATH + '.shuffle'),
             None)
+
+    def test_match_yarn_stderr(self):
+        self.assertEqual(
+            _match_task_log_path(self.YARN_STDERR_PATH + '.gz'),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='stderr'))
 
     def test_yarn_application_id_filter(self):
         self.assertEqual(
-            _match_task_syslog_path(
-                self.YARN_PATH,
+            _match_task_log_path(
+                self.YARN_SYSLOG_PATH,
                 application_id='application_1450486922681_0004'),
             dict(application_id='application_1450486922681_0004',
-                 container_id='container_1450486922681_0005_01_000003'))
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='syslog'))
 
         self.assertEqual(
-            _match_task_syslog_path(
-                self.YARN_PATH,
+            _match_task_log_path(
+                self.YARN_SYSLOG_PATH,
                 application_id='application_1450486922681_0005'),
             None)
 
 
 class InterpretTaskLogsTestCase(PatcherTestCase):
+
+    maxDiff = None
 
     def setUp(self):
         super(InterpretTaskLogsTestCase, self).setUp()
@@ -125,7 +146,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         def mock_exists(path):
             return path in self.mock_paths or path == 'MOCK_LOG_DIR'
 
-        # need to mock ls so that _ls_task_syslogs() can work
+        # need to mock ls so that _ls_task_logs() can work
         def mock_ls(log_dir):
             return self.mock_paths
 
@@ -143,7 +164,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
 
     def mock_path_matches(self):
         mock_log_dir_stream = [['MOCK_LOG_DIR']]  # _ls_logs() needs this
-        return _ls_task_syslogs(self.mock_fs, mock_log_dir_stream)
+        return _ls_task_logs(self.mock_fs, mock_log_dir_stream)
 
     def interpret_task_logs(self, **kwargs):
         return _interpret_task_logs(
@@ -190,6 +211,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000001',
                 ),
             ],
+            partial=True,
         ))
 
     def test_syslog_with_error_and_split(self):
@@ -214,12 +236,13 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000001',
                 ),
             ],
+            partial=True,
         ))
 
     def test_syslog_with_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-        mock_stderr_callback = Mock()
+        mock_log_callback = Mock()
 
         self.mock_paths = [syslog_path, stderr_path]
 
@@ -229,7 +252,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(
-            self.interpret_task_logs(stderr_callback=mock_stderr_callback),
+            self.interpret_task_logs(log_callback=mock_log_callback),
             dict(
                 errors=[
                     dict(
@@ -249,12 +272,14 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             )
         )
 
-        mock_stderr_callback.assert_called_once_with(stderr_path)
+        self.assertEqual(
+            mock_log_callback.call_args_list,
+            [call(stderr_path), call(syslog_path)])
 
     def test_syslog_with_empty_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-        mock_stderr_callback = Mock()
+        mock_log_callback = Mock()
 
         self.mock_paths = [syslog_path, stderr_path]
 
@@ -263,7 +288,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(
-            self.interpret_task_logs(stderr_callback=mock_stderr_callback),
+            self.interpret_task_logs(log_callback=mock_log_callback),
             dict(
                 errors=[
                     dict(
@@ -275,10 +300,13 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                         task_id='task_201512232143_0008_m_000001',
                     ),
                 ],
+                partial=True,
             )
         )
 
-        mock_stderr_callback.assert_called_once_with(stderr_path)
+        self.assertEqual(
+            mock_log_callback.call_args_list,
+            [call(stderr_path), call(syslog_path)])
 
     def test_yarn_syslog_with_error(self):
         # this works the same way as the other tests, except we get
@@ -302,6 +330,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     ),
                 ),
             ],
+            partial=True,
         ))
 
     def test_error_in_stderr_only(self):
@@ -315,14 +344,26 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(self.interpret_task_logs(), {})
+        self.assertEqual(self.mock_paths_catted, [stderr_path, syslog_path])
 
-        # never even looked at stderr, because no error in syslog
-        self.assertEqual(self.mock_paths_catted, [syslog_path])
+    def test_stderr_without_corresponding_syslog(self):
+        stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
 
-    maxDiff = None
+        self.mock_paths = [stderr_path]
 
-    # indirectly tests _ls_task_syslogs() and its ability to sort by recency
+        self.path_to_mock_result = {
+            stderr_path: dict(message='because, exploding code')
+        }
+
+        # don't even look at stderr if it doesn't have a matching syslog
+        self.assertEqual(self.interpret_task_logs(), {})
+        self.assertEqual(self.mock_paths_catted, [])
+
+
+    # indirectly tests _ls_task_syslogs() and its ability to sort by
+    # log type and recency
     def test_multiple_logs(self):
+        stderr1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
         syslog1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/stderr'
         syslog2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/syslog'
@@ -330,32 +371,27 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         syslog3_path = '/userlogs/attempt_201512232143_0008_m_000003_3/syslog'
         syslog4_path = '/userlogs/attempt_201512232143_0008_m_000004_3/syslog'
 
-        self.mock_paths = [syslog1_path,
-                           stderr2_path,
-                           syslog2_path,
-                           stderr3_path,
-                           syslog3_path,
-                           syslog4_path]
+        self.mock_paths = [
+            stderr1_path,
+            syslog1_path,
+            stderr2_path,
+            syslog2_path,
+            stderr3_path,
+            syslog3_path,
+            syslog4_path,
+        ]
 
         self.path_to_mock_result = {
             syslog1_path: dict(hadoop_error=dict(message='BOOM1')),
             syslog2_path: dict(hadoop_error=dict(message='BOOM2')),
             stderr2_path: dict(message='BoomException'),
             syslog3_path: dict(hadoop_error=dict(message='BOOM3')),
-            # no errors for stderr3_path or syslog4_path
+            # no errors for stderr1_path, stderr3_path, or syslog4_path
         }
 
         # we should read from syslog2_path first (later task number)
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
-                dict(
-                    attempt_id='attempt_201512232143_0008_m_000003_3',
-                    hadoop_error=dict(
-                        message='BOOM3',
-                        path=syslog3_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000003',
-                ),
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
@@ -372,11 +408,11 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             partial=True,
         ))
 
-        # shouldn't even bother with syslog1_path
+        # skip over syslog4_path (no stderr), never get to syslog1_path
         self.assertEqual(self.mock_paths_catted, [
-            syslog4_path,
-            syslog3_path, stderr3_path,
-            syslog2_path, stderr2_path,
+            stderr3_path,
+            stderr2_path,
+            syslog2_path,
         ])
 
         # try again, with partial=False
@@ -385,14 +421,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         # paths still get sorted by _ls_logs()
         self.assertEqual(self.interpret_task_logs(partial=False), dict(
             errors=[
-                dict(
-                    attempt_id='attempt_201512232143_0008_m_000003_3',
-                    hadoop_error=dict(
-                        message='BOOM3',
-                        path=syslog3_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000003',
-                ),
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
@@ -406,6 +434,14 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000002',
                 ),
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000003_3',
+                    hadoop_error=dict(
+                        message='BOOM3',
+                        path=syslog3_path,
+                    ),
+                    task_id='task_201512232143_0008_m_000003',
+                ),
+                dict(
                     attempt_id='attempt_201512232143_0008_m_000001_3',
                     hadoop_error=dict(
                         message='BOOM1',
@@ -416,8 +452,16 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             ],
         ))
 
-        self.assertEqual(self.mock_paths_catted,
-                         list(reversed(self.mock_paths)))
+        self.assertEqual(self.mock_paths_catted, [
+            stderr3_path,
+            stderr2_path,
+            syslog2_path,
+            stderr1_path,
+            syslog4_path,
+            syslog3_path,
+            syslog1_path,
+        ])
+
 
     def test_pre_yarn_sorting(self):
         # NOTE: we currently don't have to handle errors from multiple
@@ -731,21 +775,3 @@ class ParseTaskStderrTestCase(TestCase):
                 num_lines=4,
             )
         )
-
-
-class SyslogToStderrPathTestCase(TestCase):
-
-    def test_empty(self):
-        self.assertEqual(_syslog_to_stderr_path(''), 'stderr')
-
-    def test_no_stem(self):
-        self.assertEqual(_syslog_to_stderr_path('/path/to/syslog'),
-                         '/path/to/stderr')
-
-    def test_gz(self):
-        self.assertEqual(_syslog_to_stderr_path('/path/to/syslog.gz'),
-                         '/path/to/stderr.gz')
-
-    def test_doesnt_check_filename(self):
-        self.assertEqual(_syslog_to_stderr_path('/path/to/garden'),
-                         '/path/to/stderr')

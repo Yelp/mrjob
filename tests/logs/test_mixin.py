@@ -14,7 +14,7 @@
 from copy import deepcopy
 
 from mrjob.logs.mixin import LogInterpretationMixin
-from mrjob.logs.mixin import _log_parsing_task_stderr
+from mrjob.logs.mixin import _log_parsing_task_log
 
 from tests.py2 import Mock
 from tests.py2 import patch
@@ -154,7 +154,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
     def setUp(self):
         super(InterpretTaskLogsTestCase, self).setUp()
 
-        self.runner._ls_task_syslogs = Mock()
+        self.runner._ls_task_logs = Mock()
         self._interpret_task_logs = (
             self.start(patch('mrjob.logs.mixin._interpret_task_logs')))
         self.runner.get_hadoop_version = Mock(return_value='2.7.1')
@@ -169,7 +169,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertFalse(self.log.warning.called)
         self.assertFalse(self._interpret_task_logs.called)
-        self.assertFalse(self.runner._ls_task_syslogs.called)
+        self.assertFalse(self.runner._ls_task_logs.called)
 
     def test_task_interpretation_already_filled(self):
         log_interpretation = dict(task={})
@@ -195,7 +195,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self.runner._interpret_task_logs(log_interpretation, partial=False)
 
-        self.assertTrue(self.runner._ls_task_syslogs.called)
+        self.assertTrue(self.runner._ls_task_logs.called)
         self.assertTrue(self._interpret_task_logs.called)
 
     def test_application_id(self):
@@ -212,15 +212,15 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
                  task=dict(counters={'foo': {'bar': 1}})))
 
         self.assertFalse(self.log.warning.called)
-        self.runner._ls_task_syslogs.assert_called_once_with(
+        self.runner._ls_task_logs.assert_called_once_with(
             application_id='app_1',
             job_id=None,
             output_dir=None)
         self._interpret_task_logs.assert_called_once_with(
             self.runner.fs,
-            self.runner._ls_task_syslogs.return_value,
+            self.runner._ls_task_logs.return_value,
             partial=True,
-            stderr_callback=_log_parsing_task_stderr)
+            log_callback=_log_parsing_task_log)
 
     def test_job_id(self):
         self.runner.get_hadoop_version.return_value = '1.0.3'
@@ -238,15 +238,15 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
                  task=dict(counters={'foo': {'bar': 1}})))
 
         self.assertFalse(self.log.warning.called)
-        self.runner._ls_task_syslogs.assert_called_once_with(
+        self.runner._ls_task_logs.assert_called_once_with(
             application_id=None,
             job_id='job_1',
             output_dir=None)
         self._interpret_task_logs.assert_called_once_with(
             self.runner.fs,
-            self.runner._ls_task_syslogs.return_value,
+            self.runner._ls_task_logs.return_value,
             partial=True,
-            stderr_callback=_log_parsing_task_stderr)
+            log_callback=_log_parsing_task_log)
 
     def test_output_dir(self):
         self._interpret_task_logs.return_value = dict(
@@ -263,15 +263,15 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
                  task=dict(counters={'foo': {'bar': 1}})))
 
         self.assertFalse(self.log.warning.called)
-        self.runner._ls_task_syslogs.assert_called_once_with(
+        self.runner._ls_task_logs.assert_called_once_with(
             application_id='app_1',
             job_id=None,
             output_dir='hdfs:///path/')
         self._interpret_task_logs.assert_called_once_with(
             self.runner.fs,
-            self.runner._ls_task_syslogs.return_value,
+            self.runner._ls_task_logs.return_value,
             partial=True,
-            stderr_callback=_log_parsing_task_stderr)
+            log_callback=_log_parsing_task_log)
 
     def test_missing_application_id(self):
         log_interpretation = dict(step=dict(job_id='job_1'))
@@ -283,7 +283,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._interpret_task_logs.called)
-        self.assertFalse(self.runner._ls_task_syslogs.called)
+        self.assertFalse(self.runner._ls_task_logs.called)
 
     def test_missing_job_id(self):
         self.runner.get_hadoop_version.return_value = '1.0.3'
@@ -298,7 +298,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._interpret_task_logs.called)
-        self.assertFalse(self.runner._ls_task_syslogs.called)
+        self.assertFalse(self.runner._ls_task_logs.called)
 
 
 class PickCountersTestCase(LogInterpretationMixinTestCase):
@@ -403,26 +403,26 @@ class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
         self.assertRaises(StopIteration, next, results)
 
 
-class LsTaskSyslogsTestCase(LogInterpretationMixinTestCase):
+class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
 
     def setUp(self):
-        super(LsTaskSyslogsTestCase, self).setUp()
+        super(LsTaskLogsTestCase, self).setUp()
 
-        self._ls_task_syslogs = self.start(patch(
-            'mrjob.logs.mixin._ls_task_syslogs'))
+        self._ls_task_logs = self.start(patch(
+            'mrjob.logs.mixin._ls_task_logs'))
         self.runner._stream_task_log_dirs = Mock()
 
     def test_basic(self):
-        # the _ls_task_syslogs() method is a very thin wrapper. Just
+        # the _ls_task_logs() method is a very thin wrapper. Just
         # verify that the keyword args get passed through and
         # that logging happens in the right order
 
-        self._ls_task_syslogs.return_value = [
+        self._ls_task_logs.return_value = [
             dict(path='hdfs:///userlogs/1/syslog'),
             dict(path='hdfs:///userlogs/2/syslog'),
         ]
 
-        results = self.runner._ls_task_syslogs(
+        results = self.runner._ls_task_logs(
             application_id='app_1',
             job_id='job_1', output_dir='hdfs:///output/')
 
@@ -433,22 +433,20 @@ class LsTaskSyslogsTestCase(LogInterpretationMixinTestCase):
         self.runner._stream_task_log_dirs.assert_called_once_with(
             application_id='app_1',
             output_dir='hdfs:///output/')
-        self._ls_task_syslogs.assert_called_once_with(
+        self._ls_task_logs.assert_called_once_with(
             self.runner.fs,
             self.runner._stream_task_log_dirs.return_value,
             application_id='app_1',
             job_id='job_1')
 
-        self.assertEqual(self.log.info.call_count, 1)
-        self.assertIn('hdfs:///userlogs/1/syslog',
-                      self.log.info.call_args[0][0])
+        self.assertEqual(
+            list(results),
+            [dict(path='hdfs:///userlogs/2/syslog')]
+        )
 
-        self.assertEqual(next(results), dict(path='hdfs:///userlogs/2/syslog'))
-        self.assertEqual(self.log.info.call_count, 2)
-        self.assertIn('hdfs:///userlogs/2/syslog',
-                      self.log.info.call_args[0][0])
-
-        self.assertRaises(StopIteration, next, results)
+        # unlike most of the _ls_*() methods, logging is handled elsewhere
+        # with a callback
+        self.assertFalse(self.log.info.called)
 
 
 class PickErrorsTestCase(LogInterpretationMixinTestCase):

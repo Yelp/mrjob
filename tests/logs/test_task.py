@@ -115,6 +115,8 @@ class MatchTaskLogPathTestCase(TestCase):
 
 class InterpretTaskLogsTestCase(PatcherTestCase):
 
+    maxDiff = None
+
     def setUp(self):
         super(InterpretTaskLogsTestCase, self).setUp()
 
@@ -333,14 +335,26 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(self.interpret_task_logs(), {})
+        self.assertEqual(self.mock_paths_catted, [stderr_path, syslog_path])
 
-        # never even looked at stderr, because no error in syslog
-        self.assertEqual(self.mock_paths_catted, [syslog_path])
+    def test_stderr_without_corresponding_syslog(self):
+        stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
 
-    maxDiff = None
+        self.mock_paths = [stderr_path]
 
-    # indirectly tests _ls_task_syslogs() and its ability to sort by recency
+        self.path_to_mock_result = {
+            stderr_path: dict(message='because, exploding code')
+        }
+
+        # don't even look at stderr if it doesn't have a matching syslog
+        self.assertEqual(self.interpret_task_logs(), {})
+        self.assertEqual(self.mock_paths_catted, [])
+
+
+    # indirectly tests _ls_task_syslogs() and its ability to sort by
+    # log type and recency
     def test_multiple_logs(self):
+        stderr1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
         syslog1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/stderr'
         syslog2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/syslog'
@@ -348,32 +362,27 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         syslog3_path = '/userlogs/attempt_201512232143_0008_m_000003_3/syslog'
         syslog4_path = '/userlogs/attempt_201512232143_0008_m_000004_3/syslog'
 
-        self.mock_paths = [syslog1_path,
-                           stderr2_path,
-                           syslog2_path,
-                           stderr3_path,
-                           syslog3_path,
-                           syslog4_path]
+        self.mock_paths = [
+            stderr1_path,
+            syslog1_path,
+            stderr2_path,
+            syslog2_path,
+            stderr3_path,
+            syslog3_path,
+            syslog4_path,
+        ]
 
         self.path_to_mock_result = {
             syslog1_path: dict(hadoop_error=dict(message='BOOM1')),
             syslog2_path: dict(hadoop_error=dict(message='BOOM2')),
             stderr2_path: dict(message='BoomException'),
             syslog3_path: dict(hadoop_error=dict(message='BOOM3')),
-            # no errors for stderr3_path or syslog4_path
+            # no errors for stderr1_path, stderr3_path, or syslog4_path
         }
 
         # we should read from syslog2_path first (later task number)
         self.assertEqual(self.interpret_task_logs(), dict(
             errors=[
-                dict(
-                    attempt_id='attempt_201512232143_0008_m_000003_3',
-                    hadoop_error=dict(
-                        message='BOOM3',
-                        path=syslog3_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000003',
-                ),
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
@@ -390,11 +399,11 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             partial=True,
         ))
 
-        # shouldn't even bother with syslog1_path
+        # skip over syslog4_path (no stderr), never get to syslog1_path
         self.assertEqual(self.mock_paths_catted, [
-            syslog4_path,
-            syslog3_path, stderr3_path,
-            syslog2_path, stderr2_path,
+            stderr3_path,
+            stderr2_path,
+            syslog2_path,
         ])
 
         # try again, with partial=False
@@ -403,14 +412,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         # paths still get sorted by _ls_logs()
         self.assertEqual(self.interpret_task_logs(partial=False), dict(
             errors=[
-                dict(
-                    attempt_id='attempt_201512232143_0008_m_000003_3',
-                    hadoop_error=dict(
-                        message='BOOM3',
-                        path=syslog3_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000003',
-                ),
                 dict(
                     attempt_id='attempt_201512232143_0008_m_000002_3',
                     hadoop_error=dict(
@@ -424,6 +425,14 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000002',
                 ),
                 dict(
+                    attempt_id='attempt_201512232143_0008_m_000003_3',
+                    hadoop_error=dict(
+                        message='BOOM3',
+                        path=syslog3_path,
+                    ),
+                    task_id='task_201512232143_0008_m_000003',
+                ),
+                dict(
                     attempt_id='attempt_201512232143_0008_m_000001_3',
                     hadoop_error=dict(
                         message='BOOM1',
@@ -434,8 +443,16 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             ],
         ))
 
-        self.assertEqual(self.mock_paths_catted,
-                         list(reversed(self.mock_paths)))
+        self.assertEqual(self.mock_paths_catted, [
+            stderr3_path,
+            stderr2_path,
+            syslog2_path,
+            stderr1_path,
+            syslog4_path,
+            syslog3_path,
+            syslog1_path,
+        ])
+
 
     def test_pre_yarn_sorting(self):
         # NOTE: we currently don't have to handle errors from multiple

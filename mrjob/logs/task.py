@@ -199,6 +199,7 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
         if log_callback:
             log_callback(syslog_path)
         syslog_error = _parse_task_syslog(_cat_log(fs, syslog_path))
+        syslogs_parsed.add(syslog_path)
 
         if not syslog_error.get('hadoop_error'):
             # if no entry in Hadoop syslog, probably just noise
@@ -208,9 +209,10 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
         error['hadoop_error']['path'] = syslog_path
 
         # path in IDs we learned from path
-        for id_key in 'attempt_id', 'container_id', 'type_id':
+        for id_key in 'attempt_id', 'container_id':
             if id_key in match:
                 error[id_key] = match[id_key]
+        _add_implied_task_id(error)
 
         result.setdefault('errors', [])
         result['errors'].append(error)

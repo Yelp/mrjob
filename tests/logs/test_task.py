@@ -18,6 +18,7 @@ from mrjob.logs.task import _match_task_log_path
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog
 
+from tests.py2 import call
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
@@ -210,6 +211,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000001',
                 ),
             ],
+            partial=True,
         ))
 
     def test_syslog_with_error_and_split(self):
@@ -234,6 +236,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     task_id='task_201512232143_0008_m_000001',
                 ),
             ],
+            partial=True,
         ))
 
     def test_syslog_with_corresponding_stderr(self):
@@ -269,7 +272,9 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             )
         )
 
-        mock_log_callback.assert_called_once_with(stderr_path)
+        self.assertEqual(
+            mock_log_callback.call_args_list,
+            [call(stderr_path), call(syslog_path)])
 
     def test_syslog_with_empty_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
@@ -295,10 +300,13 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                         task_id='task_201512232143_0008_m_000001',
                     ),
                 ],
+                partial=True,
             )
         )
 
-        mock_log_callback.assert_called_once_with(stderr_path)
+        self.assertEqual(
+            mock_log_callback.call_args_list,
+            [call(stderr_path), call(syslog_path)])
 
     def test_yarn_syslog_with_error(self):
         # this works the same way as the other tests, except we get
@@ -322,6 +330,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
                     ),
                 ),
             ],
+            partial=True,
         ))
 
     def test_error_in_stderr_only(self):

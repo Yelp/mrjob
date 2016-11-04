@@ -13,87 +13,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _ls_task_syslogs
+from mrjob.logs.task import _ls_task_logs
 from mrjob.logs.task import _match_task_log_path
-from mrjob.logs.task import _match_task_syslog_path
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog
-from mrjob.logs.task import _syslog_to_stderr_path
 
 from tests.py2 import Mock
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.sandbox import PatcherTestCase
-
-
-class MatchTaskSyslogPathTestCase(TestCase):
-
-    PRE_YARN_PATH = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
-
-    YARN_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
-                 'container_1450486922681_0005_01_000003/syslog')
-
-    def test_empty(self):
-        self.assertEqual(_match_task_syslog_path(''), None)
-
-    def test_pre_yarn(self):
-        self.assertEqual(
-            _match_task_syslog_path(self.PRE_YARN_PATH),
-            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
-
-    def test_pre_yarn_gz(self):
-        self.assertEqual(
-            _match_task_syslog_path(self.PRE_YARN_PATH + '.gz'),
-            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
-
-    def test_dont_match_pre_yarn_stderr(self):
-        self.assertEqual(
-            _match_task_syslog_path(self.PRE_YARN_PATH[:-6] + 'stderr'),
-            None)
-
-    def test_pre_yarn_job_id_filter(self):
-        self.assertEqual(
-            _match_task_syslog_path(
-                self.PRE_YARN_PATH,
-                job_id='job_201512232143_0008'),
-            dict(attempt_id='attempt_201512232143_0008_m_000001_3'))
-
-        self.assertEqual(
-            _match_task_syslog_path(
-                self.PRE_YARN_PATH,
-                job_id='job_201512232143_0009'),
-            None)
-
-    def test_yarn(self):
-        self.assertEqual(
-            _match_task_syslog_path(self.YARN_PATH),
-            dict(application_id='application_1450486922681_0004',
-                 container_id='container_1450486922681_0005_01_000003'))
-
-    def test_yarn_gz(self):
-        self.assertEqual(
-            _match_task_syslog_path(self.YARN_PATH + '.gz'),
-            dict(application_id='application_1450486922681_0004',
-                 container_id='container_1450486922681_0005_01_000003'))
-
-    def test_dont_match_yarn_stderr(self):
-        self.assertEqual(
-            _match_task_syslog_path(self.YARN_PATH[:-6] + 'stderr'),
-            None)
-
-    def test_yarn_application_id_filter(self):
-        self.assertEqual(
-            _match_task_syslog_path(
-                self.YARN_PATH,
-                application_id='application_1450486922681_0004'),
-            dict(application_id='application_1450486922681_0004',
-                 container_id='container_1450486922681_0005_01_000003'))
-
-        self.assertEqual(
-            _match_task_syslog_path(
-                self.YARN_PATH,
-                application_id='application_1450486922681_0005'),
-            None)
 
 
 class MatchTaskLogPathTestCase(TestCase):
@@ -215,7 +143,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         def mock_exists(path):
             return path in self.mock_paths or path == 'MOCK_LOG_DIR'
 
-        # need to mock ls so that _ls_task_syslogs() can work
+        # need to mock ls so that _ls_task_logs() can work
         def mock_ls(log_dir):
             return self.mock_paths
 
@@ -233,7 +161,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
 
     def mock_path_matches(self):
         mock_log_dir_stream = [['MOCK_LOG_DIR']]  # _ls_logs() needs this
-        return _ls_task_syslogs(self.mock_fs, mock_log_dir_stream)
+        return _ls_task_logs(self.mock_fs, mock_log_dir_stream)
 
     def interpret_task_logs(self, **kwargs):
         return _interpret_task_logs(
@@ -309,7 +237,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
     def test_syslog_with_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-        mock_stderr_callback = Mock()
+        mock_log_callback = Mock()
 
         self.mock_paths = [syslog_path, stderr_path]
 
@@ -319,7 +247,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(
-            self.interpret_task_logs(stderr_callback=mock_stderr_callback),
+            self.interpret_task_logs(log_callback=mock_log_callback),
             dict(
                 errors=[
                     dict(
@@ -339,12 +267,12 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             )
         )
 
-        mock_stderr_callback.assert_called_once_with(stderr_path)
+        mock_log_callback.assert_called_once_with(stderr_path)
 
     def test_syslog_with_empty_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-        mock_stderr_callback = Mock()
+        mock_log_callback = Mock()
 
         self.mock_paths = [syslog_path, stderr_path]
 
@@ -353,7 +281,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(
-            self.interpret_task_logs(stderr_callback=mock_stderr_callback),
+            self.interpret_task_logs(log_callback=mock_log_callback),
             dict(
                 errors=[
                     dict(
@@ -368,7 +296,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             )
         )
 
-        mock_stderr_callback.assert_called_once_with(stderr_path)
+        mock_log_callback.assert_called_once_with(stderr_path)
 
     def test_yarn_syslog_with_error(self):
         # this works the same way as the other tests, except we get
@@ -821,21 +749,3 @@ class ParseTaskStderrTestCase(TestCase):
                 num_lines=4,
             )
         )
-
-
-class SyslogToStderrPathTestCase(TestCase):
-
-    def test_empty(self):
-        self.assertEqual(_syslog_to_stderr_path(''), 'stderr')
-
-    def test_no_stem(self):
-        self.assertEqual(_syslog_to_stderr_path('/path/to/syslog'),
-                         '/path/to/stderr')
-
-    def test_gz(self):
-        self.assertEqual(_syslog_to_stderr_path('/path/to/syslog.gz'),
-                         '/path/to/stderr.gz')
-
-    def test_doesnt_check_filename(self):
-        self.assertEqual(_syslog_to_stderr_path('/path/to/garden'),
-                         '/path/to/stderr')

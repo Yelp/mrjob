@@ -43,6 +43,16 @@ _PRE_YARN_TASK_SYSLOG_PATH_RE = re.compile(
     r'(?P<attempt_num>\d+))/'
     r'syslog(?P<suffix>\.\w+)?$')
 
+# what log paths look like pre-YARN
+_PRE_YARN_TASK_LOG_PATH_RE = re.compile(
+    r'^(?P<prefix>.*?/)'
+    r'(?P<attempt_id>attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_'
+    r'(?P<task_type>[mr])_(?P<task_num>\d+)_'
+    r'(?P<attempt_num>\d+))/'
+    r'(?P<log_type>stderr|syslog)(?P<suffix>\.\w{1,3})?$')
+# TODO: add stdout log type for Spark
+
+
 # ignore warnings about initializing log4j in task stderr
 _TASK_STDERR_IGNORE_RE = re.compile(r'^log4j:WARN .*$')
 
@@ -65,6 +75,15 @@ _YARN_TASK_SYSLOG_PATH_RE = re.compile(
     r'(?P<application_id>application_\d+_\d{4})/'
     r'(?P<container_id>container(_\d+)+)/'
     r'syslog(?P<suffix>\.\w+)?$')
+
+# what log paths look like on YARN
+_YARN_TASK_LOG_PATH_RE = re.compile(
+    r'^(?P<prefix>.*?/)'
+    r'(?P<application_id>application_\d+_\d{4})/'
+    r'(?P<container_id>container(_\d+)+)/'
+    r'(?P<log_type>stderr|syslog)(?P<suffix>\.\w{1,3})?$')
+# TODO: add stdout log type for Spark
+
 
 
 def _ls_task_syslogs(fs, log_dir_stream, application_id=None, job_id=None):
@@ -98,6 +117,73 @@ def _match_task_syslog_path(path, application_id=None, job_id=None):
         return dict(
             application_id=m.group('application_id'),
             container_id=m.group('container_id'))
+
+    return None
+
+
+def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
+    """Yield matching logs, optionally filtering by application_id
+    or job_id.
+
+    This will yield matches for stderr logs first, followed by syslogs. stderr
+    logs will have a 'syslog' field pointing to the match for the
+    corresponding syslog (stderr logs without a corresponding syslog won't be
+    included).
+    """
+    stderr_logs = []
+    syslogs = []
+
+    for match in _ls_logs(fs, log_dir_stream, _match_task_log_path,
+                          application_id=application_id,
+                          job_id=job_id):
+        if match['log_type'] == 'stderr':
+            stderr_logs.append(match)
+        elif match['log_type'] == 'syslog':
+            syslogs.append(match)
+
+    # use to match stderr logs to corresponding syslogs
+    def _log_key(match):
+        return tuple((k, v) for k, v in sorted(match.items())
+                     if k not in ('log_type', 'path'))
+
+    key_to_syslog = dict((_log_key(match), match) for match in syslogs)
+
+    for stderr_log in stderr_logs:
+        stderr_log['syslog'] = key_to_syslog.get(_log_key(stderr_log))
+
+    # exclude stderr logs with no syslog
+    stderr_logs_with_syslog = [m for m in stderr_logs if m['syslog']]
+
+    return stderr_logs_with_syslog + syslogs
+
+
+def _match_task_log_path(path, application_id=None, job_id=None):
+    """Is this the path/URI of a task log?
+
+    If so, return a dictionary containing application_id and container_id
+    (on YARN) or attempt_id (on pre-YARN Hadoop), plus log_type (either
+    stdout, stderr, or syslog).
+
+    Otherwise, return None
+
+    Optionally, filter by application_id (YARN) or job_id (pre-YARN).
+    """
+    m = _PRE_YARN_TASK_LOG_PATH_RE.match(path)
+    if m:
+        if job_id and job_id != _to_job_id(m.group('attempt_id')):
+            return None  # matches, but wrong job_id
+        return dict(
+            attempt_id=m.group('attempt_id'),
+            log_type=m.group('log_type'))
+
+    m = _YARN_TASK_LOG_PATH_RE.match(path)
+    if m:
+        if application_id and application_id != m.group('application_id'):
+            return None  # matches, but wrong application_id
+        return dict(
+            application_id=m.group('application_id'),
+            container_id=m.group('container_id'),
+            log_type=m.group('log_type'))
 
     return None
 

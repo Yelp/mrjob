@@ -14,6 +14,7 @@
 # limitations under the License.
 from mrjob.logs.task import _interpret_task_logs
 from mrjob.logs.task import _ls_task_syslogs
+from mrjob.logs.task import _match_task_log_path
 from mrjob.logs.task import _match_task_syslog_path
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog
@@ -91,6 +92,95 @@ class MatchTaskSyslogPathTestCase(TestCase):
         self.assertEqual(
             _match_task_syslog_path(
                 self.YARN_PATH,
+                application_id='application_1450486922681_0005'),
+            None)
+
+
+class MatchTaskLogPathTestCase(TestCase):
+
+    PRE_YARN_STDERR_PATH = (
+        '/userlogs/attempt_201512232143_0008_m_000001_3/stderr')
+    PRE_YARN_SYSLOG_PATH = (
+        '/userlogs/attempt_201512232143_0008_m_000001_3/syslog')
+
+    YARN_STDERR_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
+                        'container_1450486922681_0005_01_000003/stderr')
+    YARN_SYSLOG_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
+                        'container_1450486922681_0005_01_000003/syslog')
+
+    def test_empty(self):
+        self.assertEqual(_match_task_log_path(''), None)
+
+    def test_pre_yarn_syslog(self):
+        self.assertEqual(
+            _match_task_log_path(self.PRE_YARN_SYSLOG_PATH),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3',
+                 log_type='syslog'))
+
+    def test_pre_yarn_syslog_gz(self):
+        self.assertEqual(
+            _match_task_log_path(self.PRE_YARN_SYSLOG_PATH + '.gz'),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3',
+                 log_type='syslog'))
+
+    def test_pre_yarn_stderr(self):
+        self.assertEqual(
+            _match_task_log_path(self.PRE_YARN_STDERR_PATH),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3',
+                 log_type='stderr'))
+
+    def test_pre_yarn_job_id_filter(self):
+        self.assertEqual(
+            _match_task_log_path(
+                self.PRE_YARN_SYSLOG_PATH,
+                job_id='job_201512232143_0008'),
+            dict(attempt_id='attempt_201512232143_0008_m_000001_3',
+                 log_type='syslog'))
+
+        self.assertEqual(
+            _match_task_log_path(
+                self.PRE_YARN_SYSLOG_PATH,
+                job_id='job_201512232143_0009'),
+            None)
+
+    def test_yarn_syslog(self):
+        self.assertEqual(
+            _match_task_log_path(self.YARN_SYSLOG_PATH),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='syslog'))
+
+    def test_yarn_syslog_gz(self):
+        self.assertEqual(
+            _match_task_log_path(self.YARN_SYSLOG_PATH + '.gz'),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='syslog'))
+
+    def test_dont_match_yarn_shuffle_syslog(self):
+        self.assertEqual(
+            _match_task_log_path(self.YARN_SYSLOG_PATH + '.shuffle'),
+            None)
+
+    def test_match_yarn_stderr(self):
+        self.assertEqual(
+            _match_task_log_path(self.YARN_STDERR_PATH + '.gz'),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='stderr'))
+
+    def test_yarn_application_id_filter(self):
+        self.assertEqual(
+            _match_task_log_path(
+                self.YARN_SYSLOG_PATH,
+                application_id='application_1450486922681_0004'),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='syslog'))
+
+        self.assertEqual(
+            _match_task_log_path(
+                self.YARN_SYSLOG_PATH,
                 application_id='application_1450486922681_0005'),
             None)
 

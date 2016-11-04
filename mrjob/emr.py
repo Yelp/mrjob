@@ -1765,6 +1765,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         emr_conn = self.make_emr_conn()
 
+        logged_progress = False
+
         while True:
             # don't antagonize EMR's throttling
             log.debug('Waiting %.1f seconds...' %
@@ -1803,7 +1805,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # don't log progress for master node setup step, because
                 # it doesn't appear in job tracker
                 if step_num >= 0:
-                    self._log_step_progress()
+                    logged_progress = self._log_step_progress(logged_progress)
 
                 continue
 
@@ -1869,7 +1871,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 step_desc=(
                     'Master node setup step' if step_num == -1 else None))
 
-    def _log_step_progress(self):
+    def _log_step_progress(self, logged_progress=False):
         """Tunnel to the job tracker/resource manager and log the
         progress of the current step.
 
@@ -1877,7 +1879,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         job is ours, which should be correct for EMR.)
         """
         if not self._show_tracker_progress:
-            return
+            return False
 
         tunnel_config = self._ssh_tunnel_config()
 
@@ -1893,14 +1895,27 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if tunnel_config['name'] == 'job tracker':
                 map_progress, reduce_progress = (
                     _parse_progress_from_job_tracker(tunnel_html))
-                if map_progress is not None:
-                    log.info('   map %3d%% reduce %3d%%' % (
-                        map_progress, reduce_progress))
+
+                # don't log "100%" from previous steps (see #793)
+                if map_progress is None or (
+                        map_progress == 100 and reduce_progress == 100 and
+                        not logged_progress):
+                    return False
+
+                log.info('   map %3d%% reduce %3d%%' % (
+                    map_progress, reduce_progress))
             else:
                 progress = _parse_progress_from_resource_manager(
                     tunnel_html)
-                if progress is not None:
-                    log.info('   %5.1f%% complete' % progress)
+
+                # don't log "100%" from previous steps (see #793)
+                if progress is None or (
+                        progress == 100 and not logged_progress):
+                    return False
+
+                log.info('   %5.1f%% complete' % progress)
+
+            return True
         finally:
             if tunnel_handle is not None:
                 tunnel_handle.close()

@@ -33,15 +33,15 @@ from mrjob.logs.errors import _pick_error
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.task import _interpret_task_logs
-from mrjob.logs.task import _ls_task_syslogs
+from mrjob.logs.task import _ls_task_logs
 
 log = getLogger(__name__)
 
 
 # a callback for _interpret_task_logs(). Breaking it out to make
 # testing easier
-def _log_parsing_task_stderr(stderr_path):
-    log.info('  Parsing task stderr: %s' % stderr_path)
+def _log_parsing_task_log(log_path):
+    log.info('  Parsing task log: %s' % log_path)
 
 
 class LogInterpretationMixin(object):
@@ -184,21 +184,21 @@ class LogInterpretationMixin(object):
 
         log_interpretation['task'] = _interpret_task_logs(
             self.fs,
-            self._ls_task_syslogs(
+            self._ls_task_logs(
                 application_id=application_id,
                 job_id=job_id,
                 output_dir=output_dir),
             partial=partial,
-            stderr_callback=_log_parsing_task_stderr)
+            log_callback=_log_parsing_task_log)
 
-    def _ls_task_syslogs(
+    def _ls_task_logs(
             self, application_id=None, job_id=None, output_dir=None):
-        """Yield task log matches, logging a message for each one."""
-        for match in _ls_task_syslogs(
+        """Yield task log matches."""
+        # logging messages are handled by a callback in _interpret_task_logs()
+        for match in _ls_task_logs(
                 self.fs,
                 self._stream_task_log_dirs(
                     application_id=application_id, output_dir=output_dir),
                 application_id=application_id,
                 job_id=job_id):
-            log.info('  Parsing task syslog: %s' % match['path'])
             yield match

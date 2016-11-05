@@ -145,8 +145,18 @@ _IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG = {
 # if we SSH into a node, default place to look for logs
 _EMR_LOG_DIR = '/mnt/var/log'
 
-# EMR's hard limit on number of steps in a cluster
-_MAX_STEPS_PER_CLUSTER = 256
+# no longer limited to 256 steps starting with 2.4.8/3.1.1
+# (# of steps is actually unlimited, but API only shows 1000; see #1462)
+_IMAGE_VERSION_TO_MAX_STEPS = {
+    '2': 256,
+    '2.4.8': 1000,
+    '3': 256,
+    '3.1.1': 1000,
+}
+
+# breaking this out as a separate constant since 4.x AMIs don't report
+# RunningAmiVersion, they report ReleaseLabel
+_4_X_MAX_STEPS = 1000
 
 _MAX_SSH_RETRIES = 20
 
@@ -2868,6 +2878,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if release_label != self._opts['release_label']:
                     log.debug('    release label mismatch')
                     return
+
+                # used below
+                max_steps = _4_X_MAX_STEPS
             else:
                 # match actual AMI version
                 image_version = getattr(cluster, 'runningamiversion', '')
@@ -2879,6 +2892,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 if not image_version.startswith(self._opts['image_version']):
                     log.debug('    image version mismatch')
                     return
+
+                max_steps = map_version(
+                    image_version, _IMAGE_VERSION_TO_MAX_STEPS)
 
             applications = self._applications()
             if applications:
@@ -2908,8 +2924,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             steps = _list_all_steps(emr_conn, cluster.id)
 
-            # there is a hard limit of 256 steps per cluster
-            if len(steps) + num_steps > _MAX_STEPS_PER_CLUSTER:
+            # don't add more steps than EMR will allow/display through the API
+            if len(steps) + num_steps > max_steps:
                 log.debug('    no room for our steps')
                 return
 

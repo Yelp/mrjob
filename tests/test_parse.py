@@ -252,6 +252,13 @@ class JobTrackerProgressTestCase(TestCase):
 
     def test_on_html_snippet(self):
         HTML = b"""
+  <ul id="quicklinks-list">
+    <li><a href="#scheduling_info">Scheduling Info</a></li>
+    <li><a href="#running_jobs">Running Jobs</a></li>
+    <li><a href="#retired_jobs">Retired Jobs</a></li>
+    <li><a href="#local_logs">Local Logs</a></li>
+  </ul>
+
 <h2 id="running_jobs">Running Jobs</h2>
 <table border="1" cellpadding="5" cellspacing="0" class="sortable" style="margin-top: 10px">
 <thead><tr><td><b>Jobid</b></td><td><b>Started</b></td><td><b>Priority</b></td><td><b>User</b></td><td><b>Name</b></td><td><b>Map % Complete</b></td><td><b>Map Total</b></td><td><b>Maps Completed</b></td><td><b>Reduce % Complete</b></td><td><b>Reduce Total</b></td><td><b>Reduces Completed</b></td><td><b>Job Scheduling Information</b></td><td><b>Diagnostic Info </b></td></tr></thead>
@@ -261,13 +268,38 @@ class JobTrackerProgressTestCase(TestCase):
         self.assertEqual(_parse_progress_from_job_tracker(HTML),
                          (27.51, 0))
 
+    def test_ignore_complete_jobs(self):
+        # regression test for #793
+        HTML = b"""
+  <ul id="quicklinks-list">
+    <li><a href="#scheduling_info">Scheduling Info</a></li>
+    <li><a href="#running_jobs">Running Jobs</a></li>
+    <li><a href="#retired_jobs">Retired Jobs</a></li>
+    <li><a href="#local_logs">Local Logs</a></li>
+  </ul>
+
+  <h2 id="running_jobs">Running Jobs</h2>
+<table border="1" cellpadding="5" cellspacing="0">
+<tr><td align="center" colspan="8"><i>none</i></td></tr>
+</table>
+
+<hr>
+
+<h2 id="completed_jobs">Completed Jobs</h2><table border="1" cellpadding="5" cellspacing="0" class="sortable" style="margin-top: 10px">
+<thead><tr><td><b>Jobid</b></td><td><b>Started</b></td><td><b>Priority</b></td><td><b>User</b></td><td><b>Name</b></td><td><b>Map % Complete</b></td><td><b>Map Total</b></td><td><b>Maps Completed</b></td><td><b>Reduce % Complete</b></td><td><b>Reduce Total</b></td><td><b>Reduces Completed</b></td><td><b>Job Scheduling Information</b></td><td><b>Diagnostic Info </b></td></tr></thead>
+<tr><td id="job_0"><a href="jobdetails.jsp?jobid=job_201611042349_0003&refresh=0">job_201611042349_0003</a></td><td id="started_0">Sat Nov 05 00:20:55 UTC 2016</td><td id="priority_0" sorttable_customkey="2">NORMAL</td><td id="user_0">hadoop</td><td id="name_0">streamjob4785184554048208079.jar</td><td>100.00%<table border="1px" width="80px"><tr><td cellspacing="0" class="perc_filled" width="100%"></td></tr></table></td><td>4</td><td>4</td><td>100.00%<table border="1px" width="80px"><tr><td cellspacing="0" class="perc_filled" width="100%"></td></tr></table></td><td>1</td><td> 1</td><td>NA</td><td>NA</td></tr>
+</table>
+        """
+        self.assertEqual(_parse_progress_from_job_tracker(HTML),
+                         (None, None))
+
 
 class ResourceManagerProgressTestCase(TestCase):
 
     def test_empty(self):
         self.assertEqual(_parse_progress_from_resource_manager(b''), None)
 
-    def test_on_javascript_snippet(self):
+    def test_partially_complete_job(self):
         # the actual data is in JavaScript at the bottom of the page
         JS = b"""
 <script type="text/javascript">
@@ -285,3 +317,36 @@ class ResourceManagerProgressTestCase(TestCase):
 </html>
         """
         self.assertEqual(_parse_progress_from_resource_manager(JS), 5.0)
+
+    def test_completed_job(self):
+        JS = b"""
+<script type="text/javascript">
+              var appsTableData=[
+["<a href='/cluster/app/application_1440199050012_0002'>application_1440199050012_0002</a>","hadoop","streamjob4609242403924457306.jar","MAPREDUCE","default","1440199276424","1440199351438","FINISHED","SUCCEEDED","<br title='100.0'> <div class='ui-progressbar ui-widget ui-widget-content ui-corner-all' title='100.0%'> <div class='ui-progressbar-value ui-widget-header ui-corner-left' style='width:100.0%'> </div> </div>","<a href='http://172.31.23.88:9046/proxy/application_1440199050012_0002/jobhistory/job/job_1440199050012_0002'>History</a>"],
+["<a href='/cluster/app/application_1440199050012_0001'>application_1440199050012_0001</a>","hadoop","streamjob7935208784309830219.jar","MAPREDUCE","default","1440199122680","1440199195931","FINISHED","SUCCEEDED","<br title='100.0'> <div class='ui-progressbar ui-widget ui-widget-content ui-corner-all' title='100.0%'> <div class='ui-progressbar-value ui-widget-header ui-corner-left' style='width:100.0%'> </div> </div>","<a href='http://172.31.23.88:9046/proxy/application_1440199050012_0001/jobhistory/job/job_1440199050012_0001'>History</a>"]
+]
+            </script>
+            <tbody>
+            </tbody>
+          </table>
+    </tbody>
+  </table>
+</html>
+        """
+        self.assertEqual(_parse_progress_from_resource_manager(JS), None)
+
+    def test_failed_job(self):
+        JS = b"""
+<script type="text/javascript">
+              var appsTableData=[
+["<a href='/cluster/app/application_1440199050012_0001'>application_1440199050012_0001</a>","hadoop","streamjob7935208784309830219.jar","MAPREDUCE","default","1440199122680","1440199195931","FINISHED","FAILED","<br title='100.0'> <div class='ui-progressbar ui-widget ui-widget-content ui-corner-all' title='100.0%'> <div class='ui-progressbar-value ui-widget-header ui-corner-left' style='width:100.0%'> </div> </div>","<a href='http://172.31.23.88:9046/proxy/application_1440199050012_0001/jobhistory/job/job_1440199050012_0001'>History</a>"]
+]
+            </script>
+            <tbody>
+            </tbody>
+          </table>
+    </tbody>
+  </table>
+</html>
+        """
+        self.assertEqual(_parse_progress_from_resource_manager(JS), None)

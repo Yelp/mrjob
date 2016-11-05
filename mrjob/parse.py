@@ -275,12 +275,28 @@ def _find_python_traceback(lines):
 
 _JOB_TRACKER_HTML_RE = re.compile(br'\b(\d{1,3}\.\d{2})%')
 _RESOURCE_MANAGER_JS_RE = re.compile(
-    br'.*(application_[_\d]+).*width:(\d{1,3}.\d)%')
+    br'\s*\[.*application_[_\d]+.*"RUNNING"'
+    br'.*width:(?P<percent>\d{1,3}.\d)%.*\]'
+)
 
 
 def _parse_progress_from_job_tracker(html_bytes):
-    """Pull (map_percent, reduce_percent) from job tracker HTML as floats,
-    or return (None, None)."""
+    """Pull (map_percent, reduce_percent) from running job from job tracker
+    HTML as floats, or return (None, None).
+
+    This assumes at most one running job (designed for EMR).
+    """
+    # snip out the Running Jobs section (ignore the header)
+    start = html_bytes.rfind(b'Running Jobs')
+    if start == -1:
+        return None, None
+    end = html_bytes.find(b'Jobs', start + len(b'Running Jobs'))
+    if end == -1:
+        end = None
+
+    html_bytes = html_bytes[start:end]
+
+    # search it for percents
     matches = _JOB_TRACKER_HTML_RE.findall(html_bytes)
     if len(matches) >= 2:
         return float(matches[0]), float(matches[1])
@@ -288,25 +304,22 @@ def _parse_progress_from_job_tracker(html_bytes):
         return None, None
 
 
-# TODO: this has two issues:
-# - reports progress of previous steps
-# - reports 100% progress for failed steps
+
 def _parse_progress_from_resource_manager(html_bytes):
-    """Pull progress_precent from job tracker HTML, as a float, or return
-    None."""
-    # actual data is in an out-of-order JS data structure; need to find
-    # progress for all job IDs and then pick last one
+    """Pull progress_precent for running job from job tracker HTML, as a
+    float, or return None.
+
+    This assumes at most one running job (designed for EMR).
+    """
+    # this is for EMR and assumes only one running job
     app_id_percent_tuples = []
 
     for line in html_bytes.splitlines():
         m = _RESOURCE_MANAGER_JS_RE.match(line)
         if m:
-            app_id_percent_tuples.append((m.group(1), float(m.group(2))))
+            return float(m.group('percent'))
 
-    if app_id_percent_tuples:
-        return sorted(app_id_percent_tuples)[-1][1]
-    else:
-        return None
+    return None
 
 
 ### AWS Date-time parsing ###

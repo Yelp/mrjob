@@ -227,6 +227,8 @@ class URITestCase(TestCase):
         self.assertEqual(is_uri('2016-10-11T06:29:17'), False)
         # sorry, we only care about file URIs
         self.assertEqual(is_uri('mailto:someone@example.com'), False)
+        # urlparse has to accept it
+        self.assertEqual(is_uri('://'), False)
 
     def test_is_s3_uri(self):
         self.assertEqual(is_s3_uri('s3://a/uri'), True)

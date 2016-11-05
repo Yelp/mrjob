@@ -3458,9 +3458,9 @@ class DeprecatedHadoopStreamingJarOnEMROptionTestCase(MockBotoTestCase):
         self.log = self.start(patch('mrjob.emr.log'))
 
     def assert_deprecation_warning(self):
-        self.assertTrue(self.log.warn.called)
+        self.assertTrue(self.log.warning.called)
         self.assertIn('hadoop_streaming_jar_on_emr is deprecated',
-                      self.log.warn.call_args[0][0])
+                      self.log.warning.call_args[0][0])
 
     def test_absolute_path(self):
         runner = EMRJobRunner(hadoop_streaming_jar_on_emr='/fridge/pickle.jar')

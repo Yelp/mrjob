@@ -50,6 +50,8 @@ _WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
 
 def is_windows_path(uri):
     """Return True if *uri* is a windows path."""
+    log.warning('is_windows_path() is deprecated and will be removed in v0.6.0')
+
     if _WINPATH_RE.match(uri):
         return True
     else:
@@ -57,11 +59,10 @@ def is_windows_path(uri):
 
 
 def is_uri(uri):
-    """Return True if *uri* is any sort of URI."""
-    if is_windows_path(uri):
-        return False
-
-    return bool(urlparse(uri).scheme)
+    """Return True if *uri* is a URI and contains ``://``
+    (we only care about URIs that can describe files)
+    """
+    return '://' in uri and bool(urlparse(uri).scheme)
 
 
 def is_s3_uri(uri):

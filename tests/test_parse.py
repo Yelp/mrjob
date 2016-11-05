@@ -219,15 +219,27 @@ class PortRangeListTestCase(TestCase):
 
 
 class URITestCase(TestCase):
-    def test_uri_parsing(self):
+    def test_is_uri(self):
         self.assertEqual(is_uri('notauri!'), False)
         self.assertEqual(is_uri('they://did/the/monster/mash'), True)
         self.assertEqual(is_uri('C:\some\windows\path'), False)
-        self.assertEqual(is_windows_path('C:\some\windows\path'), True)
-        self.assertEqual(is_windows_path('s3://a/uri'), False)
+        # test #1455
+        self.assertEqual(is_uri('2016-10-11T06:29:17'), False)
+        # sorry, we only care about file URIs
+        self.assertEqual(is_uri('mailto:someone@example.com'), False)
+        # urlparse has to accept it
+        self.assertEqual(is_uri('://'), False)
+
+    def test_is_s3_uri(self):
         self.assertEqual(is_s3_uri('s3://a/uri'), True)
         self.assertEqual(is_s3_uri('s3n://a/uri'), True)
         self.assertEqual(is_s3_uri('hdfs://a/uri'), False)
+
+    def test_is_windows_path(self):
+        self.assertEqual(is_windows_path('C:\some\windows\path'), True)
+        self.assertEqual(is_windows_path('s3://a/uri'), False)
+
+    def test_parse_s3_uri(self):
         self.assertEqual(parse_s3_uri('s3://bucket/loc'), ('bucket', 'loc'))
 
     def test_urlparse(self):

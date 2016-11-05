@@ -575,8 +575,8 @@ class MRJobRunner(object):
 
         .. deprecated:: 0.5.0
         """
-        log.warn('get_job_name() has been renamed to get_job_key().'
-                 ' get_job_name() will be removed in v0.6.0')
+        log.warning('get_job_name() has been renamed to get_job_key().'
+                    ' get_job_name() will be removed in v0.6.0')
         return self.get_job_key()
 
     def get_output_dir(self):

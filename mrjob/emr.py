@@ -445,9 +445,9 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         and issue a warning."""
         if self['hadoop_streaming_jar_on_emr']:
             jar = 'file://' + self['hadoop_streaming_jar_on_emr']
-            log.warn('hadoop_streaming_jar_on_emr is deprecated'
-                     ' and will be removed in v0.6.0.'
-                     ' Set hadoop_streaming_jar to %s instead' % jar)
+            log.warning('hadoop_streaming_jar_on_emr is deprecated'
+                        ' and will be removed in v0.6.0.'
+                        ' Set hadoop_streaming_jar to %s instead' % jar)
             if not self['hadoop_streaming_jar']:
                 self['hadoop_streaming_jar'] = jar
 

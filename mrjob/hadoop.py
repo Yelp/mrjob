@@ -534,12 +534,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             args.extend(['-D', ('%s=0' % translate_jobconf(
                 'mapreduce.job.reduces', self.get_hadoop_version()))])
 
-        # -libjars (#198)
-        if self._opts['libjars']:
-            args.extend(['-libjars', ','.join(self._opts['libjars'])])
-
         # Add extra hadoop args first as hadoop args could be a hadoop
-        # specific argument (e.g. -libjars) which must come before job
+        # specific argument which must come before job
         # specific args.
         args.extend(self._hadoop_args_for_step(step_num))
 
@@ -567,6 +563,13 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     def _args_for_jar_step(self, step_num):
         step = self._get_step(step_num)
 
+        args = []
+
+        args.extend(self._get_hadoop_bin())
+
+        # -libjars, -D
+        args.extend(self._hadoop_generic_args_for_step(step_num))
+
         # special case for consistency with EMR runner.
         #
         # This might look less like duplicated code if we ever
@@ -576,7 +579,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             jar = step['jar']
 
-        args = self.get_hadoop_bin() + ['jar', jar]
+        args.extend(['jar', jar])
 
         if step.get('main_class'):
             args.append(step['main_class'])

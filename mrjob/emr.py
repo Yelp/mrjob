@@ -1623,7 +1623,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         step_args = []
         step_args.extend(step_arg_prefix)  # add 'hadoop-streaming' for 4.x
         step_args.extend(self._upload_args())
-        step_args.extend(self._libjar_step_args())
         step_args.extend(self._hadoop_args_for_step(step_num))
 
         streaming_step_kwargs['step_args'] = step_args
@@ -1643,8 +1642,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         jar = self._upload_uri_or_remote_path(step['jar'])
         step_args = self._interpolate_input_and_output(step['args'], step_num)
 
-        # -libjars comes before jar-specific args
-        step_args = self._libjar_step_args() + step_args
+        # -libjars, -D comes before jar-specific args
+        step_args = self._hadoop_generic_args_for_step(step_num) + step_args
 
         return boto.emr.JarStep(
             name=self._step_name(step_num),
@@ -1714,23 +1713,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             name=name, jar=jar, step_args=step_args,
             action_on_failure=self._action_on_failure())
 
-    def _libjar_step_args(self):
-        libjar_paths = []
+    def _libjar_paths(self):
+        results = []
 
         # libjars should be in the working dir of the master node setup
         # script path, unless they refer to paths directly (file:///)
         for path in self._opts['libjars']:
             if path.startswith('file:///'):
-                libjar_paths.append(path[7:])  # keep leading slash
+                results.append(path[7:])  # keep leading slash
             else:
-                libjar_paths.append(posixpath.join(
+                results.append(posixpath.join(
                     self._master_node_setup_working_dir(),
                     self._master_node_setup_mgr.name('file', path)))
 
-        if libjar_paths:
-            return ['-libjars', ','.join(libjar_paths)]
-        else:
-            return []
+        return results
 
     def _get_streaming_jar_and_step_arg_prefix(self):
         if self._opts['hadoop_streaming_jar']:

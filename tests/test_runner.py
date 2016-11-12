@@ -724,6 +724,35 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 )
             )
 
+    def test_libjars_option(self):
+        fake_libjar = self.makefile('fake_lib.jar')
+
+        job = MRNullSpark(
+            ['--libjar', fake_libjar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                ['--jars', fake_libjar] +
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
+    def test_libjar_paths_override(self):
+        job = MRNullSpark()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.start(patch.object(
+                runner, '_libjar_paths',
+                return_value=['s3://a/a.jar', 's3://b/b.jar']))
+
+            self.assertEqual(
+                runner._spark_submit_args(0),
+                ['--jars', 's3://a/a.jar,s3://b/b.jar'] +
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
     def test_option_spark_args(self):
         job = MRNullSpark(['--spark-arg', '--name', '--spark-arg', 'Dave'])
         job.sandbox()

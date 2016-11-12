@@ -1324,7 +1324,7 @@ class MRJobRunner(object):
         # add --jars, if any
         libjar_paths = self._libjar_paths()
         if libjar_paths:
-            args.extend(['--jars'], ','.join(libjar_paths))
+            args.extend(['--jars', ','.join(libjar_paths)])
 
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually

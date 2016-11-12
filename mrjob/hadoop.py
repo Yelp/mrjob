@@ -565,7 +565,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         args = []
 
-        args.extend(self._get_hadoop_bin())
+        args.extend(self.get_hadoop_bin())
 
         # -libjars, -D
         args.extend(self._hadoop_generic_args_for_step(step_num))

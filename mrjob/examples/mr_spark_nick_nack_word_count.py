@@ -44,9 +44,7 @@ class MRSparkNickNackWordCount(MRJob):
         counts = counts.map(lambda (word, count): (word, str(count)))
 
         counts.saveAsHadoopFile(output_path,
-                                'nicknack.MultipleValueOutputFormat',
-                                'org.apache.hadoop.io.Text',
-                                'org.apache.hadoop.io.Text')
+                                'nicknack.MultipleValueOutputFormat')
 
         sc.stop()
 

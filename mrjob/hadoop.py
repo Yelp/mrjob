@@ -421,7 +421,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         return stdin_path
 
     def _run_job_in_hadoop(self):
-        for step_num in range(self._num_steps()):
+        for step_num, step in enumerate(self._get_steps()):
             step_args = self._args_for_step(step_num)
             env = self._env_for_step(step_num)
 
@@ -482,11 +482,12 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
             log_interpretation['step'] = step_interpretation
 
-            counters = self._pick_counters(log_interpretation)
-            if counters:
-                log.info(_format_counters(counters))
-            else:
-                log.warning('No counters found')
+            if not _is_spark_step_type(step['type']):
+                counters = self._pick_counters(log_interpretation)
+                if counters:
+                    log.info(_format_counters(counters))
+                else:
+                    log.warning('No counters found')
 
             if returncode:
                 error = self._pick_error(log_interpretation)

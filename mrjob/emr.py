@@ -1975,10 +1975,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     # was it because a bootstrap action failed?
                     self._check_for_failed_bootstrap_action(cluster)
 
+            # spark steps require different log parsing. The master node
+            # setup script is a JAR step (albeit one that never produces
+            # counters)
+            step_type = (
+                self._get_step(step_num)['type'] if step_num >= 0 else 'jar')
+
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
-            # try to fetch counters
+            # try to fetch counters. (Except for master node setup
+            # and Spark, which has no counters.)
             if step.status.state != 'CANCELLED':
-                if step_num >= 0:
+                if step_num >= 0 and not _is_spark_step_type(step_type):
                     counters = self._pick_counters(log_interpretation)
                     if counters:
                         log.info(_format_counters(counters))

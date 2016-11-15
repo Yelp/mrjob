@@ -3361,16 +3361,11 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.assertEqual(ss['step_args'][2], '-files')
         self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
 
-    def test_libjars_and_hadoop_args_for_step(self):
-        self.start(patch(
-            'mrjob.emr.EMRJobRunner._libjar_step_args',
-            return_value=[
-                '-libjars',
-                '/home/hadoop/dir/honey.jar,/home/hadoop/door/a.jar']))
-
+    def test_hadoop_args_for_step(self):
         self.start(patch(
             'mrjob.emr.EMRJobRunner._hadoop_args_for_step',
-            return_value=['-D', 'foo=bar']))
+            return_value=['-libjars', '/home/hadoop/dora.jar',
+                          '-D', 'foo=bar']))
 
         ss = self._get_streaming_step(
             dict(type='streaming', mapper=dict(type='script')))
@@ -3383,17 +3378,17 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
         self.assertTrue(ss['step_args'][1].endswith('#my_job.py'))
         self.assertEqual(
             ss['step_args'][2:],
-            ['-libjars', '/home/hadoop/dir/honey.jar,/home/hadoop/door/a.jar',
+            ['-libjars', '/home/hadoop/dora.jar',
              '-D', 'foo=bar'])
 
 
-class LibjarStepArgsTestCase(MockBotoTestCase):
+class LibjarPathsTestCase(MockBotoTestCase):
 
     def test_no_libjars(self):
         runner = EMRJobRunner()
         runner._add_master_node_setup_files_for_upload()
 
-        self.assertEqual(runner._libjar_step_args(), [])
+        self.assertEqual(runner._libjar_paths(), [])
 
     def test_libjars(self):
         runner = EMRJobRunner(libjars=[
@@ -3406,11 +3401,11 @@ class LibjarStepArgsTestCase(MockBotoTestCase):
         working_dir = runner._master_node_setup_working_dir()
 
         self.assertEqual(
-            runner._libjar_step_args(),
+            runner._libjar_paths(),
             [
-                '-libjars',
-                '%s/cookie.jar,%s/honey.jar,/left/dora.jar' % (
-                    working_dir, working_dir),
+                working_dir + '/cookie.jar',
+                working_dir + '/honey.jar',
+                '/left/dora.jar',
             ]
         )
 

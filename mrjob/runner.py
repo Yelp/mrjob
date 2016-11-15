@@ -1149,6 +1149,25 @@ class MRJobRunner(object):
 
         return self._mrjob_tar_gz_path
 
+    def _hadoop_generic_args_for_step(self, step_num):
+        """Arguments like -D and -libjars that apply to every Hadoop
+        subcommand."""
+        args = []
+
+        # libjars (#198)
+        libjar_paths = self._libjar_paths()
+        if libjar_paths:
+            args.extend(['-libjars', ','.join(libjar_paths)])
+
+        # jobconf (-D)
+        jobconf = self._jobconf_for_step(step_num)
+
+        for key, value in sorted(jobconf.items()):
+            if value is not None:
+                args.extend(['-D', '%s=%s' % (key, value)])
+
+        return args
+
     def _jobconf_for_step(self, step_num):
         """Get the jobconf dictionary, optionally including step-specific
         jobconf info.
@@ -1178,13 +1197,8 @@ class MRJobRunner(object):
         """
         args = []
 
-        # translate the jobconf configuration names to match
-        # the hadoop version
-        jobconf = self._jobconf_for_step(step_num)
-
-        for key, value in sorted(jobconf.items()):
-            if value is not None:
-                args.extend(['-D', '%s=%s' % (key, value)])
+        # -libjars, -D
+        args.extend(self._hadoop_generic_args_for_step(step_num))
 
         # hadoop_extra_args (if defined; it's not for sim runners)
         # this has to come after -D because it may include streaming-specific
@@ -1307,6 +1321,11 @@ class MRJobRunner(object):
         if step.get('main_class'):
             args.extend(['--class', step['main_class']])
 
+        # add --jars, if any
+        libjar_paths = self._libjar_paths()
+        if libjar_paths:
+            args.extend(['--jars', ','.join(libjar_paths)])
+
         # --conf arguments include python bin, cmdenv, jobconf. Make sure
         # that we can always override these manually
         jobconf = {}
@@ -1348,6 +1367,13 @@ class MRJobRunner(object):
         we pass these as-is.
         """
         return self._opts['py_files']
+
+    def _libjar_paths(self):
+        """Paths or URIs of libjars, from Hadoop/Spark's point of view.
+
+        Override this for non-local libjars (e.g. on EMR).
+        """
+        return self._opts['libjars']
 
     def _upload_args(self):
         # just upload every file and archive in the working dir manager

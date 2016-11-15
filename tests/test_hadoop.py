@@ -908,24 +908,19 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                  " my_job.py --step-num=0 --mapper'"]))
 
 
-class JarStepTestCase(MockHadoopTestCase):
+class ArgsForJarStepTestCase(MockHadoopTestCase):
 
     def test_local_jar(self):
-        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
-        open(fake_jar, 'w').close()
+        fake_jar = self.makefile('fake.jar')
 
         job = MRJustAJar(['-r', 'hadoop', '--jar', fake_jar])
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner.run()
-
-        hadoop_cmd_args = get_mock_hadoop_cmd_args()
-
-        hadoop_jar_cmd_args = [args for args in hadoop_cmd_args if
-                               args and args[0] == 'jar']
-        self.assertEqual(len(hadoop_jar_cmd_args), 1)
-        self.assertEqual(hadoop_jar_cmd_args[0], ['jar', fake_jar])
+            self.assertEqual(
+                runner._args_for_jar_step(0),
+                runner.get_hadoop_bin() +
+                ['jar', fake_jar])
 
     def test_hdfs_jar_uri(self):
         # this could change, but for now, we pass URIs straight through
@@ -938,18 +933,40 @@ class JarStepTestCase(MockHadoopTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            with logger_disabled('mrjob.hadoop'):
-                # `hadoop jar` doesn't actually accept URIs
-                self.assertRaises(StepFailedException, runner.run)
+            self.assertEqual(
+                runner._args_for_jar_step(0),
+                runner.get_hadoop_bin() +
+                ['jar', jar_uri])
 
-        hadoop_cmd_args = get_mock_hadoop_cmd_args()
+    def test_libjars(self):
+        fake_jar = self.makefile('fake.jar')
+        fake_libjar = self.makefile('fake_lib.jar')
 
-        hadoop_jar_cmd_args = [args for args in hadoop_cmd_args if
-                               args and args[0] == 'jar']
-        self.assertEqual(len(hadoop_jar_cmd_args), 1)
-        self.assertEqual(hadoop_jar_cmd_args[0], ['jar', jar_uri])
+        job = MRJustAJar(
+            ['-r', 'hadoop', '--jar', fake_jar, '--libjar', fake_libjar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._args_for_jar_step(0),
+                runner.get_hadoop_bin() +
+                ['-libjars', fake_libjar, 'jar', fake_jar])
+
+    def test_jobconf(self):
+        fake_jar = self.makefile('fake.jar')
+
+        job = MRJustAJar(
+            ['-r', 'hadoop', '--jobconf', 'foo=bar', '--jar', fake_jar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._args_for_jar_step(0),
+                runner.get_hadoop_bin() +
+                ['-D', 'foo=bar', 'jar', fake_jar])
 
     def test_input_output_interpolation(self):
+        # TODO: rewrite this to just check the step args (see #1482)
         fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
         open(fake_jar, 'w').close()
         input1 = os.path.join(self.tmp_dir, 'input1')

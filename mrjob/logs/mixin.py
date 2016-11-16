@@ -82,7 +82,7 @@ class LogInterpretationMixin(object):
         # dir and depend on regexes to find the right subdir.
         return ()
 
-    def _get_step_log_interpretation(self, log_interpretation):
+    def _get_step_log_interpretation(self, log_interpretation, step_type):
         """Return interpretation of the step log. Either implement
         this, or fill ``'step'`` yourself (e.g. from Hadoop binary's
         output."""
@@ -100,7 +100,7 @@ class LogInterpretationMixin(object):
 
         if not counters:
             log.info('Attempting to fetch counters from logs...')
-            self._interpret_step_logs(log_interpretation)
+            self._interpret_step_logs(log_interpretation, step_type)
             counters = _pick_counters(log_interpretation)
 
         if not counters:
@@ -114,7 +114,7 @@ class LogInterpretationMixin(object):
         if not all(log_type in log_interpretation for
                    log_type in ('job', 'step', 'task')):
             log.info('Scanning logs for probable cause of failure...')
-            self._interpret_step_logs(log_interpretation)
+            self._interpret_step_logs(log_interpretation, step_type)
             self._interpret_history_log(log_interpretation)
             self._interpret_task_logs(log_interpretation, step_type)
 
@@ -150,13 +150,13 @@ class LogInterpretationMixin(object):
             log.info('  Parsing history log: %s' % match['path'])
             yield match
 
-    def _interpret_step_logs(self, log_interpretation):
+    def _interpret_step_logs(self, log_interpretation, step_type):
         """Add *step* to the log interpretation, if it's not already there."""
         if 'step' in log_interpretation:
             return
 
         step_interpretation = self._get_step_log_interpretation(
-            log_interpretation)
+            log_interpretation, step_type)
         if step_interpretation:
             log_interpretation['step'] = step_interpretation
 

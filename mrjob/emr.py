@@ -2226,19 +2226,23 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_dir_name=s3_dir_name,
             ssh_to_slaves=True)  # TODO: does this make sense on YARN?
 
-    def _get_step_log_interpretation(self, log_interpretation):
+    def _get_step_log_interpretation(self, log_interpretation, step_type):
         """Fetch and interpret the step log."""
         step_id = log_interpretation.get('step_id')
         if not step_id:
             log.warning("Can't fetch step log; missing step ID")
             return
 
-        return (
-            _interpret_emr_step_syslog(
-                self.fs, self._ls_step_syslogs(step_id=step_id)) or
-            _interpret_emr_step_stderr(
-                self.fs, self._ls_step_stderr_logs(step_id=step_id))
-        )
+        if _is_spark_step_type(step_type):
+            return _interpret_emr_step_syslog(
+                self.fs,  self._ls_step_stderr_logs(step_id=step_id))
+        else:
+            return (
+                _interpret_emr_step_syslog(
+                    self.fs, self._ls_step_syslogs(step_id=step_id)) or
+                _interpret_emr_step_stderr(
+                    self.fs, self._ls_step_stderr_logs(step_id=step_id))
+            )
 
     def _ls_step_syslogs(self, step_id):
         """Yield step log matches, logging a message for each one."""

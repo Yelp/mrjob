@@ -14,10 +14,8 @@
 # limitations under the License.
 """Parse "task" logs, which are the syslog and stderr for each individual
 task and typically appear in the userlogs/ directory."""
-import posixpath
 import re
 
-from mrjob.util import file_ext
 from .ids import _add_implied_task_id
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
@@ -41,8 +39,7 @@ _PRE_YARN_TASK_LOG_PATH_RE = re.compile(
     r'(?P<attempt_id>attempt_(?P<timestamp>\d+)_(?P<step_num>\d+)_'
     r'(?P<task_type>[mr])_(?P<task_num>\d+)_'
     r'(?P<attempt_num>\d+))/'
-    r'(?P<log_type>stderr|syslog)(?P<suffix>\.\w{1,3})?$')
-# TODO: add stdout log type for Spark
+    r'(?P<log_type>[a-z]+)(?P<suffix>\.\w{1,3})?$')
 
 
 # ignore warnings about initializing log4j in task stderr
@@ -66,11 +63,11 @@ _YARN_TASK_LOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<application_id>application_\d+_\d{4})/'
     r'(?P<container_id>container(_\d+)+)/'
-    r'(?P<log_type>stderr|syslog)(?P<suffix>\.\w{1,3})?$')
-# TODO: add stdout log type for Spark
+    r'(?P<log_type>[a-z]+)(?P<suffix>\.\w{1,3})?$')
 
 
-def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
+def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
+                  stderr_filename='stderr', syslog_filename='syslog'):
     """Yield matching logs, optionally filtering by application_id
     or job_id.
 
@@ -84,7 +81,9 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
 
     for match in _ls_logs(fs, log_dir_stream, _match_task_log_path,
                           application_id=application_id,
-                          job_id=job_id):
+                          job_id=job_id,
+                          stderr_filename=stderr_filename,
+                          syslog_filename=syslog_filename):
         if match['log_type'] == 'stderr':
             stderr_logs.append(match)
         elif match['log_type'] == 'syslog':
@@ -106,7 +105,8 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
     return stderr_logs_with_syslog + syslogs
 
 
-def _match_task_log_path(path, application_id=None, job_id=None):
+def _match_task_log_path(path, application_id=None, job_id=None,
+                         stderr_filename='stderr', syslog_filename='syslog'):
     """Is this the path/URI of a task log?
 
     If so, return a dictionary containing application_id and container_id
@@ -116,23 +116,37 @@ def _match_task_log_path(path, application_id=None, job_id=None):
     Otherwise, return None
 
     Optionally, filter by application_id (YARN) or job_id (pre-YARN).
+
+    Optionally, use alternate names for
     """
+    name_to_type = {stderr_filename: 'stderr', syslog_filename: 'syslog'}
+
     m = _PRE_YARN_TASK_LOG_PATH_RE.match(path)
     if m:
         if job_id and job_id != _to_job_id(m.group('attempt_id')):
             return None  # matches, but wrong job_id
+
+        log_type = name_to_type.get(m.group('log_type'))
+        if not log_type:
+            return None
+
         return dict(
             attempt_id=m.group('attempt_id'),
-            log_type=m.group('log_type'))
+            log_type=log_type)
 
     m = _YARN_TASK_LOG_PATH_RE.match(path)
     if m:
         if application_id and application_id != m.group('application_id'):
             return None  # matches, but wrong application_id
+
+        log_type = name_to_type.get(m.group('log_type'))
+        if not log_type:
+            return None
+
         return dict(
             application_id=m.group('application_id'),
             container_id=m.group('container_id'),
-            log_type=m.group('log_type'))
+            log_type=log_type)
 
     return None
 

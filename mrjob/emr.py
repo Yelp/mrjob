@@ -1986,7 +1986,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # and Spark, which has no counters.)
             if step.status.state != 'CANCELLED':
                 if step_num >= 0 and not _is_spark_step_type(step_type):
-                    counters = self._pick_counters(log_interpretation)
+                    counters = self._pick_counters(
+                        log_interpretation, step_type)
                     if counters:
                         log.info(_format_counters(counters))
                     else:
@@ -1996,7 +1997,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             if step.status.state == 'FAILED':
-                error = self._pick_error(log_interpretation)
+                error = self._pick_error(log_interpretation, step_type)
                 if error:
                     log.error('Probable cause of failure:\n\n%s\n\n' %
                               _format_error(error))

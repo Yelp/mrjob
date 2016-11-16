@@ -1127,9 +1127,9 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
     def setUp(self):
         super(RunJobInHadoopUsesEnvTestCase, self).setUp()
 
-        self.mock_num_steps = self.start(patch(
-            'mrjob.hadoop.HadoopJobRunner._num_steps',
-            return_value=1))
+        self.mock_get_steps = self.start(patch(
+            'mrjob.hadoop.HadoopJobRunner._get_steps',
+            return_value=[dict(type='spark')]))
 
         self.mock_args_for_step = self.start(patch(
             'mrjob.hadoop.HadoopJobRunner._args_for_step',

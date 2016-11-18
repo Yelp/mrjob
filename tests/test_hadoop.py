@@ -1236,7 +1236,7 @@ class PickErrorTestCase(MockHadoopTestCase):
         self.runner = HadoopJobRunner()
 
     def test_empty(self):
-        self.assertEqual(self.runner._pick_error({}), None)
+        self.assertEqual(self.runner._pick_error({}, 'streaming'), None)
 
     def test_yarn_python_exception(self):
         APPLICATION_ID = 'application_1450486922681_0004'
@@ -1275,8 +1275,10 @@ class PickErrorTestCase(MockHadoopTestCase):
             stderr.write('    MRBoom.run()\n')
             stderr.write('Exception: BOOM\n')
 
-        error = self.runner._pick_error(dict(
-            step=dict(application_id=APPLICATION_ID, job_id=JOB_ID)))
+        error = self.runner._pick_error(
+            dict(step=dict(application_id=APPLICATION_ID, job_id=JOB_ID)),
+            'streaming',
+        )
 
         self.assertIsNotNone(error)
 

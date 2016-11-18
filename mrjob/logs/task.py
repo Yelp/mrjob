@@ -384,7 +384,7 @@ def _parse_task_syslog(lines):
 
         if (record['logger'] == _SPARK_APP_MASTER_LOGGER and
                 record['level'] == 'ERROR'):
-            m = _SPARK_APP_MASTER_LOGGER.match(message)
+            m = _SPARK_APP_EXITED_RE.match(message)
             if m:
                 result['hadoop_error'] = dict(
                     message=message,

@@ -33,7 +33,9 @@ from mrjob.logs.errors import _pick_error
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.task import _interpret_task_logs
+from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_task_logs
+from mrjob.logs.task import _ls_spark_task_logs
 from mrjob.step import _is_spark_step_type
 
 log = getLogger(__name__)
@@ -187,7 +189,12 @@ class LogInterpretationMixin(object):
                     log.warning("Can't fetch task logs; missing job ID")
                 return
 
-        log_interpretation['task'] = _interpret_task_logs(
+        if _is_spark_step_type(step_type):
+            interpret_func = _interpret_spark_task_logs
+        else:
+            interpret_func = _interpret_task_logs
+
+        log_interpretation['task'] = interpret_func(
             self.fs,
             self._ls_task_logs(
                 step_type,
@@ -201,19 +208,15 @@ class LogInterpretationMixin(object):
                       application_id=None, job_id=None, output_dir=None):
         """Yield task log matches."""
         if _is_spark_step_type(step_type):
-            syslog_filename = 'stderr'
-            stderr_filename = 'stdout'
+            ls_func = _ls_spark_task_logs
         else:
-            syslog_filename = 'syslog'
-            stderr_filename = 'stderr'
+            ls_func = _ls_task_logs
 
         # logging messages are handled by a callback in _interpret_task_logs()
-        for match in _ls_task_logs(
+        for match in ls_func(
                 self.fs,
                 self._stream_task_log_dirs(
                     application_id=application_id, output_dir=output_dir),
                 application_id=application_id,
-                job_id=job_id,
-                stderr_filename=stderr_filename,
-                syslog_filename=syslog_filename):
+                job_id=job_id):
             yield match

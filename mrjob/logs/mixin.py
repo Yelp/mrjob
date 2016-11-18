@@ -96,7 +96,7 @@ class LogInterpretationMixin(object):
         """Pick counters from our log interpretation, interpreting
         history logs if need be."""
         if _is_spark_step_type(step_type):
-            return None
+            return {}
 
         counters = _pick_counters(log_interpretation)
 

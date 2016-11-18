@@ -287,8 +287,9 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
     In addition, if *partial* is set to true (and we found an error),
     this dictionary will contain the key *partial*, set to True.
 
-    *task_error*
-
+    *task_error* will only be set if we read from stdout (if the Spark
+    application master fails). Otherwise, the Python traceback will
+    be included in the java stack trace in *hadoop_error*.
     """
     result = {}
 
@@ -300,16 +301,18 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
         if log_callback:
             log_callback(stderr_path)
         # stderr is Spark's syslog
-        hadoop_error = _parse_task_syslog(_cat_log(fs, stderr_path))
+        stderr_error = _parse_task_syslog(_cat_log(fs, stderr_path))
 
-        if hadoop_error:
-            hadoop_error['path'] = stderr_path
-            error['hadoop_error'] = hadoop_error
+        if stderr_error:
+            stderr_error['hadoop_error']['path'] = stderr_path
+            error.update(stderr_error)
         else:
             continue
 
         stdout_path = match.get('stdout')
-        if stdout_path and hadoop_error.get('check_stdout'):
+        check_stdout = error.pop('check_stdout', None)
+
+        if stdout_path and check_stdout:
             if log_callback:
                 log_callback(stdout_path)
             # the stderr of the application master ends up in "stdout"
@@ -340,6 +343,9 @@ def _parse_task_syslog(lines):
 
     Returns a dict, possibly containing the following keys:
 
+    check_stdout:
+        if true, we should look for task errors in the corresponding
+        'stdout' file. Used for Spark logs.
     hadoop_error:
         message: string containing error message and Java exception
         num_lines: number of lines in syslog this takes up

@@ -173,24 +173,34 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.runner._ls_task_logs = Mock()
         self._interpret_task_logs = (
             self.start(patch('mrjob.logs.mixin._interpret_task_logs')))
+        self._interpret_spark_task_logs = (
+            self.start(patch('mrjob.logs.mixin._interpret_spark_task_logs')))
         self.runner.get_hadoop_version = Mock(return_value='2.7.1')
 
     def _test_task_interpretation_already_filled(
-            self, log_interpretation, **kwargs):
+            self, log_interpretation, step_type='streaming', **kwargs):
         orig_log_interpretation = deepcopy(log_interpretation)
 
-        self.runner._interpret_task_logs(log_interpretation, **kwargs)
+        self.runner._interpret_task_logs(
+            log_interpretation, step_type, **kwargs)
 
         self.assertEqual(log_interpretation, orig_log_interpretation)
 
         self.assertFalse(self.log.warning.called)
         self.assertFalse(self._interpret_task_logs.called)
         self.assertFalse(self.runner._ls_task_logs.called)
+        self.assertFalse(self.runner._ls_spark_task_logs.called)
 
     def test_task_interpretation_already_filled(self):
         log_interpretation = dict(task={})
 
         self._test_task_interpretation_already_filled(log_interpretation)
+
+    def test_spark_task_interpretation_already_filled(self):
+        log_interpretation = dict(task={})
+
+        self._test_task_interpretation_already_filled(log_interpretation,
+                                                      'spark')
 
     def test_task_interpretation_already_partially_filled(self):
         log_interpretation = dict(task=dict(partial=True))
@@ -209,7 +219,8 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
             step=dict(application_id='app_id'),
             task=dict(partial=True))
 
-        self.runner._interpret_task_logs(log_interpretation, partial=False)
+        self.runner._interpret_task_logs(
+            log_interpretation, 'streaming', partial=False)
 
         self.assertTrue(self.runner._ls_task_logs.called)
         self.assertTrue(self._interpret_task_logs.called)
@@ -220,7 +231,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         log_interpretation = dict(step=dict(application_id='app_1'))
 
-        self.runner._interpret_task_logs(log_interpretation)
+        self.runner._interpret_task_logs(log_interpretation, 'streaming')
 
         self.assertEqual(
             log_interpretation,
@@ -229,10 +240,38 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertFalse(self.log.warning.called)
         self.runner._ls_task_logs.assert_called_once_with(
+            'streaming',
             application_id='app_1',
             job_id=None,
             output_dir=None)
         self._interpret_task_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._ls_task_logs.return_value,
+            partial=True,
+            log_callback=_log_parsing_task_log)
+
+    def test_spark(self):
+        # don't need to test spark with job_id, since it doesn't run
+        # in Hadoop 1
+        self._interpret_spark_task_logs.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(step=dict(application_id='app_1'))
+
+        self.runner._interpret_task_logs(log_interpretation, 'spark')
+
+        self.assertEqual(
+            log_interpretation,
+            dict(step=dict(application_id='app_1'),
+                 task=dict(counters={'foo': {'bar': 1}})))
+
+        self.assertFalse(self.log.warning.called)
+        self.runner._ls_task_logs.assert_called_once_with(
+            'spark',
+            application_id='app_1',
+            job_id=None,
+            output_dir=None)
+        self._interpret_spark_task_logs.assert_called_once_with(
             self.runner.fs,
             self.runner._ls_task_logs.return_value,
             partial=True,
@@ -246,7 +285,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         log_interpretation = dict(step=dict(job_id='job_1'))
 
-        self.runner._interpret_task_logs(log_interpretation)
+        self.runner._interpret_task_logs(log_interpretation, 'streaming')
 
         self.assertEqual(
             log_interpretation,
@@ -255,6 +294,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertFalse(self.log.warning.called)
         self.runner._ls_task_logs.assert_called_once_with(
+            'streaming',
             application_id=None,
             job_id='job_1',
             output_dir=None)
@@ -271,7 +311,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         log_interpretation = dict(
             step=dict(application_id='app_1', output_dir='hdfs:///path/'))
 
-        self.runner._interpret_task_logs(log_interpretation)
+        self.runner._interpret_task_logs(log_interpretation, 'streaming')
 
         self.assertEqual(
             log_interpretation,
@@ -280,6 +320,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertFalse(self.log.warning.called)
         self.runner._ls_task_logs.assert_called_once_with(
+            'streaming',
             application_id='app_1',
             job_id=None,
             output_dir='hdfs:///path/')
@@ -292,7 +333,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
     def test_missing_application_id(self):
         log_interpretation = dict(step=dict(job_id='job_1'))
 
-        self.runner._interpret_task_logs(log_interpretation)
+        self.runner._interpret_task_logs(log_interpretation, 'streaming')
 
         self.assertEqual(
             log_interpretation, dict(step=dict(job_id='job_1')))
@@ -306,7 +347,7 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         log_interpretation = dict(step=dict(app_id='app_1'))
 
-        self.runner._interpret_task_logs(log_interpretation)
+        self.runner._interpret_task_logs(log_interpretation, 'streaming')
 
         self.assertEqual(
             log_interpretation,

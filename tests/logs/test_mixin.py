@@ -429,7 +429,7 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self.runner._stream_task_log_dirs = Mock()
 
-    def _test_step_type(self, step_type):
+    def test_streaming_step(self):
         # the _ls_task_logs() method is a very thin wrapper. Just
         # verify that the keyword args get passed through and
         # that logging happens in the right order
@@ -452,20 +452,12 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
             application_id='app_1',
             output_dir='hdfs:///output/')
 
-        if _is_spark_step_type(step_type):
-            self._ls_spark_task_logs.assert_called_once_with(
-                self.runner.fs,
-                self.runner._stream_task_log_dirs.return_value,
-                application_id='app_1',
-                job_id='job_1')
-            self.assertFalse(self._ls_task_logs.called)
-        else:
-            self._ls_task_logs.assert_called_once_with(
-                self.runner.fs,
-                self.runner._stream_task_log_dirs.return_value,
-                application_id='app_1',
-                job_id='job_1')
-            self.assertFalse(self._ls_spark_task_logs.called)
+        self._ls_task_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._stream_task_log_dirs.return_value,
+            application_id='app_1',
+            job_id='job_1')
+        self.assertFalse(self._ls_spark_task_logs.called)
 
         self.assertEqual(
             list(results),
@@ -476,13 +468,44 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
         # with a callback
         self.assertFalse(self.log.info.called)
 
-    def test_streaming_step(self):
-        self.assertFalse(_is_spark_step_type('streaming'))
-        self._test_step_type('streaming')
-
     def test_spark_step(self):
-        self.assertTrue(_is_spark_step_type('spark'))
-        self._test_step_type('spark')
+        # the _ls_task_logs() method is a very thin wrapper. Just
+        # verify that the keyword args get passed through and
+        # that logging happens in the right order
+
+        self._ls_spark_task_logs.return_value = [
+            dict(path='hdfs:///userlogs/1/stderr'),
+            dict(path='hdfs:///userlogs/2/stderr'),
+        ]
+
+        results = self.runner._ls_task_logs(
+            'spark',
+            application_id='app_1',
+            job_id='job_1', output_dir='hdfs:///output/')
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertEqual(next(results), dict(path='hdfs:///userlogs/1/stderr'))
+
+        self.runner._stream_task_log_dirs.assert_called_once_with(
+            application_id='app_1',
+            output_dir='hdfs:///output/')
+
+        self._ls_spark_task_logs.assert_called_once_with(
+            self.runner.fs,
+            self.runner._stream_task_log_dirs.return_value,
+            application_id='app_1',
+            job_id='job_1')
+        self.assertFalse(self._ls_task_logs.called)
+
+        self.assertEqual(
+            list(results),
+            [dict(path='hdfs:///userlogs/2/stderr')]
+        )
+
+        # unlike most of the _ls_*() methods, logging is handled elsewhere
+        # with a callback
+        self.assertFalse(self.log.info.called)
 
 
 class PickErrorTestCase(LogInterpretationMixinTestCase):

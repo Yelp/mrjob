@@ -15,6 +15,7 @@ from copy import deepcopy
 
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.mixin import _log_parsing_task_log
+from mrjob.step import _is_spark_step_type
 
 from tests.py2 import Mock
 from tests.py2 import patch
@@ -312,12 +313,12 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
         # no need to mock mrjob.logs.counters._pick_counters();
         # what it does is really straightforward
 
-    def test_counter_already_present(self):
+    def test_counters_already_present(self):
         log_interpretation = dict(
             step=dict(counters={'foo': {'bar': 1}}))
 
         self.assertEqual(
-            self.runner._pick_counters(log_interpretation),
+            self.runner._pick_counters(log_interpretation, 'streaming'),
             {'foo': {'bar': 1}})
 
         # don't log anything if runner._pick_counters() doesn't have
@@ -326,8 +327,8 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self.runner._interpret_step_logs.called)
         self.assertFalse(self.runner._interpret_history_log.called)
 
-    def test_counter_from_step_logs(self):
-        def mock_interpret_step_logs(log_interpretation):
+    def test_counters_from_step_logs(self):
+        def mock_interpret_step_logs(log_interpretation, step_type):
             log_interpretation['step'] = dict(
                 counters={'foo': {'bar': 1}})
 
@@ -337,14 +338,14 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
         log_interpretation = {}
 
         self.assertEqual(
-            self.runner._pick_counters(log_interpretation),
+            self.runner._pick_counters(log_interpretation, 'streaming'),
             {'foo': {'bar': 1}})
 
         self.assertTrue(self.log.info.called)  # 'Attempting to fetch...'
         self.assertTrue(self.runner._interpret_step_logs.called)
         self.assertFalse(self.runner._interpret_history_log.called)
 
-    def test_counter_from_history_logs(self):
+    def test_counters_from_history_logs(self):
         def mock_interpret_history_log(log_interpretation):
             log_interpretation['history'] = dict(
                 counters={'foo': {'bar': 1}})
@@ -355,12 +356,25 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
         log_interpretation = {}
 
         self.assertEqual(
-            self.runner._pick_counters(log_interpretation),
+            self.runner._pick_counters(log_interpretation, 'streaming'),
             {'foo': {'bar': 1}})
 
         self.assertTrue(self.log.info.called)  # 'Attempting to fetch...'
         self.assertTrue(self.runner._interpret_step_logs.called)
         self.assertTrue(self.runner._interpret_history_log.called)
+
+    def test_do_nothing_for_spark_logs(self):
+        log_interpretation = {}
+
+        self.assertEqual(
+            self.runner._pick_counters(log_interpretation, 'spark'),
+            {})
+
+        self.assertFalse(self.log.info.called)  # 'Attempting to fetch...'
+        self.assertFalse(self.runner._interpret_step_logs.called)
+        self.assertFalse(self.runner._interpret_history_log.called)
+
+
 
 
 class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
@@ -410,9 +424,12 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
 
         self._ls_task_logs = self.start(patch(
             'mrjob.logs.mixin._ls_task_logs'))
+        self._ls_spark_task_logs = self.start(patch(
+            'mrjob.logs.mixin._ls_spark_task_logs'))
+
         self.runner._stream_task_log_dirs = Mock()
 
-    def test_basic(self):
+    def _test_step_type(self, step_type):
         # the _ls_task_logs() method is a very thin wrapper. Just
         # verify that the keyword args get passed through and
         # that logging happens in the right order
@@ -423,6 +440,7 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
         ]
 
         results = self.runner._ls_task_logs(
+            'streaming',
             application_id='app_1',
             job_id='job_1', output_dir='hdfs:///output/')
 
@@ -433,11 +451,21 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.runner._stream_task_log_dirs.assert_called_once_with(
             application_id='app_1',
             output_dir='hdfs:///output/')
-        self._ls_task_logs.assert_called_once_with(
-            self.runner.fs,
-            self.runner._stream_task_log_dirs.return_value,
-            application_id='app_1',
-            job_id='job_1')
+
+        if _is_spark_step_type(step_type):
+            self._ls_spark_task_logs.assert_called_once_with(
+                self.runner.fs,
+                self.runner._stream_task_log_dirs.return_value,
+                application_id='app_1',
+                job_id='job_1')
+            self.assertFalse(self._ls_task_logs.called)
+        else:
+            self._ls_task_logs.assert_called_once_with(
+                self.runner.fs,
+                self.runner._stream_task_log_dirs.return_value,
+                application_id='app_1',
+                job_id='job_1')
+            self.assertFalse(self._ls_spark_task_logs.called)
 
         self.assertEqual(
             list(results),
@@ -448,11 +476,19 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
         # with a callback
         self.assertFalse(self.log.info.called)
 
+    def test_streaming_step(self):
+        self.assertFalse(_is_spark_step_type('streaming'))
+        self._test_step_type('streaming')
 
-class PickErrorsTestCase(LogInterpretationMixinTestCase):
+    def test_spark_step(self):
+        self.assertTrue(_is_spark_step_type('spark'))
+        self._test_step_type('spark')
+
+
+class PickErrorTestCase(LogInterpretationMixinTestCase):
 
     def setUp(self):
-        super(PickErrorsTestCase, self).setUp()
+        super(PickErrorTestCase, self).setUp()
 
         self.runner._interpret_history_log = Mock()
         self.runner._interpret_step_logs = Mock()
@@ -466,7 +502,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
             job={}, step={}, task={})
 
         self.assertEqual(
-            self.runner._pick_error(log_interpretation),
+            self.runner._pick_error(log_interpretation, 'streaming'),
             self._pick_error.return_value)
 
         # don't log a message or interpret logs
@@ -477,7 +513,7 @@ class PickErrorsTestCase(LogInterpretationMixinTestCase):
 
     def _test_interpret_all_logs(self, log_interpretation):
         self.assertEqual(
-            self.runner._pick_error(log_interpretation),
+            self.runner._pick_error(log_interpretation, 'streaming'),
             self._pick_error.return_value)
 
         # log a message ('Scanning logs...') and call _interpret() methods

@@ -32,7 +32,7 @@ _JAVA_TRACEBACK_RE = re.compile(
 # Match an error stating that Spark's subprocess has failed (and thus we
 # should read stdout
 _SPARK_APP_EXITED_RE = re.compile(
-    r'^\s+User application exited with status \d+\s+$')
+    r'^\s*User application exited with status \d+\s*$')
 
 # the name of the logger that logs the above
 _SPARK_APP_MASTER_LOGGER = 'ApplicationMaster'
@@ -309,7 +309,7 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
         else:
             continue
 
-        stdout_path = match.get('stdout')
+        stdout_path = match.get('stdout', {}).get('path')
         check_stdout = error.pop('check_stdout', None)
 
         if stdout_path and check_stdout:

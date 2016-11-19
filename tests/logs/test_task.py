@@ -34,6 +34,9 @@ class MatchTaskLogPathTestCase(TestCase):
 
     YARN_STDERR_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
                         'container_1450486922681_0005_01_000003/stderr')
+    # stdout is only used by Spark
+    YARN_STDOUT_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
+                        'container_1450486922681_0005_01_000003/stdout')
     YARN_SYSLOG_PATH = ('/log/dir/userlogs/application_1450486922681_0004/'
                         'container_1450486922681_0005_01_000003/syslog')
 
@@ -97,6 +100,13 @@ class MatchTaskLogPathTestCase(TestCase):
             dict(application_id='application_1450486922681_0004',
                  container_id='container_1450486922681_0005_01_000003',
                  log_type='stderr'))
+
+    def test_match_yarn_stdout(self):
+        self.assertEqual(
+            _match_task_log_path(self.YARN_STDOUT_PATH),
+            dict(application_id='application_1450486922681_0004',
+                 container_id='container_1450486922681_0005_01_000003',
+                 log_type='stdout'))
 
     def test_yarn_application_id_filter(self):
         self.assertEqual(

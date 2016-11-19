@@ -619,6 +619,45 @@ class ParseTaskSyslogTestCase(TestCase):
                     start_line=0,
                 )))
 
+    maxDiff = None
+
+    def test_spark_executor_exception(self):
+        lines = [
+            '16/11/16 22:05:00 ERROR Executor: Exception in task 0.2 in stage'
+            ' 0.0 (TID 4)'
+            ' org.apache.spark.api.python.PythonException: Traceback (most'
+            ' recent call last):\n',
+            '  File "/mnt/yarn/usercache/hadoop/appcache/application'
+            '_1479325434015_0003/container_1479325434015_0003_02_000002/'
+            'pyspark.zip/pyspark/worker.py", line 111, in main process()\n'
+            'Exception: KABOOM\n',
+            '\n',
+            '        at org.apache.spark.api.python.PythonRunner$$anon$1.read'
+            '(PythonRDD.scala:166)\n',
+        ]
+
+        self.assertEqual(
+            _parse_task_syslog(lines),
+            dict(
+                hadoop_error=dict(
+                    message=(
+                        'Exception in task 0.2 in stage'
+                        ' 0.0 (TID 4)'
+                        ' org.apache.spark.api.python.PythonException:'
+                        ' Traceback (most recent call last):'
+                        '  File "/mnt/yarn/usercache/hadoop/appcache/'
+                        'application_1479325434015_0003/container'
+                        '_1479325434015_0003_02_000002/pyspark.zip/pyspark/'
+                        'worker.py", line 111, in main process()\n'
+                        'Exception: KABOOM\n'
+                        '\n'
+                        '        at org.apache.spark.api.python.PythonRunner'
+                        '$$anon$1.read(PythonRDD.scala:166)\n'),
+                    num_lines=4,
+                    start_line=0,
+                )
+            ))
+
 
 class ParseTaskStderrTestCase(TestCase):
 

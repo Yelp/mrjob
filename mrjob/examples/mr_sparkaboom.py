@@ -20,8 +20,6 @@ class MRSparKaboom(MRJob):
         # Spark may not be available where script is launched
         from pyspark import SparkContext
 
-        raise Exception('BOOM')
-
         sc = SparkContext(appName='mrjob Spark wordcount script')
 
         lines = sc.textFile(input_path)

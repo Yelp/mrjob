@@ -126,7 +126,9 @@ def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
             key_to_stdout_log[_log_key(match)] = match
 
     for stderr_log in stderr_logs:
-        stderr_log['stdout'] = key_to_stdout_log.get(_log_key(stderr_log))
+        stdout_log = key_to_stdout_log.get(_log_key(stderr_log))
+        if stdout_log:
+            stderr_log['stdout'] = stdout_log
 
     return stderr_logs
 
@@ -303,13 +305,13 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
         # stderr is Spark's syslog
         stderr_error = _parse_task_syslog(_cat_log(fs, stderr_path))
 
-        if stderr_error:
+        if stderr_error.get('hadoop_error'):
             stderr_error['hadoop_error']['path'] = stderr_path
             error.update(stderr_error)
         else:
             continue
 
-        stdout_path = match.get('stdout', {}).get('path')
+        stdout_path = (match.get('stdout') or {}).get('path')
         check_stdout = error.pop('check_stdout', None)
 
         if stdout_path and check_stdout:

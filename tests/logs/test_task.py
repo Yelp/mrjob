@@ -644,7 +644,7 @@ class ParseTaskSyslogTestCase(TestCase):
                         'Exception in task 0.2 in stage'
                         ' 0.0 (TID 4)'
                         ' org.apache.spark.api.python.PythonException:'
-                        ' Traceback (most recent call last):'
+                        ' Traceback (most recent call last):\n'
                         '  File "/mnt/yarn/usercache/hadoop/appcache/'
                         'application_1479325434015_0003/container'
                         '_1479325434015_0003_02_000002/pyspark.zip/pyspark/'
@@ -652,7 +652,7 @@ class ParseTaskSyslogTestCase(TestCase):
                         'Exception: KABOOM\n'
                         '\n'
                         '        at org.apache.spark.api.python.PythonRunner'
-                        '$$anon$1.read(PythonRDD.scala:166)\n'),
+                        '$$anon$1.read(PythonRDD.scala:166)'),
                     num_lines=4,
                     start_line=0,
                 )

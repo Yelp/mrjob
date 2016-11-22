@@ -619,8 +619,6 @@ class ParseTaskSyslogTestCase(TestCase):
                     start_line=0,
                 )))
 
-    maxDiff = None
-
     def test_spark_executor_exception(self):
         lines = [
             '16/11/16 22:05:00 ERROR Executor: Exception in task 0.2 in stage'
@@ -657,6 +655,30 @@ class ParseTaskSyslogTestCase(TestCase):
                     start_line=0,
                 )
             ))
+
+    def test_spark_application_failed(self):
+        lines = [
+            '16/11/16 22:26:22 ERROR ApplicationMaster: User application'
+            ' exited with status 1\n',
+            '16/11/16 22:26:22 INFO ApplicationMaster: Final app status:'
+            ' FAILED, exitCode: 1, (reason: User application exited with'
+            ' status 1)\n',
+            '16/11/16 22:26:31 ERROR ApplicationMaster: SparkContext did not'
+            ' initialize after waiting for 100000 ms. Please check earlier'
+            ' log output for errors. Failing the application.\n',
+        ]
+
+        self.assertEqual(
+            _parse_task_syslog(lines),
+            dict(
+                check_stdout=True,
+                hadoop_error=dict(
+                    message='User application exited with status 1',
+                    num_lines=1,
+                    start_line=0,
+                ),
+            )
+        )
 
 
 class ParseTaskStderrTestCase(TestCase):

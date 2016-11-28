@@ -3455,7 +3455,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
     def test_default(self):
         runner = self.launch_runner()
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
-                         (_PRE_4_X_STREAMING_JAR, []))
+                         (_4_X_COMMAND_RUNNER_JAR, ['hadoop-streaming']))
 
     def test_pre_4_x_ami(self):
         runner = self.launch_runner('--image-version', '3.8.0')
@@ -4605,12 +4605,12 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def test_cant_stream_history_log_dirs_from_3_x_amis(self):
         runner = EMRJobRunner()
-        results = runner._stream_history_log_dirs()
+        results = runner._stream_history_log_dirs(
+            image_version='3.11.0')
         self.assertRaises(StopIteration, next, results)
 
     def test_stream_history_log_dirs_from_4_x_amis(self):
-        # history log fetching is disabled until we fix
-        # #1244 and #1253
+        # history log fetching is disabled until we fix #1253
         runner = EMRJobRunner(image_version='4.3.0')
         results = runner._stream_history_log_dirs()
         self.assertRaises(StopIteration, next, results)

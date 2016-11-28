@@ -14,10 +14,8 @@
 # limitations under the License.
 """Parse "task" logs, which are the syslog and stderr for each individual
 task and typically appear in the userlogs/ directory."""
-import posixpath
 import re
 
-from mrjob.util import file_ext
 from .ids import _add_implied_task_id
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
@@ -28,8 +26,16 @@ from .wrap import _ls_logs
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
 # use this with search()
 _JAVA_TRACEBACK_RE = re.compile(
-    r'$\s+at .*\((.*\.java:\d+|Native Method)\)$',
+    r'$\s+at .*\((.*\.(java|scala):\d+|Native Method)\)$',
     re.MULTILINE)
+
+# Match an error stating that Spark's subprocess has failed (and thus we
+# should read stdout
+_SPARK_APP_EXITED_RE = re.compile(
+    r'^\s*User application exited with status \d+\s*$')
+
+# the name of the logger that logs the above
+_SPARK_APP_MASTER_LOGGER = 'ApplicationMaster'
 
 # this seems to only happen for S3. Not sure if this happens in YARN
 _OPENING_FOR_READING_RE = re.compile(
@@ -42,7 +48,6 @@ _PRE_YARN_TASK_LOG_PATH_RE = re.compile(
     r'(?P<task_type>[mr])_(?P<task_num>\d+)_'
     r'(?P<attempt_num>\d+))/'
     r'(?P<log_type>stderr|syslog)(?P<suffix>\.\w{1,3})?$')
-# TODO: add stdout log type for Spark
 
 
 # ignore warnings about initializing log4j in task stderr
@@ -61,13 +66,12 @@ _YARN_INPUT_SPLIT_RE = re.compile(
     r'^Processing split:\s+(?P<path>.*)'
     r':(?P<start_line>\d+)\+(?P<num_lines>\d+)$')
 
-# what log paths look like on YARN
+# what log paths look like on YARN (also used for Spark, hence stdout)
 _YARN_TASK_LOG_PATH_RE = re.compile(
     r'^(?P<prefix>.*?/)'
     r'(?P<application_id>application_\d+_\d{4})/'
     r'(?P<container_id>container(_\d+)+)/'
-    r'(?P<log_type>stderr|syslog)(?P<suffix>\.\w{1,3})?$')
-# TODO: add stdout log type for Spark
+    r'(?P<log_type>stderr|stdout|syslog)(?P<suffix>\.\w{1,3})?$')
 
 
 def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
@@ -90,11 +94,6 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
         elif match['log_type'] == 'syslog':
             syslogs.append(match)
 
-    # use to match stderr logs to corresponding syslogs
-    def _log_key(match):
-        return tuple((k, v) for k, v in sorted(match.items())
-                     if k not in ('log_type', 'path'))
-
     key_to_syslog = dict((_log_key(match), match) for match in syslogs)
 
     for stderr_log in stderr_logs:
@@ -106,8 +105,42 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
     return stderr_logs_with_syslog + syslogs
 
 
+def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
+    """Yield matching Spark logs, optionally filtering by application_id
+    or job_id.
+
+    This will yield matches for stderr logs only. stderr
+    logs will have a 'stdout' field pointing to the match for the
+    corresponding stdout file; whether we process this depends on the content
+    of the stderr file.
+    """
+    stderr_logs = []
+    key_to_stdout_log = {}
+
+    for match in _ls_logs(fs, log_dir_stream, _match_task_log_path,
+                          application_id=application_id,
+                          job_id=job_id):
+        if match['log_type'] == 'stderr':
+            stderr_logs.append(match)
+        elif match['log_type'] == 'stdout':
+            key_to_stdout_log[_log_key(match)] = match
+
+    for stderr_log in stderr_logs:
+        stdout_log = key_to_stdout_log.get(_log_key(stderr_log))
+        if stdout_log:
+            stderr_log['stdout'] = stdout_log
+
+    return stderr_logs
+
+
+def _log_key(match):
+    """Helper method for _ls_task_logs() and _ls_spark_task_logs()."""
+    return tuple((k, v) for k, v in sorted(match.items())
+                 if k not in ('log_type', 'path'))
+
+
 def _match_task_log_path(path, application_id=None, job_id=None):
-    """Is this the path/URI of a task log?
+    """Is this the path/URI of a task log? (Including Spark)
 
     If so, return a dictionary containing application_id and container_id
     (on YARN) or attempt_id (on pre-YARN Hadoop), plus log_type (either
@@ -121,6 +154,7 @@ def _match_task_log_path(path, application_id=None, job_id=None):
     if m:
         if job_id and job_id != _to_job_id(m.group('attempt_id')):
             return None  # matches, but wrong job_id
+
         return dict(
             attempt_id=m.group('attempt_id'),
             log_type=m.group('log_type'))
@@ -129,6 +163,7 @@ def _match_task_log_path(path, application_id=None, job_id=None):
     if m:
         if application_id and application_id != m.group('application_id'):
             return None  # matches, but wrong application_id
+
         return dict(
             application_id=m.group('application_id'),
             container_id=m.group('container_id'),
@@ -208,7 +243,88 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
         error.update(syslog_error)
         error['hadoop_error']['path'] = syslog_path
 
-        # path in IDs we learned from path
+        # patch in IDs we learned from path
+        for id_key in 'attempt_id', 'container_id':
+            if id_key in match:
+                error[id_key] = match[id_key]
+        _add_implied_task_id(error)
+
+        result.setdefault('errors', [])
+        result['errors'].append(error)
+
+        if partial:
+            result['partial'] = True
+            break
+
+    return result
+
+
+def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
+    """Look for errors in Spark task stderr, reading stdout when appropriate.
+
+    If *partial* is true (the default), stop when we find the first error
+    that includes a *task_error*.
+
+    If *log_callback* is set, every time we're about to parse a
+        file, call it with a single argument, the path of that file
+
+    Returns a dictionary possibly containing the key 'errors', which
+    is a dict containing:
+
+    hadoop_error:
+        message: string containing error message and Java exception
+        num_lines: number of lines in syslog this takes up
+        path: syslog we read this error from
+        start_line: where in syslog exception starts (0-indexed)
+    split: (optional)
+        path: URI of input file task was processing
+        num_lines: (optional) number of lines in split
+        start_line: (optional) first line of split (0-indexed)
+    task_error:
+        message: command and error message from task, as a string
+        num_lines: number of lines in stderr this takes up
+        path: stderr we read this from
+        start_line: where in stderr error message starts (0-indexed)
+
+    In addition, if *partial* is set to true (and we found an error),
+    this dictionary will contain the key *partial*, set to True.
+
+    *task_error* will only be set if we read from stdout (if the Spark
+    application master fails). Otherwise, the Python traceback will
+    be included in the java stack trace in *hadoop_error*.
+    """
+    result = {}
+
+    for match in matches:
+        error = {}
+
+        stderr_path = match['path']
+
+        if log_callback:
+            log_callback(stderr_path)
+        # stderr is Spark's syslog
+        stderr_error = _parse_task_syslog(_cat_log(fs, stderr_path))
+
+        if stderr_error.get('hadoop_error'):
+            stderr_error['hadoop_error']['path'] = stderr_path
+            error.update(stderr_error)
+        else:
+            continue
+
+        stdout_path = (match.get('stdout') or {}).get('path')
+        check_stdout = error.pop('check_stdout', None)
+
+        if stdout_path and check_stdout:
+            if log_callback:
+                log_callback(stdout_path)
+            # the stderr of the application master ends up in "stdout"
+            task_error = _parse_task_stderr(_cat_log(fs, stdout_path))
+
+            if task_error:
+                task_error['path'] = stdout_path
+                error['task_error'] = task_error
+
+        # patch in IDs we learned from path
         for id_key in 'attempt_id', 'container_id':
             if id_key in match:
                 error[id_key] = match[id_key]
@@ -225,10 +341,13 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
 
 
 def _parse_task_syslog(lines):
-    """Parse an error out of a syslog file.
+    """Parse an error out of a syslog file (or a Spark stderr file).
 
     Returns a dict, possibly containing the following keys:
 
+    check_stdout:
+        if true, we should look for task errors in the corresponding
+        'stdout' file. Used for Spark logs.
     hadoop_error:
         message: string containing error message and Java exception
         num_lines: number of lines in syslog this takes up
@@ -264,6 +383,18 @@ def _parse_task_syslog(lines):
                 start_line=record['start_line'],
             )
             break  # nothing to do once we've found the error
+
+        if (record['logger'] == _SPARK_APP_MASTER_LOGGER and
+                record['level'] == 'ERROR'):
+            m = _SPARK_APP_EXITED_RE.match(message)
+            if m:
+                result['hadoop_error'] = dict(
+                    message=message,
+                    num_lines=record['num_lines'],
+                    start_line=record['start_line'],
+                )
+                result['check_stdout'] = True
+                break  # nothing else to do once we've found the error
 
     return result
 

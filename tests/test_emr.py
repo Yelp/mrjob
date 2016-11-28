@@ -4155,6 +4155,16 @@ class BootstrapPythonTestCase(MockBotoTestCase):
         self._assert_never_installs_python3(
             '--image-version', '4.6.0')
 
+    def test_release_label_emr_4_6_0(self):
+        self._assert_never_installs_python3(
+            '--release-label', 'emr-4.6.0')
+
+    def test_release_label_overrides_image_version(self):
+        self._assert_never_installs_python3(
+            '--release-label', 'emr-4.6.0',
+            '--image-version', '3.11.0',
+        )
+
     def test_force_booststrap_python(self):
         self._assert_installs_python3_on_py3(
             '--bootstrap-python', '--image-version', '4.6.0')

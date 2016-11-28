@@ -796,8 +796,8 @@ class MockEmrConnection(object):
                 application_names = set(['Hadoop'])
 
             applications = []
-            for name in sorted(application_names):
-                if name == 'Hadoop':
+            for app_name in sorted(application_names):
+                if app_name == 'Hadoop':
                     version = running_hadoop_version
                 else:
                     version = DUMMY_APPLICATION_VERSION

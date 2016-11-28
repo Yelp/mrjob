@@ -5984,7 +5984,7 @@ class TestClusterSparkSupportWarning(MockBotoTestCase):
         if PY2:
             return
 
-        job = MRNullSpark(['-r', 'emr'])  # default AMI is 3.11.0
+        job = MRNullSpark(['-r', 'emr', '--image-version', '3.11.0'])
         job.sandbox()
 
         with job.make_runner() as runner:

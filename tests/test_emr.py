@@ -4604,9 +4604,8 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             image_version='2.4.11', ssh=False)
 
     def test_cant_stream_history_log_dirs_from_3_x_amis(self):
-        runner = EMRJobRunner()
-        results = runner._stream_history_log_dirs(
-            image_version='3.11.0')
+        runner = EMRJobRunner(image_version='3.11.0')
+        results = runner._stream_history_log_dirs()
         self.assertRaises(StopIteration, next, results)
 
     def test_stream_history_log_dirs_from_4_x_amis(self):
@@ -4661,8 +4660,8 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self, ssh, bad_ssh_slave_hosts=False, application_id=None,
         image_version=_DEFAULT_IMAGE_VERSION,
         expected_local_path='/mnt/var/log/hadoop/userlogs',
-        expected_dir_name='hadoop/userlogs',
-        expected_s3_dir_name='task-attempts'
+        expected_dir_name='hadoop-yarn/containers',
+        expected_s3_dir_name='containers',
     ):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
         runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
@@ -4729,15 +4728,15 @@ class StreamLogDirsTestCase(MockBotoTestCase):
     def test_stream_task_log_dirs_with_application_id(self):
         self._test_stream_task_log_dirs(
             ssh=True, application_id='application_1',
-            expected_dir_name='hadoop/userlogs/application_1',
-            expected_s3_dir_name='task-attempts/application_1')
-
-    def test_stream_task_log_dirs_from_4_x_amis(self):
-        self._test_stream_task_log_dirs(
-            ssh=True, application_id='application_1',
-            image_version='4.3.0',
             expected_dir_name='hadoop-yarn/containers/application_1',
             expected_s3_dir_name='containers/application_1')
+
+    def test_stream_task_log_dirs_from_3_x_amis(self):
+        self._test_stream_task_log_dirs(
+            ssh=True,
+            image_version='3.11.0',
+            expected_dir_name='hadoop/userlogs',
+            expected_s3_dir_name='task-attempts')
 
 
 class LsStepSyslogsTestCase(MockBotoTestCase):

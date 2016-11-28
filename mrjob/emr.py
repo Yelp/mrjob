@@ -177,7 +177,7 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 _DEFAULT_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
-_DEFAULT_IMAGE_VERSION = '3.11.0'
+_DEFAULT_IMAGE_VERSION = '4.8.2'
 
 # EMR translates the dead/deprecated "latest" AMI version to 2.4.2
 # (2.4.2 isn't actually the latest version by a long shot)

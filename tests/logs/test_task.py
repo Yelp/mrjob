@@ -140,6 +140,8 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.mock_paths = []
         self.path_to_mock_result = {}
 
+        self.mock_log_callback = Mock()
+
         self.mock_paths_catted = []
 
         def mock_cat_log(fs, path):
@@ -181,7 +183,9 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
 
     def interpret_task_logs(self, **kwargs):
         return _interpret_task_logs(
-            self.mock_fs, self.mock_path_matches(), **kwargs)
+            self.mock_fs, self.mock_path_matches(),
+            log_callback=self.mock_log_callback,
+            **kwargs)
 
     def test_empty(self):
         self.assertEqual(self.interpret_task_logs(), {})
@@ -255,7 +259,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
     def test_syslog_with_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-        mock_log_callback = Mock()
 
         self.mock_paths = [syslog_path, stderr_path]
 
@@ -265,7 +268,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(
-            self.interpret_task_logs(log_callback=mock_log_callback),
+            self.interpret_task_logs(),
             dict(
                 errors=[
                     dict(
@@ -286,13 +289,12 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         )
 
         self.assertEqual(
-            mock_log_callback.call_args_list,
+            self.mock_log_callback.call_args_list,
             [call(stderr_path), call(syslog_path)])
 
     def test_syslog_with_empty_corresponding_stderr(self):
         syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
         stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-        mock_log_callback = Mock()
 
         self.mock_paths = [syslog_path, stderr_path]
 
@@ -301,7 +303,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(
-            self.interpret_task_logs(log_callback=mock_log_callback),
+            self.interpret_task_logs(),
             dict(
                 errors=[
                     dict(
@@ -318,7 +320,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         )
 
         self.assertEqual(
-            mock_log_callback.call_args_list,
+            self.mock_log_callback.call_args_list,
             [call(stderr_path), call(syslog_path)])
 
     def test_yarn_syslog_with_error(self):
@@ -544,12 +546,11 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         self.mock_paths = []
         self.path_to_mock_result = {}
 
-        self.mock_paths_catted = []
+        self.mock_log_callback = Mock()
 
         def mock_cat_log(fs, path):
             if path in self.mock_paths:
-                self.mock_paths_catted.append(path)
-            return path
+                return path
 
         # (the actual log-parsing functions take lines from the log)
         def mock_parse_task_syslog(path_from_mock_cat_log):
@@ -585,7 +586,9 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
 
     def interpret_spark_task_logs(self, **kwargs):
         return _interpret_spark_task_logs(
-            self.mock_fs, self.mock_path_matches(), **kwargs)
+            self.mock_fs, self.mock_path_matches(),
+            log_callback=self.mock_log_callback,
+            **kwargs)
 
     # need to port over remaining tests
     def interpret_task_logs(self, **kwargs):
@@ -668,8 +671,6 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         stdout_path = ('/log/dir/userlogs/application_1450486922681_0005'
                        '/container_1450486922681_0005_01_000004/stdout')
 
-        mock_log_callback = Mock()
-
         self.mock_paths = [stderr_path, stdout_path]
 
         self.path_to_mock_result = {
@@ -680,7 +681,7 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         }
 
         self.assertEqual(
-            self.interpret_spark_task_logs(log_callback=mock_log_callback),
+            self.interpret_spark_task_logs(),
             dict(
                 errors=[
                     dict(
@@ -700,33 +701,33 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         )
 
         self.assertEqual(
-            mock_log_callback.call_args_list,
+            self.mock_log_callback.call_args_list,
             [call(stderr_path), call(stdout_path)])
 
-    def test_syslog_with_empty_corresponding_stderr(self):
-        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
-        stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-        mock_log_callback = Mock()
+    def test_stderr_with_application_exited_and_empty_stdout(self):
+        stderr_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                       '/container_1450486922681_0005_01_000004/stderr')
+        stdout_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                       '/container_1450486922681_0005_01_000004/stdout')
 
-        self.mock_paths = [syslog_path, stderr_path]
+        self.mock_paths = [stderr_path, stdout_path]
 
         self.path_to_mock_result = {
-            syslog_path: dict(hadoop_error=dict(message='BOOM')),
+            stderr_path: dict(
+                check_stdout=True,
+                hadoop_error=dict(message='application exited')),
         }
 
         self.assertEqual(
-            self.interpret_task_logs(log_callback=mock_log_callback),
+            self.interpret_spark_task_logs(),
             dict(
                 errors=[
                     dict(
-                        attempt_id='attempt_201512232143_0008_m_000001_3',
-
+                        container_id='container_1450486922681_0005_01_000004',
                         hadoop_error=dict(
-                            message='BOOM',
-                            path=syslog_path,
+                            message='application exited',
+                            path=stderr_path,
                         ),
-
-                        task_id='task_201512232143_0008_m_000001',
                     ),
                 ],
                 partial=True,
@@ -734,215 +735,162 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         )
 
         self.assertEqual(
-            mock_log_callback.call_args_list,
-            [call(stderr_path), call(syslog_path)])
+            self.mock_log_callback.call_args_list,
+            [call(stderr_path), call(stdout_path)])
 
-    def test_yarn_syslog_with_error(self):
-        # this works the same way as the other tests, except we get
-        # container_id rather than attempt_id and task_id
-        syslog_path = (
-            '/log/dir/userlogs/application_1450486922681_0004'
-            '/container_1450486922681_0005_01_000003/syslog')
-        self.mock_paths = [syslog_path]
-
-        self.path_to_mock_result = {
-            syslog_path: dict(hadoop_error=dict(message='BOOM')),
-        }
-
-        self.assertEqual(self.interpret_task_logs(), dict(
-            errors=[
-                dict(
-                    container_id='container_1450486922681_0005_01_000003',
-                    hadoop_error=dict(
-                        message='BOOM',
-                        path=syslog_path,
-                    ),
-                ),
-            ],
-            partial=True,
-        ))
-
-    def test_error_in_stderr_only(self):
-        syslog_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
-        stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-
-        self.mock_paths = [syslog_path, stderr_path]
-
-        self.path_to_mock_result = {
-            stderr_path: dict(message='because, exploding code')
-        }
-
-        self.assertEqual(self.interpret_task_logs(), {})
-        self.assertEqual(self.mock_paths_catted, [stderr_path, syslog_path])
-
-    def test_stderr_without_corresponding_syslog(self):
-        stderr_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
+    def test_stderr_with_application_exited_and_no_stdout(self):
+        stderr_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                       '/container_1450486922681_0005_01_000004/stderr')
 
         self.mock_paths = [stderr_path]
 
         self.path_to_mock_result = {
-            stderr_path: dict(message='because, exploding code')
+            stderr_path: dict(
+                check_stdout=True,
+                hadoop_error=dict(message='application exited')),
         }
 
-        # don't even look at stderr if it doesn't have a matching syslog
-        self.assertEqual(self.interpret_task_logs(), {})
-        self.assertEqual(self.mock_paths_catted, [])
+        self.assertEqual(
+            self.interpret_spark_task_logs(),
+            dict(
+                errors=[
+                    dict(
+                        container_id='container_1450486922681_0005_01_000004',
+                        hadoop_error=dict(
+                            message='application exited',
+                            path=stderr_path,
+                        ),
+                    ),
+                ],
+                partial=True,
+            )
+        )
 
+        self.assertEqual(
+            self.mock_log_callback.call_args_list,
+            [call(stderr_path)])
 
-    # indirectly tests _ls_task_syslogs() and its ability to sort by
+    def test_error_in_stdout_only(self):
+        stderr_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                       '/container_1450486922681_0005_01_000004/stderr')
+        stdout_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                       '/container_1450486922681_0005_01_000004/stdout')
+
+        self.mock_paths = [stderr_path, stdout_path]
+
+        self.path_to_mock_result = {
+            stdout_path: dict(message='because, exploding code')
+        }
+
+        self.assertEqual(
+            self.interpret_spark_task_logs(),
+            {})
+
+        self.assertEqual(
+            self.mock_log_callback.call_args_list,
+            [call(stderr_path)])
+
+    # indirectly tests _ls_spark_task_logs() and its ability to sort by
     # log type and recency
     def test_multiple_logs(self):
-        stderr1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/stderr'
-        syslog1_path = '/userlogs/attempt_201512232143_0008_m_000001_3/syslog'
-        stderr2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/stderr'
-        syslog2_path = '/userlogs/attempt_201512232143_0008_m_000002_3/syslog'
-        stderr3_path = '/userlogs/attempt_201512232143_0008_m_000003_3/stderr'
-        syslog3_path = '/userlogs/attempt_201512232143_0008_m_000003_3/syslog'
-        syslog4_path = '/userlogs/attempt_201512232143_0008_m_000004_3/syslog'
+        stdout1_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000001/stdout')
+        stderr1_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000001/stderr')
+        stdout2_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000002/stdout')
+        stderr2_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000002/stderr')
+        stdout3_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000003/stdout')
+        stderr3_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000003/stderr')
+        stderr4_path = ('/log/dir/userlogs/application_1450486922681_0005'
+                        '/container_1450486922681_0005_01_000004/stderr')
 
         self.mock_paths = [
+            stdout1_path,
             stderr1_path,
-            syslog1_path,
+            stdout2_path,
             stderr2_path,
-            syslog2_path,
+            stdout3_path,
             stderr3_path,
-            syslog3_path,
-            syslog4_path,
+            stderr4_path,
         ]
 
         self.path_to_mock_result = {
-            syslog1_path: dict(hadoop_error=dict(message='BOOM1')),
-            syslog2_path: dict(hadoop_error=dict(message='BOOM2')),
-            stderr2_path: dict(message='BoomException'),
-            syslog3_path: dict(hadoop_error=dict(message='BOOM3')),
-            # no errors for stderr1_path, stderr3_path, or syslog4_path
+            stderr1_path: dict(
+                hadoop_error=dict(message='BOOM1')),
+            stderr2_path: dict(
+                check_stdout=True,
+                hadoop_error=dict(message='exited with status 2')),
+            stdout2_path: dict(message='BoomException'),
+            stderr4_path: dict(
+                check_stdout=True,
+                hadoop_error=dict(message='exited with status 4')),
+            # no errors for stdout1_path, stdout3_path, or stderr4_path
         }
 
-        # we should read from syslog2_path first (later task number)
-        self.assertEqual(self.interpret_task_logs(), dict(
+        # we should read from stderr4_path first (later task number)
+        self.assertEqual(self.interpret_spark_task_logs(), dict(
             errors=[
                 dict(
-                    attempt_id='attempt_201512232143_0008_m_000002_3',
+                    container_id='container_1450486922681_0005_01_000004',
                     hadoop_error=dict(
-                        message='BOOM2',
-                        path=syslog2_path,
+                        message='exited with status 4',
+                        path=stderr4_path,
                     ),
-                    task_error=dict(
-                        message='BoomException',
-                        path=stderr2_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000002',
                 ),
             ],
             partial=True,
         ))
 
-        # skip over syslog4_path (no stderr), never get to syslog1_path
-        self.assertEqual(self.mock_paths_catted, [
-            stderr3_path,
-            stderr2_path,
-            syslog2_path,
-        ])
+        self.assertEqual(
+            self.mock_log_callback.call_args_list,
+            [call(stderr4_path)])
 
         # try again, with partial=False
-        self.mock_paths_catted = []
+        self.mock_log_callback.reset_mock()
 
         # paths still get sorted by _ls_logs()
-        self.assertEqual(self.interpret_task_logs(partial=False), dict(
+        self.assertEqual(self.interpret_spark_task_logs(partial=False), dict(
             errors=[
                 dict(
-                    attempt_id='attempt_201512232143_0008_m_000002_3',
+                    container_id='container_1450486922681_0005_01_000004',
                     hadoop_error=dict(
-                        message='BOOM2',
-                        path=syslog2_path,
+                        message='exited with status 4',
+                        path=stderr4_path,
+                    ),
+                ),
+                dict(
+                    container_id='container_1450486922681_0005_01_000002',
+                    hadoop_error=dict(
+                        message='exited with status 2',
+                        path=stderr2_path,
                     ),
                     task_error=dict(
                         message='BoomException',
-                        path=stderr2_path,
+                        path=stdout2_path,
                     ),
-                    task_id='task_201512232143_0008_m_000002',
                 ),
                 dict(
-                    attempt_id='attempt_201512232143_0008_m_000003_3',
-                    hadoop_error=dict(
-                        message='BOOM3',
-                        path=syslog3_path,
-                    ),
-                    task_id='task_201512232143_0008_m_000003',
-                ),
-                dict(
-                    attempt_id='attempt_201512232143_0008_m_000001_3',
+                    container_id='container_1450486922681_0005_01_000001',
                     hadoop_error=dict(
                         message='BOOM1',
-                        path=syslog1_path,
+                        path=stderr1_path,
                     ),
-                    task_id='task_201512232143_0008_m_000001',
                 ),
             ],
         ))
 
-        self.assertEqual(self.mock_paths_catted, [
-            stderr3_path,
-            stderr2_path,
-            syslog2_path,
-            stderr1_path,
-            syslog4_path,
-            syslog3_path,
-            syslog1_path,
-        ])
-
-
-    def test_pre_yarn_sorting(self):
-        # NOTE: we currently don't have to handle errors from multiple
-        # jobs at once; this is a latent feature that might become
-        # useful later
-
-        self.mock_paths = [
-            '/userlogs/attempt_201512232143_0008_m_000001_3/syslog',
-            '/userlogs/attempt_201512232143_0008_r_000000_0/syslog',
-            '/userlogs/attempt_201512232143_0008_m_000003_1/syslog',
-            '/userlogs/attempt_201512232143_0006_m_000000_0/syslog',
-        ]
-
-        # just want to see order that logs are catted
-        self.assertEqual(self.interpret_task_logs(), {})
-
         self.assertEqual(
-            self.mock_paths_catted,
+            self.mock_log_callback.call_args_list,
             [
-                '/userlogs/attempt_201512232143_0008_r_000000_0/syslog',
-                '/userlogs/attempt_201512232143_0008_m_000001_3/syslog',
-                '/userlogs/attempt_201512232143_0008_m_000003_1/syslog',
-                '/userlogs/attempt_201512232143_0006_m_000000_0/syslog',
-            ]
-        )
-
-    def test_yarn_sorting(self):
-        # NOTE: we currently don't have to handle errors from multiple
-        # jobs/applications at once; this is a latent feature that might
-        # become useful later
-
-        self.mock_paths = [
-            '/log/dir/userlogs/application_1450486922681_0004'
-            '/container_1450486922681_0005_01_000003/syslog',
-            '/log/dir/userlogs/application_1450486922681_0005'
-            '/container_1450486922681_0005_01_000004/syslog',
-            '/log/dir/userlogs/application_1450486922681_0005'
-            '/container_1450486922681_0005_01_000003/syslog',
-        ]
-
-        # just want to see order that logs are catted
-        self.assertEqual(self.interpret_task_logs(), {})
-
-        self.assertEqual(
-            self.mock_paths_catted,
-            [
-                '/log/dir/userlogs/application_1450486922681_0005'
-                '/container_1450486922681_0005_01_000004/syslog',
-                '/log/dir/userlogs/application_1450486922681_0005'
-                '/container_1450486922681_0005_01_000003/syslog',
-                '/log/dir/userlogs/application_1450486922681_0004'
-                '/container_1450486922681_0005_01_000003/syslog',
+                call(stderr4_path),
+                call(stderr3_path),
+                call(stderr2_path),
+                call(stdout2_path),
+                call(stderr1_path),
             ]
         )
 

@@ -27,6 +27,7 @@ from io import BytesIO
 
 import mrjob
 import mrjob.emr
+from mrjob.compat import version_gte
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _3_X_SPARK_SUBMIT
@@ -678,7 +679,7 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
             runner.run()
             self.assertEqual(runner.get_image_version(),
                              _DEFAULT_IMAGE_VERSION)
-            self.assertEqual(runner.get_hadoop_version(), '2.4.0')
+            self.assertEqual(runner.get_hadoop_version(), '2.7.3')
 
     def test_ami_version_1_0_no_longer_supported(self):
         with self.make_runner('--image-version', '1.0') as runner:
@@ -744,7 +745,7 @@ class AMIAndHadoopVersionTestCase(MockBotoTestCase):
                 runner.run()
                 self.assertEqual(runner.get_image_version(),
                                  _DEFAULT_IMAGE_VERSION)
-                self.assertEqual(runner.get_hadoop_version(), '2.4.0')
+                self.assertEqual(runner.get_hadoop_version(), '2.7.3')
 
 
 class AvailabilityZoneTestCase(MockBotoTestCase):
@@ -1473,9 +1474,15 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
             uri = runner._upload_mgr.uri(path)
             name = runner._bootstrap_dir_mgr.name('file', path, name=name)
 
-            self.assertIn(
-                '  hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
-                lines)
+            if image_version and not version_gte(image_version, '4'):
+                self.assertIn(
+                    '  hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
+                    lines)
+            else:
+                self.assertIn(
+                    '  aws s3 cp %s $__mrjob_PWD/%s' % (uri, name),
+                    lines)
+
             self.assertIn(
                 '  chmod a+x $__mrjob_PWD/%s' % (name,),
                 lines)
@@ -1522,7 +1529,12 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertIn('  $__mrjob_PWD/s.sh', lines)
 
     def test_create_master_bootstrap_script(self):
+        # this tests 4.x
         self._test_create_master_bootstrap_script()
+
+    def test_create_master_bootstrap_script_on_3_11_0_ami(self):
+        self._test_create_master_bootstrap_script(
+            image_version='3.11.0')
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
@@ -1684,16 +1696,16 @@ class MasterNodeSetupScriptTestCase(MockBotoTestCase):
             contents = f.read()
 
         self.assertTrue(contents.startswith(b'#!/bin/sh -ex\n'))
-        self.assertIn(b'hadoop fs -copyToLocal ', contents)
-        self.assertNotIn(b'aws s3 cp ', contents)
+        self.assertIn(b'aws s3 cp ', contents)
+        self.assertNotIn(b'hadoop fs -copyToLocal ', contents)
         self.assertIn(b'chmod a+x ', contents)
         self.assertIn(b'cookie.jar', contents)
         self.assertIn(b's3://pooh/honey.jar', contents)
         self.assertNotIn(b'dora.jar', contents)
 
-    def test_4_x_ami(self):
+    def test_3_x_ami(self):
         runner = EMRJobRunner(libjars=['cookie.jar'],
-                              release_label='emr-4.0.0')
+                              image_version='3.11.0')
 
         runner._add_master_node_setup_files_for_upload()
         self.assertIsNotNone(runner._master_node_setup_script_path)
@@ -1701,8 +1713,8 @@ class MasterNodeSetupScriptTestCase(MockBotoTestCase):
         with open(runner._master_node_setup_script_path, 'rb') as f:
             contents = f.read()
 
-        self.assertNotIn(b'hadoop fs -copyToLocal ', contents)
-        self.assertIn(b'aws s3 cp ', contents)
+        self.assertIn(b'hadoop fs -copyToLocal ', contents)
+        self.assertNotIn(b'aws s3 cp ', contents)
         self.assertIn(b'cookie.jar', contents)
 
     def test_usr_bin_env(self):
@@ -3414,13 +3426,17 @@ class LibjarPathsTestCase(MockBotoTestCase):
 class DefaultPythonBinTestCase(MockBotoTestCase):
 
     def test_default_ami(self):
-        # this tests 3.x AMIs
+        # this tests 4.x AMIs
         runner = EMRJobRunner()
-        self.assertTrue(runner._opts['image_version'].startswith('3.'))
+        self.assertTrue(runner._opts['image_version'].startswith('4.'))
         self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_4_x_release_label(self):
         runner = EMRJobRunner(release_label='emr-4.0.0')
+        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+
+    def test_3_11_0_ami(self):
+        runner = EMRJobRunner(image_version='3.11.0')
         self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_2_4_3_ami(self):
@@ -4978,7 +4994,7 @@ class PartitionerTestCase(MockBotoTestCase):
 class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_default_on_3_x_ami(self):
-        job = MRTwoStepJob(['-r', 'emr'])
+        job = MRTwoStepJob(['-r', 'emr', '--image-version', '3.11.0'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5006,6 +5022,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
     def test_emr_applications_requires_4_x_ami(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
+             '--image-version', '3.11.0',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
         job.sandbox()
@@ -5015,7 +5032,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--image-version', '4.3.0',
+            ['-r', 'emr',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
         job.sandbox()
@@ -5033,7 +5050,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_implicit_hadoop(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--image-version', '4.3.0',
+            ['-r', 'emr',
              '--emr-application', 'Mahout'])
         job.sandbox()
 
@@ -5052,7 +5069,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
 
     def test_api_param_serialization(self):
         job = MRTwoStepJob(
-            ['-r', 'emr', '--image-version', '4.3.0',
+            ['-r', 'emr',
              '--emr-application', 'Hadoop',
              '--emr-application', 'Mahout'])
         job.sandbox()
@@ -5085,7 +5102,7 @@ class EMRConfigurationsTestCase(MockBotoTestCase):
         self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
             emr_configurations=[CORE_SITE_EMR_CONFIGURATION])))))
 
-        job = MRTwoStepJob(['-r', 'emr'])
+        job = MRTwoStepJob(['-r', 'emr', '--image-version', '3.11.0'])
         job.sandbox()
 
         with job.make_runner() as runner:

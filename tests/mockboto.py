@@ -802,7 +802,8 @@ class MockEmrConnection(object):
                 else:
                     version = DUMMY_APPLICATION_VERSION
 
-                applications.append(MockEmrObject(name=name, version=version))
+                applications.append(
+                    MockEmrObject(name=app_name, version=version))
         else:
             if application_objs:
                 raise boto.exception.EmrResponseError(

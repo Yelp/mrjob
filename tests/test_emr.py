@@ -4118,7 +4118,7 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             self.assertEqual(runner._bootstrap, [])
 
     def test_default(self):
-        self._assert_installs_python3_on_py3()
+        self._assert_never_installs_python3()  # pre-installed on 4.8.2 AMI
 
     def test_bootstrap_python_switch(self):
         self._assert_installs_python3_on_py3('--bootstrap-python')
@@ -4159,7 +4159,9 @@ class BootstrapPythonTestCase(MockBotoTestCase):
             '--no-bootstrap-python', '--image-version', '3.7.0')
 
     def test_bootstrap_python_comes_before_bootstrap(self):
-        mr_job = MRTwoStepJob(['-r', 'emr', '--bootstrap', 'true'])
+        mr_job = MRTwoStepJob(['-r', 'emr',
+                               '--bootstrap', 'true',
+                               '--bootstrap-python'])
 
         with mr_job.make_runner() as runner:
             self.assertEqual(

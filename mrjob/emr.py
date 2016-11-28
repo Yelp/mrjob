@@ -1299,7 +1299,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _cheapest_manager_instance_type(self):
         """What's the cheapest instance type we can get away with
         for the master node (when it's not also running jobs)?"""
-        if version_gte(self._opts['image_version'], '3'):
+        if (self._opts['release_label'] or
+            version_gte(self._opts['image_version'], '3')):
             return _CHEAPEST_INSTANCE_TYPE
         else:
             return _CHEAPEST_2_X_INSTANCE_TYPE

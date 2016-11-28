@@ -971,6 +971,11 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             core=(2, 'm1.small', None),
             master=(1, 'm1.small', None))
 
+    def test_release_label_hides_image_version(self):
+        self._test_instance_groups(
+            dict(release_label='emr-4.0.0', image_version='2.4.11'),
+            master=(1, 'm1.medium', None))
+
     def test_spark_defaults_single_node(self):
         # Spark needs at least m1.large
         self._test_instance_groups(

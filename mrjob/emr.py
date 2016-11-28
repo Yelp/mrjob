@@ -1975,11 +1975,19 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     # was it because a bootstrap action failed?
                     self._check_for_failed_bootstrap_action(cluster)
 
+            # spark steps require different log parsing. The master node
+            # setup script is a JAR step (albeit one that never produces
+            # counters)
+            step_type = (
+                self._get_step(step_num)['type'] if step_num >= 0 else 'jar')
+
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
-            # try to fetch counters
+            # try to fetch counters. (Except for master node setup
+            # and Spark, which has no counters.)
             if step.status.state != 'CANCELLED':
-                if step_num >= 0:
-                    counters = self._pick_counters(log_interpretation)
+                if step_num >= 0 and not _is_spark_step_type(step_type):
+                    counters = self._pick_counters(
+                        log_interpretation, step_type)
                     if counters:
                         log.info(_format_counters(counters))
                     else:
@@ -1989,7 +1997,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             if step.status.state == 'FAILED':
-                error = self._pick_error(log_interpretation)
+                error = self._pick_error(log_interpretation, step_type)
                 if error:
                     log.error('Probable cause of failure:\n\n%s\n\n' %
                               _format_error(error))
@@ -2218,19 +2226,25 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_dir_name=s3_dir_name,
             ssh_to_slaves=True)  # TODO: does this make sense on YARN?
 
-    def _get_step_log_interpretation(self, log_interpretation):
+    def _get_step_log_interpretation(self, log_interpretation, step_type):
         """Fetch and interpret the step log."""
         step_id = log_interpretation.get('step_id')
         if not step_id:
             log.warning("Can't fetch step log; missing step ID")
             return
 
-        return (
-            _interpret_emr_step_syslog(
-                self.fs, self._ls_step_syslogs(step_id=step_id)) or
-            _interpret_emr_step_stderr(
-                self.fs, self._ls_step_stderr_logs(step_id=step_id))
-        )
+        if _is_spark_step_type(step_type):
+            # Spark also has a "controller" log4j log, but it doesn't
+            # contain errors or anything else we need
+            return _interpret_emr_step_syslog(
+                self.fs,  self._ls_step_stderr_logs(step_id=step_id))
+        else:
+            return (
+                _interpret_emr_step_syslog(
+                    self.fs, self._ls_step_syslogs(step_id=step_id)) or
+                _interpret_emr_step_stderr(
+                    self.fs, self._ls_step_stderr_logs(step_id=step_id))
+            )
 
     def _ls_step_syslogs(self, step_id):
         """Yield step log matches, logging a message for each one."""

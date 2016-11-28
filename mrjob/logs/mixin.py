@@ -33,7 +33,10 @@ from mrjob.logs.errors import _pick_error
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.task import _interpret_task_logs
+from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_task_logs
+from mrjob.logs.task import _ls_spark_task_logs
+from mrjob.step import _is_spark_step_type
 
 log = getLogger(__name__)
 
@@ -81,7 +84,7 @@ class LogInterpretationMixin(object):
         # dir and depend on regexes to find the right subdir.
         return ()
 
-    def _get_step_log_interpretation(self, log_interpretation):
+    def _get_step_log_interpretation(self, log_interpretation, step_type):
         """Return interpretation of the step log. Either implement
         this, or fill ``'step'`` yourself (e.g. from Hadoop binary's
         output."""
@@ -89,14 +92,17 @@ class LogInterpretationMixin(object):
 
     ### stuff to call ###
 
-    def _pick_counters(self, log_interpretation):
+    def _pick_counters(self, log_interpretation, step_type):
         """Pick counters from our log interpretation, interpreting
         history logs if need be."""
+        if _is_spark_step_type(step_type):
+            return {}
+
         counters = _pick_counters(log_interpretation)
 
         if not counters:
             log.info('Attempting to fetch counters from logs...')
-            self._interpret_step_logs(log_interpretation)
+            self._interpret_step_logs(log_interpretation, step_type)
             counters = _pick_counters(log_interpretation)
 
         if not counters:
@@ -105,14 +111,14 @@ class LogInterpretationMixin(object):
 
         return counters
 
-    def _pick_error(self, log_interpretation):
+    def _pick_error(self, log_interpretation, step_type):
         """Pick probable cause of failure (only call this if job fails)."""
         if not all(log_type in log_interpretation for
                    log_type in ('job', 'step', 'task')):
             log.info('Scanning logs for probable cause of failure...')
-            self._interpret_step_logs(log_interpretation)
+            self._interpret_step_logs(log_interpretation, step_type)
             self._interpret_history_log(log_interpretation)
-            self._interpret_task_logs(log_interpretation)
+            self._interpret_task_logs(log_interpretation, step_type)
 
         return _pick_error(log_interpretation)
 
@@ -146,17 +152,18 @@ class LogInterpretationMixin(object):
             log.info('  Parsing history log: %s' % match['path'])
             yield match
 
-    def _interpret_step_logs(self, log_interpretation):
+    def _interpret_step_logs(self, log_interpretation, step_type):
         """Add *step* to the log interpretation, if it's not already there."""
         if 'step' in log_interpretation:
             return
 
         step_interpretation = self._get_step_log_interpretation(
-            log_interpretation)
+            log_interpretation, step_type)
         if step_interpretation:
             log_interpretation['step'] = step_interpretation
 
-    def _interpret_task_logs(self, log_interpretation, partial=True):
+    def _interpret_task_logs(
+            self, log_interpretation, step_type, partial=True):
         """Fetch task syslogs and stderr, and add 'task' to interpretation."""
         if 'task' in log_interpretation and (
                 partial or not log_interpretation['task'].get('partial')):
@@ -182,20 +189,31 @@ class LogInterpretationMixin(object):
                     log.warning("Can't fetch task logs; missing job ID")
                 return
 
-        log_interpretation['task'] = _interpret_task_logs(
+        if _is_spark_step_type(step_type):
+            interpret_func = _interpret_spark_task_logs
+        else:
+            interpret_func = _interpret_task_logs
+
+        log_interpretation['task'] = interpret_func(
             self.fs,
             self._ls_task_logs(
+                step_type,
                 application_id=application_id,
                 job_id=job_id,
                 output_dir=output_dir),
             partial=partial,
             log_callback=_log_parsing_task_log)
 
-    def _ls_task_logs(
-            self, application_id=None, job_id=None, output_dir=None):
+    def _ls_task_logs(self, step_type,
+                      application_id=None, job_id=None, output_dir=None):
         """Yield task log matches."""
+        if _is_spark_step_type(step_type):
+            ls_func = _ls_spark_task_logs
+        else:
+            ls_func = _ls_task_logs
+
         # logging messages are handled by a callback in _interpret_task_logs()
-        for match in _ls_task_logs(
+        for match in ls_func(
                 self.fs,
                 self._stream_task_log_dirs(
                     application_id=application_id, output_dir=output_dir),

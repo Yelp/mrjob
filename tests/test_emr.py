@@ -4855,7 +4855,8 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
         self.log.reset_mock()
 
         self.assertEqual(
-            runner._get_step_log_interpretation(log_interpretation),
+            runner._get_step_log_interpretation(
+                log_interpretation, 'streaming'),
             self._interpret_emr_step_syslog.return_value)
 
         self.assertFalse(self.log.warning.called)
@@ -4873,7 +4874,9 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
         self.log.reset_mock()
 
         self.assertEqual(
-            runner._get_step_log_interpretation(log_interpretation), None)
+            runner._get_step_log_interpretation(
+                log_interpretation, 'streaming'),
+            None)
 
         self.assertTrue(self.log.warning.called)
         self.assertFalse(self._ls_step_syslogs.called)
@@ -4891,7 +4894,8 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
         self._interpret_emr_step_syslog.return_value = {}
 
         self.assertEqual(
-            runner._get_step_log_interpretation(log_interpretation),
+            runner._get_step_log_interpretation(
+                log_interpretation, 'streaming'),
             self._interpret_emr_step_stderr.return_value)
 
         self.assertFalse(self.log.warning.called)
@@ -4901,6 +4905,26 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
         self._ls_step_stderr_logs.assert_called_once_with(step_id='s-STEPID')
         self._interpret_emr_step_stderr.assert_called_once_with(
             runner.fs, self._ls_step_stderr_logs.return_value)
+
+    def test_spark(self):
+        runner = EMRJobRunner()
+
+        log_interpretation = dict(step_id='s-STEPID')
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(
+                log_interpretation, 'spark'),
+            self._interpret_emr_step_syslog.return_value)
+
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._ls_step_syslogs.called)
+        self._ls_step_stderr_logs.assert_called_once_with(step_id='s-STEPID')
+        self._interpret_emr_step_syslog.assert_called_once_with(
+            runner.fs, self._ls_step_stderr_logs.return_value)
+        self.assertFalse(self._interpret_emr_step_stderr.called)
+
 
 
 # this basically just checks that hadoop_extra_args is an option

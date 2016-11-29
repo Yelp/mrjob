@@ -3205,6 +3205,22 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         return self._get_cluster_info('image_version')
 
+    def _image_version_gte(self, version):
+        """Check if the requested image version is greater than
+        or equal to *version*. If the *release_label* opt is set,
+        look at that instead."""
+        if self._opts['release_label']:
+            if self._opts['release_label'].startswith('emr-'):
+                try:
+                    return version_gte(self._opts['release_label'][4:],
+                                       version)
+                except TypeError:
+                    pass  # account for non-numeric versions
+
+            return version_gte('4', version)
+        else:
+            return version_gte(self._opts['image_version'], version)
+
     def _address_of_master(self):
         """Get the address of the master node so we can SSH to it"""
         return self._get_cluster_info('master_public_dns')

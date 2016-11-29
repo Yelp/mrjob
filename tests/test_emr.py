@@ -6125,19 +6125,3 @@ class ImageVersionGteTestCase(MockBotoTestCase):
         self.assertTrue(runner._image_version_gte('4.6.0'))
         self.assertTrue(runner._image_version_gte('4.8.2'))
         self.assertFalse(runner._image_version_gte('5'))
-
-    def test_non_numeric_release_label(self):
-        # equivalent to version 4, shouldn't error
-        runner = EMRJobRunner(release_label='emr-is-great')
-
-        self.assertTrue(runner._image_version_gte('3.11.0'))
-        self.assertTrue(runner._image_version_gte('4'))
-        self.assertFalse(runner._image_version_gte('4.6.0'))
-
-    def test_non_emr_release_label(self):
-        # equivalent to version 4
-        runner = EMRJobRunner(release_label='hi')
-
-        self.assertTrue(runner._image_version_gte('3.11.0'))
-        self.assertTrue(runner._image_version_gte('4'))
-        self.assertFalse(runner._image_version_gte('4.6.0'))

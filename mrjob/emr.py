@@ -177,7 +177,7 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 _DEFAULT_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
-_DEFAULT_IMAGE_VERSION = '3.11.0'
+_DEFAULT_IMAGE_VERSION = '4.8.2'
 
 # EMR translates the dead/deprecated "latest" AMI version to 2.4.2
 # (2.4.2 isn't actually the latest version by a long shot)
@@ -735,15 +735,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if local or not PY2:
             return super(EMRJobRunner, self)._default_python_bin(local=local)
 
-        if self._opts['release_label'] or version_gte(
-                self._opts['image_version'], '3'):
+        if self._image_version_gte('3'):
             # on 3.x and 4.x AMIs, both versions of Python work, so just
             # match whatever version we're using locally
             if sys.version_info >= (2, 7):
                 return ['python2.7']
             else:
                 return ['python2.6']
-        elif version_gte(self._opts['image_version'], '2.4.3'):
+        elif self._image_version_gte('2.4.3'):
             # on 2.4.3+, use python2.7 because the default python
             # doesn't have a working pip
             return ['python2.7']
@@ -751,6 +750,21 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # prior to 2.4.3, Python 2.6 is the only version installed.
             # Use "python2.6" and not "python" for consistency
             return ['python2.6']
+
+    def _image_version_gte(self, version):
+        """Check if the requested image version is greater than
+        or equal to *version*. If the *release_label* opt is set,
+        look at that instead.
+
+        If you're checking the actual image version of a cluster, just
+        use :py:func:`~mrjob.compat.version_gte` and
+        :py:meth:`get_image_version`.
+        """
+        if self._opts['release_label']:
+            return version_gte(
+                self._opts['release_label'].lstrip('emr-'), version)
+        else:
+            return version_gte(self._opts['image_version'], version)
 
     def _fix_s3_tmp_and_log_uri_opts(self):
         """Fill in cloud_tmp_dir and cloud_log_dir (in self._opts) if they
@@ -1299,7 +1313,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _cheapest_manager_instance_type(self):
         """What's the cheapest instance type we can get away with
         for the master node (when it's not also running jobs)?"""
-        if version_gte(self._opts['image_version'], '3'):
+        if self._image_version_gte('3'):
             return _CHEAPEST_INSTANCE_TYPE
         else:
             return _CHEAPEST_2_X_INSTANCE_TYPE
@@ -2446,11 +2460,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # and warn if it's an AMI before 3.7.0
         if self._opts['bootstrap_python'] or (
                 self._opts['bootstrap_python'] is None and
-                not version_gte(self._opts['image_version'], '4.6.0')):
+                not self._image_version_gte('4.6.0')):
 
             # we have to have at least on AMI 3.7.0. But give it a shot
-            if not (self._opts['release_label'] or
-                    version_gte(self._opts['image_version'], '3.7.0')):
+            if not self._image_version_gte('3.7.0'):
                 log.warning(
                     'bootstrapping Python 3 will probably not work on'
                     ' AMIs prior to 3.7.0. For an alternative, see:'

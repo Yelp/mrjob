@@ -90,6 +90,10 @@ AMI_HADOOP_VERSION_UPDATES = {
     '3.1.0': '2.4.0',
     '4.0.0': '2.6.0',
     '4.3.0': '2.7.1',
+    '4.5.0': '2.7.2',
+    '4.8.2': '2.7.3',
+    '5.0.0': '2.7.2',
+    '5.0.3': '2.7.3',
 }
 
 # need to fill in a version for non-Hadoop applications
@@ -792,13 +796,14 @@ class MockEmrConnection(object):
                 application_names = set(['Hadoop'])
 
             applications = []
-            for name in sorted(application_names):
-                if name == 'Hadoop':
+            for app_name in sorted(application_names):
+                if app_name == 'Hadoop':
                     version = running_hadoop_version
                 else:
                     version = DUMMY_APPLICATION_VERSION
 
-                applications.append(MockEmrObject(name=name, version=version))
+                applications.append(
+                    MockEmrObject(name=app_name, version=version))
         else:
             if application_objs:
                 raise boto.exception.EmrResponseError(

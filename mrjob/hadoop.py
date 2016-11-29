@@ -103,9 +103,6 @@ _HADOOP_STDOUT_RE = re.compile(br'^packageJobJar: ')
 _HADOOP_STREAMING_JAR_RE = re.compile(
     r'^hadoop.*streaming.*(?<!-sources)\.jar$')
 
-# always use these args with spark-submit
-_HADOOP_SPARK_ARGS = ['--master', 'yarn']
-
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
@@ -595,7 +592,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         return args
 
     def _spark_submit_arg_prefix(self):
-        return _HADOOP_SPARK_ARGS
+        return ['--master', self._opts['spark_master']]
 
     def _env_for_step(self, step_num):
         step = self._get_step(step_num)

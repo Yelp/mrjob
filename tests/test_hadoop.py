@@ -1488,3 +1488,20 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
             self.assertTrue(self.get_hadoop_version.called)
             self.assertTrue(self.get_hadoop_streaming_jar.called)
             self.assertTrue(self.get_spark_submit_bin.called)
+
+
+class SparkSubmitArgPrefixTestCase(MockHadoopTestCase):
+
+    def test_default(self):
+        runner = HadoopJobRunner()
+
+        self.assertEqual(
+            runner._spark_submit_arg_prefix(),
+            ['--master', 'yarn'])
+
+    def test_spark_master(self):
+        runner = HadoopJobRunner(spark_master='local')
+
+        self.assertEqual(
+            runner._spark_submit_arg_prefix(),
+            ['--master', 'local'])

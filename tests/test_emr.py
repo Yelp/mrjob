@@ -5998,9 +5998,6 @@ class TestClusterSparkSupportWarning(MockBotoTestCase):
             self.assertIsNone(message)
 
     def test_no_python_3(self):
-        if PY2:
-            return
-
         job = MRNullSpark(['-r', 'emr', '--image-version', '3.11.0'])
         job.sandbox()
 
@@ -6009,7 +6006,12 @@ class TestClusterSparkSupportWarning(MockBotoTestCase):
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
-            self.assertIn('Python 3', message)
+            # this version of Spark is bad for different reasons, depending
+            # on Python version
+            if PY2:
+                self.assertIn('old version of Spark', message)
+            else:
+                self.assertIn('Python 3', message)
             self.assertIn('4.0.0', message)
 
     def test_too_old(self):

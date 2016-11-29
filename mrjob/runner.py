@@ -407,6 +407,12 @@ class MRJobRunner(object):
         if self._ran_job:
             raise AssertionError("Job already ran!")
 
+        if not self._opts['strict_protocols']:
+            log.warning('\nNon-strict protocols are deprecated and will be'
+                        ' removed in v0.6.0. Please run your job with'
+                        ' --strict-protocols and fix any underlying'
+                        ' encoding issues\n')
+
         self._run()
         self._ran_job = True
 

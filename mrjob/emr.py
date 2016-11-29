@@ -3356,10 +3356,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     '  (try --image-version %s or later)' % (
                         image_version, suggested_version))
 
-        if not (PY2 or version_gte(image_version, _MIN_SPARK_PY3_AMI_VERSION)):
-            return ('  AMI version %s does not support Python 3 on Spark\n'
-                    '  (try --image-version %s or later)' % (
-                        image_version, _MIN_SPARK_PY3_AMI_VERSION))
+        if not version_gte(image_version, _MIN_SPARK_PY3_AMI_VERSION):
+            if PY2:
+                # even though this version of Spark "works" with Python 2,
+                # it doesn't work well
+                return ('  AMI version %s has an old version of Spark\n'
+                        ' and does not correctly determine when a Spark'
+                        ' job has failed\n'
+                        'Try --image-version %s or later)' % (
+                            image_version, _MIN_SPARK_PY3_AMI_VERSION))
+            else:
+                # this version of Spark doesn't support Python 3 at all!
+                return ('  AMI version %s does not support Python 3 on Spark\n'
+                        '  (try --image-version %s or later)' % (
+                            image_version, _MIN_SPARK_PY3_AMI_VERSION))
 
         # make sure there's enough memory to run Spark
         instance_groups = list(_yield_all_instance_groups(

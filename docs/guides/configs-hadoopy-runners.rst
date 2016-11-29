@@ -130,6 +130,18 @@ Options available to hadoop and emr runners
 
     .. versionadded:: 0.4.1
 
+.. mrjob-opt::
+    :config: spark_args
+    :switch: --spark-arg
+    :type: :ref:`string list <data-type-string-list>`
+    :set: all
+    :default: ``[]``
+
+    Extra arguments to pass to :command:`spark-submit`.
+
+    .. versionadded:: 0.5.8.spark0
+
+
 Options available to hadoop runner only
 ---------------------------------------
 
@@ -217,15 +229,17 @@ Options available to hadoop runner only
        This option used to be named ``hdfs_scratch_dir``.
 
 .. mrjob-opt::
-    :config: spark_args
-    :switch: --spark-arg
-    :type: :ref:`string list <data-type-string-list>`
-    :set: all
-    :default: ``[]``
+    :config: spark_master
+    :switch: --spark-master
+    :type: :ref:`string <data-type-string>`
+    :set: hadoop
+    :default: ``'yarn'``
 
-    Extra arguments to pass to :command:`spark-submit`.
+    Name or URL to pass to the ``--master`` argument of
+    :command:`spark-submit` (e.g. ``spark://host:port``, ``yarn``).
 
-    .. versionadded:: 0.5.8.spark0
+    Note that archives (see :mrjob-opt:`upload_archives`) only work
+    when this is set to ``yarn``.
 
 .. mrjob-opt::
     :config: spark_submit_bin

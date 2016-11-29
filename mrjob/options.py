@@ -1035,6 +1035,15 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    spark_master=dict(
+        runners=['hadoop'],
+        switches=[
+            (['--spark-master'], dict(
+                help=('--master argument to spark-submit (e.g. '
+                      'spark://host:port, local. Default is yarn'),
+            )),
+        ],
+    ),
     spark_submit_bin=dict(
         combiner=combine_cmds,
         switches=[

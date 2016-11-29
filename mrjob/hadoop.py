@@ -127,6 +127,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         super_opts = super(HadoopRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'hadoop_tmp_dir': 'tmp/mrjob',
+            'spark_master': 'yarn',
         })
 
 

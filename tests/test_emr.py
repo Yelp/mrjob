@@ -33,7 +33,6 @@ from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
-from mrjob.emr import _EMR_SPARK_ARGS
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
@@ -6127,3 +6126,14 @@ class ImageVersionGteTestCase(MockBotoTestCase):
         self.assertTrue(runner._image_version_gte('4.6.0'))
         self.assertTrue(runner._image_version_gte('4.8.2'))
         self.assertFalse(runner._image_version_gte('5'))
+
+
+class SparkSubmitArgPrefixTestCase(MockBotoTestCase):
+
+    def test_default(self):
+        # these are hard-coded and always the same
+        runner = EMRJobRunner()
+
+        self.assertEqual(
+            runner._spark_submit_arg_prefix(),
+            ['--master', 'yarn', '--deploy-mode', 'cluster'])

@@ -103,9 +103,6 @@ _HADOOP_STDOUT_RE = re.compile(br'^packageJobJar: ')
 _HADOOP_STREAMING_JAR_RE = re.compile(
     r'^hadoop.*streaming.*(?<!-sources)\.jar$')
 
-# always use these args with spark-submit
-_HADOOP_SPARK_ARGS = ['--master', 'yarn']
-
 
 def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
@@ -127,6 +124,7 @@ class HadoopRunnerOptionStore(RunnerOptionStore):
         super_opts = super(HadoopRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'hadoop_tmp_dir': 'tmp/mrjob',
+            'spark_master': 'yarn',
         })
 
 
@@ -422,6 +420,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _run_job_in_hadoop(self):
         for step_num, step in enumerate(self._get_steps()):
+            self._warn_about_spark_archives(step)
+
             step_args = self._args_for_step(step_num)
             env = self._env_for_step(step_num)
 
@@ -502,6 +502,16 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
                 raise StepFailedException(
                     reason=reason, step_num=step_num,
                     num_steps=self._num_steps())
+
+    def _warn_about_spark_archives(self, step):
+        """If *step* is a Spark step, the *upload_archives* option is set,
+        and *spark_master* is not ``'yarn'``, warn that *upload_archives*
+        will be ignored by Spark."""
+        if (_is_spark_step_type(step['type']) and
+                self._opts['spark_master'] != 'yarn' and
+                self._opts['upload_archives']):
+            log.warning('Spark will probably ignore archives because'
+                        " spark_master is not set to 'yarn'")
 
     def _args_for_step(self, step_num):
         step = self._get_step(step_num)
@@ -594,7 +604,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         return args
 
     def _spark_submit_arg_prefix(self):
-        return _HADOOP_SPARK_ARGS
+        return ['--master', self._opts['spark_master']]
 
     def _env_for_step(self, step_num):
         step = self._get_step(step_num)

@@ -234,10 +234,10 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
             # make sure mrjob.tar.gz is created and uploaded as
             # a bootstrap file
-            self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path))
-            self.assertIn(runner._mrjob_tar_gz_path,
+            self.assertTrue(os.path.exists(runner._mrjob_zip_path))
+            self.assertIn(runner._mrjob_zip_path,
                           runner._upload_mgr.path_to_uri())
-            self.assertIn(runner._mrjob_tar_gz_path,
+            self.assertIn(runner._mrjob_zip_path,
                           runner._bootstrap_dir_mgr.paths())
 
         self.assertEqual(sorted(results),
@@ -1495,7 +1495,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         assertScriptDownloads(foo_py_path, 'bar.py')
         assertScriptDownloads('s3://walrus/scripts/ohnoes.sh')
         assertScriptDownloads('/tmp/quz', 'quz')
-        assertScriptDownloads(runner._mrjob_tar_gz_path)
+        assertScriptDownloads(runner._mrjob_zip_path)
         assertScriptDownloads('speedups.sh')
         assertScriptDownloads('/tmp/s.sh')
         if PY2:
@@ -1512,12 +1512,12 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertIn('  true', lines)
         self.assertIn('  ls', lines)
         # bootstrap_mrjob
-        mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
-            'file', runner._mrjob_tar_gz_path)
+        mrjob_zip_name = runner._bootstrap_dir_mgr.name(
+            'file', runner._mrjob_zip_path)
         self.assertIn("  __mrjob_PYTHON_LIB=$(" + expected_python_bin +
                       " -c 'from distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
-        self.assertIn('  sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
+        self.assertIn('  sudo tar xfz $__mrjob_PWD/' + mrjob_zip_name +
                       ' -C $__mrjob_PYTHON_LIB', lines)
         self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)

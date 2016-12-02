@@ -944,8 +944,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         # lazily create mrjob.tar.gz
         if self._bootstrap_mrjob():
-            self._create_mrjob_tar_gz()
-            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
+            self._create_mrjob_zip()
+            self._bootstrap_dir_mgr.add('file', self._mrjob_zip_path)
 
         # all other files needed by the script are already in
         # _bootstrap_dir_mgr
@@ -2407,9 +2407,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         mrjob_bootstrap = []
         if self._bootstrap_mrjob():
             # _add_bootstrap_files_for_upload() should have done this
-            assert self._mrjob_tar_gz_path
+            assert self._mrjob_zip_path
             path_dict = {
-                'type': 'file', 'name': None, 'path': self._mrjob_tar_gz_path}
+                'type': 'file', 'name': None, 'path': self._mrjob_zip_path}
             self._bootstrap_dir_mgr.add(**path_dict)
 
             # find out where python keeps its libraries
@@ -3128,7 +3128,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             sorted(
                 (name, self.fs.md5sum(path)) for name, path
                 in self._bootstrap_dir_mgr.name_to_path('file').items()
-                if not path == self._mrjob_tar_gz_path),
+                if not path == self._mrjob_zip_path),
             self._opts['additional_emr_info'],
             self._bootstrap,
             self._bootstrap_actions(),

@@ -201,12 +201,12 @@ class TestJobName(TestCase):
 
 class CreateMrjobTarGzTestCase(TestCase):
 
-    def test_create_mrjob_tar_gz(self):
+    def test_create_mrjob_zip(self):
         with no_handlers_for_logger('mrjob.runner'):
             with InlineMRJobRunner(conf_paths=[]) as runner:
-                mrjob_tar_gz_path = runner._create_mrjob_tar_gz()
-                mrjob_tar_gz = tarfile.open(mrjob_tar_gz_path)
-                contents = mrjob_tar_gz.getnames()
+                mrjob_zip_path = runner._create_mrjob_zip()
+                mrjob_zip = tarfile.open(mrjob_zip_path)
+                contents = mrjob_zip.getnames()
 
                 for path in contents:
                     self.assertEqual(path[:6], 'mrjob/')

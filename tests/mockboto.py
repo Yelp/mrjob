@@ -175,13 +175,13 @@ class MockBotoTestCase(SandboxedTestCase):
         super(MockBotoTestCase, self).setUp()
 
         # patch slow things
-        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
-            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
+        def fake_create_mrjob_zip(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_zip_path = self.fake_mrjob_tgz_path
             return self.fake_mrjob_tgz_path
 
         self.start(patch.object(
-            EMRJobRunner, '_create_mrjob_tar_gz',
-            fake_create_mrjob_tar_gz))
+            EMRJobRunner, '_create_mrjob_zip',
+            fake_create_mrjob_zip))
 
         self.start(patch.object(time, 'sleep'))
 

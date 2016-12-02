@@ -464,8 +464,8 @@ class DataprocJobRunner(MRJobRunner):
         """
         # lazily create mrjob.tar.gz
         if self._bootstrap_mrjob():
-            self._create_mrjob_tar_gz()
-            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
+            self._create_mrjob_zip()
+            self._bootstrap_dir_mgr.add('file', self._mrjob_zip_path)
 
         # all other files needed by the script are already in
         # _bootstrap_dir_mgr
@@ -849,9 +849,9 @@ class DataprocJobRunner(MRJobRunner):
         # create mrjob.tar.gz if we need it, and add commands to install it
         mrjob_bootstrap = []
         if self._bootstrap_mrjob():
-            assert self._mrjob_tar_gz_path
+            assert self._mrjob_zip_path
             path_dict = {
-                'type': 'file', 'name': None, 'path': self._mrjob_tar_gz_path}
+                'type': 'file', 'name': None, 'path': self._mrjob_zip_path}
             self._bootstrap_dir_mgr.add(**path_dict)
 
             # find out where python keeps its libraries

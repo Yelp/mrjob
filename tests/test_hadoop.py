@@ -671,8 +671,8 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                              ['-verbose'])
 
             # make sure mrjob.tar.gz is was uploaded
-            self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path))
-            self.assertIn(runner._mrjob_tar_gz_path,
+            self.assertTrue(os.path.exists(runner._mrjob_zip_path))
+            self.assertIn(runner._mrjob_zip_path,
                           runner._upload_mgr.path_to_uri())
 
             # make sure setup script exists, and mrjob.tar.gz is added
@@ -680,11 +680,11 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertTrue(os.path.exists(runner._setup_wrapper_script_path))
             self.assertIn(runner._setup_wrapper_script_path,
                           runner._upload_mgr.path_to_uri())
-            mrjob_tar_gz_name = runner._working_dir_mgr.name(
-                'archive', runner._mrjob_tar_gz_path)
+            mrjob_zip_name = runner._working_dir_mgr.name(
+                'archive', runner._mrjob_zip_path)
             with open(runner._setup_wrapper_script_path) as wrapper:
                 self.assertTrue(any(
-                    ('export PYTHONPATH' in line and mrjob_tar_gz_name in line)
+                    ('export PYTHONPATH' in line and mrjob_zip_name in line)
                     for line in wrapper))
 
         self.assertEqual(runner.counters(),

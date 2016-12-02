@@ -886,9 +886,11 @@ class MRJobRunner(object):
         setup = self._setup
 
         if self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
-            # patch setup to add mrjob.tar.gz to PYTYHONPATH
+            # patch setup to add mrjob.zip to PYTHONPATH
             mrjob_zip = self._create_mrjob_zip()
-            path_dict = {'type': 'archive', 'name': None, 'path': mrjob_zip}
+            # this is a file, not an archive, since Python can import directly
+            # from .zip files
+            path_dict = {'type': 'file', 'name': None, 'path': mrjob_zip}
             self._working_dir_mgr.add(**path_dict)
             setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
 
@@ -919,7 +921,7 @@ class MRJobRunner(object):
         :py:func:`mrjob.setup.parse_setup_cmd()`.
 
         If *bootstrap_mrjob* and ``self.BOOTSTRAP_MRJOB_IN_SETUP`` are both
-        true, create mrjob.tar.gz (if it doesn't exist already) and
+        true, create mrjob.zip (if it doesn't exist already) and
         prepend a setup command that adds it to PYTHONPATH.
 
         Patch in *py_files*.

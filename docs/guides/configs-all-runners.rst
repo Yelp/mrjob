@@ -41,7 +41,7 @@ options related to file uploading.
     :set: all
     :default: (automatic)
 
-    Should we automatically tar up the mrjob library and install it when we run
+    Should we automatically zip up the mrjob library and install it when we run
     job? By default, we do unless :mrjob-opt:`interpreter` is set.
 
     Set this to ``False`` if you've already installed ``mrjob`` on your

@@ -267,14 +267,14 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--bootstrap-mrjob'], dict(
                 action='store_true',
-                help=("Automatically tar up the mrjob library and install it"
+                help=("Automatically zip up the mrjob library and install it"
                       " when we run the mrjob. This is the default. Use"
                       " --no-bootstrap-mrjob if you've already installed"
                       " mrjob on your Hadoop cluster."),
             )),
             (['--no-bootstrap-mrjob'], dict(
                 action='store_false',
-                help=("Don't automatically tar up the mrjob library and"
+                help=("Don't automatically zip up the mrjob library and"
                       " install it when we run this job. Use this if you've"
                       " already installed mrjob on your Hadoop cluster."),
             )),

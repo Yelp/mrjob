@@ -462,7 +462,7 @@ class DataprocJobRunner(MRJobRunner):
         Create the master bootstrap script if necessary.
 
         """
-        # lazily create mrjob.tar.gz
+        # lazily create mrjob.zip
         if self._bootstrap_mrjob():
             self._create_mrjob_zip()
             self._bootstrap_dir_mgr.add('file', self._mrjob_zip_path)
@@ -846,7 +846,7 @@ class DataprocJobRunner(MRJobRunner):
         if not (self._bootstrap or self._bootstrap_mrjob()):
             return
 
-        # create mrjob.tar.gz if we need it, and add commands to install it
+        # create mrjob.zip if we need it, and add commands to install it
         mrjob_bootstrap = []
         if self._bootstrap_mrjob():
             assert self._mrjob_zip_path
@@ -860,9 +860,9 @@ class DataprocJobRunner(MRJobRunner):
                 "'from distutils.sysconfig import get_python_lib;"
                 " print(get_python_lib())')" %
                 cmd_line(self._python_bin())])
-            # un-tar mrjob.tar.gz
+            # unzip mrjob.zip
             mrjob_bootstrap.append(
-                ['sudo tar xfz ', path_dict, ' -C $__mrjob_PYTHON_LIB'])
+                ['sudo unzip ', path_dict, ' -d $__mrjob_PYTHON_LIB'])
             # re-compile pyc files now, since mappers/reducers can't
             # write to this directory. Don't fail if there is extra
             # un-compileable crud in the tarball (this would matter if

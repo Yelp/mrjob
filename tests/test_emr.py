@@ -1517,8 +1517,8 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertIn("  __mrjob_PYTHON_LIB=$(" + expected_python_bin +
                       " -c 'from distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
-        self.assertIn('  sudo tar xfz $__mrjob_PWD/' + mrjob_zip_name +
-                      ' -C $__mrjob_PYTHON_LIB', lines)
+        self.assertIn('  sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
+                      ' -d $__mrjob_PYTHON_LIB', lines)
         self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages

@@ -667,7 +667,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             task=(20, HIGHCPU_GCE_INSTANCE))
 
 
-class TestMasterBootstrapScript(MockGoogleAPITestCase):
+class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
 
     def test_usr_bin_env(self):
         runner = DataprocJobRunner(conf_paths=[],
@@ -755,8 +755,8 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
         self.assertIn("__mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
                       " distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
-        self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_zip_name +
-                      ' -C $__mrjob_PYTHON_LIB', lines)
+        self.assertIn('sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
+                      ' -d $__mrjob_PYTHON_LIB', lines)
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python

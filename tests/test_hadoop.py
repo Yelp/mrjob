@@ -681,7 +681,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
             self.assertIn(runner._setup_wrapper_script_path,
                           runner._upload_mgr.path_to_uri())
             mrjob_zip_name = runner._working_dir_mgr.name(
-                'archive', runner._mrjob_zip_path)
+                'file', runner._mrjob_zip_path)
             with open(runner._setup_wrapper_script_path) as wrapper:
                 self.assertTrue(any(
                     ('export PYTHONPATH' in line and mrjob_zip_name in line)

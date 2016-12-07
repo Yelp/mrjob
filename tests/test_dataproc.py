@@ -159,8 +159,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             # job overrides jobconf in step 1
             self.assertIn('x=z', step_1_args)
 
-            # make sure mrjob.tar.gz is created and uploaded as
-            # a bootstrap file
+            # make sure mrjob.zip is created and uploaded as a bootstrap file
             self.assertTrue(os.path.exists(runner._mrjob_zip_path))
             self.assertIn(runner._mrjob_zip_path,
                           runner._upload_mgr.path_to_uri())

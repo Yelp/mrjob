@@ -1079,10 +1079,10 @@ class ParseTaskStderrTestCase(TestCase):
             "+ python3 -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)\n",
             '+ export PYTHONPATH=/mnt/var/lib/hadoop/tmp/nm-local-dir'
             '/usercache/hadoop/appcache/application_1453488173054_0002'
-            '/container_1453488173054_0002_01_000005/mrjob.tar.gz:\n',
+            '/container_1453488173054_0002_01_000005/mrjob.zip:\n',
             '+ PYTHONPATH=/mnt/var/lib/hadoop/tmp/nm-local-dir/usercache'
             '/hadoop/appcache/application_1453488173054_0002'
-            '/container_1453488173054_0002_01_000005/mrjob.tar.gz:\n',
+            '/container_1453488173054_0002_01_000005/mrjob.zip:\n',
             '+ rm /\n',
             'rm: cannot remove ‘/’: Is a directory\n',
         ]

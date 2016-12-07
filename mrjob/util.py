@@ -26,13 +26,16 @@ import shlex
 import shutil
 import sys
 import tarfile
-import zipfile
 import zlib
 from collections import defaultdict
 from copy import deepcopy
 from datetime import timedelta
 from distutils.spawn import find_executable
 from logging import getLogger
+from zipfile import ZIP_DEFLATED
+from zipfile import ZIP_STORED
+from zipfile import ZipFile
+from zipfile import is_zipfile
 
 try:
     import bz2
@@ -639,6 +642,45 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
 
     tar_gz.close()
 
+def zip_dir(dir, out_path, filter=None, prefix=''):
+    """Compress the given *dir* into a zip file at *out_path*.
+
+    If we encounter symlinks, include the actual file, not the symlink.
+
+    :type dir: str
+    :param dir: dir to tar up
+    :type out_path: str
+    :param out_path: where to write the tarball too
+    :param filter: if defined, a function that takes paths (relative to *dir*
+                   and returns ``True`` if we should keep them
+    :type prefix: str
+    :param prefix: subdirectory inside the tarball to put everything into (e.g.
+                   ``'mrjob'``)
+    """
+    if not os.path.isdir(dir):
+        raise IOError('Not a directory: %r' % (dir,))
+
+    if not filter:
+        filter = lambda path: True
+
+    try:
+        zip_file = ZipFile(out_path, mode='w', compression=ZIP_DEFLATED)
+    except RuntimeError:  # zlib not available
+        zip_file = ZipFile(out_path, mode='w', compression=ZIP_STORED)
+
+    for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
+        for filename in filenames:
+            path = os.path.join(dirpath, filename)
+            # janky version of os.path.relpath() (Python 2.6):
+            rel_path = path[len(os.path.join(dir, '')):]
+            if filter(rel_path):
+                # copy over real files, not symlinks
+                real_path = os.path.realpath(path)
+                path_in_zip_file = os.path.join(prefix, rel_path)
+                zip_file.write(real_path, arcname=path_in_zip_file)
+
+    zip_file.close()
+
 
 def to_lines(chunks):
     """Take in data as a sequence of bytes, and yield it, one line at a time.
@@ -706,8 +748,8 @@ def unarchive(archive_path, dest):
     if tarfile.is_tarfile(archive_path):
         with contextlib.closing(tarfile.open(archive_path, 'r')) as archive:
             archive.extractall(dest)
-    elif zipfile.is_zipfile(archive_path):
-        with contextlib.closing(zipfile.ZipFile(archive_path, 'r')) as archive:
+    elif is_zipfile(archive_path):
+        with contextlib.closing(ZipFile(archive_path, 'r')) as archive:
             for name in archive.namelist():
                 # the zip spec specifies that front slashes are always
                 # used as directory separators

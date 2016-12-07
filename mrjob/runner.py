@@ -55,7 +55,7 @@ from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
-from mrjob.util import tar_and_gzip
+from mrjob.util import zip_dir
 
 
 log = logging.getLogger(__name__)
@@ -327,8 +327,8 @@ class MRJobRunner(object):
             self._stdin = stdin or sys.stdin.buffer
         self._stdin_path = None  # temp file containing dump from stdin
 
-        # where a tarball of the mrjob library is stored locally
-        self._mrjob_tar_gz_path = None
+        # where a zip file of the mrjob library is stored locally
+        self._mrjob_zip_path = None
 
         # store output_dir
         self._output_dir = output_dir
@@ -886,9 +886,11 @@ class MRJobRunner(object):
         setup = self._setup
 
         if self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
-            # patch setup to add mrjob.tar.gz to PYTYHONPATH
-            mrjob_tar_gz = self._create_mrjob_tar_gz()
-            path_dict = {'type': 'archive', 'name': None, 'path': mrjob_tar_gz}
+            # patch setup to add mrjob.zip to PYTHONPATH
+            mrjob_zip = self._create_mrjob_zip()
+            # this is a file, not an archive, since Python can import directly
+            # from .zip files
+            path_dict = {'type': 'file', 'name': None, 'path': mrjob_zip}
             self._working_dir_mgr.add(**path_dict)
             setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
 
@@ -919,7 +921,7 @@ class MRJobRunner(object):
         :py:func:`mrjob.setup.parse_setup_cmd()`.
 
         If *bootstrap_mrjob* and ``self.BOOTSTRAP_MRJOB_IN_SETUP`` are both
-        true, create mrjob.tar.gz (if it doesn't exist already) and
+        true, create mrjob.zip (if it doesn't exist already) and
         prepend a setup command that adds it to PYTHONPATH.
 
         Patch in *py_files*.
@@ -974,7 +976,7 @@ class MRJobRunner(object):
 
         return setup
 
-    def _setup_wrapper_script_content(self, setup, mrjob_tar_gz_name=None):
+    def _setup_wrapper_script_content(self, setup, mrjob_zip_name=None):
         """Return a (Bourne) shell script that runs the setup commands and then
         executes whatever is passed to it (this will be our mapper/reducer),
         as a list of strings (one for each line, including newlines).
@@ -1111,17 +1113,17 @@ class MRJobRunner(object):
 
         return [interpolate(arg) for arg in args]
 
-    def _create_mrjob_tar_gz(self):
-        """Make a tarball of the mrjob library, without .pyc or .pyo files,
-        This will also set ``self._mrjob_tar_gz_path`` and return it.
+    def _create_mrjob_zip(self):
+        """Make a zip of the mrjob library, without .pyc or .pyo files,
+        This will also set ``self._mrjob_zip_path`` and return it.
 
         Typically called from
         :py:meth:`_create_setup_wrapper_script`.
 
         It's safe to call this method multiple times (we'll only create
-        the tarball once.)
+        the zip file once.)
         """
-        if not self._mrjob_tar_gz_path:
+        if not self._mrjob_zip_path:
             # find mrjob library
             import mrjob
 
@@ -1132,8 +1134,7 @@ class MRJobRunner(object):
 
             mrjob_dir = os.path.dirname(mrjob.__file__) or '.'
 
-            tar_gz_path = os.path.join(self._get_local_tmp_dir(),
-                                       'mrjob.tar.gz')
+            zip_path = os.path.join(self._get_local_tmp_dir(), 'mrjob.zip')
 
             def filter_path(path):
                 filename = os.path.basename(path)
@@ -1147,13 +1148,12 @@ class MRJobRunner(object):
                            filename.startswith('._'))
 
             log.debug('archiving %s -> %s as %s' % (
-                mrjob_dir, tar_gz_path, os.path.join('mrjob', '')))
-            tar_and_gzip(
-                mrjob_dir, tar_gz_path, filter=filter_path, prefix='mrjob')
+                mrjob_dir, zip_path, os.path.join('mrjob', '')))
+            zip_dir(mrjob_dir, zip_path, filter=filter_path, prefix='mrjob')
 
-            self._mrjob_tar_gz_path = tar_gz_path
+            self._mrjob_zip_path = zip_path
 
-        return self._mrjob_tar_gz_path
+        return self._mrjob_zip_path
 
     def _hadoop_generic_args_for_step(self, step_num):
         """Arguments like -D and -libjars that apply to every Hadoop

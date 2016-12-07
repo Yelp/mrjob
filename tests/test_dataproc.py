@@ -159,12 +159,11 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             # job overrides jobconf in step 1
             self.assertIn('x=z', step_1_args)
 
-            # make sure mrjob.tar.gz is created and uploaded as
-            # a bootstrap file
-            self.assertTrue(os.path.exists(runner._mrjob_tar_gz_path))
-            self.assertIn(runner._mrjob_tar_gz_path,
+            # make sure mrjob.zip is created and uploaded as a bootstrap file
+            self.assertTrue(os.path.exists(runner._mrjob_zip_path))
+            self.assertIn(runner._mrjob_zip_path,
                           runner._upload_mgr.path_to_uri())
-            self.assertIn(runner._mrjob_tar_gz_path,
+            self.assertIn(runner._mrjob_zip_path,
                           runner._bootstrap_dir_mgr.paths())
 
             cluster_id = runner.get_cluster_id()
@@ -667,7 +666,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             task=(20, HIGHCPU_GCE_INSTANCE))
 
 
-class TestMasterBootstrapScript(MockGoogleAPITestCase):
+class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
 
     def test_usr_bin_env(self):
         runner = DataprocJobRunner(conf_paths=[],
@@ -734,7 +733,7 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
         # check files get downloaded
         assertScriptDownloads(foo_py_path, 'bar.py')
         assertScriptDownloads('gs://walrus/scripts/ohnoes.sh')
-        assertScriptDownloads(runner._mrjob_tar_gz_path)
+        assertScriptDownloads(runner._mrjob_zip_path)
 
         # check scripts get run
 
@@ -750,13 +749,13 @@ class TestMasterBootstrapScript(MockGoogleAPITestCase):
         self.assertIn('/tmp/s.sh', lines)
 
         # bootstrap_mrjob
-        mrjob_tar_gz_name = runner._bootstrap_dir_mgr.name(
-            'file', runner._mrjob_tar_gz_path)
+        mrjob_zip_name = runner._bootstrap_dir_mgr.name(
+            'file', runner._mrjob_zip_path)
         self.assertIn("__mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
                       " distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
-        self.assertIn('sudo tar xfz $__mrjob_PWD/' + mrjob_tar_gz_name +
-                      ' -C $__mrjob_PYTHON_LIB', lines)
+        self.assertIn('sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
+                      ' -d $__mrjob_PYTHON_LIB', lines)
         self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python

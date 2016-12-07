@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Mercilessly taunt an Amazonian river dolphin.
+
 This is by no means a complete mock of boto, just what we need for tests.
 """
 import hashlib
@@ -145,13 +146,13 @@ class MockBotoTestCase(SandboxedTestCase):
     def setUpClass(cls):
         # we don't care what's in this file, just want mrjob to stop creating
         # and deleting a complicated archive.
-        cls.fake_mrjob_tgz_path = tempfile.mkstemp(
-            prefix='fake_mrjob_', suffix='.tar.gz')[1]
+        cls.fake_mrjob_zip_path = tempfile.mkstemp(
+            prefix='fake_mrjob_', suffix='.zip')[1]
 
     @classmethod
     def tearDownClass(cls):
-        if os.path.exists(cls.fake_mrjob_tgz_path):
-            os.remove(cls.fake_mrjob_tgz_path)
+        if os.path.exists(cls.fake_mrjob_zip_path):
+            os.remove(cls.fake_mrjob_zip_path)
 
     def setUp(self):
         # patch boto
@@ -175,13 +176,13 @@ class MockBotoTestCase(SandboxedTestCase):
         super(MockBotoTestCase, self).setUp()
 
         # patch slow things
-        def fake_create_mrjob_tar_gz(mocked_self, *args, **kwargs):
-            mocked_self._mrjob_tar_gz_path = self.fake_mrjob_tgz_path
-            return self.fake_mrjob_tgz_path
+        def fake_create_mrjob_zip(mocked_self, *args, **kwargs):
+            mocked_self._mrjob_zip_path = self.fake_mrjob_zip_path
+            return self.fake_mrjob_zip_path
 
         self.start(patch.object(
-            EMRJobRunner, '_create_mrjob_tar_gz',
-            fake_create_mrjob_tar_gz))
+            EMRJobRunner, '_create_mrjob_zip',
+            fake_create_mrjob_zip))
 
         self.start(patch.object(time, 'sleep'))
 

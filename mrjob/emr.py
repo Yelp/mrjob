@@ -942,10 +942,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         persistent -- set by make_persistent_cluster()
         """
-        # lazily create mrjob.tar.gz
+        # lazily create mrjob.zip
         if self._bootstrap_mrjob():
-            self._create_mrjob_tar_gz()
-            self._bootstrap_dir_mgr.add('file', self._mrjob_tar_gz_path)
+            self._create_mrjob_zip()
+            self._bootstrap_dir_mgr.add('file', self._mrjob_zip_path)
 
         # all other files needed by the script are already in
         # _bootstrap_dir_mgr
@@ -2403,13 +2403,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 self._bootstrap_mrjob()):
             return
 
-        # create mrjob.tar.gz if we need it, and add commands to install it
+        # create mrjob.zip if we need it, and add commands to install it
         mrjob_bootstrap = []
         if self._bootstrap_mrjob():
             # _add_bootstrap_files_for_upload() should have done this
-            assert self._mrjob_tar_gz_path
+            assert self._mrjob_zip_path
             path_dict = {
-                'type': 'file', 'name': None, 'path': self._mrjob_tar_gz_path}
+                'type': 'file', 'name': None, 'path': self._mrjob_zip_path}
             self._bootstrap_dir_mgr.add(**path_dict)
 
             # find out where python keeps its libraries
@@ -2418,9 +2418,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 "'from distutils.sysconfig import get_python_lib;"
                 " print(get_python_lib())')" %
                 cmd_line(self._python_bin())])
-            # un-tar mrjob.tar.gz
+            # copy mrjob.zip over
             mrjob_bootstrap.append(
-                ['sudo tar xfz ', path_dict, ' -C $__mrjob_PYTHON_LIB'])
+                ['sudo unzip ', path_dict, ' -d $__mrjob_PYTHON_LIB'])
             # re-compile pyc files now, since mappers/reducers can't
             # write to this directory. Don't fail if there is extra
             # un-compileable crud in the tarball (this would matter if
@@ -2429,7 +2429,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
                  cmd_line(self._python_bin())])
 
-        # TODO: isn't it b.sh now?
+        # TODO: shouldn't it be b.sh now?
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
         path = os.path.join(self._get_local_tmp_dir(), 'b.py')
@@ -3117,9 +3117,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         (pooling requires the exact same version of :py:mod:`mrjob` anyway).
         """
         things_to_hash = [
-            # exclude mrjob.tar.gz because it's only created if the
+            # exclude mrjob.zip because it's only created if the
             # job starts its own cluster (also, its hash changes every time
-            # since the tarball contains different timestamps).
+            # since the zip file contains different timestamps).
             # The filenames/md5sums are sorted because we need to
             # ensure the order they're added doesn't affect the hash
             # here. Previously this used a dict, but Python doesn't
@@ -3128,7 +3128,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             sorted(
                 (name, self.fs.md5sum(path)) for name, path
                 in self._bootstrap_dir_mgr.name_to_path('file').items()
-                if not path == self._mrjob_tar_gz_path),
+                if not path == self._mrjob_zip_path),
             self._opts['additional_emr_info'],
             self._bootstrap,
             self._bootstrap_actions(),

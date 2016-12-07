@@ -50,11 +50,11 @@ Options::
                         File to upload to the master node before running
                         bootstrap_cmds (for example, debian packages). You can
                         use --bootstrap-file more than once.
-  --bootstrap-mrjob     Automatically tar up the mrjob library and install it
+  --bootstrap-mrjob     Automatically zip up the mrjob library and install it
                         when we run the mrjob. This is the default. Use --no-
                         bootstrap-mrjob if you've already installed mrjob on
                         your Hadoop cluster.
-  --no-bootstrap-mrjob  Don't automatically tar up the mrjob library and
+  --no-bootstrap-mrjob  Don't automatically zip up the mrjob library and
                         install it when we run this job. Use this if you've
                         already installed mrjob on your Hadoop cluster.
   --bootstrap-python    Attempt to install a compatible version of Python at

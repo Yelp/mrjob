@@ -869,7 +869,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                         cmdenv=dict(PYSPARK_PYTHON='mypy')
                     ) + [
                         '--py-files',
-                        '<first py_file>,<second py_file>'
+                        '<first py_file>,<second py_file>,'
                     ]
                 )
             )
@@ -925,7 +925,8 @@ class SparkPyFilesTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._spark_py_files(), [])
+            self.assertEqual(runner._spark_py_files(),
+                             [runner._create_mrjob_zip()])
 
     def test_eggs(self):
         # by default, we pass py_files directly to Spark
@@ -938,8 +939,26 @@ class SparkPyFilesTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_py_files(),
-                [egg1_path, egg2_path]
+                [egg1_path, egg2_path, runner._create_mrjob_zip()]
             )
+
+    def test_no_bootstrap_mrjob(self):
+        job = MRNullSpark(['--no-bootstrap-mrjob'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._spark_py_files(),
+                             [])
+
+    def test_no_bootstrap_mrjob_in_setup(self):
+        job = MRNullSpark([])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            # this happens in runners that run on a cluster
+            runner.BOOTSTRAP_MRJOB_IN_SETUP = False
+            self.assertEqual(runner._spark_py_files(),
+                             [])
 
     def test_no_hash_paths(self):
         egg_path = self.makefile('horton.egg')

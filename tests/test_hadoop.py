@@ -1193,7 +1193,7 @@ class SparkPyFilesTestCase(MockHadoopTestCase):
 
             self.assertEqual(
                 runner._spark_py_files(),
-                [egg1_path, egg2_path]
+                [egg1_path, egg2_path, runner._create_mrjob_zip()]
             )
 
             # the py_files get uploaded anyway since they appear in

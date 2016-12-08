@@ -613,6 +613,10 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         self.start(patch('mrjob.runner.MRJobRunner._python_bin',
                          return_value=['mypy']))
 
+        # bootstrapping mrjob is tested below in SparkPyFilesTestCase
+        self.start(patch('mrjob.runner.MRJobRunner._bootstrap_mrjob',
+                         return_value=False))
+
     def _expected_conf_args(self, cmdenv=None, jobconf=None):
         conf = {}
 
@@ -869,7 +873,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                         cmdenv=dict(PYSPARK_PYTHON='mypy')
                     ) + [
                         '--py-files',
-                        '<first py_file>,<second py_file>,'
+                        '<first py_file>,<second py_file>'
                     ]
                 )
             )

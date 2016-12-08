@@ -1372,7 +1372,16 @@ class MRJobRunner(object):
         By default (cluster mode), Spark only accepts local files, so
         we pass these as-is.
         """
-        return self._opts['py_files']
+        py_files = []
+
+        py_files.extend(self._opts['py_files'])
+
+        # Spark doesn't have setup scripts; instead, we need to add
+        # mrjob to
+        if  self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
+            py_files.append(self._create_mrjob_zip())
+
+        return py_files
 
     def _libjar_paths(self):
         """Paths or URIs of libjars, from Hadoop/Spark's point of view.

@@ -1163,17 +1163,27 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             args.append('hadoop@' + host)
             log.debug('> %s' % cmd_line(args))
 
-            ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            time.sleep(_WAIT_FOR_SSH_TO_FAIL)
-            ssh_proc.poll()
-            # still running. We are golden
-            if ssh_proc.returncode is None:
-                self._ssh_proc = ssh_proc
-                break
-            else:
-                ssh_proc.stdin.close()
-                ssh_proc.stdout.close()
-                ssh_proc.stderr.close()
+            ssh_proc = None
+            try:
+                ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            except OSError as ex:
+                # if the ssh binary doesn't exist, we get
+                # OSError(2, 'No such file or directory')
+                # (on Python 3 it's a FileNotFoundError, but that's what you
+                # get automatically if you construct an OSError with errno 2)
+                pass
+
+            if ssh_proc:
+                time.sleep(_WAIT_FOR_SSH_TO_FAIL)
+                ssh_proc.poll()
+                # still running. We are golden
+                if ssh_proc.returncode is None:
+                    self._ssh_proc = ssh_proc
+                    break
+                else:
+                    ssh_proc.stdin.close()
+                    ssh_proc.stdout.close()
+                    ssh_proc.stderr.close()
 
         if not self._ssh_proc:
             log.warning(

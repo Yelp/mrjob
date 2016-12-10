@@ -30,7 +30,7 @@ def _cat_log(fs, path):
             return
         for line in fs.cat(path):
             yield to_string(line)
-    except IOError as e:
+    except (IOError, OSError) as e:
         log.warning("couldn't cat() %s: %r" % (path, e))
 
 
@@ -60,7 +60,7 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
             if fs.exists(log_dir):
                 for path in fs.ls(log_dir):
                     yield path
-        except IOError as e:
+        except (IOError, OSError) as e:
             log.warning("couldn't ls() %s: %r" % (log_dir, e))
 
     for log_dirs in log_dir_stream:

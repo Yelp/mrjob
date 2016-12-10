@@ -61,14 +61,21 @@ class CatLogsTestCase(PatcherTestCase):
         self.assertFalse(self.mock_fs.cat.called)
         self.assertFalse(self.mock_log.warning.called)
 
-    def test_cat_ioerror(self):
-        self.mock_fs.cat.side_effect = IOError
+    def _test_recoverable_error(self, ex):
+        self.mock_fs.cat.side_effect = ex
 
         self.assertEqual(self.cat_log('foo'), [])
 
         self.mock_fs.exists.assert_called_once_with('foo')
         self.mock_fs.cat.assert_called_once_with('foo')
         self.assertTrue(self.mock_log.warning.called)
+
+    def test_cat_ioerror(self):
+        self._test_recoverable_error(IOError())
+
+    def test_cat_bad_ssh_binary(self):
+        # tests #1474
+        self._test_recoverable_error(OSError(2, 'No such file or directory'))
 
     def test_cat_other_error(self):
         self.mock_fs.cat.side_effect = ValueError
@@ -220,10 +227,10 @@ class LsLogsTestCase(TestCase):
                           dict(path='/path/to/logs/pine', foo='bar'),
                           dict(path='/path/to/logs/redwood', foo='bar')])
 
-    def test_warn_on_io_error(self):
+    def _test_recoverable_error(self, ex):
         self.mock_paths = [
             '/path/to/logs/oak',
-            IOError(),
+            ex
         ]
 
         with no_handlers_for_logger('mrjob.logs.wrap'):
@@ -236,6 +243,13 @@ class LsLogsTestCase(TestCase):
             self.mock_fs.ls.assert_called_once_with('/path/to/logs')
 
             self.assertIn("couldn't ls() /path/to/logs", stderr.getvalue())
+
+    def test_warn_on_io_error(self):
+        self._test_recoverable_error(IOError())
+
+    def test_warn_on_bad_ssh_binary(self):
+        #tests #1474
+        self._test_recoverable_error(OSError(2, 'No such file or directory'))
 
     def test_raise_other_exceptions(self):
         self.mock_paths = [

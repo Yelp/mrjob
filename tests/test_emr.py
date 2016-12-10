@@ -5784,6 +5784,7 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
         self.assertEqual(params['local_port'], 10003)
 
     def test_missing_ssh_binary(self):
+        # tests #1474
         self.mock_Popen.side_effect = OSError(2, 'No such file or directory')
 
         self.get_ssh_args(assert_tunnel_failed=True)

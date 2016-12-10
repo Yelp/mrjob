@@ -157,45 +157,6 @@ class PickErrorTestCase(TestCase):
             )
         )
 
-    def test_container_to_attempt_id(self):
-        container_id = 'container_1449525218032_0005_01_000010'
-        attempt_id = 'attempt_1449525218032_0005_m_000000_3'
-        task_id = _attempt_id_to_task_id(attempt_id)
-
-        container_to_attempt_id = {container_id: attempt_id}
-
-        log_interpretation = dict(
-            history=dict(
-                container_to_attempt_id=container_to_attempt_id,
-                errors=[
-                    dict(
-                        attempt_id=attempt_id,
-                        hadoop_error=dict(message='SwordsMischiefException'),
-                        task_id=task_id,
-                    ),
-                ],
-            ),
-            task=dict(
-                errors=[
-                    dict(
-                        container_id=container_id,
-                        hadoop_error=dict(message='SwordsMischiefException'),
-                        task_error=dict(message='en garde!'),
-                    ),
-                ],
-            ),
-        )
-
-        self.assertEqual(
-            _pick_error(log_interpretation),
-            dict(
-                attempt_id=attempt_id,
-                container_id=container_id,
-                hadoop_error=dict(message='SwordsMischiefException'),
-                task_error=dict(message='en garde!'),
-                task_id=task_id,
-            ))
-
 
 class MergeAndSortErrorsTestCase(TestCase):
 

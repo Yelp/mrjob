@@ -89,9 +89,6 @@ log = logging.getLogger(__name__)
 _DEFAULT_MAX_HOURS_IDLE = 1
 _DEFAULT_MAX_MINUTES_LOCKED = 1
 
-_DEBUG_JAR_ARG_RE = re.compile(
-    r's3n?://.*\.elasticmapreduce/libs/state-pusher/[^/]+/fetch')
-
 
 def main(cl_args=None):
     option_parser = _make_option_parser()
@@ -152,7 +149,6 @@ def _maybe_terminate_clusters(dry_run=False,
     num_bootstrapping = 0
     num_done = 0
     num_idle = 0
-    num_non_streaming = 0
     num_pending = 0
     num_running = 0
 
@@ -178,12 +174,6 @@ def _maybe_terminate_clusters(dry_run=False,
 
         # need steps to learn more about cluster
         steps = _list_all_steps(emr_conn, cluster_id)
-
-        # we can't really tell if non-streaming jobs are idle or not, so
-        # let them be (see Issue #60)
-        if _is_cluster_non_streaming(steps):
-            num_non_streaming += 1
-            continue
 
         if any(_is_step_running(step) for step in steps):
             num_running += 1
@@ -248,35 +238,15 @@ def _maybe_terminate_clusters(dry_run=False,
 
     log.info(
         'Cluster statuses: %d starting, %d bootstrapping, %d running,'
-        ' %d pending, %d idle, %d active non-streaming, %d done' % (
+        ' %d pending, %d idle, %d done' % (
             num_starting, num_bootstrapping, num_running,
-            num_pending, num_idle, num_non_streaming, num_done))
+            num_pending, num_idle, num_done))
 
 
 def _is_cluster_done(cluster):
     """Return True if the given cluster is done running."""
     return (cluster.status.state == 'TERMINATING' or
             hasattr(cluster.status.timeline, 'enddatetime'))
-
-
-def _is_cluster_non_streaming(steps):
-    """Return ``True`` if the give cluster has steps, but none of them are
-    Hadoop streaming steps (for example, if the cluster is running Hive).
-    """
-    if not steps:
-        return False
-
-    for step in steps:
-        for arg in step.config.args:
-            # This is hadoop streaming
-            if arg.value == '-mapper':
-                return False
-            # This is a debug jar associated with hadoop streaming
-            if _DEBUG_JAR_ARG_RE.match(arg.value):
-                return False
-    else:
-        # job has at least one step, and none are streaming steps
-        return True
 
 
 def _is_cluster_starting(cluster_summary):

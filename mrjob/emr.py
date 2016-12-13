@@ -1168,9 +1168,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             ssh_proc = None
             try:
                 ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            except OSError as popen_exception:
+            except OSError as ex:
                 # e.g. OSError(2, 'File not found')
-                break  # warning handled below
+                popen_exception = ex   # warning handled below
+                break
 
             if ssh_proc:
                 time.sleep(_WAIT_FOR_SSH_TO_FAIL)

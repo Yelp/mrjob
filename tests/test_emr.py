@@ -5672,7 +5672,7 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
 
         self.start(patch('os.kill'))  # don't clean up fake SSH proc
 
-    def get_ssh_args(self, *args):
+    def get_ssh_args(self, *args, **kwargs):
         job_args = [
             '-r', 'emr',
             '--ssh-tunnel',
@@ -5694,6 +5694,9 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
             runner._set_up_ssh_tunnel()
 
             ssh_args = self.mock_Popen.call_args[0][0]
+
+            if kwargs.get('assert_tunnel_failed'):
+                self.assertFalse(runner._ssh_proc)
 
             return ssh_args
 
@@ -5779,6 +5782,17 @@ class SetUpSSHTunnelTestCase(MockBotoTestCase):
 
         self.assertEqual(self.mock_Popen.call_count, 3)
         self.assertEqual(params['local_port'], 10003)
+
+    def test_missing_ssh_binary(self):
+        # tests #1474
+        self.mock_Popen.side_effect = OSError(2, 'No such file or directory')
+
+        self.get_ssh_args(assert_tunnel_failed=True)
+
+    def test_other_popen_error(self):
+        self.mock_Popen.side_effect = NotImplementedError()
+
+        self.assertRaises(NotImplementedError, self.get_ssh_args)
 
 
 class UsesSparkTestCase(MockBotoTestCase):

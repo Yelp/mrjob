@@ -1147,6 +1147,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             fake_known_hosts_file,))
 
         bind_port = None
+        popen_exception = None
+
         for bind_port in self._pick_ssh_bind_ports():
             args = self._opts['ssh_bin'] + [
                 '-o', 'VerifyHostKeyDNS=no',
@@ -1163,21 +1165,37 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             args.append('hadoop@' + host)
             log.debug('> %s' % cmd_line(args))
 
-            ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            time.sleep(_WAIT_FOR_SSH_TO_FAIL)
-            ssh_proc.poll()
-            # still running. We are golden
-            if ssh_proc.returncode is None:
-                self._ssh_proc = ssh_proc
+            ssh_proc = None
+            try:
+                ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+            except OSError as ex:
+                # e.g. OSError(2, 'File not found')
+                popen_exception = ex   # warning handled below
                 break
-            else:
-                ssh_proc.stdin.close()
-                ssh_proc.stdout.close()
-                ssh_proc.stderr.close()
+
+            if ssh_proc:
+                time.sleep(_WAIT_FOR_SSH_TO_FAIL)
+                ssh_proc.poll()
+                # still running. We are golden
+                if ssh_proc.returncode is None:
+                    self._ssh_proc = ssh_proc
+                    break
+                else:
+                    ssh_proc.stdin.close()
+                    ssh_proc.stdout.close()
+                    ssh_proc.stderr.close()
 
         if not self._ssh_proc:
-            log.warning(
-                '  Failed to open ssh tunnel to %s' % tunnel_config['name'])
+            if popen_exception:
+                # this only happens if the ssh binary is not present
+                # or not executable (so tunnel_config and the args to the
+                # ssh binary don't matter)
+                log.warning("    Couldn't run %s: %s" % (
+                    cmd_line(self._opts['ssh_bin']), popen_exception))
+            else:
+                log.warning(
+                    '    Failed to open ssh tunnel to %s' %
+                    tunnel_config['name'])
         else:
             if self._opts['ssh_tunnel_is_open']:
                 bind_host = socket.getfqdn()

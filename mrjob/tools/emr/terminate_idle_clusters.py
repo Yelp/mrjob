@@ -152,7 +152,7 @@ def _maybe_terminate_clusters(dry_run=False,
     num_bootstrapping = 0
     num_done = 0
     num_idle = 0
-    num_non_streaming = 0
+    num_not_streaming_or_spark = 0
     num_pending = 0
     num_running = 0
 
@@ -181,8 +181,8 @@ def _maybe_terminate_clusters(dry_run=False,
 
         # we can't really tell if non-streaming jobs are idle or not, so
         # let them be (see Issue #60)
-        if _is_cluster_non_streaming(steps):
-            num_non_streaming += 1
+        if _is_cluster_not_streaming_or_spark(steps):
+            num_not_streaming_or_spark += 1
             continue
 
         if any(_is_step_running(step) for step in steps):
@@ -248,9 +248,9 @@ def _maybe_terminate_clusters(dry_run=False,
 
     log.info(
         'Cluster statuses: %d starting, %d bootstrapping, %d running,'
-        ' %d pending, %d idle, %d active non-streaming, %d done' % (
+        ' %d pending, %d idle, %d active non-streaming/Spark, %d done' % (
             num_starting, num_bootstrapping, num_running,
-            num_pending, num_idle, num_non_streaming, num_done))
+            num_pending, num_idle, num_not_streaming_or_spark, num_done))
 
 
 def _is_cluster_done(cluster):
@@ -259,7 +259,7 @@ def _is_cluster_done(cluster):
             hasattr(cluster.status.timeline, 'enddatetime'))
 
 
-def _is_cluster_non_streaming(steps):
+def _is_cluster_not_streaming_or_spark(steps):
     """Return ``True`` if the give cluster has steps, but none of them are
     Hadoop streaming steps (for example, if the cluster is running Hive).
     """
@@ -271,11 +271,14 @@ def _is_cluster_non_streaming(steps):
             # This is hadoop streaming
             if arg.value == '-mapper':
                 return False
+            # This is Spark
+            if arg.value.split('/')[-1] == 'spark-submit':
+                return False
             # This is a debug jar associated with hadoop streaming
             if _DEBUG_JAR_ARG_RE.match(arg.value):
                 return False
     else:
-        # job has at least one step, and none are streaming steps
+        # job has at least one step, and none are streaming or Spark steps
         return True
 
 

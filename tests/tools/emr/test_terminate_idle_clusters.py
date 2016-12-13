@@ -28,10 +28,11 @@ from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_bootstrapping
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_done
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_running
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_starting
-from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_non_streaming
+from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_not_streaming_or_spark
 from mrjob.tools.emr.terminate_idle_clusters import _cluster_has_pending_steps
 from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 
+from tests.mockboto import DEBUGGING_ARGS
 from tests.mockboto import MockBotoTestCase
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
@@ -395,7 +396,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             pool_hash=None,
             pool_name=None,
             running=False,
-            non_streaming=False):
+            not_streaming_or_spark=False):
 
         self.assertEqual(starting,
                          _is_cluster_starting(mock_cluster))
@@ -413,8 +414,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
                          _pool_hash_and_name(mock_cluster._bootstrapactions))
         self.assertEqual(running,
                          _is_cluster_running(mock_cluster._steps))
-        self.assertEqual(non_streaming,
-                         _is_cluster_non_streaming(mock_cluster._steps))
+        self.assertEqual(not_streaming_or_spark,
+                         _is_cluster_not_streaming_or_spark(mock_cluster._steps))
 
     def _lock_contents(self, mock_cluster, steps_ahead=0):
         conn = self.connect_s3()
@@ -492,7 +493,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-HIVE'],
             idle_for=timedelta(hours=4),
-            non_streaming=True,
+            not_streaming_or_spark=True,
         )
 
     def test_hadoop_debugging_cluster(self):
@@ -760,6 +761,67 @@ class ClusterTerminationTestCase(MockBotoTestCase):
 
         # shouldn't *actually* terminate clusters
         self.assertEqual(self.ids_of_terminated_clusters(), [])
+
+
+class IsClusterNotStreamingOrSparkTestCase(TestCase):
+
+    def _make_steps(self, *args_list):
+        return [
+            MockEmrObject(
+                config=MockEmrObject(
+                    args=[
+                        MockEmrObject(value=arg) for arg in args
+                    ]
+                )
+            )
+            for args in args_list
+        ]
+
+    def test_empty(self):
+        self.assertTrue(_is_cluster_not_streaming_or_spark(
+            self._make_steps([])))
+
+    def test_streaming_step(self):
+        self.assertFalse(_is_cluster_not_streaming_or_spark(
+            self._make_steps(['-mapper', 'my_job.py --mapper',
+                              '-reducer', 'my_job.py --reducer'])))
+
+    def test_spark_step(self):
+        self.assertFalse(_is_cluster_not_streaming_or_spark(
+            self._make_steps([
+                'spark-submit',
+                '--master',
+                'yarn',
+                '--deploy-mode',
+                'cluster',
+            ])
+        ))
+
+    def test_spark_step_3_x_ami(self):
+        self.assertFalse(_is_cluster_not_streaming_or_spark(
+            self._make_steps([
+                '/home/hadoop/spark/bin/spark-submit',
+                '--master',
+                'yarn',
+                '--deploy-mode',
+                'cluster',
+            ])
+        ))
+
+    def test_debug_step(self):
+        self.assertFalse(_is_cluster_not_streaming_or_spark(
+            self._make_steps(DEBUGGING_ARGS)))
+
+    def test_hive(self):
+        self.assertTrue(_is_cluster_not_streaming_or_spark(
+            self._make_steps([])))  # hive step doesn't take args
+
+    def test_mixed(self):
+        self.assertFalse(_is_cluster_not_streaming_or_spark(
+            ['-mapper', 'my_job.py --mapper',
+             '-reducer', 'my_job.py --reducer'],
+            ['args', 'for', 'some', 'other', 'jar']
+        ))
 
 
 # make sure _DEBUG_JAR_ARG_RE works correctly with boto 2.40.0 (tests #1306)

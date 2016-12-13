@@ -22,13 +22,11 @@ from datetime import timedelta
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
-from mrjob.tools.emr.terminate_idle_clusters import _DEBUG_JAR_ARG_RE
 from mrjob.tools.emr.terminate_idle_clusters import _maybe_terminate_clusters
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_bootstrapping
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_done
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_running
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_starting
-from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_non_streaming
 from mrjob.tools.emr.terminate_idle_clusters import _cluster_has_pending_steps
 from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 
@@ -220,25 +218,6 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             _steps=[step(start_hours_ago=4, end_hours_ago=None)],
         ))
 
-        # hive cluster (looks completed but isn't)
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-HIVE',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=6),
-                    readydatetime=ago(hours=5, minutes=5),
-                ),
-            ),
-            _steps=[step(
-                start_hours_ago=4,
-                end_hours_ago=4,
-                jar=('s3://us-east-1.elasticmapreduce/libs/script-runner/'
-                     'script-runner.jar'),
-                args=[],
-            )],
-        ))
-
         # custom hadoop streaming jar
         self.add_mock_emr_cluster(MockEmrObject(
             id='j-CUSTOM_DONE_AND_IDLE',
@@ -275,7 +254,6 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         j_debug_only._steps[0].status.timeline.enddatetime = ago(hours=2)
 
         # hadoop debugging + actual job
-        # same jar as hive but with different args
         mock_emr_conn.run_jobflow(_id='j-HADOOP_DEBUGGING',
                                   name='HADOOP_DEBUGGING',
                                   enable_debugging=True,
@@ -394,8 +372,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             idle_for=timedelta(0),
             pool_hash=None,
             pool_name=None,
-            running=False,
-            non_streaming=False):
+            running=False):
 
         self.assertEqual(starting,
                          _is_cluster_starting(mock_cluster))
@@ -413,8 +390,6 @@ class ClusterTerminationTestCase(MockBotoTestCase):
                          _pool_hash_and_name(mock_cluster._bootstrapactions))
         self.assertEqual(running,
                          _is_cluster_running(mock_cluster._steps))
-        self.assertEqual(non_streaming,
-                         _is_cluster_non_streaming(mock_cluster._steps))
 
     def _lock_contents(self, mock_cluster, steps_ahead=0):
         conn = self.connect_s3()
@@ -488,13 +463,6 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             idle_for=timedelta(hours=2),
         )
 
-    def test_hive_cluster(self):
-        self.assert_mock_cluster_is(
-            self.mock_emr_clusters['j-HIVE'],
-            idle_for=timedelta(hours=4),
-            non_streaming=True,
-        )
-
     def test_hadoop_debugging_cluster(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-HADOOP_DEBUGGING'],
@@ -537,7 +505,6 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             'j-DONE_AND_IDLE_4_X',
             'j-EMPTY',
             'j-HADOOP_DEBUGGING',
-            'j-HIVE',
             'j-IDLE_AND_FAILED',
             'j-IDLE_BUT_INCOMPLETE_STEPS',
             'j-PENDING_BUT_IDLE',
@@ -563,10 +530,6 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             conf_paths=[], max_hours_idle=5,
             now=self.now)
 
-        # j-HIVE is old enough to terminate, but it doesn't have streaming
-        # steps, so we leave it alone
-        self.assertEqual(self.ids_of_terminated_clusters(), [])
-
         # terminate 2-hour-old jobs
         self.maybe_terminate_quietly(
             conf_paths=[], max_hours_idle=2,
@@ -576,14 +539,16 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         # not over the maximum
 
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-IDLE_AND_FAILED',
+                         ['j-CUSTOM_DONE_AND_IDLE',
+                          'j-IDLE_AND_FAILED',
                           'j-PENDING_BUT_IDLE'])
 
         self.maybe_terminate_quietly(max_hours_idle=1)
 
         self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY',
+                         ['j-CUSTOM_DONE_AND_IDLE',
+                          'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
@@ -595,7 +560,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
 
         self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY',
+                         ['j-CUSTOM_DONE_AND_IDLE',
+                          'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
@@ -607,7 +573,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
 
         self.assert_terminated_clusters_locked_by_terminate()
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY',
+                         ['j-CUSTOM_DONE_AND_IDLE',
+                          'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE',
@@ -641,7 +608,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY',
+                         ['j-CUSTOM_DONE_AND_IDLE',
+                          'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-POOLED'])
@@ -669,7 +637,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         self.assert_terminated_clusters_locked_by_terminate()
 
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY',
+                         ['j-CUSTOM_DONE_AND_IDLE',
+                          'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
@@ -678,7 +647,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             unpooled_only=True, max_hours_idle=0.01)
 
         self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-DEBUG_ONLY',
+                         ['j-CUSTOM_DONE_AND_IDLE',
+                          'j-DEBUG_ONLY',
                           'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
                           'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE'])
@@ -723,6 +693,8 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         ' was idle for 3:00:00, 1:00:00 to end of hour',
         'Terminated cluster j-HADOOP_DEBUGGING (HADOOP_DEBUGGING);'
         ' was idle for 2:00:00, 1:00:00 to end of hour',
+        'Terminated cluster j-CUSTOM_DONE_AND_IDLE (CUSTOM_DONE_AND_IDLE);'
+        ' was idle for 4:00:00, 1:00:00 to end of hour',
     ]
 
     def test_its_not_very_quiet(self):
@@ -735,6 +707,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
 
         # should have actually terminated clusters
         self.assertEqual(self.ids_of_terminated_clusters(), [
+            'j-CUSTOM_DONE_AND_IDLE',
             'j-DEBUG_ONLY',
             'j-DONE_AND_IDLE',
             'j-DONE_AND_IDLE_4_X',
@@ -760,32 +733,3 @@ class ClusterTerminationTestCase(MockBotoTestCase):
 
         # shouldn't *actually* terminate clusters
         self.assertEqual(self.ids_of_terminated_clusters(), [])
-
-
-# make sure _DEBUG_JAR_ARG_RE works correctly with boto 2.40.0 (tests #1306)
-class DebugJarArgRegexTestCase(TestCase):
-
-    def test_empty(self):
-        self.assertFalse(_DEBUG_JAR_ARG_RE.match(''))
-
-    def test_boto_2_39_0_debugging_arg(self):
-        self.assertTrue(_DEBUG_JAR_ARG_RE.match(
-            's3n://us-east-1.elasticmapreduce/libs/state-pusher/0.1/fetch'))
-
-    def test_boto_2_39_0_debugging_jar(self):
-        # we don't actually look at the jar
-        self.assertFalse(_DEBUG_JAR_ARG_RE.match(
-            's3n://us-east-1.elasticmapreduce/libs/script-runner/'
-            'script-runner.jar'))
-
-    def test_boto_2_40_0_debugging_arg_us_east_1(self):
-        self.assertTrue(_DEBUG_JAR_ARG_RE.match(
-            's3://us-east-1.elasticmapreduce/libs/state-pusher/0.1/fetch'))
-
-    def test_boto_2_40_0_debugging_arg_us_west_1(self):
-        self.assertTrue(_DEBUG_JAR_ARG_RE.match(
-            's3://us-west-1.elasticmapreduce/libs/state-pusher/0.1/fetch'))
-
-    def test_different_state_pusher_version(self):
-        self.assertTrue(_DEBUG_JAR_ARG_RE.match(
-            's3://puppyland.elasticmapreduce/libs/state-pusher/3.14159/fetch'))

@@ -1147,6 +1147,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             fake_known_hosts_file,))
 
         bind_port = None
+        popen_exception = None
+
         for bind_port in self._pick_ssh_bind_ports():
             args = self._opts['ssh_bin'] + [
                 '-o', 'VerifyHostKeyDNS=no',
@@ -1166,12 +1168,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             ssh_proc = None
             try:
                 ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            except OSError as ex:
-                # if the ssh binary doesn't exist, we get
-                # OSError(2, 'No such file or directory')
-                # (on Python 3 it's a FileNotFoundError, but that's what you
-                # get automatically if you construct an OSError with errno 2)
-                pass
+            except OSError as popen_exception:
+                # e.g. OSError(2, 'File not found')
+                break  # warning handled below
 
             if ssh_proc:
                 time.sleep(_WAIT_FOR_SSH_TO_FAIL)
@@ -1186,8 +1185,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     ssh_proc.stderr.close()
 
         if not self._ssh_proc:
-            log.warning(
-                '  Failed to open ssh tunnel to %s' % tunnel_config['name'])
+            if popen_exception:
+                # this only happens if the ssh binary is not present
+                # or not executable (so tunnel_config and the args to the
+                # ssh binary don't matter)
+                log.warning("    Couldn't run %s: %s" % (
+                    cmd_line(self._opts['ssh_bin']), popen_exception))
+            else:
+                log.warning(
+                    '    Failed to open ssh tunnel to %s' %
+                    tunnel_config['name'])
         else:
             if self._opts['ssh_tunnel_is_open']:
                 bind_host = socket.getfqdn()

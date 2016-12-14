@@ -756,7 +756,7 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
                       " print(get_python_lib())')", lines)
         self.assertIn('sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
                       ' -d $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -f'
+        self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -q -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python
         if PY2:
@@ -786,7 +786,7 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
         with open(runner._master_bootstrap_script_path, 'r') as f:
             content = f.read()
 
-        self.assertIn('sudo anaconda -m compileall -f', content)
+        self.assertIn('sudo anaconda -m compileall -q -f', content)
 
 
 class DataprocNoMapperTestCase(MockGoogleAPITestCase):

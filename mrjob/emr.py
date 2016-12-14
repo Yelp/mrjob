@@ -2444,7 +2444,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # un-compileable crud in the tarball (this would matter if
             # sh_bin were 'sh -e')
             mrjob_bootstrap.append(
-                ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
+                ['sudo %s -m compileall -q -f $__mrjob_PYTHON_LIB/mrjob && true' %
                  cmd_line(self._python_bin())])
 
         # TODO: shouldn't it be b.sh now?

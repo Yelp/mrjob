@@ -868,7 +868,8 @@ class DataprocJobRunner(MRJobRunner):
             # un-compileable crud in the tarball (this would matter if
             # sh_bin were 'sh -e')
             mrjob_bootstrap.append(
-                ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
+                ['sudo %s -m compileall -q'
+                 ' -f $__mrjob_PYTHON_LIB/mrjob && true' %
                  cmd_line(self._python_bin())])
 
         # we call the script b.py because there's a character limit on

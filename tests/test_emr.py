@@ -1518,7 +1518,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
                       " print(get_python_lib())')", lines)
         self.assertIn('  sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
                       ' -d $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -f'
+        self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -q -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
         if expect_pip_binary:
@@ -1627,7 +1627,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         with open(runner._master_bootstrap_script_path, 'r') as f:
             content = f.read()
 
-        self.assertIn('sudo anaconda -m compileall -f', content)
+        self.assertIn('sudo anaconda -m compileall -q -f', content)
 
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3

@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the runner base class MRJobRunner"""
+import compileall
 import datetime
 import getpass
 import inspect
@@ -198,7 +199,7 @@ class TestJobName(TestCase):
         self.assertEqual(match.group(2), 'ads')
 
 
-class CreateMrjobZipTestCase(TestCase):
+class CreateMrjobZipTestCase(SandboxedTestCase):
 
     def test_create_mrjob_zip(self):
         with no_handlers_for_logger('mrjob.runner'):
@@ -214,6 +215,17 @@ class CreateMrjobZipTestCase(TestCase):
                 for filename in contents:
                     self.assertFalse(filename.endswith('.pyc'),
                                      msg="%s ends with '.pyc'" % filename)
+
+    def test_mrjob_zip_compiles(self):
+        runner = InlineMRJobRunner()
+        with no_handlers_for_logger('mrjob.runner'):
+            mrjob_zip = runner._create_mrjob_zip()
+
+        ZipFile(mrjob_zip).extractall(self.tmp_dir)
+
+        self.assertTrue(
+            compileall.compile_dir(os.path.join(self.tmp_dir, 'mrjob'),
+                                   quiet=1))
 
 
 class TestStreamingOutput(TestCase):

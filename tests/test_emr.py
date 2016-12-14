@@ -2443,6 +2443,12 @@ class PoolMatchingTestCase(MockBotoTestCase):
         finally:
             mrjob.__version__ = old_version
 
+    def test_dont_join_wrong_python_bin(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--python-bin', 'snake'])
+
     def test_join_similarly_bootstrapped_pool(self):
         local_input_path = os.path.join(self.tmp_dir, 'input')
         with open(local_input_path, 'w') as input_file:

@@ -139,7 +139,7 @@ Options available to hadoop and emr runners
 
     Extra arguments to pass to :command:`spark-submit`.
 
-    .. versionadded:: 0.5.8.spark0
+    .. versionadded:: 0.5.7
 
 
 Options available to hadoop runner only
@@ -261,4 +261,4 @@ Options available to hadoop runner only
 
     If all else fails, we just use ``spark-submit`` and hope for the best.
 
-    .. versionadded:: 0.5.8.spark0
+    .. versionadded:: 0.5.7

@@ -6,7 +6,7 @@ mrjob: the Python MapReduce library
 mrjob is a Python 2.6+/3.3+ package that helps you write and run Hadoop
 Streaming jobs.
 
-`Stable version (v0.5.6) documentation <http://packages.python.org/mrjob/>`_
+`Stable version (v0.5.7) documentation <http://packages.python.org/mrjob/>`_
 
 `Development version documentation <http://mrjob.readthedocs.org/en/latest/>`_
 
@@ -22,6 +22,7 @@ Some important features:
 
 * Run jobs on EMR, Google Cloud Dataproc, your own Hadoop cluster, or locally (for testing).
 * Write multi-step jobs (one map-reduce step feeds into the next)
+* Easily launch Spark jobs on EMR or your own Hadoop cluster
 * Duplicate your production environment inside Hadoop
 
   * Upload your source tree and put it in your job's ``$PYTHONPATH``
@@ -29,7 +30,7 @@ Some important features:
   * Set environment variables (e.g. ``$TZ``)
   * Easily install python packages from tarballs (EMR only)
   * Setup handled transparently by ``mrjob.conf`` config file
-* Automatically interpret error logs (EMR only)
+* Automatically interpret error logs
 * SSH tunnel to hadoop job tracker (EMR only)
 * Minimal setup
 

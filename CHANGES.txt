@@ -11,6 +11,8 @@ v0.5.7, 2016-10-?? -- ???
    * can use environment variables and ~ in hadoop_streaming_jar option
  * EMR runner:
    * added debug logging for pooling (#1449)
+   * cleaner error messages when bootstrapped mrjob won't compile
+   * master bootstrap script always created when pooling
 
 v0.5.6, 2016-09-12 -- dataproc crash fix
  * Dataproc runner:

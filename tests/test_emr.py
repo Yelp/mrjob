@@ -1518,7 +1518,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
                       " print(get_python_lib())')", lines)
         self.assertIn('  sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
                       ' -d $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -f'
+        self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -q -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python_packages
         if expect_pip_binary:
@@ -1568,14 +1568,17 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
 
-        # using pooling doesn't require us to create a bootstrap script
+
+    def test_pooling_requires_bootstrap_script(self):
+        # using pooling currently requires us to create a bootstrap script;
+        # see #1503
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
                               bootstrap_python=False,
                               pool_clusters=True)
 
         runner._add_bootstrap_files_for_upload()
-        self.assertIsNone(runner._master_bootstrap_script_path)
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
 
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [
@@ -1627,7 +1630,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         with open(runner._master_bootstrap_script_path, 'r') as f:
             content = f.read()
 
-        self.assertIn('sudo anaconda -m compileall -f', content)
+        self.assertIn('sudo anaconda -m compileall -q -f', content)
 
     def test_local_bootstrap_action(self):
         # make sure that local bootstrap action scripts get uploaded to S3
@@ -2430,7 +2433,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--pool-name', 'not_pool1'])
 
     def test_dont_join_wrong_mrjob_version(self):
-        _, cluster_id = self.make_pooled_cluster('pool1')
+        _, cluster_id = self.make_pooled_cluster()
 
         old_version = mrjob.__version__
 
@@ -2438,8 +2441,30 @@ class PoolMatchingTestCase(MockBotoTestCase):
             mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
 
             self.assertDoesNotJoin(cluster_id, [
-                '-r', 'emr', '-v', '--pool-clusters',
-                '--pool-name', 'not_pool1'])
+                '-r', 'emr', '--pool-clusters'])
+        finally:
+            mrjob.__version__ = old_version
+
+    def test_dont_join_wrong_python_bin(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--python-bin', 'snake'])
+
+    def test_versions_dont_matter_if_no_bootstrap_mrjob(self):
+        _, cluster_id = self.make_pooled_cluster(
+            bootstrap_mrjob=False)
+
+        old_version = mrjob.__version__
+
+        try:
+            mrjob.__version__ = 'OVER NINE THOUSAAAAAND'
+
+            self.assertJoins(cluster_id, [
+                '-r', 'emr', '--pool-clusters',
+                '--no-bootstrap-mrjob',
+                '--python-bin', 'snake'])
         finally:
             mrjob.__version__ = old_version
 

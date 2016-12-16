@@ -41,7 +41,8 @@ class MRSparkNickNackWordCount(MRJob):
             .reduceByKey(add))
 
         # MultipleValueOutputFormat expects Text, Text
-        counts = counts.map(lambda (word, count): (word, str(count)))
+        # w_c is (word, count)
+        counts = counts.map(lambda w_c: (w_c[0], str(w_c[1])))
 
         counts.saveAsHadoopFile(output_path,
                                 'nicknack.MultipleValueOutputFormat')

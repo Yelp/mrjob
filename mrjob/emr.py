@@ -2416,9 +2416,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return
 
         # Also don't bother if we're not bootstrapping
+        # (unless we're pooling, in which case we need the bootstrap
+        # script to attach the pool hash too; see #1503).
         if not (self._bootstrap or self._legacy_bootstrap or
                 self._opts['bootstrap_files'] or
-                self._bootstrap_mrjob()):
+                self._bootstrap_mrjob() or
+                self._opts['pool_clusters']):
             return
 
         # create mrjob.zip if we need it, and add commands to install it
@@ -2444,7 +2447,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # un-compileable crud in the tarball (this would matter if
             # sh_bin were 'sh -e')
             mrjob_bootstrap.append(
-                ['sudo %s -m compileall -f $__mrjob_PYTHON_LIB/mrjob && true' %
+                ['sudo %s -m compileall -q -f $__mrjob_PYTHON_LIB/mrjob && true' %
                  cmd_line(self._python_bin())])
 
         # TODO: shouldn't it be b.sh now?
@@ -2899,8 +2902,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             # match pool name, and (bootstrap) hash
-            bootstrap_actions = _yield_all_bootstrap_actions(
-                emr_conn, cluster.id)
+            bootstrap_actions = list(_yield_all_bootstrap_actions(
+                emr_conn, cluster.id))
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
 
             if req_hash != pool_hash:
@@ -3156,6 +3159,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         if self._bootstrap_mrjob():
             things_to_hash.append(mrjob.__version__)
+            things_to_hash.append(self._python_bin())
 
         things_json = json.dumps(things_to_hash, sort_keys=True)
         if not isinstance(things_json, bytes):

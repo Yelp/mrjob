@@ -17,13 +17,37 @@ EMR, take a look at the :doc:`emr-bootstrap-cookbook`.
 Putting your source tree in :envvar:`PYTHONPATH`
 ------------------------------------------------
 
-First you need to make a tarball of your source tree. Make sure that the root
-of your source tree is at the root of the tarball's file listing (e.g. the
-module ``foo.bar`` appears as ``foo/bar.py`` and not
-``your-src-dir/foo/bar.py``).
+The simplest way to do this is to package your source tree as a ``.zip`` file
+(which Python can import from without unarchving it):
 
-For reference, here is a command line that will put an entire source directory
-into a tarball:
+.. code-block:: sh
+
+  cd my-source-tree
+  zip -r ../my-source-tree.zip .
+
+Then reference that ``.zip`` with the :mrjob-opt:`py_files` option. Either run
+your job with:
+
+.. code-block:: sh
+
+   --py-file my-source-tree.zip
+
+Or update your :file:`mrjob.conf` like this:
+
+.. code-block:: yaml
+
+    runners:
+      hadoop:
+        py_files:
+        - my-source-tree.zip
+
+Uploading your source tree as an archive
+----------------------------------------
+
+If your source tree isn't zip-safe (for example, if it contains non-Python
+support files), you can upload it as an archive instead.
+
+First you need to make a tarball of your source tree:
 
 .. code-block:: sh
 

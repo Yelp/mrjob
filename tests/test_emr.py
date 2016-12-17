@@ -4234,8 +4234,8 @@ class BootstrapSparkTestCase(MockBotoTestCase):
     def test_default_ami(self):
         cluster = self.get_cluster()
 
-        self.assertTrue(self.ran_spark_bootstrap_action(cluster))
-        self.assertFalse(self.installed_spark_application(cluster))
+        self.assertTrue(self.installed_spark_application(cluster))
+        self.assertFalse(self.ran_spark_bootstrap_action(cluster))
 
     def test_3_11_0_ami(self):
         cluster = self.get_cluster('--image-version', '3.11.0')

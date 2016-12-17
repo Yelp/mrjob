@@ -1,14 +1,35 @@
 v0.5.7, 2016-12-?? -- Spark
- * deprecated mrjob.parse.parse_*_list() functions
- * deprecated mrjob.parse.scrape_options_into_new_groups()
- * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
  * EMR and Hadoop runners:
+   * full support for Spark (#1320)
+     * includes spark() method in MRJob and SparkStep/SparkScriptStep
    * can use environment variables and ~ in hadoop_streaming_jar option
  * EMR runner:
-   * added debug logging for pooling (#1449)
+   * default AMI version is now 4.8.2 (#1486)
+   * default instance type is m1.large when running Spark jobs (#1465)
+   * added debug logging for matching available pooled clusters (#1449)
    * cleaner error messages when bootstrapped mrjob won't compile
    * defaults to cheapest instance type that will work (#1369)
    * master bootstrap script always created when pooling
+   * no longer crashes when trying to use missing ssh binary (#1474)
+   * pooled clusters may have 1000 steps (#1463)
+   * failed jobs no longer reported as 100% complete (#793)
+ * All runners:
+   * py_files option for Spark and streaming steps (#1375)
+   * bootstrap mrjob with a .zip rather than a tarball
+   * options refactor, added missing command-line switches (#1439)
+ * mrjob terminate-idle-clusters works with all step types (#1363)
+ * log interpretation
+   * dropped unnecessary container-to-attempt-ID mapping (#1487)
+   * more efficient search for task log errors (#1450)
+ * JarSteps
+   * now support libjars, jobconf (#1481)
+   * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
+ * is_uri() now only matches URIs containing "://" (#1455)
+ * works in Anaconda3 Jupyter Notebook (#1441)
+ * deprecated mrjob.parse.parse_*_list() functions
+ * deprecated mrjob.parse.scrape_options_into_new_groups()
+ * deprecated non-strict protocols (#1452)
+ * deprecated python_archives (#1056)
 
 v0.5.6, 2016-09-12 -- dataproc crash fix
  * Dataproc runner:

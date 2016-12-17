@@ -642,6 +642,7 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
 
     tar_gz.close()
 
+
 def zip_dir(dir, out_path, filter=None, prefix=''):
     """Compress the given *dir* into a zip file at *out_path*.
 

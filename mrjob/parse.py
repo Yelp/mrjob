@@ -50,7 +50,8 @@ _WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
 
 def is_windows_path(uri):
     """Return True if *uri* is a windows path."""
-    log.warning('is_windows_path() is deprecated and will be removed in v0.6.0')
+    log.warning(
+        'is_windows_path() is deprecated and will be removed in v0.6.0')
 
     if _WINPATH_RE.match(uri):
         return True
@@ -303,7 +304,6 @@ def _parse_progress_from_job_tracker(html_bytes):
         return float(matches[0]), float(matches[1])
     else:
         return None, None
-
 
 
 def _parse_progress_from_resource_manager(html_bytes):

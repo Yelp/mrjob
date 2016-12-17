@@ -440,7 +440,7 @@ class SparkJarStepTestCase(TestCase):
                 main_class='backpack.Map',
                 args=[],
                 spark_args=[],
-             )
+            )
         )
 
     def test_all_args(self):
@@ -461,7 +461,7 @@ class SparkJarStepTestCase(TestCase):
                 main_class='backpack.Map',
                 args=['ARGH', 'ARGH'],
                 spark_args=['argh', 'argh'],
-             )
+            )
         )
 
     def test_positional_args(self):
@@ -490,7 +490,7 @@ class SparkScriptStepTestCase(TestCase):
                 script='macbeth.py',
                 args=[],
                 spark_args=[],
-             )
+            )
         )
 
     def test_all_args(self):
@@ -508,7 +508,7 @@ class SparkScriptStepTestCase(TestCase):
                 script='macbeth.py',
                 args=['ARGH', 'ARGH'],
                 spark_args=['argh', 'argh'],
-             )
+            )
         )
 
     def test_positional_args(self):

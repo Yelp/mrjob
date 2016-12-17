@@ -18,6 +18,7 @@ from mrjob.job import MRJob
 from mrjob.step import MRStep
 from mrjob.step import SparkStep
 
+
 class MRStreamingAndSpark(MRJob):
 
     def mapper(self):

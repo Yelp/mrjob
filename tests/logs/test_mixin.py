@@ -430,8 +430,6 @@ class PickCountersTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self.runner._interpret_history_log.called)
 
 
-
-
 class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
 
     def setUp(self):

@@ -554,6 +554,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-partitioner', partitioner])
 
+
 class ArgsForSparkStepTestCase(SandboxedTestCase):
     # just test the structure of _args_for_spark_step()
 
@@ -900,7 +901,6 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             runner._spark_py_files = Mock(
                 return_value=['<first py_file>', '<second py_file>']
             )
-
 
             # should handle cmdenv and --class
             # but not set PYSPARK_PYTHON or --py-file

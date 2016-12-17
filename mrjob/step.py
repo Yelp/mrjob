@@ -58,8 +58,6 @@ INPUT = '<input>'
 #: with the step's output path
 OUTPUT = '<output>'
 
-
-
 log = logging.getLogger(__name__)
 
 

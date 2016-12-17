@@ -68,6 +68,7 @@ _CLEANUP_DEPRECATED_ALIASES = {
     'SCRATCH': 'TMP',
 }
 
+
 ### custom callbacks ###
 
 def _default_to(parser, dest, value):
@@ -337,8 +338,8 @@ _RUNNER_OPTS = dict(
                 help="Auto-install Spark on the cluster (even if not needed)."
             )),
             (['--no-bootstrap-spark'], dict(
-                 action='store_false',
-                 help="Don't auto-install Spark on the cluster."
+                action='store_false',
+                help="Don't auto-install Spark on the cluster."
             )),
         ],
     ),
@@ -730,8 +731,7 @@ _RUNNER_OPTS = dict(
                       ' -- See'
                       ' https://cloud.google.com/compute/docs/machine-types\n'
                       ' EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge '
-                      ' -- See http://aws.amazon.com/ec2/instance-types/'
-                ),
+                      ' -- See http://aws.amazon.com/ec2/instance-types/'),
             )),
         ],
     ),
@@ -896,8 +896,8 @@ _RUNNER_OPTS = dict(
         deprecated_aliases=['emr_job_flow_pool_name'],
         runners=['emr'],
         switches=[
-             (['--pool-name'], dict(
-                 deprecated_aliases=['--emr-job-flow-pool-name'],
+            (['--pool-name'], dict(
+                deprecated_aliases=['--emr-job-flow-pool-name'],
                 help='Specify a pool name to join. Default is "default"',
             )),
         ],
@@ -1254,7 +1254,6 @@ def _allowed_keys(runner_alias):
 
 def _combiners(runner_alias):
     results = {}
-
 
     for name, config in _RUNNER_OPTS.items():
         if not _for_runner(config, runner_alias):

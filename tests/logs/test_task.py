@@ -374,7 +374,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.assertEqual(self.interpret_task_logs(), {})
         self.assertEqual(self.mock_paths_catted, [])
 
-
     # indirectly tests _ls_task_syslogs() and its ability to sort by
     # log type and recency
     def test_multiple_logs(self):
@@ -476,7 +475,6 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
             syslog3_path,
             syslog1_path,
         ])
-
 
     def test_pre_yarn_sorting(self):
         # NOTE: we currently don't have to handle errors from multiple

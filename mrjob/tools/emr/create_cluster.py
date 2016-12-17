@@ -105,7 +105,8 @@ Options::
                         Deprecated alias for --core-instance-bid-price
   --core-instance-type=CORE_INSTANCE_TYPE
                         Type of GCE/EC2 core instance(s) to launch
-  --ec2-core-instance-type=CORE_INSTANCE_TYPE, --ec2-slave-instance-type=CORE_INSTANCE_TYPE
+  --ec2-core-instance-type=CORE_INSTANCE_TYPE,
+  --ec2-slave-instance-type=CORE_INSTANCE_TYPE
                         Deprecated aliases for --core-instance-type
   --ec2-key-pair=EC2_KEY_PAIR
                         Name of the SSH key pair you set up for EMR

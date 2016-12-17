@@ -1378,7 +1378,7 @@ class MRJobRunner(object):
 
         # Spark doesn't have setup scripts; instead, we need to add
         # mrjob to
-        if  self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
+        if self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
             py_files.append(self._create_mrjob_zip())
 
         return py_files

@@ -1478,7 +1478,8 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
             if image_version and not version_gte(image_version, '4'):
                 self.assertIn(
-                    '  hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
+                    '  hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (
+                        uri, name),
                     lines)
             else:
                 self.assertIn(
@@ -1566,7 +1567,6 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
-
 
     def test_pooling_requires_bootstrap_script(self):
         # using pooling currently requires us to create a bootstrap script;
@@ -4205,6 +4205,7 @@ class BootstrapPythonTestCase(MockBotoTestCase):
                 runner._bootstrap,
                 self.EXPECTED_BOOTSTRAP + [['true']])
 
+
 class BootstrapSparkTestCase(MockBotoTestCase):
 
     def setUp(self):
@@ -4979,7 +4980,6 @@ class GetStepLogInterpretationTestCase(MockBotoTestCase):
         self._interpret_emr_step_syslog.assert_called_once_with(
             runner.fs, self._ls_step_stderr_logs.return_value)
         self.assertFalse(self._interpret_emr_step_stderr.called)
-
 
 
 # this basically just checks that hadoop_extra_args is an option
@@ -6001,7 +6001,6 @@ class SparkPyFilesTestCase(MockBotoTestCase):
                 [runner._upload_mgr.uri(egg1_path),
                  runner._upload_mgr.uri(egg2_path)]
             )
-
 
 
 class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):

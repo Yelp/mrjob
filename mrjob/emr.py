@@ -1325,7 +1325,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             time.sleep(self._opts['check_cluster_every'])
             cluster = self._describe_cluster()
 
-
     # instance types
 
     def _cheapest_manager_instance_type(self):
@@ -2269,7 +2268,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # Spark also has a "controller" log4j log, but it doesn't
             # contain errors or anything else we need
             return _interpret_emr_step_syslog(
-                self.fs,  self._ls_step_stderr_logs(step_id=step_id))
+                self.fs, self._ls_step_stderr_logs(step_id=step_id))
         else:
             return (
                 _interpret_emr_step_syslog(
@@ -2447,8 +2446,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # un-compileable crud in the tarball (this would matter if
             # sh_bin were 'sh -e')
             mrjob_bootstrap.append(
-                ['sudo %s -m compileall -q -f $__mrjob_PYTHON_LIB/mrjob && true' %
-                 cmd_line(self._python_bin())])
+                ['sudo %s -m compileall -q -f $__mrjob_PYTHON_LIB/mrjob'
+                 ' && true' % cmd_line(self._python_bin())])
 
         # TODO: shouldn't it be b.sh now?
         # we call the script b.py because there's a character limit on
@@ -3098,7 +3097,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '  Found %d usable clusters%s%s' % (
                     len(cluster_info_list),
                     ': ' if cluster_info_list else '',
-                    ', '.join(c for c,n in reversed(cluster_info_list))))
+                    ', '.join(c for c, n in reversed(cluster_info_list))))
             if cluster_info_list:
                 cluster_id, num_steps = cluster_info_list[-1]
                 status = _attempt_to_acquire_lock(

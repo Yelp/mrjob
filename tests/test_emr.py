@@ -52,7 +52,6 @@ from mrjob.py2 import StringIO
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
-from mrjob.step import SparkScriptStep
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
@@ -2322,7 +2321,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--image-version', '2.4.7'],
             job_class=MRTwoStepJob)
 
-    def test_join_almost_full_cluster(self):
+    def test_join_almost_full_2_x_ami_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster(
             image_version='2.4.7')
 
@@ -4237,7 +4236,7 @@ class BootstrapSparkTestCase(MockBotoTestCase):
         self.assertTrue(self.ran_spark_bootstrap_action(cluster))
         self.assertFalse(self.installed_spark_application(cluster))
 
-    def test_default_ami(self):
+    def test_3_11_0_ami(self):
         cluster = self.get_cluster('--image-version', '3.11.0')
 
         self.assertTrue(self.ran_spark_bootstrap_action(cluster))

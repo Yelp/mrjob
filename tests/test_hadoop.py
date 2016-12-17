@@ -29,7 +29,6 @@ from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
-from mrjob.step import StepFailedException
 from mrjob.util import bash_wrap
 from mrjob.util import which
 

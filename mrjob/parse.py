@@ -313,8 +313,6 @@ def _parse_progress_from_resource_manager(html_bytes):
     This assumes at most one running job (designed for EMR).
     """
     # this is for EMR and assumes only one running job
-    app_id_percent_tuples = []
-
     for line in html_bytes.splitlines():
         m = _RESOURCE_MANAGER_JS_RE.match(line)
         if m:

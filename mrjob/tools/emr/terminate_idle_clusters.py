@@ -67,7 +67,6 @@ from datetime import datetime
 from datetime import timedelta
 import logging
 from optparse import OptionParser
-import re
 
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner

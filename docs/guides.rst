@@ -9,6 +9,7 @@ Guides
     guides/concepts.rst
     guides/writing-mrjobs.rst
     guides/runners.rst
+    guides/spark.rst
     guides/configs-basics.rst
     guides/configs-all-runners.rst
     guides/configs-hadoopy-runners.rst
@@ -18,7 +19,6 @@ Guides
     guides/testing.rst
     guides/dataproc.rst
     guides/emr.rst
-    guides/spark.rst
     guides/py2-vs-py3.rst
     guides/contributing.rst
     guides/runner-job-interactions.rst

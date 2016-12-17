@@ -73,7 +73,6 @@ Running on your own Hadoop cluster
 ----------------------------------
 
 * Set up a hadoop cluster (see http://hadoop.apache.org/common/docs/current/)
-* Make sure :envvar:`$HADOOP_PREFIX` is set
 * Run your job with ``-r hadoop``::
 
     python your_mr_job_sub_class.py -r hadoop < input > output

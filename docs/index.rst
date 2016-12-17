@@ -9,6 +9,7 @@ several platforms.** You can:
 * Run on a Hadoop cluster
 * Run in the cloud using `Amazon Elastic MapReduce (EMR)`_
 * Run in the cloud using `Google Cloud Dataproc (Dataproc)`_
+* Easily run :doc:`Spark <guides/spark>` jobs on EMR or your own Hadoop cluster
 
 .. _Google Cloud Dataproc (Dataproc): https://cloud.google.com/dataproc/overview
 .. _Amazon Elastic MapReduce (EMR): http://aws.amazon.com/documentation/elasticmapreduce/

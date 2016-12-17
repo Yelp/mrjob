@@ -1,17 +1,13 @@
-v0.5.?, 2016-??-?? -- Spark
- * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
- * runners:
-   * EMR:
-     * default to cheapest instance type that will work (#1369)
-
-v0.5.7, 2016-10-?? -- ???
+v0.5.7, 2016-12-?? -- Spark
  * deprecated mrjob.parse.parse_*_list() functions
  * deprecated mrjob.parse.scrape_options_into_new_groups()
+ * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
  * EMR and Hadoop runners:
    * can use environment variables and ~ in hadoop_streaming_jar option
  * EMR runner:
    * added debug logging for pooling (#1449)
    * cleaner error messages when bootstrapped mrjob won't compile
+   * defaults to cheapest instance type that will work (#1369)
    * master bootstrap script always created when pooling
 
 v0.5.6, 2016-09-12 -- dataproc crash fix

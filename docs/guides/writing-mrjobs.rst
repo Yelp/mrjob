@@ -620,6 +620,8 @@ be propagated to other runs of your script. Instead, you can use mrjob's option
 API: :py:meth:`~mrjob.job.MRJob.add_passthrough_option` and
 :py:meth:`~mrjob.job.MRJob.add_file_option`.
 
+.. _passthrough-opts:
+
 Passthrough options
 ^^^^^^^^^^^^^^^^^^^
 

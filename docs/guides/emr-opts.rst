@@ -514,9 +514,16 @@ and install another Python binary.
 
    By default, we automatically install Spark only if our job has Spark steps.
 
-   .. TODO: update versionadded for spark release
-   .. versionadded:: 0.5.8
+   .. versionadded:: 0.5.7
 
+   In case you're curious, here's how mrjob determines you're using Spark:
+
+   * any :py:class:`~mrjob.step.SparkStep` or
+     :py:class:`~mrjob.step.SparkScriptStep` in your job's steps (including
+     implicitly through the :py:class:`~mrjob.job.MRJob.spark` method)
+   * "Spark" included in :mrjob-opt:`emr_applications` option
+   * any bootstrap action (see :mrjob-opt:`bootstrap_actions`) ending in
+     ``/spark-install`` (this is how you install Spark on 3.x AMIs)
 
 .. mrjob-opt::
     :config: bootstrap_python_packages
@@ -589,7 +596,7 @@ Number and type of instances
     By default, mrjob picks the cheapest instance type that will work at all.
     This is usually ``m1.medium``, with two exceptions:
 
-    * ``m1.large`` if you're running Spark (see :ref:`spark-auto-detection`)
+    * ``m1.large`` if you're running Spark (see :mrjob-opt:`bootstrap_spark`)
     * ``m1.small`` if you're running on the (deprecated) 2.x AMIs
 
     Once you've tested a job and want to run it at scale, it's usually a good

@@ -59,7 +59,7 @@ options related to file uploading.
    This is based on a Spark feature, but it works just as well with streaming
    jobs.
 
-   .. versionadded:: 0.5.8.spark0
+   .. versionadded:: 0.5.7
 
 .. mrjob-opt::
     :config: python_archives
@@ -71,7 +71,7 @@ options related to file uploading.
     Same as upload_archives, except they get added to the job's
     :envvar:`PYTHONPATH`.
 
-    .. deprecated:: 0.5.8.spark0
+    .. deprecated:: 0.5.7
 
        Try :mrjob-opt:`py_files` with a `.zip` or `.egg` file instead. If you
        must use an archive, see :ref:`cookbook-src-tree-pythonpath`.
@@ -97,7 +97,7 @@ options related to file uploading.
 
         --file file_1.txt --file file_2.sqlite
 
-    .. versionchanged:: 0.5.8.spark0
+    .. versionchanged:: 0.5.7
 
        This works with Spark as well.
 
@@ -115,7 +115,7 @@ options related to file uploading.
     ``foo.tar.gz/``, and ``foo.tar.gz#stuff`` is unpacked to the directory
     ``stuff/``).
 
-    .. versionchanged:: 0.5.8.spark0
+    .. versionchanged:: 0.5.7
 
        This works with Spark as well.
 
@@ -231,7 +231,7 @@ Job execution context
 
         --cmdenv PYTHONPATH=$HOME/stuff,TZ=America/Los_Angeles
 
-    .. versionchanged:: 0.5.8.spark
+    .. versionchanged:: 0.5.7
 
        This works with Spark too. In client mode (hadoop runner), these
        environment variables are passed directly to :command:`spark-submit`.

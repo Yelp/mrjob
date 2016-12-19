@@ -108,8 +108,8 @@ If you want to run on Spark 2, please set :mrjob-opt:`image_version` to
   python your_mr_spark2_job -r emr --image-version 5.0.0 input > output
 
 EMR introduced Spark support in AMI version 3.8.0, but it's not recommended
-to use the 3.x AMIs if you can avoid it because they only support Python 2,
-and have trouble detecting when Spark jobs succeed (instead silently producing
+to use the 3.x AMIs if you can avoid; they only support Python 2
+and have trouble detecting when Spark jobs fail (instead silently producing
 no output).
 
 The EMR runner always submits jobs to Spark in ``cluster`` mode, which it needs
@@ -136,7 +136,7 @@ No setup scripts
 Unlike with streaming jobs, you can't wrap Spark jobs in
 :doc:`setup scripts <setup-cookbook>`;
 once Spark starts operating on serialized data, it's operating in pure
-Python/Java on serialized data and there's not a way to slip in a shell script.
+Python/Java and there's not a way to slip in a shell script.
 
 If you're running in EMR, you can use
 :doc:`bootstrap scripts <emr-bootstrap-cookbook>` to set up your
@@ -157,7 +157,7 @@ method and using the :py:class:`~mrjob.step.SparkStep` class::
   def steps():
     return [
       MRStep(mapper=self.preprocessing_mapper),
-      MRSparkStep(spark=self.spark),
+      SparkStep(spark=self.spark),
     ]
 
 External Spark scripts
@@ -167,7 +167,7 @@ mrjob can also be used to launch external (non-mrjob) Spark scripts using
 the :py:class:`~mrjob.step.SparkScriptStep` class, which specifies the
 path (or URI) of the script and its arguments.
 
-As with :py:class:`~mrjob.job.JarStep`\s, you can interpolate input
+As with :py:class:`~mrjob.step.JarStep`\s, you can interpolate input
 and output paths using :py:data:`~mrjob.step.INPUT` and
 :py:data:`~mrjob.step.OUTPUT` constants. For example, you could set your job's
 :py:meth:`~mrjob.job.MRJob.steps` method up like this::

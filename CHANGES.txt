@@ -1,4 +1,4 @@
-v0.5.7, 2016-12-?? -- Spark
+v0.5.7, 2016-12-19 -- Spark
  * EMR and Hadoop runners:
    * full support for Spark (#1320)
      * includes spark() method in MRJob and SparkStep/SparkScriptStep

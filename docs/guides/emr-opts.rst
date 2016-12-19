@@ -248,6 +248,10 @@ Cluster creation and configuration
 
        This used to be called *ami_version*.
 
+    .. versionchanged:: 0.5.7
+
+       Default used to be ``'3.11.0'``.
+
     .. warning::
 
        The deprecated *ami_version* alias for this option is completely

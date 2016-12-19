@@ -47,6 +47,10 @@ options related to file uploading.
     Set this to ``False`` if you've already installed ``mrjob`` on your
     Hadoop cluster or install it by some other method.
 
+    .. versionchanged 0.5.7:
+
+    mrjob used to be bootstrapped as a tarball.
+
 .. mrjob-opt::
    :config: py_files
    :switch: --py-file

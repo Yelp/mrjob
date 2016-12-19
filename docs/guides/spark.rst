@@ -1,6 +1,8 @@
 Spark
 =====
 
+.. _why-mrjob-with-spark:
+
 Why use mrjob with Spark?
 -------------------------
 

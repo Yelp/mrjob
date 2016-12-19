@@ -4,6 +4,94 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.7:
+
+0.5.7
+-----
+
+Spark and related changes
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+mrjob now supports running Spark jobs on your own Hadoop cluster or
+Elastic MapReduce. mrjob provides significant benefits over Spark's
+built-in Python support; see :ref:`why-mrjob-with-spark` for details.
+
+Added the :mrjob-opt:`py_files` option, to put `.zip` or `.egg` files in your
+job's ``PYTHONPATH``. This is based on a Spark feature, but it works with
+streaming jobs as well. mrjob is now bootstrapped (see
+:mrjob-opt:`bootstrap_mrjob`) as a `.zip` file rather than a tarball.
+If for some reason, the bootstrapped mrjob library won't compile, you'll
+get much cleaner error messages.
+
+The default AMI version on EMR (see :mrjob-opt:`image_version`) has been bumped
+from 3.11.0 to 4.8.2, as 3.11.0's Spark support is spotty.
+
+On EMR, mrjob now defaults to the cheapest instance type that will work (see
+:mrjob-opt:`instance_type`). In most cases, this is ``m1.medium``, but it
+needs to be ``m1.large`` for Spark worker nodes.
+
+Cluster pooling
+^^^^^^^^^^^^^^^
+
+mrjob can now add up to 1,000 steps on
+:ref:`pooled clusters <pooling-clusters>` on EMR (except on very old AMIs).
+mrjob now prints debug messages explaining why your job matched
+a particular pooled cluster when running in verbose mode (the ``-v`` option).
+Fixed a bug that caused pooling to fail when there was no need for a master
+bootstrap script (e.g. when running with ``--no-bootstrap-mrjob``).
+
+Other improvements
+^^^^^^^^^^^^^^^^^^
+
+Log interpretation is much more efficient at determining a job's probable
+cause of failure (this works with Spark as well).
+
+When running custom JARs (see :py:class:`~mrjob.step.JarStep`) mrjob now
+repects :mrjob-opt:`libjars` and :mrjob-opt:`jobconf`.
+
+The :mrjob-opt:`hadoop_streaming_jar` option now supports environment variables
+and ``~``.
+
+The :ref:`terminate-idle-clusters` tool now works with all step types,
+including Spark. (It's still recommended that you rely on the
+:mrjob-opt:`max_hours_idle` option rather than this tool.)
+
+mrjob now works in Anaconda3 Jupyter Notebook.
+
+Bugfixes
+^^^^^^^^
+
+Added several missing command-line switches, including
+``--no-bootstrap-python`` on Dataproc. Made a major refactor that should
+prevent these kinds of issues in the future.
+
+Fixed a bug that caused mrjob to crash when the ssh binary (see
+:mrjob-opt:`ssh_bin`) was missing or not executable.
+
+Fixed a bug that erroneously reported failed or just-started jobs as 100%
+complete.
+
+Fixed a bug where timestamps were erroneously recognized as URIs.
+mrjob now only recognizes strings containing
+``://`` as URIs (see :py:func:`~mrjob.parse.is_uri`).
+
+Deprecation
+^^^^^^^^^^^
+
+The following are deprecated and will be removed in v0.6.0:
+
+* :py:class:`~mrjob.step.JarStep`.``INPUT``; use :py:data:`mrjob.step.INPUT`
+  instead
+* :py:class:`~mrjob.step.JarStep`.``OUTPUT``; use :py:data:`mrjob.step.OUTPUT`
+  instead
+* non-strict protocols (see :mrjob-opt:`strict_protocols`)
+* the :mrjob-opt:`python_archives` option (try
+  :ref:`this <cookbook-src-tree-pythonpath>` instead)
+* :py:func:`~mrjob.parse.is_windows_path`
+* :py:func:`~mrjob.parse.parse_key_value_list`
+* :py:func:`~mrjob.parse.parse_port_range_list`
+* :py:func:`~mrjob.util.scrape_options_into_new_groups`
+
 .. _v0.5.6:
 
 0.5.6

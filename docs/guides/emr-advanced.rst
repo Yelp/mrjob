@@ -80,8 +80,11 @@ cluster's instances provide at least as much memory and at least as much CPU as
 your job requests. If there is a tie, it picks clusters that are closest to
 the end of a full hour, to minimize wasted instance hours.
 
-Amazon limits clusters to 256 steps total; pooling respects this and won't try
-to use pooled clusters that are "full." :py:mod:`mrjob` also uses an S3-based
+mrjob's pooling won't add more than 1000 steps to a cluster, as the
+EMR API won't show more than this many steps. (For `very old AMIs <http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/AddingStepstoaJobFlow.html>`
+there is a stricter limit of 256 steps).
+
+:py:mod:`mrjob` also uses an S3-based
 "locking" mechanism to prevent two jobs from simultaneously joining the same
 cluster. This is somewhat ugly but works in practice, and avoids
 :py:mod:`mrjob` depending on Amazon services other than EMR and S3.

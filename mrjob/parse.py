@@ -49,7 +49,10 @@ _WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
 
 
 def is_windows_path(uri):
-    """Return True if *uri* is a windows path."""
+    """Return True if *uri* is a windows path.
+
+    .. deprecated:: 0.5.7
+    """
     log.warning(
         'is_windows_path() is deprecated and will be removed in v0.6.0')
 
@@ -62,6 +65,11 @@ def is_windows_path(uri):
 def is_uri(uri):
     """Return True if *uri* is a URI and contains ``://``
     (we only care about URIs that can describe files)
+
+    .. versionchanged:: 0.5.7
+
+       used to recognize anything containing a colon as a URI
+       unless it was a Windows path (``C:\...``).
     """
     return '://' in uri and bool(urlparse(uri).scheme)
 
@@ -123,7 +131,10 @@ def urlparse(urlstring, scheme='', allow_fragments=True, *args, **kwargs):
 ### OPTION PARSING ###
 
 def parse_port_range_list(range_list_str):
-    """Parse a port range list of the form (start[:end])(,(start[:end]))*"""
+    """Parse a port range list of the form ``(start[:end])(,(start[:end]))*``
+
+    .. deprecated:: 0.5.7
+    """
     log.warning('parse_key_value_list() is deprecated and will be removed'
                 ' in v0.6.0')
     return _parse_port_range_list(range_list_str)
@@ -152,6 +163,8 @@ def parse_key_value_list(kv_string_list, error_fmt, error_func):
     :type error_fmt: str
     :param error_func: Function to call when a malformed string is encountered.
     :type error_func: function(str)
+
+    .. deprecated:: 0.5.7
     """
     log.warning('parse_key_value_list() is deprecated and will be removed'
                 ' in v0.6.0')

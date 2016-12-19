@@ -7,7 +7,6 @@ v0.5.7, 2016-12-?? -- Spark
    * default AMI version is now 4.8.2 (#1486)
    * default instance type is m1.large when running Spark jobs (#1465)
    * added debug logging for matching available pooled clusters (#1449)
-   * cleaner error messages when bootstrapped mrjob won't compile
    * defaults to cheapest instance type that will work (#1369)
    * master bootstrap script always created when pooling
    * no longer crashes when trying to use missing ssh binary (#1474)
@@ -21,13 +20,16 @@ v0.5.7, 2016-12-?? -- Spark
  * log interpretation
    * dropped unnecessary container-to-attempt-ID mapping (#1487)
    * more efficient search for task log errors (#1450)
+   * cleaner error messages when bootstrapped mrjob won't compile
  * JarSteps
    * now support libjars, jobconf (#1481)
    * JarStep.{INPUT,OUTPUT} are deprecated (use mrjob.step.{INPUT,OUTPUT})
  * is_uri() now only matches URIs containing "://" (#1455)
  * works in Anaconda3 Jupyter Notebook (#1441)
- * deprecated mrjob.parse.parse_*_list() functions
- * deprecated mrjob.parse.scrape_options_into_new_groups()
+ * deprecated mrjob.parse.is_windows_path()
+ * deprecated mrjob.parse.parse_key_value_list()
+ * deprecated mrjob.parse.parse_port_range_list()
+ * deprecated mrjob.util.scrape_options_into_new_groups()
  * deprecated non-strict protocols (#1452)
  * deprecated python_archives (#1056)
 

@@ -1,3 +1,6 @@
+v0.5.8, 2017-01-?? -- ???
+ * deprecated mrjob.util.tar_and_gz
+
 v0.5.7, 2016-12-19 -- Spark
  * EMR and Hadoop runners:
    * full support for Spark (#1320)

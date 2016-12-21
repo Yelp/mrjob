@@ -32,13 +32,21 @@ class ParseSetupCmdTestCase(TestCase):
         self.assertEqual(parse_setup_cmd(' '), [' '])
         self.assertRaises(TypeError, parse_setup_cmd, None)
 
-    def test_hash_path_alone(self):
+    def test_file_hash_path_alone(self):
+        self.assertEqual(
+            parse_setup_cmd('foo#'),
+            [{'type': 'file', 'path': 'foo', 'name': None}])
         self.assertEqual(
             parse_setup_cmd('foo#bar'),
             [{'type': 'file', 'path': 'foo', 'name': 'bar'}])
         self.assertEqual(
             parse_setup_cmd('/dir/foo#bar'),
             [{'type': 'file', 'path': '/dir/foo', 'name': 'bar'}])
+
+    def test_archive_hash_path_alone(self):
+        self.assertEqual(
+            parse_setup_cmd('foo#/'),
+            [{'type': 'archive', 'path': 'foo', 'name': None}, '/'])
         self.assertEqual(
             parse_setup_cmd('foo#bar/'),
             [{'type': 'archive', 'path': 'foo', 'name': 'bar'}, '/'])
@@ -46,8 +54,33 @@ class ParseSetupCmdTestCase(TestCase):
             parse_setup_cmd('/dir/foo#bar/'),
             [{'type': 'archive', 'path': '/dir/foo', 'name': 'bar'}, '/'])
 
+    def test_dir_hash_path_alone(self):
+        self.assertEqual(
+            parse_setup_cmd('foo/#'),
+            [{'type': 'dir', 'path': 'foo', 'name': None}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('foo/#/'),
+            [{'type': 'dir', 'path': 'foo', 'name': None}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('foo/#bar'),
+            [{'type': 'dir', 'path': 'foo', 'name': 'bar'}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('foo/#bar/'),
+            [{'type': 'dir', 'path': 'foo', 'name': 'bar'}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('/dir/foo/#bar'),
+            [{'type': 'dir', 'path': '/dir/foo', 'name': 'bar'}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('/dir/foo/#bar/'),
+            [{'type': 'dir', 'path': '/dir/foo', 'name': 'bar'}, '/'])
+
     def test_no_path(self):
         self.assertEqual(parse_setup_cmd('#bar'), ['#bar'])
+
+    def test_root_dir_only(self):
+        # tarring up the entire filesystem is a terrible idea; no
+        # good reason to allow this
+        self.assertEqual(parse_setup_cmd('/#'), ['/#'])
 
     def test_no_name(self):
         self.assertEqual(
@@ -70,6 +103,20 @@ class ParseSetupCmdTestCase(TestCase):
             ['sudo dpkg -i ',
              {'type': 'archive', 'path': 'my_pkgs.tar', 'name': None},
              '/fooify.deb'])
+
+    def test_file_inside_dir(self):
+        self.assertEqual(
+            parse_setup_cmd('sudo dpkg -i my_pkgs/#/fooify.deb'),
+            ['sudo dpkg -i ',
+             {'type': 'dir', 'path': 'my_pkgs', 'name': None},
+             '/fooify.deb'])
+
+    def test_named_dir(self):
+        self.assertEqual(
+            parse_setup_cmd('cd src/#awesome-dir'),
+            ['cd ',
+             {'type': 'dir', 'path': 'src', 'name': 'awesome-dir'},
+             '/'])
 
     def test_shell_punctuation_after_name(self):
         self.assertEqual(

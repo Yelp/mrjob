@@ -55,7 +55,8 @@ _SETUP_CMD_RE = re.compile(
     r'(?P<double_quoted>"([^"\\]|\\.)*")|'
     r'(?P<hash_path>'
         r'(?P<path>([A-Za-z][A-Za-z0-9\.-]*://([^\'"\s\\]|\\.)+)|'  # noqa
-            r'([^\'":=\s\\]|\\.)+)'  # noqa
+            r'([^\'":=\s\\]|\\.)*([^\'":=\s\\/]|\\.))'  # noqa
+            r'(?P<path_slash>/)?'
         r'#(?P<name>([^\'":;><|=/#\s\\]|\\.)*)'
             r'(?P<name_slash>/)?)|'
     r'(?P<unquoted>([^\'":=\s\\]|\\.)+)|'
@@ -86,8 +87,14 @@ def parse_setup_cmd(cmd):
     remote system. The trailing slash will *also* be kept as part of the
     original command.
 
+    If *path* is followed by a trailing slash, that indicates *path* is a
+    directory and should be tarballed and later unarchived into a directory
+    on the remote system. The trailing slash will *also* be kept as part of the
+    original command. You may also include a slash after *name* as needed
+    (this will only result in a single slash in the final command).
+
     Parsed hash paths are dicitionaries with the keys ``path``, ``name``, and
-    ``type`` (either ``'file'`` or ``'archive'``).
+    ``type`` (either ``'file'``, ``'archive'``, or ``'dir'``).
 
     Most of the time, this function will just do what you expect. Rules for
     finding hash paths:
@@ -127,11 +134,20 @@ def parse_setup_cmd(cmd):
             else:
                 tokens.append(keep_as_is)
         elif m.group('hash_path'):
+            if m.group('path_slash'):
+                token_type = 'dir'
+            elif m.group('name_slash'):
+                token_type = 'archive'
+            else:
+                token_type = 'file'
+
             tokens.append({
                 'path': _resolve_path(m.group('path')),
                 'name': m.group('name') or None,
-                'type': 'archive' if m.group('name_slash') else 'file'})
-            if m.group('name_slash'):
+                'type': token_type
+            })
+
+            if m.group('path_slash') or m.group('name_slash'):
                 tokens.append('/')
         elif m.group('error'):
             # these match the error messages from shlex.split()

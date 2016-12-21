@@ -267,6 +267,8 @@ class MRJobRunner(object):
         self._fs = None
 
         self._working_dir_mgr = WorkingDirManager()
+        # cache of directories that have been converted to tarballs
+        self._dir_to_archive = {}
 
         # track (name, path) of files and archives to upload to spark.
         # these are a subset of those in self._working_dir_mgr
@@ -1041,6 +1043,29 @@ class MRJobRunner(object):
         writeln('"$@"')
 
         return out
+
+    def _archive_dir(self, dir_path, name):
+        """Get the archive corresponding to *path*, which is a directory that's
+        been added to self._working_dir_mgr."""
+        # TODO: verify that we're not tarballing a directory that contains the
+        # temp directory
+
+        if dir_path in self._dir_to_archive:
+            return self._dir_to_archive[dir_path]
+
+        tar_gz_name = (
+            self._working_dir_mgr.name('dir', dir_path, name) + '.tar.gz')
+
+        # TODO: start here
+
+        for path in self._fs.ls(dir_path):
+            # if not local, copy to tmp file
+
+            # add to tarball
+
+            # if dir_path appears, raise an exception (not a directory)
+            pass
+
 
     def _bootstrap_mrjob(self):
         """Should we bootstrap mrjob?"""

@@ -202,17 +202,21 @@ def parse_legacy_hash_path(type, path, must_name=None):
     if '#' in path:
         path, name = path.split('#', 1)
 
-        # allow a slash after the name of an archive because that's
+        # allow a slash after the name of an archive or dir because that's
         # the new-way of specifying archive paths
-        if name.endswith('/') and type == 'archive':
-            name = name[:-1]
+        if type in ('archive', 'dir'):
+            name = name.rstrip('/' + os.sep)
 
         if '/' in name or '#' in name:
             raise ValueError(
                 'Bad path %r; name must not contain # or /' % (path,))
     else:
         if must_name:
-            name = os.path.basename(path)
+            if type == 'dir':
+                # handle trailing slash on directory names
+                name = os.path.basename(path.rstrip('/' + os.sep))
+            else:
+                name = os.path.basename(path)
         else:
             name = None
 
@@ -347,7 +351,9 @@ class WorkingDirManager(object):
     If you wish, you may assign multiple names to the same file, or add
     a path as both a file and an archive (though not mapped to the same name).
     """
-    _SUPPORTED_TYPES = _SUPPORTED_TYPES
+    # dirs are not supported directly; runners need to archive them
+    # and add that archive
+    _SUPPORTED_TYPES = ('archive', 'file')
 
     def __init__(self):
         # map from paths added without a name to None or lazily chosen name

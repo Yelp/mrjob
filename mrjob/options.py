@@ -1205,7 +1205,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--dir'], dict(
                 action='append',
-                help('Tarball the given directory and unpack the resulting'
+                help=('Tarball the given directory and unpack the resulting'
                      ' archive in the working directory of this script.'
                      ' You can use --dir multiple times'),
             )),

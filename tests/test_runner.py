@@ -26,6 +26,7 @@ import tarfile
 import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
+from time import sleep
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
@@ -1646,10 +1647,80 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
             self.assertEqual(output_uri_1, runner._output_dir)
 
 
-class DirArchiveTestCase(SandboxedTestCase):
+class DirArchivePathTestCase(SandboxedTestCase):
+
+    def test_dir(self):
+        archive_dir = self.makedirs('archive')
+
+        runner = InlineMRJobRunner()
+        archive_path = runner._dir_archive_path(archive_dir)
+
+        self.assertEqual(os.path.basename(archive_path), 'archive.tar.gz')
+
+    def test_trailing_slash(self):
+        archive_dir = self.makedirs('archive') + os.sep
+
+        runner = InlineMRJobRunner()
+        archive_path = runner._dir_archive_path(archive_dir)
+
+        self.assertEqual(os.path.basename(archive_path), 'archive.tar.gz')
+
+    def test_missing_dir(self):
+        archive_path = os.path.join(self.tmp_dir, 'archive')
+
+        runner = InlineMRJobRunner()
+
+        self.assertRaises(OSError, runner._dir_archive_path, archive_path)
+
+    def test_file(self):
+        foo_file = self.makefile('foo')
+
+        runner = InlineMRJobRunner()
+
+        self.assertRaises(OSError, runner._dir_archive_path, foo_file)
+
+    def test_uri(self):
+        # we don't check whether URIs exist or are directories
+        runner = InlineMRJobRunner()
+        archive_path = runner._dir_archive_path('s3://bucket/stuff')
+
+        self.assertEqual(os.path.basename(archive_path), 'stuff.tar.gz')
+
+    def test_dirs_with_same_name(self):
+        foo_archive = self.makedirs(os.path.join('foo', 'archive'))
+        bar_archive = self.makedirs(os.path.join('bar', 'archive'))
+
+        runner = InlineMRJobRunner()
+        foo_archive_path = runner._dir_archive_path(foo_archive)
+        bar_archive_path = runner._dir_archive_path(bar_archive)
+
+        self.assertEqual(os.path.basename(foo_archive_path),
+                         'archive.tar.gz')
+        self.assertNotEqual(foo_archive_path, bar_archive_path)
+
+    def test_same_dir_twice(self):
+        archive_dir = self.makedirs('archive')
+
+        runner = InlineMRJobRunner()
+        archive_path_1 = runner._dir_archive_path(archive_dir)
+        archive_path_2 = runner._dir_archive_path(archive_dir)
+
+        self.assertEqual(os.path.basename(archive_path_1), 'archive.tar.gz')
+        self.assertEqual(archive_path_1, archive_path_2)
+
+    def test_doesnt_actually_create_archive(self):
+        archive_dir = self.makedirs('archive')
+
+        runner = InlineMRJobRunner()
+        archive_path = runner._dir_archive_path(archive_dir)
+
+        self.assertFalse(os.path.exists(archive_path))
+
+
+class CreateDirArchiveTestCase(SandboxedTestCase):
 
     def setUp(self):
-        super(DirArchiveTestCase, self).setUp()
+        super(CreateDirArchiveTestCase, self).setUp()
 
         self._to_archive = self.makedirs('archive')
         self.makefile(os.path.join('archive', 'foo'))
@@ -1658,47 +1729,10 @@ class DirArchiveTestCase(SandboxedTestCase):
     def test_archive(self):
         runner = InlineMRJobRunner()
 
-        runner._working_dir_mgr.add('dir', self._to_archive)
-
-        tar_gz_path = runner._dir_archive(self._to_archive, None)
-
+        tar_gz_path = runner._dir_archive_path(self._to_archive)
         self.assertEqual(os.path.basename(tar_gz_path), 'archive.tar.gz')
 
-        tar_gz = tarfile.open(tar_gz_path, 'r:gz')
-        try:
-            self.assertEqual(sorted(tar_gz.getnames()),
-                             [os.path.join('bar', 'baz'), 'foo'])
-        finally:
-            tar_gz.close()
-
-    def test_named_archive(self):
-        runner = InlineMRJobRunner()
-
-        runner._working_dir_mgr.add('dir', self._to_archive, 'blarchive')
-
-        tar_gz_path = runner._dir_archive(self._to_archive, 'blarchive')
-
-        self.assertEqual(os.path.basename(tar_gz_path), 'blarchive.tar.gz')
-
-        tar_gz = tarfile.open(tar_gz_path, 'r:gz')
-        try:
-            self.assertEqual(sorted(tar_gz.getnames()),
-                             [os.path.join('bar', 'baz'), 'foo'])
-        finally:
-            tar_gz.close()
-
-    def test_trailing_slash(self):
-        # this shouldn't happen in practice because the trailing slash
-        # is part of the setup syntax and will be stripped
-        runner = InlineMRJobRunner()
-
-        to_archive = self._to_archive + os.sep
-
-        runner._working_dir_mgr.add('dir', to_archive)
-
-        tar_gz_path = runner._dir_archive(to_archive, None)
-
-        self.assertEqual(os.path.basename(tar_gz_path), 'archive.tar.gz')
+        runner._create_dir_archive(self._to_archive)
 
         tar_gz = tarfile.open(tar_gz_path, 'r:gz')
         try:
@@ -1710,31 +1744,15 @@ class DirArchiveTestCase(SandboxedTestCase):
     def test_only_create_archive_once(self):
         runner = InlineMRJobRunner()
 
-        runner._working_dir_mgr.add('dir', self._to_archive)
+        tar_gz_path = runner._dir_archive_path(self._to_archive)
 
-        tar_gz_path_1 = runner._dir_archive(self._to_archive, None)
-        mtime_1 = os.stat(tar_gz_path_1).st_mtime
+        runner._create_dir_archive(self._to_archive)
+        mtime_1 = os.stat(tar_gz_path).st_mtime
 
-        tar_gz_path_2 = runner._dir_archive(self._to_archive, None)
-        mtime_2 = os.stat(tar_gz_path_2).st_mtime
+        sleep(1)
+        runner._create_dir_archive(self._to_archive)
+        mtime_2 = os.stat(tar_gz_path).st_mtime
 
-        self.assertEqual(tar_gz_path_1, tar_gz_path_2)
-        self.assertEqual(mtime_1, mtime_2)
-
-    def test_use_whatever_name_requested_first(self):
-        runner = InlineMRJobRunner()
-
-        runner._working_dir_mgr.add('dir', self._to_archive)
-        runner._working_dir_mgr.add('dir', self._to_archive, 'blarchive')
-
-        tar_gz_path_1 = runner._dir_archive(self._to_archive, 'blarchive')
-        mtime_1 = os.stat(tar_gz_path_1).st_mtime
-        self.assertEqual(os.path.basename(tar_gz_path_1), 'blarchive.tar.gz')
-
-        tar_gz_path_2 = runner._dir_archive(self._to_archive, None)
-        mtime_2 = os.stat(tar_gz_path_2).st_mtime
-
-        self.assertEqual(tar_gz_path_1, tar_gz_path_2)
         self.assertEqual(mtime_1, mtime_2)
 
     def test_nonexistent_dir(self):
@@ -1742,9 +1760,8 @@ class DirArchiveTestCase(SandboxedTestCase):
 
         nonexistent_dir = os.path.join(self.tmp_dir, 'nonexistent')
 
-        runner._working_dir_mgr.add('dir', nonexistent_dir)
-
-        self.assertRaises(OSError, runner._dir_archive, nonexistent_dir, None)
+        self.assertRaises(
+            OSError, runner._create_dir_archive, nonexistent_dir)
 
     def test_empty_dir(self):
 
@@ -1752,11 +1769,10 @@ class DirArchiveTestCase(SandboxedTestCase):
 
         empty_dir = self.makedirs('empty')
 
-        runner._working_dir_mgr.add('dir', empty_dir)
-
-        tar_gz_path = runner._dir_archive(empty_dir, None)
-
+        tar_gz_path = runner._dir_archive_path(empty_dir)
         self.assertEqual(os.path.basename(tar_gz_path), 'empty.tar.gz')
+
+        runner._create_dir_archive(empty_dir)
 
         tar_gz = tarfile.open(tar_gz_path, 'r:gz')
         try:
@@ -1769,33 +1785,14 @@ class DirArchiveTestCase(SandboxedTestCase):
 
         runner = InlineMRJobRunner()
 
-        runner._working_dir_mgr.add('dir', qux_path)
-
-        self.assertRaises(OSError, runner._dir_archive, qux_path, None)
-
-    def test_unknown_dir(self):
-        runner = InlineMRJobRunner()
-
-        # don't add self._to_archive to WorkingDirManager
-
-        self.assertRaises(ValueError,
-                          runner._dir_archive, self._to_archive, None)
-
-    def test_added_as_archive(self):
-        runner = InlineMRJobRunner()
-
-        runner._working_dir_mgr.add('archive', self._to_archive)
-
-        self.assertRaises(ValueError,
-                          runner._dir_archive, self._to_archive, None)
+        self.assertRaises(OSError, runner._create_dir_archive, qux_path)
 
 
-
-class RemoteDirArchiveTestCase(MockBotoTestCase):
+class RemoteCreateDirArchiveTestCase(MockBotoTestCase):
     # additional test cases that archive stuff from (mock) S3
 
     def setUp(self):
-        super(RemoteDirArchiveTestCase, self).setUp()
+        super(RemoteCreateDirArchiveTestCase, self).setUp()
 
         fs = S3Filesystem()
 
@@ -1806,11 +1803,10 @@ class RemoteDirArchiveTestCase(MockBotoTestCase):
     def test_archive_remote_data(self):
         runner = EMRJobRunner()
 
-        runner._working_dir_mgr.add('dir', 's3://walrus/archive')
-
-        tar_gz_path = runner._dir_archive('s3://walrus/archive', None)
-
+        tar_gz_path = runner._dir_archive_path('s3://walrus/archive')
         self.assertEqual(os.path.basename(tar_gz_path), 'archive.tar.gz')
+
+        runner._create_dir_archive('s3://walrus/archive')
 
         tar_gz = tarfile.open(tar_gz_path, 'r:gz')
         try:

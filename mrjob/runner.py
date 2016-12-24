@@ -51,6 +51,7 @@ from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
+from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
@@ -269,8 +270,15 @@ class MRJobRunner(object):
         self._fs = None
 
         self._working_dir_mgr = WorkingDirManager()
-        # cache of directories that have been converted to tarballs
-        self._dir_to_archive = {}
+
+        # mapping from dir to path for corresponding archive. we pick
+        # paths during init(), but don't actually create the archives
+        # until self._create_dir_archives() is called
+        self._dir_to_archive_path = {}
+        # dir archive names (the filename minus ".tar.gz") already taken
+        self._dir_archive_names_taken = set()
+        # set of dir_archives that have actually been created
+        self._dir_archives_created = set()
 
         # track (name, path) of files and archives to upload to spark.
         # these are a subset of those in self._working_dir_mgr
@@ -314,14 +322,30 @@ class MRJobRunner(object):
             self._working_dir_mgr.add(**ua)
             self._spark_archives.append((ua['name'], ua['path']))
 
+        for path in self._opts['upload_dirs']:
+            # pick name based on directory path
+            ud = parse_legacy_hash_path('dir', path,
+                                        must_name='upload_archives')
+            # but feed working_dir_mgr the archive's path
+            archive_path = self._dir_archive_path(path)
+            self._working_dir_mgr.add(
+                'archive', archive_path, name=ud['name'])
+            self._spark_archives.append((ud['name'], archive_path))
+
         # py_files, python_archives, setup, setup_cmds, and setup_scripts
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmds() for details
         self._setup = self._parse_setup()
         for cmd in self._setup:
-            for maybe_path_dict in cmd:
-                if isinstance(maybe_path_dict, dict):
-                    self._working_dir_mgr.add(**maybe_path_dict)
+            for token in cmd:
+                if isinstance(token, dict):
+                    if token['type'] == 'dir':
+                        # feed the archive's path to self._working_dir_mgr
+                        archive_path = self._dir_archive_path(token['path'])
+                        self._working_dir_mgr.add(
+                            'archive', archive_path, name=token['name'])
+                    else:
+                        self._working_dir_mgr.add(**token)
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin
@@ -417,6 +441,7 @@ class MRJobRunner(object):
                         ' --strict-protocols and fix any underlying'
                         ' encoding issues\n')
 
+        self._create_dir_archives()
         self._run()
         self._ran_job = True
 
@@ -1046,26 +1071,40 @@ class MRJobRunner(object):
 
         return out
 
-    def _dir_archive(self, dir_path, name):
-        """Get the archive corresponding to *path*, which is a directory that's
-        been added to self._working_dir_mgr."""
-        if dir_path not in self._dir_to_archive:
-            self._dir_to_archive[dir_path] = (
-                self._create_dir_archive(dir_path, name))
+    def _dir_archive_path(self, dir_path):
+        """Assign a path for the archive of *dir_path* but don't
+        actually create anything."""
+        if dir_path not in self._dir_to_archive_path:
+            # we can check local paths now
+            if not (is_uri(dir_path) or os.path.isdir(dir_path)):
+                raise OSError('%s is not a directory!' % dir_path)
 
-        return self._dir_to_archive[dir_path]
+            name = name_uniquely(
+                dir_path, names_taken=self._dir_archive_names_taken)
+            self._dir_archive_names_taken.add(name)
 
-    def _create_dir_archive(self, dir_path, name):
+            self._dir_to_archive_path[dir_path] = os.path.join(
+                self._get_local_tmp_dir(), 'archives', name + '.tar.gz')
+
+        return self._dir_to_archive_path[dir_path]
+
+    def _create_dir_archives(self):
+        """Call this to create all dir archives"""
+        for dir_path in sorted(set(self._dir_to_archive_path)):
+            self._create_dir_archive(dir_path)
+
+    def _create_dir_archive(self, dir_path):
         """Helper for :py:meth:`archive_dir`"""
         if not self.fs.exists(dir_path):
             raise OSError('%s does not exist')
 
-        archive_tmp_dir = os.path.join(self._get_local_tmp_dir(), 'archives')
-        self.fs.mkdir(archive_tmp_dir)
+        tar_gz_path = self._dir_archive_path(dir_path)
 
-        tar_gz_name = (
-            self._working_dir_mgr.name('dir', dir_path, name) + '.tar.gz')
-        tar_gz_path = os.path.join(archive_tmp_dir, tar_gz_name)
+        if tar_gz_path in self._dir_archives_created:
+            return  # already created
+
+        if not os.path.isdir(os.path.dirname(tar_gz_path)):
+            os.makedirs(os.path.dirname(tar_gz_path))
 
         log.info('Archiving %s into %s' % (dir_path, tar_gz_path))
 
@@ -1075,34 +1114,36 @@ class MRJobRunner(object):
         tmp_download_path = os.path.join(
             self._get_local_tmp_dir(), 'tmp-download')
 
-        for path in self.fs.ls(dir_path):
-            # fs.ls() only lists files
-            if path == dir_path:
-                raise OSError('%s is a file, not a directory!' % dir_path)
+        try:
+            for path in self.fs.ls(dir_path):
+                # fs.ls() only lists files
+                if path == dir_path:
+                    raise OSError('%s is a file, not a directory!' % dir_path)
 
-            # TODO: do we need this?
-            if os.path.realpath(path) == os.path.realpath(tar_gz_path):
-                raise OSError(
-                    'attempted to archive %s into itself!' % tar_gz_path)
+                # TODO: do we need this?
+                if os.path.realpath(path) == os.path.realpath(tar_gz_path):
+                    raise OSError(
+                        'attempted to archive %s into itself!' % tar_gz_path)
 
-            if is_uri(path):
-                path_in_tar_gz = path[len(dir_path):].lstrip('/')
+                if is_uri(path):
+                    path_in_tar_gz = path[len(dir_path):].lstrip('/')
 
-                log.info('  downloading %s -> %s' % (path, tmp_download_path))
-                with open(tmp_download_path, 'wb') as f:
-                    for chunk in self.fs.cat(path):
-                        f.write(chunk)
-                local_path = tmp_download_path
-            else:
-                path_in_tar_gz = path[len(dir_path):].lstrip(os.sep)
-                local_path = path
+                    log.info('  downloading %s -> %s' % (
+                        path, tmp_download_path))
+                    with open(tmp_download_path, 'wb') as f:
+                        for chunk in self.fs.cat(path):
+                            f.write(chunk)
+                    local_path = tmp_download_path
+                else:
+                    path_in_tar_gz = path[len(dir_path):].lstrip(os.sep)
+                    local_path = path
 
-            log.debug('  adding %s to %s' % (path, tar_gz_path))
-            tar_gz.add(local_path, path_in_tar_gz, recursive=False)
+                log.debug('  adding %s to %s' % (path, tar_gz_path))
+                tar_gz.add(local_path, path_in_tar_gz, recursive=False)
+        finally:
+            tar_gz.close()
 
-        tar_gz.close()
-
-        return tar_gz_path
+        self._dir_archives_created.add(tar_gz_path)
 
     def _bootstrap_mrjob(self):
         """Should we bootstrap mrjob?"""

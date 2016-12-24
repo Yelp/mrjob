@@ -35,6 +35,7 @@ manager classes.
 """
 import itertools
 import logging
+import os
 import os.path
 import posixpath
 import re
@@ -47,7 +48,7 @@ from mrjob.util import expand_path
 log = logging.getLogger(__name__)
 
 
-_SUPPORTED_TYPES = ('archive', 'file')
+_SUPPORTED_TYPES = ('archive', 'dir', 'file')
 
 
 _SETUP_CMD_RE = re.compile(
@@ -244,7 +245,7 @@ def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False):
     'foo-1.tar.gz'
     """
     if not proposed_name:
-        proposed_name = os.path.basename(path)
+        proposed_name = os.path.basename(path.rstrip('/' + os.sep))
 
     if unhide:
         proposed_name = proposed_name.lstrip('.').lstrip('_')

@@ -246,7 +246,7 @@ class ParseLegacyHashPathTestCase(TestCase):
     def test_bad_path_type(self):
         self.assertRaises(
             ValueError,
-            parse_legacy_hash_path, 'dir', 'foo#bar')
+            parse_legacy_hash_path, 'symlink', 'foo#bar')
 
     def test_bad_name(self):
         self.assertRaises(
@@ -269,7 +269,7 @@ class NameUniquelyTestCase(TestCase):
 
     def test_use_basename_by_default(self):
         self.assertEqual(name_uniquely('foo/bar.py'), 'bar.py')
-        self.assertEqual(name_uniquely('foo/bar/'), '1')
+        self.assertEqual(name_uniquely('/'), '1')
 
     def test_dont_use_names_taken(self):
         self.assertEqual(name_uniquely('foo.py'), 'foo.py')
@@ -343,6 +343,14 @@ class NameUniquelyTestCase(TestCase):
             name_uniquely(
                 'foo.py', proposed_name='.hidden.foo.py', unhide=True),
             'hidden.foo.py')
+
+    def test_strip_trailing_slash(self):
+        self.assertEqual(
+            name_uniquely('s3://bucket/archive-dir/'), 'archive-dir')
+
+    def test_strip_trailing_os_sep(self):
+        self.assertEqual(
+            name_uniquely(os.path.join('foo', 'bar', '')), 'bar')
 
 
 class UploadDirManagerTestCase(TestCase):
@@ -494,9 +502,9 @@ class WorkingDirManagerTestCase(TestCase):
 
     def test_bad_path_type(self):
         wd = WorkingDirManager()
-        self.assertRaises(ValueError, wd.add, 'dir', 'foo.py')
-        self.assertRaises(ValueError, wd.name_to_path, 'dir')
-        self.assertRaises(ValueError, wd.name, 'dir', 'foo.py')
+        self.assertRaises(ValueError, wd.add, 'symlink', 'foo.py')
+        self.assertRaises(ValueError, wd.name_to_path, 'symlink')
+        self.assertRaises(ValueError, wd.name, 'symlink', 'foo.py')
 
     def test_cant_name_unknown_paths(self):
         wd = WorkingDirManager()

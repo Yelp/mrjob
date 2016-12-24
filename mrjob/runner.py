@@ -25,6 +25,7 @@ import pprint
 import re
 import shutil
 import sys
+import tarfile
 import tempfile
 from inspect import isfunction
 from inspect import ismethod
@@ -46,6 +47,7 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.options import CLEANUP_CHOICES
 from mrjob.options import _CLEANUP_DEPRECATED_ALIASES
+from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
@@ -1044,28 +1046,63 @@ class MRJobRunner(object):
 
         return out
 
-    def _archive_dir(self, dir_path, name):
+    def _dir_archive(self, dir_path, name):
         """Get the archive corresponding to *path*, which is a directory that's
         been added to self._working_dir_mgr."""
-        # TODO: verify that we're not tarballing a directory that contains the
-        # temp directory
+        if dir_path not in self._dir_to_archive:
+            self._dir_to_archive[dir_path] = (
+                self._create_dir_archive(dir_path, name))
 
-        if dir_path in self._dir_to_archive:
-            return self._dir_to_archive[dir_path]
+        return self._dir_to_archive[dir_path]
+
+    def _create_dir_archive(self, dir_path, name):
+        """Helper for :py:meth:`archive_dir`"""
+        if not self.fs.exists(dir_path):
+            raise OSError('%s does not exist')
+
+        archive_tmp_dir = os.path.join(self._get_local_tmp_dir(), 'archives')
+        self.fs.mkdir(archive_tmp_dir)
 
         tar_gz_name = (
             self._working_dir_mgr.name('dir', dir_path, name) + '.tar.gz')
+        tar_gz_path = os.path.join(archive_tmp_dir, tar_gz_name)
 
-        # TODO: start here
+        log.info('Archiving %s into %s' % (dir_path, tar_gz_path))
 
-        for path in self._fs.ls(dir_path):
-            # if not local, copy to tmp file
+        tar_gz = tarfile.open(tar_gz_path, mode='w:gz')
 
-            # add to tarball
+        # for remote files
+        tmp_download_path = os.path.join(
+            self._get_local_tmp_dir(), 'tmp-download')
 
-            # if dir_path appears, raise an exception (not a directory)
-            pass
+        for path in self.fs.ls(dir_path):
+            # fs.ls() only lists files
+            if path == dir_path:
+                raise OSError('%s is a file, not a directory!' % dir_path)
 
+            # TODO: do we need this?
+            if os.path.realpath(path) == os.path.realpath(tar_gz_path):
+                raise OSError(
+                    'attempted to archive %s into itself!' % tar_gz_path)
+
+            if is_uri(path):
+                path_in_tar_gz = path[len(dir_path):].lstrip('/')
+
+                log.info('  downloading %s -> %s' % (path, tmp_download_path))
+                with open(tmp_download_path, 'wb') as f:
+                    for chunk in self.fs.cat(path):
+                        f.write(chunk)
+                local_path = tmp_download_path
+            else:
+                path_in_tar_gz = path[len(dir_path):].lstrip(os.sep)
+                local_path = path
+
+            log.debug('  adding %s to %s' % (path, tar_gz_path))
+            tar_gz.add(local_path, path_in_tar_gz, recursive=False)
+
+        tar_gz.close()
+
+        return tar_gz_path
 
     def _bootstrap_mrjob(self):
         """Should we bootstrap mrjob?"""

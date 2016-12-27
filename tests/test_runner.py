@@ -26,6 +26,7 @@ import tarfile
 import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
+from tarfile import ReadError
 from time import sleep
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
@@ -1764,7 +1765,6 @@ class CreateDirArchiveTestCase(SandboxedTestCase):
             OSError, runner._create_dir_archive, nonexistent_dir)
 
     def test_empty_dir(self):
-
         runner = InlineMRJobRunner()
 
         empty_dir = self.makedirs('empty')
@@ -1774,7 +1774,17 @@ class CreateDirArchiveTestCase(SandboxedTestCase):
 
         runner._create_dir_archive(empty_dir)
 
-        tar_gz = tarfile.open(tar_gz_path, 'r:gz')
+        tar_gz = None
+        try:
+            tar_gz = tarfile.open(tar_gz_path, 'r:gz')
+        except ReadError as e:
+            # Python 2.6 can produce valid empty tarballs (verified this
+            # by hand) but it can't read them
+            if sys.version_info < (2, 7) and e.args == ('empty header',):
+                return
+            else:
+                raise
+
         try:
             self.assertEqual(sorted(tar_gz.getnames()), [])
         finally:

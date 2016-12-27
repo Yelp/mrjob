@@ -344,13 +344,13 @@ class MRJobRunner(object):
         for cmd in self._setup:
             for token in cmd:
                 if isinstance(token, dict):
+                    # convert dir archives tokens to archives
                     if token['type'] == 'dir':
                         # feed the archive's path to self._working_dir_mgr
-                        archive_path = self._dir_archive_path(token['path'])
-                        self._working_dir_mgr.add(
-                            'archive', archive_path, name=token['name'])
-                    else:
-                        self._working_dir_mgr.add(**token)
+                        token['path'] = self._dir_archive_path(token['path'])
+                        token['type'] = 'archive'
+
+                    self._working_dir_mgr.add(**token)
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin

@@ -269,6 +269,10 @@ class MRJobRunner(object):
         self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_paths)
         self._fs = None
 
+        # a local tmp directory that will be cleaned up when we're done
+        # access/make this using self._get_local_tmp_dir()
+        self._local_tmp_dir = None
+
         self._working_dir_mgr = WorkingDirManager()
 
         # mapping from dir to path for corresponding archive. we pick
@@ -327,7 +331,7 @@ class MRJobRunner(object):
             ud = parse_legacy_hash_path('dir', path,
                                         must_name='upload_archives')
             # but feed working_dir_mgr the archive's path
-            archive_path = self._dir_archive_path(path)
+            archive_path = self._dir_archive_path(ud['path'])
             self._working_dir_mgr.add(
                 'archive', archive_path, name=ud['name'])
             self._spark_archives.append((ud['name'], archive_path))
@@ -367,10 +371,6 @@ class MRJobRunner(object):
         # store hadoop input and output formats
         self._hadoop_input_format = hadoop_input_format
         self._hadoop_output_format = hadoop_output_format
-
-        # a local tmp directory that will be cleaned up when we're done
-        # access/make this using self._get_local_tmp_dir()
-        self._local_tmp_dir = None
 
         # A cache for self._get_steps(); also useful as a test hook
         self._steps = None

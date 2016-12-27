@@ -621,7 +621,8 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
     :param prefix: subdirectory inside the tarball to put everything into (e.g.
                    ``'mrjob'``)
     """
-    log.warn('tar_and_gzip() is deprecated and will be removed in v0.6.0')
+    # might move this to tests/; we use it a few places there
+    log.warning('tar_and_gzip() is deprecated and will be removed in v0.6.0')
 
     if not os.path.isdir(dir):
         raise IOError('Not a directory: %r' % (dir,))

@@ -822,11 +822,13 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         foo1_path = self.makefile('foo1')
         foo2_path = self.makefile('foo2')
         baz_path = self.makefile('baz.tar.gz')
+        qux_path = self.makedirs('qux')
 
         job = MRNullSpark([
             '--file', foo1_path + '#foo1',
             '--file', foo2_path + '#bar',
             '--archive', baz_path,
+            '--dir', qux_path,
         ])
         job.sandbox()
 
@@ -839,10 +841,14 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                         cmdenv=dict(PYSPARK_PYTHON='mypy')
                     ) + [
                         '--files',
-                        (runner._upload_mgr.uri(foo1_path) + '#foo1' + ',' +
+                        (runner._upload_mgr.uri(foo1_path) + '#foo1' +
+                         ',' +
                          runner._upload_mgr.uri(foo2_path) + '#bar'),
                         '--archives',
-                        runner._upload_mgr.uri(baz_path) + '#baz.tar.gz'
+                        runner._upload_mgr.uri(baz_path) + '#baz.tar.gz' +
+                        ',' +
+                        runner._upload_mgr.uri(
+                            runner._dir_archive_path(qux_path)) + '#qux'
                     ]
                 )
             )
@@ -1213,7 +1219,7 @@ class SetupTestCase(SandboxedTestCase):
     def setUp(self):
         super(SetupTestCase, self).setUp()
 
-        os.mkdir(os.path.join(self.tmp_dir, 'foo'))
+        self.foo_dir = self.makedirs('foo')
 
         self.foo_py = os.path.join(self.tmp_dir, 'foo', 'foo.py')
 
@@ -1231,7 +1237,7 @@ class SetupTestCase(SandboxedTestCase):
         os.chmod(self.foo_sh, stat.S_IRWXU)
 
         self.foo_tar_gz = os.path.join(self.tmp_dir, 'foo.tar.gz')
-        tar_and_gzip(os.path.join(self.tmp_dir, 'foo'), self.foo_tar_gz)
+        tar_and_gzip(self.foo_dir, self.foo_tar_gz)
 
         self.foo_zip = os.path.join(self.tmp_dir, 'foo.zip')
         zf = ZipFile(self.foo_zip, 'w', ZIP_DEFLATED)
@@ -1276,6 +1282,24 @@ class SetupTestCase(SandboxedTestCase):
         self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
                          self.foo_py_size)
         self.assertEqual(path_to_size.get('./foo/foo.py'),
+                         self.foo_py_size)
+
+    def test_dir_upload(self):
+        job = MROSWalkJob(['-r', 'local',
+                           '--dir', self.foo_dir,
+                           '--dir', self.foo_dir + '#bar'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            with no_handlers_for_logger('mrjob.local'):
+                r.run()
+
+            path_to_size = dict(job.parse_output_line(line)
+                                for line in r.stream_output())
+
+        self.assertEqual(path_to_size.get('./foo/foo.py'),
+                         self.foo_py_size)
+        self.assertEqual(path_to_size.get('./bar/foo.py'),
                          self.foo_py_size)
 
     def test_deprecated_python_archive_option(self):

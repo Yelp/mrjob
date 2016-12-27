@@ -315,20 +315,21 @@ class MRJobRunner(object):
                 self._spark_files.append((arg_file['name'], arg_file['path']))
 
         # set up uploading
-        for path in self._opts['upload_files']:
-            uf = parse_legacy_hash_path('file', path, must_name='upload_files')
+        for hash_path in self._opts['upload_files']:
+            uf = parse_legacy_hash_path('file', hash_path,
+                                        must_name='upload_files')
             self._working_dir_mgr.add(**uf)
             self._spark_files.append((uf['name'], uf['path']))
 
-        for path in self._opts['upload_archives']:
-            ua = parse_legacy_hash_path('archive', path,
+        for hash_path in self._opts['upload_archives']:
+            ua = parse_legacy_hash_path('archive', hash_path,
                                         must_name='upload_archives')
             self._working_dir_mgr.add(**ua)
             self._spark_archives.append((ua['name'], ua['path']))
 
-        for path in self._opts['upload_dirs']:
+        for hash_path in self._opts['upload_dirs']:
             # pick name based on directory path
-            ud = parse_legacy_hash_path('dir', path,
+            ud = parse_legacy_hash_path('dir', hash_path,
                                         must_name='upload_archives')
             # but feed working_dir_mgr the archive's path
             archive_path = self._dir_archive_path(ud['path'])

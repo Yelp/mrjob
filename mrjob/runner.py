@@ -1107,7 +1107,7 @@ class MRJobRunner(object):
         if not os.path.isdir(os.path.dirname(tar_gz_path)):
             os.makedirs(os.path.dirname(tar_gz_path))
 
-        log.info('Archiving %s into %s' % (dir_path, tar_gz_path))
+        log.info('Archiving %s -> %s' % (dir_path, tar_gz_path))
 
         tar_gz = tarfile.open(tar_gz_path, mode='w:gz')
 

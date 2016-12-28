@@ -1,4 +1,5 @@
 # Copyright 2013 David Marin
+# Copyright 2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +21,9 @@ from mrjob.job import MRJob
 class MROSWalkJob(MRJob):
     """Recursively return the name and size of each file in the current dir."""
 
+    def mapper(self, key, value):
+        return  # ignore input
+
     def mapper_final(self):
         # hook for test_local.LocalRunnerSetupTestCase.test_python_archive()
         try:
@@ -33,6 +37,12 @@ class MROSWalkJob(MRJob):
                 path = os.path.join(dirpath, filename)
                 size = os.path.getsize(path)
                 yield path, size
+
+    def reducer(self, key, values):
+        # remove duplicates
+        for value in values:
+            yield (key, value)
+            break
 
 
 if __name__ == '__main__':

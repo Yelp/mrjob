@@ -35,6 +35,7 @@ from subprocess import PIPE
 from subprocess import check_call
 
 import mrjob.step
+from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
@@ -68,6 +69,22 @@ GLOB_RE = re.compile(r'^(.*?)([\[\*\?].*)$')
 
 # buffer for piping files into sort on Windows
 _BUFFER_SIZE = 4096
+
+# jobconf options for implementing SORT_VALUES
+_SORT_VALUES_JOBCONF = {
+    'stream.num.map.output.key.fields': 2,
+    'mapred.text.key.partitioner.options': '-k1,1',
+    # Hadoop's defaults for these actually work fine; we just want to
+    # prevent interference from mrjob.conf.
+    'mapred.output.key.comparator.class': None,
+    'mapred.text.key.comparator.options': None,
+}
+
+# partitioner for sort_values
+_SORT_VALUES_PARTITIONER = \
+    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
+
+
 
 
 class RunnerOptionStore(OptionStore):
@@ -195,7 +212,7 @@ class MRJobRunner(object):
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 stdin=None, **opts):
+                 sort_values=None, stdin=None, **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -252,11 +269,17 @@ class MRJobRunner(object):
                            qualified with ``hdfs://`` URIs because it's
                            understood that it has to be on HDFS.
         :type partitioner: str
-        :param partitioner: Optional name of a Hadoop partitoner class, e.g.
+        :param partitioner: Optional name of a Hadoop partitioner class, e.g.
                             ``'org.apache.hadoop.mapred.lib.HashPartitioner'``.
                             Hadoop streaming will use this to determine how
                             mapper output should be sorted and distributed
                             to reducers.
+        :type sort_values: bool
+        :param sort_values: if true, set partitioners and jobconf variables
+                            so that reducers to receive the values
+                            associated with any key in sorted order (sorted by
+                            their *encoded* value). Also known as secondary
+                            sort.
         :param stdin: an iterable (can be a ``BytesIO`` or even a list) to use
                       as stdin. This is a hook for testing; if you set
                       ``stdin`` via :py:meth:`~mrjob.job.MRJob.sandbox`, it'll
@@ -368,6 +391,9 @@ class MRJobRunner(object):
 
         # store partitioner
         self._partitioner = partitioner
+
+        # store sort_values
+        self._sort_values = sort_values
 
         # store hadoop input and output formats
         self._hadoop_input_format = hadoop_input_format
@@ -1284,15 +1310,43 @@ class MRJobRunner(object):
 
         Also translate jobconfs to the current Hadoop version, if necessary.
         """
+
         step = self._get_step(step_num)
-        jobconf = combine_dicts(self._opts['jobconf'], step.get('jobconf'))
+
+        jobconf = combine_dicts(self._sort_values_jobconf(),
+                                self._opts['jobconf'],
+                                step.get('jobconf'))
 
         # if user is using the wrong jobconfs, add in the correct ones
-        version = self.get_hadoop_version()
-        if version:
-            jobconf = translate_jobconf_dict(jobconf, hadoop_version=version)
+        # and log a warning
+        hadoop_version = self.get_hadoop_version()
+        if hadoop_version:
+            jobconf = translate_jobconf_dict(jobconf, hadoop_version)
 
         return jobconf
+
+    def _sort_values_jobconf(self, step):
+        """Jobconf dictionary to enable sorting by value."""
+        if not self._sort_values or _is_spark_step_type(step['type']):
+            return {}
+
+        # translate _SORT_VALUES_JOBCONF to the correct Hadoop version,
+        # without logging a warning
+        hadoop_version = self.get_hadoop_version()
+        if hadoop_version:
+            return dict(
+                (translate_jobconf(k), hadoop_version)
+                for k,v in _SORT_VALUES_JOBCONF.items())
+        else:
+            # hadoop_version can be None on local runners
+            return dict(_SORT_VALUES_JOBCONF)
+
+    def _sort_values_partitioner(self):
+        """Partitioner to use with *sort_values* keyword to the constructor."""
+        if self._sort_values:
+            return _SORT_VALUES_PARTITIONER
+        else:
+            return None
 
     # TODO: this is only used by non-local runners, and could
     # conceivably be moved to some intermediary class (RealMRJobRunner?)
@@ -1316,8 +1370,9 @@ class MRJobRunner(object):
         args.extend(self._opts.get('hadoop_extra_args', ()))
 
         # partitioner
-        if self._partitioner:
-            args.extend(['-partitioner', self._partitioner])
+        partitioner = self._partitioner or self._sort_values_partitioner()
+        if partitioner:
+            args.extend(['-partitioner', partitioner])
 
         # cmdenv
         for key, value in sorted(self._opts['cmdenv'].items()):

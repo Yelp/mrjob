@@ -43,21 +43,6 @@ from mrjob.util import read_input
 log = logging.getLogger(__name__)
 
 
-# jobconf options for implementing SORT_VALUES
-_SORT_VALUES_JOBCONF = {
-    'stream.num.map.output.key.fields': 2,
-    'mapred.text.key.partitioner.options': '-k1,1',
-    # Hadoop's defaults for these actually work fine; we just want to
-    # prevent interference from mrjob.conf.
-    'mapred.output.key.comparator.class': None,
-    'mapred.text.key.comparator.options': None,
-}
-
-# partitioner for sort_values
-_SORT_VALUES_PARTITIONER = \
-    'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
-
-
 def _im_func(f):
     """Wrapper to get at the underlying function belonging to a method.
 
@@ -1112,10 +1097,7 @@ class MRJob(MRJobLauncher):
         You probably don't need to re-define this; it's just here for
         completeness.
         """
-        return (self.options.partitioner or
-                self.PARTITIONER or
-                ('org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner' if
-                 self.SORT_VALUES else None))
+        return self.options.partitioner or self.PARTITIONER
 
     ### Jobconf ###
 
@@ -1136,11 +1118,6 @@ class MRJob(MRJobLauncher):
         By default, this combines :option:`jobconf` options from the command
         lines with :py:attr:`JOBCONF`, with command line arguments taking
         precedence.
-
-        If :py:attr:`SORT_VALUES` is set, we also set these jobconf values::
-
-            stream.num.map.output.key.fields=2
-            mapred.text.key.partitioner.options=k1,1
 
         We also blank out ``mapred.output.key.comparator.class``
         and ``mapred.text.key.comparator.options`` to prevent interference
@@ -1203,10 +1180,6 @@ class MRJob(MRJobLauncher):
                 filtered_val = format_hadoop_version(unfiltered_val)
             filtered_jobconf[key] = filtered_val
 
-        if self.SORT_VALUES:
-            filtered_jobconf = combine_dicts(
-                _SORT_VALUES_JOBCONF, filtered_jobconf)
-
         return filtered_jobconf
 
     ### Secondary Sort ###
@@ -1232,6 +1205,13 @@ class MRJob(MRJobLauncher):
     #:
     #: .. versionadded:: 0.4.1
     SORT_VALUES = None
+
+    def sort_values(self):
+        """A method that by default, just returns the value of
+        :py:attr:`SORT_VALUES`. Mostly exists for the sake
+        of consistency, but you could override it if you wanted to make
+        secondary sort configurable."""
+        return self.SORT_VALUES
 
 
 if __name__ == '__main__':

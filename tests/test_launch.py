@@ -409,6 +409,7 @@ class JobRunnerKwargsTestCase(TestCase):
         'mr_job_script',
         'output_dir',
         'partitioner',
+        'sort_values',
         'stdin',
     ])
 

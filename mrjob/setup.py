@@ -35,6 +35,7 @@ manager classes.
 """
 import itertools
 import logging
+import os
 import os.path
 import posixpath
 import re
@@ -47,7 +48,7 @@ from mrjob.util import expand_path
 log = logging.getLogger(__name__)
 
 
-_SUPPORTED_TYPES = ('archive', 'file')
+_SUPPORTED_TYPES = ('archive', 'dir', 'file')
 
 
 _SETUP_CMD_RE = re.compile(
@@ -55,7 +56,8 @@ _SETUP_CMD_RE = re.compile(
     r'(?P<double_quoted>"([^"\\]|\\.)*")|'
     r'(?P<hash_path>'
         r'(?P<path>([A-Za-z][A-Za-z0-9\.-]*://([^\'"\s\\]|\\.)+)|'  # noqa
-            r'([^\'":=\s\\]|\\.)+)'  # noqa
+            r'([^\'":=\s\\]|\\.)*([^\'":=\s\\/]|\\.))'  # noqa
+            r'(?P<path_slash>/)?'
         r'#(?P<name>([^\'":;><|=/#\s\\]|\\.)*)'
             r'(?P<name_slash>/)?)|'
     r'(?P<unquoted>([^\'":=\s\\]|\\.)+)|'
@@ -86,8 +88,16 @@ def parse_setup_cmd(cmd):
     remote system. The trailing slash will *also* be kept as part of the
     original command.
 
+    If *path* is followed by a trailing slash, that indicates *path* is a
+    directory and should be tarballed and later unarchived into a directory
+    on the remote system. The trailing slash will also be kept as part of
+    the original command. You may optionally include a slash after *name* as
+    well (this will only result in a single slash in the final command).
+
+    .. versionadded:: 0.5.8 support for directories (above)
+
     Parsed hash paths are dicitionaries with the keys ``path``, ``name``, and
-    ``type`` (either ``'file'`` or ``'archive'``).
+    ``type`` (either ``'file'``, ``'archive'``, or ``'dir'``).
 
     Most of the time, this function will just do what you expect. Rules for
     finding hash paths:
@@ -127,11 +137,20 @@ def parse_setup_cmd(cmd):
             else:
                 tokens.append(keep_as_is)
         elif m.group('hash_path'):
+            if m.group('path_slash'):
+                token_type = 'dir'
+            elif m.group('name_slash'):
+                token_type = 'archive'
+            else:
+                token_type = 'file'
+
             tokens.append({
                 'path': _resolve_path(m.group('path')),
                 'name': m.group('name') or None,
-                'type': 'archive' if m.group('name_slash') else 'file'})
-            if m.group('name_slash'):
+                'type': token_type
+            })
+
+            if m.group('path_slash') or m.group('name_slash'):
                 tokens.append('/')
         elif m.group('error'):
             # these match the error messages from shlex.split()
@@ -185,17 +204,21 @@ def parse_legacy_hash_path(type, path, must_name=None):
     if '#' in path:
         path, name = path.split('#', 1)
 
-        # allow a slash after the name of an archive because that's
+        # allow a slash after the name of an archive or dir because that's
         # the new-way of specifying archive paths
-        if name.endswith('/') and type == 'archive':
-            name = name[:-1]
+        if type in ('archive', 'dir'):
+            name = name.rstrip('/' + os.sep)
 
         if '/' in name or '#' in name:
             raise ValueError(
                 'Bad path %r; name must not contain # or /' % (path,))
     else:
         if must_name:
-            name = os.path.basename(path)
+            if type == 'dir':
+                # handle trailing slash on directory names
+                name = os.path.basename(path.rstrip('/' + os.sep))
+            else:
+                name = os.path.basename(path)
         else:
             name = None
 
@@ -228,7 +251,7 @@ def name_uniquely(path, names_taken=(), proposed_name=None, unhide=False):
     'foo-1.tar.gz'
     """
     if not proposed_name:
-        proposed_name = os.path.basename(path)
+        proposed_name = os.path.basename(path.rstrip('/' + os.sep))
 
     if unhide:
         proposed_name = proposed_name.lstrip('.').lstrip('_')
@@ -330,7 +353,9 @@ class WorkingDirManager(object):
     If you wish, you may assign multiple names to the same file, or add
     a path as both a file and an archive (though not mapped to the same name).
     """
-    _SUPPORTED_TYPES = _SUPPORTED_TYPES
+    # dirs are not supported directly; runners need to archive them
+    # and add that archive
+    _SUPPORTED_TYPES = ('archive', 'file')
 
     def __init__(self):
         # map from paths added without a name to None or lazily chosen name

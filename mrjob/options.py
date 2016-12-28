@@ -1200,6 +1200,17 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    upload_dirs=dict(
+        combiner=combine_path_lists,
+        switches=[
+            (['--dir'], dict(
+                action='append',
+                help=('Tarball the given directory and unpack the resulting'
+                     ' archive in the working directory of this script.'
+                     ' You can use --dir multiple times'),
+            )),
+        ],
+    ),
     upload_files=dict(
         combiner=combine_path_lists,
         switches=[

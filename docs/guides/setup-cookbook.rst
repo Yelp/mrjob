@@ -12,42 +12,48 @@ All our :file:`mrjob.conf` examples below are for the ``hadoop`` runner,
 but these work equally well with the ``emr`` runner. Also, if you are using
 EMR, take a look at the :doc:`emr-bootstrap-cookbook`.
 
+.. note::
+
+   Setup scripts don't work with :doc:`spark`; try :mrjob-opt:`py_files`
+   instead.
+
 .. _cookbook-src-tree-pythonpath:
 
-Putting your source tree in :envvar:`PYTHONPATH`
-------------------------------------------------
+Uploading your source tree
+--------------------------
 
-The simplest way to do this is to package your source tree as a ``.zip`` file
-(which Python can import from without unarchving it):
+.. note:: This relies on a feature that was added in 0.5.8. See below
+          for how to do it in earlier versions.
 
-.. code-block:: sh
+mrjob can automatically tarball your source directory and include it
+in your job's working directory. We can use setup scripts to upload the
+directory and then add it to :envvar:`PYTHONPATH`.
 
-  cd my-source-tree
-  zip -r ../my-source-tree.zip .
-
-Then reference that ``.zip`` with the :mrjob-opt:`py_files` option. Either run
-your job with:
+Run your job with:
 
 .. code-block:: sh
 
-   --py-file my-source-tree.zip
+    --setup 'export PYTHONPATH=$PYTHONPATH:your-src-code/#'
 
-Or update your :file:`mrjob.conf` like this:
+The ``/`` before the ``#`` tells mrjob that :file:`your-src-code` is a
+directory. You may optionally include a ``/`` after the ``#`` as well
+(e.g. ``export PYTHONPATH=$PYTHONPATH:your-source-code/#/your-lib``).
+
+If every job you run is going to want to use :file:`your-src-code`, you can do
+this in your :file:`mrjob.conf`:
 
 .. code-block:: yaml
 
     runners:
       hadoop:
-        py_files:
-        - my-source-tree.zip
+        setup:
+        - export PYTHONPATH=$PYTHONPATH:your-src-code/#
 
 Uploading your source tree as an archive
 ----------------------------------------
 
-If your source tree isn't zip-safe (for example, if it contains non-Python
-support files), you can upload it as an archive instead.
-
-First you need to make a tarball of your source tree:
+If you're using an earlier version of Python, you'll have to build the
+tarball yourself:
 
 .. code-block:: sh
 
@@ -57,10 +63,12 @@ Then, run your job with:
 
 .. code-block:: sh
 
-    --setup 'export PYTHONPATH=$PYTHONPATH:your-src-dir.tar.gz#/'
+    --setup 'export PYTHONPATH=$PYTHONPATH:your-src-code.tar.gz#/'
 
-If every job you run is going to want to use ``your-src-code.tar.gz``, you can do
-this in your :file:`mrjob.conf`:
+The ``/`` after the ``#`` (without one before it) is what tells mrjob that
+``your-src-code.tar.gz`` is an archive that Hadoop should unpack.
+
+To do the same thing in :file:`mrjob.conf`:
 
 .. code-block:: yaml
 

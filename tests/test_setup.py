@@ -32,13 +32,21 @@ class ParseSetupCmdTestCase(TestCase):
         self.assertEqual(parse_setup_cmd(' '), [' '])
         self.assertRaises(TypeError, parse_setup_cmd, None)
 
-    def test_hash_path_alone(self):
+    def test_file_hash_path_alone(self):
+        self.assertEqual(
+            parse_setup_cmd('foo#'),
+            [{'type': 'file', 'path': 'foo', 'name': None}])
         self.assertEqual(
             parse_setup_cmd('foo#bar'),
             [{'type': 'file', 'path': 'foo', 'name': 'bar'}])
         self.assertEqual(
             parse_setup_cmd('/dir/foo#bar'),
             [{'type': 'file', 'path': '/dir/foo', 'name': 'bar'}])
+
+    def test_archive_hash_path_alone(self):
+        self.assertEqual(
+            parse_setup_cmd('foo#/'),
+            [{'type': 'archive', 'path': 'foo', 'name': None}, '/'])
         self.assertEqual(
             parse_setup_cmd('foo#bar/'),
             [{'type': 'archive', 'path': 'foo', 'name': 'bar'}, '/'])
@@ -46,8 +54,33 @@ class ParseSetupCmdTestCase(TestCase):
             parse_setup_cmd('/dir/foo#bar/'),
             [{'type': 'archive', 'path': '/dir/foo', 'name': 'bar'}, '/'])
 
+    def test_dir_hash_path_alone(self):
+        self.assertEqual(
+            parse_setup_cmd('foo/#'),
+            [{'type': 'dir', 'path': 'foo', 'name': None}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('foo/#/'),
+            [{'type': 'dir', 'path': 'foo', 'name': None}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('foo/#bar'),
+            [{'type': 'dir', 'path': 'foo', 'name': 'bar'}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('foo/#bar/'),
+            [{'type': 'dir', 'path': 'foo', 'name': 'bar'}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('/dir/foo/#bar'),
+            [{'type': 'dir', 'path': '/dir/foo', 'name': 'bar'}, '/'])
+        self.assertEqual(
+            parse_setup_cmd('/dir/foo/#bar/'),
+            [{'type': 'dir', 'path': '/dir/foo', 'name': 'bar'}, '/'])
+
     def test_no_path(self):
         self.assertEqual(parse_setup_cmd('#bar'), ['#bar'])
+
+    def test_root_dir_only(self):
+        # tarring up the entire filesystem is a terrible idea; no
+        # good reason to allow this
+        self.assertEqual(parse_setup_cmd('/#'), ['/#'])
 
     def test_no_name(self):
         self.assertEqual(
@@ -70,6 +103,20 @@ class ParseSetupCmdTestCase(TestCase):
             ['sudo dpkg -i ',
              {'type': 'archive', 'path': 'my_pkgs.tar', 'name': None},
              '/fooify.deb'])
+
+    def test_file_inside_dir(self):
+        self.assertEqual(
+            parse_setup_cmd('sudo dpkg -i my_pkgs/#/fooify.deb'),
+            ['sudo dpkg -i ',
+             {'type': 'dir', 'path': 'my_pkgs', 'name': None},
+             '/fooify.deb'])
+
+    def test_named_dir(self):
+        self.assertEqual(
+            parse_setup_cmd('cd src/#awesome-dir'),
+            ['cd ',
+             {'type': 'dir', 'path': 'src', 'name': 'awesome-dir'},
+             '/'])
 
     def test_shell_punctuation_after_name(self):
         self.assertEqual(
@@ -199,7 +246,7 @@ class ParseLegacyHashPathTestCase(TestCase):
     def test_bad_path_type(self):
         self.assertRaises(
             ValueError,
-            parse_legacy_hash_path, 'dir', 'foo#bar')
+            parse_legacy_hash_path, 'symlink', 'foo#bar')
 
     def test_bad_name(self):
         self.assertRaises(
@@ -222,7 +269,7 @@ class NameUniquelyTestCase(TestCase):
 
     def test_use_basename_by_default(self):
         self.assertEqual(name_uniquely('foo/bar.py'), 'bar.py')
-        self.assertEqual(name_uniquely('foo/bar/'), '1')
+        self.assertEqual(name_uniquely('/'), '1')
 
     def test_dont_use_names_taken(self):
         self.assertEqual(name_uniquely('foo.py'), 'foo.py')
@@ -296,6 +343,14 @@ class NameUniquelyTestCase(TestCase):
             name_uniquely(
                 'foo.py', proposed_name='.hidden.foo.py', unhide=True),
             'hidden.foo.py')
+
+    def test_strip_trailing_slash(self):
+        self.assertEqual(
+            name_uniquely('s3://bucket/archive-dir/'), 'archive-dir')
+
+    def test_strip_trailing_os_sep(self):
+        self.assertEqual(
+            name_uniquely(os.path.join('foo', 'bar', '')), 'bar')
 
 
 class UploadDirManagerTestCase(TestCase):
@@ -447,9 +502,9 @@ class WorkingDirManagerTestCase(TestCase):
 
     def test_bad_path_type(self):
         wd = WorkingDirManager()
-        self.assertRaises(ValueError, wd.add, 'dir', 'foo.py')
-        self.assertRaises(ValueError, wd.name_to_path, 'dir')
-        self.assertRaises(ValueError, wd.name, 'dir', 'foo.py')
+        self.assertRaises(ValueError, wd.add, 'symlink', 'foo.py')
+        self.assertRaises(ValueError, wd.name_to_path, 'symlink')
+        self.assertRaises(ValueError, wd.name, 'symlink', 'foo.py')
 
     def test_cant_name_unknown_paths(self):
         wd = WorkingDirManager()

@@ -81,6 +81,44 @@ options related to file uploading.
        must use an archive, see :ref:`cookbook-src-tree-pythonpath`.
 
 .. mrjob-opt::
+    :config: upload_archives
+    :switch: --archive
+    :type: :ref:`path list <data-type-path-list>`
+    :set: all
+    :default: ``[]``
+
+    A list of archives (e.g. tarballs) to unpack in the local directory of the
+    mr_job script when it runs. You can set the name in the job's working
+    directory we unpack into by appending ``#nameinworkingdir`` to the path;
+    otherwise we just use the
+    name of the archive file (e.g. ``foo.tar.gz`` is unpacked to the directory
+    ``foo.tar.gz/``, and ``foo.tar.gz#stuff`` is unpacked to the directory
+    ``stuff/``).
+
+    .. versionchanged:: 0.5.7
+
+       This works with Spark as well.
+
+.. mrjob-opt::
+    :config: upload_dirs
+    :switch: --dir
+    :type: :ref:`path list <data-type-path-list>`
+    :set: all
+    :default: ``[]``
+
+    A list of directories to copy to the local directory of the
+    mr_job script when it runs (mrjob does this by tarballing the directory
+    and submitting the tarball to Hadoop as an archive).
+
+    You can set the name in the job's working directory of the directory
+    we copy by appending
+    ``#nameinworkingdir`` to the path; otherwise we just use its name.
+
+    This works with Spark as well.
+
+    .. versionadded:: 0.5.8
+
+.. mrjob-opt::
     :config: upload_files
     :switch: --file
     :type: :ref:`path list <data-type-path-list>`
@@ -88,8 +126,9 @@ options related to file uploading.
     :default: ``[]``
 
     Files to copy to the local directory of the mr_job script when it runs. You
-    can set the local name of the dir we unpack into by appending
-    ``#localname`` to the path; otherwise we just use the name of the file.
+    can set the name of the file in the job's working directory by appending
+    ``#nameinworkingdir`` to the path; otherwise we just use the name of the
+    file.
 
     In the config file::
 
@@ -100,24 +139,6 @@ options related to file uploading.
     On the command line::
 
         --file file_1.txt --file file_2.sqlite
-
-    .. versionchanged:: 0.5.7
-
-       This works with Spark as well.
-
-.. mrjob-opt::
-    :config: upload_archives
-    :switch: --archive
-    :type: :ref:`path list <data-type-path-list>`
-    :set: all
-    :default: ``[]``
-
-    A list of archives (e.g. tarballs) to unpack in the local directory of the
-    mr_job script when it runs. You can set the local name of the dir we unpack
-    into by appending ``#localname`` to the path; otherwise we just use the
-    name of the archive file (e.g. ``foo.tar.gz`` is unpacked to the directory
-    ``foo.tar.gz/``, and ``foo.tar.gz#stuff`` is unpacked to the directory
-    ``stuff/``).
 
     .. versionchanged:: 0.5.7
 
@@ -319,8 +340,18 @@ Job execution context
 
     *path* may also be a URI, and ``~`` and environment variables within *path*
     will be resolved based on the local environment. *name* is optional.
+
     You can indicate that an archive should be unarchived into a directory by
-    putting a ``/`` after *name*. For details of parsing, see
+    putting a ``/`` after *name* (e.g. ``foo.tar.gz#foo/``).
+
+    You can indicate that a directory should be copied into the job's
+    working directory by putting a ``/`` after *path* (e.g. ``src-tree/#``).
+    You may optionally put a ``/`` after *name* as well
+    (e.g. ``cd src-tree/#/subdir``).
+
+    .. versionadded:: 0.5.8 support for directories (above)
+
+    For more details of parsing, see
     :py:func:`~mrjob.setup.parse_setup_cmd`.
 
 .. mrjob-opt::

@@ -1,4 +1,5 @@
 # Copyright 2013 David Marin
+# Copyright 2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,11 +29,17 @@ class MROSWalkJob(MRJob):
         except ImportError:
             pass
 
-        for dirpath, _, filenames in os.walk('.'):
+        for dirpath, _, filenames in os.walk('.', followlinks=True):
             for filename in filenames:
                 path = os.path.join(dirpath, filename)
                 size = os.path.getsize(path)
                 yield path, size
+
+    def reducer(self, key, values):
+        # remove duplicates
+        for value in values:
+            yield (key, value)
+            break
 
 
 if __name__ == '__main__':

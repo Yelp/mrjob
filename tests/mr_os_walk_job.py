@@ -21,9 +21,6 @@ from mrjob.job import MRJob
 class MROSWalkJob(MRJob):
     """Recursively return the name and size of each file in the current dir."""
 
-    def mapper(self, key, value):
-        return  # ignore input
-
     def mapper_final(self):
         # hook for test_local.LocalRunnerSetupTestCase.test_python_archive()
         try:

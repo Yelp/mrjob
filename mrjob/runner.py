@@ -1313,6 +1313,9 @@ class MRJobRunner(object):
 
         step = self._get_step(step_num)
 
+        # _sort_values_jobconf() isn't relevant to Spark,
+        # but it doesn't do any harm either
+
         jobconf = combine_dicts(self._sort_values_jobconf(),
                                 self._opts['jobconf'],
                                 step.get('jobconf'))
@@ -1325,9 +1328,10 @@ class MRJobRunner(object):
 
         return jobconf
 
-    def _sort_values_jobconf(self, step):
-        """Jobconf dictionary to enable sorting by value."""
-        if not self._sort_values or _is_spark_step_type(step['type']):
+    def _sort_values_jobconf(self):
+        """Jobconf dictionary to enable sorting by value.
+        """
+        if not self._sort_values:
             return {}
 
         # translate _SORT_VALUES_JOBCONF to the correct Hadoop version,

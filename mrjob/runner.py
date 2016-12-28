@@ -1339,8 +1339,8 @@ class MRJobRunner(object):
         hadoop_version = self.get_hadoop_version()
         if hadoop_version:
             return dict(
-                (translate_jobconf(k), hadoop_version)
-                for k,v in _SORT_VALUES_JOBCONF.items())
+                (translate_jobconf(k, hadoop_version), v)
+                for k, v in _SORT_VALUES_JOBCONF.items())
         else:
             # hadoop_version can be None on local runners
             return dict(_SORT_VALUES_JOBCONF)

@@ -90,9 +90,11 @@ def parse_setup_cmd(cmd):
 
     If *path* is followed by a trailing slash, that indicates *path* is a
     directory and should be tarballed and later unarchived into a directory
-    on the remote system. The trailing slash will *also* be kept as part of the
-    original command. You may also include a slash after *name* as needed
-    (this will only result in a single slash in the final command).
+    on the remote system. The trailing slash will also be kept as part of
+    the original command. You may optionally include a slash after *name* as
+    well (this will only result in a single slash in the final command).
+
+    .. versionadded:: 0.5.8 support for directories (above)
 
     Parsed hash paths are dicitionaries with the keys ``path``, ``name``, and
     ``type`` (either ``'file'``, ``'archive'``, or ``'dir'``).

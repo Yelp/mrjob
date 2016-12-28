@@ -32,7 +32,7 @@ class MROSWalkJob(MRJob):
         except ImportError:
             pass
 
-        for dirpath, _, filenames in os.walk('.'):
+        for dirpath, _, filenames in os.walk('.', followlinks=True):
             for filename in filenames:
                 path = os.path.join(dirpath, filename)
                 size = os.path.getsize(path)

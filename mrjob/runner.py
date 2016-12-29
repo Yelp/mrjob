@@ -37,6 +37,7 @@ from subprocess import check_call
 import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
+from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.conf import load_opts_from_mrjob_confs
@@ -72,12 +73,8 @@ _BUFFER_SIZE = 4096
 
 # jobconf options for implementing SORT_VALUES
 _SORT_VALUES_JOBCONF = {
-    'stream.num.map.output.key.fields': 2,
-    'mapred.text.key.partitioner.options': '-k1,1',
-    # Hadoop's defaults for these actually work fine; we just want to
-    # prevent interference from mrjob.conf.
-    'mapred.output.key.comparator.class': None,
-    'mapred.text.key.comparator.options': None,
+    'mapreduce.partition.keypartitioner.options': '-k1,1',
+    'stream.num.map.output.key.fields': 2
 }
 
 # partitioner for sort_values
@@ -1337,13 +1334,16 @@ class MRJobRunner(object):
         # translate _SORT_VALUES_JOBCONF to the correct Hadoop version,
         # without logging a warning
         hadoop_version = self.get_hadoop_version()
-        if hadoop_version:
-            return dict(
-                (translate_jobconf(k, hadoop_version), v)
-                for k, v in _SORT_VALUES_JOBCONF.items())
-        else:
-            # hadoop_version can be None on local runners
-            return dict(_SORT_VALUES_JOBCONF)
+
+        jobconf = {}
+        for k, v in _SORT_VALUES_JOBCONF.items():
+            if hadoop_version:
+                jobconf[translate_jobconf(k, hadoop_version)] = v
+            else:
+                for j in translate_jobconf_for_all_versions(k):
+                    jobconf[j] = v
+
+        return jobconf
 
     def _sort_values_partitioner(self):
         """Partitioner to use with *sort_values* keyword to the constructor."""

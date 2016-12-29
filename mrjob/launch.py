@@ -645,31 +645,33 @@ class MRJobLauncher(object):
             jobconf=self.jobconf(),
             libjars=self.libjars(),
             partitioner=self.partitioner(),
+            sort_values=self.sort_values(),
         )
 
-    ### Default values for Hadoop stuff ###
+    ### Hooks for options defined by the job ###
 
     def hadoop_input_format(self):
-        """Hadoop input format must be known by the launcher but is defined by
-        the job. We have no good way to do this, but
-        :py:class:`~mrjob.job.MRJob` handles it well for now.
-        """
+        """See :py:meth:`mrjob.job.MRJob.hadoop_input_format`."""
         return None
 
     def hadoop_output_format(self):
-        """See hadoop_input_format()."""
+        """See :py:meth:`mrjob.job.MRJob.hadoop_output_format`."""
         return None
 
     def jobconf(self):
-        """See hadoop_input_format()."""
+        """See :py:meth:`mrjob.job.MRJob.jobconf`."""
         return {}
 
     def libjars(self):
-        """See hadoop_input_format()."""
+        """See :py:meth:`mrjob.job.MRJob.libjars`."""
         return []
 
     def partitioner(self):
-        """See hadoop_input_format()."""
+        """See :py:meth:`mrjob.job.MRJob.partitioner`."""
+        return None
+
+    def sort_values(self):
+        """See :py:meth:`mrjob.job.MRJob.sort_values`."""
         return None
 
     ### More option stuff ###

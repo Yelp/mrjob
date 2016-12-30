@@ -119,7 +119,7 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     ec2_key_pair_file = runner._opts['ec2_key_pair_file']
 
     keyfile = None
-    slave_addrs = runner._ssh_worker_ips()
+    slave_addrs = runner._ssh_worker_hosts()
 
     if slave_addrs:
         addresses += ['%s!%s' % (master_addr, slave_addr)

@@ -2326,7 +2326,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 host_desc = ssh_host
                 if ssh_to_workers:
                     try:
-                        hosts.extend(self._ssh_worker_ips())
+                        hosts.extend(self._ssh_worker_hosts())
                         host_desc += ' and task/core nodes'
                     except IOError:
                         log.warning('Could not get slave addresses for %s' %
@@ -2349,10 +2349,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('Looking for %s in %s...' % (log_desc, cloud_log_dir))
             yield [cloud_log_dir]
 
-    def _ssh_worker_ips(self):
-        """Get the private IP addresses of all core and task nodes,
+    def _ssh_worker_hosts(self):
+        """Get the hostnames of all core and task nodes,
         that are currently running, so we can SSH to them through the master
-         nodes and read their logs."""
+        nodes and read their logs.
+
+        (This currently returns IP addresses rather than full hostnames
+        because they're shorter.)
+        """
         return [
             instance.privateipaddress for instance in
             _yield_all_instances(

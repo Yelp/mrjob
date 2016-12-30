@@ -58,7 +58,6 @@ class SSHFilesystem(Filesystem):
 
         # should we use sudo (for EMR)? Enable with use_sudo_over_ssh()
         self._sudo = False
-
     def can_handle_path(self, path):
         return _SSH_URI_RE.match(path) is not None
 
@@ -153,6 +152,9 @@ class SSHFilesystem(Filesystem):
 
     def ssh_slave_hosts(self, host, force=False):
         """Get a list of the slave hosts reachable through *hosts*"""
+        log.warning('ssh_slave_hosts() is deprecated and will be removed'
+                    ' in v0.6.0')
+
         if force or host not in self._host_to_slave_hosts:
             self._host_to_slave_hosts[host] = _ssh_slave_addresses(
                 self._ssh_bin, host, self._ec2_key_pair_file)

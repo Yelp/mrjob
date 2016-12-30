@@ -247,6 +247,7 @@ class MockBotoTestCase(SandboxedTestCase):
         runner._fs = None
         #runner.fs
 
+    # TODO: this should be replaced once we get rid of ssh_slave_hosts()
     def add_slave(self):
         """Add a mocked slave to the cluster. Caller is responsible for setting
         runner._opts['num_ec2_instances'] to the correct number.
@@ -1183,9 +1184,9 @@ class MockEmrConnection(object):
 
     def list_instances(self, cluster_id, instance_group_id=None,
                        instance_group_types=None, marker=None):
-        """really bare-bones simulation of list_instances() to support
-        SSH tunneling; only works for the master instance, and only includes
-        the privateipaddress field.
+        """stripped-down simulation of list_instances() to support
+        SSH tunneling; only includes state.status and the privateipaddress
+        field.
         """
         self._enforce_strict_ssl()
 
@@ -1193,22 +1194,34 @@ class MockEmrConnection(object):
             raise NotImplementedError(
                 'instance_group_id not simulated for ListInstances')
 
-        if not (instance_group_types and
-                list(instance_group_types) == ['MASTER']):
-            raise NotImplementedError(
-                'ListInstances only simulated for master group')
-
         if marker is not None:
             raise NotImplementedError(
                 'marker not simulated for ListInstances')
 
         cluster = self._get_mock_cluster(cluster_id)
 
-        master = MockEmrObject()
-        if cluster.status.state != 'STARTING':
-            master.privateipaddress = '172.172.172.172'
+        instances = []
 
-        return MockEmrObject(instances=[master])
+        for i, ig in enumerate(cluster._instancegroups):
+            if instance_group_types and (
+                    ig.instancegrouptype not in instance_group_types):
+                continue
+
+            for j in range(int(ig.requestedinstancecount)):
+                instance = MockEmrObject()
+
+                state = ig.status.state
+
+                instance.status = MockEmrObject(state=state)
+
+                if state not in ('PROVISIONING', 'AWAITING_FULLFILLMENT'):
+                    # this is just an easy way to assign a unique IP
+                    instance.privateipaddress = '172.172.%d.%d' % (
+                        i + 1, j + 1)
+
+                instances.append(instance)
+
+        return MockEmrObject(instances=instances)
 
     def list_instance_groups(self, cluster_id, marker=None):
         self._enforce_strict_ssl()

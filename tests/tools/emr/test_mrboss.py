@@ -22,6 +22,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.mrboss import _run_on_all_nodes
 from tests.mockssh import mock_ssh_file
 from tests.mockboto import MockBotoTestCase
+from tests.py2 import patch
 from tests.test_emr import BUCKET_URI
 from tests.test_emr import LOG_DIR
 
@@ -30,6 +31,11 @@ class MRBossTestCase(MockBotoTestCase):
 
     def setUp(self):
         super(MRBossTestCase, self).setUp()
+
+        self.ssh_worker_hosts = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ssh_worker_hosts',
+            return_value=[]))
+
         self.make_runner()
 
     def tearDown(self):
@@ -67,6 +73,8 @@ class MRBossTestCase(MockBotoTestCase):
 
     def test_two_nodes(self):
         self.add_slave()
+        self.ssh_worker_hosts.return_value = ['testslave0']
+
         self.runner._opts['num_ec2_instances'] = 2
 
         mock_ssh_file('testmaster', 'some_file', b'file contents 1')

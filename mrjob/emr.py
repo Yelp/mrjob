@@ -289,6 +289,14 @@ def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
             yield action
 
 
+def _yield_all_instances(emr_conn, cluster_id, *args, **kwargs):
+    """Get information about all instances for the given cluster."""
+    for resp in _repeat(emr_conn.list_instances,
+                        cluster_id, *args, **kwargs):
+        for instance in getattr(resp, 'instances', []):
+            yield instance
+
+
 def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
     """Get all instance groups for the given cluster.
 
@@ -2255,7 +2263,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             'task logs',
             dir_name=dir_name,
             s3_dir_name=s3_dir_name,
-            ssh_to_slaves=True)  # TODO: does this make sense on YARN?
+            ssh_to_workers=True)  # TODO: does this make sense on YARN?
 
     def _get_step_log_interpretation(self, log_interpretation, step_type):
         """Fetch and interpret the step log."""
@@ -2301,11 +2309,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_dir_name=posixpath.join('steps', step_id))
 
     def _stream_log_dirs(self, log_desc, dir_name, s3_dir_name,
-                         ssh_to_slaves=False):
+                         ssh_to_workers=False):
         """Stream log dirs for any kind of log.
 
         Our general strategy is first, if SSH is enabled, to SSH into the
-        master node (and possibly slaves, if *ssh_to_slaves* is set).
+        master node (and possibly slaves, if *ssh_to_workers* is set).
 
         If this doesn't work, we have to look on S3. If the cluster is
         TERMINATING, we first wait for it to terminate (since that
@@ -2316,9 +2324,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if ssh_host:
                 hosts = [ssh_host]
                 host_desc = ssh_host
-                if ssh_to_slaves:
+                if ssh_to_workers:
                     try:
-                        hosts.extend(self.fs.ssh_slave_hosts(ssh_host))
+                        hosts.extend(self._ssh_worker_hosts())
                         host_desc += ' and task/core nodes'
                     except IOError:
                         log.warning('Could not get slave addresses for %s' %
@@ -2340,6 +2348,23 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             cloud_log_dir = posixpath.join(self._s3_log_dir(), s3_dir_name)
             log.info('Looking for %s in %s...' % (log_desc, cloud_log_dir))
             yield [cloud_log_dir]
+
+    def _ssh_worker_hosts(self):
+        """Get the hostnames of all core and task nodes,
+        that are currently running, so we can SSH to them through the master
+        nodes and read their logs.
+
+        (This currently returns IP addresses rather than full hostnames
+        because they're shorter.)
+        """
+        return [
+            instance.privateipaddress for instance in
+            _yield_all_instances(
+                self.make_emr_conn(),
+                self._cluster_id,
+                instance_group_types=['CORE', 'TASK'])
+            if instance.status.state == 'RUNNING'
+        ]
 
     def _wait_for_logs_on_s3(self):
         """If the cluster is already terminating, wait for it to terminate,

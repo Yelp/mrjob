@@ -1213,7 +1213,7 @@ class MockEmrConnection(object):
 
                 instance.status = MockEmrObject(state=state)
 
-                if state != 'STARTING':
+                if state not in ('PROVISIONING', 'AWAITING_FULLFILLMENT'):
                     # this is just an easy way to assign a unique IP
                     instance.privateipaddress = '172.172.%d.%d' % (
                         i + 1, j + 1)

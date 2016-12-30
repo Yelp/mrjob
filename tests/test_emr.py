@@ -4563,9 +4563,9 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             'mrjob.emr.EMRJobRunner.get_hadoop_version',
             return_value='2.4.0'))
 
-        self.ssh_slave_hosts = self.start(patch(
-            'mrjob.fs.ssh.SSHFilesystem.ssh_slave_hosts',
-            return_value=['slave1', 'slave2']))
+        self.ssh_worker_hosts = self.start(patch(
+            'mrjob.emr.EMRJobRunner._ssh_worker_hosts',
+            return_value=['core1', 'core2', 'task1']))
 
         self._s3_log_dir = self.start(patch(
             'mrjob.emr.EMRJobRunner._s3_log_dir',
@@ -4714,7 +4714,7 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self._test_stream_step_log_dirs(ssh=False)
 
     def _test_stream_task_log_dirs(
-        self, ssh, bad_ssh_slave_hosts=False, application_id=None,
+        self, ssh, application_id=None,
         image_version=_DEFAULT_IMAGE_VERSION,
         expected_local_path='/mnt/var/log/hadoop/userlogs',
         expected_dir_name='hadoop-yarn/containers',
@@ -4725,9 +4725,6 @@ class StreamLogDirsTestCase(MockBotoTestCase):
         self.get_hadoop_version.return_value = '1.0.3'
         self.get_image_version.return_value = image_version
 
-        if bad_ssh_slave_hosts:
-            self.ssh_slave_hosts.side_effect = IOError
-
         results = runner._stream_task_log_dirs(application_id=application_id)
 
         if ssh:
@@ -4737,24 +4734,16 @@ class StreamLogDirsTestCase(MockBotoTestCase):
             if application_id:
                 local_path = posixpath.join(local_path, application_id)
 
-            if bad_ssh_slave_hosts:
-                self.assertEqual(next(results), [
-                    'ssh://master/mnt/var/log/' + expected_dir_name,
-                ])
-                self.assertTrue(self.log.warning.called)
-                self.log.info.assert_called_once_with(
-                    'Looking for task logs in /mnt/var/log/' +
-                    expected_dir_name + ' on master...')
-            else:
-                self.assertEqual(next(results), [
-                    'ssh://master/mnt/var/log/' + expected_dir_name,
-                    'ssh://master!slave1/mnt/var/log/' + expected_dir_name,
-                    'ssh://master!slave2/mnt/var/log/' + expected_dir_name,
-                ])
-                self.assertFalse(self.log.warning.called)
-                self.log.info.assert_called_once_with(
-                    'Looking for task logs in /mnt/var/log/' +
-                    expected_dir_name + ' on master and task/core nodes...')
+            self.assertEqual(next(results), [
+                'ssh://master/mnt/var/log/' + expected_dir_name,
+                'ssh://master!core1/mnt/var/log/' + expected_dir_name,
+                'ssh://master!core2/mnt/var/log/' + expected_dir_name,
+                'ssh://master!task1/mnt/var/log/' + expected_dir_name,
+            ])
+            self.assertFalse(self.log.warning.called)
+            self.log.info.assert_called_once_with(
+                'Looking for task logs in /mnt/var/log/' +
+                expected_dir_name + ' on master and task/core nodes...')
 
             self.assertFalse(
                 self._wait_for_logs_on_s3.called)
@@ -4775,9 +4764,6 @@ class StreamLogDirsTestCase(MockBotoTestCase):
 
     def test_stream_task_log_dirs_with_ssh(self):
         self._test_stream_task_log_dirs(ssh=True)
-
-    def test_stream_task_log_dirs_with_bad_ssh_slave_hosts(self):
-        self._test_stream_task_log_dirs(ssh=True, bad_ssh_slave_hosts=True)
 
     def test_stream_task_log_dirs_without_ssh(self):
         self._test_stream_task_log_dirs(ssh=False)

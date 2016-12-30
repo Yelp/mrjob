@@ -6159,3 +6159,29 @@ class SparkSubmitArgPrefixTestCase(MockBotoTestCase):
         self.assertEqual(
             runner._spark_submit_arg_prefix(),
             ['--master', 'yarn', '--deploy-mode', 'cluster'])
+
+
+class SSHWorkerHostsTestCase(MockBotoTestCase):
+
+    def _ssh_worker_hosts(self, *args):
+        mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+            return runner._ssh_worker_hosts()
+
+    def test_ignore_master(self):
+        self.assertEqual(len(self._ssh_worker_hosts()), 0)
+
+    def test_include_core_nodes(self):
+        self.assertEqual(
+            len(self._ssh_worker_hosts('--num-core-instances', '2')),
+            2)
+
+    def test_include_task_nodes(self):
+        self.assertEqual(
+            len(self._ssh_worker_hosts('--num-core-instances', '2',
+                                       '--num-task-instances', '3')),
+            5)

@@ -1404,6 +1404,12 @@ def _add_job_options(opt_group):
         help=('Where to run the job; one of dataproc, emr, hadoop, inline,'
               ' or local'))
 
+    opt_group.add_option(
+        '--step-output-dir', dest='step_output_dir', default=None,
+        help=('A directory to store output from job steps other than'
+              ' the last one. Useful for debugging. Currently'
+              ' ignored by local runners.'))
+
 
 ### other utilities for switches ###
 

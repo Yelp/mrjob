@@ -21,6 +21,7 @@ import logging
 import os
 import os.path
 import pipes
+import posixpath
 import pprint
 import re
 import shutil
@@ -209,7 +210,8 @@ class MRJobRunner(object):
                  extra_args=None, file_upload_args=None,
                  hadoop_input_format=None, hadoop_output_format=None,
                  input_paths=None, output_dir=None, partitioner=None,
-                 sort_values=None, stdin=None, **opts):
+                 sort_values=None, stdin=None, step_output_dir=None,
+                 **opts):
         """All runners take the following keyword arguments:
 
         :type mr_job_script: str
@@ -256,7 +258,7 @@ class MRJobRunner(object):
                             this is left blank, we'll read from stdin
         :type output_dir: str
         :param output_dir: An empty/non-existent directory where Hadoop
-                           streaming should put the final output from the job.
+                           should put the final output from the job.
                            If you don't specify an output directory, we'll
                            output into a subdirectory of this job's temporary
                            directory. You can control this from the command
@@ -283,6 +285,11 @@ class MRJobRunner(object):
                       get passed through to the runner. If for some reason
                       your lines are missing newlines, we'll add them;
                       this makes it easier to write automated tests.
+        :type step_output_dir: str
+        :param step_output_dir: An empty/non-existent directory where Hadoop
+                                should put output from all steps other than
+                                the last one (this only matters for multi-step
+                                jobs). Currently ignored by local runners.
         """
         self._ran_job = False
 
@@ -391,6 +398,9 @@ class MRJobRunner(object):
 
         # store sort_values
         self._sort_values = sort_values
+
+        # store step_output_dir
+        self._step_output_dir = step_output_dir
 
         # store hadoop input and output formats
         self._hadoop_input_format = hadoop_input_format
@@ -1198,8 +1208,20 @@ class MRJobRunner(object):
         return [self._stdin_path if p == '-' else p for p in self._input_paths]
 
     def _intermediate_output_uri(self, step_num):
-        """A URI for intermediate output for the given step number.
-        Define this in your runner subclass."""
+        """A URI for intermediate output for the given step number."""
+        # TODO: if we enable this for local runners, use os.path.join()
+        # for them.
+        return posixpath.join(
+            self._step_output_dir or self._default_step_output_dir(),
+            '%04d' % step_num)
+
+    def _default_step_output_dir(self):
+        """Where to put output for steps other than the last one,
+        if not specified by the *output_dir* constructor keyword.
+        Usually you want this to be on HDFS (most efficient).
+
+        Define this in your runner subclass.
+        """
         raise NotImplementedError
 
     def _step_input_uris(self, step_num):

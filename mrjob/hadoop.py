@@ -617,9 +617,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return env
 
-    def _intermediate_output_uri(self, step_num):
-        return posixpath.join(self._hadoop_tmp_dir,
-                              'step-output/%04d' % step_num)
+    def _default_step_output_dir(self):
+        return posixpath.join(self._hadoop_tmp_dir, 'step-output')
 
     def _cleanup_hadoop_tmp(self):
         if self._hadoop_tmp_dir:

@@ -233,6 +233,23 @@ Temp files and cleanup
     Don't stream output to STDOUT after job completion.  This is often used in
     conjunction with ``--output-dir`` to store output only in HDFS or S3.
 
+.. mrjob-opt::
+   :config: step_output_dir
+   :switch: --step-output-dir
+   :type: :ref:`string <data-type-string>`
+   :set: no_mrjob_conf
+   :default: (automatic)
+
+   For a multi-step job, where to put output from job steps other than
+   the last one. Each step's output will go into a numbered subdirectory
+   of this one (``0000/``, ``0001/``, etc.)
+
+   This option can be useful for debugging. By default, intermediate output
+   goes into HDFS, which is fastest but not easily accessible on EMR or
+   Dataproc.
+
+   This option currently does nothing on local and inline runners.
+
 Job execution context
 =====================
 

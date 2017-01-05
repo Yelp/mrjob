@@ -2156,11 +2156,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '/emr-quickstart.html#configuring-ssh-credentials\n' %
                 (_DEFAULT_REGION, _DEFAULT_REGION))
 
-    def _intermediate_output_uri(self, step_num):
-        """Where to store output for non-final steps."""
+    def _default_step_output_dir(self):
         # put intermediate data in HDFS
-        return ('hdfs:///tmp/mrjob/%s/step-output/%04d/' %
-                (self._job_key, step_num))
+        return 'hdfs:///tmp/mrjob/%s/step-output' % self._job_key
 
     ### LOG PARSING (implementation of LogInterpretationMixin) ###
 

@@ -786,11 +786,9 @@ class DataprocJobRunner(MRJobRunner):
 
             raise StepFailedException(step_num=step_num, num_steps=num_steps)
 
-    def _intermediate_output_uri(self, step_num):
-        # TODO: davidmarin @ mtai: noticed this is 1-indexed and uses
-        # %05d instead of %04d. Any particular reason?
-        return 'hdfs:///tmp/mrjob/%s/step-output/%05d/' % (
-            self._job_key, step_num + 1)
+    def _default_step_output_dir(self):
+        # put intermediate data in HDFS
+        return 'hdfs:///tmp/mrjob/%s/step-output' % self._job_key
 
     def counters(self):
         # TODO - mtai @ davidmarin - Counters are currently always empty as we

@@ -60,6 +60,32 @@ else:
     PYTHON_BIN = 'python3'
 
 
+
+class MockHadoopTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(MockHadoopTestCase, self).setUp()
+        # setup fake hadoop home
+        hadoop_home = self.makedirs('mock_hadoop_home')
+        os.environ['HADOOP_HOME'] = hadoop_home
+        os.environ['MOCK_HADOOP_VERSION'] = "1.2.0"
+        os.environ['MOCK_HADOOP_TMP'] = self.makedirs('mock_hadoop_tmp')
+
+        # make fake hadoop binary
+        os.mkdir(os.path.join(hadoop_home, 'bin'))
+        self.hadoop_bin = os.path.join(hadoop_home, 'bin', 'hadoop')
+        create_mock_hadoop_script(self.hadoop_bin)
+
+        # make fake streaming jar
+        os.makedirs(os.path.join(hadoop_home, 'contrib', 'streaming'))
+        streaming_jar_path = os.path.join(
+            hadoop_home, 'contrib', 'streaming', 'hadoop-0.X.Y-streaming.jar')
+        open(streaming_jar_path, 'w').close()
+
+        # make sure the fake hadoop binaries can find mrjob
+        self.add_mrjob_to_pythonpath()
+
+
 class TestFullyQualifyHDFSPath(TestCase):
 
     def test_empty(self):
@@ -88,6 +114,20 @@ class TestFullyQualifyHDFSPath(TestCase):
     def test_other_uri(self):
         self.assertEqual(fully_qualify_hdfs_path('foo://bar/baz'),
                          'foo://bar/baz')
+
+
+class RunnerFullyQualifiesOutputPathsTestCase(MockHadoopTestCase):
+
+    def test_output_dir(self):
+        runner = HadoopJobRunner(output_dir='/path/to/output')
+
+        self.assertEqual(runner._output_dir, 'hdfs:///path/to/output')
+
+    def test_step_output_dir(self):
+        runner = HadoopJobRunner(output_dir='/path/to/step-output')
+
+        self.assertEqual(runner._output_dir, 'hdfs:///path/to/step-output')
+
 
 
 class HadoopStreamingJarTestCase(SandboxedTestCase):
@@ -568,31 +608,6 @@ class StreamTaskLogDirsTestCase(StreamingLogDirsTestCase):
         results = self.runner._stream_task_log_dirs()
 
         self.assertRaises(StopIteration, next, results)
-
-
-class MockHadoopTestCase(SandboxedTestCase):
-
-    def setUp(self):
-        super(MockHadoopTestCase, self).setUp()
-        # setup fake hadoop home
-        hadoop_home = self.makedirs('mock_hadoop_home')
-        os.environ['HADOOP_HOME'] = hadoop_home
-        os.environ['MOCK_HADOOP_VERSION'] = "1.2.0"
-        os.environ['MOCK_HADOOP_TMP'] = self.makedirs('mock_hadoop_tmp')
-
-        # make fake hadoop binary
-        os.mkdir(os.path.join(hadoop_home, 'bin'))
-        self.hadoop_bin = os.path.join(hadoop_home, 'bin', 'hadoop')
-        create_mock_hadoop_script(self.hadoop_bin)
-
-        # make fake streaming jar
-        os.makedirs(os.path.join(hadoop_home, 'contrib', 'streaming'))
-        streaming_jar_path = os.path.join(
-            hadoop_home, 'contrib', 'streaming', 'hadoop-0.X.Y-streaming.jar')
-        open(streaming_jar_path, 'w').close()
-
-        # make sure the fake hadoop binaries can find mrjob
-        self.add_mrjob_to_pythonpath()
 
 
 class GetHadoopVersionTestCase(MockHadoopTestCase):

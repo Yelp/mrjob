@@ -630,6 +630,7 @@ class MRJobLauncher(object):
             output_dir=self.options.output_dir,
             partitioner=self.partitioner(),
             stdin=self.stdin,
+            step_output_dir=self.options.step_output_dir,
         )
 
     def _kwargs_from_switches(self, keys):

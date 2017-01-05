@@ -167,6 +167,11 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
             self._output_dir or
             posixpath.join(self._hadoop_tmp_dir, 'output'))
 
+        # Fully qualify step_output_dir, if set
+        if self._step_output_dir:
+            self._step_output_dir = fully_qualify_hdfs_path(
+                self._step_output_dir)
+
         # Track job and (YARN) application ID to enable log parsing
         self._application_id = None
         self._job_id = None
@@ -617,9 +622,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return env
 
-    def _intermediate_output_uri(self, step_num):
-        return posixpath.join(self._hadoop_tmp_dir,
-                              'step-output/%04d' % step_num)
+    def _default_step_output_dir(self):
+        return posixpath.join(self._hadoop_tmp_dir, 'step-output')
 
     def _cleanup_hadoop_tmp(self):
         if self._hadoop_tmp_dir:

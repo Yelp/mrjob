@@ -89,6 +89,7 @@ class SimMRJobRunner(MRJobRunner):
         '_hadoop_input_format',
         '_hadoop_output_format',
         '_partitioner',
+        '_step_output_dir',
     ]
 
     # options that we ignore becaue they require real Hadoop.

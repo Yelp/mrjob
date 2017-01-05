@@ -411,6 +411,7 @@ class JobRunnerKwargsTestCase(TestCase):
         'partitioner',
         'sort_values',
         'stdin',
+        'step_output_dir',
     ])
 
     CONF_ONLY_OPTIONS = set([

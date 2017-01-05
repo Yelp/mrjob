@@ -48,6 +48,7 @@ from mrjob.util import tar_and_gzip
 
 
 from tests.mockboto import MockBotoTestCase
+from tests.mr_counting_job import MRCountingJob
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_sort_values import MRSortValues
@@ -1690,6 +1691,46 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
 
             output_uri_1 = runner._step_output_uri(1)
             self.assertEqual(output_uri_1, runner._output_dir)
+
+    def test_output_dir_and_step_output_dir(self):
+        input1_path = self.makefile('input1')
+        input2_path = self.makefile('input2')
+
+        output_dir = 'hdfs:///tmp/output'
+        step_output_dir = 'hdfs://tmp/step-output'
+
+        # this has three steps, which lets us test step numbering
+        job = MRCountingJob([
+            '-r', 'hadoop',
+            '--hadoop-bin', 'false',  # shouldn't run; just in case
+            '--output-dir', 'hdfs:///tmp/output',
+            '--step-output-dir', 'hdfs://tmp/step-output',
+            input1_path, input2_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(runner._num_steps(), 3)
+
+            runner._add_job_files_for_upload()
+
+            input_uris_0 = runner._step_input_uris(0)
+            self.assertEqual([os.path.basename(uri) for uri in input_uris_0],
+                             ['input1', 'input2'])
+
+            output_uri_0 = runner._step_output_uri(0)
+            self.assertEqual(output_uri_0, 'hdfs://tmp/step-output/0000')
+
+            input_uris_1 = runner._step_input_uris(1)
+            self.assertEqual(input_uris_1, [output_uri_0])
+
+            output_uri_1 = runner._step_output_uri(1)
+            self.assertEqual(output_uri_1, 'hdfs://tmp/step-output/0001')
+
+            input_uris_2 = runner._step_input_uris(2)
+            self.assertEqual(input_uris_2, [output_uri_1])
+
+            output_uri_2 = runner._step_output_uri(2)
+            self.assertEqual(output_uri_2, 'hdfs:///tmp/output')
 
 
 class DirArchivePathTestCase(SandboxedTestCase):

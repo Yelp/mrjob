@@ -90,6 +90,7 @@ class JarStepTestCase(TestCase):
             'jar': 'binks.jar.jar',
             'main_class': 'MyMainMan',
             'args': ['argh', 'argh'],
+            'jobconf': dict(foo='bar')
         }
         expected = kwargs.copy()
         expected['type'] = 'jar'
@@ -104,6 +105,7 @@ class JarStepTestCase(TestCase):
             'type': 'jar',
             'main_class': None,
             'args': [],
+            'jobconf': {},
         })
         self.assertEqual(JarStep(**kwargs).description(0), expected)
 

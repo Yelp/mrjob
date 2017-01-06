@@ -308,7 +308,90 @@ class MRStep(object):
         return substep_descs
 
 
-class JarStep(object):
+
+class _Step(object):
+    """Generic implementation of steps which are basically just simple objects
+    that hold attributes."""
+
+    # unique string for this step type (e.g. 'jar'). Redefine in your subclass
+    _STEP_TYPE = None
+
+    # all keyword arguments we accept. Redefine in your subclass
+    _STEP_ATTRS = []
+
+    # map from keyword argument to type(s), if we check
+    _STEP_ATTR_TYPES = {
+        'args': (list, tuple),
+        'jar': string_types,
+        'jobconf': dict,
+        'main_class': string_types,
+        'spark_args': (list, tuple),
+    }
+
+    # map from keyword argument to constructor that produces
+    # default values
+    _STEP_ATTR_DEFAULTS = {
+        'args': list,
+        'jobconf': dict,
+        'spark_args': list,
+    }
+
+    # use your own __init__() method to make arguments required
+
+    def __init__(self, **kwargs):
+        """Set all attributes to the corresponding value in *kwargs*, or the
+        default value. Raise :py:class:`TypeError` for unknown arguments or
+        values with the wrong type."""
+        bad_kwargs = sorted(set(kwargs) - set(self._STEP_ATTRS))
+        if bad_kwargs:
+            raise TypeError('%s() got unexpected keyword arguments: %s' % (
+                self.__class__.__name__, ', '.join(bad_kwargs)))
+
+        for k in self._STEP_ATTRS:
+            v = kwargs.get(k)
+            if v is None:
+                v = self._default(k)
+            elif k in self._STEP_ATTR_TYPES and not isinstance(
+                    v, self._STEP_ATTR_TYPES[k]):
+                raise TypeError('%s is not an instance of %r: %r' % (
+                    k, attr_type, v))
+
+            setattr(self, k, v)
+
+    def __repr__(self):
+        kwargs = dict(
+            (k, gettattr(self, k))
+            for k in self._STEP_ATTR_TYPES if hasattr(self, k))
+
+        return '%s(%s)' % (
+            self.__class__.__name__, ', '.join(
+                '%s=%s' % (k, v)
+                for k, v in sorted(kwargs.items())
+                if v != self._default(k)))
+
+    def __eq__(self, other):
+        return (isinstance(other, self.__class__) and
+                all(getattr(self, key) == getattr(other, key)
+                    for key in set(self._STEP_ATTRS)))
+
+    def _default(self, k):
+        if k in self._STEP_ATTR_DEFAULTS:
+            return self._STEP_ATTR_DEFAULTS[k]()
+        else:
+            return None
+
+    def description(self, other):
+        """Return a dictionary representation of this step. See
+        :ref:`steps-format` for examples."""
+        result = dict((k, getattr(self, k)) for k in self._STEP_ATTRS)
+        result['type'] = self._STEP_TYPE
+
+        return result
+
+
+
+
+class JarStep(_Step):
     """Represents a running a custom Jar as a step.
 
     Accepts the following keyword arguments:
@@ -319,6 +402,7 @@ class JarStep(object):
     :param args: (optional) A list of arguments to the jar. Use
                  :py:data:`mrjob.step.INPUT` and :py:data:`OUTPUT` to
                  interpolate input and output paths.
+    :param jobconf: (optional) A dictionary of Hadoop properties
     :param main_class: (optional) The main class to run from the jar. If
                        not specified, Hadoop will use the main class
                        in the jar's manifest file.
@@ -335,52 +419,12 @@ class JarStep(object):
     INPUT = INPUT
     OUTPUT = OUTPUT
 
+    _STEP_TYPE = 'jar'
+
+    _STEP_ATTRS = ['args', 'jar', 'jobconf', 'main_class']
+
     def __init__(self, jar, **kwargs):
-        bad_kwargs = sorted(set(kwargs) - set(_JAR_STEP_KWARGS))
-        if bad_kwargs:
-            raise TypeError('JarStep() got an unexpected keyword argument %r' %
-                            bad_kwargs[0])
-
-        self.jar = jar
-
-        self.args = kwargs.get('args') or []
-        self.main_class = kwargs.get('main_class')
-
-    def __repr__(self):
-        repr_args = []
-        repr_args.append(repr(self.jar))
-        if self.args:
-            repr_args.append('args=' + repr(self.args))
-        if self.main_class:
-            repr_args.append('main_class=' + repr(self.main_class))
-
-        return 'JarStep(%s)' % ', '.join(repr_args)
-
-    def __eq__(self, other):
-        return (isinstance(other, JarStep) and
-                all(getattr(self, key) == getattr(other, key)
-                    for key in ('jar', 'args', 'main_class')))
-
-    def description(self, step_num):
-        """Returns a dictionary representation of this step:
-
-        .. code-block:: js
-
-            {
-                'type': 'jar',
-                'jar': path of the jar,
-                'main_class': string, name of the main class,
-                'args': list of strings, args to the main class,
-            }
-
-        See :ref:`steps-format` for examples.
-        """
-        return {
-            'type': 'jar',
-            'args': self.args,
-            'jar': self.jar,
-            'main_class': self.main_class,
-        }
+        super(JarStep, self).__init__(jar=jar, **kwargs)
 
 
 class SparkStep(object):

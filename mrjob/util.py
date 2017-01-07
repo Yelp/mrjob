@@ -144,7 +144,10 @@ def bash_wrap(cmd_str):
     This low-tech replacement works because we control the surrounding string
     and single quotes are the only character in a single-quote string that
     needs escaping.
+
+    .. deprecated:: 0.5.8
     """
+    log.warning('bash_wrap() is deprecated and will be removed in v0.6.0')
     return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
 
 

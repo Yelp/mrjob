@@ -329,6 +329,7 @@ class _Step(object):
         'jar': string_types,
         'jobconf': dict,
         'main_class': string_types,
+        'script': string_types,
         'spark_args': (list, tuple),
     }
 
@@ -358,13 +359,13 @@ class _Step(object):
             elif k in self._STEP_ATTR_TYPES and not isinstance(
                     v, self._STEP_ATTR_TYPES[k]):
                 raise TypeError('%s is not an instance of %r: %r' % (
-                    k, attr_type, v))
+                    k, self._STEP_ATTR_TYPES[k], v))
 
             setattr(self, k, v)
 
     def __repr__(self):
         kwargs = dict(
-            (k, gettattr(self, k))
+            (k, getattr(self, k))
             for k in self._STEP_ATTR_TYPES if hasattr(self, k))
 
         return '%s(%s)' % (

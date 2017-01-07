@@ -398,17 +398,22 @@ class SparkStepTestCase(TestCase):
         self.assertEqual(step.spark_args, [])
         self.assertEqual(
             step.description(0),
-            dict(type='spark', spark_args=[]),
+            dict(type='spark', jobconf={}, spark_args=[]),
         )
 
     def test_all_args(self):
-        step = SparkStep(spark=spark_func, spark_args=['argh', 'argh'])
+        step = SparkStep(
+            jobconf=dict(foo='bar'),
+            spark=spark_func,
+            spark_args=['argh', 'argh'])
 
         self.assertEqual(step.spark, spark_func)
         self.assertEqual(step.spark_args, ['argh', 'argh'])
         self.assertEqual(
             step.description(0),
-            dict(type='spark', spark_args=['argh', 'argh']),
+            dict(type='spark',
+                 jobconf=dict(foo='bar'),
+                 spark_args=['argh', 'argh']),
         )
 
     def test_positional_spark_arg(self):
@@ -441,6 +446,7 @@ class SparkJarStepTestCase(TestCase):
                 jar='dora.jar',
                 main_class='backpack.Map',
                 args=[],
+                jobconf={},
                 spark_args=[],
             )
         )
@@ -449,6 +455,7 @@ class SparkJarStepTestCase(TestCase):
         step = SparkJarStep(jar='dora.jar',
                             main_class='backpack.Map',
                             args=['ARGH', 'ARGH'],
+                            jobconf=dict(foo='bar'),
                             spark_args=['argh', 'argh'])
 
         self.assertEqual(step.jar, 'dora.jar')
@@ -462,6 +469,7 @@ class SparkJarStepTestCase(TestCase):
                 jar='dora.jar',
                 main_class='backpack.Map',
                 args=['ARGH', 'ARGH'],
+                jobconf=dict(foo='bar'),
                 spark_args=['argh', 'argh'],
             )
         )
@@ -491,6 +499,7 @@ class SparkScriptStepTestCase(TestCase):
                 type='spark_script',
                 script='macbeth.py',
                 args=[],
+                jobconf={},
                 spark_args=[],
             )
         )
@@ -498,6 +507,7 @@ class SparkScriptStepTestCase(TestCase):
     def test_all_args(self):
         step = SparkScriptStep(script='macbeth.py',
                                args=['ARGH', 'ARGH'],
+                               jobconf=dict(foo='bar'),
                                spark_args=['argh', 'argh'])
 
         self.assertEqual(step.script, 'macbeth.py')
@@ -509,6 +519,7 @@ class SparkScriptStepTestCase(TestCase):
                 type='spark_script',
                 script='macbeth.py',
                 args=['ARGH', 'ARGH'],
+                jobconf=dict(foo='bar'),
                 spark_args=['argh', 'argh'],
             )
         )

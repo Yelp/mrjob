@@ -433,8 +433,12 @@ class SparkStepTestCase(TestCase):
         self.assertEqual(step1.description(0), step2.description(0))
 
     def test_bad_arg_types(self):
-        self.assertRaises(TypeError, SparkStep, jobconf=['confs'])
-        self.assertRaises(TypeError, SparkStep, spark_args='argh argh argh')
+        self.assertRaises(TypeError,
+                          SparkStep, spark_func, jobconf=['confs'])
+        self.assertRaises(TypeError,
+                          SparkStep, spark='never call me')
+        self.assertRaises(TypeError,
+                          SparkStep, spark_func, spark_args='argh argh argh')
 
     def test_bad_arg(self):
         self.assertRaises(TypeError, SparkJarStep, jar='dora.jar')

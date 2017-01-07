@@ -118,8 +118,6 @@ class StepFailedException(Exception):
                        if getattr(self, k) is not None)))
 
 
-# TODO: reduce enormous amount of boilerplate in these classes (see #1368)
-
 class MRStep(object):
     """Represents steps handled by the script containing your job.
 
@@ -312,6 +310,7 @@ class MRStep(object):
 class _Step(object):
     """Generic implementation of steps which are basically just simple objects
     that hold attributes."""
+    # MRStep is different enough that I'm going to leave it as-is for now.
 
     # unique string for this step type (e.g. 'jar'). Redefine in your subclass
     _STEP_TYPE = None
@@ -323,13 +322,15 @@ class _Step(object):
     # are handled by the job, not the runner
     _HIDDEN_ATTRS = []
 
-    # map from keyword argument to type(s), if we check
+    # map from keyword argument to type(s), if we check. You can also use
+    # "callable" (which is actually a builtin, not a type) for callables
     _STEP_ATTR_TYPES = {
         'args': (list, tuple),
         'jar': string_types,
         'jobconf': dict,
         'main_class': string_types,
         'script': string_types,
+        'spark': callable,
         'spark_args': (list, tuple),
     }
 
@@ -356,10 +357,15 @@ class _Step(object):
             v = kwargs.get(k)
             if v is None:
                 v = self._default(k)
-            elif k in self._STEP_ATTR_TYPES and not isinstance(
-                    v, self._STEP_ATTR_TYPES[k]):
-                raise TypeError('%s is not an instance of %r: %r' % (
-                    k, self._STEP_ATTR_TYPES[k], v))
+            elif k in self._STEP_ATTR_TYPES:
+                attr_type = self._STEP_ATTR_TYPES[k]
+
+                if attr_type is callable:
+                    if not callable(v):
+                        raise TypeError('%s is not callable: %r' % (k, v))
+                elif not isinstance(v, attr_type):
+                    raise TypeError('%s is not an instance of %r: %r' % (
+                        k, self._STEP_ATTR_TYPES[k], v))
 
             setattr(self, k, v)
 

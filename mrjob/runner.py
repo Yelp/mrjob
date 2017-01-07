@@ -59,7 +59,6 @@ from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
-from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import zip_dir
 
@@ -850,7 +849,7 @@ class MRJobRunner(object):
                 return self._sh_wrap(
                     '%s | %s' % (step[mrc]['pre_filter'], cmd_str))
             else:
-                return cmd
+                return cmd_str
         else:
             raise ValueError("Invalid %s step %d: %r" % (
                 mrc, step_num, step[mrc]))

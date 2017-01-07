@@ -90,6 +90,7 @@ class JarStepTestCase(TestCase):
             'jar': 'binks.jar.jar',
             'main_class': 'MyMainMan',
             'args': ['argh', 'argh'],
+            'jobconf': dict(foo='bar')
         }
         expected = kwargs.copy()
         expected['type'] = 'jar'
@@ -104,8 +105,18 @@ class JarStepTestCase(TestCase):
             'type': 'jar',
             'main_class': None,
             'args': [],
+            'jobconf': {},
         })
         self.assertEqual(JarStep(**kwargs).description(0), expected)
+
+    def test_bad_arg_types(self):
+        self.assertRaises(TypeError, JarStep, args='argh argh argh')
+        self.assertRaises(TypeError, JarStep, jar=['mason'])
+        self.assertRaises(TypeError, JarStep, jobconf='nah')
+        self.assertRaises(TypeError, JarStep, main_class=1)
+
+    def test_bad_arg(self):
+        self.assertRaises(TypeError, JarStep, 'dora.jar', pickle='dill')
 
     def test_deprecated_INPUT_and_OUTPUT_attrs(self):
         self.assertEqual(JarStep.INPUT, INPUT)
@@ -396,17 +407,22 @@ class SparkStepTestCase(TestCase):
         self.assertEqual(step.spark_args, [])
         self.assertEqual(
             step.description(0),
-            dict(type='spark', spark_args=[]),
+            dict(type='spark', jobconf={}, spark_args=[]),
         )
 
     def test_all_args(self):
-        step = SparkStep(spark=spark_func, spark_args=['argh', 'argh'])
+        step = SparkStep(
+            jobconf=dict(foo='bar'),
+            spark=spark_func,
+            spark_args=['argh', 'argh'])
 
         self.assertEqual(step.spark, spark_func)
         self.assertEqual(step.spark_args, ['argh', 'argh'])
         self.assertEqual(
             step.description(0),
-            dict(type='spark', spark_args=['argh', 'argh']),
+            dict(type='spark',
+                 jobconf=dict(foo='bar'),
+                 spark_args=['argh', 'argh']),
         )
 
     def test_positional_spark_arg(self):
@@ -415,6 +431,17 @@ class SparkStepTestCase(TestCase):
 
         self.assertEqual(step1, step2)
         self.assertEqual(step1.description(0), step2.description(0))
+
+    def test_bad_arg_types(self):
+        self.assertRaises(TypeError,
+                          SparkStep, spark_func, jobconf=['confs'])
+        self.assertRaises(TypeError,
+                          SparkStep, spark='never call me')
+        self.assertRaises(TypeError,
+                          SparkStep, spark_func, spark_args='argh argh argh')
+
+    def test_bad_arg(self):
+        self.assertRaises(TypeError, SparkJarStep, jar='dora.jar')
 
 
 class SparkJarStepTestCase(TestCase):
@@ -439,6 +466,7 @@ class SparkJarStepTestCase(TestCase):
                 jar='dora.jar',
                 main_class='backpack.Map',
                 args=[],
+                jobconf={},
                 spark_args=[],
             )
         )
@@ -447,6 +475,7 @@ class SparkJarStepTestCase(TestCase):
         step = SparkJarStep(jar='dora.jar',
                             main_class='backpack.Map',
                             args=['ARGH', 'ARGH'],
+                            jobconf=dict(foo='bar'),
                             spark_args=['argh', 'argh'])
 
         self.assertEqual(step.jar, 'dora.jar')
@@ -460,6 +489,7 @@ class SparkJarStepTestCase(TestCase):
                 jar='dora.jar',
                 main_class='backpack.Map',
                 args=['ARGH', 'ARGH'],
+                jobconf=dict(foo='bar'),
                 spark_args=['argh', 'argh'],
             )
         )
@@ -470,6 +500,16 @@ class SparkJarStepTestCase(TestCase):
 
         self.assertEqual(step1, step2)
         self.assertEqual(step1.description(0), step2.description(0))
+
+    def test_bad_arg_types(self):
+        self.assertRaises(TypeError, SparkJarStep, args='argh argh argh')
+        self.assertRaises(TypeError, SparkJarStep, jar=['mason'])
+        self.assertRaises(TypeError, SparkJarStep, jobconf='nah')
+        self.assertRaises(TypeError, SparkJarStep, main_class=1)
+        self.assertRaises(TypeError, SparkJarStep, spark_args='*ARGH* *ARGH*')
+
+    def test_bad_arg(self):
+        self.assertRaises(TypeError, SparkJarStep, 'dora.jar', spark='*')
 
 
 class SparkScriptStepTestCase(TestCase):
@@ -489,6 +529,7 @@ class SparkScriptStepTestCase(TestCase):
                 type='spark_script',
                 script='macbeth.py',
                 args=[],
+                jobconf={},
                 spark_args=[],
             )
         )
@@ -496,6 +537,7 @@ class SparkScriptStepTestCase(TestCase):
     def test_all_args(self):
         step = SparkScriptStep(script='macbeth.py',
                                args=['ARGH', 'ARGH'],
+                               jobconf=dict(foo='bar'),
                                spark_args=['argh', 'argh'])
 
         self.assertEqual(step.script, 'macbeth.py')
@@ -507,6 +549,7 @@ class SparkScriptStepTestCase(TestCase):
                 type='spark_script',
                 script='macbeth.py',
                 args=['ARGH', 'ARGH'],
+                jobconf=dict(foo='bar'),
                 spark_args=['argh', 'argh'],
             )
         )
@@ -517,3 +560,13 @@ class SparkScriptStepTestCase(TestCase):
 
         self.assertEqual(step1, step2)
         self.assertEqual(step1.description(0), step2.description(0))
+
+    def test_bad_arg_types(self):
+        self.assertRaises(TypeError, SparkScriptStep, args='argh argh argh')
+        self.assertRaises(TypeError, SparkScriptStep, jobconf='nah')
+        self.assertRaises(TypeError, SparkScriptStep, main_class=1)
+        self.assertRaises(TypeError, SparkScriptStep, script=['macbeth'])
+        self.assertRaises(TypeError, SparkScriptStep, spark_args='*ARGH* *ARGH*')
+
+    def test_bad_arg(self):
+        self.assertRaises(TypeError, SparkScriptStep, 'hap.py', spark='*')

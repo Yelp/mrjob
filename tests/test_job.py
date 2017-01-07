@@ -1084,7 +1084,7 @@ class StepsTestCase(TestCase):
 
         self.assertEqual(
             j._steps_desc(),
-            [dict(type='spark', spark_args=[])]
+            [dict(type='spark', jobconf={}, spark_args=[])]
         )
 
     def test_spark_and_spark_args_methods(self):
@@ -1099,7 +1099,7 @@ class StepsTestCase(TestCase):
 
         self.assertEqual(
             j._steps_desc(),
-            [dict(type='spark', spark_args=['argh', 'ARRRRGH!'])]
+            [dict(type='spark', jobconf={}, spark_args=['argh', 'ARRRRGH!'])]
         )
 
     def test_spark_and_streaming_dont_mix(self):

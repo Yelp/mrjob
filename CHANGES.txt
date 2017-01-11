@@ -1,5 +1,6 @@
 v0.5.8, 2017-01-?? -- ???
- * deprecated mrjob.util.tar_and_gz
+ * deprecated mrjob.util.bash_wrap()
+ * deprecated mrjob.util.tar_and_gz()
  * deprecated SSHFilesystem.ssh_slave_hosts()
 
 v0.5.7, 2016-12-19 -- Spark

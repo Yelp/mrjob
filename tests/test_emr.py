@@ -3343,15 +3343,15 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
                      pre_filter='grep something')))
 
         self.assertEqual(ss['mapper'],
-                         "bash -c 'grep anything | " +
+                         "/bin/sh -ex -c 'grep anything | " +
                          PYTHON_BIN +
                          " my_job.py --step-num=0 --mapper'")
         self.assertEqual(ss['combiner'],
-                         "bash -c 'grep nothing | " +
+                         "/bin/sh -ex -c 'grep nothing | " +
                          PYTHON_BIN +
                          " my_job.py --step-num=0 --combiner'")
         self.assertEqual(ss['reducer'],
-                         "bash -c 'grep something | " +
+                         "/bin/sh -ex -c 'grep something | " +
                          PYTHON_BIN +
                          " my_job.py --step-num=0 --reducer'")
 
@@ -3364,7 +3364,7 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
 
         self.assertEqual(
             ss['mapper'],
-            "bash -c 'bash -c '\\''grep"
+            "/bin/sh -ex -c 'bash -c '\\''grep"
             " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
             PYTHON_BIN +
             " my_job.py --step-num=0 --mapper'")

@@ -889,13 +889,13 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
             self.runner._args_for_streaming_step(0),
             (self.BASIC_HADOOP_ARGS + self.BASIC_JOB_ARGS + [
              '-mapper',
-             "bash -c 'grep anything | " + PYTHON_BIN +
+             "sh -ex -c 'grep anything | " + PYTHON_BIN +
              " my_job.py --step-num=0 --mapper'",
              '-combiner',
-             "bash -c 'grep nothing | " + PYTHON_BIN +
+             "sh -ex -c 'grep nothing | " + PYTHON_BIN +
              " my_job.py --step-num=0 --combiner'",
              '-reducer',
-             "bash -c 'grep something | " + PYTHON_BIN +
+             "sh -ex -c 'grep something | " + PYTHON_BIN +
              " my_job.py --step-num=0 --reducer'"]))
 
     def test_pre_filter_escaping(self):
@@ -916,7 +916,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
              ['-D', 'mapreduce.job.reduces=0'] +
              self.BASIC_JOB_ARGS + [
                  '-mapper',
-                 "bash -c 'bash -c '\\''grep"
+                 "sh -ex -c 'bash -c '\\''grep"
                  " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
                  PYTHON_BIN +
                  " my_job.py --step-num=0 --mapper'"]))

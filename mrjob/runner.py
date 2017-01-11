@@ -59,7 +59,6 @@ from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
-from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import zip_dir
 
@@ -839,17 +838,18 @@ class MRJobRunner(object):
 
         if step[mrc]['type'] == 'command':
             # never wrap custom hadoop streaming commands in bash
-            return step[mrc]['command'], False
+            return step[mrc]['command']
 
         elif step[mrc]['type'] == 'script':
-            cmd = cmd_line(self._script_args_for_step(step_num, mrc))
+            cmd_str = cmd_line(self._script_args_for_step(step_num, mrc))
 
             # filter input and pipe for great speed, if user asks
-            # but we have to wrap the command in bash
+            # but we have to wrap the command in sh -c
             if 'pre_filter' in step[mrc]:
-                return '%s | %s' % (step[mrc]['pre_filter'], cmd), True
+                return self._sh_wrap(
+                    '%s | %s' % (step[mrc]['pre_filter'], cmd_str))
             else:
-                return cmd, False
+                return cmd_str
         else:
             raise ValueError("Invalid %s step %d: %r" % (
                 mrc, step_num, step[mrc]))
@@ -861,31 +861,23 @@ class MRJobRunner(object):
             return self._substep_cmd_line(step_num, mrc)
         else:
             if mrc == 'mapper':
-                return 'cat', False
+                return 'cat'
             else:
-                return None, False
+                return None
 
     def _hadoop_streaming_commands(self, step_num):
-        # Hadoop streaming stuff
-        mapper, bash_wrap_mapper = self._render_substep(
-            step_num, 'mapper')
+        return (
+            self._render_substep(step_num, 'mapper'),
+            self._render_substep(step_num, 'combiner'),
+            self._render_substep(step_num, 'reducer'),
+        )
 
-        combiner, bash_wrap_combiner = self._render_substep(
-            step_num, 'combiner')
-
-        reducer, bash_wrap_reducer = self._render_substep(
-            step_num, 'reducer')
-
-        if bash_wrap_mapper:
-            mapper = bash_wrap(mapper)
-
-        if bash_wrap_combiner:
-            combiner = bash_wrap(combiner)
-
-        if bash_wrap_reducer:
-            reducer = bash_wrap(reducer)
-
-        return mapper, combiner, reducer
+    def _sh_wrap(self, cmd_str):
+        """Wrap command in sh -c '...' to allow for pipes, etc.
+        Use *sh_bin* option."""
+        return "%s -c '%s'" % (
+            cmd_line(self._opts['sh_bin']),
+            cmd_str.replace("'", "'\\''"))
 
     def _mr_job_extra_args(self, local=False):
         """Return arguments to add to every invocation of MRJob.

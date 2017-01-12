@@ -1037,6 +1037,17 @@ class StepsTestCase(TestCase):
         def jobconf(self):
             return {'mapred.baz': 'bar'}
 
+    class PreFilterJob(MRJob):
+
+        def mapper_pre_filter(self):
+            return 'grep m'
+
+        def combiner_pre_filter(self):
+            return 'grep c'
+
+        def reducer_pre_filter(self):
+            return 'grep r'
+
     # for spark testing used mock methods instead
 
     def test_steps(self):
@@ -1072,6 +1083,19 @@ class StepsTestCase(TestCase):
         self.assertEqual(
             j.steps()[0],
             MRStep(mapper=j.mapper))
+
+    def test_pre_filters(self):
+        j = self.PreFilterJob(['--no-conf'])
+        self.assertEqual(
+            j._steps_desc(),
+            [
+                dict(
+                    type='streaming',
+                    mapper=dict(type='script', pre_filter='grep m'),
+                    combiner=dict(type='script', pre_filter='grep c'),
+                    reducer=dict(type='script', pre_filter='grep r'),
+                )
+            ])
 
     def test_spark_method(self):
         j = MRJob(['--no-conf'])

@@ -12,18 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""The classic MapReduce job, minus lines containing "e".
+"""The classic MapReduce job, but only for words containing "v"
 """
 from mrjob.job import MRJob
 import re
 
-WORD_RE = re.compile(r"[\w']+")
+WORD_RE = re.compile(r"[\w']*u[\w']*", re.I)
 
 
-class MRGrepWordFreqCount(MRJob):
+class MRVWordFreqCount(MRJob):
 
     def mapper_pre_filter(self):
-        return 'grep -v -i e'
+        return 'grep -i u'
 
     def mapper(self, _, line):
         for word in WORD_RE.findall(line):
@@ -37,4 +37,4 @@ class MRGrepWordFreqCount(MRJob):
 
 
 if __name__ == '__main__':
-    MRGrepWordFreqCount.run()
+    MRVWordFreqCount.run()

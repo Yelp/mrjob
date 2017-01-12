@@ -347,7 +347,7 @@ class MRJob(MRJobLauncher):
         # class as functions that return strings, so call the functions.
         updates = {}
         for k, v in kwargs.items():
-            if k.endswith('_cmd'):
+            if k.endswith('_cmd') or k.endswith('_pre_filter'):
                 updates[k] = v()
 
         kwargs.update(updates)

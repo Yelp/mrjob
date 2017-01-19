@@ -16,10 +16,12 @@
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
 import logging
+from os.path import abspath
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 
+from mrjob.conf import combine_local_envs
 from mrjob.logs.counters import _format_counters
 from mrjob.parse import _find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
@@ -128,6 +130,9 @@ class LocalMRJobRunner(SimMRJobRunner):
             procs_args = self._reducer_arg_chain(
                 step, step_num, input_path)
 
+        # add . to PYTHONPATH (in case mrjob isn't actually installed)
+        env = combine_local_envs(env, {'PYTHONPATH': abspath('.')})
+
         proc_dicts = self._invoke_processes(
             procs_args, output_path, working_dir, env)
         self._all_proc_dicts.extend(proc_dicts)
@@ -138,10 +143,13 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         self._all_proc_dicts = []
 
+    def _cat_args(self, *input_paths):
+        return self._python_bin() + ['-m', 'mrjob.cat'] + list(input_paths)
+
     def _mapper_arg_chain(self, step_dict, step_num, input_path):
         procs_args = []
 
-        procs_args.append(['cat', input_path])
+        procs_args.append(self._cat_args(input_path))
 
         if 'mapper' in step_dict:
             procs_args.append(shlex_split(
@@ -161,7 +169,7 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         procs_args = []
 
-        procs_args.append(['cat', input_path])
+        procs_args.append(self._cat_args(input_path))
         procs_args.append(shlex_split(
             self._substep_cmd_line(step_num, 'reducer')))
 

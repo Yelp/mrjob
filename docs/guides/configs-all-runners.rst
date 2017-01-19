@@ -402,14 +402,15 @@ Job execution context
     :switch: --sh-bin
     :type: :ref:`command <data-type-command>`
     :set: all
-    :default: :command:`sh -e` (:command:`/bin/sh -e` on EMR)
+    :default: :command:`sh -ex` (:command:`/bin/sh -ex` on EMR)
 
     Name/path of alternate shell binary to use for :mrjob-opt:`setup` and
     :mrjob-opt:`bootstrap`. Needs to be backwards compatible with
-    Bourne Shell (e.g. ``'bash'``).
+    Bourne Shell (e.g. ``'sh'``, ``'bash'``, ``'zsh'``).
 
-    To force setup/bootstrapping to terminate when any command exits with
-    an error, use ``'sh -e'``.
+    This is also used to wrap mappers, reducers, etc. that require piping
+    one command into another (see e.g.
+    :py:meth:`~mrjob.job.MRJob.mapper_pre_filter`).
 
 .. mrjob-opt::
     :config: steps_interpreter

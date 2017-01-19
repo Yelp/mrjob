@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2013 Yelp and Contributors
+# Copyright 2015-2016 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -137,84 +138,34 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         self._all_proc_dicts = []
 
-    def _filter_if_any(self, substep_dict):
-        if substep_dict['type'] == 'script':
-            if 'pre_filter' in substep_dict:
-                return shlex_split(substep_dict['pre_filter'])
-        return None
-
-    def _substep_args(self, step_dict, step_num, mrc, input_path=None):
-        if step_dict['type'] != 'streaming':
-            raise Exception("LocalMRJobRunner cannot run %s steps." %
-                            step_dict['type'])
-        if step_dict[mrc]['type'] == 'command':
-            if input_path is None:
-                return [shlex_split(step_dict[mrc]['command'])]
-            else:
-                return [
-                    ['cat', input_path],
-                    shlex_split(step_dict[mrc]['command'])]
-        if step_dict[mrc]['type'] == 'script':
-            args = self._script_args_for_step(step_num, mrc)
-            if input_path is None:
-                return [args]
-            else:
-                return [args + [input_path]]
-
-    def _substep_arg_chain(self, mrc, step_dict, step_num, input_path):
+    def _mapper_arg_chain(self, step_dict, step_num, input_path):
         procs_args = []
 
-        filter_args = self._filter_if_any(step_dict[mrc])
-        if filter_args:
-            procs_args.append(['cat', input_path])
-            procs_args.append(filter_args)
-            # _substep_args may return more than one process
-            procs_args.extend(
-                self._substep_args(step_dict, step_num, mrc))
-        else:
-            # _substep_args may return more than one process
-            procs_args.extend(
-                self._substep_args(step_dict, step_num, mrc, input_path))
-        return procs_args
+        procs_args.append(['cat', input_path])
 
-    def _mapper_arg_chain(self, step_dict, step_num, input_path):
-        # sometimes the mapper isn't actually there, so if it isn't, use cat
-        if 'mapper' not in step_dict:
-            new_step_dict = {
-                'mapper': {
-                    'type': 'command',
-                    'command': 'cat',
-                }
-            }
-            new_step_dict.update(step_dict)
-            step_dict = new_step_dict
-
-        procs_args = self._substep_arg_chain(
-            'mapper', step_dict, step_num, input_path)
+        if 'mapper' in step_dict:
+            procs_args.append(shlex_split(
+                self._substep_cmd_line(step_num, 'mapper')))
 
         if 'combiner' in step_dict:
             procs_args.append(['sort'])
             # _substep_args may return more than one process
-            procs_args.extend(self._combiner_arg_chain(step_dict, step_num))
+            procs_args.append(shlex_split(
+                self._substep_cmd_line(step_num, 'combiner')))
 
-        return procs_args
-
-    def _combiner_arg_chain(self, step_dict, step_num):
-        # simpler than mapper or reducer arg logic because it never takes an
-        # input file, always reads from stdin
-        procs_args = []
-
-        filter_args = self._filter_if_any(step_dict['combiner'])
-        if filter_args:
-            procs_args.append(filter_args)
-        # _substep_args may return more than one process
-        procs_args.extend(
-            self._substep_args(step_dict, step_num, 'combiner'))
         return procs_args
 
     def _reducer_arg_chain(self, step_dict, step_num, input_path):
-        return self._substep_arg_chain(
-            'reducer', step_dict, step_num, input_path)
+        if 'reducer' not in step_dict:
+            return []
+
+        procs_args = []
+
+        procs_args.append(['cat', input_path])
+        procs_args.append(shlex_split(
+            self._substep_cmd_line(step_num, 'reducer')))
+
+        return procs_args
 
     def _invoke_processes(self, procs_args, output_path, working_dir, env):
         """invoke the process described by *args* and write to *output_path*

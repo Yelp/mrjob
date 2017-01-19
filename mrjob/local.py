@@ -131,6 +131,10 @@ class LocalMRJobRunner(SimMRJobRunner):
                 step, step_num, input_path)
 
         # add . to PYTHONPATH (in case mrjob isn't actually installed)
+        # we need this to access mrjob.cat
+
+        # if we wanted, we could move read_file() and read_input()
+        # to mrjob.cat and make it a standalone script
         env = combine_local_envs(env, {'PYTHONPATH': abspath('.')})
 
         proc_dicts = self._invoke_processes(

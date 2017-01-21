@@ -716,6 +716,27 @@ class FilterTestCase(SandboxedTestCase):
             lines = [line.strip() for line in list(r.stream_output())]
             self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
+    def test_pre_filter_failure(self):
+        # regression test for #1524
+
+        data = b'x\ny\nz\n'
+        # grep will return exit code 1 because there are no matches
+        job = FilterJob(['--mapper-filter', 'grep w', '--runner=local'])
+        job.sandbox(stdin=BytesIO(data))
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                        'pre_filter': 'grep w'}}])
+
+            r.run()
+
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertEqual(sorted(lines), [])
+
 
 class SetupLineEncodingTestCase(TestCase):
 

@@ -1,4 +1,6 @@
 v0.5.8, 2017-01-?? -- ???
+ * moved mrjob.util.bunzip2_stream() to mrjob.cat
+ * moved mrjob.util.gunzip_stream() to mrjob.cat
  * deprecated mrjob.util.bash_wrap()
  * deprecated mrjob.util.tar_and_gz()
  * deprecated SSHFilesystem.ssh_slave_hosts()

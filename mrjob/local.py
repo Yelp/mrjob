@@ -21,6 +21,7 @@ from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 
+import mrjob.cat
 from mrjob.conf import combine_local_envs
 from mrjob.logs.counters import _format_counters
 from mrjob.parse import _find_python_traceback
@@ -147,8 +148,13 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         self._all_proc_dicts = []
 
-    def _cat_args(self, *input_paths):
-        return self._python_bin() + ['-m', 'mrjob.cat'] + list(input_paths)
+    def _cat_args(self, input_path):
+        """Return a command line that can call mrjob's internal "cat" script
+        from any working directory, without mrjob in PYTHONPATH"""
+        return self._python_bin() + [
+            abspath(mrjob.cat.__file__),
+            input_path
+        ]
 
     def _mapper_arg_chain(self, step_dict, step_num, input_path):
         procs_args = []

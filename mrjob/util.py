@@ -11,7 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utility functions for MRJob that have no external dependencies."""
+"""Utility functions for MRJob that have no external dependencies
+
+(other than :py:mod:`mrjob.cat`, which has no external dependencies)
+"""
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
@@ -26,7 +29,6 @@ import shlex
 import shutil
 import sys
 import tarfile
-import zlib
 from collections import defaultdict
 from copy import deepcopy
 from datetime import timedelta
@@ -37,11 +39,17 @@ from zipfile import ZIP_STORED
 from zipfile import ZipFile
 from zipfile import is_zipfile
 
-try:
-    import bz2
-    bz2  # redefine bz2 for pepflakes
-except ImportError:
-    bz2 = None
+from mrjob.cat import bunzip2_stream
+from mrjob.cat import decompress
+from mrjob.cat import gunzip_stream
+
+# these used to live in util, ssh, pyflakes
+bunzip2_stream
+gunzip_stream
+
+
+
+
 
 from mrjob.py2 import PY2
 
@@ -161,33 +169,6 @@ def buffer_iterator_to_line_iterator(chunks):
     return to_lines(chunks)
 
 
-def bunzip2_stream(fileobj, bufsize=1024):
-    """Decompress gzipped data on the fly.
-
-    :param fileobj: object supporting ``read()``
-    :param bufsize: number of bytes to read from *fileobj* at a time.
-
-    .. warning::
-
-        This yields decompressed chunks; it does *not* split on lines. To get
-        lines, wrap this in :py:func:`to_lines`.
-    """
-    if bz2 is None:
-        raise Exception(
-            'bz2 module was not successfully imported (likely not installed).')
-
-    d = bz2.BZ2Decompressor()
-
-    while True:
-        chunk = fileobj.read(bufsize)
-        if not chunk:
-            return
-
-        part = d.decompress(chunk)
-        if part:
-            yield part
-
-
 def cmd_line(args):
     """build a command line that works in a shell.
     """
@@ -216,33 +197,6 @@ def file_ext(filename):
     if dot_index == -1:
         return ''
     return filename[dot_index:]
-
-
-def gunzip_stream(fileobj, bufsize=1024):
-    """Decompress gzipped data on the fly.
-
-    :param fileobj: object supporting ``read()``
-    :param bufsize: number of bytes to read from *fileobj* at a time. The
-                    default is the same as in :py:mod:`gzip`.
-
-    .. warning::
-
-        This yields decompressed chunks; it does *not* split on lines. To get
-        lines, wrap this in :py:func:`to_lines`.
-    """
-    # see Issue #601 for why we need this.
-
-    # we need this flag to read gzip rather than raw zlib, but it's not
-    # actually defined in zlib, so we define it here.
-    READ_GZIP_DATA = 16
-    d = zlib.decompressobj(READ_GZIP_DATA | zlib.MAX_WBITS)
-    while True:
-        chunk = fileobj.read(bufsize)
-        if not chunk:
-            return
-        data = d.decompress(chunk)
-        if data:
-            yield data
 
 
 def log_to_null(name=None):
@@ -407,20 +361,14 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
         else:
             f = fileobj
 
-        if path.endswith('.gz'):
-            lines = to_lines(gunzip_stream(f))
-        elif path.endswith('.bz2'):
-            if bz2 is None:
-                raise Exception('bz2 module was not successfully imported'
-                                ' (likely not installed).')
-            else:
-                lines = to_lines(bunzip2_stream(f))
+        decompressed_f = decompress(f, path)
+
+        if decompressed_f is f and yields_lines:
+            # this could be important; iterating over to_lines(f) is about 8x
+            # slower than iterating over f
+            lines = f
         else:
-            if yields_lines:
-                lines = f
-            else:
-                # handle boto.s3.Key, which yields chunks of bytes, not lines
-                lines = to_lines(f)
+            lines = to_lines(decompressed_f)
 
         for line in lines:
             yield line
@@ -649,46 +597,6 @@ def tar_and_gzip(dir, out_path, filter=None, prefix=''):
     tar_gz.close()
 
 
-def zip_dir(dir, out_path, filter=None, prefix=''):
-    """Compress the given *dir* into a zip file at *out_path*.
-
-    If we encounter symlinks, include the actual file, not the symlink.
-
-    :type dir: str
-    :param dir: dir to tar up
-    :type out_path: str
-    :param out_path: where to write the tarball too
-    :param filter: if defined, a function that takes paths (relative to *dir*
-                   and returns ``True`` if we should keep them
-    :type prefix: str
-    :param prefix: subdirectory inside the tarball to put everything into (e.g.
-                   ``'mrjob'``)
-    """
-    if not os.path.isdir(dir):
-        raise IOError('Not a directory: %r' % (dir,))
-
-    if not filter:
-        filter = lambda path: True
-
-    try:
-        zip_file = ZipFile(out_path, mode='w', compression=ZIP_DEFLATED)
-    except RuntimeError:  # zlib not available
-        zip_file = ZipFile(out_path, mode='w', compression=ZIP_STORED)
-
-    for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
-        for filename in filenames:
-            path = os.path.join(dirpath, filename)
-            # janky version of os.path.relpath() (Python 2.6):
-            rel_path = path[len(os.path.join(dir, '')):]
-            if filter(rel_path):
-                # copy over real files, not symlinks
-                real_path = os.path.realpath(path)
-                path_in_zip_file = os.path.join(prefix, rel_path)
-                zip_file.write(real_path, arcname=path_in_zip_file)
-
-    zip_file.close()
-
-
 def to_lines(chunks):
     """Take in data as a sequence of bytes, and yield it, one line at a time.
 
@@ -790,3 +698,44 @@ def which(cmd, path=None):
         return None
     else:
         return find_executable(cmd, path=path)
+
+
+
+def zip_dir(dir, out_path, filter=None, prefix=''):
+    """Compress the given *dir* into a zip file at *out_path*.
+
+    If we encounter symlinks, include the actual file, not the symlink.
+
+    :type dir: str
+    :param dir: dir to tar up
+    :type out_path: str
+    :param out_path: where to write the tarball too
+    :param filter: if defined, a function that takes paths (relative to *dir*
+                   and returns ``True`` if we should keep them
+    :type prefix: str
+    :param prefix: subdirectory inside the tarball to put everything into (e.g.
+                   ``'mrjob'``)
+    """
+    if not os.path.isdir(dir):
+        raise IOError('Not a directory: %r' % (dir,))
+
+    if not filter:
+        filter = lambda path: True
+
+    try:
+        zip_file = ZipFile(out_path, mode='w', compression=ZIP_DEFLATED)
+    except RuntimeError:  # zlib not available
+        zip_file = ZipFile(out_path, mode='w', compression=ZIP_STORED)
+
+    for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
+        for filename in filenames:
+            path = os.path.join(dirpath, filename)
+            # janky version of os.path.relpath() (Python 2.6):
+            rel_path = path[len(os.path.join(dir, '')):]
+            if filter(rel_path):
+                # copy over real files, not symlinks
+                real_path = os.path.realpath(path)
+                path_in_zip_file = os.path.join(prefix, rel_path)
+                zip_file.write(real_path, arcname=path_in_zip_file)
+
+    zip_file.close()

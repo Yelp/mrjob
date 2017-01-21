@@ -737,6 +737,29 @@ class FilterTestCase(SandboxedTestCase):
             lines = [line.strip() for line in list(r.stream_output())]
             self.assertEqual(sorted(lines), [])
 
+    def test_pre_filter_on_compressed_data(self):
+        # regression test for #1061
+        input_gz_path = self.makefile('data.gz')
+        input_gz = gzip.GzipFile(input_gz_path, 'wb')
+        input_gz.write(b'x\ny\nz\n')
+        input_gz.close()
+
+        job = FilterJob([
+            '--mapper-filter', 'cat -e', '--runner=local', input_gz_path])
+        with job.make_runner() as r:
+            self.assertEqual(
+                r._get_steps(),
+                [{
+                    'type': 'streaming',
+                    'mapper': {
+                        'type': 'script',
+                        'pre_filter': 'cat -e'}}])
+
+            r.run()
+
+            lines = [line.strip() for line in list(r.stream_output())]
+            self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
+
 
 class SetupLineEncodingTestCase(TestCase):
 

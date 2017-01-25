@@ -2,6 +2,8 @@ v0.5.8, 2017-01-?? -- ???
  * moved mrjob.util.bunzip2_stream() to mrjob.cat
  * moved mrjob.util.gunzip_stream() to mrjob.cat
  * deprecated mrjob.util.args_for_opt_dest_subset()
+ * deprecated mrjob.util.populate_option_groups_with_options()
+ * deprecated mrjob.util.scrape_options_and_index_by_dest()
  * deprecated mrjob.util.bash_wrap()
  * deprecated mrjob.util.tar_and_gz()
  * deprecated SSHFilesystem.ssh_slave_hosts()

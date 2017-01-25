@@ -337,6 +337,9 @@ def populate_option_groups_with_options(assignments, indexed_options):
                            :py:func:`util.scrape_options_and_index_by_dest`
     :param indexed_options: options to use when populating the parsers/groups
     """
+    log.warning('populate_option_groups_with_options() is deprecated and'
+                ' will be removed in v0.6.0')
+
     for opt_group, opt_dest_list in assignments.items():
         new_options = []
         for option_dest in assignments[opt_group]:
@@ -528,8 +531,9 @@ def scrape_options_and_index_by_dest(*parsers_and_groups):
 
     :return: dict of the form ``{dest_var: [option1, option2, ...], ...}``
     """
+    log.warning('scrape_options_and_index_by_dest() is deprecated'
+                ' and will be removed in v0.6.0')
 
-    # Scrape options from MRJob and index them by dest
     all_options = {}
     job_option_lists = [g.option_list for g in parsers_and_groups]
     for option in itertools.chain(*job_option_lists):

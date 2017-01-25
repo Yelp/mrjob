@@ -41,17 +41,12 @@ from zipfile import is_zipfile
 from mrjob.cat import bunzip2_stream
 from mrjob.cat import decompress
 from mrjob.cat import gunzip_stream
+from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 
-# these used to live in util, ssh, pyflakes
+# these used to live in util; hush, pyflakes
 bunzip2_stream
 gunzip_stream
-
-
-
-
-
-from mrjob.py2 import PY2
 
 log = getLogger(__name__)
 
@@ -61,16 +56,23 @@ class NullHandler(logging.Handler):
         pass
 
 
+# TODO: remove in v0.6.0
 def args_for_opt_dest_subset(option_parser, args, dests=None):
     """For the given :py:class:`OptionParser` and list of command line
     arguments *args*, yield values in *args* that correspond to option
     destinations in the set of strings *dests*. If *dests* is None, return
     *args* as parsed by :py:class:`OptionParser`.
+
+    .. deprecated:: 0.5.8
     """
+    log.warning('args_for_opt_dest_subset() is deprecated and will be'
+                ' removed in v0.6.0')
+
     for dest, value in _args_for_opt_dest_subset(option_parser, args, dests):
         yield value
 
 
+# TODO: remove in v0.6.0
 def _process_short_opts(option_parser, rargs, values, dests):
     """Mimic function of the same name in ``OptionParser``, capturing the
     arguments consumed in *arg_map*
@@ -121,6 +123,7 @@ def _process_short_opts(option_parser, rargs, values, dests):
             break
 
 
+# TODO: remove in v0.6.0
 def _args_for_opt_dest_subset(option_parser, args, dests=None):
     """See docs for :py:func:`args_for_opt_dest_subset()`. This function allows
     us to write a compatibility wrapper for the old API
@@ -239,6 +242,7 @@ def log_to_stream(name=None, stream=None, format=None, level=None,
     logger.addHandler(handler)
 
 
+# TODO: remove in v0.6.0
 def _process_long_opt(option_parser, rargs, values, dests):
     """Mimic function of the same name in ``OptionParser``, capturing the
     arguments consumed in *arg_map*

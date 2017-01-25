@@ -11,9 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Utility functions for MRJob that have no external dependencies
-
-(other than :py:mod:`mrjob.cat`, which has no external dependencies)
+"""Utility functions for MRJob
 """
 
 # don't add imports here that aren't part of the standard Python library,
@@ -34,6 +32,7 @@ from copy import deepcopy
 from datetime import timedelta
 from distutils.spawn import find_executable
 from logging import getLogger
+from optparse import OptionParser
 from zipfile import ZIP_DEFLATED
 from zipfile import ZIP_STORED
 from zipfile import ZipFile
@@ -42,6 +41,7 @@ from zipfile import is_zipfile
 from mrjob.cat import bunzip2_stream
 from mrjob.cat import decompress
 from mrjob.cat import gunzip_stream
+from mrjob.py2 import string_types
 
 # these used to live in util, ssh, pyflakes
 bunzip2_stream
@@ -279,23 +279,40 @@ def _process_long_opt(option_parser, rargs, values, dests):
 
 
 def parse_and_save_options(option_parser, args):
-    """Duplicate behavior of :py:class:`OptionParser`, but capture the strings
-    required to reproduce the same values. Ref. optparse.py lines 1414-1548
-    (python 2.6.5)
+    """Return a map from option name (``dest``) to a list of the arguments
+    in *args* that correspond to that *dest*.
+
+    This won't modify *option_parser*.
     """
-    arg_map = defaultdict(list)
-    real_values = option_parser.values
+    arg_map = {}
 
-    try:
-        # sub in fresh values so that callbacks don't double-update
-        # parser's values
-        option_parser.values = option_parser.get_default_values()
+    def sim_callback(option, opt_str, value, parser):
+        dest = option.dest
+        arg_map.setdefault(dest, [])
 
-        for dest, value in (
-                _args_for_opt_dest_subset(option_parser, args, None)):
+        arg_map[dest].append(opt_str)
+        if isinstance(value, string_types):
             arg_map[dest].append(value)
-    finally:
-        option_parser.values = real_values
+        elif value:
+            arg_map[dest].extend(value)
+
+    sim_parser = OptionParser()
+
+    # optparse is no longer being maintained, so it's safe to access
+    # hidden methods and attributes
+    for option in option_parser._get_all_options():
+        if option.action == 'help':
+            continue
+
+        sim_parser.add_option(
+            *(option._short_opts + option._long_opts),
+            dest=option.dest,
+            nargs=option.nargs,
+            action='callback',
+            type=('string' if option.type else None),
+            callback=sim_callback)
+
+    sim_parser.parse_args(args)
 
     return arg_map
 

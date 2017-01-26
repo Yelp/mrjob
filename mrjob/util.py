@@ -169,13 +169,11 @@ def parse_and_save_options(option_parser, args):
             arg_map[dest].extend(value)
 
     sim_parser = OptionParser()
+    sim_parser.remove_option('-h')
 
     # optparse is no longer being maintained, so it's safe to access
     # hidden methods and attributes
     for option in option_parser._get_all_options():
-        if option.action == 'help':
-            continue
-
         sim_parser.add_option(
             *(option._short_opts + option._long_opts),
             dest=option.dest,

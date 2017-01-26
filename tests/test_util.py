@@ -150,7 +150,8 @@ class OptionScrapingTestCase(TestCase):
         self.original_parser.add_option(
             '-a', '--yes-a', dest='a', action='store_true', default=False)
         self.original_group.add_option('-x', '--xx', dest='x', action='store')
-        self.original_group.add_option('-y', '--yy', dest='y', action='store')
+        self.original_group.add_option(
+            '-y', '--yy', dest='y', action='store', nargs=2)
 
         self.new_parser = optparse.OptionParser()
         self.new_group_1 = optparse.OptionGroup(self.new_parser, '?')
@@ -188,24 +189,27 @@ class OptionScrapingTestCase(TestCase):
         self.assertEqual(options.x, 'happy')
 
     def test_parse_and_save_simple(self):
-        args = ['x.py', '-b', '-a', '--no-a', '-x', 'x', '-y', 'y', '-x', 'z']
+        args = ['x.py', '-b', '-a', '--no-a',
+                '-x', 'x', '-y', 'y', 'ynot', '-x', 'z']
+
         self.assertEqual(
             dict(parse_and_save_options(self.original_parser, args)),
             {
                 'a': ['-b', '-a', '--no-a'],
                 'x': ['-x', 'x', '-x', 'z'],
-                'y': ['-y', 'y']
+                'y': ['-y', 'y', 'ynot']
             })
 
     def test_parse_and_save_with_dashes(self):
-        args = ['x.py', '-b', '-a', '--no-a', '-x', 'x', '-y', 'y', '-x', 'z',
+        args = ['x.py', '-b', '-a', '--no-a',
+                '-x', 'x', '-y', 'y', 'ynot', '-x', 'z',
                 '--', 'ignore', 'these', 'args']
         self.assertEqual(
             dict(parse_and_save_options(self.original_parser, args)),
             {
                 'a': ['-b', '-a', '--no-a'],
                 'x': ['-x', 'x', '-x', 'z'],
-                'y': ['-y', 'y']
+                'y': ['-y', 'y', 'ynot']
             })
 
 

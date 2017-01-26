@@ -56,98 +56,6 @@ class NullHandler(logging.Handler):
         pass
 
 
-# TODO: remove in v0.6.0
-def args_for_opt_dest_subset(option_parser, args, dests=None):
-    """For the given :py:class:`OptionParser` and list of command line
-    arguments *args*, yield values in *args* that correspond to option
-    destinations in the set of strings *dests*. If *dests* is None, return
-    *args* as parsed by :py:class:`OptionParser`.
-
-    .. deprecated:: 0.5.8
-    """
-    log.warning('args_for_opt_dest_subset() is deprecated and will be'
-                ' removed in v0.6.0')
-
-    for dest, value in _args_for_opt_dest_subset(option_parser, args, dests):
-        yield value
-
-
-# TODO: remove in v0.6.0
-def _process_short_opts(option_parser, rargs, values, dests):
-    """Mimic function of the same name in ``OptionParser``, capturing the
-    arguments consumed in *arg_map*
-    """
-    arg = rargs.pop(0)
-    stop = False
-    i = 1
-    for ch in arg[1:]:
-        opt = "-" + ch
-        option = option_parser._short_opt.get(opt)
-        i += 1                      # we have consumed a character
-
-        # Store the 'before' value of *rargs*
-        rargs_before_processing = [x for x in rargs]
-
-        # We won't see a difference in rargs for things like '-pJSON', so
-        # handle that edge case explicitly.
-        args_from_smashed_short_opt = []
-
-        if option.takes_value():
-            # Any characters left in arg?  Pretend they're the
-            # next arg, and stop consuming characters of arg.
-            if i < len(arg):
-                rargs.insert(0, arg[i:])
-                args_from_smashed_short_opt.append(arg[i:])
-                stop = True
-
-            nargs = option.nargs
-            if nargs == 1:
-                value = rargs.pop(0)
-            else:
-                value = tuple(rargs[0:nargs])
-                del rargs[0:nargs]
-
-        else:                       # option doesn't take a value
-            value = None
-
-        option.process(opt, value, values, option_parser)
-
-        if dests is None or option.dest in dests:
-            # Measure rargs before and after processing. Yield difference.
-            length_difference = len(rargs_before_processing) - len(rargs)
-            for item in ([opt] + args_from_smashed_short_opt +
-                         rargs_before_processing[:length_difference]):
-                yield option.dest, item
-
-        if stop:
-            break
-
-
-# TODO: remove in v0.6.0
-def _args_for_opt_dest_subset(option_parser, args, dests=None):
-    """See docs for :py:func:`args_for_opt_dest_subset()`. This function allows
-    us to write a compatibility wrapper for the old API
-    (:py:func:`parse_and_save_options()`).
-    """
-    values = deepcopy(option_parser.get_default_values())
-    rargs = [x for x in args]
-    option_parser.rargs = rargs
-    while rargs:
-        arg = rargs[0]
-        if arg == '--':
-            del rargs[0]
-            return
-        elif arg[0:2] == '--':
-            for item in _process_long_opt(option_parser, rargs, values, dests):
-                yield item
-        elif arg[:1] == '-' and len(arg) > 1:
-            for item in _process_short_opts(option_parser, rargs, values,
-                                            dests):
-                yield item
-        else:
-            del rargs[0]
-
-
 def bash_wrap(cmd_str):
     """Escape single quotes in a shell command string and wrap it with ``bash
     -c '<string>'``.
@@ -242,46 +150,6 @@ def log_to_stream(name=None, stream=None, format=None, level=None,
     logger.addHandler(handler)
 
 
-# TODO: remove in v0.6.0
-def _process_long_opt(option_parser, rargs, values, dests):
-    """Mimic function of the same name in ``OptionParser``, capturing the
-    arguments consumed in *arg_map*
-    """
-    arg = rargs.pop(0)
-
-    # Value explicitly attached to arg?  Pretend it's the next
-    # argument.
-    if "=" in arg:
-        (opt, next_arg) = arg.split("=", 1)
-        rargs.insert(0, next_arg)
-    else:
-        opt = arg
-
-    opt = option_parser._match_long_opt(opt)
-    option = option_parser._long_opt[opt]
-
-    # Store the 'before' value of *rargs*
-    rargs_before_processing = [x for x in rargs]
-
-    if option.takes_value():
-        nargs = option.nargs
-        if nargs == 1:
-            value = rargs.pop(0)
-        else:
-            value = tuple(rargs[0:nargs])
-            del rargs[0:nargs]
-    else:
-        value = None
-
-    option.process(opt, value, values, option_parser)
-
-    if dests is None or option.dest in dests:
-        # Measure rargs before and after processing. Yield difference.
-        length_difference = len(rargs_before_processing) - len(rargs)
-        for item in [opt] + rargs_before_processing[:length_difference]:
-            yield option.dest, item
-
-
 def parse_and_save_options(option_parser, args):
     """Return a map from option name (``dest``) to a list of the arguments
     in *args* that correspond to that *dest*.
@@ -319,38 +187,6 @@ def parse_and_save_options(option_parser, args):
     sim_parser.parse_args(args)
 
     return arg_map
-
-
-def populate_option_groups_with_options(assignments, indexed_options):
-    """Given a dictionary mapping :py:class:`OptionGroup` and
-    :py:class:`OptionParser` objects to a list of strings represention option
-    dests, populate the objects with options from ``indexed_options``
-    (generated by :py:func:`scrape_options_and_index_by_dest`) in alphabetical
-    order by long option name. This function primarily exists to serve
-    :py:func:`scrape_options_into_new_groups`.
-
-    :type assignments: dict of the form ``{my_option_parser: ('verbose',
-                       'help', ...), my_option_group: (...)}``
-    :param assignments: specification of which parsers/groups should get which
-                        options
-    :type indexed_options: dict generated by
-                           :py:func:`util.scrape_options_and_index_by_dest`
-    :param indexed_options: options to use when populating the parsers/groups
-    """
-    log.warning('populate_option_groups_with_options() is deprecated and'
-                ' will be removed in v0.6.0')
-
-    for opt_group, opt_dest_list in assignments.items():
-        new_options = []
-        for option_dest in assignments[opt_group]:
-            for option in indexed_options[option_dest]:
-                new_options.append(option)
-        # New options must be added using add_options() or they will not be
-        # allowed by the parser on the command line
-        opt_group.add_options(new_options)
-        # Sort alphabetically for help
-        opt_group.option_list = sorted(opt_group.option_list,
-                                       key=lambda item: item.get_opt_string())
 
 
 def random_identifier():
@@ -516,54 +352,6 @@ def save_cwd():
         os.chdir(original_cwd)
 
 
-def scrape_options_and_index_by_dest(*parsers_and_groups):
-    """Scrapes ``optparse`` options from :py:class:`OptionParser` and
-    :py:class:`OptionGroup` objects and builds a dictionary of
-    ``dest_var: [option1, option2, ...]``. This function primarily exists to
-    serve :py:func:`scrape_options_into_new_groups`.
-
-    An example return value: ``{'verbose': [<verbose_on_option>,
-    <verbose_off_option>], 'files': [<file_append_option>]}``
-
-    :type parsers_and_groups: :py:class:`OptionParser` or
-                              :py:class:`OptionGroup`
-    :param parsers_and_groups: Parsers and groups to scrape option objects from
-
-    :return: dict of the form ``{dest_var: [option1, option2, ...], ...}``
-    """
-    log.warning('scrape_options_and_index_by_dest() is deprecated'
-                ' and will be removed in v0.6.0')
-
-    all_options = {}
-    job_option_lists = [g.option_list for g in parsers_and_groups]
-    for option in itertools.chain(*job_option_lists):
-        other_options = all_options.get(option.dest, [])
-        other_options.append(option)
-        all_options[option.dest] = other_options
-    return all_options
-
-
-def scrape_options_into_new_groups(source_groups, assignments):
-    """Puts options from the :py:class:`OptionParser` and
-    :py:class:`OptionGroup` objects in `source_groups` into the keys of
-    `assignments` according to the values of `assignments`. An example:
-
-    :type source_groups: list of :py:class:`OptionParser` and
-                         :py:class:`OptionGroup` objects
-    :param source_groups: parsers/groups to scrape options from
-    :type assignments: dict with keys that are :py:class:`OptionParser` and
-                       :py:class:`OptionGroup` objects and values that are
-                       lists of strings
-    :param assignments: map empty parsers/groups to lists of destination names
-                        that they should contain options for
-    """
-    log.warning('scrape_options_into_new_groups() is deprecated'
-                ' and will be removed in v0.6.0')
-
-    all_options = scrape_options_and_index_by_dest(*source_groups)
-    return populate_option_groups_with_options(assignments, all_options)
-
-
 def shlex_split(s):
     """Wrapper around shlex.split(), but convert to str if Python version <
     2.7.3 when unicode support was added.
@@ -725,7 +513,6 @@ def which(cmd, path=None):
         return find_executable(cmd, path=path)
 
 
-
 def zip_dir(dir, out_path, filter=None, prefix=''):
     """Compress the given *dir* into a zip file at *out_path*.
 
@@ -764,3 +551,212 @@ def zip_dir(dir, out_path, filter=None, prefix=''):
                 zip_file.write(real_path, arcname=path_in_zip_file)
 
     zip_file.close()
+
+
+### deprecated code, to remove in v0.6.0 ###
+
+def args_for_opt_dest_subset(option_parser, args, dests=None):
+    """For the given :py:class:`OptionParser` and list of command line
+    arguments *args*, yield values in *args* that correspond to option
+    destinations in the set of strings *dests*. If *dests* is None, return
+    *args* as parsed by :py:class:`OptionParser`.
+
+    .. deprecated:: 0.5.8
+    """
+    log.warning('args_for_opt_dest_subset() is deprecated and will be'
+                ' removed in v0.6.0')
+
+    for dest, value in _args_for_opt_dest_subset(option_parser, args, dests):
+        yield value
+
+
+def _args_for_opt_dest_subset(option_parser, args, dests=None):
+    """See docs for :py:func:`args_for_opt_dest_subset()`. This function allows
+    us to write a compatibility wrapper for the old API
+    (:py:func:`parse_and_save_options()`).
+    """
+    values = deepcopy(option_parser.get_default_values())
+    rargs = [x for x in args]
+    option_parser.rargs = rargs
+    while rargs:
+        arg = rargs[0]
+        if arg == '--':
+            del rargs[0]
+            return
+        elif arg[0:2] == '--':
+            for item in _process_long_opt(option_parser, rargs, values, dests):
+                yield item
+        elif arg[:1] == '-' and len(arg) > 1:
+            for item in _process_short_opts(option_parser, rargs, values,
+                                            dests):
+                yield item
+        else:
+            del rargs[0]
+
+def _process_long_opt(option_parser, rargs, values, dests):
+    """Mimic function of the same name in ``OptionParser``, capturing the
+    arguments consumed in *arg_map*
+    """
+    arg = rargs.pop(0)
+
+    # Value explicitly attached to arg?  Pretend it's the next
+    # argument.
+    if "=" in arg:
+        (opt, next_arg) = arg.split("=", 1)
+        rargs.insert(0, next_arg)
+    else:
+        opt = arg
+
+    opt = option_parser._match_long_opt(opt)
+    option = option_parser._long_opt[opt]
+
+    # Store the 'before' value of *rargs*
+    rargs_before_processing = [x for x in rargs]
+
+    if option.takes_value():
+        nargs = option.nargs
+        if nargs == 1:
+            value = rargs.pop(0)
+        else:
+            value = tuple(rargs[0:nargs])
+            del rargs[0:nargs]
+    else:
+        value = None
+
+    option.process(opt, value, values, option_parser)
+
+    if dests is None or option.dest in dests:
+        # Measure rargs before and after processing. Yield difference.
+        length_difference = len(rargs_before_processing) - len(rargs)
+        for item in [opt] + rargs_before_processing[:length_difference]:
+            yield option.dest, item
+
+
+def _process_short_opts(option_parser, rargs, values, dests):
+    """Mimic function of the same name in ``OptionParser``, capturing the
+    arguments consumed in *arg_map*
+    """
+    arg = rargs.pop(0)
+    stop = False
+    i = 1
+    for ch in arg[1:]:
+        opt = "-" + ch
+        option = option_parser._short_opt.get(opt)
+        i += 1                      # we have consumed a character
+
+        # Store the 'before' value of *rargs*
+        rargs_before_processing = [x for x in rargs]
+
+        # We won't see a difference in rargs for things like '-pJSON', so
+        # handle that edge case explicitly.
+        args_from_smashed_short_opt = []
+
+        if option.takes_value():
+            # Any characters left in arg?  Pretend they're the
+            # next arg, and stop consuming characters of arg.
+            if i < len(arg):
+                rargs.insert(0, arg[i:])
+                args_from_smashed_short_opt.append(arg[i:])
+                stop = True
+
+            nargs = option.nargs
+            if nargs == 1:
+                value = rargs.pop(0)
+            else:
+                value = tuple(rargs[0:nargs])
+                del rargs[0:nargs]
+
+        else:                       # option doesn't take a value
+            value = None
+
+        option.process(opt, value, values, option_parser)
+
+        if dests is None or option.dest in dests:
+            # Measure rargs before and after processing. Yield difference.
+            length_difference = len(rargs_before_processing) - len(rargs)
+            for item in ([opt] + args_from_smashed_short_opt +
+                         rargs_before_processing[:length_difference]):
+                yield option.dest, item
+
+        if stop:
+            break
+
+
+def populate_option_groups_with_options(assignments, indexed_options):
+    """Given a dictionary mapping :py:class:`OptionGroup` and
+    :py:class:`OptionParser` objects to a list of strings represention option
+    dests, populate the objects with options from ``indexed_options``
+    (generated by :py:func:`scrape_options_and_index_by_dest`) in alphabetical
+    order by long option name. This function primarily exists to serve
+    :py:func:`scrape_options_into_new_groups`.
+
+    :type assignments: dict of the form ``{my_option_parser: ('verbose',
+                       'help', ...), my_option_group: (...)}``
+    :param assignments: specification of which parsers/groups should get which
+                        options
+    :type indexed_options: dict generated by
+                           :py:func:`util.scrape_options_and_index_by_dest`
+    :param indexed_options: options to use when populating the parsers/groups
+    """
+    log.warning('populate_option_groups_with_options() is deprecated and'
+                ' will be removed in v0.6.0')
+
+    for opt_group, opt_dest_list in assignments.items():
+        new_options = []
+        for option_dest in assignments[opt_group]:
+            for option in indexed_options[option_dest]:
+                new_options.append(option)
+        # New options must be added using add_options() or they will not be
+        # allowed by the parser on the command line
+        opt_group.add_options(new_options)
+        # Sort alphabetically for help
+        opt_group.option_list = sorted(opt_group.option_list,
+                                       key=lambda item: item.get_opt_string())
+
+
+def scrape_options_and_index_by_dest(*parsers_and_groups):
+    """Scrapes ``optparse`` options from :py:class:`OptionParser` and
+    :py:class:`OptionGroup` objects and builds a dictionary of
+    ``dest_var: [option1, option2, ...]``. This function primarily exists to
+    serve :py:func:`scrape_options_into_new_groups`.
+
+    An example return value: ``{'verbose': [<verbose_on_option>,
+    <verbose_off_option>], 'files': [<file_append_option>]}``
+
+    :type parsers_and_groups: :py:class:`OptionParser` or
+                              :py:class:`OptionGroup`
+    :param parsers_and_groups: Parsers and groups to scrape option objects from
+
+    :return: dict of the form ``{dest_var: [option1, option2, ...], ...}``
+    """
+    log.warning('scrape_options_and_index_by_dest() is deprecated'
+                ' and will be removed in v0.6.0')
+
+    all_options = {}
+    job_option_lists = [g.option_list for g in parsers_and_groups]
+    for option in itertools.chain(*job_option_lists):
+        other_options = all_options.get(option.dest, [])
+        other_options.append(option)
+        all_options[option.dest] = other_options
+    return all_options
+
+
+def scrape_options_into_new_groups(source_groups, assignments):
+    """Puts options from the :py:class:`OptionParser` and
+    :py:class:`OptionGroup` objects in `source_groups` into the keys of
+    `assignments` according to the values of `assignments`. An example:
+
+    :type source_groups: list of :py:class:`OptionParser` and
+                         :py:class:`OptionGroup` objects
+    :param source_groups: parsers/groups to scrape options from
+    :type assignments: dict with keys that are :py:class:`OptionParser` and
+                       :py:class:`OptionGroup` objects and values that are
+                       lists of strings
+    :param assignments: map empty parsers/groups to lists of destination names
+                        that they should contain options for
+    """
+    log.warning('scrape_options_into_new_groups() is deprecated'
+                ' and will be removed in v0.6.0')
+
+    all_options = scrape_options_and_index_by_dest(*source_groups)
+    return populate_option_groups_with_options(assignments, all_options)

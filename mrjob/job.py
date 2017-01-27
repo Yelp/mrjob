@@ -29,6 +29,7 @@ from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
+from mrjob.options import _add_step_options
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.py2 import integer_types
@@ -850,33 +851,7 @@ class MRJob(MRJobLauncher):
             self.option_parser, 'Running specific parts of the job')
         self.option_parser.add_option_group(self.mux_opt_group)
 
-        self.mux_opt_group.add_option(
-            '--mapper', dest='run_mapper', action='store_true', default=False,
-            help='run a mapper')
-
-        self.mux_opt_group.add_option(
-            '--combiner', dest='run_combiner', action='store_true',
-            default=False, help='run a combiner')
-
-        self.mux_opt_group.add_option(
-            '--reducer', dest='run_reducer', action='store_true',
-            default=False, help='run a reducer')
-
-        # To run spark steps
-        self.mux_opt_group.add_option(
-            '--spark', dest='run_spark', action='store_true', default=False,
-            help='run Spark code')
-
-        # To choose step number
-        self.mux_opt_group.add_option(
-            '--step-num', dest='step_num', type='int', default=0,
-            help='which step to execute (default is 0)')
-
-        # To describe the steps
-        self.mux_opt_group.add_option(
-            '--steps', dest='show_steps', action='store_true', default=False,
-            help=('print the mappers, combiners, and reducers that this job'
-                  ' defines'))
+        _add_step_options(self.mux_opt_group)
 
     def all_option_groups(self):
         return super(MRJob, self).all_option_groups() + (self.mux_opt_group,)

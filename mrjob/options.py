@@ -157,9 +157,59 @@ def _port_range_callback(option, opt_str, value, parser):
 ### mux opts ###
 
 # these are used by MRJob to determine what part of a job to run
-
-# TODO: fill this in
-_MUX_OPTS = dict(
+#
+# this just maps dest to the args and kwargs to OptionParser.add_option()
+# (minus the dest keyword arg)
+_STEP_OPTS = dict(
+    run_combiner=(
+        ['--combiner'],
+        dict(
+            action='store_true',
+            default=False,
+            help='run a combiner',
+        ),
+    ),
+    run_mapper=(
+        ['--mapper'],
+        dict(
+            action='store_true',
+            default=False,
+            help='run a mapper'
+        ),
+    ),
+    run_reducer=(
+        ['--reducer'],
+        dict(
+            action='store_true',
+            default=False,
+            help='run a reducer',
+        ),
+    ),
+    run_spark=(
+        ['--spark'],
+        dict(
+            action='store_true',
+            default=False,
+            help='run Spark code',
+        ),
+    ),
+    show_steps=(
+        ['--steps'],
+        dict(
+            action='store_true',
+            default=False,
+            help=('print the mappers, combiners, and reducers that this job'
+                  ' defines'),
+        ),
+    ),
+    step_num=(
+        ['--step-num'],
+        dict(
+            type='int',
+            default=0,
+            help='which step to execute (default is 0)',
+        ),
+    ),
 )
 
 
@@ -1420,6 +1470,13 @@ def _add_job_options(opt_group):
               ' ignored by local runners.'))
 
 
+def _add_step_options(opt_group):
+    """Add options that determine what part of the job a MRJob runs."""
+    for dest, (args, kwargs) in _STEP_OPTS.items():
+        kwargs = dict(dest=dest, **kwargs)
+        opt_group.add_option(*args, **kwargs)
+
+
 ### other utilities for switches ###
 
 def _print_help_for_groups(*args):
@@ -1443,11 +1500,16 @@ def _print_non_runner_help(option_parser):
     help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
 
     for option in option_parser._get_all_options():
-        if option.dest not in _RUNNER_OPTS:
-            help_parser.add_option(
-                *(option._short_opts + option._long_opts),
-                dest=option.dest,
-                help=option.help)
+        if option.dest in _RUNNER_OPTS:
+            continue
+
+        if option.dest in _STEP_OPTS:
+            continue
+
+        help_parser.add_option(
+            *(option._short_opts + option._long_opts),
+            dest=option.dest,
+            help=option.help)
 
     help_parser.print_help()
 

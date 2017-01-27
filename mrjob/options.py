@@ -154,6 +154,15 @@ def _port_range_callback(option, opt_str, value, parser):
 
     setattr(parser.values, option.dest, ports)
 
+### mux opts ###
+
+# these are used by MRJob to determine what part of a job to run
+
+# TODO: fill this in
+_MUX_OPTS = dict(
+)
+
+
 ### runner opts ###
 
 # map from runner option name to dict with the following keys (all optional):
@@ -308,8 +317,8 @@ _RUNNER_OPTS = dict(
                 action='append',
                 help=('Path to a Python module to install on EMR. These should'
                       ' be standard python module tarballs where you can cd'
-                      ' into a subdirectory and run ``sudo python setup.py'
-                      ' install``. You can use --bootstrap-python-package more'
+                      ' into a subdirectory and run "sudo python setup.py'
+                      ' install". You can use --bootstrap-python-package more'
                       ' than once.'),
             )),
         ],
@@ -1417,6 +1426,30 @@ def _print_help_for_groups(*args):
     option_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
     option_parser.option_groups = args
     option_parser.print_help()
+
+
+def _print_help_for_runner(runner_alias, include_deprecated=False):
+    help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
+
+    opt_names = _pick_runner_opts(runner_alias)
+    _add_runner_options(help_parser, opt_names,
+                        include_deprecated=include_deprecated)
+
+    help_parser.print_help()
+
+
+def _print_non_runner_help(option_parser):
+    """Print all help for the parser (including passthrough options)"""
+    help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
+
+    for option in option_parser._get_all_options():
+        if option.dest not in _RUNNER_OPTS:
+            help_parser.add_option(
+                *(option._short_opts + option._long_opts),
+                dest=option.dest,
+                help=option.help)
+
+    help_parser.print_help()
 
 
 def _alphabetize_options(opt_group):

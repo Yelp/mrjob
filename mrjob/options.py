@@ -1496,6 +1496,7 @@ def _print_help_for_runner(runner_alias, include_deprecated=False):
     _add_runner_options(help_parser, opt_names,
                         include_deprecated=include_deprecated)
 
+    _alphabetize_options(help_parser)
     help_parser.print_help()
 
 
@@ -1504,6 +1505,7 @@ def _print_help_for_steps():
 
     _add_step_options(help_parser)
 
+    _alphabetize_options(help_parser)
     help_parser.print_help()
 
 
@@ -1530,6 +1532,7 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
             dest=option.dest,
             help=option.help)
 
+    _alphabetize_options(help_parser)
     help_parser.print_help()
 
     print()

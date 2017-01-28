@@ -29,7 +29,6 @@ from mrjob.options import _add_basic_options
 from mrjob.options import _add_job_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _allowed_keys
-from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
@@ -87,6 +86,8 @@ class MRJobLauncher(object):
         self.option_parser = OptionParser(usage=self._usage(),
                                           option_class=self.OPTION_CLASS,
                                           add_help_option=False)
+
+        self.configure_options()
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script

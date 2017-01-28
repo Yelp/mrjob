@@ -848,14 +848,14 @@ class MRJob(MRJobLauncher):
         super(MRJob, self).configure_options()
 
         # To run mappers or reducers
-        self.mux_opt_group = OptionGroup(
+        self._mux_opt_group = OptionGroup(
             self.option_parser, 'Running specific parts of the job')
-        self.option_parser.add_option_group(self.mux_opt_group)
+        self.option_parser.add_option_group(self._mux_opt_group)
 
-        _add_step_options(self.mux_opt_group)
+        _add_step_options(self._mux_opt_group)
 
     def all_option_groups(self):
-        return super(MRJob, self).all_option_groups() + (self.mux_opt_group,)
+        return super(MRJob, self).all_option_groups() + (self._mux_opt_group,)
 
     def is_task(self):
         """True if this is a mapper, combiner, reducer, or Spark script.

@@ -1,4 +1,7 @@
 v0.5.8, 2017-01-?? -- ???
+ * jobs:
+   * deprecated option groups in MRJobs
+   * deprecated MRJob.get_all_option_groups()
  * moved mrjob.util.bunzip2_stream() to mrjob.cat
  * moved mrjob.util.gunzip_stream() to mrjob.cat
  * deprecated mrjob.util.args_for_opt_dest_subset()

@@ -1195,6 +1195,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     strict_protocols=dict(
+        deprecated=True,
         switches=[
             (['--strict-protocols'], dict(
                 action='store_true',

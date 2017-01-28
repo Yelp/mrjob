@@ -19,6 +19,7 @@ import os.path
 import sys
 import time
 from io import BytesIO
+from optparse import OptionParser
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -43,6 +44,7 @@ from mrjob.step import SparkStep
 from mrjob.util import log_to_stream
 
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_cmd_job import CmdJob
 from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
@@ -1200,3 +1202,106 @@ class RunSparkTestCase(TestCase):
         job.spark = MagicMock()
 
         self.assertRaises(ValueError, job.execute)
+
+
+class PrintHelpTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(PrintHelpTestCase, self).setUp()
+
+        self.exit = self.start(patch('sys.exit'))
+        self.stdout = self.start(patch.object(sys, 'stdout', StringIO()))
+
+    def test_basic_help(self):
+        job = MRJob(['--help'])
+
+        self.exit.assert_called_once_with(0)
+
+        output = self.stdout.getvalue()
+        # basic option
+        self.assertIn('--conf', output)
+
+        # not basic options
+        self.assertNotIn('--step-num', output)
+        self.assertNotIn('--s3-endpoint', output)
+
+        # deprecated options
+        self.assertNotIn('--partitioner', output)
+        self.assertIn('add --deprecated', output)
+        self.assertNotIn('--deprecated=DEPRECATED', output)
+
+    def test_basic_help_deprecated(self):
+        job = MRJob(['--help', '--deprecated'])
+
+        self.exit.assert_called_once_with(0)
+
+        output = self.stdout.getvalue()
+        # basic option
+        self.assertIn('--conf', output)
+
+        # not basic options
+        self.assertNotIn('--step-num', output)
+        self.assertNotIn('--s3-endpoint', output)
+
+        # deprecated options
+        self.assertIn('--partitioner', output)
+        self.assertNotIn('add --deprecated', output)
+        self.assertIn('--deprecated=DEPRECATED', output)
+
+    def test_runner_help(self):
+        job = MRJob(['--help', '-r', 'emr'])
+
+        self.exit.assert_called_once_with(0)
+
+        output = self.stdout.getvalue()
+        # EMR runner option
+        self.assertIn('--s3-endpoint', output)
+
+        # not runner options
+        self.assertNotIn('--conf', output)
+        self.assertNotIn('--step-num', output)
+
+        # a runner option, but not for EMR
+        self.assertNotIn('--gcp-project', output)
+
+        # deprecated options
+        self.assertNotIn('--bootstrap-cmd', output)
+
+    def test_deprecated_runner_help(self):
+        job = MRJob(['--help', '-r', 'emr', '--deprecated'])
+
+        self.exit.assert_called_once_with(0)
+
+        output = self.stdout.getvalue()
+        # EMR runner option
+        self.assertIn('--s3-endpoint', output)
+
+        # not runner options
+        self.assertNotIn('--conf', output)
+        self.assertNotIn('--step-num', output)
+
+        # a runner option, but not for EMR
+        self.assertNotIn('--gcp-project', output)
+
+        # deprecated options
+        self.assertIn('--bootstrap-cmd', output)
+
+    def test_steps_help(self):
+        job = MRJob(['--help', '--steps'])
+
+        self.exit.assert_called_once_with(0)
+
+        output = self.stdout.getvalue()
+        # step option
+        self.assertIn('--step-num', output)
+
+        # not step options
+        self.assertNotIn('--conf', output)
+        self.assertNotIn('--s3-endpoint', output)
+
+
+    def test_passthrough_options(self):
+        cmd_job = CmdJob(['--help'])
+
+        output = self.stdout.getvalue()
+        self.assertIn('--reducer-cmd-2', output)

@@ -29,9 +29,9 @@ from mrjob.options import _add_basic_options
 from mrjob.options import _add_job_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _allowed_keys
-from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
-from mrjob.options import _print_help_for_groups
+from mrjob.options import _print_help_for_runner
+from mrjob.options import _print_basic_help
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
@@ -87,13 +87,7 @@ class MRJobLauncher(object):
                                           option_class=self.OPTION_CLASS,
                                           add_help_option=False)
 
-        # temporary, for testing
-        self._option_parser = OptionParser()
-
         self.configure_options()
-
-        for opt_group in self.all_option_groups():
-            _alphabetize_options(opt_group)
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script
@@ -131,6 +125,16 @@ class MRJobLauncher(object):
         """Command line usage string for this class"""
         return ("usage: mrjob run [script path|executable path|--help]"
                 " [options] [input files]")
+
+    def _print_help(self, options):
+        """Print help for this job. This will either print runner
+        or basic help. Override to allow other kinds of help."""
+        if options.runner:
+            _print_help_for_runner(options.runner, options.deprecated)
+        else:
+            _print_basic_help(self.option_parser,
+                              self._usage(),
+                              options.deprecated)
 
     @classmethod
     def run(cls, args=_READ_ARGS_FROM_SYS_ARGV):
@@ -252,124 +256,109 @@ class MRJobLauncher(object):
                 ...
         """
         self.option_parser.add_option(
-            '--help', dest='help_main', action='store_true', default=False,
+            '-h', '--help', dest='help', action='store_true', default=False,
             help='show this message and exit')
 
         self.option_parser.add_option(
-            '--help-dataproc', dest='help_dataproc', action='store_true',
+            '--deprecated', dest='deprecated', action='store_true',
             default=False,
-            help='show Dataproc-related options')
-
-        self.option_parser.add_option(
-            '--help-emr', dest='help_emr', action='store_true', default=False,
-            help='show EMR-related options')
-
-        self.option_parser.add_option(
-            '--help-hadoop', dest='help_hadoop', action='store_true',
-            default=False,
-            help='show Hadoop-related options')
-
-        self.option_parser.add_option(
-            '--help-local', dest='help_local', action='store_true',
-            default=False,
-            help='show local/inline runner-related options')
-
-        self.option_parser.add_option(
-            '--help-runner', dest='help_runner', action='store_true',
-            default=False, help='show runner-related options')
+            help='include help for deprecated options')
 
         # protocol stuff
-        self.proto_opt_group = OptionGroup(
+        self._proto_opt_group = OptionGroup(
             self.option_parser, 'Protocols')
-        self.option_parser.add_option_group(self.proto_opt_group)
+        self.option_parser.add_option_group(self._proto_opt_group)
 
         _add_runner_options(
-            self.proto_opt_group, set(['strict_protocols']))
+            self._proto_opt_group, set(['strict_protocols']))
 
         # options for running the job (any runner)
-        self.runner_opt_group = OptionGroup(
+        self._runner_opt_group = OptionGroup(
             self.option_parser, 'Running the entire job')
-        self.option_parser.add_option_group(self.runner_opt_group)
+        self.option_parser.add_option_group(self._runner_opt_group)
 
-        _add_basic_options(self.runner_opt_group)
-        _add_job_options(self.runner_opt_group)
+        _add_basic_options(self._runner_opt_group)
+        _add_job_options(self._runner_opt_group)
         _add_runner_options(
-            self.runner_opt_group,
+            self._runner_opt_group,
             _pick_runner_opts('base') - set(['strict_protocols']))
 
         # options for inline/local runners
-        self.local_opt_group = OptionGroup(
+        self._local_opt_group = OptionGroup(
             self.option_parser,
             'Running locally (these apply when you set -r inline or -r local)')
-        self.option_parser.add_option_group(self.local_opt_group)
+        self.option_parser.add_option_group(self._local_opt_group)
 
         _add_runner_options(
-            self.local_opt_group,
+            self._local_opt_group,
             _pick_runner_opts('local') - _pick_runner_opts('base'))
 
         # options common to Hadoop and EMR
-        self.hadoop_emr_opt_group = OptionGroup(
+        self._hadoop_emr_opt_group = OptionGroup(
             self.option_parser,
             'Running on Hadoop or EMR (these apply when you set -r hadoop or'
             ' -r emr)')
-        self.option_parser.add_option_group(self.hadoop_emr_opt_group)
+        self.option_parser.add_option_group(self._hadoop_emr_opt_group)
 
         _add_runner_options(
-            self.hadoop_emr_opt_group,
+            self._hadoop_emr_opt_group,
             ((_pick_runner_opts('emr') & _pick_runner_opts('hadoop')) -
              _pick_runner_opts('base')))
 
         # options for running the job on Hadoop
-        self.hadoop_opt_group = OptionGroup(
+        self._hadoop_opt_group = OptionGroup(
             self.option_parser,
             'Running on Hadoop (these apply when you set -r hadoop)')
-        self.option_parser.add_option_group(self.hadoop_opt_group)
+        self.option_parser.add_option_group(self._hadoop_opt_group)
 
         _add_runner_options(
-            self.hadoop_opt_group,
+            self._hadoop_opt_group,
             (_pick_runner_opts('hadoop') -
              _pick_runner_opts('emr') - _pick_runner_opts('base')))
 
         # options for running the job on Dataproc or EMR
-        self.dataproc_emr_opt_group = OptionGroup(
+        self._dataproc_emr_opt_group = OptionGroup(
             self.option_parser,
             'Running on Dataproc or EMR (these apply when you set -r dataproc'
             ' or -r emr)')
-        self.option_parser.add_option_group(self.dataproc_emr_opt_group)
+        self.option_parser.add_option_group(self._dataproc_emr_opt_group)
 
         _add_runner_options(
-            self.dataproc_emr_opt_group,
+            self._dataproc_emr_opt_group,
             ((_pick_runner_opts('dataproc') & _pick_runner_opts('emr')) -
              _pick_runner_opts('base')))
 
         # options for running the job on Dataproc
-        self.dataproc_opt_group = OptionGroup(
+        self._dataproc_opt_group = OptionGroup(
             self.option_parser,
             'Running on Dataproc (these apply when you set -r dataproc)')
-        self.option_parser.add_option_group(self.dataproc_opt_group)
+        self.option_parser.add_option_group(self._dataproc_opt_group)
 
         _add_runner_options(
-            self.dataproc_opt_group,
+            self._dataproc_opt_group,
             (_pick_runner_opts('dataproc') -
              _pick_runner_opts('emr') - _pick_runner_opts('base')))
 
         # options for running the job on EMR
-        self.emr_opt_group = OptionGroup(
+        self._emr_opt_group = OptionGroup(
             self.option_parser,
             'Running on EMR (these apply when you set -r emr)')
-        self.option_parser.add_option_group(self.emr_opt_group)
+        self.option_parser.add_option_group(self._emr_opt_group)
 
         _add_runner_options(
-            self.emr_opt_group,
+            self._emr_opt_group,
             (_pick_runner_opts('emr') - _pick_runner_opts('hadoop') -
              _pick_runner_opts('dataproc') - _pick_runner_opts('base')))
 
     def all_option_groups(self):
-        return (self.option_parser, self.proto_opt_group,
-                self.runner_opt_group, self.hadoop_opt_group,
-                self.dataproc_emr_opt_group, self.hadoop_emr_opt_group,
-                self.dataproc_opt_group, self.emr_opt_group,
-                self.local_opt_group)
+        log.warning('all_option_groups() is deprecated and will be removed'
+                    ' in v0.6.0')
+
+        return (self.option_parser, self._proto_opt_group,
+                self._runner_opt_group, self._hadoop_opt_group,
+                self._dataproc_emr_opt_group, self._hadoop_emr_opt_group,
+                self._dataproc_opt_group, self._emr_opt_group,
+                self._local_opt_group)
 
     def is_task(self):
         """True if this is a mapper, combiner, or reducer.
@@ -476,11 +465,6 @@ class MRJobLauncher(object):
                 self._script_path = os.path.abspath(args[0])
                 self.args = args[1:]
 
-    def _help_main(self):
-        self.option_parser.option_groups = []
-        self.option_parser.print_help()
-        sys.exit(0)
-
     def load_options(self, args):
         """Load command-line options into ``self.options``,
         ``self._script_path``, and ``self.args``.
@@ -501,31 +485,8 @@ class MRJobLauncher(object):
         """
         self.options, args = self.option_parser.parse_args(args)
 
-        if self.options.help_main:
-            self._help_main()
-
-        if self.options.help_dataproc:
-            _print_help_for_groups(self.dataproc_emr_opt_group,
-                                   self.dataproc_opt_group)
-            sys.exit(0)
-
-        if self.options.help_emr:
-            _print_help_for_groups(self.dataproc_emr_opt_group,
-                                   self.hadoop_emr_opt_group,
-                                   self.emr_opt_group)
-            sys.exit(0)
-
-        if self.options.help_hadoop:
-            _print_help_for_groups(self.hadoop_emr_opt_group,
-                                   self.hadoop_opt_group)
-            sys.exit(0)
-
-        if self.options.help_local:
-            _print_help_for_groups(self.local_opt_group)
-            sys.exit(0)
-
-        if self.options.help_runner:
-            _print_help_for_groups(self.runner_opt_group)
+        if self.options.help:
+            self._print_help(self.options)
             sys.exit(0)
 
         self._process_args(args)
@@ -773,22 +734,13 @@ class MRJobLauncher(object):
 
         return self
 
-    ### deprecated option group methods ###
-
-    def _deprecated_option_group(self, opt_names, title):
-        if not getattr(self, '_warned_about_opt_groups', None):
-            log.warning('*_opt_group attributes are deprecated and going away'
-                        ' in v0.6.0')
-            self._warned_about_opt_groups = True
-
-        opt_group = OptionGroup(self._dummy_option_parser, title)
-
-        _add_runner_options(opt_group, opt_names)
-
-    ### temporary, for debugging ###
-
-    def _opt_group_names(self):
-        return set(name for name in dir(self) if name.endswith('_opt_group'))
+    def __getattr__(self, name):
+        if name.startswith('_') and name.endswith('_opt_group'):
+            log.warning('The %s attribute is deprecated and will be removed'
+                        ' in v0.6.0' % name)
+            return getattr(self, name[1:])
+        else:
+            raise AttributeError(name)
 
 
 def _dests(opt_group):

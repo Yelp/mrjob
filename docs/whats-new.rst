@@ -4,6 +4,57 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.8:
+
+0.5.8
+-----
+
+You can now pass directories to jobs, either directly with the
+:mrjob-opt:`upload_dirs` directory, or through :mrjob-opt:`setup`
+and :mrjob-opt:`bootstrap` commands. mrjob will automatically tarball them
+and pass them to Hadoop as archives.
+
+For multi-step jobs, you can now specify where inter-step output goes
+with :mrjob-opt:`step_output_dir`, which can be useful
+for debugging.
+
+All job step types now take a *jobconf* option.
+
+Jobs' ``--help`` printout is now better-organized and less verbose.
+
+Made several fixes to pre-filters (commands that pipe into streaming steps):
+
+* you can once again add pre-filters to a single step job by re-defining
+  :py:meth:`~mrjob.job.MRJob.mapper_pre_filter`,
+  :py:meth:`~mrjob.job.MRJob.combiner_pre_filter`, and/or
+  :py:meth:`~mrjob.job.MRJob.reducer_pre_filter`
+* local mode now ignores non-zero return codes from pre-filters (this
+  matters for BSD grep)
+* local mode can now run pre-filters on compressed input files
+
+mrjob now respects :mrjob-opt:`sh_bin` when it needs to wrap a command
+in ``sh`` before passing it to Hadoop (e.g. to support pipes)
+
+On EMR, mrjob now fetches logs from task nodes when determining probable cause
+of error (it used to only look at nodes with HDFS on them).
+
+Several unused functions in :py:mod:`mrjob.util` are now deprecated:
+
+* :py:func:`~mrjob.util.args_for_opt_dest_subset`
+* :py:func:`~mrjob.util.bash_wrap`
+* :py:func:`~mrjob.util.populate_option_groups_with_options`
+* :py:func:`~mrjob.util.scrape_options_and_index_by_dest`
+* :py:func:`~mrjob.util.tar_and_gz`
+
+:py:func:`~mrjob.cat.bunzip2_stream` and :py:func:`~mrjob.cat.gunzip_stream`
+have been moved from :py:mod:`mrjob.util` to :py:mod:`mrjob.cat`.
+
+:py:meth:`SSHFilesystem.ssh_slave_hosts <mrjob.fs.ssh.SSHFilesystem.ssh_slave_hosts>` has been deprecated.
+
+Option group attributes in :py:class:`~mrjob.job.MRJob`\s have been deprecated,
+as has :py:meth:`~mrjob.job.MRJob.get_all_option_groups`.
+
+
 .. _v0.5.7:
 
 0.5.7

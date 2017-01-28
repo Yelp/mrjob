@@ -4,6 +4,7 @@ Reference
 .. toctree::
     :maxdepth: 1
 
+    utils-cat.rst
     utils-compat.rst
     configs.rst
     runners-dataproc.rst

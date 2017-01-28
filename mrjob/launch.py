@@ -88,14 +88,6 @@ class MRJobLauncher(object):
                                           option_class=self.OPTION_CLASS,
                                           add_help_option=False)
 
-        # temporary, for testing
-        self._option_parser = OptionParser()
-
-        self.configure_options()
-
-        for opt_group in self.all_option_groups():
-            _alphabetize_options(opt_group)
-
         # don't pass None to parse_args unless we're actually running
         # the MRJob script
         if args is _READ_ARGS_FROM_SYS_ARGV:
@@ -737,23 +729,6 @@ class MRJobLauncher(object):
         self.stderr = stderr or BytesIO()
 
         return self
-
-    ### deprecated option group methods ###
-
-    def _deprecated_option_group(self, opt_names, title):
-        if not getattr(self, '_warned_about_opt_groups', None):
-            log.warning('*_opt_group attributes are deprecated and going away'
-                        ' in v0.6.0')
-            self._warned_about_opt_groups = True
-
-        opt_group = OptionGroup(self._dummy_option_parser, title)
-
-        _add_runner_options(opt_group, opt_names)
-
-    ### temporary, for debugging ###
-
-    def _opt_group_names(self):
-        return set(name for name in dir(self) if name.endswith('_opt_group'))
 
 
 def _dests(opt_group):

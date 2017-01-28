@@ -30,6 +30,7 @@ from mrjob.conf import combine_lists
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.options import _add_step_options
+from mrjob.options import _print_help_for_steps
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.py2 import integer_types
@@ -874,13 +875,12 @@ class MRJob(MRJobLauncher):
         """
         self.args = args
 
-    def _help_main(self):
-        self.option_parser.option_groups = [
-            self.mux_opt_group,
-            self.proto_opt_group,
-        ]
-        self.option_parser.print_help()
-        sys.exit(0)
+    def _print_help(self, options):
+        """Implement --help --steps"""
+        if options.show_steps:
+            _print_help_for_steps()
+        else:
+            super(MRJob, self)._print_help(options)
 
     ### protocols ###
 

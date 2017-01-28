@@ -16,6 +16,8 @@
 objects with categorized command line parameters. This module should not be
 made public until at least 0.4 if not later or never.
 """
+from __future__ import print_function
+
 import json
 from optparse import OptionParser
 from optparse import SUPPRESS_USAGE
@@ -211,6 +213,13 @@ _STEP_OPTS = dict(
         ),
     ),
 )
+
+# don't show this unless someone types --help --deprecated
+_DEPRECATED_NON_RUNNER_OPTS = set([
+    'deprecated',
+    'partitioner',
+])
+
 
 
 ### runner opts ###
@@ -1479,12 +1488,6 @@ def _add_step_options(opt_group):
 
 ### other utilities for switches ###
 
-def _print_help_for_groups(*args):
-    option_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
-    option_parser.option_groups = args
-    option_parser.print_help()
-
-
 def _print_help_for_runner(runner_alias, include_deprecated=False):
     help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
 
@@ -1495,9 +1498,20 @@ def _print_help_for_runner(runner_alias, include_deprecated=False):
     help_parser.print_help()
 
 
-def _print_non_runner_help(option_parser):
-    """Print all help for the parser (including passthrough options)"""
+def _print_help_for_steps():
     help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
+
+    _add_step_options(help_parser)
+
+    help_parser.print_help()
+
+
+def _print_basic_help(option_parser, usage, include_deprecated=False):
+    """Print all help for the parser. Unlike similar functions, this needs a
+    parser so that it can include custom options added by a
+    :py:class:`~mrjob.job.MRJob`.
+    """
+    help_parser = OptionParser(usage=usage, add_help_option=False)
 
     for option in option_parser._get_all_options():
         if option.dest in _RUNNER_OPTS:
@@ -1506,12 +1520,26 @@ def _print_non_runner_help(option_parser):
         if option.dest in _STEP_OPTS:
             continue
 
+        if (option.dest in _DEPRECATED_NON_RUNNER_OPTS and
+                not include_deprecated):
+            continue
+
         help_parser.add_option(
             *(option._short_opts + option._long_opts),
             dest=option.dest,
             help=option.help)
 
     help_parser.print_help()
+
+    print()
+    print('To see help for a specific runner, use --help -r <runner name>')
+    print()
+    print('To see help for options that control what part of a job runs,'
+          ' use --help --steps')
+    print()
+    if not include_deprecated:
+        print('To include help for deprecated options, add --deprecated')
+        print()
 
 
 def _alphabetize_options(opt_group):

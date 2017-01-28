@@ -31,7 +31,8 @@ from mrjob.options import _add_runner_options
 from mrjob.options import _allowed_keys
 from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
-from mrjob.options import _print_help_for_groups
+from mrjob.options import _print_help_for_runner
+from mrjob.options import _print_basic_help
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
@@ -131,6 +132,16 @@ class MRJobLauncher(object):
         """Command line usage string for this class"""
         return ("usage: mrjob run [script path|executable path|--help]"
                 " [options] [input files]")
+
+    def _print_help(self, options):
+        """Print help for this job. This will either print runner
+        or basic help. Override to allow other kinds of help."""
+        if options.runner:
+            _print_help_for_runner(options.runner, options.deprecated)
+        else:
+            _print_basic_help(self.option_parser,
+                              self._usage(),
+                              options.deprecated)
 
     @classmethod
     def run(cls, args=_READ_ARGS_FROM_SYS_ARGV):
@@ -252,31 +263,13 @@ class MRJobLauncher(object):
                 ...
         """
         self.option_parser.add_option(
-            '--help', dest='help_main', action='store_true', default=False,
+            '-h', '--help', dest='help', action='store_true', default=False,
             help='show this message and exit')
 
         self.option_parser.add_option(
-            '--help-dataproc', dest='help_dataproc', action='store_true',
+            '--deprecated', dest='deprecated', action='store_true',
             default=False,
-            help='show Dataproc-related options')
-
-        self.option_parser.add_option(
-            '--help-emr', dest='help_emr', action='store_true', default=False,
-            help='show EMR-related options')
-
-        self.option_parser.add_option(
-            '--help-hadoop', dest='help_hadoop', action='store_true',
-            default=False,
-            help='show Hadoop-related options')
-
-        self.option_parser.add_option(
-            '--help-local', dest='help_local', action='store_true',
-            default=False,
-            help='show local/inline runner-related options')
-
-        self.option_parser.add_option(
-            '--help-runner', dest='help_runner', action='store_true',
-            default=False, help='show runner-related options')
+            help='include help for deprecated options')
 
         # protocol stuff
         self.proto_opt_group = OptionGroup(
@@ -476,11 +469,6 @@ class MRJobLauncher(object):
                 self._script_path = os.path.abspath(args[0])
                 self.args = args[1:]
 
-    def _help_main(self):
-        self.option_parser.option_groups = []
-        self.option_parser.print_help()
-        sys.exit(0)
-
     def load_options(self, args):
         """Load command-line options into ``self.options``,
         ``self._script_path``, and ``self.args``.
@@ -501,31 +489,8 @@ class MRJobLauncher(object):
         """
         self.options, args = self.option_parser.parse_args(args)
 
-        if self.options.help_main:
-            self._help_main()
-
-        if self.options.help_dataproc:
-            _print_help_for_groups(self.dataproc_emr_opt_group,
-                                   self.dataproc_opt_group)
-            sys.exit(0)
-
-        if self.options.help_emr:
-            _print_help_for_groups(self.dataproc_emr_opt_group,
-                                   self.hadoop_emr_opt_group,
-                                   self.emr_opt_group)
-            sys.exit(0)
-
-        if self.options.help_hadoop:
-            _print_help_for_groups(self.hadoop_emr_opt_group,
-                                   self.hadoop_opt_group)
-            sys.exit(0)
-
-        if self.options.help_local:
-            _print_help_for_groups(self.local_opt_group)
-            sys.exit(0)
-
-        if self.options.help_runner:
-            _print_help_for_groups(self.runner_opt_group)
+        if self.options.help:
+            self._print_help(self.options)
             sys.exit(0)
 
         self._process_args(args)

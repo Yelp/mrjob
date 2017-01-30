@@ -566,7 +566,8 @@ class SparkScriptStepTestCase(TestCase):
         self.assertRaises(TypeError, SparkScriptStep, jobconf='nah')
         self.assertRaises(TypeError, SparkScriptStep, main_class=1)
         self.assertRaises(TypeError, SparkScriptStep, script=['macbeth'])
-        self.assertRaises(TypeError, SparkScriptStep, spark_args='*ARGH* *ARGH*')
+        self.assertRaises(TypeError, SparkScriptStep,
+                          spark_args='*ARGH* *ARGH*')
 
     def test_bad_arg(self):
         self.assertRaises(TypeError, SparkScriptStep, 'hap.py', spark='*')

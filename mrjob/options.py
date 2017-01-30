@@ -221,7 +221,6 @@ _DEPRECATED_NON_RUNNER_OPTS = set([
 ])
 
 
-
 ### runner opts ###
 
 # map from runner option name to dict with the following keys (all optional):
@@ -1275,8 +1274,8 @@ _RUNNER_OPTS = dict(
             (['--dir'], dict(
                 action='append',
                 help=('Tarball the given directory and unpack the resulting'
-                     ' archive in the working directory of this script.'
-                     ' You can use --dir multiple times'),
+                      ' archive in the working directory of this script.'
+                      ' You can use --dir multiple times'),
             )),
         ],
     ),

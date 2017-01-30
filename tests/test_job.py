@@ -1293,7 +1293,6 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--conf', output)
         self.assertNotIn('--s3-endpoint', output)
 
-
     def test_passthrough_options(self):
         CmdJob(['--help'])
         self.exit.assert_called_once_with(0)

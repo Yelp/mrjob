@@ -82,8 +82,6 @@ _SORT_VALUES_PARTITIONER = \
     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
 
 
-
-
 class RunnerOptionStore(OptionStore):
     # 'base' is aritrary; if an option support all runners, it won't
     # have "runners" set in _RUNNER_OPTS at all

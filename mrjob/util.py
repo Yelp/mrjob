@@ -589,6 +589,7 @@ def _args_for_opt_dest_subset(option_parser, args, dests=None):
         else:
             del rargs[0]
 
+
 def _process_long_opt(option_parser, rargs, values, dests):
     """Mimic function of the same name in ``OptionParser``, capturing the
     arguments consumed in *arg_map*

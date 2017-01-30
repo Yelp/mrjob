@@ -15,6 +15,7 @@
 from mrjob.job import MRJob
 from mrjob.step import MRStep
 
+
 class MRSortValuesAndMore(MRJob):
 
     JOBCONF = {
@@ -31,12 +32,16 @@ class MRSortValuesAndMore(MRJob):
 
     def steps(self):
         return [
-            MRStep(mapper_init=self.dummy_mapper_init),
-            MRStep(mapper_init=self.dummy_mapper_init,
-                   jobconf={
-                       'mapreduce.job.output.key.comparator.class':
-                       'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
-                    })
+            MRStep(
+                mapper_init=self.dummy_mapper_init,
+            ),
+            MRStep(
+                mapper_init=self.dummy_mapper_init,
+                jobconf={
+                    'mapreduce.job.output.key.comparator.class':
+                    'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
+                }
+            ),
         ]
 
 

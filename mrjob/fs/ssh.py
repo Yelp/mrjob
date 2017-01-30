@@ -58,6 +58,7 @@ class SSHFilesystem(Filesystem):
 
         # should we use sudo (for EMR)? Enable with use_sudo_over_ssh()
         self._sudo = False
+
     def can_handle_path(self, path):
         return _SSH_URI_RE.match(path) is not None
 

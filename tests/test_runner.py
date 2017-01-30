@@ -1964,7 +1964,8 @@ class SortValuesTestCase(SandboxedTestCase):
                     'mapreduce.partition.keycomparator.options': '-k1 -k2nr',
                     'mapreduce.partition.keypartitioner.options': '-k1,1',
                     'stream.num.map.output.key.fields': 3,
-            })
+                }
+            )
 
     def test_steps_can_override_jobconf(self):
         mr_job = MRSortValuesAndMore(['--hadoop-version', '2.0.0'])
@@ -1978,7 +1979,8 @@ class SortValuesTestCase(SandboxedTestCase):
                     'mapreduce.partition.keycomparator.options': '-k1 -k2nr',
                     'mapreduce.partition.keypartitioner.options': '-k1,1',
                     'stream.num.map.output.key.fields': 3,
-            })
+                }
+            )
 
     def test_cmd_line_can_override_jobconf(self):
         mr_job = MRSortValues([
@@ -1992,7 +1994,8 @@ class SortValuesTestCase(SandboxedTestCase):
                 runner._jobconf_for_step(0), {
                     'mapreduce.partition.keypartitioner.options': '-k1,1',
                     'stream.num.map.output.key.fields': '3',
-            })
+                }
+            )
 
     def test_partitioner(self):
         mr_job = MRSortValues()
@@ -2020,7 +2023,7 @@ class SortValuesTestCase(SandboxedTestCase):
                 hadoop_args[hadoop_args.index('-partitioner') + 1],
                 'org.apache.hadoop.mapred.lib.HashPartitioner')
 
-    def test_cmd_line_can_override_partitioner(self):\
+    def test_cmd_line_can_override_partitioner(self):
         # the --partitioner option is deprecated
         mr_job = MRSortValues(['--partitioner', 'FooPartitioner'])
         mr_job.sandbox()

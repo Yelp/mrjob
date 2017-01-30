@@ -60,7 +60,6 @@ else:
     PYTHON_BIN = 'python3'
 
 
-
 class MockHadoopTestCase(SandboxedTestCase):
 
     def setUp(self):
@@ -127,7 +126,6 @@ class RunnerFullyQualifiesOutputPathsTestCase(MockHadoopTestCase):
         runner = HadoopJobRunner(output_dir='/path/to/step-output')
 
         self.assertEqual(runner._output_dir, 'hdfs:///path/to/step-output')
-
 
 
 class HadoopStreamingJarTestCase(SandboxedTestCase):

@@ -306,7 +306,6 @@ class MRStep(object):
         return substep_descs
 
 
-
 class _Step(object):
     """Generic implementation of steps which are basically just simple objects
     that hold attributes."""
@@ -402,8 +401,6 @@ class _Step(object):
         result['type'] = self._STEP_TYPE
 
         return result
-
-
 
 
 class JarStep(_Step):

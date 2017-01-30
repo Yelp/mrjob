@@ -82,7 +82,6 @@ def gunzip_stream(fileobj, bufsize=1024):
             yield data
 
 
-
 def decompress(fileobj, path):
     """Take a *fileobj* correponding to the given path and returns an iterator
     that yield chunks of bytes, or, if *path* doesn't correspond to a

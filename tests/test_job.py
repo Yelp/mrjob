@@ -19,7 +19,6 @@ import os.path
 import sys
 import time
 from io import BytesIO
-from optparse import OptionParser
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -1213,8 +1212,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.stdout = self.start(patch.object(sys, 'stdout', StringIO()))
 
     def test_basic_help(self):
-        job = MRJob(['--help'])
-
+        MRJob(['--help'])
         self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()
@@ -1231,8 +1229,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--deprecated=DEPRECATED', output)
 
     def test_basic_help_deprecated(self):
-        job = MRJob(['--help', '--deprecated'])
-
+        MRJob(['--help', '--deprecated'])
         self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()
@@ -1249,8 +1246,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertIn('--deprecated=DEPRECATED', output)
 
     def test_runner_help(self):
-        job = MRJob(['--help', '-r', 'emr'])
-
+        MRJob(['--help', '-r', 'emr'])
         self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()
@@ -1268,8 +1264,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--bootstrap-cmd', output)
 
     def test_deprecated_runner_help(self):
-        job = MRJob(['--help', '-r', 'emr', '--deprecated'])
-
+        MRJob(['--help', '-r', 'emr', '--deprecated'])
         self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()
@@ -1287,8 +1282,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertIn('--bootstrap-cmd', output)
 
     def test_steps_help(self):
-        job = MRJob(['--help', '--steps'])
-
+        MRJob(['--help', '--steps'])
         self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()
@@ -1301,7 +1295,8 @@ class PrintHelpTestCase(SandboxedTestCase):
 
 
     def test_passthrough_options(self):
-        cmd_job = CmdJob(['--help'])
+        CmdJob(['--help'])
+        self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()
         self.assertIn('--reducer-cmd-2', output)

@@ -1696,9 +1696,6 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
         input1_path = self.makefile('input1')
         input2_path = self.makefile('input2')
 
-        output_dir = 'hdfs:///tmp/output'
-        step_output_dir = 'hdfs://tmp/step-output'
-
         # this has three steps, which lets us test step numbering
         job = MRCountingJob([
             '-r', 'hadoop',

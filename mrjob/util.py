@@ -27,7 +27,6 @@ import shlex
 import shutil
 import sys
 import tarfile
-from collections import defaultdict
 from copy import deepcopy
 from datetime import timedelta
 from distutils.spawn import find_executable

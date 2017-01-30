@@ -1,15 +1,30 @@
-v0.5.8, 2017-01-?? -- ???
+v0.5.8, 2017-01-30 -- upload_dirs, pre-filters
+ * automatically tarball and upload directories with --dir, setup hooks (#23)
+ * specify path for inter-step output with --step-output-dir #263
  * jobs:
+   * better --help printout
    * deprecated option groups in MRJobs
    * deprecated MRJob.get_all_option_groups()
+   * overriding *_pre_filter() methods in MRJob works again (#1521)
+   * all step types accept jobconf (#1447)
+   * quieted warning about SORT_VALUES on Hadoop 2 (#1286)
+ * all runners:
+   * wrap tasks that require pipes with sh_bin, not bash (#1330)
+ * local runner:
+   * allows non-zero exit status from pre-filters (#1524)
+   * pre-filters can now handle compressed input (#1061)
+ * EMR runner:
+   * fetch logs from task nodes as well as core nodes (#1400)
+     * use ListInstances rather than dfsadmin to get node list (#1345)
  * moved mrjob.util.bunzip2_stream() to mrjob.cat
  * moved mrjob.util.gunzip_stream() to mrjob.cat
- * deprecated mrjob.util.args_for_opt_dest_subset()
- * deprecated mrjob.util.bash_wrap()
- * deprecated mrjob.util.populate_option_groups_with_options()
- * deprecated mrjob.util.scrape_options_and_index_by_dest()
- * deprecated mrjob.util.tar_and_gz()
- * deprecated SSHFilesystem.ssh_slave_hosts()
+ * deprecated:
+   * mrjob.util.args_for_opt_dest_subset()
+   * mrjob.util.bash_wrap()
+   * mrjob.util.populate_option_groups_with_options()
+   * mrjob.util.scrape_options_and_index_by_dest()
+   * mrjob.util.tar_and_gz()
+   * SSHFilesystem.ssh_slave_hosts()
 
 v0.5.7, 2016-12-19 -- Spark
  * EMR and Hadoop runners:

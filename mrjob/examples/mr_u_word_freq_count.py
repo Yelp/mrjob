@@ -1,5 +1,4 @@
-#!/usr/bin/python
-# Copyright 2009-2010 Yelp
+# Copyright 2016-2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.

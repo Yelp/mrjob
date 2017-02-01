@@ -93,7 +93,7 @@ In addition, it ignores *hadoop_input_format*, *hadoop_output_format*,
 
 :py:class:`~mrjob.inline.InlineMRJobRunner` works like
 :py:class:`~mrjob.local.LocalMRJobRunner`, only it also ignores
-*bootstrap_mrjob*, *cmdenv*, *python_bin*, *setup_cmds*, *setup_scripts*,
+*bootstrap_mrjob*, *cmdenv*, *python_bin*, *setup_scripts*,
 *steps_python_bin*, *upload_archives*, and *upload_files*.
 
 

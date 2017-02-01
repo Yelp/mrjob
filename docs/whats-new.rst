@@ -741,7 +741,7 @@ Java libraries such as `Mahout <http://mahout.apache.org/>`_ in your MRJobs.
 For more information, see :ref:`non-hadoop-streaming-jar-steps`.
 
 Many options for setting up your task's environment (``--python-archive``,
-``setup-cmd`` and ``--setup-script``) have been replaced by a powerful
+``--setup-cmd`` and ``--setup-script``) have been replaced by a powerful
 ``--setup`` option. See the :doc:`guides/setup-cookbook` for examples.
 
 Similarly, many options for bootstrapping nodes on EMR (``--bootstrap-cmd``,

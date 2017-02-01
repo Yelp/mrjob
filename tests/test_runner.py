@@ -1305,20 +1305,6 @@ class SetupTestCase(SandboxedTestCase):
         self.assertEqual(path_to_size.get('./bar/foo.py'),
                          self.foo_py_size)
 
-    def test_deprecated_setup_cmd_option(self):
-        job = MROSWalkJob(
-            ['-r', 'local',
-             '--setup-cmd', 'touch bar'])
-        job.sandbox()
-
-        with job.make_runner() as r:
-            r.run()
-
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
-
-        self.assertIn('./bar', path_to_size)
-
     def test_deprecated_setup_script_option(self):
         job = MROSWalkJob(
             ['-r', 'local',

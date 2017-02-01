@@ -361,9 +361,9 @@ class MRJobRunner(object):
                 'archive', archive_path, name=ud['name'])
             self._spark_archives.append((ud['name'], archive_path))
 
-        # py_files, setup, setup_cmds, and setup_scripts
+        # py_files, setup, and setup_scripts
         # self._setup is a list of shell commands with path dicts
-        # interleaved; see mrjob.setup.parse_setup_cmds() for details
+        # interleaved; see mrjob.setup.parse_setup_cmd() for details
         self._setup = self._parse_setup()
         for cmd in self._setup:
             for token in cmd:
@@ -980,7 +980,7 @@ class MRJobRunner(object):
         Patch in *py_files*.
 
         Also patch in the deprecated
-        options *setup_cmd*, and *setup_script*
+        option *setup_script*
         as setup commands.
         """
         setup = []
@@ -997,17 +997,6 @@ class MRJobRunner(object):
         # setup
         for cmd in self._opts['setup']:
             setup.append(parse_setup_cmd(cmd))
-
-        # setup_cmds
-        if self._opts['setup_cmds']:
-            log.warning(
-                "setup_cmds is deprecated since v0.4.2 and will be removed"
-                " in v0.6.0. Consider using setup instead.")
-
-        for cmd in self._opts['setup_cmds']:
-            if not isinstance(cmd, string_types):
-                cmd = cmd_line(cmd)
-            setup.append([cmd])
 
         # setup_scripts
         if self._opts['setup_scripts']:

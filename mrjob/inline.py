@@ -57,7 +57,7 @@ class InlineMRJobRunner(SimMRJobRunner):
           because they require Java. If you need to test these, consider
           starting up a standalone Hadoop instance and running your job with
           ``-r hadoop``.
-        * *python_bin*, *setup*, *setup_cmds*, *setup_scripts* and
+        * *python_bin*, *setup*, *setup_scripts* and
           *steps_python_bin* are ignored because we don't invoke
           subprocesses.
         """
@@ -71,7 +71,6 @@ class InlineMRJobRunner(SimMRJobRunner):
         'bootstrap_mrjob',
         'python_bin',
         'setup',
-        'setup_cmds',
         'setup_scripts',
         'steps_python_bin',
     ]

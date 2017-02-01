@@ -2620,7 +2620,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     bootstrap.append(
                         ['sudo %s -m pip install ' % python_bin, path_dict])
 
-        # setup_cmds
+        # bootstrap_cmds
         if self._opts['bootstrap_cmds']:
             log.warning(
                 "bootstrap_cmds is deprecated since v0.4.2 and will be"

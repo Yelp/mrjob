@@ -381,7 +381,7 @@ class TestExtraKwargs(ConfigFilesTestCase):
 
     CONFIG = {'runners': {'inline': {
         'qux': 'quux',
-        'setup_cmds': ['echo foo']}}}
+        'setup': ['echo foo']}}}
 
     def setUp(self):
         super(TestExtraKwargs, self).setUp()
@@ -390,7 +390,7 @@ class TestExtraKwargs(ConfigFilesTestCase):
     def test_extra_kwargs_in_mrjob_conf_okay(self):
         with logger_disabled('mrjob.runner'):
             opts = RunnerOptionStore('inline', {}, [self.path])
-            self.assertEqual(opts['setup_cmds'], ['echo foo'])
+            self.assertEqual(opts['setup'], ['echo foo'])
             self.assertNotIn('qux', opts)
 
     def test_extra_kwargs_passed_in_directly_okay(self):

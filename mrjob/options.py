@@ -1046,20 +1046,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    setup_cmds=dict(
-        combiner=combine_lists,
-        deprecated=True,
-        switches=[
-            (['--setup-cmd'], dict(
-                action='append',
-                help=('A command to run before each mapper/reducer step in the'
-                      ' shell (e.g. "cd my-src-tree; make") specified as a'
-                      ' string. You can use --setup-cmd more than once. Use'
-                      ' mrjob.conf to specify arguments as a list to be run'
-                      ' directly.'),
-            )),
-        ],
-    ),
     setup_scripts=dict(
         combiner=combine_path_lists,
         deprecated=True,
@@ -1068,7 +1054,7 @@ _RUNNER_OPTS = dict(
                 action='append',
                 help=('Path to file to be copied into the local working'
                       ' directory and then run. You can use --setup-script'
-                      ' more than once. These are run after setup_cmds.'),
+                      ' more than once.'),
             )),
         ],
     ),

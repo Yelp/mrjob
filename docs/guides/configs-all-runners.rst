@@ -357,19 +357,6 @@ Job execution context
     :py:func:`~mrjob.setup.parse_setup_cmd`.
 
 .. mrjob-opt::
-    :config: setup_cmds
-    :switch: --setup-cmd
-    :type: :ref:`string list <data-type-string-list>`
-    :set: all
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    A list of commands to run before each mapper/reducer step. Basically
-    :mrjob-opt:`setup` without automatic file uploading/interpolation.
-    Can also take commands as lists of arguments.
-
-.. mrjob-opt::
     :config: setup_scripts
     :switch: --setup-script
     :type: :ref:`path list <data-type-path-list>`
@@ -497,6 +484,5 @@ as a subprocess:
 * :mrjob-opt:`bootstrap_mrjob`
 * :mrjob-opt:`python_bin`
 * :mrjob-opt:`setup`
-* :mrjob-opt:`setup_cmds`
 * :mrjob-opt:`setup_scripts`
 * :mrjob-opt:`steps_python_bin`

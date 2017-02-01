@@ -300,7 +300,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--s3-log-uri', 's3://walrus/logs',
+                               '--cloud-log-dir', 's3://walrus/logs',
                                '-', '--cleanup', mode])
         mr_job.sandbox(stdin=stdin)
 
@@ -2203,8 +2203,8 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--num-ec2-core-instances', '2',
-            '--num-ec2-task-instances', '10',  # more instances, but smaller
+            '--num-core-instances', '2',
+            '--num-task-instances', '10',  # more instances, but smaller
             '--core-instance-bid-price', '0.10',
             '--master-instance-bid-price', '77.77',
             '--task-instance-bid-price', '22.00'])
@@ -3641,7 +3641,7 @@ class SparkStepTestCase(MockBotoTestCase):
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
     def test_3_x_ami(self):
-        job = MRNullSpark(['-r', 'emr', '--ami-version', '3.11.0'])
+        job = MRNullSpark(['-r', 'emr', '--image-version', '3.11.0'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -3658,7 +3658,7 @@ class SparkStepTestCase(MockBotoTestCase):
                 _3_X_SPARK_SUBMIT)
 
     def test_4_x_ami(self):
-        job = MRNullSpark(['-r', 'emr', '--ami-version', '4.7.2'])
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.7.2'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -3777,7 +3777,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
 
     def test_3_x_ami(self):
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
-                             '--ami-version', '3.11.0'])
+                             '--image-version', '3.11.0'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -3795,7 +3795,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
 
     def test_4_x_ami(self):
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
-                             '--ami-version', '4.7.2'])
+                             '--image-version', '4.7.2'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5816,7 +5816,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_spark_application(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--emr-application', 'Spark'])
         job.sandbox()
 
@@ -5826,7 +5826,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_spark_application_lowercase(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--emr-application', 'spark'])
         job.sandbox()
 
@@ -5836,7 +5836,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--emr-application', 'Mahout'])
         job.sandbox()
 
@@ -5846,7 +5846,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_spark_and_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--emr-application', 'Mahout',
                             '--emr-application', 'Spark'])
         job.sandbox()
@@ -5876,7 +5876,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_ignores_application_api_param(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--emr-api-param',
                             'Application.member.1.Name=Spark'])
         job.sandbox()

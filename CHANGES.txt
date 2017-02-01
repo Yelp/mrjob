@@ -1,4 +1,4 @@
-v0.5.8, 2017-01-30 -- upload_dirs, pre-filters
+v0.5.8, 2017-02-01 -- upload_dirs, pre-filters
  * automatically tarball and upload directories with --dir, setup hooks (#23)
  * specify path for inter-step output with --step-output-dir #263
  * jobs:

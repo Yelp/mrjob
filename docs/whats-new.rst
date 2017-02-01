@@ -10,7 +10,7 @@ For a complete list of changes, see `CHANGES.txt
 -----
 
 You can now pass directories to jobs, either directly with the
-:mrjob-opt:`upload_dirs` directory, or through :mrjob-opt:`setup` commands.
+:mrjob-opt:`upload_dirs` option, or through :mrjob-opt:`setup` commands.
 For example:
 
 .. code-block:: sh

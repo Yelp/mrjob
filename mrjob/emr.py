@@ -420,7 +420,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['region'] = _DEFAULT_REGION
 
         self._fix_emr_configurations_opt()
-        self._fix_hadoop_streaming_jar_on_emr_opt()
         self._fix_instance_opts()
         self._fix_image_version_latest()
         self._fix_release_label_opt()
@@ -435,7 +434,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'cleanup_on_failure': ['JOB'],
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
-            'num_ec2_instances': 1,
             'num_task_instances': 0,
             'pool_name': 'default',
             'pool_wait_minutes': 0,
@@ -458,17 +456,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         self['emr_configurations'] = [
             _fix_configuration_opt(c) for c in self['emr_configurations']]
 
-    def _fix_hadoop_streaming_jar_on_emr_opt(self):
-        """Translate hadoop_streaming_jar_on_emr to hadoop_streaming_jar
-        and issue a warning."""
-        if self['hadoop_streaming_jar_on_emr']:
-            jar = 'file://' + self['hadoop_streaming_jar_on_emr']
-            log.warning('hadoop_streaming_jar_on_emr is deprecated'
-                        ' and will be removed in v0.6.0.'
-                        ' Set hadoop_streaming_jar to %s instead' % jar)
-            if not self['hadoop_streaming_jar']:
-                self['hadoop_streaming_jar'] = jar
-
     def _fix_instance_opts(self):
         """If the *instance_type* option is set, override instance
         type for the nodes that actually run tasks (see Issue #66). Allow
@@ -483,30 +470,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         if not self['task_instance_type']:
             self['task_instance_type'] = (
                 self['core_instance_type'])
-
-        # Within EMRJobRunner, we use num_core_instances and
-        # num_task_instances, not num_ec2_instances. (Number
-        # of master instances is always 1.)
-        if (self._opt_priority['num_ec2_instances'] >
-            max(self._opt_priority['num_core_instances'],
-                self._opt_priority['num_task_instances'])):
-            # assume 1 master, n - 1 core, 0 task
-            self['num_core_instances'] = self['num_ec2_instances'] - 1
-            self['num_task_instances'] = 0
-
-            log.warning('num_ec2_instances is deprecated; set'
-                        ' num_core_instances to %d instead' % (
-                            self['num_core_instances']))
-        else:
-            # issue a warning if we used both kinds of instance number
-            # options on the command line or in mrjob.conf
-            if (self._opt_priority['num_ec2_instances'] >= 2 and
-                self._opt_priority['num_ec2_instances'] <=
-                max(self._opt_priority['num_core_instances'],
-                    self._opt_priority['num_task_instances'])):
-                log.warning('Mixing num_ec2_instances and'
-                            ' num_{core,task}_instances does not make'
-                            ' sense; ignoring num_ec2_instances')
 
         # Allow ec2 instance type to override other instance types
         instance_type = self['instance_type']

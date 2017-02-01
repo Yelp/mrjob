@@ -65,7 +65,6 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'max_hours_idle': None,
                 'mins_to_end_of_hour': None,
                 'num_core_instances': None,
-                'num_ec2_instances': None,
                 'num_task_instances': None,
                 'owner': None,
                 'pool_clusters': None,

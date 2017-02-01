@@ -734,22 +734,6 @@ Number and type of instances
        This option used to be named *num_ec2_core_instances*.
 
 .. mrjob-opt::
-    :config: num_ec2_instances
-    :switch: --num-ec2-instances
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: 1
-
-    Total number of instances to start up; basically the number of core
-    instance you want, plus 1 (there is always one master instance).
-    Incompatible with :mrjob-opt:`num_core_instances` and
-    :mrjob-opt:`num_task_instances`.
-
-    .. deprecated:: 0.5.4
-
-       Just subtract one and pass that to :mrjob-opt:`num_core_instances`.
-
-.. mrjob-opt::
     :config: num_task_instances
     :switch: --num-task-instances
     :type: :ref:`string <data-type-string>`
@@ -757,7 +741,7 @@ Number and type of instances
     :default: 0
 
     Number of task instances to start up.  These run your job but do not host
-    HDFS. Incompatible with :mrjob-opt:`num_ec2_instances`. If you use this,
+    HDFS. If you use this,
     you must set :mrjob-opt:`num_core_instances`; EMR does not allow you to
     run task instances without core instances (because there's nowhere to host
     HDFS).

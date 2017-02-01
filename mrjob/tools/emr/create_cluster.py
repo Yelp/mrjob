@@ -78,22 +78,14 @@ Options::
                         How long to wait for remote FS to reach eventual
                         consistency. This is typically less than a second but
                         the default is 5.0 to be safe.
-  --s3-sync-wait-time=CLOUD_FS_SYNC_SECS
-                        Deprecated alias for --cloud-fs-sync-secs
   --cloud-log-dir=CLOUD_LOG_DIR
                         URI on remote FS to write logs into
-  --s3-log-uri=CLOUD_LOG_DIR
-                        Deprecated alias for --cloud-log-dir
   --cloud-tmp-dir=CLOUD_TMP_DIR
                         URI on remote FS to use as our temp directory.
-  --s3-scratch-uri=CLOUD_TMP_DIR, --s3-tmp-dir=CLOUD_TMP_DIR
-                        Deprecated aliases for --cloud-tmp-dir
   --cloud-upload-part-size=CLOUD_UPLOAD_PART_SIZE
                         Upload files to S3 in parts no bigger than this many
                         megabytes. Default is 100 MiB. Set to 0 to disable
                         multipart uploading entirely.
-  --s3-upload-part-size=CLOUD_UPLOAD_PART_SIZE
-                        Deprecated alias for --cloud-upload-part-size
   -c CONF_PATHS, --conf-path=CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
@@ -101,13 +93,8 @@ Options::
                         Bid price to specify for core nodes when setting them
                         up as EC2 spot instances (you probably only want to do
                         this for task instances).
-  --ec2-core-instance-bid-price=CORE_INSTANCE_BID_PRICE
-                        Deprecated alias for --core-instance-bid-price
   --core-instance-type=CORE_INSTANCE_TYPE
                         Type of GCE/EC2 core instance(s) to launch
-  --ec2-core-instance-type=CORE_INSTANCE_TYPE,
-  --ec2-slave-instance-type=CORE_INSTANCE_TYPE
-                        Deprecated aliases for --core-instance-type
   --ec2-key-pair=EC2_KEY_PAIR
                         Name of the SSH key pair you set up for EMR
   --emr-api-param=EMR_API_PARAMS
@@ -145,27 +132,19 @@ Options::
                         "Configure IAM Roles for Amazon EMR" in AWS docs
   --image-version=IMAGE_VERSION
                         EMR/Dataproc machine image to launch clusters with
-  --ami-version=IMAGE_VERSION
-                        Deprecated alias for --image-version
   --instance-type=INSTANCE_TYPE
                         Type of GCE/EC2 instance(s) to launch   GCE - e.g.
                         n1-standard-1, n1-highcpu-4, n1-highmem-4 -- See
                         https://cloud.google.com/compute/docs/machine-types
                         EC2 - e.g. m1.medium, c3.xlarge, r3.xlarge  -- See
                         http://aws.amazon.com/ec2/instance-types/
-  --ec2-instance-type=INSTANCE_TYPE
-                        Deprecated alias for --instance-type
   --label=LABEL         Alternate label for the job, to help us identify it.
   --master-instance-bid-price=MASTER_INSTANCE_BID_PRICE
                         Bid price to specify for the master node when setting
                         it up as an EC2 spot instance (you probably only want
                         to do this for task instances).
-  --ec2-master-instance-bid-price=MASTER_INSTANCE_BID_PRICE
-                        Deprecated alias for --master-instance-bid-price
   --master-instance-type=MASTER_INSTANCE_TYPE
                         Type of GCE/EC2 master instance to launch
-  --ec2-master-instance-type=MASTER_INSTANCE_TYPE
-                        Deprecated alias for --master-instance-type
   --max-hours-idle=MAX_HOURS_IDLE
                         If we create a cluster, have it automatically
                         terminate itself after it's been idle this many hours
@@ -175,32 +154,19 @@ Options::
                         itself (default is 5 minutes)
   --num-core-instances=NUM_CORE_INSTANCES
                         Total number of core instances to launch
-  --num-ec2-core-instances=NUM_CORE_INSTANCES
-                        Deprecated alias for --num-core-instances
-  --num-ec2-instances=NUM_EC2_INSTANCES
-                        Deprecated: subtract one and pass that to --num-core-
-                        instances instead
   --num-task-instances=NUM_TASK_INSTANCES
                         Total number of task instances to launch
-  --num-ec2-task-instances=NUM_TASK_INSTANCES
-                        Deprecated alias for --num-task-instances
   --owner=OWNER         User who ran the job (default is the current user)
   --pool-clusters       Add to an existing cluster or create a new one that
                         does not terminate when the job completes. WARNING: do
                         not run this without --max-hours-idle or  with mrjob
                         terminate-idle-clusters in your crontab; clusters left
                         idle can quickly become expensive!
-  --pool-emr-job-flows  Deprecated alias for --pool-clusters
   --no-pool-clusters    Don't run job on a pooled cluster (the default)
-  --no-pool-emr-job-flows
-                        Deprecated alias for --no-pool-clusters
   --pool-name=POOL_NAME
                         Specify a pool name to join. Default is "default"
-  --emr-job-flow-pool-name=POOL_NAME
-                        Deprecated alias for --pool-name
   -q, --quiet           Don't print anything to stderr
   --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
-  --aws-region=REGION   Deprecated alias for --region
   --release-label=RELEASE_LABEL
                         Release Label (e.g. "emr-4.0.0"). Overrides --image-
                         version
@@ -214,16 +180,11 @@ Options::
                         AWS cloud
   --tag=TAGS            Metadata tags to apply to the EMR cluster; should take
                         the form KEY=VALUE. You can use --tag multiple times
-  --emr-tag=TAGS        Deprecated alias for --tag
   --task-instance-bid-price=TASK_INSTANCE_BID_PRICE
                         Bid price to specify for task nodes when setting them
                         up as EC2 spot instances
-  --ec2-task-instance-bid-price=TASK_INSTANCE_BID_PRICE
-                        Deprecated alias for --task-instance-bid-price
   --task-instance-type=TASK_INSTANCE_TYPE
                         Type of GCE/EC2 task instance(s) to launch
-  --ec2-task-instance-type=TASK_INSTANCE_TYPE
-                        Deprecated alias for --task-instance-type
   -v, --verbose         print more messages to stderr
   --visible-to-all-users
                         Make your cluster is visible to all IAM users on the
@@ -233,8 +194,6 @@ Options::
                         account
   --zone=ZONE           GCE zone/AWS availability zone to run Dataproc/EMR
                         jobs in.
-  --aws-availability-zone=ZONE
-                        Deprecated alias for --zone
 """
 from __future__ import print_function
 

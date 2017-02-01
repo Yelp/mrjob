@@ -1,8 +1,37 @@
 v0.6.0, 2017-03-?? -- ???
  * removed deprecated options:
+   * hadoop_streaming_jar_on_emr
+   * num_ec2_instances
    * python_archives
    * setup_cmds
    * setup_scripts
+ * removed deprecated option aliases:
+   * ami_version
+   * aws_availability_zone
+   * aws_region
+   * base_tmp_dir
+   * check_emr_status_every
+   * ec2_core_instance_bid_price
+   * ec2_core_instance_type
+   * ec2_instance_type
+   * ec2_master_instance_bid_price
+   * ec2_master_instance_type
+   * ec2_slave_instance_type
+   * ec2_task_instance_bid_price
+   * ec2_task_instance_type
+   * emr_job_flow_id
+   * emr_job_flow_pool_name
+   * emr_tags
+   * hdfs_scratch_dir
+   * num_ec2_core_instances
+   * num_ec2_task_instances
+   * pool_emr_job_flows
+   * s3_log_uri
+   * s3_scratch_uri
+   * s3_tmp_dir
+   * s3_sync_wait_time
+   * s3_upload_part_size
+   * ssh_tunnel_to_job_tracker
  * removed deprecated JOB_FLOW and *SCRATCH cleanup types
 
 v0.5.8, 2017-02-01 -- upload_dirs, pre-filters

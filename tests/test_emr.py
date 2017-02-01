@@ -1173,54 +1173,6 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             master=(1, 'm1.medium', None),
             task=(20, 'c1.medium', None))
 
-    def test_deprecated_num_ec2_instances(self):
-        self._test_instance_groups(
-            {'num_ec2_instances': 3},
-            core=(2, 'm1.medium', None),
-            master=(1, 'm1.medium', None))
-
-    def test_deprecated_num_ec2_instances_conflict_on_cmd_line(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.emr', stderr)
-            self._test_instance_groups(
-                {'num_ec2_instances': 4,
-                 'num_core_instances': 10},
-                core=(10, 'm1.medium', None),
-                master=(1, 'm1.medium', None))
-
-        self.assertIn('does not make sense', stderr.getvalue())
-
-    def test_deprecated_num_ec2_instances_conflict_in_mrjob_conf(self):
-        self.set_in_mrjob_conf(num_ec2_instances=3,
-                               num_core_instances=5,
-                               num_task_instances=9)
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.emr', stderr)
-            self._test_instance_groups(
-                {},
-                core=(5, 'm1.medium', None),
-                master=(1, 'm1.medium', None),
-                task=(9, 'm1.medium', None))
-
-        self.assertIn('does not make sense', stderr.getvalue())
-
-    def test_deprecated_num_ec2_instances_cmd_line_beats_mrjob_conf(self):
-        self.set_in_mrjob_conf(num_core_instances=5,
-                               num_task_instances=9)
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.emr', stderr)
-            self._test_instance_groups(
-                {'num_ec2_instances': 3},
-                core=(2, 'm1.medium', None),
-                master=(1, 'm1.medium', None))
-
-        self.assertNotIn('does not make sense', stderr.getvalue())
-
 
 ### tests for error parsing ###
 
@@ -3534,37 +3486,6 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
             '--hadoop-streaming-jar', 'file://justice.jar')
         self.assertEqual(runner._get_streaming_jar_and_step_arg_prefix(),
                          ('justice.jar', []))
-
-
-class DeprecatedHadoopStreamingJarOnEMROptionTestCase(MockBotoTestCase):
-
-    def setUp(self):
-        super(DeprecatedHadoopStreamingJarOnEMROptionTestCase, self).setUp()
-        self.log = self.start(patch('mrjob.emr.log'))
-
-    def assert_deprecation_warning(self):
-        self.assertTrue(self.log.warning.called)
-        self.assertIn('hadoop_streaming_jar_on_emr is deprecated',
-                      self.log.warning.call_args[0][0])
-
-    def test_absolute_path(self):
-        runner = EMRJobRunner(hadoop_streaming_jar_on_emr='/fridge/pickle.jar')
-        self.assert_deprecation_warning()
-        self.assertEqual(runner._opts['hadoop_streaming_jar'],
-                         'file:///fridge/pickle.jar')
-
-    def test_relative_path(self):
-        runner = EMRJobRunner(hadoop_streaming_jar_on_emr='mason.jar')
-        self.assert_deprecation_warning()
-        self.assertEqual(runner._opts['hadoop_streaming_jar'],
-                         'file://mason.jar')
-
-    def test_dont_override_hadoop_streaming_jar(self):
-        runner = EMRJobRunner(hadoop_streaming_jar='s3://bucket/nice.jar',
-                              hadoop_streaming_jar_on_emr='/path/to/bad.jar')
-        self.assert_deprecation_warning()
-        self.assertEqual(runner._opts['hadoop_streaming_jar'],
-                         's3://bucket/nice.jar')
 
 
 class JarStepTestCase(MockBotoTestCase):
@@ -5988,23 +5909,6 @@ class SparkPyFilesTestCase(MockBotoTestCase):
                 [runner._upload_mgr.uri(egg1_path),
                  runner._upload_mgr.uri(egg2_path)]
             )
-
-
-class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):
-    # regression test for #1421
-
-    def test_ami_version_4_0_0(self):
-        runner = EMRJobRunner(ami_version='4.0.0')
-        runner.make_persistent_cluster()
-
-        self.assertEqual(runner.get_image_version(), '4.0.0')
-
-        cluster = runner._describe_cluster()
-        self.assertEqual(cluster.releaselabel, 'emr-4.0.0')
-        self.assertFalse(hasattr(cluster, 'runningamiversion'))
-
-        self.assertEqual(runner._opts['image_version'], '4.0.0')
-        self.assertEqual(runner._opts['release_label'], 'emr-4.0.0')
 
 
 class TestClusterSparkSupportWarning(MockBotoTestCase):

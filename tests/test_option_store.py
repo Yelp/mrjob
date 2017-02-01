@@ -109,10 +109,10 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                 'label': 'organic',
                 'local_tmp_dir': '/tmp',
                 'python_bin': 'py3k',
+                'py_files': ['/mylib.zip'],
                 'setup': [
                     ['thing1'],
                 ],
-                'setup_scripts': ['/myscript.py'],
             }
         }
     }
@@ -137,10 +137,10 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                     'label': 'usda_organic',
                     'local_tmp_dir': '/var/tmp',
                     'python_bin': 'py4k',
+                    'py_files': ['/yourlib.zip'],
                     'setup': [
                         ['thing2'],
                     ],
-                    'setup_scripts': ['/yourscript.py'],
                 }
             }
         }
@@ -186,9 +186,9 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
         self.assertEqual(self.opts_2['local_tmp_dir'], '/var/tmp')
 
     def test_combine_path_lists(self):
-        self.assertEqual(self.opts_1['setup_scripts'], ['/myscript.py'])
-        self.assertEqual(self.opts_2['setup_scripts'],
-                         ['/myscript.py', '/yourscript.py'])
+        self.assertEqual(self.opts_1['py_files'], ['/mylib.zip'])
+        self.assertEqual(self.opts_2['py_files'],
+                         ['/mylib.zip', '/yourlib.zip'])
 
     def test_combine_values(self):
         self.assertEqual(self.opts_1['label'], 'organic')

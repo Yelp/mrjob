@@ -1305,21 +1305,6 @@ class SetupTestCase(SandboxedTestCase):
         self.assertEqual(path_to_size.get('./bar/foo.py'),
                          self.foo_py_size)
 
-    def test_deprecated_setup_script_option(self):
-        job = MROSWalkJob(
-            ['-r', 'local',
-             '--setup-script', self.foo_sh])
-        job.sandbox()
-
-        with job.make_runner() as r:
-            r.run()
-
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
-
-            self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
-            self.assertIn('./foo.sh-made-this', path_to_size)
-
     def test_python_archive(self):
         job = MROSWalkJob([
             '-r', 'local',

@@ -1046,18 +1046,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    setup_scripts=dict(
-        combiner=combine_path_lists,
-        deprecated=True,
-        switches=[
-            (['--setup-script'], dict(
-                action='append',
-                help=('Path to file to be copied into the local working'
-                      ' directory and then run. You can use --setup-script'
-                      ' more than once.'),
-            )),
-        ],
-    ),
     sh_bin=dict(
         combiner=combine_cmds,
         switches=[

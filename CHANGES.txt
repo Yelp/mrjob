@@ -2,6 +2,7 @@ v0.6.0, 2017-03-?? -- ???
  * removed deprecated options:
    * python_archives
    * setup_cmds
+   * setup_scripts
 
 
 v0.5.8, 2017-02-01 -- upload_dirs, pre-filters

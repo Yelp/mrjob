@@ -357,19 +357,6 @@ Job execution context
     :py:func:`~mrjob.setup.parse_setup_cmd`.
 
 .. mrjob-opt::
-    :config: setup_scripts
-    :switch: --setup-script
-    :type: :ref:`path list <data-type-path-list>`
-    :set: all
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    Files that will be copied into the local working directory and then run.
-
-    Pass ``'path/to/script#'`` to :mrjob-opt:`setup` instead.
-
-.. mrjob-opt::
     :config: sh_bin
     :switch: --sh-bin
     :type: :ref:`command <data-type-command>`
@@ -484,5 +471,4 @@ as a subprocess:
 * :mrjob-opt:`bootstrap_mrjob`
 * :mrjob-opt:`python_bin`
 * :mrjob-opt:`setup`
-* :mrjob-opt:`setup_scripts`
 * :mrjob-opt:`steps_python_bin`

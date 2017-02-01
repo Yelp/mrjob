@@ -361,7 +361,7 @@ class MRJobRunner(object):
                 'archive', archive_path, name=ud['name'])
             self._spark_archives.append((ud['name'], archive_path))
 
-        # py_files, setup, and setup_scripts
+        # py_files and setup
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
         self._setup = self._parse_setup()
@@ -971,17 +971,7 @@ class MRJobRunner(object):
 
     def _parse_setup(self):
         """Parse the *setup* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`.
-
-        If *bootstrap_mrjob* and ``self.BOOTSTRAP_MRJOB_IN_SETUP`` are both
-        true, create mrjob.zip (if it doesn't exist already) and
-        prepend a setup command that adds it to PYTHONPATH.
-
-        Patch in *py_files*.
-
-        Also patch in the deprecated
-        option *setup_script*
-        as setup commands.
+        :py:func:`mrjob.setup.parse_setup_cmd()`, and patch in *py_files*.
         """
         setup = []
 
@@ -997,16 +987,6 @@ class MRJobRunner(object):
         # setup
         for cmd in self._opts['setup']:
             setup.append(parse_setup_cmd(cmd))
-
-        # setup_scripts
-        if self._opts['setup_scripts']:
-            log.warning(
-                "setup_scripts is deprecated since v0.4.2 and will be removed"
-                " in v0.6.0. Consider using setup instead.")
-
-        for path in self._opts['setup_scripts']:
-            path_dict = parse_legacy_hash_path('file', path)
-            setup.append([path_dict])
 
         return setup
 

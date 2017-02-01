@@ -361,7 +361,7 @@ class MRJobRunner(object):
                 'archive', archive_path, name=ud['name'])
             self._spark_archives.append((ud['name'], archive_path))
 
-        # py_files, python_archives, setup, setup_cmds, and setup_scripts
+        # py_files, setup, setup_cmds, and setup_scripts
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmds() for details
         self._setup = self._parse_setup()
@@ -980,7 +980,7 @@ class MRJobRunner(object):
         Patch in *py_files*.
 
         Also patch in the deprecated
-        options *python_archives*, *setup_cmd*, and *setup_script*
+        options *setup_cmd*, and *setup_script*
         as setup commands.
         """
         setup = []
@@ -993,14 +993,6 @@ class MRJobRunner(object):
                 raise ValueError("py_files cannot contain '#'")
             path_dict = parse_legacy_hash_path('file', path)
             setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
-
-        # python_archives
-        if self._opts['python_archives']:
-            log.warning('python_archives is deprecated and will be removed'
-                        ' in v0.6.0. Try py_files instead')
-            for path in self._opts['python_archives']:
-                path_dict = parse_legacy_hash_path('archive', path)
-                setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
         # setup
         for cmd in self._opts['setup']:

@@ -143,7 +143,7 @@ The following are deprecated and will be removed in v0.6.0:
 * :py:class:`~mrjob.step.JarStep`.``OUTPUT``; use :py:data:`mrjob.step.OUTPUT`
   instead
 * non-strict protocols (see :mrjob-opt:`strict_protocols`)
-* the :mrjob-opt:`python_archives` option (try
+* the *python_archives* option (try
   :ref:`this <cookbook-src-tree-pythonpath>` instead)
 * :py:func:`~mrjob.parse.is_windows_path`
 * :py:func:`~mrjob.parse.parse_key_value_list`

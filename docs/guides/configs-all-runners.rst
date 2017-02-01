@@ -66,21 +66,6 @@ options related to file uploading.
    .. versionadded:: 0.5.7
 
 .. mrjob-opt::
-    :config: python_archives
-    :switch: --python-archive
-    :type: :ref:`path list <data-type-path-list>`
-    :set: all
-    :default: ``[]``
-
-    Same as upload_archives, except they get added to the job's
-    :envvar:`PYTHONPATH`.
-
-    .. deprecated:: 0.5.7
-
-       Try :mrjob-opt:`py_files` with a `.zip` or `.egg` file instead. If you
-       must use an archive, see :ref:`cookbook-src-tree-pythonpath`.
-
-.. mrjob-opt::
     :config: upload_archives
     :switch: --archive
     :type: :ref:`path list <data-type-path-list>`

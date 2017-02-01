@@ -1305,23 +1305,6 @@ class SetupTestCase(SandboxedTestCase):
         self.assertEqual(path_to_size.get('./bar/foo.py'),
                          self.foo_py_size)
 
-    def test_deprecated_python_archive_option(self):
-        job = MROSWalkJob(
-            ['-r', 'local',
-             '--python-archive', self.foo_tar_gz])
-        job.sandbox()
-
-        with job.make_runner() as r:
-            r.run()
-
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
-
-        # foo.py should be there, and getsize() should be patched to return
-        # double the number of bytes
-        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
-                         self.foo_py_size * 2)
-
     def test_deprecated_setup_cmd_option(self):
         job = MROSWalkJob(
             ['-r', 'local',

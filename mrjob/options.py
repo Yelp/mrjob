@@ -990,18 +990,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    python_archives=dict(
-        combiner=combine_path_lists,
-        deprecated=True,
-        switches=[
-            (['--python-archive'], dict(
-                action='append',
-                help=('Archive to unpack and add to the PYTHONPATH of the'
-                      ' MRJob script when it runs. This is deprecated;'
-                      ' try --py-file instead'),
-            )),
-        ],
-    ),
     python_bin=dict(
         combiner=combine_cmds,
         switches=[

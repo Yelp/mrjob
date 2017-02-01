@@ -36,10 +36,6 @@ runners:
     num_ec2_instances: 1
     # alternate tmp dir
     local_tmp_dir: /tmp/$USER
-    # we create the src-tree.tar.gz tarball with a Makefile. It only contains
-    # a subset of our code
-    python_archives: &python_archives
-    - $BT/aws/src-tree.tar.gz
     # our bucket also lives in the us-west region
     cloud_log_dir: s3://walrus/tmp/logs/
     cloud_tmp_dir: s3://walrus/tmp/
@@ -73,7 +69,6 @@ runners:
     # We don't currently run our own hadoop cluster, so this section is
     # pretty boring.
     local_tmp_dir: /tmp/$USER
-    python_archives: *python_archives
     setup_cmds: *setup_cmds
     upload_files: *upload_files
   local:

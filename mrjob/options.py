@@ -64,13 +64,6 @@ CLEANUP_CHOICES = [
     'TMP',
 ]
 
-_CLEANUP_DEPRECATED_ALIASES = {
-    'JOB_FLOW': 'CLUSTER',
-    'LOCAL_SCRATCH': 'LOCAL_TMP',
-    'REMOTE_SCRATCH': 'CLOUD_TMP',
-    'SCRATCH': 'TMP',
-}
-
 
 ### custom callbacks ###
 

@@ -49,7 +49,6 @@ from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.options import CLEANUP_CHOICES
-from mrjob.options import _CLEANUP_DEPRECATED_ALIASES
 from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
@@ -165,14 +164,6 @@ class RunnerOptionStore(OptionStore):
         def handle_cleanup_opt(opt):
             if opt in CLEANUP_CHOICES:
                 return opt
-
-            if opt in _CLEANUP_DEPRECATED_ALIASES:
-                aliased_opt = _CLEANUP_DEPRECATED_ALIASES[opt]
-                # TODO: don't do this when option value is None
-                log.warning(
-                    'Deprecated %s option %s%s has been renamed to %s' % (
-                        opt_key, opt, from_where, aliased_opt))
-                return aliased_opt
 
             raise ValueError('%s must be one of %s, not %s' % (
                 opt_key, ', '.join(CLEANUP_CHOICES), opt))

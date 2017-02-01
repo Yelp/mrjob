@@ -475,32 +475,6 @@ class DeprecatedAliasesTestCase(ConfigFilesTestCase):
             self.assertIn('Deprecated option s3_scratch_uri has been renamed'
                           ' to cloud_tmp_dir', stderr.getvalue())
 
-    def test_cleanup_options(self):
-        stderr = StringIO()
-        with no_handlers_for_logger('mrjob.runner'):
-            log_to_stream('mrjob.runner', stderr)
-            opts = RunnerOptionStore(
-                'inline',
-                dict(cleanup=['LOCAL_SCRATCH', 'REMOTE_SCRATCH'],
-                     cleanup_on_failure=['JOB_FLOW', 'SCRATCH']),
-                [])
-
-            self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'CLOUD_TMP'])
-            self.assertIn(
-                'Deprecated cleanup option LOCAL_SCRATCH has been renamed'
-                ' to LOCAL_TMP', stderr.getvalue())
-            self.assertIn(
-                'Deprecated cleanup option REMOTE_SCRATCH has been renamed'
-                ' to CLOUD_TMP', stderr.getvalue())
-
-            self.assertEqual(opts['cleanup_on_failure'], ['CLUSTER', 'TMP'])
-            self.assertIn(
-                'Deprecated cleanup_on_failure option JOB_FLOW has been'
-                ' renamed to CLUSTER', stderr.getvalue())
-            self.assertIn(
-                'Deprecated cleanup_on_failure option SCRATCH has been renamed'
-                ' to TMP', stderr.getvalue())
-
 
 class OptionStoreSanityCheckTestCase(TestCase):
 

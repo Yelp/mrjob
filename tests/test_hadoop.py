@@ -148,19 +148,6 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
     def test_empty_fs(self):
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
 
-    def test_deprecated_hadoop_home_option(self):
-        self.runner = HadoopJobRunner(hadoop_home='/ha/do/op/home-option')
-
-        self.mock_paths.append('/ha/do/op/home-option/hadoop-streaming.jar')
-        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
-                         '/ha/do/op/home-option/hadoop-streaming.jar')
-
-    def test_deprecated_hadoop_home_option_beats_hadoop_prefix(self):
-        os.environ['HADOOP_PREFIX'] = '/ha/do/op/prefix'
-        self.mock_paths.append('/ha/do/op/prefix/hadoop-streaming.jar')
-
-        self.test_deprecated_hadoop_home_option()
-
     # tests of well-known environment variables
 
     def test_hadoop_prefix(self):
@@ -765,7 +752,6 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'hadoop': {
-        'hadoop_home': 'kansas',
         'hadoop_streaming_jar': 'binks.jar.jar',
     }}}
 

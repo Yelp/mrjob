@@ -1582,7 +1582,6 @@ class FSPassthroughTestCase(TestCase):
         # TODO: currently can't initialize HadoopRunner without setting these
         runner = HadoopJobRunner(
             hadoop_bin='hadoop',
-            hadoop_home='kansas',
             hadoop_streaming_jar='streaming.jar')
 
         with no_handlers_for_logger('mrjob.runner'):
@@ -1604,7 +1603,6 @@ class FSPassthroughTestCase(TestCase):
         # TODO: currently can't initialize HadoopRunner without setting these
         runner = HadoopJobRunner(
             hadoop_bin='hadoooooooooop',
-            hadoop_home='kansas',
             hadoop_streaming_jar='streaming.jar')
 
         with no_handlers_for_logger('mrjob.runner'):

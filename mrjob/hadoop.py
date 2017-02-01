@@ -146,13 +146,6 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         super(HadoopJobRunner, self).__init__(**kwargs)
 
-        if self._opts['hadoop_home']:
-            log.warning(
-                'hadoop_home is deprecated since 0.5.0 and will be removed'
-                ' in v0.6.0. In most cases, mrjob will now find the hadoop'
-                ' binary and streaming jar without help. If not, use the'
-                ' hadoop_bin and hadoop_streaming_jar options.')
-
         self._hadoop_tmp_dir = fully_qualify_hdfs_path(
             posixpath.join(
                 self._opts['hadoop_tmp_dir'], self._job_key))
@@ -253,9 +246,6 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     def _hadoop_dirs(self):
         """Yield all possible hadoop directories (used for streaming jar
         and logs). May yield duplicates"""
-        if self._opts['hadoop_home']:
-            yield self._opts['hadoop_home']
-
         for name in ('HADOOP_PREFIX', 'HADOOP_HOME', 'HADOOP_INSTALL',
                      'HADOOP_MAPRED_HOME'):
             path = os.environ.get(name)

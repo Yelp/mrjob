@@ -657,19 +657,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    hadoop_home=dict(
-        combiner=combine_paths,
-        deprecated=True,
-        runners=['hadoop'],
-        switches=[
-            (['--hadoop-home'], dict(
-                help=('Deprecated hint about where to find hadoop binary and'
-                      ' streaming jar. In most cases mrjob will now find these'
-                      ' on its own. If not, use the --hadoop-bin and'
-                      ' --hadoop-streaming-jar switches.'),
-            )),
-        ],
-    ),
     hadoop_log_dirs=dict(
         combiner=combine_path_lists,
         runners=['hadoop'],

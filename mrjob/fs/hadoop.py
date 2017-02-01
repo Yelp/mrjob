@@ -56,17 +56,13 @@ class HadoopFilesystem(Filesystem):
     as ``hadoop version`` (see :py:meth:`invoke_hadoop`).
     """
 
-    def __init__(self, hadoop_bin=None, hadoop_home=None):
+    def __init__(self, hadoop_bin=None):
         """Create a Hadoop filesystem
 
         :param hadoop_bin: ``hadoop`` binary, as a list of args
-        :param hadoop_home: Hint about where to find the Hadoop binary
-
-        hadoop_home is deprecated and will no longer be needed in v0.6.0.
         """
         super(HadoopFilesystem, self).__init__()
         self._hadoop_bin = hadoop_bin
-        self._hadoop_home = hadoop_home
         self._hadoop_version = None  # cache for get_hadoop_version()
 
     def can_handle_path(self, path):
@@ -83,9 +79,6 @@ class HadoopFilesystem(Filesystem):
         else fails, return ``['hadoop']``.
         """
         def yield_paths():
-            if self._hadoop_home:
-                yield os.path.join(self._hadoop_home, 'bin')
-
             for name in 'HADOOP_PREFIX', 'HADOOP_HOME', 'HADOOP_INSTALL':
                 path = os.environ.get(name)
                 if path:

@@ -10,15 +10,22 @@ For a complete list of changes, see `CHANGES.txt
 -----
 
 You can now pass directories to jobs, either directly with the
-:mrjob-opt:`upload_dirs` directory, or through :mrjob-opt:`setup`
-and :mrjob-opt:`bootstrap` commands. mrjob will automatically tarball them
-and pass them to Hadoop as archives.
+:mrjob-opt:`upload_dirs` directory, or through :mrjob-opt:`setup` commands.
+For example:
+
+.. code-block:: sh
+
+   --setup 'export PYTHONPATH=$PYTHONPATH:your-src-code/#'
+
+mrjob will automatically tarball these directories and pass them to Hadoop as
+archives.
 
 For multi-step jobs, you can now specify where inter-step output goes
-with :mrjob-opt:`step_output_dir`, which can be useful
+with :mrjob-opt:`step_output_dir` (``--step-output-dir``), which can be useful
 for debugging.
 
-All job step types now take a *jobconf* option.
+All :py:mod:`job step types <mrjob.step>` now take the *jobconf* keyword
+argument to set Hadoop properties for that step.
 
 Jobs' ``--help`` printout is now better-organized and less verbose.
 
@@ -36,7 +43,7 @@ mrjob now respects :mrjob-opt:`sh_bin` when it needs to wrap a command
 in ``sh`` before passing it to Hadoop (e.g. to support pipes)
 
 On EMR, mrjob now fetches logs from task nodes when determining probable cause
-of error (it used to only look at nodes with HDFS on them).
+of error, not just core nodes (the ones that run tasks and host HDFS).
 
 Several unused functions in :py:mod:`mrjob.util` are now deprecated:
 
@@ -44,12 +51,12 @@ Several unused functions in :py:mod:`mrjob.util` are now deprecated:
 * :py:func:`~mrjob.util.bash_wrap`
 * :py:func:`~mrjob.util.populate_option_groups_with_options`
 * :py:func:`~mrjob.util.scrape_options_and_index_by_dest`
-* :py:func:`~mrjob.util.tar_and_gz`
+* :py:func:`~mrjob.util.tar_and_gzip`
 
 :py:func:`~mrjob.cat.bunzip2_stream` and :py:func:`~mrjob.cat.gunzip_stream`
 have been moved from :py:mod:`mrjob.util` to :py:mod:`mrjob.cat`.
 
-:py:meth:`SSHFilesystem.ssh_slave_hosts <mrjob.fs.ssh.SSHFilesystem.ssh_slave_hosts>` has been deprecated.
+:py:meth:`SSHFilesystem.ssh_slave_hosts() <mrjob.fs.ssh.SSHFilesystem.ssh_slave_hosts>` has been deprecated.
 
 Option group attributes in :py:class:`~mrjob.job.MRJob`\s have been deprecated,
 as has :py:meth:`~mrjob.job.MRJob.get_all_option_groups`.

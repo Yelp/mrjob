@@ -59,7 +59,7 @@ have been moved from :py:mod:`mrjob.util` to :py:mod:`mrjob.cat`.
 :py:meth:`SSHFilesystem.ssh_slave_hosts() <mrjob.fs.ssh.SSHFilesystem.ssh_slave_hosts>` has been deprecated.
 
 Option group attributes in :py:class:`~mrjob.job.MRJob`\s have been deprecated,
-as has :py:meth:`~mrjob.job.MRJob.get_all_option_groups`.
+as has the :py:meth:`~mrjob.job.MRJob.get_all_option_groups` method.
 
 
 .. _v0.5.7:

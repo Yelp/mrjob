@@ -54,6 +54,9 @@ Options::
   --no-bootstrap-python
                         Don't automatically try to install a compatible
                         version of Python at bootstrap time.
+  --bootstrap-spark     Auto-install Spark on the cluster (even if not
+                        needed).
+  --no-bootstrap-spark  Don't auto-install Spark on the cluster.
   --cloud-fs-sync-secs=CLOUD_FS_SYNC_SECS
                         How long to wait for remote FS to reach eventual
                         consistency. This is typically less than a second but

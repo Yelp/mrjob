@@ -11,10 +11,19 @@ v0.6.0, 2017-03-?? -- ???
    * all_option_groups()
    * is_mapper_or_reducer()
    * mr()
- * removed option groups from MRJobLauncher
+ * removed option groups (deprecated) from MRJobLauncher
  * removed deprecated functions:
    * mrjob.parse:
      * is_windows_path()
+   * mrjob.util:
+     * args_for_opt_dest_subset()
+     * bash_wrap()
+     * buffer_iterator_to_line_iterator()
+     * bunzip2_stream() (now in mrjob.cat)
+     * gunzip_stream() (now in mrjob.cat)
+     * populate_option_groups_with_options()
+     * scrape_options_and_index_by_dest()
+     * scrape_options_into_new_groups()
  * removed deprecated options:
    * bootstrap_cmds
    * bootstrap_files

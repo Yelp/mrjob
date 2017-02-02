@@ -27,7 +27,6 @@ from subprocess import Popen
 
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
-from mrjob.util import buffer_iterator_to_line_iterator
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 from mrjob.util import log_to_stream
@@ -36,7 +35,6 @@ from mrjob.util import random_identifier
 from mrjob.util import read_file
 from mrjob.util import read_input
 from mrjob.util import safeeval
-from mrjob.util import scrape_options_into_new_groups
 from mrjob.util import tar_and_gzip
 from mrjob.util import to_lines
 from mrjob.util import unarchive
@@ -95,21 +93,6 @@ class ToLinesTestCase(TestCase):
                  for i in range(0, len(super_long_line), 1024)))),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
-    def test_deprecated_alias(self):
-        with no_handlers_for_logger('mrjob.util'):
-            stderr = StringIO()
-            log_to_stream('mrjob.util', stderr)
-
-            self.assertEqual(
-                list(buffer_iterator_to_line_iterator(
-                    chunk for chunk in
-                    [b'The quick\nbrown fox\njumped over\nthe lazy\ndogs.\n'])
-                ),
-                [b'The quick\n', b'brown fox\n', b'jumped over\n',
-                 b'the lazy\n', b'dogs.\n'])
-
-            self.assertIn('has been renamed', stderr.getvalue())
-
 
 class CmdLineTestCase(TestCase):
 
@@ -135,7 +118,7 @@ class FileExtTestCase(TestCase):
         self.assertEqual(file_ext('README.txt,v'), '.txt,v')
 
 
-class OptionScrapingTestCase(TestCase):
+class ParseAndSaveOptionsTestCase(TestCase):
 
     def setUp(self):
         self.setup_options()
@@ -159,35 +142,6 @@ class OptionScrapingTestCase(TestCase):
         self.new_group_2 = optparse.OptionGroup(self.new_parser, '?')
         self.new_parser.add_option_group(self.new_group_1)
         self.new_parser.add_option_group(self.new_group_2)
-
-    def test_scrape_all(self):
-        assignments = {
-            self.new_parser: ('a',),
-            self.new_group_1: ('x', 'y'),
-        }
-        old_groups = (self.original_parser, self.original_group)
-        scrape_options_into_new_groups(old_groups, assignments)
-        self.assertEqual(self.original_parser.option_list[1:],
-                         self.new_parser.option_list[1:])
-        self.assertEqual(self.original_group.option_list,
-                         self.new_group_1.option_list)
-
-    def test_scrape_different(self):
-        assignments = {
-            self.new_parser: ('x',),
-            self.new_group_1: ('y',),
-            self.new_group_2: ('a',),
-        }
-        old_groups = (self.original_parser, self.original_group)
-        scrape_options_into_new_groups(old_groups, assignments)
-        target_1 = self.original_group.option_list[:1]
-        target_2 = self.original_group.option_list[1:]
-        target_3 = self.original_parser.option_list[1:]
-        self.assertEqual(target_1, self.new_parser.option_list[1:])
-        self.assertEqual(target_2, self.new_group_1.option_list)
-        self.assertEqual(target_3, self.new_group_2.option_list)
-        options, args = self.new_parser.parse_args(['-x', 'happy'])
-        self.assertEqual(options.x, 'happy')
 
     def test_parse_and_save_simple(self):
         args = ['x.py', '-b', '-a', '--no-a',

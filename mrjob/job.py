@@ -493,11 +493,6 @@ class MRJob(MRJobLauncher):
         :type step_num: int
         :param step_num: which step to run (0-indexed)
 
-        If --no-strict-protocols is set, and we encounter a line that can't
-        be decoded by our input protocol or a tuple that can't be encoded
-        by our output protocol, we'll increment a counter rather than
-        raising an exception. This will be going away in v0.6.0.
-
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
         """

@@ -119,8 +119,6 @@ Cluster creation and configuration
               Instances.Ec2SubnetId: someID
               VisibleToAllUsers: null
 
-    .. versionadded:: 0.4.3
-
 .. mrjob-opt::
    :config: emr_applications
    :switch: --emr-application
@@ -211,8 +209,6 @@ Cluster creation and configuration
     http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles.html
     for more details on using IAM with EMR.
 
-    .. versionadded:: 0.4.3
-
 .. mrjob-opt::
     :config: iam_service_role
     :switch: --iam-service-role
@@ -223,8 +219,6 @@ Cluster creation and configuration
     Name of an IAM role for the EMR service to use. See
     http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles.html
     for more details on using IAM with EMR.
-
-    .. versionadded:: 0.4.4
 
 .. mrjob-opt::
     :config: image_version
@@ -277,8 +271,6 @@ Cluster creation and configuration
     after it's been idle this many hours AND we're within
     :mrjob-opt:`mins_to_end_of_hour` of an EC2 billing hour.
 
-    .. versionadded:: 0.4.1
-
 .. mrjob-opt::
     :config: mins_to_end_of_hour
     :switch: --mins-to-end-of-hour
@@ -288,8 +280,6 @@ Cluster creation and configuration
 
     If :mrjob-opt:`max_hours_idle` is set, controls how close to the end of an
     EC2 billing hour the cluster can automatically terminate itself.
-
-    .. versionadded:: 0.4.1
 
 .. mrjob-opt::
     :config: region
@@ -372,8 +362,6 @@ Cluster creation and configuration
 
        This option used to be named *emr_tags*
 
-    .. versionadded:: 0.4.5
-
 .. mrjob-opt::
     :config: visible_to_all_users
     :switch: --visible-to-all-users, --no-visible-to-all-users
@@ -392,8 +380,6 @@ Cluster creation and configuration
         not be able to reuse your clusters, and
         :command:`mrjob terminate-idle-clusters` won't be
         able to shut them down when they become idle.
-
-    .. versionadded:: 0.4.1
 
 .. mrjob-opt::
     :config: zone
@@ -723,8 +709,6 @@ Choosing/creating a cluster to join
     The default is ``'CANCEL_AND_WAIT'`` when using pooling (see
     :mrjob-opt:`pool_clusters`) or an existing cluster (see
     :mrjob-opt:`cluster_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
-
-    .. versionadded:: 0.4.3
 
 .. mrjob-opt::
     :config: pool_name

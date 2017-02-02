@@ -1141,9 +1141,6 @@ class MRJob(MRJobLauncher):
     #: you're using.
     #:
     #: See :py:meth:`jobconf()` and :py:meth:`partitioner()` for more about
-    #: how this works.
-    #:
-    #: .. versionadded:: 0.4.1
     SORT_VALUES = None
 
     def sort_values(self):

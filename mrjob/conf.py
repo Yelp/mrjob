@@ -346,13 +346,11 @@ def load_opts_from_mrjob_conf(runner_alias, conf_path=None,
                            been loaded (used by
                            :py:func:`load_opts_from_mrjob_confs`).
 
-    .. versionchanged:: 0.4.6
-        Relative ``include:`` paths are relative to the real (after resolving
-        symlinks) path of the including conf file
+    Relative ``include:`` paths are relative to the real (after resolving
+    symlinks) path of the including conf file
 
-    .. versionchanged:: 0.4.6
-        This will only load each config file once, even if it's referenced
-        from multiple paths due to symlinks.
+    This will only load each config file once, even if it's referenced
+    from multiple paths due to symlinks.
     """
     if already_loaded is None:
         already_loaded = []
@@ -419,9 +417,8 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
     :type conf_paths: list or ``None``
     :param conf_path: locations of the files to load
 
-    .. versionchanged:: 0.4.6
-        This will only load each config file once, even if it's referenced
-        from multiple paths due to symlinks.
+    This will only load each config file once, even if it's referenced
+    from multiple paths due to symlinks.
     """
     if conf_paths is None:
         return load_opts_from_mrjob_conf(runner_alias)
@@ -492,9 +489,8 @@ def combine_lists(*seqs):
     Generally this is used for a list of commands we want to run; the
     "default" commands get run before any commands specific to your job.
 
-    .. versionchanged:: 0.4.6
-       Strings, bytes, and non-sequence objects (e.g. numbers) are treated as
-       single-item lists.
+    Strings, bytes, and non-sequence objects (e.g. numbers) are treated as
+    single-item lists.
 
     .. versionchanged:: 0.5.3
        Dicts are treated as single-item lists
@@ -621,8 +617,7 @@ def combine_path_lists(*path_seqs):
     Resolve ``~`` (home dir) and environment variables, and expand globs
     that refer to the local filesystem.
 
-    .. versionchanged:: 0.4.6
-       Can take single strings as well as lists.
+    Can take single strings as well as lists.
     """
     results = []
 

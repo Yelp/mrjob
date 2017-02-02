@@ -3122,8 +3122,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         .. versionchanged:: 0.5.4
 
            This used to be called :py:meth:`get_ami_version`
-
-        .. versionadded:: 0.4.5
         """
         return self._get_cluster_info('image_version')
 

@@ -127,8 +127,6 @@ Options available to hadoop and emr runners
     input paths to the runner will be passed straight through, without
     checking if they exist.
 
-    .. versionadded:: 0.4.1
-
 .. mrjob-opt::
     :config: spark_args
     :switch: --spark-arg

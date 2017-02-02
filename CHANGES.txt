@@ -1,4 +1,8 @@
 v0.6.0, 2017-03-?? -- ???
+ * removed deprecated mrjob command aliases:
+   * create-job-flow
+   * terminate-idle-job-flows
+   * terminate-job-flow
  * removed deprecated options:
    * bootstrap_cmds
    * bootstrap_files

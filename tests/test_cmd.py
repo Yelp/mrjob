@@ -17,13 +17,10 @@ from mrjob import cmd
 from mrjob import launch
 from mrjob.tools.emr import audit_usage
 from mrjob.tools.emr import create_cluster
-from mrjob.tools.emr import create_job_flow
 from mrjob.tools.emr import report_long_jobs
 from mrjob.tools.emr import s3_tmpwatch
 from mrjob.tools.emr import terminate_cluster
 from mrjob.tools.emr import terminate_idle_clusters
-from mrjob.tools.emr import terminate_idle_job_flows
-from mrjob.tools.emr import terminate_job_flow
 
 from tests.py2 import TestCase
 from tests.py2 import patch
@@ -71,13 +68,3 @@ class CommandTestCase(TestCase):
 
     def test_terminate_cluster(self):
         self._test_main_call(terminate_cluster, 'terminate-cluster')
-
-    def test_deprecated_create_job_flow(self):
-        self._test_main_call(create_job_flow, 'create-job-flow')
-
-    def test_deprecated_terminate_idle_job_flows(self):
-        self._test_main_call(terminate_idle_job_flows,
-                             'terminate-idle-job-flows')
-
-    def test_deprecated_terminate_job_flow(self):
-        self._test_main_call(terminate_job_flow, 'terminate-job-flow')

@@ -1,4 +1,7 @@
 v0.6.0, 2017-03-?? -- ???
+ * removed deprecated filesystem methods:
+   * path_exists()
+   * path_join()
  * removed deprecated mrjob command aliases:
    * create-job-flow
    * terminate-idle-job-flows

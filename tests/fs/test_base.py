@@ -47,24 +47,3 @@ class JoinTestCase(SandboxedTestCase):
                          'hdfs://host2/path')
         self.assertEqual(self.fs.join('/', 'hdfs://host2/path', 'subdir'),
                          'hdfs://host2/path/subdir')
-
-
-class DeprecatedAliasesTestCase(TestCase):
-
-    def test_path_exists(self):
-        fs = Filesystem()
-
-        with patch.object(fs, 'exists'):
-            with no_handlers_for_logger('mrjob.fs.base'):
-                fs.path_exists('foo')
-
-            fs.exists.assert_called_once_with('foo')
-
-    def test_path_join(self):
-        fs = Filesystem()
-
-        with patch.object(fs, 'join'):
-            with no_handlers_for_logger('mrjob.fs.base'):
-                fs.path_join('foo', 'bar')
-
-            fs.join.assert_called_once_with('foo', 'bar')

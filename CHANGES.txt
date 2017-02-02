@@ -12,6 +12,9 @@ v0.6.0, 2017-03-?? -- ???
    * is_mapper_or_reducer()
    * mr()
  * removed option groups from MRJobLauncher
+ * removed deprecated functions:
+   * mrjob.parse:
+     * is_windows_path()
  * removed deprecated options:
    * bootstrap_cmds
    * bootstrap_files

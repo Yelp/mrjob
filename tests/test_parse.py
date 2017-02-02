@@ -21,7 +21,6 @@ from subprocess import PIPE
 from subprocess import Popen
 
 from mrjob.parse import _find_python_traceback
-from mrjob.parse import is_windows_path
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import parse_mr_job_stderr
@@ -234,10 +233,6 @@ class URITestCase(TestCase):
         self.assertEqual(is_s3_uri('s3://a/uri'), True)
         self.assertEqual(is_s3_uri('s3n://a/uri'), True)
         self.assertEqual(is_s3_uri('hdfs://a/uri'), False)
-
-    def test_is_windows_path(self):
-        self.assertEqual(is_windows_path('C:\some\windows\path'), True)
-        self.assertEqual(is_windows_path('s3://a/uri'), False)
 
     def test_parse_s3_uri(self):
         self.assertEqual(parse_s3_uri('s3://bucket/loc'), ('bucket', 'loc'))

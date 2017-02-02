@@ -44,23 +44,6 @@ log = logging.getLogger(__name__)
 # urlparse()
 _NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
-# Used to check if the candidate uri is actually a local windows path.
-_WINPATH_RE = re.compile(r"^[aA-zZ]:\\")
-
-
-def is_windows_path(uri):
-    """Return True if *uri* is a windows path.
-
-    .. deprecated:: 0.5.7
-    """
-    log.warning(
-        'is_windows_path() is deprecated and will be removed in v0.6.0')
-
-    if _WINPATH_RE.match(uri):
-        return True
-    else:
-        return False
-
 
 def is_uri(uri):
     """Return True if *uri* is a URI and contains ``://``

@@ -321,12 +321,14 @@ class MRJob(MRJobLauncher):
         re-defined. For example::
 
             def steps(self):
-                return [self.mr(mapper=self.transform_input,
-                                reducer=self.consolidate_1),
-                        self.mr(reducer_init=self.log_mapper_init,
-                                reducer=self.consolidate_2)]
+                return [MRStep(mapper=self.transform_input,
+                               reducer=self.consolidate_1),
+                        MRStep(reducer_init=self.log_mapper_init,
+                               reducer=self.consolidate_2)]
 
-        :return: a list of steps constructed with :py:meth:`mr`
+        :return: a list of steps constructed with
+        :py:class:`~mrjob.step.MRStep` or other classes in
+        :py:mod:`mrjob.step`.
         """
         # only include methods that have been redefined
         kwargs = dict(
@@ -355,15 +357,6 @@ class MRJob(MRJobLauncher):
         kwargs.update(updates)
 
         return [MRStep(**kwargs)]
-
-    @classmethod
-    def mr(cls, **kwargs):
-        """A deprecated wrapper for :py:class:`~mrjob.step.MRStep`.
-        """
-        log.warning('mr() is deprecated and will be removed in v0.6.0.'
-                    ' Use mrjob.step.MRStep directly instead.')
-
-        return MRStep(**kwargs)
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr.

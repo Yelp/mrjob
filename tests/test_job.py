@@ -1106,18 +1106,6 @@ class StepsTestCase(TestCase):
         self.assertEqual(j.steps(), [MRStep(reducer=j.reducer)])
 
 
-class DeprecatedMRMethodTestCase(TestCase):
-
-    def test_mr(self):
-        kwargs = {
-            'mapper': _IDENTITY_MAPPER,
-            'reducer': _IDENTITY_REDUCER,
-        }
-
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(MRJob.mr(**kwargs), MRStep(**kwargs))
-
-
 class RunSparkTestCase(TestCase):
 
     def test_spark(self):

@@ -73,7 +73,7 @@ class OptionStore(dict):
                 aliased_opt = self.DEPRECATED_ALIASES[k]
 
                 log.warning('Deprecated option %s%s has been renamed to %s'
-                            ' and will be removed in v0.6.0' % (
+                            ' and will be removed in v0.7.0' % (
                                 k, from_where, aliased_opt))
 
                 if opts.get(aliased_opt) is None:

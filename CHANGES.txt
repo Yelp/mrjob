@@ -2,6 +2,7 @@ v0.6.0, 2017-03-?? -- ???
  * removed deprecated filesystem methods:
    * path_exists()
    * path_join()
+   * SSHFilesystem.ssh_slave_hosts()
  * removed deprecated mrjob command aliases:
    * create-job-flow
    * terminate-idle-job-flows

@@ -119,21 +119,6 @@ def _ssh_copy_key(ssh_bin, master_address, ec2_key_pair_file, keyfile):
                                 args, stdin=f.read()))
 
 
-def _ssh_slave_addresses(ssh_bin, master_address, ec2_key_pair_file):
-    """Get the IP addresses of the slave nodes. Fails silently because it
-    makes testing easier and if things are broken they will fail before this
-    function is called.
-    """
-    if not ec2_key_pair_file or not os.path.exists(ec2_key_pair_file):
-        return []   # this is a testing environment
-
-    cmd = "hadoop dfsadmin -report | grep ^Name | cut -f2 -d: | cut -f2 -d' '"
-    args = ['bash -c "%s"' % cmd]
-    ips = to_string(_check_output(
-        *_ssh_run(ssh_bin, master_address, ec2_key_pair_file, args)))
-    return [ip for ip in ips.split('\n') if ip]
-
-
 def _ssh_cat(ssh_bin, address, ec2_key_pair_file, path,
              keyfile=None, sudo=False):
     """Return the file at ``path`` as a string. Raises ``IOError`` if the

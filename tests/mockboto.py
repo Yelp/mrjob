@@ -247,7 +247,7 @@ class MockBotoTestCase(SandboxedTestCase):
         runner._fs = None
         #runner.fs
 
-    # TODO: this should be replaced once we get rid of ssh_slave_hosts()
+    # TODO: this should be replaced
     def add_slave(self):
         """Add a mocked slave to the cluster. Caller is responsible for setting
         runner._opts['num_ec2_instances'] to the correct number.

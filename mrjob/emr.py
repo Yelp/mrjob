@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2016 Yelp and Contributors
+# Copyright 2009-2017 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -2693,18 +2693,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     ### EMR JOB MANAGEMENT UTILS ###
 
-    def make_persistent_job_flow(self):
-        """Create a new EMR cluster that requires manual termination, and
-        return its ID.
-
-        You can also fetch the job ID by calling self.get_cluster_id()
-        """
-        log.warning(
-            'make_persistent_job_flow() has been renamed to'
-            ' make_persistent_cluster(). This alias will be removed in v0.6.0')
-
-        return self.make_persistent_cluster()
-
     def make_persistent_cluster(self):
         if (self._cluster_id):
             raise AssertionError(
@@ -2722,13 +2710,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._cluster_id = self._create_cluster(persistent=True)
 
         return self._cluster_id
-
-    def get_emr_job_flow_id(self):
-        log.warning(
-            'get_emr_job_flow_id() has been renamed to get_cluster_id().'
-            ' This alias will be removed in v0.6.0')
-
-        return self.get_cluster_id()
 
     def get_cluster_id(self):
         return self._cluster_id
@@ -3134,12 +3115,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def get_hadoop_version(self):
         return self._get_app_versions().get('hadoop')
-
-    def get_ami_version(self):
-        log.warning('get_ami_version() is a depreacated alias for'
-                    ' get_image_version() and will be removed in'
-                    ' mrjob v0.6.0')
-        return self.get_image_version()
 
     def get_image_version(self):
         """Get the AMI that our cluster is running.

@@ -41,6 +41,11 @@ v0.6.0, 2017-03-?? -- ???
    * s3_sync_wait_time
    * s3_upload_part_size
    * ssh_tunnel_to_job_tracker
+ * removed deprecated runner methods:
+   * EMRJobRunner:
+     * get_ami_version()
+     * get_emr_job_flow_id()
+     * make_persistent_job_flow()
  * removed deprecated switches:
    * --partitioner
  * removed deprecated JOB_FLOW and *SCRATCH cleanup types

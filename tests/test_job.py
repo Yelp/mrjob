@@ -1245,7 +1245,9 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--gcp-project', output)
 
         # deprecated options
-        self.assertNotIn('--bootstrap-cmd', output)
+        #
+        # currently there aren't any
+        #self.assertNotIn('--bootstrap-cmd', output)
 
     def test_deprecated_runner_help(self):
         MRJob(['--help', '-r', 'emr', '--deprecated'])
@@ -1263,7 +1265,9 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--gcp-project', output)
 
         # deprecated options
-        self.assertIn('--bootstrap-cmd', output)
+        #
+        # currently there aren't any
+        #self.assertIn('--bootstrap-cmd', output)
 
     def test_steps_help(self):
         MRJob(['--help', '--steps'])

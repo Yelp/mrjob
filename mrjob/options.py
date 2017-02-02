@@ -294,35 +294,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    bootstrap_cmds=dict(
-        cloud_role='launch',
-        combiner=combine_lists,
-        deprecated=True,
-        runners=['emr'],
-        switches=[
-            (['--bootstrap-cmd'], dict(
-                action='append',
-                help=('Commands to run on the master node to set up libraries,'
-                      ' etc. You can use --bootstrap-cmd more than once. Use'
-                      ' mrjob.conf to specify arguments as a list to be run'
-                      ' directly.'),
-            )),
-        ],
-    ),
-    bootstrap_files=dict(
-        cloud_role='launch',
-        combiner=combine_path_lists,
-        deprecated=True,
-        runners=['emr'],
-        switches=[
-            (['--bootstrap-file'], dict(
-                action='append',
-                help=('File to upload to the master node before running'
-                      ' bootstrap_cmds (for example, debian packages). You'
-                      ' can use --bootstrap-file more than once.'),
-            )),
-        ],
-    ),
     bootstrap_mrjob=dict(
         cloud_role='launch',
         switches=[
@@ -355,37 +326,6 @@ _RUNNER_OPTS = dict(
                 action='store_false',
                 help=("Don't automatically try to install a compatible version"
                       " of Python at bootstrap time."),
-            )),
-        ],
-    ),
-    bootstrap_python_packages=dict(
-        cloud_role='launch',
-        combiner=combine_path_lists,
-        deprecated=True,
-        runners=['emr'],
-        switches=[
-            (['--bootstrap-python-package'], dict(
-                action='append',
-                help=('Path to a Python module to install on EMR. These should'
-                      ' be standard python module tarballs where you can cd'
-                      ' into a subdirectory and run "sudo python setup.py'
-                      ' install". You can use --bootstrap-python-package more'
-                      ' than once.'),
-            )),
-        ],
-    ),
-    bootstrap_scripts=dict(
-        cloud_role='launch',
-        combiner=combine_path_lists,
-        deprecated=True,
-        runners=['emr'],
-        switches=[
-            (['--bootstrap-script'], dict(
-                action='append',
-                help=('Script to upload and then run on the master node (a'
-                      ' combination of bootstrap_cmds and bootstrap_files).'
-                      ' These are run after the command from bootstrap_cmds.'
-                      ' You can use --bootstrap-script more than once.'),
             )),
         ],
     ),

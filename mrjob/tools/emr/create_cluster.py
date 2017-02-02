@@ -41,15 +41,6 @@ Options::
                         more than once. Local scripts will be automatically
                         uploaded to S3. To add arguments, just use quotes:
                         "foo.sh arg1 arg2"
-  --bootstrap-cmd=BOOTSTRAP_CMDS
-                        Commands to run on the master node to set up
-                        libraries, etc. You can use --bootstrap-cmd more than
-                        once. Use mrjob.conf to specify arguments as a list to
-                        be run directly.
-  --bootstrap-file=BOOTSTRAP_FILES
-                        File to upload to the master node before running
-                        bootstrap_cmds (for example, debian packages). You can
-                        use --bootstrap-file more than once.
   --bootstrap-mrjob     Automatically zip up the mrjob library and install it
                         when we run the mrjob. This is the default. Use --no-
                         bootstrap-mrjob if you've already installed mrjob on
@@ -63,17 +54,6 @@ Options::
   --no-bootstrap-python
                         Don't automatically try to install a compatible
                         version of Python at bootstrap time.
-  --bootstrap-python-package=BOOTSTRAP_PYTHON_PACKAGES
-                        Path to a Python module to install on EMR. These
-                        should be standard python module tarballs where you
-                        can cd into a subdirectory and run ``sudo python
-                        setup.py install``. You can use --bootstrap-python-
-                        package more than once.
-  --bootstrap-script=BOOTSTRAP_SCRIPTS
-                        Script to upload and then run on the master node (a
-                        combination of bootstrap_cmds and bootstrap_files).
-                        These are run after the command from bootstrap_cmds.
-                        You can use --bootstrap-script more than once.
   --cloud-fs-sync-secs=CLOUD_FS_SYNC_SECS
                         How long to wait for remote FS to reach eventual
                         consistency. This is typically less than a second but

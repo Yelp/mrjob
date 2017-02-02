@@ -1,5 +1,8 @@
 v0.6.0, 2017-03-?? -- ???
  * removed deprecated options:
+   * bootstrap_cmds
+   * bootstrap_files
+   * bootstrap_scripts
    * hadoop_home
    * hadoop_streaming_jar_on_emr
    * num_ec2_instances

@@ -1402,11 +1402,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
                                   expected_python_bin + ' ' +
                                   foo_py_path + '#bar.py',
                                   's3://walrus/scripts/ohnoes.sh#'],
-                              bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
-                              bootstrap_files=['/tmp/quz'],
-                              bootstrap_mrjob=True,
-                              bootstrap_python_packages=[yelpy_tar_gz_path],
-                              bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
+                              bootstrap_mrjob=True)
 
         runner._add_bootstrap_files_for_upload()
 
@@ -1459,10 +1455,6 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertIn('  ' + expected_python_bin + ' $__mrjob_PWD/bar.py',
                       lines)
         self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
-        # bootstrap_cmds
-        self.assertIn('  echo "Hi!"', lines)
-        self.assertIn('  true', lines)
-        self.assertIn('  ls', lines)
         # bootstrap_mrjob
         mrjob_zip_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_zip_path)
@@ -1473,16 +1465,6 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
                       ' -d $__mrjob_PYTHON_LIB', lines)
         self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -q -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
-        # bootstrap_python_packages
-        if expect_pip_binary:
-            self.assertIn('  sudo pip install $__mrjob_PWD/yelpy.tar.gz',
-                          lines)
-        else:
-            self.assertIn(('  sudo ' + expected_python_bin +
-                           ' -m pip install $__mrjob_PWD/yelpy.tar.gz'), lines)
-        # bootstrap_scripts
-        self.assertIn('  $__mrjob_PWD/speedups.sh', lines)
-        self.assertIn('  $__mrjob_PWD/s.sh', lines)
 
     def test_create_master_bootstrap_script(self):
         # this tests 4.x
@@ -2421,33 +2403,21 @@ class PoolMatchingTestCase(MockBotoTestCase):
             mrjob.__version__ = old_version
 
     def test_join_similarly_bootstrapped_pool(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
         _, cluster_id = self.make_pooled_cluster(
-            bootstrap_files=[local_input_path])
+            bootstrap=['true'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--bootstrap-file', local_input_path])
+            '--bootstrap', 'true'])
 
     def test_dont_join_differently_bootstrapped_pool(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--bootstrap-file', local_input_path])
+            '--bootstrap', 'true'])
 
     def test_dont_join_differently_bootstrapped_pool_2(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
         bootstrap_path = os.path.join(self.tmp_dir, 'go.sh')
         with open(bootstrap_path, 'w') as f:
             f.write('#!/usr/bin/sh\necho "hi mom"\n')

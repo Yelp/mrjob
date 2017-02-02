@@ -459,32 +459,6 @@ and install another Python binary.
     in order to give direct access to the EMR API.
 
 .. mrjob-opt::
-    :config: bootstrap_cmds
-    :switch: --bootstrap-cmd
-    :type: :ref:`string list <data-type-string-list>`
-    :set: emr
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    A list of commands to run at bootstrap time. Basically
-    :mrjob-opt:`bootstrap` without automatic file uploading/interpolation.
-    Can also take commands as lists of arguments.
-
-.. mrjob-opt::
-    :config: bootstrap_files
-    :switch: --bootstrap-file
-    :type: :ref:`path list <data-type-path-list>`
-    :set: emr
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    Files to download to the bootstrap working directory before running
-    bootstrap commands. Use the :mrjob-opt:`bootstrap` option's file
-    auto-upload/interpolation feature instead.
-
-.. mrjob-opt::
    :config: bootstrap_python
    :switch: --bootstrap-python, --no-bootstrap-python
    :type: boolean
@@ -529,37 +503,6 @@ and install another Python binary.
    * any bootstrap action (see :mrjob-opt:`bootstrap_actions`) ending in
      ``/spark-install`` (this is how you install Spark on 3.x AMIs)
 
-.. mrjob-opt::
-    :config: bootstrap_python_packages
-    :switch: --bootstrap-python-package
-    :type: :ref:`path list <data-type-path-list>`
-    :set: emr
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    Paths of python modules tarballs to install on EMR. Pass
-    :command:`sudo` :mrjob-opt:`python_bin`
-    :command:`-m pip install path/to/package.tar.gz#` to
-    :mrjob-opt:`bootstrap` instead.
-
-    Also, please consider installing packages directly from
-    `PyPI <https://pypi.python.org/pypi>`_ instead (
-    :command:`sudo` :mrjob-opt:`python_bin`
-    :command:`-m pip install package1 package2`); PyPI is much, much more
-    robust/production-ready than when this option was first created.
-
-.. mrjob-opt::
-    :config: bootstrap_scripts
-    :switch: --bootstrap-script
-    :type: :ref:`path list <data-type-path-list>`
-    :set: emr
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    Scripts to upload and then run at bootstrap time. Pass
-    ``path/to/script# args`` to :mrjob-opt:`bootstrap` instead.
 
 Monitoring the cluster
 -----------------------

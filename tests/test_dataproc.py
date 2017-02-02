@@ -689,18 +689,15 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
         with open(foo_py_path, 'w'):
             pass
 
-        # use all the bootstrap options
         runner = DataprocJobRunner(
             conf_paths=[],
             bootstrap=[
                 PYTHON_BIN + ' ' +
                 foo_py_path + '#bar.py',
                 'gs://walrus/scripts/ohnoes.sh#',
-                # bootstrap_cmds
                 'echo "Hi!"',
                 'true',
                 'ls',
-                # bootstrap_scripts
                 'speedups.sh',
                 '/tmp/s.sh'
             ],

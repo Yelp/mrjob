@@ -615,18 +615,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # manage working dir for bootstrap script
         self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
 
-        if self._opts['bootstrap_files']:
-            log.warning(
-                "bootstrap_files is deprecated since v0.4.2 and will be"
-                " removed in v0.6.0. Consider using bootstrap instead.")
-        for path in self._opts['bootstrap_files']:
-            self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
-                'file', path, must_name='bootstrap_files'))
-
         self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
-        self._legacy_bootstrap = self._parse_legacy_bootstrap()
 
-        for cmd in self._bootstrap + self._legacy_bootstrap:
+        for cmd in self._bootstrap:
             for maybe_path_dict in cmd:
                 if isinstance(maybe_path_dict, dict):
                     self._bootstrap_dir_mgr.add(**maybe_path_dict)
@@ -2403,8 +2394,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # Also don't bother if we're not bootstrapping
         # (unless we're pooling, in which case we need the bootstrap
         # script to attach the pool hash too; see #1503).
-        if not (self._bootstrap or self._legacy_bootstrap or
-                self._opts['bootstrap_files'] or
+        if not (self._bootstrap or
                 self._bootstrap_mrjob() or
                 self._opts['pool_clusters']):
             return
@@ -2442,7 +2432,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content(
-            self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
+            self._bootstrap + mrjob_bootstrap)
         for line in contents:
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
@@ -2543,67 +2533,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         :py:func:`mrjob.setup.parse_setup_cmd()`.
         """
         return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
-
-    def _parse_legacy_bootstrap(self):
-        """Parse the deprecated
-        options *bootstrap_python_packages*, and *bootstrap_cmds*
-        *bootstrap_scripts* as bootstrap commands, in that order.
-
-        This is a separate method from _parse_bootstrap() because bootstrapping
-        mrjob happens after the new bootstrap commands (so you can upgrade
-        Python) but before the legacy commands (for backwards compatibility).
-        """
-        bootstrap = []
-
-        # bootstrap_python_packages. Deprecated but still works, except
-        if self._opts['bootstrap_python_packages']:
-            log.warning(
-                'bootstrap_python_packages is deprecated since v0.4.2'
-                ' and will be removed in v0.6.0. Consider using'
-                ' bootstrap instead.')
-
-            # bootstrap_python_packages won't work on AMI 3.0.0 (out-of-date
-            # SSL keys) and AMI 2.4.2 and earlier (no pip, and have to fix
-            # sources.list to apt-get it). These AMIs are so old it's probably
-            # not worth dedicating code to this, but can add a warning if
-            # need be.
-
-            for path in self._opts['bootstrap_python_packages']:
-                path_dict = parse_legacy_hash_path('file', path)
-
-                python_bin = cmd_line(self._python_bin())
-
-                if python_bin in ('python', 'python2.6'):
-                    # Special case: in Python 2.6, we can't python -m pip
-                    bootstrap.append(['sudo pip install ', path_dict])
-                else:
-                    # Otherwise a little more robust to use Python than pip
-                    # binary; for example, there is a python3 binary but no
-                    # pip-3 (only pip-3.4)
-                    bootstrap.append(
-                        ['sudo %s -m pip install ' % python_bin, path_dict])
-
-        # bootstrap_cmds
-        if self._opts['bootstrap_cmds']:
-            log.warning(
-                "bootstrap_cmds is deprecated since v0.4.2 and will be"
-                " removed in v0.6.0. Consider using bootstrap instead.")
-        for cmd in self._opts['bootstrap_cmds']:
-            if not isinstance(cmd, string_types):
-                cmd = cmd_line(cmd)
-            bootstrap.append([cmd])
-
-        # bootstrap_scripts
-        if self._opts['bootstrap_scripts']:
-            log.warning(
-                "bootstrap_scripts is deprecated since v0.4.2 and will be"
-                " removed in v0.6.0. Consider using bootstrap instead.")
-
-        for path in self._opts['bootstrap_scripts']:
-            path_dict = parse_legacy_hash_path('file', path)
-            bootstrap.append([path_dict])
-
-        return bootstrap
 
     def _master_bootstrap_script_content(self, bootstrap):
         """Create the contents of the master bootstrap script.
@@ -3138,7 +3067,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._opts['additional_emr_info'],
             self._bootstrap,
             self._bootstrap_actions(),
-            self._opts['bootstrap_cmds'],
             self._bootstrap_mrjob(),
         ]
 

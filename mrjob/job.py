@@ -704,29 +704,12 @@ class MRJob(MRJobLauncher):
 
         def read_lines():
             for line in self._read_input():
-                try:
-                    key, value = read(line.rstrip(b'\r\n'))
-                    yield key, value
-                except Exception as e:
-                    # the strict_protocols option has to default to None
-                    # because it's used by runners, so treat None as true
-                    if self.options.strict_protocols is not False:
-                        raise
-                    else:
-                        self.increment_counter(
-                            'Undecodable input', e.__class__.__name__)
+                key, value = read(line.rstrip(b'\r\n'))
+                yield key, value
 
         def write_line(key, value):
-            try:
-                self.stdout.write(write(key, value))
-                self.stdout.write(b'\n')
-            except Exception as e:
-                # None counts as true, see above
-                if self.options.strict_protocols is not False:
-                    raise
-                else:
-                    self.increment_counter(
-                        'Unencodable output', e.__class__.__name__)
+            self.stdout.write(write(key, value))
+            self.stdout.write(b'\n')
 
         return read_lines, write_line
 

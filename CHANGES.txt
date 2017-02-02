@@ -9,6 +9,7 @@ v0.6.0, 2017-03-?? -- ???
    * python_archives
    * setup_cmds
    * setup_scripts
+   * strict_protocols
  * removed deprecated option aliases:
    * ami_version
    * aws_availability_zone

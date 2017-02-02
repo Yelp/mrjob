@@ -136,7 +136,6 @@ class RunnerOptionStore(OptionStore):
             'local_tmp_dir': tempfile.gettempdir(),
             'owner': owner,
             'sh_bin': ['sh', '-ex'],
-            'strict_protocols': True,
         })
 
     def validated_options(self, opts, from_where=''):
@@ -456,12 +455,6 @@ class MRJobRunner(object):
 
         if self._ran_job:
             raise AssertionError("Job already ran!")
-
-        if not self._opts['strict_protocols']:
-            log.warning('\nNon-strict protocols are deprecated and will be'
-                        ' removed in v0.6.0. Please run your job with'
-                        ' --strict-protocols and fix any underlying'
-                        ' encoding issues\n')
 
         self._create_dir_archives()
         self._run()
@@ -876,7 +869,6 @@ class MRJobRunner(object):
             the path they'll have inside Hadoop streaming
         """
         return (self._get_file_upload_args(local=local) +
-                self._get_strict_protocols_args() +
                 self._extra_args)
 
     def _get_file_upload_args(self, local=False):
@@ -895,20 +887,6 @@ class MRJobRunner(object):
             else:
                 args.append(self._working_dir_mgr.name(**path_dict))
         return args
-
-    def _get_strict_protocols_args(self):
-        """Arguments used to control protocol behavior in the job.
-
-        This just adds --no-strict-protocols when strict_protocols
-        is false.
-        """
-        # These are only in the runner so that we can default them from
-        # mrjob.conf, which will allow us to eventually remove them.
-        # See issue #726.
-        if not self._opts['strict_protocols']:
-            return ['--no-strict-protocols']
-        else:
-            return []
 
     def _create_setup_wrapper_script(
             self, dest='setup-wrapper.sh', local=False):

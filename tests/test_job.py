@@ -306,7 +306,7 @@ class ProtocolsTestCase(TestCase):
                          RAW_INPUT.getvalue())
 
 
-class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
+class ProtocolErrorsTestCase(EmptyMrjobConfTestCase):
 
     class MRBoringReprAndJSONJob(MRBoringJob):
         # allowing reading in bytes that can't be JSON-encoded
@@ -385,24 +385,8 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
     def test_undecodable_input(self):
         self.assertJobRaisesExceptionOnUndecodableInput()
 
-    def test_undecodable_input_strict_protocols(self):
-        self.assertJobRaisesExceptionOnUndecodableInput(
-            ['--strict-protocols'])
-
-    def test_undecodable_input_no_strict_protocols(self):
-        self.assertJobHandlesUndecodableInput(
-            ['--no-strict-protocols'])
-
     def test_unencodable_output(self):
         self.assertJobRaisesExceptionOnUnencodableOutput()
-
-    def test_unencodable_output_strict(self):
-        self.assertJobRaisesExceptionOnUnencodableOutput(
-            ['--strict-protocols'])
-
-    def test_unencodable_output_no_strict_protocols(self):
-        self.assertJobHandlesUnencodableOutput(
-            ['--no-strict-protocols'])
 
 
 class PickProtocolsTestCase(TestCase):

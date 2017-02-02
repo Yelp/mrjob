@@ -265,14 +265,6 @@ class MRJobLauncher(object):
             default=False,
             help='include help for deprecated options')
 
-        # protocol stuff
-        self._proto_opt_group = OptionGroup(
-            self.option_parser, 'Protocols')
-        self.option_parser.add_option_group(self._proto_opt_group)
-
-        _add_runner_options(
-            self._proto_opt_group, set(['strict_protocols']))
-
         # options for running the job (any runner)
         self._runner_opt_group = OptionGroup(
             self.option_parser, 'Running the entire job')
@@ -280,9 +272,7 @@ class MRJobLauncher(object):
 
         _add_basic_options(self._runner_opt_group)
         _add_job_options(self._runner_opt_group)
-        _add_runner_options(
-            self._runner_opt_group,
-            _pick_runner_opts('base') - set(['strict_protocols']))
+        _add_runner_options(self._runner_opt_group, _pick_runner_opts('base'))
 
         # options for inline/local runners
         self._local_opt_group = OptionGroup(

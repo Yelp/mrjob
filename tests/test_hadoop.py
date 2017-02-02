@@ -29,7 +29,6 @@ from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
-from mrjob.util import bash_wrap
 from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters
@@ -52,6 +51,7 @@ from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.test_local import _bash_wrap
 
 # used to match command lines
 if PY2:
@@ -889,7 +889,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 'type': 'streaming',
                 'mapper': {
                     'type': 'script',
-                    'pre_filter': bash_wrap("grep 'anything'"),
+                    'pre_filter': _bash_wrap("grep 'anything'"),
                 },
             },
         ]

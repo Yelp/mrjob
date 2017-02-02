@@ -54,7 +54,6 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
-from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
 
 from tests.mockboto import DEFAULT_MAX_STEPS_RETURNED
@@ -83,6 +82,7 @@ from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
+from tests.test_local import _bash_wrap
 
 try:
     import boto
@@ -3274,7 +3274,7 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
             dict(type='streaming',
                  mapper=dict(
                      type='script',
-                     pre_filter=bash_wrap("grep 'anything'"))))
+                     pre_filter=_bash_wrap("grep 'anything'"))))
 
         self.assertEqual(
             ss['mapper'],

@@ -71,6 +71,7 @@ v0.6.0, 2017-03-?? -- ???
      * get_ami_version()
      * get_emr_job_flow_id()
      * make_persistent_job_flow()
+ * removed deprecated passthrough to runner.fs
  * removed deprecated switches:
    * --partitioner
  * removed deprecated JOB_FLOW and *SCRATCH cleanup types

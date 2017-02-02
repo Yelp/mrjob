@@ -409,36 +409,13 @@ class MRJobRunner(object):
     @property
     def fs(self):
         """:py:class:`~mrjob.fs.base.Filesystem` object for the local
-        filesystem. Methods on :py:class:`~mrjob.fs.base.Filesystem` objects
-        will be forwarded to :py:class:`~mrjob.runner.MRJobRunner` until mrjob
-        0.6.0, but **this behavior is deprecated.**
+        filesystem.
         """
         if self._fs is None:
             # wrap LocalFilesystem in CompositeFilesystem to get IOError
             # on URIs (see #1185)
             self._fs = CompositeFilesystem(LocalFilesystem())
         return self._fs
-
-    def __getattr__(self, name):
-        # For backward compatibility, forward filesystem methods
-        try:
-            value = getattr(self.fs, name)
-        except AttributeError:
-            raise AttributeError(name)
-
-        # friendly deprecation warning
-        is_func = ismethod(value) or isfunction(value)
-        log.warning(
-            'deprecated: %s %s.fs.%s%s directly'
-            ' (%s.%s is going away in v0.6.0)' % (
-                'call' if is_func else 'access',
-                self.__class__.__name__,
-                name,
-                '()' if is_func else '',
-                self.__class__.__name__,
-                name))
-
-        return value
 
     ### Running the job and parsing output ###
 

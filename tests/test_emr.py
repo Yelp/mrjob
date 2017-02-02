@@ -1392,9 +1392,6 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         with open(foo_py_path, 'w'):
             pass
 
-        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
-        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
-
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
                               image_version=image_version,
@@ -1442,12 +1439,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # check files get downloaded
         assertScriptDownloads(foo_py_path, 'bar.py')
         assertScriptDownloads('s3://walrus/scripts/ohnoes.sh')
-        assertScriptDownloads('/tmp/quz', 'quz')
         assertScriptDownloads(runner._mrjob_zip_path)
-        assertScriptDownloads('speedups.sh')
-        assertScriptDownloads('/tmp/s.sh')
-        if PY2:
-            assertScriptDownloads(yelpy_tar_gz_path)
 
         # check scripts get run
 

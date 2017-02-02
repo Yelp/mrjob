@@ -277,12 +277,6 @@ class MRJobLauncher(object):
         """
         return False
 
-    def is_mapper_or_reducer(self):
-        """The old name for :py:meth:`is_task`. Going away in v0.6.0"""
-        log.warning('is_mapper_or_reducer() has been renamed to is_task().'
-                    ' This alias will be removed in v0.6.0')
-        return self.is_task()
-
     def add_passthrough_option(self, *args, **kwargs):
         """Function to create options which both the job runner
         and the job itself respect (we use this for protocols, for example).

@@ -7,8 +7,9 @@ v0.6.0, 2017-03-?? -- ???
    * create-job-flow
    * terminate-idle-job-flows
    * terminate-job-flow
- * removed deprecated MRJob methods:
+ * removed deprecated MRJob/MRJobLauncher methods:
    * all_option_groups()
+   * is_mapper_or_reducer()
    * mr()
  * removed option groups from MRJobLauncher
  * removed deprecated options:

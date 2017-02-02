@@ -769,11 +769,6 @@ class IsTaskTestCase(TestCase):
         self.assertEqual(MRJob(['--spark']).is_task(), True)
         self.assertEqual(MRJob(['--steps']).is_task(), False)
 
-    def test_deprecated_alias(self):
-        with logger_disabled('mrjob.launch'):
-            self.assertEqual(MRJob().is_mapper_or_reducer(), False)
-            self.assertEqual(MRJob(['--mapper']).is_mapper_or_reducer(), True)
-
 
 class StepNumTestCase(TestCase):
 

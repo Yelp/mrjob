@@ -44,7 +44,6 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
-from mrjob.util import tar_and_gzip
 
 
 from tests.mockboto import MockBotoTestCase
@@ -1195,6 +1194,34 @@ class CheckInputPathsTestCase(TestCase):
                 self.assertFalse(runner._opts['check_input_paths'])
 
 
+def _tar_and_gzip(dir, out_path):
+    """Tar and gzip the given *dir* to a tarball at *out_path*.
+
+    If we encounter symlinks, include the actual file, not the symlink.
+
+    :type dir: str
+    :param dir: dir to tar up
+    :type out_path: str
+    :param out_path: where to write the tarball too
+    """
+    if not os.path.isdir(dir):
+        raise IOError('Not a directory: %r' % (dir,))
+
+    tar_gz = tarfile.open(out_path, mode='w:gz')
+
+    for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
+        for filename in filenames:
+            path = os.path.join(dirpath, filename)
+            # janky version of os.path.relpath() (Python 2.6):
+            path_in_tar_gz = path[len(os.path.join(dir, '')):]
+
+            # copy over real files, not symlinks
+            real_path = os.path.realpath(path)
+            tar_gz.add(real_path, arcname=path_in_tar_gz, recursive=False)
+
+    tar_gz.close()
+
+
 class SetupTestCase(SandboxedTestCase):
 
     def setUp(self):
@@ -1218,7 +1245,7 @@ class SetupTestCase(SandboxedTestCase):
         os.chmod(self.foo_sh, stat.S_IRWXU)
 
         self.foo_tar_gz = os.path.join(self.tmp_dir, 'foo.tar.gz')
-        tar_and_gzip(self.foo_dir, self.foo_tar_gz)
+        _tar_and_gzip(self.foo_dir, self.foo_tar_gz)
 
         self.foo_zip = os.path.join(self.tmp_dir, 'foo.zip')
         zf = ZipFile(self.foo_zip, 'w', ZIP_DEFLATED)

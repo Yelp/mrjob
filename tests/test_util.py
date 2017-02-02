@@ -35,7 +35,6 @@ from mrjob.util import random_identifier
 from mrjob.util import read_file
 from mrjob.util import read_input
 from mrjob.util import safeeval
-from mrjob.util import tar_and_gzip
 from mrjob.util import to_lines
 from mrjob.util import unarchive
 from mrjob.util import unique
@@ -351,22 +350,6 @@ class ArchiveTestCase(TestCase):
         # make sure symlinks are converted to files
         assert os.path.isfile(join(self.tmp_dir, 'b', 'bar'))
         assert not os.path.islink(join(self.tmp_dir, 'b', 'bar'))
-
-    def test_tar_and_gzip(self):
-        join = os.path.join
-
-        # tar it up, and put it in subdirectory (b/)
-        tar_and_gzip(dir=join(self.tmp_dir, 'a'),
-                     out_path=join(self.tmp_dir, 'a.tar.gz'),
-                     filter=lambda path: not path.endswith('z'),
-                     prefix='b')
-
-        # untar it into b/
-        t = tarfile.open(join(self.tmp_dir, 'a.tar.gz'), 'r:gz')
-        t.extractall(self.tmp_dir)
-        t.close()
-
-        self.ensure_expected_results(excluded_files=['baz'])
 
     def archive_and_unarchive(self, extension, archive_template,
                               added_files=[]):

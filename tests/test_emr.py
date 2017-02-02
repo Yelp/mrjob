@@ -56,7 +56,6 @@ from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
 from mrjob.util import log_to_stream
-from mrjob.util import tar_and_gzip
 
 from tests.mockboto import DEFAULT_MAX_STEPS_RETURNED
 from tests.mockboto import MockBotoTestCase

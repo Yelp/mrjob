@@ -337,46 +337,6 @@ def strip_microseconds(delta):
     return timedelta(delta.days, delta.seconds)
 
 
-def tar_and_gzip(dir, out_path, filter=None, prefix=''):
-    """Tar and gzip the given *dir* to a tarball at *out_path*.
-
-    If we encounter symlinks, include the actual file, not the symlink.
-
-    :type dir: str
-    :param dir: dir to tar up
-    :type out_path: str
-    :param out_path: where to write the tarball too
-    :param filter: if defined, a function that takes paths (relative to *dir*
-                   and returns ``True`` if we should keep them
-    :type prefix: str
-    :param prefix: subdirectory inside the tarball to put everything into (e.g.
-                   ``'mrjob'``)
-    """
-    # might move this to tests/; we use it a few places there
-    log.warning('tar_and_gzip() is deprecated and will be removed in v0.6.0')
-
-    if not os.path.isdir(dir):
-        raise IOError('Not a directory: %r' % (dir,))
-
-    if not filter:
-        filter = lambda path: True
-
-    tar_gz = tarfile.open(out_path, mode='w:gz')
-
-    for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
-        for filename in filenames:
-            path = os.path.join(dirpath, filename)
-            # janky version of os.path.relpath() (Python 2.6):
-            rel_path = path[len(os.path.join(dir, '')):]
-            if filter(rel_path):
-                # copy over real files, not symlinks
-                real_path = os.path.realpath(path)
-                path_in_tar_gz = os.path.join(prefix, rel_path)
-                tar_gz.add(real_path, arcname=path_in_tar_gz, recursive=False)
-
-    tar_gz.close()
-
-
 def to_lines(chunks):
     """Take in data as a sequence of bytes, and yield it, one line at a time.
 

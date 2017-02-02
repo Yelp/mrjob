@@ -113,15 +113,6 @@ def urlparse(urlstring, scheme='', allow_fragments=True, *args, **kwargs):
 
 ### OPTION PARSING ###
 
-def parse_port_range_list(range_list_str):
-    """Parse a port range list of the form ``(start[:end])(,(start[:end]))*``
-
-    .. deprecated:: 0.5.7
-    """
-    log.warning('parse_key_value_list() is deprecated and will be removed'
-                ' in v0.6.0')
-    return _parse_port_range_list(range_list_str)
-
 
 # planning to move this into mrjob.options
 def _parse_port_range_list(range_list_str):
@@ -133,33 +124,6 @@ def _parse_port_range_list(range_list_str):
         else:
             all_ranges.append(int(range_str))
     return all_ranges
-
-
-def parse_key_value_list(kv_string_list, error_fmt, error_func):
-    """Parse a list of strings like ``KEY=VALUE`` into a dictionary.
-
-    :param kv_string_list: Parse a list of strings like ``KEY=VALUE`` into a
-                           dictionary.
-    :type kv_string_list: [str]
-    :param error_fmt: Format string accepting one ``%s`` argument which is the
-                      malformed (i.e. not ``KEY=VALUE``) string
-    :type error_fmt: str
-    :param error_func: Function to call when a malformed string is encountered.
-    :type error_func: function(str)
-
-    .. deprecated:: 0.5.7
-    """
-    log.warning('parse_key_value_list() is deprecated and will be removed'
-                ' in v0.6.0')
-
-    ret = {}
-    for value in kv_string_list:
-        try:
-            k, v = value.split('=', 1)
-            ret[k] = v
-        except ValueError:
-            error_func(error_fmt % (value,))
-    return ret
 
 
 ### parsing job output/stderr ###

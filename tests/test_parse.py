@@ -21,14 +21,14 @@ from subprocess import PIPE
 from subprocess import Popen
 
 from mrjob.parse import _find_python_traceback
+from mrjob.parse import _parse_port_range_list
+from mrjob.parse import _parse_progress_from_job_tracker
+from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import parse_mr_job_stderr
-from mrjob.parse import parse_port_range_list
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
-from mrjob.parse import _parse_progress_from_job_tracker
-from mrjob.parse import _parse_progress_from_resource_manager
 
 from tests.py2 import TestCase
 
@@ -201,19 +201,19 @@ class ParseMRJobStderrTestCase(TestCase):
 
 class PortRangeListTestCase(TestCase):
     def test_port_range_list(self):
-        self.assertEqual(parse_port_range_list('1234'), [1234])
-        self.assertEqual(parse_port_range_list('123,456,789'), [123, 456, 789])
-        self.assertEqual(parse_port_range_list('1234,5678'), [1234, 5678])
-        self.assertEqual(parse_port_range_list('1234:1236'),
+        self.assertEqual(_parse_port_range_list('1234'), [1234])
+        self.assertEqual(_parse_port_range_list('123,456,789'), [123, 456, 789])
+        self.assertEqual(_parse_port_range_list('1234,5678'), [1234, 5678])
+        self.assertEqual(_parse_port_range_list('1234:1236'),
                          [1234, 1235, 1236])
-        self.assertEqual(parse_port_range_list('123:125,456'),
+        self.assertEqual(_parse_port_range_list('123:125,456'),
                          [123, 124, 125, 456])
-        self.assertEqual(parse_port_range_list('123:125,456:458'),
+        self.assertEqual(_parse_port_range_list('123:125,456:458'),
                          [123, 124, 125, 456, 457, 458])
-        self.assertEqual(parse_port_range_list('0123'), [123])
+        self.assertEqual(_parse_port_range_list('0123'), [123])
 
-        self.assertRaises(ValueError, parse_port_range_list, 'Alexandria')
-        self.assertRaises(ValueError, parse_port_range_list,
+        self.assertRaises(ValueError, _parse_port_range_list, 'Alexandria')
+        self.assertRaises(ValueError, _parse_port_range_list,
                           'Athens:Alexandria')
 
 

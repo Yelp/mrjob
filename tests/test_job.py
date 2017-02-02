@@ -306,7 +306,7 @@ class ProtocolsTestCase(TestCase):
                          RAW_INPUT.getvalue())
 
 
-class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
+class ProtocolErrorsTestCase(EmptyMrjobConfTestCase):
 
     class MRBoringReprAndJSONJob(MRBoringJob):
         # allowing reading in bytes that can't be JSON-encoded
@@ -385,24 +385,8 @@ class StrictProtocolsTestCase(EmptyMrjobConfTestCase):
     def test_undecodable_input(self):
         self.assertJobRaisesExceptionOnUndecodableInput()
 
-    def test_undecodable_input_strict_protocols(self):
-        self.assertJobRaisesExceptionOnUndecodableInput(
-            ['--strict-protocols'])
-
-    def test_undecodable_input_no_strict_protocols(self):
-        self.assertJobHandlesUndecodableInput(
-            ['--no-strict-protocols'])
-
     def test_unencodable_output(self):
         self.assertJobRaisesExceptionOnUnencodableOutput()
-
-    def test_unencodable_output_strict(self):
-        self.assertJobRaisesExceptionOnUnencodableOutput(
-            ['--strict-protocols'])
-
-    def test_unencodable_output_no_strict_protocols(self):
-        self.assertJobHandlesUnencodableOutput(
-            ['--no-strict-protocols'])
 
 
 class PickProtocolsTestCase(TestCase):
@@ -767,32 +751,12 @@ class PartitionerTestCase(TestCase):
 
         self.assertEqual(mr_job.job_runner_kwargs()['partitioner'], None)
 
-    def test_cmd_line_options(self):
-        mr_job = MRJob([
-            '--partitioner', 'java.lang.Object',
-            '--partitioner', 'org.apache.hadoop.mapreduce.Partitioner'
-        ])
-
-        # second option takes priority
-        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
-                         'org.apache.hadoop.mapreduce.Partitioner')
-
     def test_partitioner_attr(self):
         mr_job = self.MRPartitionerJob()
 
         self.assertEqual(
             mr_job.job_runner_kwargs()['partitioner'],
             'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
-
-    def test_partitioner_attr_and_cmd_line_options(self):
-        mr_job = self.MRPartitionerJob([
-            '--partitioner', 'java.lang.Object',
-            '--partitioner', 'org.apache.hadoop.mapreduce.Partitioner'
-        ])
-
-        # command line takes priority
-        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
-                         'org.apache.hadoop.mapreduce.Partitioner')
 
 
 class IsTaskTestCase(TestCase):
@@ -804,11 +768,6 @@ class IsTaskTestCase(TestCase):
         self.assertEqual(MRJob(['--combiner']).is_task(), True)
         self.assertEqual(MRJob(['--spark']).is_task(), True)
         self.assertEqual(MRJob(['--steps']).is_task(), False)
-
-    def test_deprecated_alias(self):
-        with logger_disabled('mrjob.launch'):
-            self.assertEqual(MRJob().is_mapper_or_reducer(), False)
-            self.assertEqual(MRJob(['--mapper']).is_mapper_or_reducer(), True)
 
 
 class StepNumTestCase(TestCase):
@@ -1142,18 +1101,6 @@ class StepsTestCase(TestCase):
         self.assertEqual(j.steps(), [MRStep(reducer=j.reducer)])
 
 
-class DeprecatedMRMethodTestCase(TestCase):
-
-    def test_mr(self):
-        kwargs = {
-            'mapper': _IDENTITY_MAPPER,
-            'reducer': _IDENTITY_REDUCER,
-        }
-
-        with logger_disabled('mrjob.job'):
-            self.assertEqual(MRJob.mr(**kwargs), MRStep(**kwargs))
-
-
 class RunSparkTestCase(TestCase):
 
     def test_spark(self):
@@ -1224,7 +1171,9 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--s3-endpoint', output)
 
         # deprecated options
-        self.assertNotIn('--partitioner', output)
+
+        # currently there are no deprecated options to test against
+        #self.assertNotIn('--partitioner', output)
         self.assertIn('add --deprecated', output)
         self.assertNotIn('--deprecated=DEPRECATED', output)
 
@@ -1241,7 +1190,9 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--s3-endpoint', output)
 
         # deprecated options
-        self.assertIn('--partitioner', output)
+
+        # currently there are no deprecated options to test against
+        #self.assertIn('--partitioner', output)
         self.assertNotIn('add --deprecated', output)
         self.assertIn('--deprecated=DEPRECATED', output)
 
@@ -1261,7 +1212,9 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--gcp-project', output)
 
         # deprecated options
-        self.assertNotIn('--bootstrap-cmd', output)
+        #
+        # currently there aren't any
+        #self.assertNotIn('--bootstrap-cmd', output)
 
     def test_deprecated_runner_help(self):
         MRJob(['--help', '-r', 'emr', '--deprecated'])
@@ -1279,7 +1232,9 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--gcp-project', output)
 
         # deprecated options
-        self.assertIn('--bootstrap-cmd', output)
+        #
+        # currently there aren't any
+        #self.assertIn('--bootstrap-cmd', output)
 
     def test_steps_help(self):
         MRJob(['--help', '--steps'])

@@ -92,7 +92,6 @@ setup(
     packages=[
         'mrjob',
         'mrjob.examples',
-        'mrjob.examples.bash_wrap',
         'mrjob.examples.mr_postfix_bounce',
         'mrjob.examples.mr_travelling_salesman',
         'mrjob.fs',
@@ -102,7 +101,6 @@ setup(
     ],
     package_data={
         'mrjob': ['bootstrap/*.sh'],
-        'mrjob.examples.bash_wrap': ['*.sh'],
         'mrjob.examples.mr_postfix_bounce': ['*.json'],
         'mrjob.examples.mr_travelling_salesman': ['example_graphs/*.json'],
     },

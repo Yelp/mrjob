@@ -1,3 +1,81 @@
+v0.6.0, 2017-03-?? -- ???
+ * removed deprecated INPUT, OUTPUT attributes from JarStep
+ * removed deprecated filesystem methods:
+   * path_exists()
+   * path_join()
+   * SSHFilesystem.ssh_slave_hosts()
+ * removed deprecated mrjob command aliases:
+   * create-job-flow
+   * terminate-idle-job-flows
+   * terminate-job-flow
+ * removed deprecated MRJob/MRJobLauncher methods:
+   * all_option_groups()
+   * is_mapper_or_reducer()
+   * mr()
+ * removed option groups (deprecated) from MRJobLauncher
+ * removed deprecated functions:
+   * mrjob.parse:
+     * is_windows_path()
+     * parse_key_value_list()
+     * parse_port_range_list()
+   * mrjob.util:
+     * args_for_opt_dest_subset()
+     * bash_wrap()
+     * buffer_iterator_to_line_iterator()
+     * bunzip2_stream() (now in mrjob.cat)
+     * gunzip_stream() (now in mrjob.cat)
+     * populate_option_groups_with_options()
+     * scrape_options_and_index_by_dest()
+     * scrape_options_into_new_groups()
+ * removed deprecated options:
+   * bootstrap_cmds
+   * bootstrap_files
+   * bootstrap_scripts
+   * hadoop_home
+   * hadoop_streaming_jar_on_emr
+   * num_ec2_instances
+   * python_archives
+   * setup_cmds
+   * setup_scripts
+   * strict_protocols
+ * removed deprecated option aliases:
+   * ami_version
+   * aws_availability_zone
+   * aws_region
+   * base_tmp_dir
+   * check_emr_status_every
+   * ec2_core_instance_bid_price
+   * ec2_core_instance_type
+   * ec2_instance_type
+   * ec2_master_instance_bid_price
+   * ec2_master_instance_type
+   * ec2_slave_instance_type
+   * ec2_task_instance_bid_price
+   * ec2_task_instance_type
+   * emr_job_flow_id
+   * emr_job_flow_pool_name
+   * emr_tags
+   * hdfs_scratch_dir
+   * num_ec2_core_instances
+   * num_ec2_task_instances
+   * pool_emr_job_flows
+   * s3_log_uri
+   * s3_scratch_uri
+   * s3_tmp_dir
+   * s3_sync_wait_time
+   * s3_upload_part_size
+   * ssh_tunnel_to_job_tracker
+ * removed deprecated runner methods:
+   * get_job_name()
+   * EMRJobRunner:
+     * get_ami_version()
+     * get_emr_job_flow_id()
+     * make_persistent_job_flow()
+ * removed deprecated passthrough to runner.fs
+ * removed deprecated switches:
+   * --partitioner
+ * removed deprecated JOB_FLOW and *SCRATCH cleanup types
+
 v0.5.8, 2017-02-01 -- upload_dirs, pre-filters
  * automatically tarball and upload directories with --dir, setup hooks (#23)
  * specify path for inter-step output with --step-output-dir #263

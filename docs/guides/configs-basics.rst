@@ -165,9 +165,8 @@ once, the lists are concatenated together.
 
 .. _configs-list-example:
 
-.. versionchanged:: 0.4.6
-   strings and non-sequence data types (e.g. numbers) are treated as
-   single-item lists.
+Strings and non-sequence data types (e.g. numbers) are treated as
+single-item lists.
 
 For example,
 
@@ -310,9 +309,8 @@ In this case, :file:`~/.mrjob.very-large.conf` has taken precedence over
 Relative includes
 ^^^^^^^^^^^^^^^^^
 
-.. versionchanged:: 0.4.6
-    Relative ``include:`` paths are relative to the real (after resolving
-    symlinks) path of the including conf file.
+Relative ``include:`` paths are relative to the real (after resolving
+symlinks) path of the including conf file.
 
 For example, you could do this:
 

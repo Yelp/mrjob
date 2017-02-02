@@ -29,7 +29,6 @@ from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
 from mrjob.py2 import PY2
-from mrjob.util import bash_wrap
 from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters
@@ -52,6 +51,7 @@ from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.test_local import _bash_wrap
 
 # used to match command lines
 if PY2:
@@ -147,19 +147,6 @@ class HadoopStreamingJarTestCase(SandboxedTestCase):
 
     def test_empty_fs(self):
         self.assertEqual(self.runner._find_hadoop_streaming_jar(), None)
-
-    def test_deprecated_hadoop_home_option(self):
-        self.runner = HadoopJobRunner(hadoop_home='/ha/do/op/home-option')
-
-        self.mock_paths.append('/ha/do/op/home-option/hadoop-streaming.jar')
-        self.assertEqual(self.runner._find_hadoop_streaming_jar(),
-                         '/ha/do/op/home-option/hadoop-streaming.jar')
-
-    def test_deprecated_hadoop_home_option_beats_hadoop_prefix(self):
-        os.environ['HADOOP_PREFIX'] = '/ha/do/op/prefix'
-        self.mock_paths.append('/ha/do/op/prefix/hadoop-streaming.jar')
-
-        self.test_deprecated_hadoop_home_option()
 
     # tests of well-known environment variables
 
@@ -765,7 +752,6 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 class StreamingArgsTestCase(EmptyMrjobConfTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'hadoop': {
-        'hadoop_home': 'kansas',
         'hadoop_streaming_jar': 'binks.jar.jar',
     }}}
 
@@ -903,7 +889,7 @@ class StreamingArgsTestCase(EmptyMrjobConfTestCase):
                 'type': 'streaming',
                 'mapper': {
                     'type': 'script',
-                    'pre_filter': bash_wrap("grep 'anything'"),
+                    'pre_filter': _bash_wrap("grep 'anything'"),
                 },
             },
         ]
@@ -1316,8 +1302,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
             ['-r', self.RUNNER,
              '--cmdenv', 'FOO=bar',
              '--hadoop-arg', '-libjar', '--hadoop-arg', 'qux.jar',
-             '--jobconf', 'baz=qux',
-             '--partitioner', 'java.lang.Object'])
+             '--jobconf', 'baz=qux'])
         job.HADOOP_INPUT_FORMAT = 'FooInputFormat'
         job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'
 
@@ -1326,7 +1311,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
             self.assertEqual(
                 hadoop_args[:4],
                 ['-D', 'baz=qux', '-libjar', 'qux.jar'])
-            self.assertEqual(len(hadoop_args), 12)
+            self.assertEqual(len(hadoop_args), 10)
 
 
 class LibjarsTestCase(MockHadoopTestCase):

@@ -35,7 +35,6 @@ Options::
                         Specify an output directory (default: CLUSTER_ID)
   -q, --quiet           Don't print anything to stderr
   --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
-  --aws-region=REGION   Deprecated alias for --region
   --s3-endpoint=S3_ENDPOINT
                         Force mrjob to connect to S3 on this endpoint (e.g. s3
                         -us-west-1.amazonaws.com). You usually shouldn't set

@@ -25,7 +25,6 @@ from io import BytesIO
 
 import mrjob
 from mrjob.local import LocalMRJobRunner
-from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
 
@@ -49,6 +48,20 @@ from tests.sandbox import mrjob_conf_patcher
 from tests.test_inline import InlineMRJobRunnerFSTestCase
 from tests.test_inline import InlineMRJobRunnerJobConfTestCase
 from tests.test_inline import InlineMRJobRunnerNoMapperTestCase
+
+
+def _bash_wrap(cmd_str):
+    """Escape single quotes in a shell command string and wrap it with ``bash
+    -c '<string>'``.
+
+    This low-tech replacement works because we control the surrounding string
+    and single quotes are the only character in a single-quote string that
+    needs escaping.
+
+    .. deprecated:: 0.5.8
+    """
+    return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
+
 
 
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
@@ -624,7 +637,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
     def test_multiple(self):
         data = b'x\nx\nx\nx\nx\nx\n'
         mapper_cmd = 'cat -e'
-        reducer_cmd = bash_wrap('wc -l | tr -Cd "[:digit:]"')
+        reducer_cmd = _bash_wrap('wc -l | tr -Cd "[:digit:]"')
         job = CmdJob([
             '--runner', 'local',
             '--mapper-cmd', mapper_cmd,

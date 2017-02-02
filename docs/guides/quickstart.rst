@@ -208,8 +208,6 @@ See :doc:`configs-basics` for in-depth information. Here is an example file::
 
   runners:
     emr:
-      aws-region: us-west-1
-      python_archives:
-        - a_library_I_use_on_emr.tar.gz
+      aws-region: us-west-2
     inline:
       local_tmp_dir: $HOME/.tmp

@@ -423,14 +423,6 @@ class JarStep(_Step):
 
     See :ref:`non-hadoop-streaming-jar-steps` for sample usage.
     """
-    # these are deprecated and will be removed in v0.6.0; use
-    # mrjob.step.INPUT and mrjob.step.OUTPUT instead.
-    #
-    # Unfortunately, creating a "class property" to issue a deprecation
-    # warning for these is way more trouble than it's worth (metaclasses, etc.)
-    INPUT = INPUT
-    OUTPUT = OUTPUT
-
     _STEP_TYPE = 'jar'
 
     _STEP_ATTRS = ['args', 'jar', 'jobconf', 'main_class']

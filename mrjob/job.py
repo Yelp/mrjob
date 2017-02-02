@@ -321,12 +321,14 @@ class MRJob(MRJobLauncher):
         re-defined. For example::
 
             def steps(self):
-                return [self.mr(mapper=self.transform_input,
-                                reducer=self.consolidate_1),
-                        self.mr(reducer_init=self.log_mapper_init,
-                                reducer=self.consolidate_2)]
+                return [MRStep(mapper=self.transform_input,
+                               reducer=self.consolidate_1),
+                        MRStep(reducer_init=self.log_mapper_init,
+                               reducer=self.consolidate_2)]
 
-        :return: a list of steps constructed with :py:meth:`mr`
+        :return: a list of steps constructed with
+        :py:class:`~mrjob.step.MRStep` or other classes in
+        :py:mod:`mrjob.step`.
         """
         # only include methods that have been redefined
         kwargs = dict(
@@ -355,15 +357,6 @@ class MRJob(MRJobLauncher):
         kwargs.update(updates)
 
         return [MRStep(**kwargs)]
-
-    @classmethod
-    def mr(cls, **kwargs):
-        """A deprecated wrapper for :py:class:`~mrjob.step.MRStep`.
-        """
-        log.warning('mr() is deprecated and will be removed in v0.6.0.'
-                    ' Use mrjob.step.MRStep directly instead.')
-
-        return MRStep(**kwargs)
 
     def increment_counter(self, group, counter, amount=1):
         """Increment a counter in Hadoop streaming by printing to stderr.
@@ -499,11 +492,6 @@ class MRJob(MRJobLauncher):
 
         :type step_num: int
         :param step_num: which step to run (0-indexed)
-
-        If --no-strict-protocols is set, and we encounter a line that can't
-        be decoded by our input protocol or a tuple that can't be encoded
-        by our output protocol, we'll increment a counter rather than
-        raising an exception. This will be going away in v0.6.0.
 
         Called from :py:meth:`run`. You'd probably only want to call this
         directly from automated tests.
@@ -704,29 +692,12 @@ class MRJob(MRJobLauncher):
 
         def read_lines():
             for line in self._read_input():
-                try:
-                    key, value = read(line.rstrip(b'\r\n'))
-                    yield key, value
-                except Exception as e:
-                    # the strict_protocols option has to default to None
-                    # because it's used by runners, so treat None as true
-                    if self.options.strict_protocols is not False:
-                        raise
-                    else:
-                        self.increment_counter(
-                            'Undecodable input', e.__class__.__name__)
+                key, value = read(line.rstrip(b'\r\n'))
+                yield key, value
 
         def write_line(key, value):
-            try:
-                self.stdout.write(write(key, value))
-                self.stdout.write(b'\n')
-            except Exception as e:
-                # None counts as true, see above
-                if self.options.strict_protocols is not False:
-                    raise
-                else:
-                    self.increment_counter(
-                        'Unencodable output', e.__class__.__name__)
+            self.stdout.write(write(key, value))
+            self.stdout.write(b'\n')
 
         return read_lines, write_line
 
@@ -853,9 +824,6 @@ class MRJob(MRJobLauncher):
         self.option_parser.add_option_group(self._mux_opt_group)
 
         _add_step_options(self._mux_opt_group)
-
-    def all_option_groups(self):
-        return super(MRJob, self).all_option_groups() + (self._mux_opt_group,)
 
     def is_task(self):
         """True if this is a mapper, combiner, reducer, or Spark script.
@@ -1064,15 +1032,12 @@ class MRJob(MRJobLauncher):
         """Optional Hadoop partitioner class to use to determine how mapper
         output should be sorted and distributed to reducers.
 
-        By default, returns whatever is passed to :option:`--partitioner`,
-        or if that option isn't used, :py:attr:`PARTITIONER`, or if that
-        isn't set, and :py:attr:`SORT_VALUES` is true, it's set to
-        ``'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'``.
+        By default, returns :py:attr:`PARTITIONER`.
 
         You probably don't need to re-define this; it's just here for
         completeness.
         """
-        return self.options.partitioner or self.PARTITIONER
+        return self.PARTITIONER
 
     ### Jobconf ###
 
@@ -1176,9 +1141,6 @@ class MRJob(MRJobLauncher):
     #: you're using.
     #:
     #: See :py:meth:`jobconf()` and :py:meth:`partitioner()` for more about
-    #: how this works.
-    #:
-    #: .. versionadded:: 0.4.1
     SORT_VALUES = None
 
     def sort_values(self):

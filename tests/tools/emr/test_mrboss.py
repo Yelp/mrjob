@@ -75,7 +75,7 @@ class MRBossTestCase(MockBotoTestCase):
         self.add_slave()
         self.ssh_worker_hosts.return_value = ['testslave0']
 
-        self.runner._opts['num_ec2_instances'] = 2
+        self.runner._opts['num_core_instances'] = 1
 
         mock_ssh_file('testmaster', 'some_file', b'file contents 1')
         mock_ssh_file('testmaster!testslave0', 'some_file', b'file contents 2')

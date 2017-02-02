@@ -1,4 +1,5 @@
-# Copyright 2016 Yelp
+# -*- coding: utf-8 -*-
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,19 +12,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""create_job_flow has been renamed to create_cluster; this is just
-a stub that runs create_cluster with a deprecation warning."""
-from __future__ import print_function
-from sys import stderr
+"""Job that sets the partitioner."""
 
-from .create_cluster import main as real_main
+from mrjob.job import MRJob
 
 
-def main(args=None):
-    print('create-job-flow is a deprecated alias for create-cluster'
-          ' and will be removed in v0.6.0', file=stderr)
-    real_main(args)
+class MRPartitioner(MRJob):
+
+    PARTITIONER = 'org.apache.hadoop.mapred.lib.HashPartitioner'
+
+    def mapper(self, key, value):
+        pass
 
 
 if __name__ == '__main__':
-    main()
+    MRPartitioner.run()

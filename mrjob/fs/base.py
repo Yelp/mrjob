@@ -97,24 +97,6 @@ class Filesystem(object):
         """
         raise NotImplementedError
 
-    def path_exists(self, path_glob):
-        """Alias for :py:meth:`exists`. Going away in v0.6.0
-
-        .. deprecated: 0.5.0
-        """
-        log.warning('path_exists() has been renamed to exists(). This'
-                    ' alias will be removed in v0.6.0')
-        return self.exists(path_glob)
-
-    def path_join(self, dirname, filename):
-        """Alias for :py:meth:`join`. Going away in v0.6.0
-
-        .. deprecated: 0.5.0
-        """
-        log.warning('path_join() has been renamed to join(). This'
-                    ' alias will be removed in v0.6.0')
-        return self.join(dirname, filename)
-
     def rm(self, path_glob):
         """Recursively delete the given file/directory, if it exists
 

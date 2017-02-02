@@ -7,6 +7,10 @@ v0.6.0, 2017-03-?? -- ???
    * create-job-flow
    * terminate-idle-job-flows
    * terminate-job-flow
+ * removed deprecated MRJob methods:
+   * all_option_groups()
+   * mr()
+ * removed option groups from MRJobLauncher
  * removed deprecated options:
    * bootstrap_cmds
    * bootstrap_files

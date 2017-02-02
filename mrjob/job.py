@@ -825,9 +825,6 @@ class MRJob(MRJobLauncher):
 
         _add_step_options(self._mux_opt_group)
 
-    def all_option_groups(self):
-        return super(MRJob, self).all_option_groups() + (self._mux_opt_group,)
-
     def is_task(self):
         """True if this is a mapper, combiner, reducer, or Spark script.
 

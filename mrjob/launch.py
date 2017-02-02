@@ -265,91 +265,9 @@ class MRJobLauncher(object):
             default=False,
             help='include help for deprecated options')
 
-        # options for running the job (any runner)
-        self._runner_opt_group = OptionGroup(
-            self.option_parser, 'Running the entire job')
-        self.option_parser.add_option_group(self._runner_opt_group)
-
-        _add_basic_options(self._runner_opt_group)
-        _add_job_options(self._runner_opt_group)
-        _add_runner_options(self._runner_opt_group, _pick_runner_opts('base'))
-
-        # options for inline/local runners
-        self._local_opt_group = OptionGroup(
-            self.option_parser,
-            'Running locally (these apply when you set -r inline or -r local)')
-        self.option_parser.add_option_group(self._local_opt_group)
-
-        _add_runner_options(
-            self._local_opt_group,
-            _pick_runner_opts('local') - _pick_runner_opts('base'))
-
-        # options common to Hadoop and EMR
-        self._hadoop_emr_opt_group = OptionGroup(
-            self.option_parser,
-            'Running on Hadoop or EMR (these apply when you set -r hadoop or'
-            ' -r emr)')
-        self.option_parser.add_option_group(self._hadoop_emr_opt_group)
-
-        _add_runner_options(
-            self._hadoop_emr_opt_group,
-            ((_pick_runner_opts('emr') & _pick_runner_opts('hadoop')) -
-             _pick_runner_opts('base')))
-
-        # options for running the job on Hadoop
-        self._hadoop_opt_group = OptionGroup(
-            self.option_parser,
-            'Running on Hadoop (these apply when you set -r hadoop)')
-        self.option_parser.add_option_group(self._hadoop_opt_group)
-
-        _add_runner_options(
-            self._hadoop_opt_group,
-            (_pick_runner_opts('hadoop') -
-             _pick_runner_opts('emr') - _pick_runner_opts('base')))
-
-        # options for running the job on Dataproc or EMR
-        self._dataproc_emr_opt_group = OptionGroup(
-            self.option_parser,
-            'Running on Dataproc or EMR (these apply when you set -r dataproc'
-            ' or -r emr)')
-        self.option_parser.add_option_group(self._dataproc_emr_opt_group)
-
-        _add_runner_options(
-            self._dataproc_emr_opt_group,
-            ((_pick_runner_opts('dataproc') & _pick_runner_opts('emr')) -
-             _pick_runner_opts('base')))
-
-        # options for running the job on Dataproc
-        self._dataproc_opt_group = OptionGroup(
-            self.option_parser,
-            'Running on Dataproc (these apply when you set -r dataproc)')
-        self.option_parser.add_option_group(self._dataproc_opt_group)
-
-        _add_runner_options(
-            self._dataproc_opt_group,
-            (_pick_runner_opts('dataproc') -
-             _pick_runner_opts('emr') - _pick_runner_opts('base')))
-
-        # options for running the job on EMR
-        self._emr_opt_group = OptionGroup(
-            self.option_parser,
-            'Running on EMR (these apply when you set -r emr)')
-        self.option_parser.add_option_group(self._emr_opt_group)
-
-        _add_runner_options(
-            self._emr_opt_group,
-            (_pick_runner_opts('emr') - _pick_runner_opts('hadoop') -
-             _pick_runner_opts('dataproc') - _pick_runner_opts('base')))
-
-    def all_option_groups(self):
-        log.warning('all_option_groups() is deprecated and will be removed'
-                    ' in v0.6.0')
-
-        return (self.option_parser, self._proto_opt_group,
-                self._runner_opt_group, self._hadoop_opt_group,
-                self._dataproc_emr_opt_group, self._hadoop_emr_opt_group,
-                self._dataproc_opt_group, self._emr_opt_group,
-                self._local_opt_group)
+        _add_basic_options(self.option_parser)
+        _add_job_options(self.option_parser)
+        _add_runner_options(self.option_parser, _pick_runner_opts())
 
     def is_task(self):
         """True if this is a mapper, combiner, or reducer.
@@ -724,14 +642,6 @@ class MRJobLauncher(object):
         self.stderr = stderr or BytesIO()
 
         return self
-
-    def __getattr__(self, name):
-        if name.startswith('_') and name.endswith('_opt_group'):
-            log.warning('The %s attribute is deprecated and will be removed'
-                        ' in v0.6.0' % name)
-            return getattr(self, name[1:])
-        else:
-            raise AttributeError(name)
 
 
 def _dests(opt_group):

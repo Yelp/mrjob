@@ -449,24 +449,3 @@ class JobRunnerKwargsTestCase(TestCase):
 
     def test_local(self):
         self._test_job_runner_kwargs(LocalMRJobRunner)
-
-    # not sure this test is valid
-    def _test_options_appear_in_single_opt_group(self):
-        launcher = MRJobLauncher(args=['/path/to/script'])
-
-        dest_to_groups = defaultdict(set)
-
-        for name, group in launcher.__dict__.items():
-            if not name.endswith('_opt_group'):
-                continue
-
-            for option in group.option_list:
-                dest_to_groups[option.dest].add(name)
-
-        dest_to_multiple_groups = dict(
-            (dest, groups) for dest, groups in dest_to_groups.items()
-            if len(groups) > 1)
-
-        self.assertEqual(dest_to_multiple_groups, {})
-
-    maxDiff = None

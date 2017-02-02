@@ -1064,15 +1064,12 @@ class MRJob(MRJobLauncher):
         """Optional Hadoop partitioner class to use to determine how mapper
         output should be sorted and distributed to reducers.
 
-        By default, returns whatever is passed to :option:`--partitioner`,
-        or if that option isn't used, :py:attr:`PARTITIONER`, or if that
-        isn't set, and :py:attr:`SORT_VALUES` is true, it's set to
-        ``'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'``.
+        By default, returns :py:attr:`PARTITIONER`.
 
         You probably don't need to re-define this; it's just here for
         completeness.
         """
-        return self.options.partitioner or self.PARTITIONER
+        return self.PARTITIONER
 
     ### Jobconf ###
 

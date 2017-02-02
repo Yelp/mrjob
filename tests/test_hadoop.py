@@ -1302,8 +1302,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
             ['-r', self.RUNNER,
              '--cmdenv', 'FOO=bar',
              '--hadoop-arg', '-libjar', '--hadoop-arg', 'qux.jar',
-             '--jobconf', 'baz=qux',
-             '--partitioner', 'java.lang.Object'])
+             '--jobconf', 'baz=qux'])
         job.HADOOP_INPUT_FORMAT = 'FooInputFormat'
         job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'
 
@@ -1312,7 +1311,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
             self.assertEqual(
                 hadoop_args[:4],
                 ['-D', 'baz=qux', '-libjar', 'qux.jar'])
-            self.assertEqual(len(hadoop_args), 12)
+            self.assertEqual(len(hadoop_args), 10)
 
 
 class LibjarsTestCase(MockHadoopTestCase):

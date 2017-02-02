@@ -767,32 +767,12 @@ class PartitionerTestCase(TestCase):
 
         self.assertEqual(mr_job.job_runner_kwargs()['partitioner'], None)
 
-    def test_cmd_line_options(self):
-        mr_job = MRJob([
-            '--partitioner', 'java.lang.Object',
-            '--partitioner', 'org.apache.hadoop.mapreduce.Partitioner'
-        ])
-
-        # second option takes priority
-        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
-                         'org.apache.hadoop.mapreduce.Partitioner')
-
     def test_partitioner_attr(self):
         mr_job = self.MRPartitionerJob()
 
         self.assertEqual(
             mr_job.job_runner_kwargs()['partitioner'],
             'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
-
-    def test_partitioner_attr_and_cmd_line_options(self):
-        mr_job = self.MRPartitionerJob([
-            '--partitioner', 'java.lang.Object',
-            '--partitioner', 'org.apache.hadoop.mapreduce.Partitioner'
-        ])
-
-        # command line takes priority
-        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'],
-                         'org.apache.hadoop.mapreduce.Partitioner')
 
 
 class IsTaskTestCase(TestCase):
@@ -1224,7 +1204,9 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--s3-endpoint', output)
 
         # deprecated options
-        self.assertNotIn('--partitioner', output)
+
+        # currently there are no deprecated options to test against
+        #self.assertNotIn('--partitioner', output)
         self.assertIn('add --deprecated', output)
         self.assertNotIn('--deprecated=DEPRECATED', output)
 
@@ -1241,7 +1223,9 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--s3-endpoint', output)
 
         # deprecated options
-        self.assertIn('--partitioner', output)
+
+        # currently there are no deprecated options to test against
+        #self.assertIn('--partitioner', output)
         self.assertNotIn('add --deprecated', output)
         self.assertIn('--deprecated=DEPRECATED', output)
 

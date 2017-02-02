@@ -208,10 +208,9 @@ _STEP_OPTS = dict(
     ),
 )
 
-# don't show this unless someone types --help --deprecated
+# don't show these unless someone types --help --deprecated
 _DEPRECATED_NON_RUNNER_OPTS = set([
     'deprecated',
-    'partitioner',
 ])
 
 
@@ -1329,11 +1328,6 @@ def _add_job_options(opt_group):
         help='Where to put final job output. This must be an s3:// URL ' +
         'for EMR, an HDFS path for Hadoop, and a system path for local,' +
         'and must be empty')
-
-    opt_group.add_option(
-        '--partitioner', dest='partitioner', default=None,
-        help=('Hadoop partitioner class. Deprecated as of v0.5.1 and'
-              ' will be removed in v0.6.0 (specify in your job instead)'))
 
     opt_group.add_option(
         '-r', '--runner', dest='runner', default=None,

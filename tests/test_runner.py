@@ -51,6 +51,7 @@ from tests.mockboto import MockBotoTestCase
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
+from tests.mr_partitioner import MRPartitioner
 from tests.mr_sort_values import MRSortValues
 from tests.mr_sort_values_and_more import MRSortValuesAndMore
 from tests.mr_spark_jar import MRSparkJar
@@ -558,11 +559,14 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
 
     def test_partitioner(self):
         partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
-        job = MRWordCount(['--partitioner', partitioner])
+        job = MRPartitioner([])
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0),
-                             ['-partitioner', partitioner])
+            self.assertEqual(
+                runner._hadoop_args_for_step(0),
+                ['-partitioner',
+                 'org.apache.hadoop.mapred.lib.HashPartitioner']
+            )
 
 
 class ArgsForSparkStepTestCase(SandboxedTestCase):
@@ -1974,17 +1978,3 @@ class SortValuesTestCase(SandboxedTestCase):
             self.assertEqual(
                 hadoop_args[hadoop_args.index('-partitioner') + 1],
                 'org.apache.hadoop.mapred.lib.HashPartitioner')
-
-    def test_cmd_line_can_override_partitioner(self):
-        # the --partitioner option is deprecated
-        mr_job = MRSortValues(['--partitioner', 'FooPartitioner'])
-        mr_job.sandbox()
-
-        self.assertTrue(mr_job.sort_values())
-
-        with mr_job.make_runner() as runner:
-            hadoop_args = runner._hadoop_args_for_step(0)
-            self.assertIn('-partitioner', hadoop_args)
-            self.assertEqual(
-                hadoop_args[hadoop_args.index('-partitioner') + 1],
-                'FooPartitioner')

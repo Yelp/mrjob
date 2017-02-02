@@ -4926,17 +4926,6 @@ class PartitionerTestCase(MockBotoTestCase):
                     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner',
                 ])
 
-    def test_switch_overrides_sort_values(self):
-        job = MRSortValues(['-r', 'emr', '--partitioner', 'java.lang.Object'])
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._hadoop_args_for_step(0), [
-                    '-D', 'mapred.text.key.partitioner.options=-k1,1',
-                    '-D', 'stream.num.map.output.key.fields=2',
-                    '-partitioner', 'java.lang.Object',
-                ])
-
 
 class EMRApplicationsTestCase(MockBotoTestCase):
 

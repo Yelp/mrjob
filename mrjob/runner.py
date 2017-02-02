@@ -620,15 +620,6 @@ class MRJobRunner(object):
         """
         return self._job_key
 
-    def get_job_name(self):
-        """Alias for :py:meth:`get_job_key`. Will be removed in v0.6.0.
-
-        .. deprecated:: 0.5.0
-        """
-        log.warning('get_job_name() has been renamed to get_job_key().'
-                    ' get_job_name() will be removed in v0.6.0')
-        return self.get_job_key()
-
     def get_output_dir(self):
         """Find the directory containing the job output. If the job hasn't
         run yet, returns None"""

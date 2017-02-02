@@ -65,6 +65,7 @@ v0.6.0, 2017-03-?? -- ???
    * s3_upload_part_size
    * ssh_tunnel_to_job_tracker
  * removed deprecated runner methods:
+   * get_job_name()
    * EMRJobRunner:
      * get_ami_version()
      * get_emr_job_flow_id()

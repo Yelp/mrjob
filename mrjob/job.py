@@ -327,8 +327,8 @@ class MRJob(MRJobLauncher):
                                reducer=self.consolidate_2)]
 
         :return: a list of steps constructed with
-        :py:class:`~mrjob.step.MRStep` or other classes in
-        :py:mod:`mrjob.step`.
+                 :py:class:`~mrjob.step.MRStep` or other classes in
+                 :py:mod:`mrjob.step`.
         """
         # only include methods that have been redefined
         kwargs = dict(

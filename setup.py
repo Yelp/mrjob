@@ -26,6 +26,7 @@ try:
         },
         'install_requires': [
             'boto>=2.35.0',
+            'boto3>=1.4.4',
             'filechunkio',
             #'google-api-python-client>=1.5.0'  # see below
             'PyYAML>=3.08',

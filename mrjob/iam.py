@@ -84,46 +84,6 @@ _FALLBACK_INSTANCE_PROFILE = 'EMR_EC2_DefaultRole'
 log = getLogger(__name__)
 
 
-# Utilities for all API calls
-
-def _unquote_json(quoted_json_document):
-    """URI-decode and then JSON-decode the given document."""
-    json_document = unquote(quoted_json_document)
-    return json.loads(json_document)
-
-
-def _unwrap_response(resp):
-    """Get the actual result from an IAM API response."""
-    for resp_key, resp_data in resp.items():
-        if resp_key.endswith('_response'):
-            for result_key, result in resp_data.items():
-                if result_key.endswith('_result'):
-                    return result
-
-            return {}  # PutRolePolicy has no response, for example
-
-    raise ValueError(resp)
-
-
-def _repeat(api_call, *args, **kwargs):
-    """Make the same API call repeatedly until we've seen every page
-    of the response (sets *marker* automatically).
-
-    Yields one or more unwrapped responses.
-    """
-    marker = None
-
-    while True:
-        raw_resp =api_call(*args, marker=marker, **kwargs)
-        resp = _unwrap_response(raw_resp)
-        yield resp
-
-        # go to next page, if any
-        marker = resp.get('marker')
-        if not marker:
-            return
-
-
 # Auto-created roles/profiles
 
 def get_or_create_mrjob_service_role(client):
@@ -176,35 +136,6 @@ def get_or_create_mrjob_instance_profile(client):
     return name
 
 
-def _yield_roles(conn):
-    """Yield (role_name, role_document)."""
-    for resp in _repeat(conn.list_roles):
-        for role_data in resp['roles']:
-            yield _get_role_name_and_document(role_data)
-
-
-def _yield_instance_profiles(conn):
-    """Yield (profile_name, role_name, role_document).
-
-    role_name and role_document are None for empty instance profiles
-    """
-    for resp in _repeat(conn.list_instance_profiles):
-        for profile_data in resp['instance_profiles']:
-            profile_name = profile_data['instance_profile_name']
-
-            if profile_data['roles']:
-                # doesn't look like boto can handle two list markers, hence
-                # the extra "member" layer
-                role_data = profile_data['roles']['member']
-                role_name, role_document = _get_role_name_and_document(
-                    role_data)
-            else:
-                role_name = None
-                role_document = None
-
-            yield (profile_name, role_name, role_document)
-
-
 def _yield_attached_role_policies(client, role_name):
     """Yield the ARNs for policies attached to the given role."""
     # allowing for multiple responses might be overkill, as currently
@@ -213,13 +144,6 @@ def _yield_attached_role_policies(client, role_name):
     for page in paginator.paginate(RoleName=role_name):
         for policy_data in page['AttachedPolicies']:
             yield policy_data['PolicyArn']
-
-
-def _get_role_name_and_document(role_data):
-    role_name = role_data['role_name']
-    role_document = _unquote_json(role_data['assume_role_policy_document'])
-
-    return (role_name, role_document)
 
 
 def _role_matches(client, role, role_document, policy_arn):
@@ -253,15 +177,3 @@ def _create_mrjob_role_with_attached_policy(client, role_document, policy_arn):
                               RoleName=role_name)
 
     return role_name
-
-
-# methods which should eventually be added to boto's IAMConnection
-
-def _list_attached_role_policies(conn, role_name, marker=None, max_items=None):
-    params = {'RoleName': role_name}
-    if marker is not None:
-        params['Marker'] = marker
-    if max_items is not None:
-        params['MaxItems'] = max_items
-    return conn.get_response('ListAttachedRolePolicies', params,
-                             list_marker='AttachedPolicies')

@@ -92,7 +92,7 @@ def get_or_create_mrjob_service_role(client):
 
     # look for matching role. Must have same policy document
     # and attached role policy
-    for role_page in client.get_paginator('list_instance_profiles').paginate():
+    for role_page in client.get_paginator('list_roles').paginate():
         for role in role_page['Roles']:
             if _role_matches(client, role, _MRJOB_SERVICE_ROLE,
                              _EMR_SERVICE_ROLE_POLICY_ARN):
@@ -136,16 +136,6 @@ def get_or_create_mrjob_instance_profile(client):
     return name
 
 
-def _yield_attached_role_policies(client, role_name):
-    """Yield the ARNs for policies attached to the given role."""
-    # allowing for multiple responses might be overkill, as currently
-    # (2015-05-29) only two policies are allowed per role.
-    paginator = client.get_paginator('list_attached_role_policies')
-    for page in paginator.paginate(RoleName=role_name):
-        for policy_data in page['AttachedPolicies']:
-            yield policy_data['PolicyArn']
-
-
 def _role_matches(client, role, role_document, policy_arn):
     """Does the given role data structure have the given policy document
     and the given policy ARN attached?
@@ -156,9 +146,11 @@ def _role_matches(client, role, role_document, policy_arn):
     if role['AssumeRolePolicyDocument'] != role_document:
         return False
 
-    policy_arns = list(
-        _yield_attached_role_policies(client, role['RoleName']))
-    return policy_arns == [policy_arn]
+    # not bothering to paginate these because we're only checking for
+    # a single one. As of 2015-05-29, the max allowed was two anyway.
+    policy_resp = client.list_attached_role_policies(RoleName=role['RoleName'])
+    policies = policy_resp['AttachedPolicies']
+    return len(policies) == 1 and policies[0]['PolicyArn'] == policy_arn
 
 
 def _create_mrjob_role_with_attached_policy(client, role_document, policy_arn):

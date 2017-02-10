@@ -131,17 +131,12 @@ def get_or_create_mrjob_service_role(client):
     create one. Either way, return that role's name."""
 
     # look for matching role. Must have same policy document
-    # and attached role policies
-    for role_page in client.get_paginator('list_roles').paginate():
+    # and attached role policy
+    for role_page in client.get_paginator('list_instance_profiles').paginate():
         for role in role_page['Roles']:
-            if role['AssumeRolePolicyDocument'] != _MRJOB_SERVICE_ROLE:
-                continue
-
-            role_name = role['RoleName']
-            policy_arns = list(
-                _yield_attached_role_policies(client, role_name))
-            if policy_arns == [_EMR_SERVICE_ROLE_POLICY_ARN]:
-                return role_name
+            if _role_matches(client, role, _MRJOB_SERVICE_ROLE,
+                             _EMR_SERVICE_ROLE_POLICY_ARN):
+                return role['RoleName']
 
     # no matches, create it ourselves
     role_name = _create_mrjob_role_with_attached_policy(
@@ -152,25 +147,29 @@ def get_or_create_mrjob_service_role(client):
     return role_name
 
 
-def get_or_create_mrjob_instance_profile(conn):
+def get_or_create_mrjob_instance_profile(client):
     """Look for a usable instance profile for EMR, and if there is none,
     create one."""
-    for profile_name, role_name, role_document in (
-            _yield_instance_profiles(conn)):
+    # look for matching instance profile. Must point to a role with
+    # the right policy document and attached role policy
+    profile_paginator = client.get_paginator('list_instance_profiles')
+    for profile_page in profile_paginator.paginate():
+        for profile in profile_page['InstanceProfiles']:
+            roles = profile['Roles']
+            if len(roles) != 1:
+                continue
+            if _role_matches(client, roles[0], _MRJOB_INSTANCE_PROFILE_ROLE,
+                             _EMR_INSTANCE_PROFILE_POLICY_ARN):
+                return profile['InstanceProfileName']
 
-        if role_document != _MRJOB_INSTANCE_PROFILE_ROLE:
-            continue
-
-        policy_arns = list(_yield_attached_role_policies(conn, role_name))
-        if policy_arns == [_EMR_INSTANCE_PROFILE_POLICY_ARN]:
-            return role_name
-
+    # create a new role, and wrap it in an instance profile
+    # with the same name
     name = _create_mrjob_role_with_attached_policy(
-        conn, _MRJOB_INSTANCE_PROFILE_ROLE, _EMR_INSTANCE_PROFILE_POLICY_ARN)
+        client, _MRJOB_INSTANCE_PROFILE_ROLE, _EMR_INSTANCE_PROFILE_POLICY_ARN)
 
-    # create an instance profile with the same name as the role
-    conn.create_instance_profile(name)
-    conn.add_role_to_instance_profile(name, name)
+    client.create_instance_profile(InstanceProfileName=name)
+    client.add_role_to_instance_profile(InstanceProfileName=name,
+                                        RoleName=name)
 
     log.info('Auto-created instance profile %s' % name)
 
@@ -223,7 +222,28 @@ def _get_role_name_and_document(role_data):
     return (role_name, role_document)
 
 
+def _role_matches(client, role, role_document, policy_arn):
+    """Does the given role data structure have the given policy document
+    and the given policy ARN attached?
+
+    (Roles can have up to two policy ARNs attached, but we don't need this
+    functionality.)
+    """
+    if role['AssumeRolePolicyDocument'] != role_document:
+        return False
+
+    policy_arns = list(
+        _yield_attached_role_policies(client, role['RoleName']))
+    return policy_arns == [policy_arn]
+
+
 def _create_mrjob_role_with_attached_policy(client, role_document, policy_arn):
+    """Create a new role with a random name starting with ``mrjob-`` that
+    has the given policy document and the given policy ARN attached.
+
+    (Roles can have up to two policy ARNs attached, but we don't need this
+    functionality.)
+    """
     # create role
     role_name = 'mrjob-' + random_identifier()
 

@@ -114,7 +114,7 @@ def _repeat(api_call, *args, **kwargs):
     marker = None
 
     while True:
-        raw_resp = api_call(*args, marker=marker, **kwargs)
+        raw_resp =api_call(*args, marker=marker, **kwargs)
         resp = _unwrap_response(raw_resp)
         yield resp
 
@@ -126,24 +126,30 @@ def _repeat(api_call, *args, **kwargs):
 
 # Auto-created roles/profiles
 
-def get_or_create_mrjob_service_role(conn):
+def get_or_create_mrjob_service_role(client):
     """Look for a usable service role for EMR, and if there is none,
-    create one."""
+    create one. Either way, return that role's name."""
 
-    for role_name, role_document in _yield_roles(conn):
-        if role_document != _MRJOB_SERVICE_ROLE:
-            continue
+    # look for matching role. Must have same policy document
+    # and attached role policies
+    for role_page in client.get_paginator('list_roles').paginate():
+        for role in role_page['Roles']:
+            if role['AssumeRolePolicyDocument'] != _MRJOB_SERVICE_ROLE:
+                continue
 
-        policy_arns = list(_yield_attached_role_policies(conn, role_name))
-        if policy_arns == [_EMR_SERVICE_ROLE_POLICY_ARN]:
-            return role_name
+            role_name = role['RoleName']
+            policy_arns = list(
+                _yield_attached_role_policies(client, role_name))
+            if policy_arns == [_EMR_SERVICE_ROLE_POLICY_ARN]:
+                return role_name
 
-    name = _create_mrjob_role_with_attached_policy(
-        conn, _MRJOB_SERVICE_ROLE, _EMR_SERVICE_ROLE_POLICY_ARN)
+    # no matches, create it ourselves
+    role_name = _create_mrjob_role_with_attached_policy(
+        client, _MRJOB_SERVICE_ROLE, _EMR_SERVICE_ROLE_POLICY_ARN)
 
-    log.info('Auto-created service role %s' % name)
+    log.info('Auto-created service role %s' % role_name)
 
-    return name
+    return role_name
 
 
 def get_or_create_mrjob_instance_profile(conn):
@@ -200,13 +206,14 @@ def _yield_instance_profiles(conn):
             yield (profile_name, role_name, role_document)
 
 
-def _yield_attached_role_policies(conn, role_name):
+def _yield_attached_role_policies(client, role_name):
     """Yield the ARNs for policies attached to the given role."""
     # allowing for multiple responses might be overkill, as currently
     # (2015-05-29) only two policies are allowed per role.
-    for resp in _repeat(_list_attached_role_policies, conn, role_name):
-        for policy_data in resp['attached_policies']:
-            yield policy_data['policy_arn']
+    paginator = client.get_paginator('list_attached_role_policies')
+    for page in paginator.paginate(RoleName=role_name):
+        for policy_data in page['AttachedPolicies']:
+            yield policy_data['PolicyArn']
 
 
 def _get_role_name_and_document(role_data):
@@ -216,12 +223,14 @@ def _get_role_name_and_document(role_data):
     return (role_name, role_document)
 
 
-def _create_mrjob_role_with_attached_policy(conn, role_document, policy_arn):
+def _create_mrjob_role_with_attached_policy(client, role_document, policy_arn):
     # create role
     role_name = 'mrjob-' + random_identifier()
 
-    conn.create_role(role_name, json.dumps(role_document))
-    _attach_role_policy(conn, role_name, policy_arn)
+    client.create_role(AssumeRolePolicyDocument=json.dumps(role_document),
+                       RoleName=role_name)
+    client.attach_role_policy(PolicyArn=policy_arn,
+                              RoleName=role_name)
 
     return role_name
 
@@ -236,10 +245,3 @@ def _list_attached_role_policies(conn, role_name, marker=None, max_items=None):
         params['MaxItems'] = max_items
     return conn.get_response('ListAttachedRolePolicies', params,
                              list_marker='AttachedPolicies')
-
-
-def _attach_role_policy(conn, role_name, policy_arn):
-    params = {'PolicyArn': policy_arn,
-              'RoleName': role_name}
-
-    return conn.get_response('AttachRolePolicy', params)

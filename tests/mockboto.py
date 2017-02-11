@@ -1563,6 +1563,9 @@ class MockIAMClient(object):
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
+        # so we can easily check this
+        self.endpoint_url = endpoint_url
+
     def get_paginator(self, operation_name):
         return MockPaginator(
             getattr(self, operation_name),

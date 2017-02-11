@@ -4289,27 +4289,32 @@ class EMRTagsTestCase(MockBotoTestCase):
         ])
 
 
+# this isn't actually enough to support GovCloud; see:
+# http://docs.aws.amazon.com/govcloud-us/latest/UserGuide/using-govcloud-arns.html
 class IAMEndpointTestCase(MockBotoTestCase):
 
     def test_default(self):
         runner = EMRJobRunner()
 
-        iam_conn = runner.make_iam_conn()
-        self.assertEqual(iam_conn.host, 'iam.amazonaws.com')
+        iam_client = runner.make_iam_client()
+        self.assertEqual(iam_client.endpoint_url, 'https://iam.amazonaws.com')
 
     def test_explicit_iam_endpoint(self):
-        runner = EMRJobRunner(iam_endpoint='iam.us-gov.amazonaws.com')
+        runner = EMRJobRunner(iam_endpoint='https://iam.us-gov.amazonaws.com')
 
-        iam_conn = runner.make_iam_conn()
-        self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')
+        iam_client = runner.make_iam_client()
+        self.assertEqual(iam_client.endpoint_url,
+                         'https://iam.us-gov.amazonaws.com')
 
     def test_iam_endpoint_option(self):
+        # also test hostname without scheme
         mr_job = MRJob(
             ['-r', 'emr', '--iam-endpoint', 'iam.us-gov.amazonaws.com'])
 
         with mr_job.make_runner() as runner:
-            iam_conn = runner.make_iam_conn()
-            self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')
+            iam_client = runner.make_iam_client()
+            self.assertEqual(iam_client.endpoint_url,
+                             'https://iam.us-gov.amazonaws.com')
 
 
 class SetupLineEncodingTestCase(MockBotoTestCase):

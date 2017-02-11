@@ -17,12 +17,17 @@ This is by no means a complete mock of boto, just what we need for tests.
 """
 import hashlib
 import itertools
+import json
 import os
 import shutil
 import tempfile
 import time
 from datetime import datetime
 from io import BytesIO
+
+import boto3
+from botocore.exceptions import ClientError
+
 
 try:
     import boto.emr.connection
@@ -34,8 +39,10 @@ try:
 except ImportError:
     boto = None
 
+
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
+from mrjob.conf import combine_dicts
 from mrjob.conf import combine_values
 from mrjob.emr import _EMR_LOG_DIR
 from mrjob.emr import EMRJobRunner
@@ -168,8 +175,9 @@ class MockBotoTestCase(SandboxedTestCase):
         self.emr_conn_iterator = itertools.repeat(
             None, self.MAX_EMR_CONNECTIONS)
 
+        self.start(patch.object(boto3, 'client', self.client))
+
         self.start(patch.object(boto, 'connect_s3', self.connect_s3))
-        self.start(patch.object(boto, 'connect_iam', self.connect_iam))
         self.start(patch.object(
             boto.emr.connection, 'EmrConnection', self.connect_emr))
 
@@ -300,12 +308,17 @@ class MockBotoTestCase(SandboxedTestCase):
         kwargs['mock_emr_output'] = self.mock_emr_output
         return MockEmrConnection(*args, **kwargs)
 
-    def connect_iam(self, *args, **kwargs):
-        kwargs['mock_iam_instance_profiles'] = self.mock_iam_instance_profiles
-        kwargs['mock_iam_roles'] = self.mock_iam_roles
-        kwargs['mock_iam_role_attached_policies'] = (
-            self.mock_iam_role_attached_policies)
-        return MockIAMConnection(*args, **kwargs)
+    # mock boto3.client()
+    def client(self, service_name, **kwargs):
+        if service_name == 'iam':
+            kwargs['mock_iam_instance_profiles'] = (
+                self.mock_iam_instance_profiles)
+            kwargs['mock_iam_roles'] = self.mock_iam_roles
+            kwargs['mock_iam_role_attached_policies'] = (
+                self.mock_iam_role_attached_policies)
+            return MockIAMClient(**kwargs)
+        else:
+            raise ValueError
 
 
 ### S3 ###
@@ -1485,17 +1498,44 @@ class MockEmrObject(object):
                       for k, v in sorted(self.__dict__.items()))))
 
 
-class MockIAMConnection(object):
+class MockPaginator(object):
+    """Mock botocore paginators.
+
+    Rather than mocking pagination, markers, etc. in every mock API call,
+    we have our API calls return the full results, and make our paginators
+    break them into pages.
+    """
+    def __init__(self, method, result_key, page_size):
+        self.result_key = result_key
+        self.method = method
+        self.page_size = page_size
+
+    def paginate(self, **kwargs):
+        result = self.method(**kwargs)
+
+        values = result[self.result_key]
+
+        for page_start in range(0, len(values), self.page_size):
+            page = values[page_start:page_start + self.page_size]
+            yield combine_dicts(result, {self.result_key: page})
+
+
+class MockIAMClient(object):
 
     DEFAULT_PATH = '/'
 
     DEFAULT_MAX_ITEMS = 100
 
-    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
-                 is_secure=True, port=None, proxy=None, proxy_port=None,
-                 proxy_user=None, proxy_pass=None, host='iam.amazonaws.com',
-                 debug=0, https_connection_factory=None, path='/',
-                 security_token=None, validate_certs=True, profile_name=None,
+    OPERATION_NAME_TO_RESULT_KEY = dict(
+        list_attached_role_policies='AttachedPolicies',
+        list_instance_profiles='InstanceProfiles',
+        list_roles='Roles',
+    )
+
+    def __init__(self, region_name=None, api_version=None,
+                 use_ssl=True, verify=None, endpoint_url=None,
+                 aws_access_key_id=None, aws_secret_access_key=None,
+                 aws_session_token=None, config=None,
                  mock_iam_instance_profiles=None, mock_iam_roles=None,
                  mock_iam_role_attached_policies=None):
         """Mock out connection to IAM.
@@ -1516,255 +1556,153 @@ class MockIAMConnection(object):
         We don't track which managed policies exist or what their contents are.
         We also don't support role IDs.
         """
+        # if not passed dictionaries for these mock values, create our own
         self.mock_iam_instance_profiles = combine_values(
             {}, mock_iam_instance_profiles)
         self.mock_iam_roles = combine_values({}, mock_iam_roles)
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
-        self.host = host
+        # so we can easily check this
+        self.endpoint_url = endpoint_url
 
-    def get_response(self, action, params, path='/', parent=None,
-                     verb='POST', list_marker='Set'):
-        # this only supports actions for which there is no method
-        # in boto's IAMConnection
-
-        if action == 'AttachRolePolicy':
-            return self._attach_role_policy(params['RoleName'],
-                                            params['PolicyArn'])
-
-        elif action == 'ListAttachedRolePolicies':
-            if list_marker != 'AttachedPolicies':
-                raise ValueError
-
-            return self._list_attached_role_policies(params['RoleName'])
-
-        else:
-            raise NotImplementedError(
-                'mockboto does not implement the %s API call' % action)
-
-    # instance profiles
-
-    def add_role_to_instance_profile(self, instance_profile_name, role_name):
-        self._check_instance_profile_exists(instance_profile_name)
-
-        profile_data = self.mock_iam_instance_profiles[instance_profile_name]
-
-        if profile_data['role_name'] is not None:
-            raise boto.exception.BotoServerError(
-                409, 'Conflict', boto=err_xml(
-                    ('Cannot exceed quota for'
-                     ' InstanceSessionsPerInstanceProfile: 1'),
-                    code='LimitExceeded'))
-
-        self._check_role_exists(role_name)
-
-        profile_data['role_name'] = role_name
-
-        # response is empty
-        return self._wrap_result('add_role_to_instance_profile')
-
-    def create_instance_profile(self, instance_profile_name, path=None):
-        self._check_path(path)
-        self._check_instance_profile_does_not_exist(instance_profile_name)
-
-        self.mock_iam_instance_profiles[instance_profile_name] = dict(
-            create_date=to_iso8601(datetime.utcnow()),
-            path=(path or self.DEFAULT_PATH),
-            role_name=None,
-        )
-
-        return self._wrap_result(
-            'create_instance_profile',
-            {'instance_profile': self._describe_instance_profile(
-                instance_profile_name)})
-
-    def list_instance_profiles(self, path_prefix=None, marker=None,
-                               max_items=None):
-
-        self._check_path(path_prefix, field_name='pathPrefix')
-        path_prefix = path_prefix or '/'
-
-        profile_names = sorted(
-            name for name, data in self.mock_iam_instance_profiles.items()
-            if data['path'].startswith(path_prefix))
-
-        profiles = [self._describe_instance_profile(profile_name)
-                    for profile_name in profile_names]
-
-        result = self._paginate(profiles, 'instance_profiles',
-                                marker=marker, max_items=max_items)
-
-        return self._wrap_result('list_instance_profiles', result)
-
-    def _check_instance_profile_exists(self, instance_profile_name):
-        if instance_profile_name not in self.mock_iam_instance_profiles:
-            raise boto.exception.BotoServerError(
-                404, 'Not Found', body=err_xml(
-                    ('Instance Profile %s cannot be found.' %
-                     instance_profile_name), code='NoSuchEntity'))
-
-    def _check_instance_profile_does_not_exist(self, instance_profile_name):
-        if instance_profile_name in self.mock_iam_instance_profiles:
-            raise boto.exception.BotoServerError(
-                409, 'Conflict', body=err_xml(
-                    ('Instance Profile %s already exists.' %
-                     instance_profile_name), code='EntityAlreadyExists'))
-
-    def _describe_instance_profile(self, instance_profile_name):
-        """Format the given instance profile for an API response."""
-        profile_data = self.mock_iam_instance_profiles[instance_profile_name]
-
-        if profile_data['role_name'] is None:
-            roles = {}
-        else:
-            roles = {'member': self._describe_role(profile_data['role_name'])}
-
-        return dict(
-            create_date=profile_data['create_date'],
-            instance_profile_name=instance_profile_name,
-            path=profile_data['path'],
-            roles=roles)
+    def get_paginator(self, operation_name):
+        return MockPaginator(
+            getattr(self, operation_name),
+            self.OPERATION_NAME_TO_RESULT_KEY[operation_name],
+            self.DEFAULT_MAX_ITEMS)
 
     # roles
 
-    def create_role(self, role_name, assume_role_policy_document, path=None):
-        # real boto has a default for assume_role_policy_document; not
-        # supporting this for now
-        self._check_path(path)
-        self._check_role_does_not_exist(role_name)
+    def create_role(self, AssumeRolePolicyDocument, RoleName):
+        # Path not supported
+        # mock RoleIds are all the same
 
-        # there's no validation of assume_role_policy_document; not entirely
-        # sure what the rules are
+        self._check_role_does_not_exist(RoleName, 'CreateRole')
 
-        self.mock_iam_roles[role_name] = dict(
-            assume_role_policy_document=assume_role_policy_document,
-            create_date=to_iso8601(datetime.utcnow()),
-            path=(path or self.DEFAULT_PATH),
-            policy_names=[],
+        role = dict(
+            Arn=('arn:aws:iam::012345678901:role/%s' % RoleName),
+            AssumeRolePolicyDocument=json.loads(AssumeRolePolicyDocument),
+            CreateDate=datetime.utcnow(),
+            Path='/',
+            RoleId='AROAMOCKMOCKMOCKMOCK',
+            RoleName=RoleName,
         )
+        self.mock_iam_roles[RoleName] = role
 
-        result = dict(role=self._describe_role(role_name))
+        return dict(Role=role)
 
-        return self._wrap_result('create_role', result)
+    def list_roles(self):
+        # PathPrefix not supported
 
-    def list_roles(self, path_prefix=None, marker=None, max_items=None):
-        self._check_path(path_prefix, field_name='pathPrefix')
-        path_prefix = path_prefix or '/'
+        roles = list(data for name, data in
+                     sorted(self.mock_iam_roles.items()))
 
-        # find all matching profiles
-        role_names = sorted(
-            name for name, data in self.mock_iam_roles.items()
-            if data['path'].startswith(path_prefix))
+        return dict(Roles=roles)
 
-        roles = [self._describe_role(role_name) for role_name in role_names]
+    def _check_role_does_not_exist(self, RoleName, OperationName):
+        if RoleName in self.mock_iam_roles:
+            raise ClientError(
+                dict(Error=dict(
+                    Code='EntityAlreadyExists',
+                    Message=('Role with name %s already exists' % RoleName))),
+                OperationName)
 
-        result = self._paginate(roles, 'roles',
-                                marker=marker, max_items=max_items)
+    def _check_role_exists(self, RoleName, OperationName):
+        if RoleName not in self.mock_iam_roles:
+            raise ClientError(
+                dict(Error=dict(
+                    Code='NoSuchEntity',
+                    Message=('Role not found for %s' % RoleName))),
+                OperationName)
 
-        return self._wrap_result('list_roles', result)
+    # attached role policies
 
-    def _check_role_exists(self, role_name):
-        if role_name not in self.mock_iam_roles:
-            raise boto.exception.BotoServerError(
-                404, 'Not Found', body=err_xml(
-                    ('The role with name %s cannot be found.' %
-                     role_name), code='NoSuchEntity'))
+    def attach_role_policy(self, PolicyArn, RoleName):
+        self._check_role_exists(RoleName, 'AttachRolePolicy')
 
-    def _check_role_does_not_exist(self, role_name):
-        if role_name in self.mock_iam_roles:
-            raise boto.exception.BotoServerError(
-                409, 'Conflict', body=err_xml(
-                    ('Role with name %s already exists.' %
-                     role_name), code='EntityAlreadyExists'))
+        arns = self.mock_iam_role_attached_policies.setdefault(RoleName, [])
+        if PolicyArn not in arns:
+            arns.append(PolicyArn)
 
-    def _describe_role(self, role_name):
-        """Format the given instance profile for an API response."""
-        role_data = self.mock_iam_roles[role_name]
+        return {}
 
-        # the IAM API doesn't include policy names when describing roles
+    def list_attached_role_policies(self, RoleName):
+        self._check_role_exists(RoleName, 'ListAttachedRolePolicies')
 
-        return dict(
-            assume_role_policy_document=(
-                role_data['assume_role_policy_document']),
-            create_date=role_data['create_date'],
-            role_name=role_name,
-            path=role_data['path']
+        arns = self.mock_iam_role_attached_policies.get(RoleName, [])
+
+        return dict(AttachedPolicies=[
+            dict(PolicyArn=arn, PolicyName=arn.split('/')[-1])
+            for arn in arns
+        ])
+
+    # instance profiles
+
+    def create_instance_profile(self, InstanceProfileName):
+        # Path not implemented
+        # mock InstanceProfileIds are all the same
+
+        self._check_instance_profile_does_not_exist(InstanceProfileName,
+                                                    'CreateInstanceProfile')
+
+        profile = dict(
+            Arn=('arn:aws:iam::012345678901:instance-profile/%s' %
+                 InstanceProfileName),
+            CreateDate=datetime.utcnow(),
+            InstanceProfileId='AIPAMOCKMOCKMOCKMOCK',
+            InstanceProfileName=InstanceProfileName,
+            Path='/',
+            Roles=[],
         )
+        self.mock_iam_instance_profiles[InstanceProfileName] = profile
 
-    # attached (managed) role policies
+        return dict(InstanceProfile=profile)
 
-    # boto does not yet have methods for these
+    def add_role_to_instance_profile(self, InstanceProfileName, RoleName):
+        self._check_role_exists(RoleName, 'AddRoleToInstanceProfile')
+        self._check_instance_profile_exists(
+            InstanceProfileName, 'AddRoleToInstanceProfile')
 
-    def _attach_role_policy(self, role_name, policy_arn):
-        self._check_role_exists(role_name)
+        profile = self.mock_iam_instance_profiles[InstanceProfileName]
+        if profile['Roles']:
+            raise LimitExceededException(
+                'An error occurred (LimitExceeded) when calling the'
+                ' AddRoleToInstanceProfile operation: Cannot exceed quota for'
+                ' InstanceSessionsPerInstanceProfile: 1')
 
-        arns = self.mock_iam_role_attached_policies.setdefault(role_name, [])
-        if policy_arn not in arns:
-            arns.append(policy_arn)
+        # just point straight at the mock role; never going to redefine it
+        profile['Roles'] = [self.mock_iam_roles[RoleName]]
 
-        return self._wrap_result('attach_role_policy')
+    def list_instance_profiles(self):
+        # PathPrefix not implemented
 
-    def _list_attached_role_policies(
-            self, role_name, marker=None, max_items=None):
+        profiles = list(data for name, data in
+                        sorted(self.mock_iam_instance_profiles.items()))
 
-        self._check_role_exists(role_name)
+        return dict(InstanceProfiles=profiles)
 
-        # in theory, pagination is supported, but in practice each role
-        # can have a maximum of two policies attached
-        if marker or max_items:
-            raise NotImplementedError()
+    def _check_instance_profile_does_not_exist(
+            self, InstanceProfileName, OperationName):
 
-        arns = self.mock_iam_role_attached_policies.get(role_name, [])
+        if InstanceProfileName in self.mock_iam_instance_profiles:
+            raise ClientError(
+                dict(Error=dict(
+                    Code='EntityAlreadyExists',
+                    Message=('Instance Profile %s already exists' %
+                             InstanceProfileName))),
+                OperationName)
 
-        return self._wrap_result('list_attached_role_policies',
-                                 {'attached_policies': [
-                                     {'policy_arn': arn} for arn in arns]})
+    def _check_instance_profile_exists(
+            self, InstanceProfileName, OperationName):
 
-    # other utilities
-
-    def _check_path(self, path=None, field_name='path'):
-        if path is None or (path.startswith('/') and path.endswith('/')):
-            return
-
-        raise boto.exception.BotoServerError(
-            400, 'Bad Request', body=err_xml(
-                'The specified value for %s is invalid. It must begin and'
-                ' end with / and contain only alphanumeric characters and/or'
-                ' / characters.' % field_name))
-
-    def _paginate(self, items, name, marker=None, max_items=None):
-        """Given a list of items, return a dictionary mapping
-        *name* to a slice of items, with additional keys
-        'is_truncated' and, if 'is_truncated' is true, 'marker'.
-        """
-        max_items = max_items or self.DEFAULT_MAX_ITEMS
-
-        start = 0
-        if marker:
-            start = int(marker)
-
-        end = start + max_items
-
-        result = {name: items[start:end]}
-
-        result['is_truncated'] = end < len(items)
-        if result['is_truncated']:
-            result['marker'] = str(end)
-
-        return result
-
-    def _wrap_result(self, prefix, result=None):
-        """Wrap result in two additional dictionaries (these result from boto's
-        decoding of the XML response)."""
-        if result is None:
-            result_dict = {}
-        else:
-            result_dict = {prefix + '_result': result}
-
-       # could add response_metadata to result_dict, but we don't use it
-
-        return {prefix + '_response': result_dict}
+        if InstanceProfileName not in self.mock_iam_instance_profiles:
+            raise ClientError(
+                dict(Error=dict(
+                    Code='NoSuchEntity',
+                    Message=('Instance Profile %s cannot be found' %
+                             InstanceProfileName))),
+                OperationName)
 
 
 def _api_params_to_emr_object(params):

@@ -49,6 +49,16 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+
+try:
+    import boto3
+    boto3  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    # don't require boto; MRJobs don't actually need it when running
+    # inside hadoop streaming
+    boto3 = None
+
+
 try:
     import filechunkio
 except ImportError:
@@ -69,6 +79,7 @@ from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
+from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import _FALLBACK_SERVICE_ROLE
@@ -1542,7 +1553,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _instance_profile(self):
         try:
             return (self._opts['iam_instance_profile'] or
-                    get_or_create_mrjob_instance_profile(self.make_iam_conn()))
+                    get_or_create_mrjob_instance_profile(self.make_iam_client()))
         except boto.exception.BotoServerError as ex:
             if ex.status != 403:
                 raise
@@ -1554,7 +1565,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _service_role(self):
         try:
             return (self._opts['iam_service_role'] or
-                    get_or_create_mrjob_service_role(self.make_iam_conn()))
+                    get_or_create_mrjob_service_role(self.make_iam_client()))
         except boto.exception.BotoServerError as ex:
             if ex.status != 403:
                 raise
@@ -3200,27 +3211,33 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if hasattr(master, 'privateipaddress'):
             cache['master_private_ip'] = master.privateipaddress
 
-    def make_iam_conn(self):
-        """Create a connection to S3.
+    def make_iam_client(self):
+        """Create a :py:mod:`boto3` IAM client.
 
-        :return: a :py:class:`boto.iam.connection.IAMConnection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`botocore.client.IAM` wrapped in a
+                :py:class:`mrjob.retry.RetryWrapper`
         """
-        # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to connect to IAM')
+        if boto3 is None:
+            raise ImportError('You must install boto3 to connect to IAM')
 
-        host = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
+        endpoint_url = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
+        if not is_uri(endpoint_url):
+            endpoint_url = 'https://' + endpoint_url
 
-        log.debug('creating IAM connection to %s' % host)
+        log.debug('creating IAM connection to %s' % endpoint_url)
 
-        raw_iam_conn = boto.connect_iam(
+        # IAM only has a single region. Setting region_name stops
+        # another region being loaded from configs, environment variables, etc.
+        raw_iam_client = boto3.client(
+            'iam',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
-            host=host,
-            security_token=self._opts['aws_security_token'])
+            aws_session_token=self._opts['aws_security_token'],
+            endpoint_url=endpoint_url,
+            region_name='us-east-1',
+        )
 
-        return wrap_aws_conn(raw_iam_conn)
+        return _wrap_aws_client(raw_iam_client)
 
     # Spark
 
@@ -3295,6 +3312,35 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         ' your job may stall forever' % ig.instancetype)
 
         return None
+
+    ### deprecated boto (not boto3) connections ###
+
+    def make_iam_conn(self):
+        """Create a connection to IAM.
+
+        :return: a :py:class:`boto.iam.connection.IAMConnection`, wrapped in a
+                 :py:class:`mrjob.retry.RetryWrapper`
+        """
+        # give a non-cryptic error message if boto isn't installed
+        if boto is None:
+            raise ImportError('You must install boto to use make_iam_conn()')
+
+        log.warning('make_iam_conn() is deprecated and will be removed in'
+                    ' v0.7.0. Use make_iam_client(), which uses boto3,'
+                    ' instead.')
+
+        host = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
+
+        log.debug('creating IAM connection to %s' % host)
+
+        raw_iam_conn = boto.connect_iam(
+            aws_access_key_id=self._opts['aws_access_key_id'],
+            aws_secret_access_key=self._opts['aws_secret_access_key'],
+            host=host,
+            security_token=self._opts['aws_security_token'])
+
+        return wrap_aws_conn(raw_iam_conn)
+
 
 
 def _encode_emr_api_params(x):

@@ -23,6 +23,13 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+try:
+    import botocore.client
+    botocore  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    botocore = None
+
+
 from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_s3_uri
@@ -46,6 +53,7 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
+# only exists for deprecated boto library support, going away in v0.7.0
 def wrap_aws_conn(raw_conn):
     """Wrap a given boto Connection object so that it can retry when
     throttled."""
@@ -63,6 +71,31 @@ def wrap_aws_conn(raw_conn):
 
     return RetryWrapper(raw_conn,
                         retry_if=retry_if,
+                        backoff=_EMR_BACKOFF,
+                        multiplier=_EMR_BACKOFF_MULTIPLIER,
+                        max_tries=_EMR_MAX_TRIES)
+
+
+def _is_retriable_client_error(ex):
+    """Is the exception from a boto client retriable?"""
+    if isinstance(ex, botocore.exceptions.ClientError):
+        code = ex.get('Error', {}).get('Code', '')
+        if any(c in code for c in ('Throttl', 'RequestExpired', 'Timeout')):
+            return True
+        status = ex.get('Error', {}).get('HTTPStatusCode')
+        return status == 505
+    elif isinstance(ex, socket.error):
+        return ex.args in ((104, 'Connection reset by peer'),
+                           (110, 'Connection timed out'))
+    else:
+        return False
+
+
+def _wrap_aws_client(raw_client):
+    """Wrap a given boto3 Client object so that it can retry when
+    throttled."""
+    return RetryWrapper(raw_client,
+                        retry_if=_is_retriable_client_error,
                         backoff=_EMR_BACKOFF,
                         multiplier=_EMR_BACKOFF_MULTIPLIER,
                         max_tries=_EMR_MAX_TRIES)

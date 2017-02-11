@@ -29,9 +29,16 @@ try:
 except ImportError:
     botocore = None
 
+try:
+    import boto3
+    boto3  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    boto3 = None
+
 
 from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
+from mrjob.parse import is_uri
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
@@ -229,8 +236,8 @@ class S3Filesystem(Filesystem):
     # Try to use the more general filesystem interface unless you really
     # need to do something S3-specific (e.g. setting file permissions)
 
-    def make_s3_conn(self, region=''):
-        """Create a connection to S3.
+    def make_s3_resource(self, region_name=''):
+        """Create a :py:mod:`boto3` S3 resource.
 
         :param region: region to use to choose S3 endpoint.
 
@@ -242,14 +249,18 @@ class S3Filesystem(Filesystem):
         :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
                  :py:class:`mrjob.retry.RetryWrapper`
         """
+        # TODO: start here
+
         # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to connect to S3')
+        if boto3 is None:
+            raise ImportError('You must install boto3 to connect to S3')
 
         # self._s3_endpoint overrides region
-        host = self._s3_endpoint or s3_endpoint_for_region(region)
+        endpoint_url = self._s3_endpoint or s3_endpoint_for_region(region_name)
+        if not is_uri(endpoint_url):
+            endpoint_url = 'https://' + endpoint_url
 
-        log.debug('creating S3 connection (to %s)' % host)
+        log.debug('creating S3 connection (to %s)' % endpoint_url)
 
         raw_s3_conn = boto.connect_s3(
             aws_access_key_id=self._aws_access_key_id,
@@ -257,6 +268,7 @@ class S3Filesystem(Filesystem):
             host=host,
             security_token=self._aws_security_token)
         return wrap_aws_conn(raw_s3_conn)
+
 
     def get_bucket(self, bucket_name):
         """Get the bucket, connecting through the appropriate endpoint."""
@@ -333,3 +345,38 @@ class S3Filesystem(Filesystem):
         """Create a bucket on S3, optionally setting location constraint."""
         return self.make_s3_conn().create_bucket(
             bucket_name, location=location)
+
+    # old interface, uses boto, not boto 3
+
+    def make_s3_conn(self, region=''):
+        """Create a connection to S3.
+
+        :param region: region to use to choose S3 endpoint.
+
+        If you are doing anything with buckets other than creating them
+        or fetching basic metadata (name and location), it's best to use
+        :py:meth:`get_bucket` because it chooses the appropriate S3 endpoint
+        automatically.
+
+        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
+                 :py:class:`mrjob.retry.RetryWrapper`
+        """
+        # give a non-cryptic error message if boto isn't installed
+        if boto is None:
+            raise ImportError('You must install boto to use make_s3_conn()')
+
+        log.warning('make_s3_conn() is deprecated and will be removed in'
+                    ' v0.7.0. Use make_s3_resource(), which uses boto3,'
+                    ' instead.')
+
+        # self._s3_endpoint overrides region
+        host = self._s3_endpoint or s3_endpoint_for_region(region)
+
+        log.debug('creating S3 connection (to %s)' % host)
+
+        raw_s3_conn = boto.connect_s3(
+            aws_access_key_id=self._aws_access_key_id,
+            aws_secret_access_key=self._aws_secret_access_key,
+            host=host,
+            security_token=self._aws_security_token)
+        return wrap_aws_conn(raw_s3_conn)

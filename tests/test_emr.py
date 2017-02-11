@@ -26,6 +26,8 @@ from datetime import datetime
 from datetime import timedelta
 from io import BytesIO
 
+import boto3
+
 import mrjob
 import mrjob.emr
 from mrjob.compat import version_gte
@@ -480,14 +482,12 @@ class IAMTestCase(MockBotoTestCase):
     def setUp(self):
         super(IAMTestCase, self).setUp()
 
-        # wrap connect_iam() so we can see if it was called
-        p_iam = patch.object(boto, 'connect_iam', wraps=boto.connect_iam)
-        self.addCleanup(p_iam.stop)
-        p_iam.start()
+        # wrap boto3.client() so we can see if it was called
+        self.start(patch('boto3.client', wraps=boto3.client))
 
     def test_role_auto_creation(self):
         cluster = self.run_and_get_cluster()
-        self.assertTrue(boto.connect_iam.called)
+        self.assertTrue(boto3.client.called)
 
         # check instance_profile
         instance_profile_name = (
@@ -519,7 +519,7 @@ class IAMTestCase(MockBotoTestCase):
     def test_iam_instance_profile_option(self):
         cluster = self.run_and_get_cluster(
             '--iam-instance-profile', 'EMR_EC2_DefaultRole')
-        self.assertTrue(boto.connect_iam.called)
+        self.assertTrue(boto3.client.called)
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
@@ -527,7 +527,7 @@ class IAMTestCase(MockBotoTestCase):
     def test_iam_service_role_option(self):
         cluster = self.run_and_get_cluster(
             '--iam-service-role', 'EMR_DefaultRole')
-        self.assertTrue(boto.connect_iam.called)
+        self.assertTrue(boto3.client.called)
 
         self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
@@ -538,7 +538,7 @@ class IAMTestCase(MockBotoTestCase):
 
         # users with limited access may not be able to connect to the IAM API.
         # This gives them a plan B
-        self.assertFalse(boto.connect_iam.called)
+        self.assertFalse(boto3.client.called)
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
@@ -546,13 +546,13 @@ class IAMTestCase(MockBotoTestCase):
 
     def test_no_iam_access(self):
         ex = boto.exception.BotoServerError(403, 'Forbidden')
-        self.assertIsInstance(boto.connect_iam, Mock)
-        boto.connect_iam.side_effect = ex
+        self.assertIsInstance(boto3.client, Mock)
+        boto3.client.side_effect = ex
 
         with logger_disabled('mrjob.emr'):
             cluster = self.run_and_get_cluster()
 
-        self.assertTrue(boto.connect_iam.called)
+        self.assertTrue(boto3.client.called)
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
@@ -3950,7 +3950,7 @@ class SecurityTokenTestCase(MockBotoTestCase):
         super(SecurityTokenTestCase, self).setUp()
 
         self.mock_emr = self.start(patch('boto.emr.connection.EmrConnection'))
-        self.mock_iam = self.start(patch('boto.connect_iam'))
+        self.mock_client = self.start(patch('boto3.client'))
 
         # runner needs to do stuff with S3 on initialization
         self.mock_s3 = self.start(patch('boto.connect_s3',
@@ -3964,12 +3964,14 @@ class SecurityTokenTestCase(MockBotoTestCase):
         self.assertIn('security_token', emr_kwargs)
         self.assertEqual(emr_kwargs['security_token'], security_token)
 
-        runner.make_iam_conn()
+        runner.make_iam_client()
 
-        self.assertTrue(self.mock_iam.called)
-        iam_kwargs = self.mock_iam.call_args[1]
-        self.assertIn('security_token', iam_kwargs)
-        self.assertEqual(iam_kwargs['security_token'], security_token)
+        # TODO: once we use boto3.client() for other services, we'll need
+        # to separate out IAM calls
+        self.assertTrue(self.mock_client.called)
+        iam_kwargs = self.mock_client.call_args[1]
+        self.assertIn('aws_session_token', iam_kwargs)
+        self.assertEqual(iam_kwargs['aws_session_token'], security_token)
 
         runner.fs.make_s3_conn()
 

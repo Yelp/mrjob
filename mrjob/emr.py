@@ -67,6 +67,7 @@ except ImportError:
 
 import mrjob
 import mrjob.step
+from mrjob.aws import _DEFAULT_REGION
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import emr_endpoint_for_region
@@ -3226,15 +3227,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         log.debug('creating IAM connection to %s' % endpoint_url)
 
-        # IAM only has a single region. Setting region_name stops
-        # another region being loaded from configs, environment variables, etc.
+        # IAM only has a single region. It looks like if endpoint_url is
+        # set, boto3 will start loading region from configs (e.g.
+        # ~/.aws/config), even when this makes no sense
+        # (see https://github.com/boto/boto3/issues/985).
+        #
+        # patching around this by explicitly setting region_name
+        # to us-east-1
         raw_iam_client = boto3.client(
             'iam',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             aws_session_token=self._opts['aws_security_token'],
             endpoint_url=endpoint_url,
-            region_name='us-east-1',
+            region_name=_DEFAULT_REGION,
         )
 
         return _wrap_aws_client(raw_iam_client)

@@ -15,14 +15,13 @@
 # limitations under the License.
 """Run an MRJob locally by forking off a bunch of processes and piping
 them together. Useful for testing."""
+import inspect
 import logging
-from os.path import abspath
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
 
 import mrjob.cat
-from mrjob.conf import combine_local_envs
 from mrjob.logs.counters import _format_counters
 from mrjob.parse import _find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
@@ -120,6 +119,10 @@ class LocalMRJobRunner(SimMRJobRunner):
         # running the job)
         self._internal_jobconf = {}
 
+        # add mrjob/cat.py to working dir so we can invoke it to uncompress
+        # input files (see #1540)
+        self._working_dir_mgr.add('file', self._cat_py())
+
     def _run_step(self, step_num, step_type, input_path, output_path,
                   working_dir, env):
         step = self._get_step(step_num)
@@ -131,13 +134,6 @@ class LocalMRJobRunner(SimMRJobRunner):
             procs_args = self._reducer_arg_chain(
                 step, step_num, input_path)
 
-        # add . to PYTHONPATH (in case mrjob isn't actually installed)
-        # we need this to access mrjob.cat
-
-        # if we wanted, we could move read_file() and read_input()
-        # to mrjob.cat and make it a standalone script
-        env = combine_local_envs(env, {'PYTHONPATH': abspath('.')})
-
         proc_dicts = self._invoke_processes(
             procs_args, output_path, working_dir, env)
         self._all_proc_dicts.extend(proc_dicts)
@@ -148,11 +144,15 @@ class LocalMRJobRunner(SimMRJobRunner):
 
         self._all_proc_dicts = []
 
+    def _cat_py(self):
+        """Return the path of mrjob.cat."""
+        return inspect.getsourcefile(mrjob.cat)
+
     def _cat_args(self, input_path):
         """Return a command line that can call mrjob's internal "cat" script
         from any working directory, without mrjob in PYTHONPATH"""
         return self._python_bin() + [
-            abspath(mrjob.cat.__file__),
+            self._working_dir_mgr.name('file', self._cat_py()),
             input_path
         ]
 

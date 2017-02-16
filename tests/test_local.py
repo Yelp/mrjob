@@ -527,6 +527,10 @@ class LocalMRJobRunnerJobConfTestCase(InlineMRJobRunnerJobConfTestCase):
 
     RUNNER = 'local'
 
+    def _extra_expected_local_files(self, runner):
+        cat_py = runner._cat_py()
+        return [(cat_py, runner._working_dir_mgr.name('file', cat_py))]
+
 
 class LocalMRJobRunnerNoMapperTestCase(InlineMRJobRunnerNoMapperTestCase):
 

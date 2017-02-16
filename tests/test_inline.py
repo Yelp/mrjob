@@ -261,6 +261,11 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         self.assertEqual(sorted(results),
                          [(input_path, 3), (input_gz_path, 1)])
 
+    def _extra_expected_local_files(self, runner):
+        """A list of additional local files expected, as tuples
+        of (path, name). Hook for dealing with cat.py in local mode."""
+        return []
+
     def test_jobconf_simulated_by_runner(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:
@@ -303,16 +308,24 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
                                       'job_local_dir', '0', 'mapper', '0'))
 
         self.assertEqual(results['mapreduce.job.cache.archives'], '')
-        expected_cache_files = (
+        expected_cache_files = [
             script_path + '#mr_test_jobconf.py',
-            upload_path + '#upload')
+            upload_path + '#upload'
+        ] + [
+            '%s#%s' % (path, name)
+            for path, name in self._extra_expected_local_files(runner)
+        ]
         self.assertEqual(
             sorted(results['mapreduce.job.cache.files'].split(',')),
             sorted(expected_cache_files))
         self.assertEqual(results['mapreduce.job.cache.local.archives'], '')
-        expected_local_files = (
+        expected_local_files = [
             os.path.join(working_dir, 'mr_test_jobconf.py'),
-            os.path.join(working_dir, 'upload'))
+            os.path.join(working_dir, 'upload')
+        ] + [
+            os.path.join(working_dir, name)
+            for path, name in self._extra_expected_local_files(runner)
+        ]
         self.assertEqual(
             sorted(results['mapreduce.job.cache.local.files'].split(',')),
             sorted(expected_local_files))

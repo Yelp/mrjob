@@ -781,10 +781,10 @@ class MRJobRunner(object):
         if steps:
             return (self._opts['steps_interpreter'] or
                     self._opts['interpreter'] or
-                    self._python_bin(steps=True))
+                    self._steps_python_bin())
         else:
             return (self._opts['interpreter'] or
-                    self._python_bin())
+                    self._task_python_bin())
 
     def _executable(self, steps=False):
         if steps:
@@ -793,13 +793,32 @@ class MRJobRunner(object):
             return self._interpreter() + [
                 self._working_dir_mgr.name('file', self._script_path)]
 
-    def _python_bin(self, steps=False):
-        if steps:
-            return (self._opts['steps_python_bin'] or
-                    self._default_python_bin(local=True))
-        else:
-            return (self._opts['python_bin'] or
-                    self._default_python_bin())
+    def _python_bin(self):
+        """Python binary used for everything other than invoking the job.
+        For invoking jobs with ``--steps``, see :py:meth:`_steps_python_bin`,
+        and for everything else (e.g. ``--mapper``, ``--spark``), see
+        :py:meth:`_task_python_bin`, which defaults to this method if
+        :mrjob-opt:`task_python_bin` isn't set.
+
+        Other ways mrjob uses Python:
+         * file locking in setup wrapper scripts
+         * finding site-packages dir to bootstrap mrjob on clusters
+         * invoking ``cat.py`` in local mode
+         * the Python binary for Spark (``$PYSPARK_PYTHON``)
+        """
+        return (self._opts['python_bin'] or
+                self._default_python_bin())
+
+    def _steps_python_bin(self):
+        """Python binary used to invoke job with ``--steps``"""
+        return (self._opts['steps_python_bin'] or
+                self._default_python_bin(local=True))
+
+    def _task_python_bin(self):
+        """Python binary used to invoke job with ``--mapper``,
+        ``--reducer``, ``--spark``, etc."""
+        return (self._opts['task_python_bin'] or
+                self._python_bin())
 
     def _default_python_bin(self, local=False):
         """The default python command. If local is true, try to use

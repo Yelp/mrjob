@@ -3320,35 +3320,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return None
 
-    ### deprecated boto (not boto3) connections ###
-
-    def make_iam_conn(self):
-        """Create a connection to IAM.
-
-        :return: a :py:class:`boto.iam.connection.IAMConnection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
-        """
-        # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to use make_iam_conn()')
-
-        log.warning('make_iam_conn() is deprecated and will be removed in'
-                    ' v0.7.0. Use make_iam_client(), which uses boto3,'
-                    ' instead.')
-
-        host = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
-
-        log.debug('creating IAM connection to %s' % host)
-
-        raw_iam_conn = boto.connect_iam(
-            aws_access_key_id=self._opts['aws_access_key_id'],
-            aws_secret_access_key=self._opts['aws_secret_access_key'],
-            host=host,
-            security_token=self._opts['aws_security_token'])
-
-        return wrap_aws_conn(raw_iam_conn)
-
-
 
 def _encode_emr_api_params(x):
     """Recursively unpack parameters to the EMR API."""

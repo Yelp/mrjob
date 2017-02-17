@@ -806,8 +806,7 @@ class MRJobRunner(object):
          * invoking ``cat.py`` in local mode
          * the Python binary for Spark (``$PYSPARK_PYTHON``)
         """
-        return (self._opts['python_bin'] or
-                self._default_python_bin())
+        return self._opts['python_bin'] or self._default_python_bin()
 
     def _steps_python_bin(self):
         """Python binary used to invoke job with ``--steps``"""

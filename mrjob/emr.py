@@ -3065,6 +3065,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._bootstrap_mrjob():
             things_to_hash.append(mrjob.__version__)
             things_to_hash.append(self._python_bin())
+            things_to_hash.append(self._task_python_bin())
 
         things_json = json.dumps(things_to_hash, sort_keys=True)
         if not isinstance(things_json, bytes):

@@ -202,8 +202,8 @@ class S3Filesystem(Filesystem):
             dir_glob = path_glob + '*'
 
         bucket = self.get_bucket(bucket_name)
-        for key in bucket.list(base_name):
-            uri = "%s://%s/%s" % (scheme, bucket_name, key.name)
+        for key in bucket.objects.filter(Prefix=base_name):
+            uri = "%s://%s/%s" % (scheme, bucket_name, key.key)
 
             # enforce globbing
             if not (fnmatch.fnmatchcase(uri, path_glob) or

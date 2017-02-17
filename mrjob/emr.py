@@ -81,6 +81,7 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
 from mrjob.fs.s3 import _endpoint_url
+from mrjob.fs.s3 import _get_bucket_region
 from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
@@ -764,30 +765,24 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _set_cloud_tmp_dir(self):
         """Helper for _fix_s3_tmp_and_log_uri_opts"""
-        buckets = self.fs.get_all_buckets()
-        mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
+        client = self.fs.make_s3_client()
 
-        # Loop over buckets until we find one that is not region-
-        #   restricted, matches region, or can be used to
-        #   infer region if no region is specified
-        for tmp_bucket in mrjob_buckets:
-            tmp_bucket_name = tmp_bucket.name
+        for bucket_name in self.fs.get_all_bucket_names():
+            if not bucket_name.startswith('mrjob-'):
+                continue
 
-            if (tmp_bucket.get_location() == s3_location_constraint_for_region(
-                    self._opts['region'])):
-
+            bucket_region = _get_bucket_region(client, bucket_name)
+            if bucket_region == self._opts['region']:
                 # Regions are both specified and match
-                log.debug("using existing temp bucket %s" %
-                          tmp_bucket_name)
-                self._opts['cloud_tmp_dir'] = ('s3://%s/tmp/' %
-                                               tmp_bucket_name)
+                log.debug("using existing temp bucket %s" % bucket_name)
+                self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % bucket_name
                 return
 
         # That may have all failed. If so, pick a name.
-        tmp_bucket_name = 'mrjob-' + random_identifier()
-        self._s3_tmp_bucket_to_create = tmp_bucket_name
-        self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
-        log.info('Auto-created temp S3 bucket %s' % tmp_bucket_name)
+        bucket_name = 'mrjob-' + random_identifier()
+        self._s3_tmp_bucket_to_create = bucket_name
+        self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % bucket_name
+        log.info('Auto-created temp S3 bucket %s' % bucket_name)
         self._wait_for_s3_eventual_consistency()
 
     def _s3_log_dir(self):
@@ -806,10 +801,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._s3_tmp_bucket_to_create:
             log.debug('creating S3 bucket %r to use as temp space' %
                       self._s3_tmp_bucket_to_create)
-            location = s3_location_constraint_for_region(
-                self._opts['region'])
-            self.fs.create_bucket(
-                self._s3_tmp_bucket_to_create, location=location)
+            self.fs.create_bucket(self._s3_tmp_bucket_to_create,
+                                  self._opts['region'])
             self._s3_tmp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
@@ -830,8 +823,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_fs = S3Filesystem(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
-                aws_security_token=self._opts['aws_security_token'],
-                s3_endpoint=self._opts['s3_endpoint'])
+                aws_session_token=self._opts['aws_security_token'],
+                s3_endpoint=self._opts['s3_endpoint'],
+                s3_region=self._opts['region'])
 
             if self._opts['ec2_key_pair_file']:
                 self._ssh_fs = SSHFilesystem(
@@ -3205,18 +3199,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # special logic for setting IAM endpoint (which you don't usually
         # want to do, because IAM is regionless).
-        endpoint_url = None
-        region_name = None
-        if self._opts['iam_endpoint']:
-            endpoint_url = _endpoint_url(self._opts['iam_endpoint'])
+        endpoint_url = _endpoint_url(self._opts['iam_endpoint'])
+        if endpoint_url:
             # keep boto3 from loading a nonsensical region name from configs
             # (see https://github.com/boto/boto3/issues/985)
             region_name = _DEFAULT_AWS_REGION
-
-        if endpoint_url:
-            log.debug('creating IAM connection to %s' % endpoint_url)
+            log.debug('creating IAM client to %s' % endpoint_url)
         else:
-            log.debug('creating IAM connection')
+            region_name = None
+            log.debug('creating IAM client')
 
         raw_iam_client = boto3.client(
             'iam',

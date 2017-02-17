@@ -39,6 +39,8 @@ except ImportError:
     boto3 = None
 
 
+from mrjob.aws import _DEFAULT_AWS_REGION
+from mrjob.aws import _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
 from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_uri
@@ -64,11 +66,23 @@ def s3_key_to_uri(s3_key):
 
 
 def _endpoint_url(host_or_uri):
-    """If *host_or_url* isn't a URI, prepend ``'https://'``."""
-    if is_uri(host_or_uri):
+    """If *host_or_uri* is non-empty and isn't a URI, prepend ``'https://'``.
+
+    Otherwise, pass through as-is.
+    """
+    if not host_or_uri:
+        return host_or_uri
+    elif is_uri(host_or_uri):
         return host_or_uri
     else:
         return 'https://' + host_or_uri
+
+
+def _get_bucket_region(client, bucket_name):
+    """Look up the given bucket's location constraint and translate
+    it to a region name."""
+    resp = client.get_bucket_location(Bucket=bucket_name)
+    return resp['LocationConstraint'] or _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
 
 
 # only exists for deprecated boto library support, going away in v0.7.0
@@ -97,10 +111,10 @@ def wrap_aws_conn(raw_conn):
 def _is_retriable_client_error(ex):
     """Is the exception from a boto client retriable?"""
     if isinstance(ex, botocore.exceptions.ClientError):
-        code = ex.get('Error', {}).get('Code', '')
+        code = ex.response.get('Error', {}).get('Code', '')
         if any(c in code for c in ('Throttl', 'RequestExpired', 'Timeout')):
             return True
-        status = ex.get('Error', {}).get('HTTPStatusCode')
+        status = ex.response.get('Error', {}).get('HTTPStatusCode')
         return status == 505
     elif isinstance(ex, socket.error):
         return ex.args in ((104, 'Connection reset by peer'),
@@ -127,19 +141,22 @@ class S3Filesystem(Filesystem):
     """
 
     def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
-                 aws_security_token=None, s3_endpoint=None):
+                 aws_session_token=None, s3_endpoint=None, s3_region=None):
         """
         :param aws_access_key_id: Your AWS access key ID
         :param aws_secret_access_key: Your AWS secret access key
-        :param aws_security_token: security token for use with temporary
+        :param aws_session_token: session token for use with temporary
                                    AWS credentials
         :param s3_endpoint: If set, always use this endpoint
+        :param s3_region: Region name corresponding to s3_endpoint. Only used
+                          if *s3_endpoint* is set
         """
         super(S3Filesystem, self).__init__()
-        self._s3_endpoint = s3_endpoint
+        self._s3_endpoint_url = _endpoint_url(s3_endpoint)
+        self._s3_region = s3_region
         self._aws_access_key_id = aws_access_key_id
         self._aws_secret_access_key = aws_secret_access_key
-        self._aws_security_token = aws_security_token
+        self._aws_session_token = aws_session_token
 
     def can_handle_path(self, path):
         return is_s3_uri(path)
@@ -247,66 +264,85 @@ class S3Filesystem(Filesystem):
     # Try to use the more general filesystem interface unless you really
     # need to do something S3-specific (e.g. setting file permissions)
 
-    def make_s3_resource(self, region_name=''):
+    # sadly resources aren't as smart as we'd like; they provide a Bucket
+    # abstraction, but don't automatically connect to buckets on the
+    # correct region
+
+    def make_s3_resource(self, region_name=None):
         """Create a :py:mod:`boto3` S3 resource.
 
         :param region: region to use to choose S3 endpoint.
 
-        If you are doing anything with buckets other than creating them
-        or fetching basic metadata (name and location), it's best to use
-        :py:meth:`get_bucket` because it chooses the appropriate S3 endpoint
-        automatically.
-
-        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
+        It's best to use :py:meth:`get_bucket` because it chooses the
+        appropriate S3 endpoint automatically. If you are trying to get
+        bucket metadata, use :py:meth:`make_s3_client`.
         """
-        # TODO: start here
-
         # give a non-cryptic error message if boto isn't installed
         if boto3 is None:
             raise ImportError('You must install boto3 to connect to S3')
 
+        kwargs = self._client_kwargs(region_name)
+
+        log.debug('creating S3 resource (%s)' % (
+            kwargs['endpoint_url'] or kwargs['region_name'] or 'default'))
+
+        s3_resource = boto3.resource('s3', **kwargs)
+        s3_resource.meta.client = _wrap_aws_client(s3_resource.meta.client)
+
+        return s3_resource
+
+    def make_s3_client(self, region_name=None):
+        """Create a :py:mod:`boto3` S3 client.
+
+        :param region: region to use to choose S3 endpoint.
+        """
+        # give a non-cryptic error message if boto isn't installed
+        if boto3 is None:
+            raise ImportError('You must install boto3 to connect to S3')
+
+        kwargs = self._client_kwargs(region_name)
+
+        log.debug('creating S3 client (%s)' % (
+            kwargs['endpoint_url'] or kwargs['region_name'] or 'default'))
+
+        return _wrap_aws_client(boto3.client('s3', **kwargs))
+
+    def _client_kwargs(self, region_name):
+        """Keyword args for creating resources or clients."""
+
         # self._s3_endpoint overrides region
-        endpoint_url = self._s3_endpoint or s3_endpoint_for_region(region_name)
-        if not is_uri(endpoint_url):
-            endpoint_url = 'https://' + endpoint_url
+        endpoint_url = None
+        if self._s3_endpoint_url:
+            endpoint_url = self._s3_endpoint_url
+            region_name = self._s3_region
 
-        log.debug('creating S3 connection (to %s)' % endpoint_url)
-
-        raw_s3_conn = boto.connect_s3(
+        return dict(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
-            host=host,
-            security_token=self._aws_security_token)
-        return wrap_aws_conn(raw_s3_conn)
-
+            aws_session_token=self._aws_session_token,
+            endpoint_url=endpoint_url,
+            region_name=region_name,
+        )
 
     def get_bucket(self, bucket_name):
         """Get the bucket, connecting through the appropriate endpoint."""
-        s3_conn = self.make_s3_conn()
-
-        bucket = s3_conn.get_bucket(bucket_name)
-        if self._s3_endpoint:
-            return bucket
+        client = self.make_s3_client()
 
         try:
-            location = bucket.get_location()
-        except boto.exception.S3ResponseError as e:
+            region_name = _get_bucket_region(client, bucket_name)
+        except botocore.exceptions.ClientError:
             # it's possible to have access to a bucket but not access
             # to its location metadata. This happens on the 'elasticmapreduce'
             # bucket, for example (see #1170)
-            if e.status == 403:
-                log.warning('Could not infer endpoint for bucket %s; '
-                            'assuming %s', bucket_name, s3_conn.host)
-                return bucket
+            status = ex.response.get('Error', {}).get('HTTPStatusCode')
+            if status != 403:   # e.g. 404 for non-existent bucket
+                raise
+            log.warning('Could not infer endpoint for bucket %s; '
+                        'assuming defaults', bucket_name)
+            region_name = None
 
-            raise
-
-        if (s3_endpoint_for_region(location) != s3_conn.host):
-            s3_conn = self.make_s3_conn(location)
-            bucket = s3_conn.get_bucket(bucket_name)
-
-        return bucket
+        resource = self.make_s3_resource(region_name)
+        return resource.Bucket(bucket_name)
 
     def get_s3_key(self, uri):
         """Get the boto Key object matching the given S3 uri, or
@@ -348,14 +384,27 @@ class S3Filesystem(Filesystem):
         for key in bucket.list(key_prefix):
             yield key
 
-    def get_all_buckets(self):
-        """Get a stream of all buckets owned by this user on S3."""
-        return self.make_s3_conn().get_all_buckets()
+    def get_all_bucket_names(self):
+        """Get a stream of the names of all buckets owned by this user
+        on S3."""
+        # we don't actually want to return these Bucket objects to
+        # the user because their client might connect to the wrong region
+        # endpoint
+        r = self.make_s3_resource()
+        for b in r.buckets.all():
+            yield b.name
 
-    def create_bucket(self, bucket_name, location=''):
-        """Create a bucket on S3, optionally setting location constraint."""
-        return self.make_s3_conn().create_bucket(
-            bucket_name, location=location)
+    def create_bucket(self, bucket_name, region=None):
+        """Create a bucket on S3 with a location constraint
+        matching the given region."""
+        client = self.make_s3_client()
+
+        conf = {}
+        if region and region != _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
+            conf['LocationConstraint'] = region
+
+        client.create_bucket(Bucket=bucket_name,
+                             CreateBucketConfiguration=conf)
 
     # old interface, uses boto, not boto 3
 
@@ -381,7 +430,7 @@ class S3Filesystem(Filesystem):
                     ' instead.')
 
         # self._s3_endpoint overrides region
-        host = self._s3_endpoint or s3_endpoint_for_region(region)
+        host = self._s3_endpoint_url or s3_endpoint_for_region(region)
 
         log.debug('creating S3 connection (to %s)' % host)
 
@@ -389,5 +438,5 @@ class S3Filesystem(Filesystem):
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
             host=host,
-            security_token=self._aws_security_token)
+            security_token=self._aws_session_token)
         return wrap_aws_conn(raw_s3_conn)

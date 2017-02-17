@@ -1,6 +1,10 @@
 v0.6.0, 2017-03-?? -- ???
  * use boto3 instead of boto
-   * old boto make_*_conn() methods removed
+   * removed make_*_conn() from EMRJobRunner (use make_*_client())
+   * changes to S3FileSystem:
+     * removed make_s3_conn() (use make_s3_client() or make_s3_resource())
+     * removed get_all_buckets() (use get_all_bucket_names())
+     * create_bucket()'s second arg is now named region, not location
    * mrjob.fs.s3.wrap_aws_conn() removed
  * removed deprecated INPUT, OUTPUT attributes from JarStep
  * removed deprecated filesystem methods:

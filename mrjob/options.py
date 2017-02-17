@@ -1259,6 +1259,17 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    task_python_bin=dict(
+        combiner=combine_cmds,
+        switches=[
+            (['--task-python-bin'], dict(
+                help=('Name/path of alternate python command to use to'
+                      " run tasks (e.g. mappers); doesn't affect setup"
+                      ' wrapper scripts. Defaults to'
+                      ' current Python interpreter.'),
+            )),
+        ],
+    ),
     upload_archives=dict(
         combiner=combine_path_lists,
         switches=[

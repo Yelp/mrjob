@@ -373,17 +373,6 @@ class S3Filesystem(Filesystem):
 
         return self.get_bucket(bucket_name).new_key(key_name)
 
-    def get_s3_keys(self, uri):
-        """Get a stream of boto Key objects for each key inside
-        the given dir on S3.
-
-        uri is an S3 URI: ``s3://foo/bar``
-        """
-        bucket_name, key_prefix = parse_s3_uri(uri)
-        bucket = self.get_bucket(bucket_name)
-        for key in bucket.list(key_prefix):
-            yield key
-
     def get_all_bucket_names(self):
         """Get a stream of the names of all buckets owned by this user
         on S3."""

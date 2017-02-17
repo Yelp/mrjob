@@ -11,6 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+"""S3 Filesystem.
+
+Also the place for common code used to establish and wrap AWS connections."""
 import fnmatch
 import logging
 import socket
@@ -58,6 +61,14 @@ _EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
 def s3_key_to_uri(s3_key):
     """Convert a boto Key object into an ``s3://`` URI"""
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
+
+
+def _endpoint_url(host_or_uri):
+    """If *host_or_url* isn't a URI, prepend ``'https://'``."""
+    if is_uri(host_or_uri):
+        return host_or_uri
+    else:
+        return 'https://' + host_or_uri
 
 
 # only exists for deprecated boto library support, going away in v0.7.0

@@ -67,7 +67,7 @@ except ImportError:
 
 import mrjob
 import mrjob.step
-from mrjob.aws import _DEFAULT_REGION
+from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import emr_endpoint_for_region
@@ -80,6 +80,7 @@ from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
+from mrjob.fs.s3 import _endpoint_url
 from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
@@ -121,7 +122,6 @@ from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
@@ -186,7 +186,7 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 
 # default AWS region to use for EMR. Using us-west-2 because it is the default
 # for new (since October 10, 2012) accounts (see #1025)
-_DEFAULT_REGION = 'us-west-2'
+_DEFAULT_EMR_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_IMAGE_VERSION = '4.8.2'
@@ -429,7 +429,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
         # don't allow region to be ''
         if not self['region']:
-            self['region'] = _DEFAULT_REGION
+            self['region'] = _DEFAULT_EMR_REGION
 
         self._fix_emr_configurations_opt()
         self._fix_instance_opts()
@@ -440,7 +440,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'image_version': _DEFAULT_IMAGE_VERSION,
-            'region': _DEFAULT_REGION,
+            'region': _DEFAULT_EMR_REGION,
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
@@ -1975,8 +1975,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         cluster, step)
                     # was it caused by IAM roles?
                     self._check_for_missing_default_iam_roles(cluster)
-                    # was it caused by a key pair from the wrong region?
-                    self._check_for_key_pair_from_wrong_region(cluster)
                     # was it because a bootstrap action failed?
                     self._check_for_failed_bootstrap_action(cluster)
 
@@ -2104,23 +2102,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 ' by following:\n\n'
                 '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
                 '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
-
-    def _check_for_key_pair_from_wrong_region(self, cluster):
-        """Help users tripped up by the default AWS region changing
-        in mrjob v0.5.0 (see #1111) by pointing them to the
-        docs for creating EC2 key pairs."""
-        if not self._opts.is_default('region'):
-            return
-
-        reason = _get_reason(cluster)
-        if reason == 'The given SSH key name was invalid':
-            log.warning(
-                '\n'
-                'The default AWS region is now %s. Create SSH keys for'
-                ' %s by following:\n\n'
-                '    https://pythonhosted.org/mrjob/guides'
-                '/emr-quickstart.html#configuring-ssh-credentials\n' %
-                (_DEFAULT_REGION, _DEFAULT_REGION))
 
     def _default_step_output_dir(self):
         # put intermediate data in HDFS
@@ -3222,26 +3203,28 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if boto3 is None:
             raise ImportError('You must install boto3 to connect to IAM')
 
-        endpoint_url = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
-        if not is_uri(endpoint_url):
-            endpoint_url = 'https://' + endpoint_url
+        # special logic for setting IAM endpoint (which you don't usually
+        # want to do, because IAM is regionless).
+        endpoint_url = None
+        region_name = None
+        if self._opts['iam_endpoint']:
+            endpoint_url = _endpoint_url(self._opts['iam_endpoint'])
+            # keep boto3 from loading a nonsensical region name from configs
+            # (see https://github.com/boto/boto3/issues/985)
+            region_name = _DEFAULT_AWS_REGION
 
-        log.debug('creating IAM connection to %s' % endpoint_url)
+        if endpoint_url:
+            log.debug('creating IAM connection to %s' % endpoint_url)
+        else:
+            log.debug('creating IAM connection')
 
-        # IAM only has a single region. It looks like if endpoint_url is
-        # set, boto3 will start loading region from configs (e.g.
-        # ~/.aws/config), even when this makes no sense
-        # (see https://github.com/boto/boto3/issues/985).
-        #
-        # patching around this by explicitly setting region_name
-        # to us-east-1
         raw_iam_client = boto3.client(
             'iam',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             aws_session_token=self._opts['aws_security_token'],
             endpoint_url=endpoint_url,
-            region_name=_DEFAULT_REGION,
+            region_name=region_name,
         )
 
         return _wrap_aws_client(raw_iam_client)

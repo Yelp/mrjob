@@ -1500,6 +1500,8 @@ class InterpreterTestCase(TestCase):
 
     def test_default(self):
         runner = MRJobRunner()
+        self.assertEqual(runner._python_bin(),
+                         self.default_python_bin())
         self.assertEqual(runner._interpreter(),
                          self.default_python_bin())
         self.assertEqual(runner._interpreter(steps=True),
@@ -1507,14 +1509,22 @@ class InterpreterTestCase(TestCase):
 
     def test_python_bin(self):
         runner = MRJobRunner(python_bin=['python', '-v'])
+        self.assertEqual(runner._python_bin(), ['python', '-v'])
         self.assertEqual(runner._interpreter(), ['python', '-v'])
         self.assertEqual(runner._interpreter(steps=True), [sys.executable])
 
     def test_steps_python_bin(self):
         runner = MRJobRunner(steps_python_bin=['python', '-v'])
-        self.assertEqual(runner._interpreter(),
-                         self.default_python_bin())
+        self.assertEqual(runner._python_bin(), self.default_python_bin())
+        self.assertEqual(runner._interpreter(), self.default_python_bin())
         self.assertEqual(runner._interpreter(steps=True), ['python', '-v'])
+
+    def test_task_python_bin(self):
+        runner = MRJobRunner(task_python_bin=['python', '-v'])
+        self.assertEqual(runner._python_bin(), self.default_python_bin())
+        self.assertEqual(runner._interpreter(), ['python', '-v'])
+        self.assertEqual(runner._interpreter(steps=True),
+                         [sys.executable])
 
     def test_interpreter(self):
         runner = MRJobRunner(interpreter=['ruby'])

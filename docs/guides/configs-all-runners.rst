@@ -439,6 +439,20 @@ Job execution context
     Python interpreter).
 
 .. mrjob-opt::
+    :config: task_python_bin
+    :switch: --task-python-bin
+    :type: :ref:`command <data-type-command>`
+    :set: all
+    :default: same as :mrjob-opt:`python_bin`
+
+    Name/path of alternate python binary to run the job (invoking it with
+    ``--mapper``, ``--spark`` or anything other than ``--steps``).
+
+    In most cases, you're better off setting :mrjob-opt:`python_bin`, which
+    this defaults to. This option exists mostly to support running tasks
+    inside Docker while using a normal Python binary in setup wrapper scripts.
+
+.. mrjob-opt::
     :config: strict_protocols
     :switch: --strict-protocols, --no-strict-protocols
     :type: boolean

@@ -63,6 +63,19 @@ def s3_key_to_uri(s3_key):
     return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
+def _client_error_code(ex):
+    """Get the error code for the given ClientError"""
+    return ex.response.get('Error', {}).get('Code', '')
+
+
+def _client_error_status(ex):
+    """Get the HTTP status for the given ClientError"""
+    resp = ex.response
+    # sometimes status code is in ResponseMetadata, not Error
+    return (resp.get('Error', {}).get('HTTPStatusCode') or
+            resp.get('ResponseMetadata', {}).get('HTTPStatusCode'))
+
+
 def _endpoint_url(host_or_uri):
     """If *host_or_uri* is non-empty and isn't a URI, prepend ``'https://'``.
 
@@ -81,6 +94,8 @@ def _get_bucket_region(client, bucket_name):
     it to a region name."""
     resp = client.get_bucket_location(Bucket=bucket_name)
     return resp['LocationConstraint'] or _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
+
+
 
 
 # only exists for deprecated boto library support, going away in v0.7.0
@@ -109,11 +124,11 @@ def wrap_aws_conn(raw_conn):
 def _is_retriable_client_error(ex):
     """Is the exception from a boto client retriable?"""
     if isinstance(ex, botocore.exceptions.ClientError):
-        code = ex.response.get('Error', {}).get('Code', '')
+        code = _client_error_code(ex)
         if any(c in code for c in ('Throttl', 'RequestExpired', 'Timeout')):
             return True
-        status = ex.response.get('Error', {}).get('HTTPStatusCode')
-        return status == 505
+        # spurious 505s thought to be part of an AWS load balancer issue
+        return _client_error_status(ex) == 505
     elif isinstance(ex, socket.error):
         return ex.args in ((104, 'Connection reset by peer'),
                            (110, 'Connection timed out'))
@@ -177,7 +192,7 @@ class S3Filesystem(Filesystem):
             all keys starting with ``dir/``.
         """
         for uri, key in self._ls(path_glob):
-            yield key
+            yield uri
 
     def _ls(self, path_glob):
         """Helper method for :py:meth:`ls`; yields tuples of
@@ -208,8 +223,7 @@ class S3Filesystem(Filesystem):
         try:
             bucket = self.get_bucket(bucket_name)
         except botocore.exceptions.ClientError as ex:
-            status = ex.response.get('Error', {}).get('HTTPStatusCode')
-            if status == 404:  # treat nonexistent buckets as empty
+            if _client_error_status(ex) == 404:  # treat nonexistent as empty
                 return
             raise
 
@@ -225,7 +239,7 @@ class S3Filesystem(Filesystem):
 
     def md5sum(self, path):
         k = self.get_s3_key(path)
-        return k.etag.strip('"')
+        return k.e_tag.strip('"')
 
     def _cat_file(self, filename):
         # stream lines from the s3 key
@@ -259,10 +273,19 @@ class S3Filesystem(Filesystem):
         """Make an empty file in the given location. Raises an error if
         a non-empty file already exists in that location."""
         key = self.get_s3_key(dest)
-        if key and key.size != 0:
+
+        data = None
+        try:
+            data = key.get()
+        except botocore.exceptions.ClientError as ex:
+            # okay if key doesn't exist
+            if _client_error_status(ex) != 404:
+                raise
+
+        if data and data['ContentLength'] != 0:
             raise OSError('Non-empty file %r already exists!' % (dest,))
 
-        self.make_s3_key(dest).set_contents_from_string('')
+        key.put(Body=b'')
 
     # Utilities for interacting with S3 using S3 URIs.
 
@@ -339,8 +362,7 @@ class S3Filesystem(Filesystem):
             # it's possible to have access to a bucket but not access
             # to its location metadata. This happens on the 'elasticmapreduce'
             # bucket, for example (see #1170)
-            status = ex.response.get('Error', {}).get('HTTPStatusCode')
-            if status != 403:   # e.g. 404 for non-existent bucket
+            if _client_error_status(ex) != 403:
                 raise
             log.warning('Could not infer endpoint for bucket %s; '
                         'assuming defaults', bucket_name)
@@ -356,17 +378,7 @@ class S3Filesystem(Filesystem):
         uri is an S3 URI: ``s3://foo/bar``
         """
         bucket_name, key_name = parse_s3_uri(uri)
-
-        try:
-            bucket = self.get_bucket(bucket_name)
-        except boto.exception.S3ResponseError as e:
-            if e.status != 404:
-                raise e
-            key = None
-        else:
-            key = bucket.get_key(key_name)
-
-        return key
+        return self.get_bucket(bucket_name).Object(key_name)
 
     def make_s3_key(self, uri):
         """Create the given S3 key, and return the corresponding

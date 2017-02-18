@@ -38,8 +38,6 @@ try:
 except ImportError:
     boto3 = None
 
-
-from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
 from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
@@ -163,10 +161,10 @@ class S3Filesystem(Filesystem):
 
     def du(self, path_glob):
         """Get the size of all files matching path_glob."""
-        return sum(self.get_s3_key(uri).size for uri in self.ls(path_glob))
+        return sum(key.size for uri, key in self._ls(path_glob))
 
     def ls(self, path_glob):
-        """Recursively list files on S3.
+        """Recursively yield the URIs of S3 keys matching the given glob.
 
         *path_glob* can include ``?`` to match single characters or
         ``*`` to match 0 or more characters. Both ``?`` and ``*`` can match
@@ -178,7 +176,13 @@ class S3Filesystem(Filesystem):
             both ``ls('s3://b/dir')`` and `ls('s3://b/dir/')` will list
             all keys starting with ``dir/``.
         """
+        for uri, key in self._ls(path_glob):
+            yield key
 
+    def _ls(self, path_glob):
+        """Helper method for :py:meth:`ls`; yields tuples of
+        ``(uri, key)`` where *key* is the corresponding boto3 s3.ObjectSummary.
+        """
         # clean up the  base uri to ensure we have an equal uri to boto (s3://)
         # just in case we get passed s3n://
         scheme = urlparse(path_glob).scheme
@@ -201,7 +205,14 @@ class S3Filesystem(Filesystem):
         else:
             dir_glob = path_glob + '*'
 
-        bucket = self.get_bucket(bucket_name)
+        try:
+            bucket = self.get_bucket(bucket_name)
+        except botocore.exceptions.ClientError as ex:
+            status = ex.response.get('Error', {}).get('HTTPStatusCode')
+            if status == 404:  # treat nonexistent buckets as empty
+                return
+            raise
+
         for key in bucket.objects.filter(Prefix=base_name):
             uri = "%s://%s/%s" % (scheme, bucket_name, key.key)
 
@@ -210,7 +221,7 @@ class S3Filesystem(Filesystem):
                     fnmatch.fnmatchcase(uri, dir_glob)):
                 continue
 
-            yield uri
+            yield uri, key
 
     def md5sum(self, path):
         k = self.get_s3_key(path)
@@ -235,20 +246,14 @@ class S3Filesystem(Filesystem):
         If dest is a directory (ends with a "/"), we check if there are
         any files starting with that path.
         """
-        # just fall back on ls(); it's smart
-        try:
-            paths = self.ls(path_glob)
-        except boto.exception.S3ResponseError:
-            paths = []
-        return any(paths)
+        # just fall back on _ls(); it's smart
+        return any(self._ls(path_glob))
 
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
-        for uri in self.ls(path_glob):
-            key = self.get_s3_key(uri)
-            if key:
-                log.debug('deleting ' + uri)
-                key.delete()
+        for uri, key in self._ls(path_glob):
+            log.debug('deleting ' + uri)
+            key.delete()
 
     def touchz(self, dest):
         """Make an empty file in the given location. Raises an error if
@@ -330,7 +335,7 @@ class S3Filesystem(Filesystem):
 
         try:
             region_name = _get_bucket_region(client, bucket_name)
-        except botocore.exceptions.ClientError:
+        except botocore.exceptions.ClientError as ex:
             # it's possible to have access to a bucket but not access
             # to its location metadata. This happens on the 'elasticmapreduce'
             # bucket, for example (see #1170)

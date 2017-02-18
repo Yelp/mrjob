@@ -47,6 +47,7 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
+from mrjob.runner import _BUFFER_SIZE
 from mrjob.util import read_file
 
 
@@ -241,9 +242,11 @@ class S3Filesystem(Filesystem):
         k = self.get_s3_key(path)
         return k.e_tag.strip('"')
 
+    # TODO: start here
     def _cat_file(self, filename):
         # stream lines from the s3 key
         s3_key = self.get_s3_key(filename)
+
         # yields_lines=False: warn read_file that s3_key yields chunks of bytes
         return read_file(
             s3_key_to_uri(s3_key), fileobj=s3_key, yields_lines=False)
@@ -380,6 +383,7 @@ class S3Filesystem(Filesystem):
         bucket_name, key_name = parse_s3_uri(uri)
         return self.get_bucket(bucket_name).Object(key_name)
 
+    # TODO: need to port or remove this
     def make_s3_key(self, uri):
         """Create the given S3 key, and return the corresponding
         boto Key object.

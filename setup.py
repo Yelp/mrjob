@@ -31,6 +31,7 @@ try:
             'filechunkio',
             #'google-api-python-client>=1.5.0'  # see below
             'PyYAML>=3.08',
+            'msgpack-python'
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',

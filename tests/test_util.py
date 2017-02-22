@@ -33,7 +33,7 @@ from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import random_identifier
 from mrjob.util import read_file
-from mrjob.util import read_input
+from mrjob.util import read_text_input
 from mrjob.util import safeeval
 from mrjob.util import to_lines
 from mrjob.util import unarchive
@@ -205,52 +205,52 @@ class ReadInputTestCase(TestCase):
         shutil.rmtree(self.tmpdir)
 
     def test_stdin(self):
-        lines = read_input('-', stdin=BytesIO(self.BEAVER_DATA))
+        lines = read_text_input('-', stdin=BytesIO(self.BEAVER_DATA))
         self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_stdin_can_be_iterator(self):
-        lines = read_input('-', stdin=[self.BEAVER_DATA] * 5)
+        lines = read_text_input('-', stdin=[self.BEAVER_DATA] * 5)
         self.assertEqual(list(lines), [self.BEAVER_DATA] * 5)
 
     def test_normal_file(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers'))
+        lines = read_text_input(os.path.join(self.tmpdir, 'beavers'))
         self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_gz_file(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers.gz'))
+        lines = read_text_input(os.path.join(self.tmpdir, 'beavers.gz'))
         self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_bz2_file(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers.bz2'))
+        lines = read_text_input(os.path.join(self.tmpdir, 'beavers.bz2'))
         self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_glob(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers.*'))
+        lines = read_text_input(os.path.join(self.tmpdir, 'beavers.*'))
         self.assertEqual(list(lines), [self.BEAVER_DATA] * 3)
 
     def test_dir(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers/'))
+        lines = read_text_input(os.path.join(self.tmpdir, 'beavers/'))
         self.assertEqual(list(lines), [self.BEAVER_DATA])
 
     def test_dir_recursion(self):
-        lines = read_input(self.tmpdir)
+        lines = read_text_input(self.tmpdir)
         self.assertEqual(list(lines), [self.BEAVER_DATA] * 4)
 
     def test_glob_including_dir(self):
-        lines = read_input(os.path.join(self.tmpdir, 'beavers*'))
+        lines = read_text_input(os.path.join(self.tmpdir, 'beavers*'))
         self.assertEqual(list(lines), [self.BEAVER_DATA] * 4)
 
     def test_bad_path(self):
         # read_input is a generator, so we won't get an error
         # until we try to read from it
         self.assertRaises(IOError, list,
-                          read_input(os.path.join(self.tmpdir, 'lions')))
+                          read_text_input(os.path.join(self.tmpdir, 'lions')))
 
     def test_bad_glob(self):
         # read_input is a generator, so we won't get an error
         # until we try to read from it
         self.assertRaises(IOError, list,
-                          read_input(os.path.join(self.tmpdir, 'lions*')))
+                          read_text_input(os.path.join(self.tmpdir, 'lions*')))
 
 
 class SafeEvalTestCase(TestCase):

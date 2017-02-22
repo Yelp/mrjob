@@ -31,7 +31,7 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
-from mrjob.util import read_input
+from mrjob.util import read_text_input
 from mrjob.util import unarchive
 
 
@@ -380,10 +380,10 @@ class SimMRJobRunner(MRJobRunner):
                 # assume that input is a collection of key <tab> value pairs
                 # match all non-tab characters
                 for _, lines in itertools.groupby(
-                        read_input(input_path), key=reducer_key):
+                        read_text_input(input_path), key=reducer_key):
                     yield lines
             else:
-                for line in read_input(input_path):
+                for line in read_text_input(input_path):
                     yield (line,)
 
         for path in input_paths_to_split:

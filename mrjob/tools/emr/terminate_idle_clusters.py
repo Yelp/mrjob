@@ -323,7 +323,7 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
         did_terminate = True
     else:
         status = _attempt_to_acquire_lock(
-            runner.fs.make_s3_conn(),
+            runner.fs,
             runner._lock_uri(cluster_id, num_steps),
             runner._opts['cloud_fs_sync_secs'],
             '%s (%s)' % (msg,

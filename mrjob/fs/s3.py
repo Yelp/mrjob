@@ -53,6 +53,8 @@ from mrjob.util import read_file
 
 log = logging.getLogger(__name__)
 
+_CHUNK_SIZE = 8192
+
 # if EMR throttles us, how long to wait (in seconds) before trying again?
 _EMR_BACKOFF = 20
 _EMR_BACKOFF_MULTIPLIER = 1.5
@@ -242,14 +244,12 @@ class S3Filesystem(Filesystem):
         k = self.get_s3_key(path)
         return k.e_tag.strip('"')
 
-    # TODO: start here
     def _cat_file(self, filename):
         # stream lines from the s3 key
         s3_key = self.get_s3_key(filename)
+        body = s3_key.get()['Body']
 
-        # yields_lines=False: warn read_file that s3_key yields chunks of bytes
-        return read_file(
-            s3_key_to_uri(s3_key), fileobj=s3_key, yields_lines=False)
+        return read_file(filename, fileobj=body, yields_lines=False)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are
@@ -382,17 +382,6 @@ class S3Filesystem(Filesystem):
         """
         bucket_name, key_name = parse_s3_uri(uri)
         return self.get_bucket(bucket_name).Object(key_name)
-
-    # TODO: need to port or remove this
-    def make_s3_key(self, uri):
-        """Create the given S3 key, and return the corresponding
-        boto Key object.
-
-        uri is an S3 URI: ``s3://foo/bar``
-        """
-        bucket_name, key_name = parse_s3_uri(uri)
-
-        return self.get_bucket(bucket_name).new_key(key_name)
 
     def get_all_bucket_names(self):
         """Get a stream of the names of all buckets owned by this user

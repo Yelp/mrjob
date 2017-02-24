@@ -989,61 +989,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _upload_contents(self, s3_uri, path):
         """Uploads the file at the given path to S3, possibly using
         multipart upload."""
-        fsize = os.stat(path).st_size
-        part_size = self._get_upload_part_size()
+        s3_key = self.fs.get_s3_key(s3_uri)
 
-        s3_key = self.fs.make_s3_key(s3_uri)
+        # you can also disable multipart upload by using s3_key.put()
+        # directly, but I didn't want to have to maintain/test multiple
+        # code paths
+        part_size = self._get_upload_part_size() or 2**256
 
-        if self._should_use_multipart_upload(fsize, part_size, path):
-            log.debug("Starting multipart upload of %s" % (path,))
-            mpul = s3_key.bucket.initiate_multipart_upload(s3_key.name)
-
-            try:
-                self._upload_parts(mpul, path, fsize, part_size)
-            except:
-                mpul.cancel_upload()
-                raise
-
-            mpul.complete_upload()
-            log.debug("Completed multipart upload of %s to %s" % (
-                      path, s3_key.name))
-        else:
-            s3_key.set_contents_from_filename(path)
-
-    def _upload_parts(self, mpul, path, fsize, part_size):
-        offsets = range(0, fsize, part_size)
-
-        for i, offset in enumerate(offsets):
-            part_num = i + 1
-
-            log.debug("uploading %d/%d of %s" % (
-                part_num, len(offsets), path))
-            chunk_bytes = min(part_size, fsize - offset)
-
-            with filechunkio.FileChunkIO(
-                    path, 'r', offset=offset, bytes=chunk_bytes) as fp:
-                mpul.upload_part_from_file(fp, part_num)
-
-    def _get_upload_part_size(self):
-        # part size is in MB, as the minimum is 5 MB
-        return int((self._opts['cloud_upload_part_size'] or 0) * 1024 * 1024)
-
-    def _should_use_multipart_upload(self, fsize, part_size, path):
-        """Decide if we want to use multipart uploading.
-
-        path is only used to log warnings."""
-        if not part_size:  # disabled
-            return False
-
-        if fsize <= part_size:
-            return False
-
-        if filechunkio is None:
-            log.warning("Can't use S3 multipart upload for %s because"
-                        " filechunkio is not installed" % path)
-            return False
-
-        return True
+        s3_key.upload_file(
+            path,
+            Config=TransferConfig(
+                multipart_threshold=part_size,
+                multipart_chunksize=part_size,
+            ),
+        )
 
     def _ssh_tunnel_config(self):
         """Look up AMI version, and return a dict with the following keys:

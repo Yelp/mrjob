@@ -1030,6 +1030,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             ),
         )
 
+    def _get_upload_part_size(self):
+        # part size is in MB, as the minimum is 5 MB
+        return int((self._opts['cloud_upload_part_size'] or 0) * 1024 * 1024)
+
     def _ssh_tunnel_config(self):
         """Look up AMI version, and return a dict with the following keys:
 

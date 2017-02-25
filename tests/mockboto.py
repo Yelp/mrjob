@@ -176,6 +176,7 @@ class MockBotoTestCase(SandboxedTestCase):
             None, self.MAX_EMR_CONNECTIONS)
 
         self.start(patch.object(boto3, 'client', self.client))
+        self.start(patch.object(boto3, 'resource', self.resource))
 
         self.start(patch.object(boto, 'connect_s3', self.connect_s3))
         self.start(patch.object(
@@ -319,6 +320,10 @@ class MockBotoTestCase(SandboxedTestCase):
             return MockIAMClient(**kwargs)
         else:
             raise ValueError
+
+    # mock boto3.resource()
+    def resource(self, service_name, **kwargs):
+        raise NotImplementedError
 
 
 ### S3 ###

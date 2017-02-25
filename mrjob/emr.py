@@ -49,6 +49,11 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+try:
+    import botocore.client
+    botocore  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    botocore = None
 
 try:
     import boto3
@@ -59,12 +64,6 @@ except ImportError:
     # inside hadoop streaming
     boto3 = None
 
-
-try:
-    import filechunkio
-except ImportError:
-    # that's cool; filechunkio is only for multipart uploading
-    filechunkio = None
 
 import mrjob
 import mrjob.step
@@ -82,6 +81,7 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _EMR_BACKOFF
 from mrjob.fs.s3 import _EMR_BACKOFF_MULTIPLIER
 from mrjob.fs.s3 import _EMR_MAX_TRIES
+from mrjob.fs.s3 import _client_error_status
 from mrjob.fs.s3 import _endpoint_url
 from mrjob.fs.s3 import _get_bucket_region
 from mrjob.fs.s3 import _wrap_aws_client
@@ -106,9 +106,7 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
-from mrjob.parse import iso8601_to_datetime
 from mrjob.parse import iso8601_to_timestamp
-from mrjob.parse import parse_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.patched_boto import _patched_describe_cluster
@@ -372,31 +370,30 @@ def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
     return cloud_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
 
 
+# helpers for _attempt_to_acquire_lock()
+
 def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
-    bucket_name, key_prefix = parse_s3_uri(lock_uri)
-    bucket = s3_fs.get_bucket(bucket_name)
-    key = bucket.get_key(key_prefix)
+    s3_key = s3_fs.get_s3_key(lock_uri)
 
-    # EMRJobRunner should start using a cluster within about a second of
-    # locking it, so if it's been a while, then it probably crashed and we
-    # can just use this cluster.
-    key_expired = False
-    if key and mins_to_expiration is not None:
-        last_modified = iso8601_to_datetime(key.last_modified)
-        age = datetime.utcnow() - last_modified
-        if age > timedelta(minutes=mins_to_expiration):
-            key_expired = True
+    try:
+        key_data = s3_key.get()
+    except botocore.exceptions.ClientError as ex:
+        if _client_error_status(ex) != 404:
+            raise
+        key_data = None
 
-    if key is None or key_expired:
-        key = bucket.new_key(key_prefix)
-        key.set_contents_from_string(job_key.encode('utf_8'))
-        return key
-    else:
-        return None
+    # if there's an unexpired lock, give up
+    if key_data and mins_to_expiration is not None:
+        age = datetime.utcnow() - key_data['LastModified']
+        if age <= timedelta(minutes=mins_to_expiration):
+            return None
+
+    s3_key.put(Body=job_key.encode('utf_8'))
+    return s3_key
 
 
 def _lock_acquire_step_2(key, job_key):
-    key_value = key.get_contents_as_string()
+    key_value = key.get
     return (key_value == job_key.encode('utf_8'))
 
 

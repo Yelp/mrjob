@@ -19,14 +19,6 @@ import logging
 import socket
 
 try:
-    import boto
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    # don't require boto; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    boto = None
-
-try:
     import botocore.client
     botocore  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
@@ -39,7 +31,6 @@ except ImportError:
     boto3 = None
 
 from mrjob.aws import _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
-from mrjob.aws import s3_endpoint_for_region
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_uri
 from mrjob.parse import is_s3_uri
@@ -47,7 +38,6 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
-from mrjob.runner import _BUFFER_SIZE
 from mrjob.util import read_file
 
 
@@ -97,31 +87,6 @@ def _get_bucket_region(client, bucket_name):
     it to a region name."""
     resp = client.get_bucket_location(Bucket=bucket_name)
     return resp['LocationConstraint'] or _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
-
-
-
-
-# only exists for deprecated boto library support, going away in v0.7.0
-def wrap_aws_conn(raw_conn):
-    """Wrap a given boto Connection object so that it can retry when
-    throttled."""
-    def retry_if(ex):
-        """Retry if we get a server error indicating throttling. Also
-        handle spurious 505s that are thought to be part of a load
-        balancer issue inside AWS."""
-        return ((isinstance(ex, boto.exception.BotoServerError) and
-                 ('Throttling' in ex.body or
-                  'RequestExpired' in ex.body or
-                  ex.status == 505)) or
-                (isinstance(ex, socket.error) and
-                 ex.args in ((104, 'Connection reset by peer'),
-                             (110, 'Connection timed out'))))
-
-    return RetryWrapper(raw_conn,
-                        retry_if=retry_if,
-                        backoff=_EMR_BACKOFF,
-                        multiplier=_EMR_BACKOFF_MULTIPLIER,
-                        max_tries=_EMR_MAX_TRIES)
 
 
 def _is_retriable_client_error(ex):
@@ -404,38 +369,3 @@ class S3Filesystem(Filesystem):
 
         client.create_bucket(Bucket=bucket_name,
                              CreateBucketConfiguration=conf)
-
-    # old interface, uses boto, not boto 3
-
-    def make_s3_conn(self, region=''):
-        """Create a connection to S3.
-
-        :param region: region to use to choose S3 endpoint.
-
-        If you are doing anything with buckets other than creating them
-        or fetching basic metadata (name and location), it's best to use
-        :py:meth:`get_bucket` because it chooses the appropriate S3 endpoint
-        automatically.
-
-        :return: a :py:class:`boto.s3.connection.S3Connection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
-        """
-        # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to use make_s3_conn()')
-
-        log.warning('make_s3_conn() is deprecated and will be removed in'
-                    ' v0.7.0. Use make_s3_resource(), which uses boto3,'
-                    ' instead.')
-
-        # self._s3_endpoint overrides region
-        host = self._s3_endpoint_url or s3_endpoint_for_region(region)
-
-        log.debug('creating S3 connection (to %s)' % host)
-
-        raw_s3_conn = boto.connect_s3(
-            aws_access_key_id=self._aws_access_key_id,
-            aws_secret_access_key=self._aws_secret_access_key,
-            host=host,
-            security_token=self._aws_session_token)
-        return wrap_aws_conn(raw_s3_conn)

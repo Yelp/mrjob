@@ -52,6 +52,7 @@ except ImportError:
 
 try:
     import boto3
+    import boto3.s3.transfer
     boto3  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
@@ -72,14 +73,15 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
-from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import wrap_aws_conn
+from mrjob.fs.s3 import _EMR_BACKOFF
+from mrjob.fs.s3 import _EMR_BACKOFF_MULTIPLIER
+from mrjob.fs.s3 import _EMR_MAX_TRIES
 from mrjob.fs.s3 import _endpoint_url
 from mrjob.fs.s3 import _get_bucket_region
 from mrjob.fs.s3 import _wrap_aws_client
@@ -119,6 +121,7 @@ from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
 from mrjob.retry import RetryGoRound
+from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import BootstrapWorkingDirManager
@@ -417,6 +420,32 @@ def _get_reason(cluster_or_step):
     return getattr(
         getattr(cluster_or_step.status, 'statechangereason', ''),
         'message', '').rstrip()
+
+
+
+
+# only exists for deprecated boto library support, going away in v0.7.0
+def _wrap_aws_conn(raw_conn):
+    """Wrap a given boto Connection object so that it can retry when
+    throttled."""
+    def retry_if(ex):
+        """Retry if we get a server error indicating throttling. Also
+        handle spurious 505s that are thought to be part of a load
+        balancer issue inside AWS."""
+        return ((isinstance(ex, boto.exception.BotoServerError) and
+                 ('Throttling' in ex.body or
+                  'RequestExpired' in ex.body or
+                  ex.status == 505)) or
+                (isinstance(ex, socket.error) and
+                 ex.args in ((104, 'Connection reset by peer'),
+                             (110, 'Connection timed out'))))
+
+    return RetryWrapper(raw_conn,
+                        retry_if=retry_if,
+                        backoff=_EMR_BACKOFF,
+                        multiplier=_EMR_BACKOFF_MULTIPLIER,
+                        max_tries=_EMR_MAX_TRIES)
+
 
 
 class EMRRunnerOptionStore(RunnerOptionStore):
@@ -998,7 +1027,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         s3_key.upload_file(
             path,
-            Config=TransferConfig(
+            Config=boto3.s3.transfer.TransferConfig(
                 multipart_threshold=part_size,
                 multipart_chunksize=part_size,
             ),
@@ -3054,7 +3083,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 lambda ex: isinstance(
                     ex, boto.https_connection.InvalidCertificateException))
 
-        return wrap_aws_conn(conn)
+        return _wrap_aws_conn(conn)
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()

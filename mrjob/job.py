@@ -43,7 +43,7 @@ from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import expand_path
 from mrjob.util import read_text_input
 
-from msgpack import packb, Unpacker, UnpackValueError
+from msgpack import Packer, Unpacker, UnpackValueError
 
 
 log = logging.getLogger(__name__)
@@ -708,10 +708,15 @@ class MRJob(MRJobLauncher):
         # We disable protocols selection, because non of default protocols is compatible with our changes
         # read, write = self.pick_protocols(step_num, step_type)
         self.unpacker = Unpacker(self.stdin, encoding="utf-8")
+        self.packer = Packer(use_bin_type=True)
 
         def write_(key, value):
-            self.stdout.write(packb(key, use_bin_type=True))
-            self.stdout.write(packb(value, use_bin_type=True))
+            key_enc = self.packer.pack(key, use_bin_type=True)
+            val_enc = self.packer.pack(value, use_bin_type=True)
+            self.stdout.write(struct.pack(">i", len(key_enc)))
+            self.stdout.write(key_enc)
+            self.stdout.write(struct.pack(">i", len(val_enc)))
+            self.stdout.write(val_enc)
 
         return self._read_input, write_
 

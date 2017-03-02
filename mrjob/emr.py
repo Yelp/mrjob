@@ -183,6 +183,15 @@ _DEFAULT_IMAGE_VERSION = '4.8.2'
 # (2.4.2 isn't actually the latest version by a long shot)
 _IMAGE_VERSION_LATEST = '2.4.2'
 
+# first AMI version that we can't run bash -e on (see #1548)
+_BAD_BASH_IMAGE_VERSION = '5.2.0'
+
+# use this if bash -e works (/bin/sh is actually bash)
+_GOOD_BASH_SH_BIN = ['/bin/sh', '-ex']
+
+# use this if bash -e doesn't work
+_BAD_BASH_SH_BIN = ['/bin/sh', '-x']
+
 # Hadoop streaming jar on 1-3.x AMIs
 _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 
@@ -854,6 +863,26 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_uri = s3_uri + '/'
 
         return s3_uri
+
+    def _bash_is_bad(self):
+        # hopefully, there will eventually be an image version
+        # where this issue is fixed. See #1548
+        return self._image_version_gte(_BAD_BASH_IMAGE_VERSION)
+
+    def _sh_bin(self):
+        if self._opts['sh_bin'] is None:
+            if self._bash_is_bad():
+                return _BAD_BASH_SH_BIN
+            else:
+                return _GOOD_BASH_SH_BIN
+        else:
+            return self._opts['sh_bin']
+
+    def _setup_wrapper_pre_command(self):
+        if self._opts['sh_bin'] is None and self._bash_is_bad():
+            return ['set -e']
+        else:
+            return []
 
     @property
     def fs(self):

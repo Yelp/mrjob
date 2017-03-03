@@ -917,7 +917,7 @@ class DataprocJobRunner(MRJobRunner):
             out.append(line + '\n')
 
         # shebang
-        sh_bin = self._opts['sh_bin']
+        sh_bin = self._sh_bin()
         if not sh_bin[0].startswith('/'):
             sh_bin = ['/usr/bin/env'] + sh_bin
         writeln('#!' + cmd_line(sh_bin))

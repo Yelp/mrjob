@@ -842,7 +842,7 @@ class MRJobRunner(object):
         ] + self._mr_job_extra_args()
 
         if self._setup_wrapper_script_path:
-            return (self._opts['sh_bin'] +
+            return (self._sh_bin() +
                     [self._working_dir_mgr.name(
                         'file', self._setup_wrapper_script_path)] +
                     args)
@@ -892,7 +892,7 @@ class MRJobRunner(object):
         """Wrap command in sh -c '...' to allow for pipes, etc.
         Use *sh_bin* option."""
         return "%s -c '%s'" % (
-            cmd_line(self._opts['sh_bin']),
+            cmd_line(self._sh_bin()),
             cmd_str.replace("'", "'\\''"))
 
     def _mr_job_extra_args(self, local=False):
@@ -936,6 +936,19 @@ class MRJobRunner(object):
             return ['--no-strict-protocols']
         else:
             return []
+
+    def _sh_bin(self):
+        """The sh binary and any arguments, as a list. Override this
+        if, for example, a runner needs different default values
+        depending on circumstances (see :py:class:`~mrjob.emr.EMRJobRunner`).
+        """
+        return self._opts['sh_bin']
+
+    def _sh_pre_commands(self):
+        """A list of lines to put at the very start of any sh script
+        (e.g. ``set -e`` when ``sh -e`` wont work, see #1549)
+        """
+        return []
 
     def _create_setup_wrapper_script(
             self, dest='setup-wrapper.sh', local=False):
@@ -1060,6 +1073,13 @@ class MRJobRunner(object):
 
         def writeln(line=''):
             out.append(line + '\n')
+
+        # hook for 'set -e', etc.
+        pre_commands = self._sh_pre_commands()
+        if pre_commands:
+            for cmd in pre_commands:
+                writeln(cmd)
+            writeln()
 
         # we're always going to execute this script as an argument to
         # sh, so there's no need to add a shebang (e.g. #!/bin/sh)

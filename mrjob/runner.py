@@ -891,6 +891,9 @@ class MRJobRunner(object):
     def _sh_wrap(self, cmd_str):
         """Wrap command in sh -c '...' to allow for pipes, etc.
         Use *sh_bin* option."""
+        # prepend set -e etc.
+        cmd_str = '; '.join(self._sh_pre_commands() + [cmd_str])
+
         return "%s -c '%s'" % (
             cmd_line(self._sh_bin()),
             cmd_str.replace("'", "'\\''"))

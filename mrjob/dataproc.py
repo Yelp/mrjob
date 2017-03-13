@@ -921,6 +921,10 @@ class DataprocJobRunner(MRJobRunner):
         if not sh_bin[0].startswith('/'):
             sh_bin = ['/usr/bin/env'] + sh_bin
         writeln('#!' + cmd_line(sh_bin))
+
+        # unused hook for 'set -e', etc. (see #1549)
+        for cmd in self._sh_pre_commands():
+            writeln(cmd)
         writeln()
 
         # store $PWD

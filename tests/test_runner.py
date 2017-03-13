@@ -43,12 +43,17 @@ from mrjob.runner import MRJobRunner
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
+from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
 
 from tests.mockboto import MockBotoTestCase
+from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
+from tests.mr_filter_job import MRFilterJob
+from tests.mr_no_mapper import MRNoMapper
+from tests.mr_no_runner import MRNoRunner
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_sort_values import MRSortValues
@@ -64,6 +69,12 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+
+# used to match command lines
+if PY2:
+    PYTHON_BIN = 'python'
+else:
+    PYTHON_BIN = 'python3'
 
 
 class WithStatementTestCase(TestCase):
@@ -2046,3 +2057,189 @@ class SortValuesTestCase(SandboxedTestCase):
             self.assertEqual(
                 hadoop_args[hadoop_args.index('-partitioner') + 1],
                 'FooPartitioner')
+
+
+class RenderSubstepTestCase(SandboxedTestCase):
+
+    def test_streaming_mapper(self):
+        self._test_streaming_substep('mapper')
+
+    def test_streaming_combiner(self):
+        self._test_streaming_substep('combiner')
+
+    def test_streaming_reducer(self):
+        self._test_streaming_substep('reducer')
+
+    def _test_streaming_substep(self, mrc):
+        job = MRTwoStepJob()  # includes mapper, combiner, reducer
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(0, mrc),
+                '%s mr_two_step_job.py --step-num=0 --%s' % (PYTHON_BIN, mrc)
+            )
+
+    def test_step_1_streaming(self):
+        # just make sure that --step-num isn't hardcoded
+        job = MRTwoStepJob()  # includes step 1 mapper
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(1, 'mapper'),
+                '%s mr_two_step_job.py --step-num=1 --mapper' % PYTHON_BIN
+            )
+
+    def test_mapper_cmd(self):
+        self._test_cmd('mapper')
+
+    def test_combiner_cmd(self):
+        self._test_cmd('combiner')
+
+    def test_reducer_cmd(self):
+        self._test_cmd('reducer')
+
+    def _test_cmd(self, mrc):
+        job = MRCmdJob([('--%s-cmd' % mrc), 'grep foo'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(0, mrc),
+                'grep foo'
+            )
+
+    def test_no_mapper(self):
+        job = MRNoMapper()  # second step has no mapper
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(1, 'mapper'),
+                'cat'
+            )
+
+    def test_no_combiner(self):
+        self._test_no_non_mapper('combiner')
+
+    def test_no_reducer(self):
+        self._test_no_non_mapper('reducer')
+
+    def _test_no_non_mapper(self, mrc):
+        job = MRNoRunner()  # only has mapper
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(0, mrc),
+                None
+            )
+
+    def test_respects_interpreter_method(self):
+        # _interpreter() method is extensively tested; just
+        # verify that we use it
+        job = MRTwoStepJob()
+        job.sandbox()
+
+        self.start(patch('mrjob.runner.MRJobRunner._interpreter',
+                         return_value=['run-my-task']))
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(0, 'mapper'),
+                'run-my-task mr_two_step_job.py --step-num=0 --mapper'
+            )
+
+    def test_setup_wrapper_script(self):
+        # inline runner doesn't create wrapper script
+        job = MRTwoStepJob(['-r', 'local', '--setup', 'true'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._create_setup_wrapper_script()
+
+            # note that local mode uses sys.executable, not python/python3
+            self.assertEqual(
+                runner._render_substep(0, 'mapper'),
+                'sh -ex setup-wrapper.sh %s mr_two_step_job.py'
+                ' --step-num=0 --mapper' % sys.executable
+            )
+
+    def test_setup_wrapper_script_custom_sh_bin(self):
+        job = MRTwoStepJob(['-r', 'local', '--setup', 'true',
+                            '--sh-bin', 'sh -xv'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._create_setup_wrapper_script()
+
+            # note that local mode uses sys.executable, not python/python3
+            self.assertEqual(
+                runner._render_substep(0, 'mapper'),
+                'sh -xv setup-wrapper.sh %s mr_two_step_job.py'
+                ' --step-num=0 --mapper' % sys.executable
+            )
+
+    def test_setup_wrapper_respects_sh_bin_method(self):
+        job = MRTwoStepJob(['-r', 'local', '--setup', 'true'])
+        job.sandbox()
+
+        self.start(patch('mrjob.runner.MRJobRunner._sh_bin',
+                         return_value=['bash']))
+
+        with job.make_runner() as runner:
+            runner._create_setup_wrapper_script()
+
+            self.assertEqual(
+                runner._render_substep(0, 'mapper'),
+                'bash setup-wrapper.sh %s mr_two_step_job.py'
+                ' --step-num=0 --mapper' % sys.executable
+            )
+
+    def test_mapper_pre_filter(self):
+        self._test_pre_filter('mapper')
+
+    def test_combiner_pre_filter(self):
+        self._test_pre_filter('combiner')
+
+    def test_reducer_pre_filter(self):
+        self._test_pre_filter('reducer')
+
+    def _test_pre_filter(self, mrc):
+        job = MRFilterJob(['-r', 'local', ('--%s-filter' % mrc), 'cat'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(0, mrc),
+                "sh -ex -c 'cat |"
+                " %s mr_filter_job.py --step-num=0 --%s"
+                " --%s-filter cat'" %
+                (sys.executable, mrc, mrc))
+
+    def test_pre_filter_custom_sh_bin(self):
+        job = MRFilterJob(['-r', 'local', '--mapper-filter', 'cat',
+                           '--sh-bin', 'sh -xv'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(0, 'mapper'),
+                "sh -xv -c 'cat |"
+                " %s mr_filter_job.py --step-num=0 --mapper"
+                " --mapper-filter cat'" % sys.executable)
+
+    def test_pre_filter_respects_sh_bin_method(self):
+        job = MRFilterJob(['-r', 'local', '--mapper-filter', 'cat'])
+        job.sandbox()
+
+        self.start(patch('mrjob.runner.MRJobRunner._sh_bin',
+                         return_value=['bash']))
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(0, 'mapper'),
+                "bash -c 'cat |"
+                " %s mr_filter_job.py --step-num=0 --mapper"
+                " --mapper-filter cat'" % sys.executable)

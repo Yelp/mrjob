@@ -29,10 +29,10 @@ from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
 
-from tests.mr_cmd_job import CmdJob
+from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
-from tests.mr_filter_job import FilterJob
+from tests.mr_filter_job import MRFilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
@@ -566,7 +566,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
     def test_cat_mapper(self):
         data = b'x\ny\nz\n'
-        job = CmdJob(['--mapper-cmd=cat', '--runner=local'])
+        job = MRCmdJob(['--mapper-cmd=cat', '--runner=local'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
@@ -583,7 +583,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
     def test_uniq_combiner(self):
         data = b'x\nx\nx\nx\nx\nx\n'
-        job = CmdJob(['--combiner-cmd=uniq', '--runner=local'])
+        job = MRCmdJob(['--combiner-cmd=uniq', '--runner=local'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
@@ -606,7 +606,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
     def test_cat_reducer(self):
         data = b'x\ny\nz\n'
-        job = CmdJob(['--reducer-cmd', 'cat -e', '--runner=local'])
+        job = MRCmdJob(['--reducer-cmd', 'cat -e', '--runner=local'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
@@ -629,7 +629,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
         data = b'x\nx\nx\nx\nx\nx\n'
         mapper_cmd = 'cat -e'
         reducer_cmd = bash_wrap('wc -l | tr -Cd "[:digit:]"')
-        job = CmdJob([
+        job = MRCmdJob([
             '--runner', 'local',
             '--mapper-cmd', mapper_cmd,
             '--combiner-cmd', 'uniq',
@@ -651,7 +651,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
     def test_multiple_2(self):
         data = b'x\ny\nz\n'
-        job = CmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', 'wc -l',
+        job = MRCmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', 'wc -l',
                       '--runner=local', '--no-conf'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
@@ -663,7 +663,7 @@ class FilterTestCase(SandboxedTestCase):
 
     def test_mapper_pre_filter(self):
         data = b'x\ny\nz\n'
-        job = FilterJob(['--mapper-filter', 'cat -e', '--runner=local'])
+        job = MRFilterJob(['--mapper-filter', 'cat -e', '--runner=local'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
@@ -681,7 +681,7 @@ class FilterTestCase(SandboxedTestCase):
 
     def test_combiner_pre_filter(self):
         data = b'x\ny\nz\n'
-        job = FilterJob(['--combiner-filter', 'cat -e', '--runner=local'])
+        job = MRFilterJob(['--combiner-filter', 'cat -e', '--runner=local'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
@@ -702,7 +702,7 @@ class FilterTestCase(SandboxedTestCase):
 
     def test_reducer_pre_filter(self):
         data = b'x\ny\nz\n'
-        job = FilterJob(['--reducer-filter', 'cat -e', '--runner=local'])
+        job = MRFilterJob(['--reducer-filter', 'cat -e', '--runner=local'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
@@ -726,7 +726,7 @@ class FilterTestCase(SandboxedTestCase):
 
         data = b'x\ny\nz\n'
         # grep will return exit code 1 because there are no matches
-        job = FilterJob(['--mapper-filter', 'grep w', '--runner=local'])
+        job = MRFilterJob(['--mapper-filter', 'grep w', '--runner=local'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             self.assertEqual(
@@ -749,7 +749,7 @@ class FilterTestCase(SandboxedTestCase):
         input_gz.write(b'x\ny\nz\n')
         input_gz.close()
 
-        job = FilterJob([
+        job = MRFilterJob([
             '--mapper-filter', 'cat -e', '--runner=local', input_gz_path])
         with job.make_runner() as r:
             self.assertEqual(

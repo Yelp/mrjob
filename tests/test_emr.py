@@ -2753,6 +2753,46 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
 
+    def test_restart_ssh_tunnel_on_launch(self):
+        # regression test for #1549
+        ssh_tunnel_cluster_ids = []
+
+        def _set_up_ssh_tunnel(self):
+            if self._ssh_proc is None:
+                ssh_tunnel_cluster_ids.append(self._cluster_id)
+                self._ssh_proc = Mock()
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._set_up_ssh_tunnel',
+            side_effect=_set_up_ssh_tunnel, autospec=True))
+
+        def _kill_ssh_tunnel(self):
+            self._ssh_proc = None
+
+        mock_kill_ssh_tunnel = self.start(patch(
+            'mrjob.emr.EMRJobRunner._kill_ssh_tunnel',
+            side_effect=_kill_ssh_tunnel,
+            autospec=True))
+
+        cluster_id = self.make_pooled_cluster()
+        self.mock_emr_self_termination.add(cluster_id)
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # tried to add steps to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 2)
+
+            self.assertNotEqual(runner.get_cluster_id(), cluster_id)
+            self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+            self.assertEqual(len(mock_kill_ssh_tunnel.call_args_list), 1)
+            self.assertEqual(ssh_tunnel_cluster_ids,
+                             [cluster_id, runner.get_cluster_id()])
+
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable
         cluster1_id = self.make_pooled_cluster(num_core_instances=20)

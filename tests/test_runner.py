@@ -2244,6 +2244,20 @@ class RenderSubstepTestCase(SandboxedTestCase):
                 " %s mr_filter_job.py --step-num=0 --mapper"
                 " --mapper-filter cat'" % sys.executable)
 
+    def test_pre_filter_respects_sh_pre_commands_method(self):
+        job = MRFilterJob(['-r', 'local', '--mapper-filter', 'cat'])
+        job.sandbox()
+
+        self.start(patch('mrjob.runner.MRJobRunner._sh_pre_commands',
+                         return_value=['set -v']))
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._render_substep(0, 'mapper'),
+                "sh -ex -c 'set -v;"
+                " cat | %s mr_filter_job.py --step-num=0 --mapper"
+                " --mapper-filter cat'" % sys.executable)
+
 
 class SetupWrapperScriptContentTestCase(SandboxedTestCase):
 

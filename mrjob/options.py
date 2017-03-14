@@ -521,12 +521,10 @@ _RUNNER_OPTS = dict(
     applications=dict(
         cloud_role='launch',
         combiner=combine_lists,
-        deprecated_aliases=['emr_applications'],
         runners=['emr'],
         switches=[
             (['--application'], dict(
                 action='append',
-                deprecated_aliases=['--emr-application'],
                 help=('Additional applications to run on 4.x AMIs (e.g.'
                       ' Ganglia, Mahout, Spark)'),
             )),

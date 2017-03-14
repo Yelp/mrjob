@@ -29,6 +29,9 @@ Options::
   -h, --help            show this help message and exit
   --additional-emr-info=ADDITIONAL_EMR_INFO
                         A JSON string for selecting additional features on EMR
+  --application=APPLICATIONS
+                        Additional applications to run on 4.x AMIs (e.g.
+                        Ganglia, Mahout, Spark)
   --bootstrap=BOOTSTRAP
                         A shell command to set up libraries etc. before any
                         steps (e.g. "sudo apt-get -qy install python3"). You
@@ -87,9 +90,6 @@ Options::
   --no-emr-api-param=EMR_API_PARAMS
                         Parameter to be unset when calling EMR API. You can
                         use --no-emr-api-param multiple times.
-  --emr-application=EMR_APPLICATIONS
-                        Additional applications to run on 4.x AMIs (e.g.
-                        Ganglia, Mahout, Spark)
   --emr-configuration=EMR_CONFIGURATIONS
                         Configuration to use on 4.x AMIs as a JSON-encoded
                         dict; see http://docs.aws.amazon.com/ElasticMapReduce/

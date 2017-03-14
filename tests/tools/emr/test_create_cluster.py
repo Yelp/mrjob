@@ -32,6 +32,7 @@ class ClusterInspectionTestCase(ToolTestCase):
         self.assertEqual(
             _runner_kwargs(), {
                 'additional_emr_info': None,
+                'applications': [],
                 'bootstrap': [],
                 'bootstrap_actions': [],
                 'bootstrap_mrjob': None,
@@ -46,7 +47,6 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'core_instance_type': None,
                 'ec2_key_pair': None,
                 'emr_api_params': None,
-                'emr_applications': [],
                 'emr_configurations': None,
                 'emr_endpoint': None,
                 'enable_emr_debugging': None,

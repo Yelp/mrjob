@@ -120,8 +120,8 @@ Cluster creation and configuration
               VisibleToAllUsers: null
 
 .. mrjob-opt::
-   :config: emr_applications
-   :switch: --emr-application
+   :config: applications
+   :switch: --application
    :type: :ref:`string list <data-type-string-list>`
    :set: emr
    :default: ``[]``
@@ -133,6 +133,10 @@ Cluster creation and configuration
    See `Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-release-components.html>`_ in the EMR docs for more details.
 
    .. versionadded:: 0.5.2
+
+   .. versionchanged:: 0.5.9
+
+      This used to be called *emr_applications*.
 
 .. mrjob-opt::
     :config: emr_configurations

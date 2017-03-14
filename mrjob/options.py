@@ -252,6 +252,18 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    applications=dict(
+        cloud_role='launch',
+        combiner=combine_lists,
+        runners=['emr'],
+        switches=[
+            (['--application'], dict(
+                action='append',
+                help=('Additional applications to run on 4.x AMIs (e.g.'
+                      ' Ganglia, Mahout, Spark)'),
+            )),
+        ],
+    ),
     aws_access_key_id=dict(
         cloud_role='connect',
         runners=['emr'],
@@ -515,18 +527,6 @@ _RUNNER_OPTS = dict(
                 callback=_key_none_value_callback,
                 help=('Parameter to be unset when calling EMR API.'
                       ' You can use --no-emr-api-param multiple times.'),
-            )),
-        ],
-    ),
-    applications=dict(
-        cloud_role='launch',
-        combiner=combine_lists,
-        runners=['emr'],
-        switches=[
-            (['--application'], dict(
-                action='append',
-                help=('Additional applications to run on 4.x AMIs (e.g.'
-                      ' Ganglia, Mahout, Spark)'),
             )),
         ],
     ),

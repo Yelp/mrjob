@@ -17,7 +17,7 @@ from mrjob.step import MRStep
 from mrjob.protocol import RawValueProtocol
 
 
-class FilterJob(MRJob):
+class MRFilterJob(MRJob):
 
     INPUT_PROTOCOL = RawValueProtocol
 
@@ -26,7 +26,7 @@ class FilterJob(MRJob):
     OUTPUT_PROTOCOL = RawValueProtocol
 
     def configure_options(self):
-        super(FilterJob, self).configure_options()
+        super(MRFilterJob, self).configure_options()
         self.add_passthrough_option('--mapper-filter', default=None)
         self.add_passthrough_option('--combiner-filter', default=None)
         self.add_passthrough_option('--reducer-filter', default=None)
@@ -43,4 +43,4 @@ class FilterJob(MRJob):
 
 
 if __name__ == '__main__':
-    FilterJob().run()
+    MRFilterJob().run()

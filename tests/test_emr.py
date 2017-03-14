@@ -55,6 +55,7 @@ from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import bash_wrap
+from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
@@ -6186,3 +6187,45 @@ class SSHWorkerHostsTestCase(MockBotoTestCase):
             len(self._ssh_worker_hosts('--num-core-instances', '2',
                                        '--num-task-instances', '3')),
             5)
+
+
+class BadBashWorkaroundTestCase(MockBotoTestCase):
+    # regression test for 1548
+
+    def _test_sh_bin(self, image_version, expected_bin, expected_pre_commands):
+        cookie_jar = self.makefile('cookie.jar')
+
+        job = MRTwoStepJob(['-r', 'emr', '--image-version', image_version,
+                            '--libjar', cookie_jar])
+        job.sandbox()
+
+        def check_script(path):
+            self.assertTrue(path)
+            with open(path) as script:
+                lines = list(script)
+                self.assertEqual(lines[0].strip(),
+                                 '#!%s' % cmd_line(expected_bin))
+                # everything up to first newline is a pre-command
+                pre_commands = []
+                for line in lines[1:]:
+                    cmd = line.strip()
+                    if not cmd:
+                        break
+                    pre_commands.append(cmd)
+
+                self.assertEqual(pre_commands, expected_pre_commands)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(runner._sh_bin(), expected_bin)
+            self.assertEqual(runner._sh_pre_commands(), expected_pre_commands)
+
+            check_script(runner._master_bootstrap_script_path)
+            check_script(runner._master_node_setup_script_path)
+
+    def test_good_bash(self):
+        self._test_sh_bin('5.0.0', ['/bin/sh', '-ex'], [])
+
+    def test_bad_bash(self):
+        self._test_sh_bin('5.2.0', ['/bin/sh', '-x'], ['set -e'])

@@ -183,6 +183,15 @@ _DEFAULT_IMAGE_VERSION = '4.8.2'
 # (2.4.2 isn't actually the latest version by a long shot)
 _IMAGE_VERSION_LATEST = '2.4.2'
 
+# first AMI version that we can't run bash -e on (see #1548)
+_BAD_BASH_IMAGE_VERSION = '5.2.0'
+
+# use this if bash -e works (/bin/sh is actually bash)
+_GOOD_BASH_SH_BIN = ['/bin/sh', '-ex']
+
+# use this if bash -e doesn't work
+_BAD_BASH_SH_BIN = ['/bin/sh', '-x']
+
 # Hadoop streaming jar on 1-3.x AMIs
 _PRE_4_X_STREAMING_JAR = '/home/hadoop/contrib/streaming/hadoop-streaming.jar'
 
@@ -441,7 +450,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'pool_wait_minutes': 0,
             'cloud_fs_sync_secs': 5.0,
             'cloud_upload_part_size': 100,  # 100 MB
-            'sh_bin': ['/bin/sh', '-ex'],
+            'sh_bin': None,  # see _sh_bin(), below
             'ssh_bin': ['ssh'],
             # don't use a list because it makes it hard to read option values
             # when running in verbose mode. See #1284
@@ -854,6 +863,25 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_uri = s3_uri + '/'
 
         return s3_uri
+
+    def _bash_is_bad(self):
+        # hopefully, there will eventually be an image version
+        # where this issue is fixed. See #1548
+        return self._image_version_gte(_BAD_BASH_IMAGE_VERSION)
+
+    def _sh_bin(self):
+        if self._opts['sh_bin']:
+            return self._opts['sh_bin']
+        elif self._bash_is_bad():
+            return _BAD_BASH_SH_BIN
+        else:
+            return _GOOD_BASH_SH_BIN
+
+    def _sh_pre_commands(self):
+        if self._bash_is_bad() and not self._opts['sh_bin']:
+            return ['set -e']
+        else:
+            return []
 
     @property
     def fs(self):
@@ -2642,6 +2670,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return bootstrap
 
+    # helper for _master_*_script_content() methods
+    def _write_start_of_sh_script(self, writeln):
+        # shebang
+        sh_bin = self._sh_bin()
+        if not sh_bin[0].startswith('/'):
+            sh_bin = ['/usr/bin/env'] + sh_bin
+        writeln('#!' + cmd_line(sh_bin))
+
+        # hook for 'set -e', etc. (see #1549)
+        for cmd in self._sh_pre_commands():
+            writeln(cmd)
+
+        writeln()
+
     def _master_bootstrap_script_content(self, bootstrap):
         """Create the contents of the master bootstrap script.
         """
@@ -2650,12 +2692,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         def writeln(line=''):
             out.append(line + '\n')
 
-        # shebang
-        sh_bin = self._opts['sh_bin']
-        if not sh_bin[0].startswith('/'):
-            sh_bin = ['/usr/bin/env'] + sh_bin
-        writeln('#!' + cmd_line(sh_bin))
-        writeln()
+        # shebang, etc.
+        self._write_start_of_sh_script(writeln)
 
         # store $PWD
         writeln('# store $PWD')
@@ -2751,12 +2789,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         def writeln(line=''):
             out.append(line + '\n')
 
-        # shebang
-        sh_bin = self._opts['sh_bin']
-        if not sh_bin[0].startswith('/'):
-            sh_bin = ['/usr/bin/env'] + sh_bin
-        writeln('#!' + cmd_line(sh_bin))
-        writeln()
+        # shebang, etc.
+        self._write_start_of_sh_script(writeln)
 
         # run commands in a block so we can redirect stdout to stderr
         # (e.g. to catch errors from compileall). See #370

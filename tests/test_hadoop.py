@@ -52,12 +52,7 @@ from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
-
-# used to match command lines
-if PY2:
-    PYTHON_BIN = 'python'
-else:
-    PYTHON_BIN = 'python3'
+from tests.test_runner import PYTHON_BIN
 
 
 class MockHadoopTestCase(SandboxedTestCase):

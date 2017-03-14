@@ -489,7 +489,7 @@ and install another Python binary.
    * any :py:class:`~mrjob.step.SparkStep` or
      :py:class:`~mrjob.step.SparkScriptStep` in your job's steps (including
      implicitly through the :py:class:`~mrjob.job.MRJob.spark` method)
-   * "Spark" included in :mrjob-opt:`emr_applications` option
+   * "Spark" included in :mrjob-opt:`applications` option
    * any bootstrap action (see :mrjob-opt:`bootstrap_actions`) ending in
      ``/spark-install`` (this is how you install Spark on 3.x AMIs)
 

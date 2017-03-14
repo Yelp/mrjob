@@ -356,8 +356,7 @@ This release adds basic support for `Google Cloud Dataproc <https://cloud.google
 * finding probable cause of errors
 * running Java JARs as steps
 
-Added the :mrjob-opt:`emr_applications` option, which helps you configure
-4.x AMIs.
+Added the `emr_applications` option, which helps you configure 4.x AMIs.
 
 Fixed an EMR bug (introduced in v0.5.0) where we were waiting for steps
 to complete in the wrong order (in a multi-step job, we wouldn't register

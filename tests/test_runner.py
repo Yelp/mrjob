@@ -2243,3 +2243,27 @@ class RenderSubstepTestCase(SandboxedTestCase):
                 "bash -c 'cat |"
                 " %s mr_filter_job.py --step-num=0 --mapper"
                 " --mapper-filter cat'" % sys.executable)
+
+
+class SetupWrapperScriptContentTestCase(SandboxedTestCase):
+
+    def test_no_shebang(self):
+        job = MRTwoStepJob()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            out = runner._setup_wrapper_script_content([])
+
+            self.assertFalse(out[0].startswith('#!'))
+
+    def test_respects_sh_pre_commands_methd(self):
+        job = MRTwoStepJob()
+        job.sandbox()
+
+        self.start(patch('mrjob.runner.MRJobRunner._sh_pre_commands',
+                         return_value=['set -e', 'set -v']))
+
+        with job.make_runner() as runner:
+            out = runner._setup_wrapper_script_content([])
+
+            self.assertEqual(out[:2], ['set -e\n', 'set -v\n'])

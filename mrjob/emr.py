@@ -2556,9 +2556,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return bool(self._opts['bootstrap_spark'])
 
     def _applications(self, add_spark=True):
-        """Returns applications (*emr_applications* option) as a set. Adds
+        """Returns applications (*applications* option) as a set. Adds
         in ``Hadoop`` and ``Spark`` as needed."""
-        applications = set(self._opts['emr_applications'])
+        applications = set(self._opts['applications'])
 
         # release_label implies 4.x AMI and later
         if (add_spark and self._should_bootstrap_spark() and
@@ -3410,7 +3410,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                    for ba in self._bootstrap_actions(add_spark=False))
 
     def _has_spark_application(self):
-        """Does this runner have "Spark" in its *emr_applications* option?"""
+        """Does this runner have "Spark" in its *applications* option?"""
         return any(a.lower() == 'spark'
                    for a in self._applications(add_spark=False))
 

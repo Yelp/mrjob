@@ -978,14 +978,14 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
     def test_spark_defaults_single_node(self):
         # Spark needs at least m1.large
         self._test_instance_groups(
-            dict(image_version='4.0.0', emr_applications=['Spark']),
+            dict(image_version='4.0.0', applications=['Spark']),
             master=(1, 'm1.large', None))
 
     def test_spark_defaults_multiple_nodes(self):
         # Spark can get away with m1.medium for the resource manager
         self._test_instance_groups(
             dict(image_version='4.0.0',
-                 emr_applications=['Spark'],
+                 applications=['Spark'],
                  num_core_instances=2),
             core=(2, 'm1.large', None),
             master=(1, 'm1.medium', None))
@@ -1949,42 +1949,42 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--release-label', 'emr-4.0.0',
             '--image-version', '1.0.0'])
 
-    def test_matching_emr_applications(self):
+    def test_matching_applications(self):
         _, cluster_id = self.make_pooled_cluster(
-            image_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', applications=['Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--emr-application', 'Mahout'])
+            '--application', 'Mahout'])
 
-    def test_extra_emr_applications_okay(self):
+    def test_extra_applications_okay(self):
         _, cluster_id = self.make_pooled_cluster(
-            image_version='4.0.0', emr_applications=['Ganglia', 'Mahout'])
+            image_version='4.0.0', applications=['Ganglia', 'Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--emr-application', 'Mahout'])
+            '--application', 'Mahout'])
 
-    def test_missing_emr_applications_not_okay(self):
+    def test_missing_applications_not_okay(self):
         _, cluster_id = self.make_pooled_cluster(
-            image_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', applications=['Mahout'])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--emr-application', 'Ganglia',
-            '--emr-application', 'Mahout'])
+            '--application', 'Ganglia',
+            '--application', 'Mahout'])
 
-    def test_emr_application_matching_is_case_insensitive(self):
+    def test_application_matching_is_case_insensitive(self):
         _, cluster_id = self.make_pooled_cluster(
-            image_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', applications=['Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--emr-application', 'mahout'])
+            '--application', 'mahout'])
 
     def test_matching_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2678,7 +2678,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_join_cluster_with_spark_4_x_ami(self):
         _, cluster_id = self.make_pooled_cluster(
             image_version='4.7.2',
-            emr_applications=['Spark'])
+            applications=['Spark'])
 
         self.assertJoins(
             cluster_id,
@@ -4280,7 +4280,7 @@ class BootstrapSparkTestCase(MockBotoTestCase):
 
         cluster = self.get_cluster(
             '--image-version', '4.7.2',
-            '--emr-application', 'spark')
+            '--application', 'spark')
 
         # shouldn't add "Spark" application on top of "spark"
         self.assertTrue(self.installed_spark_application(cluster, 'spark'))
@@ -5046,12 +5046,12 @@ class EMRApplicationsTestCase(MockBotoTestCase):
             applications = set(a.name for a in cluster.applications)
             self.assertEqual(applications, set(['Hadoop']))
 
-    def test_emr_applications_requires_4_x_ami(self):
+    def test_applications_requires_4_x_ami(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
              '--image-version', '3.11.0',
-             '--emr-application', 'Hadoop',
-             '--emr-application', 'Mahout'])
+             '--application', 'Hadoop',
+             '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5060,8 +5060,8 @@ class EMRApplicationsTestCase(MockBotoTestCase):
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
-             '--emr-application', 'Hadoop',
-             '--emr-application', 'Mahout'])
+             '--application', 'Hadoop',
+             '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5078,7 +5078,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
     def test_implicit_hadoop(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
-             '--emr-application', 'Mahout'])
+             '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5097,8 +5097,8 @@ class EMRApplicationsTestCase(MockBotoTestCase):
     def test_api_param_serialization(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
-             '--emr-application', 'Hadoop',
-             '--emr-application', 'Mahout'])
+             '--application', 'Hadoop',
+             '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5897,7 +5897,7 @@ class UsesSparkTestCase(MockBotoTestCase):
     def test_spark_application(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--ami-version', '4.0.0',
-                            '--emr-application', 'Spark'])
+                            '--application', 'Spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5907,7 +5907,7 @@ class UsesSparkTestCase(MockBotoTestCase):
     def test_spark_application_lowercase(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--ami-version', '4.0.0',
-                            '--emr-application', 'spark'])
+                            '--application', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5917,7 +5917,7 @@ class UsesSparkTestCase(MockBotoTestCase):
     def test_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--ami-version', '4.0.0',
-                            '--emr-application', 'Mahout'])
+                            '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5927,8 +5927,8 @@ class UsesSparkTestCase(MockBotoTestCase):
     def test_spark_and_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--ami-version', '4.0.0',
-                            '--emr-application', 'Mahout',
-                            '--emr-application', 'Spark'])
+                            '--application', 'Mahout',
+                            '--application', 'Spark'])
         job.sandbox()
 
         with job.make_runner() as runner:

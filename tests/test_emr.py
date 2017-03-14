@@ -56,7 +56,6 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
-from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 

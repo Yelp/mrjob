@@ -906,6 +906,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._cluster_id = None
         self._created_cluster = False
 
+        # old SSH tunnel isn't valid for this cluster (see #1549)
+        if self._ssh_proc:
+            self._kill_ssh_tunnel()
+
         self._launch_emr_job()
 
     def _check_input_exists(self):
@@ -1208,6 +1212,27 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('  Connect to %s at: %s' % (
                 tunnel_config['name'], self._tunnel_url))
 
+    def _kill_ssh_tunnel(self):
+        """Send SIGKILL to SSH tunnel, if it's running."""
+        if not self._ssh_proc:
+            return
+
+        self._ssh_proc.poll()
+        if self._ssh_proc.returncode is None:
+            log.info('Killing our SSH tunnel (pid %d)' %
+                     self._ssh_proc.pid)
+
+            self._ssh_proc.stdin.close()
+            self._ssh_proc.stdout.close()
+            self._ssh_proc.stderr.close()
+
+            try:
+                os.kill(self._ssh_proc.pid, signal.SIGKILL)
+            except Exception as e:
+                log.exception(e)
+
+        self._ssh_proc = None
+
     def _pick_ssh_bind_ports(self):
         """Pick a list of ports to try binding our SSH tunnel to.
 
@@ -1231,20 +1256,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # always stop our SSH tunnel if it's still running
         if self._ssh_proc:
-            self._ssh_proc.poll()
-            if self._ssh_proc.returncode is None:
-                log.info('Killing our SSH tunnel (pid %d)' %
-                         self._ssh_proc.pid)
-
-                self._ssh_proc.stdin.close()
-                self._ssh_proc.stdout.close()
-                self._ssh_proc.stderr.close()
-
-                try:
-                    os.kill(self._ssh_proc.pid, signal.SIGKILL)
-                    self._ssh_proc = None
-                except Exception as e:
-                    log.exception(e)
+            self._kill_ssh_tunnel()
 
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)

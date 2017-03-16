@@ -109,7 +109,7 @@ using a ``pre_filter`` key in the substep dictionary::
 
 :py:class:`~mrjob.job.MRJob` code::
 
-    class MRMapperMRFilterJob(MRJob):
+    class MRMapperFilterJob(MRJob):
 
         def steps(self):
             return [MRStep(mapper=self.my_mapper,

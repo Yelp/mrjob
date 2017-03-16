@@ -652,7 +652,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
     def test_multiple_2(self):
         data = b'x\ny\nz\n'
         job = MRCmdJob(['--mapper-cmd=cat', '--reducer-cmd-2', 'wc -l',
-                      '--runner=local', '--no-conf'])
+                        '--runner=local', '--no-conf'])
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             r.run()

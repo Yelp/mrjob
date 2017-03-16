@@ -6422,3 +6422,72 @@ class ProgressHtmlFromTunnelTestCase(MockBotoTestCase):
         self.assertTrue(self.urlopen.return_value.read.called)
 
         self.assertTrue(self.urlopen.return_value.close.called)
+
+
+class ProgressHtmlOverSshTestCase(MockBotoTestCase):
+
+    MOCK_MASTER = 'mockmaster'
+    MOCK_JOB_TRACKER_URL = 'http://1.2.3.4:8088/cluster'
+
+    MOCK_EC2_KEY_PAIR_FILE = 'mock.pem'
+
+    def setUp(self):
+        super(ProgressHtmlOverSshTestCase, self).setUp()
+
+        self._ssh_run = self.start(patch('mrjob.emr._ssh_run',
+                                         return_value=(Mock(), Mock())))
+
+        self._address_of_master = self.start(patch(
+            'mrjob.emr.EMRJobRunner._address_of_master',
+            return_value=self.MOCK_MASTER))
+
+        self._job_tracker_url = self.start(patch(
+            'mrjob.emr.EMRJobRunner._job_tracker_url',
+            return_value=self.MOCK_JOB_TRACKER_URL))
+
+    def _launch_and_get_progress_html(self, *args):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ec2-key-pair-file', self.MOCK_EC2_KEY_PAIR_FILE] +
+            list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            return runner._progress_html_over_ssh()
+
+    def test_default(self):
+        html = self._launch_and_get_progress_html()
+
+        self.assertIsNotNone(html)
+        self._ssh_run.assert_called_once_with(
+            ['ssh'],
+            self.MOCK_MASTER,
+            self.MOCK_EC2_KEY_PAIR_FILE,
+            ['curl', self.MOCK_JOB_TRACKER_URL])
+
+        self.assertEqual(html, self._ssh_run.return_value[0])
+
+    def test_no_master_node(self):
+        self._address_of_master.return_value = None
+
+        self.assertIsNone(self._launch_and_get_progress_html())
+
+        self.assertFalse(self._ssh_run.called)
+
+    def test_no_ssh_bin(self):
+        self.assertIsNone(self._launch_and_get_progress_html('--ssh-bin', ''))
+
+        self.assertFalse(self._ssh_run.called)
+
+    def test_no_key_pair_file(self):
+        self.assertIsNone(self._launch_and_get_progress_html(
+            '--ec2-key-pair-file', ''))
+
+        self.assertFalse(self._ssh_run.called)
+
+    def test_ssh_run_exception(self):
+        self._ssh_run.side_effect = Exception('BOOM')
+
+        self.assertIsNone(self._launch_and_get_progress_html())
+
+        self.assertTrue(self._ssh_run.called)

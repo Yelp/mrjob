@@ -6291,7 +6291,7 @@ class LogProgressTestCase(MockBotoTestCase):
 
         self.log = self.start(patch('mrjob.emr.log'))
 
-        # don't clean up our mock cluster; this causes more logging
+        # don't clean up our mock cluster; this causes unwanted logging
         self.start(patch('mrjob.emr.EMRJobRunner.cleanup'))
 
     def _launch_and_log_progress(self, *args):
@@ -6359,3 +6359,66 @@ class LogProgressTestCase(MockBotoTestCase):
         self._parse_progress_from_job_tracker.assert_called_once_with(
             self._progress_html_from_tunnel.return_value)
         self.assertFalse(self._parse_progress_from_resource_manager.called)
+
+
+class ProgressHtmlFromTunnelTestCase(MockBotoTestCase):
+
+    MOCK_TUNNEL_URL = 'http://foohost:12345/cluster'
+
+    def setUp(self):
+        super(ProgressHtmlFromTunnelTestCase, self).setUp()
+
+        self.urlopen = self.start(patch('mrjob.emr.urlopen'))
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        # don't clean up our mock cluster; this causes unwanted logging
+        self.start(patch('mrjob.emr.EMRJobRunner.cleanup'))
+
+    def _launch_and_get_progress_html(self, ssh_tunnel=True):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            if ssh_tunnel:
+                runner._ssh_tunnel_url = self.MOCK_TUNNEL_URL
+
+            self.log.debug.reset_mock()
+
+            return runner._progress_html_from_tunnel()
+
+    def test_no_tunnel(self):
+        self.assertIsNone(self._launch_and_get_progress_html(ssh_tunnel=False))
+
+        self.assertFalse(self.urlopen.called)
+
+    def test_tunnel(self):
+        html = self._launch_and_get_progress_html()
+
+        self.urlopen.assert_called_once_with(self.MOCK_TUNNEL_URL)
+        self.assertTrue(self.urlopen.return_value.read.called)
+
+        self.assertEqual(html, self.urlopen.return_value.read.return_value)
+
+        self.assertTrue(self.urlopen.return_value.close.called)
+
+    def test_urlopen_exception(self):
+        self.urlopen.side_effect = Exception('BOOM')
+
+        self.assertIsNone(self._launch_and_get_progress_html())
+
+        self.urlopen.assert_called_once_with(self.MOCK_TUNNEL_URL)
+        self.assertFalse(self.urlopen.return_value.read.called)
+
+        self.assertFalse(self.urlopen.return_value.close.called)
+
+    def test_urlopen_read_exception(self):
+        self.urlopen.return_value.read.side_effect = Exception('BOOM')
+
+        self.assertIsNone(self._launch_and_get_progress_html())
+
+        self.urlopen.assert_called_once_with(self.MOCK_TUNNEL_URL)
+        self.assertTrue(self.urlopen.return_value.read.called)
+
+        self.assertTrue(self.urlopen.return_value.close.called)

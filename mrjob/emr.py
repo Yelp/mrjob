@@ -111,6 +111,7 @@ from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
+from mrjob.ssh import _ssh_run
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
@@ -708,10 +709,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._ssh_key_is_copied = False
 
         # store the (tunneled) URL of the job tracker/resource manager
-        self._tunnel_url = None
-
-        # turn off tracker progress until tunnel is up
-        self._show_tracker_progress = False
+        self._ssh_tunnel_url = None
 
         # map from cluster ID to a dictionary containing cached info about
         # that cluster. Includes the following keys:
@@ -1127,6 +1125,30 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return map_version(self.get_image_version(),
                            _IMAGE_VERSION_TO_SSH_TUNNEL_CONFIG)
 
+    def _job_tracker_host(self):
+        """The host of the job tracker/resource manager, from the master node.
+        """
+        tunnel_config = self._ssh_tunnel_config()
+
+        if tunnel_config['localhost']:
+            # Issue #1311: on the 2.x AMIs, we want to tunnel to the job
+            # tracker on localhost; otherwise it won't
+            # work on some VPC setups.
+            return 'localhost'
+        else:
+            # Issue #1397: on the 3.x and 4.x AMIs we want to tunnel to the
+            # resource manager on the master node's *internal* IP; otherwise
+            # it work won't work on some VPC setups
+            return self._master_private_ip()
+
+    def _job_tracker_url(self):
+        tunnel_config = self._ssh_tunnel_config()
+
+        return 'http://%s:%d%s' % (
+            self._job_tracker_host(),
+            tunnel_config['port'],
+            tunnel_config['path'])
+
     def _set_up_ssh_tunnel(self):
         """set up the ssh tunnel to the job tracker, if it's not currently
         running.
@@ -1140,17 +1162,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # look up what we're supposed to do on this AMI version
         tunnel_config = self._ssh_tunnel_config()
-
-        if tunnel_config['localhost']:
-            # Issue #1311: on the 2.x AMIs, we want to tunnel to the job
-            # tracker on localhost; otherwise it won't
-            # work on some VPC setups.
-            remote_host = 'localhost'
-        else:
-            # Issue #1397: on the 3.x and 4.x AMIs we want to tunnel to the
-            # resource manager on the master node's *internal* IP; otherwise
-            # it work won't work on some VPC setups
-            remote_host = self._master_private_ip()
 
         REQUIRED_OPTS = ['ec2_key_pair', 'ec2_key_pair_file', 'ssh_bind_ports']
         for opt_name in REQUIRED_OPTS:
@@ -1196,7 +1207,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 '-o', 'ExitOnForwardFailure=yes',
                 '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
                 '-L', '%d:%s:%d' % (
-                    bind_port, remote_host, tunnel_config['port']),
+                    bind_port,
+                    self._job_tracker_host(),
+                    tunnel_config['port']),
                 '-N', '-n', '-q',  # no shell, no input, no output
                 '-i', self._opts['ec2_key_pair_file'],
             ]
@@ -1241,11 +1254,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 bind_host = socket.getfqdn()
             else:
                 bind_host = 'localhost'
-            self._tunnel_url = 'http://%s:%d%s' % (
+            self._ssh_tunnel_url = 'http://%s:%d%s' % (
                 bind_host, bind_port, tunnel_config['path'])
-            self._show_tracker_progress = True
             log.info('  Connect to %s at: %s' % (
-                tunnel_config['name'], self._tunnel_url))
+                tunnel_config['name'], self._ssh_tunnel_url))
 
     def _kill_ssh_tunnel(self):
         """Send SIGKILL to SSH tunnel, if it's running."""
@@ -1267,6 +1279,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 log.exception(e)
 
         self._ssh_proc = None
+        self._ssh_tunnel_url = None
 
     def _pick_ssh_bind_ports(self):
         """Pick a list of ports to try binding our SSH tunnel to.
@@ -2094,34 +2107,76 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         (This takes no arguments; we just assume the most recent running
         job is ours, which should be correct for EMR.)
         """
-        if not self._show_tracker_progress:
+        progress_html = (self._progress_html_from_tunnel() or
+                         self._progress_html_over_ssh())
+        if not progress_html:
             return
 
         tunnel_config = self._ssh_tunnel_config()
 
+        if tunnel_config['name'] == 'job tracker':
+            map_progress, reduce_progress = (
+                _parse_progress_from_job_tracker(progress_html))
+            if map_progress is not None:
+                log.info('   map %3d%% reduce %3d%%' % (
+                    map_progress, reduce_progress))
+        else:
+            progress = _parse_progress_from_resource_manager(
+                progress_html)
+            if progress is not None:
+                log.info('   %5.1f%% complete' % progress)
+
+    def _progress_html_from_tunnel(self):
+        """Fetch progress by calling :py:func:`urlopen` on our ssh tunnel, or
+        return ``None``."""
+        if not self._ssh_tunnel_url:
+            return None
+
+        tunnel_config = self._ssh_tunnel_config()
+        log.debug('  Fetching progress from %s at %s' % (
+            tunnel_config['name'], self._ssh_tunnel_url))
+
         tunnel_handle = None
         try:
-            tunnel_handle = urlopen(self._tunnel_url)
-            tunnel_html = tunnel_handle.read()
-        except:
-            log.error('Unable to connect to %s' %
-                      tunnel_config['name'])
-            self._show_tracker_progress = False
-        else:
-            if tunnel_config['name'] == 'job tracker':
-                map_progress, reduce_progress = (
-                    _parse_progress_from_job_tracker(tunnel_html))
-                if map_progress is not None:
-                    log.info('   map %3d%% reduce %3d%%' % (
-                        map_progress, reduce_progress))
-            else:
-                progress = _parse_progress_from_resource_manager(
-                    tunnel_html)
-                if progress is not None:
-                    log.info('   %5.1f%% complete' % progress)
+            tunnel_handle = urlopen(self._ssh_tunnel_url)
+            return tunnel_handle.read()
+        except Exception as e:
+            log.debug('    failed: %s' % str(e))
+            return None
         finally:
-            if tunnel_handle is not None:
+            if tunnel_handle:
                 tunnel_handle.close()
+
+    def _progress_html_over_ssh(self):
+        """Fetch progress by running :command:`curl` over SSH, or return
+        ``None``"""
+        host = self._address_of_master()
+
+        if not (self._opts['ssh_bin'] and
+                self._opts['ec2_key_pair_file'] and
+                host):
+            return None
+
+        if not host:
+            return None
+
+        tunnel_config = self._ssh_tunnel_config()
+        remote_url = self._job_tracker_url()
+
+        log.debug('  Fetching progress from %s over SSH' % (
+            tunnel_config['name']))
+
+        try:
+            stdout, _ = _ssh_run(
+                self._opts['ssh_bin'],
+                host,
+                self._opts['ec2_key_pair_file'],
+                ['curl', remote_url])
+            return stdout
+        except Exception as e:
+            log.debug('    failed: %s' % str(e))
+
+        return None
 
     def _check_for_pooled_cluster_self_termination(self, cluster, step):
         """If failure could have been due to a pooled cluster self-terminating,

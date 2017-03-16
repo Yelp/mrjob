@@ -43,7 +43,6 @@ from mrjob.runner import MRJobRunner
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
-from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 

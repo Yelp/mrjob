@@ -6269,3 +6269,93 @@ class BadBashWorkaroundTestCase(MockBotoTestCase):
 
     def test_bad_bash(self):
         self._test_sh_bin('5.2.0', ['/bin/sh', '-x'], ['set -e'])
+
+
+class LogProgressTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(LogProgressTestCase, self).setUp()
+
+        self._progress_html_from_tunnel = self.start(patch(
+            'mrjob.emr.EMRJobRunner._progress_html_from_tunnel'))
+        self._progress_html_over_ssh = self.start(patch(
+            'mrjob.emr.EMRJobRunner._progress_html_over_ssh'))
+
+        self._parse_progress_from_job_tracker = self.start(patch(
+            'mrjob.emr._parse_progress_from_job_tracker',
+            return_value=(100, 50)))
+
+        self._parse_progress_from_resource_manager = self.start(patch(
+            'mrjob.emr._parse_progress_from_resource_manager',
+            return_value=61.3))
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        # don't clean up our mock cluster; this causes more logging
+        self.start(patch('mrjob.emr.EMRJobRunner.cleanup'))
+
+    def _launch_and_log_progress(self, *args):
+        job = MRTwoStepJob(['-r', 'emr'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            self.log.info.reset_mock()
+
+            runner._log_step_progress()
+
+    def test_default(self):
+        # by default, we fetch progress from the resource manager, through
+        # the SSH tunnel
+        self._launch_and_log_progress()
+
+        self.log.info.assert_called_once_with('    61.3% complete')
+
+        self.assertTrue(self._progress_html_from_tunnel.called)
+        self.assertFalse(self._progress_html_over_ssh.called)
+
+        self.assertFalse(self._parse_progress_from_job_tracker.called)
+        self._parse_progress_from_resource_manager.assert_called_once_with(
+            self._progress_html_from_tunnel.return_value)
+
+    def test_fallback_to_direct_ssh(self):
+        self._progress_html_from_tunnel.return_value = None
+
+        self._launch_and_log_progress()
+
+        self.log.info.assert_called_once_with('    61.3% complete')
+
+        self.assertTrue(self._progress_html_from_tunnel.called)
+        self.assertTrue(self._progress_html_over_ssh.called)
+
+        self.assertFalse(self._parse_progress_from_job_tracker.called)
+        self._parse_progress_from_resource_manager.assert_called_once_with(
+            self._progress_html_over_ssh.return_value)
+
+    def test_no_progress_available(self):
+        self._progress_html_from_tunnel.return_value = None
+        self._progress_html_over_ssh.return_value = None
+
+        self._launch_and_log_progress()
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertTrue(self._progress_html_from_tunnel.called)
+        self.assertTrue(self._progress_html_over_ssh.called)
+
+        self.assertFalse(self._parse_progress_from_job_tracker.called)
+        self.assertFalse(self._parse_progress_from_resource_manager.called)
+
+    def test_use_job_tracker_on_2_x_amis(self):
+        # by default, we fetch progress from the resource manager, through
+        # the SSH tunnel
+        self._launch_and_log_progress('--image-version', '2.4.9')
+
+        self.log.info.assert_called_once_with('   map 100% reduce  50%')
+
+        self.assertTrue(self._progress_html_from_tunnel.called)
+        self.assertFalse(self._progress_html_over_ssh.called)
+
+        self._parse_progress_from_job_tracker.assert_called_once_with(
+            self._progress_html_from_tunnel.return_value)
+        self.assertFalse(self._parse_progress_from_resource_manager.called)

@@ -26,6 +26,8 @@ try:
         },
         'install_requires': [
             'boto>=2.35.0',
+            'boto3>=1.4.4',
+            'botocore>=1.5.0',
             'filechunkio',
             #'google-api-python-client>=1.5.0'  # see below
             'PyYAML>=3.08',
@@ -92,7 +94,6 @@ setup(
     packages=[
         'mrjob',
         'mrjob.examples',
-        'mrjob.examples.bash_wrap',
         'mrjob.examples.mr_postfix_bounce',
         'mrjob.examples.mr_travelling_salesman',
         'mrjob.fs',
@@ -102,7 +103,6 @@ setup(
     ],
     package_data={
         'mrjob': ['bootstrap/*.sh'],
-        'mrjob.examples.bash_wrap': ['*.sh'],
         'mrjob.examples.mr_postfix_bounce': ['*.json'],
         'mrjob.examples.mr_travelling_salesman': ['example_graphs/*.json'],
     },

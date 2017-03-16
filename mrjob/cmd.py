@@ -22,7 +22,6 @@ from sys import stderr
 commands = {}
 
 # map from command name to description for help
-# (deprecated commands won't be included here)
 descriptions = {}
 
 usage = """usage: mrjob {subcommand|--help}"
@@ -86,13 +85,6 @@ def _create_cluster(args):
     main(args)
 
 
-# deprecated alias for create-cluster, delete in v0.6.0
-@_command('create-job-flow')
-def _create_jf(args):
-    from mrjob.tools.emr.create_job_flow import main
-    main(args)
-
-
 @_command('boss', 'Run a command on every node of a cluster.')
 def _mrboss(args):
     from mrjob.tools.emr.mrboss import main
@@ -118,23 +110,9 @@ def _terminate_idle_clusters(args):
     main(args)
 
 
-# deprecated alias for terminate-idle-clusters, delete in v0.6.0
-@_command('terminate-idle-job-flows')
-def _terminate_idle_jfs(args):
-    from mrjob.tools.emr.terminate_idle_job_flows import main
-    main(args)
-
-
 @_command('terminate-cluster', 'Terminate a single EMR cluster')
 def _terminate_cluster(args):
     from mrjob.tools.emr.terminate_cluster import main
-    main(args)
-
-
-# deprecated alias for terminate-cluster, delete in v0.6.0
-@_command('terminate-job-flow')
-def _terminate_jf(args):
-    from mrjob.tools.emr.terminate_job_flow import main
     main(args)
 
 

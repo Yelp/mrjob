@@ -66,21 +66,6 @@ options related to file uploading.
    .. versionadded:: 0.5.7
 
 .. mrjob-opt::
-    :config: python_archives
-    :switch: --python-archive
-    :type: :ref:`path list <data-type-path-list>`
-    :set: all
-    :default: ``[]``
-
-    Same as upload_archives, except they get added to the job's
-    :envvar:`PYTHONPATH`.
-
-    .. deprecated:: 0.5.7
-
-       Try :mrjob-opt:`py_files` with a `.zip` or `.egg` file instead. If you
-       must use an archive, see :ref:`cookbook-src-tree-pythonpath`.
-
-.. mrjob-opt::
     :config: upload_archives
     :switch: --archive
     :type: :ref:`path list <data-type-path-list>`
@@ -372,32 +357,6 @@ Job execution context
     :py:func:`~mrjob.setup.parse_setup_cmd`.
 
 .. mrjob-opt::
-    :config: setup_cmds
-    :switch: --setup-cmd
-    :type: :ref:`string list <data-type-string-list>`
-    :set: all
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    A list of commands to run before each mapper/reducer step. Basically
-    :mrjob-opt:`setup` without automatic file uploading/interpolation.
-    Can also take commands as lists of arguments.
-
-.. mrjob-opt::
-    :config: setup_scripts
-    :switch: --setup-script
-    :type: :ref:`path list <data-type-path-list>`
-    :set: all
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    Files that will be copied into the local working directory and then run.
-
-    Pass ``'path/to/script#'`` to :mrjob-opt:`setup` instead.
-
-.. mrjob-opt::
     :config: sh_bin
     :switch: --sh-bin
     :type: :ref:`command <data-type-command>`
@@ -462,23 +421,6 @@ Job execution context
     this defaults to. This option exists mostly to support running tasks
     inside Docker while using a normal Python binary in setup wrapper scripts.
 
-.. mrjob-opt::
-    :config: strict_protocols
-    :switch: --strict-protocols, --no-strict-protocols
-    :type: boolean
-    :set: all
-    :default: ``True``
-
-    If you set this to false, when jobs encounter unencodable input or output,
-    they'll increment a counter rather than simply raising an exception.
-
-    .. warning::
-
-       Non-strict protocols are going away in v0.6.0. There is no limit on
-       how much data on-strict protocols can silently swallow (potentially
-       *all* of it). If you have a problem caused by character encoding in
-       log files, consider using
-       :py:class:`~mrjob.protocol.TextValueProtocol` instead.
 
 Other
 =====
@@ -536,6 +478,4 @@ as a subprocess:
 * :mrjob-opt:`bootstrap_mrjob`
 * :mrjob-opt:`python_bin`
 * :mrjob-opt:`setup`
-* :mrjob-opt:`setup_cmds`
-* :mrjob-opt:`setup_scripts`
 * :mrjob-opt:`steps_python_bin`

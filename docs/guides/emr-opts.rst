@@ -119,8 +119,6 @@ Cluster creation and configuration
               Instances.Ec2SubnetId: someID
               VisibleToAllUsers: null
 
-    .. versionadded:: 0.4.3
-
 .. mrjob-opt::
    :config: applications
    :switch: --application
@@ -215,8 +213,6 @@ Cluster creation and configuration
     http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles.html
     for more details on using IAM with EMR.
 
-    .. versionadded:: 0.4.3
-
 .. mrjob-opt::
     :config: iam_service_role
     :switch: --iam-service-role
@@ -227,8 +223,6 @@ Cluster creation and configuration
     Name of an IAM role for the EMR service to use. See
     http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/emr-iam-roles.html
     for more details on using IAM with EMR.
-
-    .. versionadded:: 0.4.4
 
 .. mrjob-opt::
     :config: image_version
@@ -281,8 +275,6 @@ Cluster creation and configuration
     after it's been idle this many hours AND we're within
     :mrjob-opt:`mins_to_end_of_hour` of an EC2 billing hour.
 
-    .. versionadded:: 0.4.1
-
 .. mrjob-opt::
     :config: mins_to_end_of_hour
     :switch: --mins-to-end-of-hour
@@ -292,8 +284,6 @@ Cluster creation and configuration
 
     If :mrjob-opt:`max_hours_idle` is set, controls how close to the end of an
     EC2 billing hour the cluster can automatically terminate itself.
-
-    .. versionadded:: 0.4.1
 
 .. mrjob-opt::
     :config: region
@@ -376,8 +366,6 @@ Cluster creation and configuration
 
        This option used to be named *emr_tags*
 
-    .. versionadded:: 0.4.5
-
 .. mrjob-opt::
     :config: visible_to_all_users
     :switch: --visible-to-all-users, --no-visible-to-all-users
@@ -396,8 +384,6 @@ Cluster creation and configuration
         not be able to reuse your clusters, and
         :command:`mrjob terminate-idle-clusters` won't be
         able to shut them down when they become idle.
-
-    .. versionadded:: 0.4.1
 
 .. mrjob-opt::
     :config: zone
@@ -463,32 +449,6 @@ and install another Python binary.
     in order to give direct access to the EMR API.
 
 .. mrjob-opt::
-    :config: bootstrap_cmds
-    :switch: --bootstrap-cmd
-    :type: :ref:`string list <data-type-string-list>`
-    :set: emr
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    A list of commands to run at bootstrap time. Basically
-    :mrjob-opt:`bootstrap` without automatic file uploading/interpolation.
-    Can also take commands as lists of arguments.
-
-.. mrjob-opt::
-    :config: bootstrap_files
-    :switch: --bootstrap-file
-    :type: :ref:`path list <data-type-path-list>`
-    :set: emr
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    Files to download to the bootstrap working directory before running
-    bootstrap commands. Use the :mrjob-opt:`bootstrap` option's file
-    auto-upload/interpolation feature instead.
-
-.. mrjob-opt::
    :config: bootstrap_python
    :switch: --bootstrap-python, --no-bootstrap-python
    :type: boolean
@@ -533,37 +493,6 @@ and install another Python binary.
    * any bootstrap action (see :mrjob-opt:`bootstrap_actions`) ending in
      ``/spark-install`` (this is how you install Spark on 3.x AMIs)
 
-.. mrjob-opt::
-    :config: bootstrap_python_packages
-    :switch: --bootstrap-python-package
-    :type: :ref:`path list <data-type-path-list>`
-    :set: emr
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    Paths of python modules tarballs to install on EMR. Pass
-    :command:`sudo` :mrjob-opt:`python_bin`
-    :command:`-m pip install path/to/package.tar.gz#` to
-    :mrjob-opt:`bootstrap` instead.
-
-    Also, please consider installing packages directly from
-    `PyPI <https://pypi.python.org/pypi>`_ instead (
-    :command:`sudo` :mrjob-opt:`python_bin`
-    :command:`-m pip install package1 package2`); PyPI is much, much more
-    robust/production-ready than when this option was first created.
-
-.. mrjob-opt::
-    :config: bootstrap_scripts
-    :switch: --bootstrap-script
-    :type: :ref:`path list <data-type-path-list>`
-    :set: emr
-    :default: ``[]``
-
-    .. deprecated:: 0.4.2
-
-    Scripts to upload and then run at bootstrap time. Pass
-    ``path/to/script# args`` to :mrjob-opt:`bootstrap` instead.
 
 Monitoring the cluster
 -----------------------
@@ -738,22 +667,6 @@ Number and type of instances
        This option used to be named *num_ec2_core_instances*.
 
 .. mrjob-opt::
-    :config: num_ec2_instances
-    :switch: --num-ec2-instances
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: 1
-
-    Total number of instances to start up; basically the number of core
-    instance you want, plus 1 (there is always one master instance).
-    Incompatible with :mrjob-opt:`num_core_instances` and
-    :mrjob-opt:`num_task_instances`.
-
-    .. deprecated:: 0.5.4
-
-       Just subtract one and pass that to :mrjob-opt:`num_core_instances`.
-
-.. mrjob-opt::
     :config: num_task_instances
     :switch: --num-task-instances
     :type: :ref:`string <data-type-string>`
@@ -761,7 +674,7 @@ Number and type of instances
     :default: 0
 
     Number of task instances to start up.  These run your job but do not host
-    HDFS. Incompatible with :mrjob-opt:`num_ec2_instances`. If you use this,
+    HDFS. If you use this,
     you must set :mrjob-opt:`num_core_instances`; EMR does not allow you to
     run task instances without core instances (because there's nowhere to host
     HDFS).
@@ -800,8 +713,6 @@ Choosing/creating a cluster to join
     The default is ``'CANCEL_AND_WAIT'`` when using pooling (see
     :mrjob-opt:`pool_clusters`) or an existing cluster (see
     :mrjob-opt:`cluster_id`), and ``'TERMINATE_CLUSTER'`` otherwise.
-
-    .. versionadded:: 0.4.3
 
 .. mrjob-opt::
     :config: pool_name

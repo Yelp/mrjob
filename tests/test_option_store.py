@@ -109,10 +109,10 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                 'label': 'organic',
                 'local_tmp_dir': '/tmp',
                 'python_bin': 'py3k',
+                'py_files': ['/mylib.zip'],
                 'setup': [
                     ['thing1'],
                 ],
-                'setup_scripts': ['/myscript.py'],
             }
         }
     }
@@ -137,10 +137,10 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                     'label': 'usda_organic',
                     'local_tmp_dir': '/var/tmp',
                     'python_bin': 'py4k',
+                    'py_files': ['/yourlib.zip'],
                     'setup': [
                         ['thing2'],
                     ],
-                    'setup_scripts': ['/yourscript.py'],
                 }
             }
         }
@@ -186,9 +186,9 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
         self.assertEqual(self.opts_2['local_tmp_dir'], '/var/tmp')
 
     def test_combine_path_lists(self):
-        self.assertEqual(self.opts_1['setup_scripts'], ['/myscript.py'])
-        self.assertEqual(self.opts_2['setup_scripts'],
-                         ['/myscript.py', '/yourscript.py'])
+        self.assertEqual(self.opts_1['py_files'], ['/mylib.zip'])
+        self.assertEqual(self.opts_2['py_files'],
+                         ['/mylib.zip', '/yourlib.zip'])
 
     def test_combine_values(self):
         self.assertEqual(self.opts_1['label'], 'organic')
@@ -381,7 +381,7 @@ class TestExtraKwargs(ConfigFilesTestCase):
 
     CONFIG = {'runners': {'inline': {
         'qux': 'quux',
-        'setup_cmds': ['echo foo']}}}
+        'setup': ['echo foo']}}}
 
     def setUp(self):
         super(TestExtraKwargs, self).setUp()
@@ -390,7 +390,7 @@ class TestExtraKwargs(ConfigFilesTestCase):
     def test_extra_kwargs_in_mrjob_conf_okay(self):
         with logger_disabled('mrjob.runner'):
             opts = RunnerOptionStore('inline', {}, [self.path])
-            self.assertEqual(opts['setup_cmds'], ['echo foo'])
+            self.assertEqual(opts['setup'], ['echo foo'])
             self.assertNotIn('qux', opts)
 
     def test_extra_kwargs_passed_in_directly_okay(self):
@@ -399,107 +399,6 @@ class TestExtraKwargs(ConfigFilesTestCase):
                 'inline', {'local_tmp_dir': '/var/tmp', 'foo': 'bar'}, [])
             self.assertEqual(opts['local_tmp_dir'], '/var/tmp')
             self.assertNotIn('bar', opts)
-
-
-class DeprecatedAliasesTestCase(ConfigFilesTestCase):
-
-    def test_runner_option_store(self):
-        stderr = StringIO()
-        with no_handlers_for_logger('mrjob.conf'):
-            log_to_stream('mrjob.conf', stderr)
-            opts = RunnerOptionStore(
-                'inline', dict(base_tmp_dir='/scratch'), [])
-
-            self.assertEqual(opts['local_tmp_dir'], '/scratch')
-            self.assertNotIn('base_tmp_dir', opts)
-            self.assertIn('Deprecated option base_tmp_dir has been renamed'
-                          ' to local_tmp_dir', stderr.getvalue())
-
-    def test_hadoop_runner_option_store(self):
-        stderr = StringIO()
-        with no_handlers_for_logger('mrjob.conf'):
-            log_to_stream('mrjob.conf', stderr)
-
-            opts = HadoopRunnerOptionStore(
-                'hadoop',
-                dict(base_tmp_dir='/scratch',
-                     hdfs_scratch_dir='hdfs:///scratch'),
-                [])
-
-            self.assertEqual(opts['local_tmp_dir'], '/scratch')
-            self.assertNotIn('base_tmp_dir', opts)
-            self.assertIn('Deprecated option base_tmp_dir has been renamed'
-                          ' to local_tmp_dir', stderr.getvalue())
-
-            self.assertEqual(opts['hadoop_tmp_dir'], 'hdfs:///scratch')
-            self.assertNotIn('hdfs_scratch_dir', opts)
-            self.assertIn('Deprecated option hdfs_scratch_dir has been renamed'
-                          ' to hadoop_tmp_dir', stderr.getvalue())
-
-    def test_emr_runner_option_store(self):
-        stderr = StringIO()
-        with no_handlers_for_logger('mrjob.conf'):
-            log_to_stream('mrjob.conf', stderr)
-
-            opts = EMRRunnerOptionStore(
-                'emr',
-                dict(base_tmp_dir='/scratch',
-                     emr_job_flow_id='j-CLUSTERID',
-                     emr_job_flow_pool_name='liver',
-                     pool_emr_job_flows=True,
-                     s3_scratch_uri='s3://bucket/walrus'),
-                [])
-
-            self.assertEqual(opts['cluster_id'], 'j-CLUSTERID')
-            self.assertNotIn('emr_job_flow_id', opts)
-            self.assertIn('Deprecated option emr_job_flow_id has been renamed'
-                          ' to cluster_id', stderr.getvalue())
-
-            self.assertEqual(opts['local_tmp_dir'], '/scratch')
-            self.assertNotIn('base_tmp_dir', opts)
-            self.assertIn('Deprecated option base_tmp_dir has been renamed'
-                          ' to local_tmp_dir', stderr.getvalue())
-
-            self.assertEqual(opts['pool_clusters'], True)
-            self.assertNotIn('pool_emr_job_flows', opts)
-            self.assertIn('Deprecated option pool_emr_job_flows has been'
-                          ' renamed to pool_clusters', stderr.getvalue())
-
-            self.assertEqual(opts['pool_name'], 'liver')
-            self.assertNotIn('emr_job_flow_pool_name', opts)
-            self.assertIn('Deprecated option emr_job_flow_pool_name has been'
-                          ' renamed to pool_name', stderr.getvalue())
-
-            self.assertEqual(opts['cloud_tmp_dir'], 's3://bucket/walrus')
-            self.assertNotIn('s3_scratch_uri', opts)
-            self.assertIn('Deprecated option s3_scratch_uri has been renamed'
-                          ' to cloud_tmp_dir', stderr.getvalue())
-
-    def test_cleanup_options(self):
-        stderr = StringIO()
-        with no_handlers_for_logger('mrjob.runner'):
-            log_to_stream('mrjob.runner', stderr)
-            opts = RunnerOptionStore(
-                'inline',
-                dict(cleanup=['LOCAL_SCRATCH', 'REMOTE_SCRATCH'],
-                     cleanup_on_failure=['JOB_FLOW', 'SCRATCH']),
-                [])
-
-            self.assertEqual(opts['cleanup'], ['LOCAL_TMP', 'CLOUD_TMP'])
-            self.assertIn(
-                'Deprecated cleanup option LOCAL_SCRATCH has been renamed'
-                ' to LOCAL_TMP', stderr.getvalue())
-            self.assertIn(
-                'Deprecated cleanup option REMOTE_SCRATCH has been renamed'
-                ' to CLOUD_TMP', stderr.getvalue())
-
-            self.assertEqual(opts['cleanup_on_failure'], ['CLUSTER', 'TMP'])
-            self.assertIn(
-                'Deprecated cleanup_on_failure option JOB_FLOW has been'
-                ' renamed to CLUSTER', stderr.getvalue())
-            self.assertIn(
-                'Deprecated cleanup_on_failure option SCRATCH has been renamed'
-                ' to TMP', stderr.getvalue())
 
 
 class OptionStoreSanityCheckTestCase(TestCase):

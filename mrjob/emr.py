@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2016 Yelp and Contributors
+# Copyright 2009-2017 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -49,6 +49,16 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+
+try:
+    import boto3
+    boto3  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    # don't require boto; MRJobs don't actually need it when running
+    # inside hadoop streaming
+    boto3 = None
+
+
 try:
     import filechunkio
 except ImportError:
@@ -69,6 +79,7 @@ from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import wrap_aws_conn
+from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
 from mrjob.iam import _FALLBACK_SERVICE_ROLE
@@ -430,7 +441,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             self['region'] = _DEFAULT_REGION
 
         self._fix_emr_configurations_opt()
-        self._fix_hadoop_streaming_jar_on_emr_opt()
         self._fix_instance_opts()
         self._fix_image_version_latest()
         self._fix_release_label_opt()
@@ -445,7 +455,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'cleanup_on_failure': ['JOB'],
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
-            'num_ec2_instances': 1,
             'num_task_instances': 0,
             'pool_name': 'default',
             'pool_wait_minutes': 0,
@@ -468,17 +477,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         self['emr_configurations'] = [
             _fix_configuration_opt(c) for c in self['emr_configurations']]
 
-    def _fix_hadoop_streaming_jar_on_emr_opt(self):
-        """Translate hadoop_streaming_jar_on_emr to hadoop_streaming_jar
-        and issue a warning."""
-        if self['hadoop_streaming_jar_on_emr']:
-            jar = 'file://' + self['hadoop_streaming_jar_on_emr']
-            log.warning('hadoop_streaming_jar_on_emr is deprecated'
-                        ' and will be removed in v0.6.0.'
-                        ' Set hadoop_streaming_jar to %s instead' % jar)
-            if not self['hadoop_streaming_jar']:
-                self['hadoop_streaming_jar'] = jar
-
     def _fix_instance_opts(self):
         """If the *instance_type* option is set, override instance
         type for the nodes that actually run tasks (see Issue #66). Allow
@@ -493,30 +491,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         if not self['task_instance_type']:
             self['task_instance_type'] = (
                 self['core_instance_type'])
-
-        # Within EMRJobRunner, we use num_core_instances and
-        # num_task_instances, not num_ec2_instances. (Number
-        # of master instances is always 1.)
-        if (self._opt_priority['num_ec2_instances'] >
-            max(self._opt_priority['num_core_instances'],
-                self._opt_priority['num_task_instances'])):
-            # assume 1 master, n - 1 core, 0 task
-            self['num_core_instances'] = self['num_ec2_instances'] - 1
-            self['num_task_instances'] = 0
-
-            log.warning('num_ec2_instances is deprecated; set'
-                        ' num_core_instances to %d instead' % (
-                            self['num_core_instances']))
-        else:
-            # issue a warning if we used both kinds of instance number
-            # options on the command line or in mrjob.conf
-            if (self._opt_priority['num_ec2_instances'] >= 2 and
-                self._opt_priority['num_ec2_instances'] <=
-                max(self._opt_priority['num_core_instances'],
-                    self._opt_priority['num_task_instances'])):
-                log.warning('Mixing num_ec2_instances and'
-                            ' num_{core,task}_instances does not make'
-                            ' sense; ignoring num_ec2_instances')
 
         # Allow ec2 instance type to override other instance types
         instance_type = self['instance_type']
@@ -662,18 +636,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # manage working dir for bootstrap script
         self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
 
-        if self._opts['bootstrap_files']:
-            log.warning(
-                "bootstrap_files is deprecated since v0.4.2 and will be"
-                " removed in v0.6.0. Consider using bootstrap instead.")
-        for path in self._opts['bootstrap_files']:
-            self._bootstrap_dir_mgr.add(**parse_legacy_hash_path(
-                'file', path, must_name='bootstrap_files'))
-
         self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
-        self._legacy_bootstrap = self._parse_legacy_bootstrap()
 
-        for cmd in self._bootstrap + self._legacy_bootstrap:
+        for cmd in self._bootstrap:
             for maybe_path_dict in cmd:
                 if isinstance(maybe_path_dict, dict):
                     self._bootstrap_dir_mgr.add(**maybe_path_dict)
@@ -1641,7 +1606,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _instance_profile(self):
         try:
             return (self._opts['iam_instance_profile'] or
-                    get_or_create_mrjob_instance_profile(self.make_iam_conn()))
+                    get_or_create_mrjob_instance_profile(self.make_iam_client()))
         except boto.exception.BotoServerError as ex:
             if ex.status != 403:
                 raise
@@ -1653,7 +1618,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _service_role(self):
         try:
             return (self._opts['iam_service_role'] or
-                    get_or_create_mrjob_service_role(self.make_iam_conn()))
+                    get_or_create_mrjob_service_role(self.make_iam_client()))
         except boto.exception.BotoServerError as ex:
             if ex.status != 403:
                 raise
@@ -2535,8 +2500,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # Also don't bother if we're not bootstrapping
         # (unless we're pooling, in which case we need the bootstrap
         # script to attach the pool hash too; see #1503).
-        if not (self._bootstrap or self._legacy_bootstrap or
-                self._opts['bootstrap_files'] or
+        if not (self._bootstrap or
                 self._bootstrap_mrjob() or
                 self._opts['pool_clusters']):
             return
@@ -2574,7 +2538,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content(
-            self._bootstrap + mrjob_bootstrap + self._legacy_bootstrap)
+            self._bootstrap + mrjob_bootstrap)
         for line in contents:
             log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
 
@@ -2675,67 +2639,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         :py:func:`mrjob.setup.parse_setup_cmd()`.
         """
         return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
-
-    def _parse_legacy_bootstrap(self):
-        """Parse the deprecated
-        options *bootstrap_python_packages*, and *bootstrap_cmds*
-        *bootstrap_scripts* as bootstrap commands, in that order.
-
-        This is a separate method from _parse_bootstrap() because bootstrapping
-        mrjob happens after the new bootstrap commands (so you can upgrade
-        Python) but before the legacy commands (for backwards compatibility).
-        """
-        bootstrap = []
-
-        # bootstrap_python_packages. Deprecated but still works, except
-        if self._opts['bootstrap_python_packages']:
-            log.warning(
-                'bootstrap_python_packages is deprecated since v0.4.2'
-                ' and will be removed in v0.6.0. Consider using'
-                ' bootstrap instead.')
-
-            # bootstrap_python_packages won't work on AMI 3.0.0 (out-of-date
-            # SSL keys) and AMI 2.4.2 and earlier (no pip, and have to fix
-            # sources.list to apt-get it). These AMIs are so old it's probably
-            # not worth dedicating code to this, but can add a warning if
-            # need be.
-
-            for path in self._opts['bootstrap_python_packages']:
-                path_dict = parse_legacy_hash_path('file', path)
-
-                python_bin = cmd_line(self._python_bin())
-
-                if python_bin in ('python', 'python2.6'):
-                    # Special case: in Python 2.6, we can't python -m pip
-                    bootstrap.append(['sudo pip install ', path_dict])
-                else:
-                    # Otherwise a little more robust to use Python than pip
-                    # binary; for example, there is a python3 binary but no
-                    # pip-3 (only pip-3.4)
-                    bootstrap.append(
-                        ['sudo %s -m pip install ' % python_bin, path_dict])
-
-        # setup_cmds
-        if self._opts['bootstrap_cmds']:
-            log.warning(
-                "bootstrap_cmds is deprecated since v0.4.2 and will be"
-                " removed in v0.6.0. Consider using bootstrap instead.")
-        for cmd in self._opts['bootstrap_cmds']:
-            if not isinstance(cmd, string_types):
-                cmd = cmd_line(cmd)
-            bootstrap.append([cmd])
-
-        # bootstrap_scripts
-        if self._opts['bootstrap_scripts']:
-            log.warning(
-                "bootstrap_scripts is deprecated since v0.4.2 and will be"
-                " removed in v0.6.0. Consider using bootstrap instead.")
-
-        for path in self._opts['bootstrap_scripts']:
-            path_dict = parse_legacy_hash_path('file', path)
-            bootstrap.append([path_dict])
-
-        return bootstrap
 
     # helper for _master_*_script_content() methods
     def _write_start_of_sh_script(self, writeln):
@@ -2902,18 +2805,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     ### EMR JOB MANAGEMENT UTILS ###
 
-    def make_persistent_job_flow(self):
-        """Create a new EMR cluster that requires manual termination, and
-        return its ID.
-
-        You can also fetch the job ID by calling self.get_cluster_id()
-        """
-        log.warning(
-            'make_persistent_job_flow() has been renamed to'
-            ' make_persistent_cluster(). This alias will be removed in v0.6.0')
-
-        return self.make_persistent_cluster()
-
     def make_persistent_cluster(self):
         if (self._cluster_id):
             raise AssertionError(
@@ -2931,13 +2822,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._cluster_id = self._create_cluster(persistent=True)
 
         return self._cluster_id
-
-    def get_emr_job_flow_id(self):
-        log.warning(
-            'get_emr_job_flow_id() has been renamed to get_cluster_id().'
-            ' This alias will be removed in v0.6.0')
-
-        return self.get_cluster_id()
 
     def get_cluster_id(self):
         return self._cluster_id
@@ -3276,7 +3160,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._opts['additional_emr_info'],
             self._bootstrap,
             self._bootstrap_actions(),
-            self._opts['bootstrap_cmds'],
             self._bootstrap_mrjob(),
         ]
 
@@ -3346,20 +3229,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def get_hadoop_version(self):
         return self._get_app_versions().get('hadoop')
 
-    def get_ami_version(self):
-        log.warning('get_ami_version() is a depreacated alias for'
-                    ' get_image_version() and will be removed in'
-                    ' mrjob v0.6.0')
-        return self.get_image_version()
-
     def get_image_version(self):
         """Get the AMI that our cluster is running.
 
         .. versionchanged:: 0.5.4
 
            This used to be called :py:meth:`get_ami_version`
-
-        .. versionadded:: 0.4.5
         """
         return self._get_cluster_info('image_version')
 
@@ -3438,27 +3313,33 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if hasattr(master, 'privateipaddress'):
             cache['master_private_ip'] = master.privateipaddress
 
-    def make_iam_conn(self):
-        """Create a connection to S3.
+    def make_iam_client(self):
+        """Create a :py:mod:`boto3` IAM client.
 
-        :return: a :py:class:`boto.iam.connection.IAMConnection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`botocore.client.IAM` wrapped in a
+                :py:class:`mrjob.retry.RetryWrapper`
         """
-        # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to connect to IAM')
+        if boto3 is None:
+            raise ImportError('You must install boto3 to connect to IAM')
 
-        host = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
+        endpoint_url = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
+        if not is_uri(endpoint_url):
+            endpoint_url = 'https://' + endpoint_url
 
-        log.debug('creating IAM connection to %s' % host)
+        log.debug('creating IAM connection to %s' % endpoint_url)
 
-        raw_iam_conn = boto.connect_iam(
+        # IAM only has a single region. Setting region_name stops
+        # another region being loaded from configs, environment variables, etc.
+        raw_iam_client = boto3.client(
+            'iam',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
-            host=host,
-            security_token=self._opts['aws_security_token'])
+            aws_session_token=self._opts['aws_security_token'],
+            endpoint_url=endpoint_url,
+            region_name='us-east-1',
+        )
 
-        return wrap_aws_conn(raw_iam_conn)
+        return _wrap_aws_client(raw_iam_client)
 
     # Spark
 
@@ -3533,6 +3414,35 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         ' your job may stall forever' % ig.instancetype)
 
         return None
+
+    ### deprecated boto (not boto3) connections ###
+
+    def make_iam_conn(self):
+        """Create a connection to IAM.
+
+        :return: a :py:class:`boto.iam.connection.IAMConnection`, wrapped in a
+                 :py:class:`mrjob.retry.RetryWrapper`
+        """
+        # give a non-cryptic error message if boto isn't installed
+        if boto is None:
+            raise ImportError('You must install boto to use make_iam_conn()')
+
+        log.warning('make_iam_conn() is deprecated and will be removed in'
+                    ' v0.7.0. Use make_iam_client(), which uses boto3,'
+                    ' instead.')
+
+        host = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
+
+        log.debug('creating IAM connection to %s' % host)
+
+        raw_iam_conn = boto.connect_iam(
+            aws_access_key_id=self._opts['aws_access_key_id'],
+            aws_secret_access_key=self._opts['aws_secret_access_key'],
+            host=host,
+            security_token=self._opts['aws_security_token'])
+
+        return wrap_aws_conn(raw_iam_conn)
+
 
 
 def _encode_emr_api_params(x):

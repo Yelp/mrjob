@@ -45,7 +45,6 @@ from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
-from mrjob.util import tar_and_gzip
 
 
 from tests.mockboto import MockBotoTestCase
@@ -56,6 +55,7 @@ from tests.mr_no_mapper import MRNoMapper
 from tests.mr_no_runner import MRNoRunner
 from tests.mr_null_spark import MRNullSpark
 from tests.mr_os_walk_job import MROSWalkJob
+from tests.mr_partitioner import MRPartitioner
 from tests.mr_sort_values import MRSortValues
 from tests.mr_sort_values_and_more import MRSortValuesAndMore
 from tests.mr_spark_jar import MRSparkJar
@@ -569,11 +569,14 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
 
     def test_partitioner(self):
         partitioner = 'org.apache.hadoop.mapreduce.Partitioner'
-        job = MRWordCount(['--partitioner', partitioner])
+        job = MRPartitioner([])
 
         with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0),
-                             ['-partitioner', partitioner])
+            self.assertEqual(
+                runner._hadoop_args_for_step(0),
+                ['-partitioner',
+                 'org.apache.hadoop.mapred.lib.HashPartitioner']
+            )
 
 
 class ArgsForSparkStepTestCase(SandboxedTestCase):
@@ -1182,32 +1185,6 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 runner._spark_script_args, 0)
 
 
-class StrictProtocolsInConfTestCase(SandboxedTestCase):
-    # regression tests for #1302, where command-line option's default
-    # overrode configs
-
-    STRICT_MRJOB_CONF = {'runners': {'inline': {'strict_protocols': True}}}
-
-    LOOSE_MRJOB_CONF = {'runners': {'inline': {'strict_protocols': False}}}
-
-    def test_default(self):
-        job = MRJob()
-        with job.make_runner() as runner:
-            self.assertEqual(runner._opts['strict_protocols'], True)
-
-    def test_strict_mrjob_conf(self):
-        job = MRJob()
-        with mrjob_conf_patcher(self.STRICT_MRJOB_CONF):
-            with job.make_runner() as runner:
-                self.assertEqual(runner._opts['strict_protocols'], True)
-
-    def test_loose_mrjob_conf(self):
-        job = MRJob()
-        with mrjob_conf_patcher(self.LOOSE_MRJOB_CONF):
-            with job.make_runner() as runner:
-                self.assertEqual(runner._opts['strict_protocols'], False)
-
-
 class CheckInputPathsTestCase(TestCase):
 
     def test_check_input_paths_enabled_by_default(self):
@@ -1226,6 +1203,34 @@ class CheckInputPathsTestCase(TestCase):
                 {'runners': {'inline': {'check_input_paths': False}}}):
             with job.make_runner() as runner:
                 self.assertFalse(runner._opts['check_input_paths'])
+
+
+def _tar_and_gzip(dir, out_path):
+    """Tar and gzip the given *dir* to a tarball at *out_path*.
+
+    If we encounter symlinks, include the actual file, not the symlink.
+
+    :type dir: str
+    :param dir: dir to tar up
+    :type out_path: str
+    :param out_path: where to write the tarball too
+    """
+    if not os.path.isdir(dir):
+        raise IOError('Not a directory: %r' % (dir,))
+
+    tar_gz = tarfile.open(out_path, mode='w:gz')
+
+    for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
+        for filename in filenames:
+            path = os.path.join(dirpath, filename)
+            # janky version of os.path.relpath() (Python 2.6):
+            path_in_tar_gz = path[len(os.path.join(dir, '')):]
+
+            # copy over real files, not symlinks
+            real_path = os.path.realpath(path)
+            tar_gz.add(real_path, arcname=path_in_tar_gz, recursive=False)
+
+    tar_gz.close()
 
 
 class SetupTestCase(SandboxedTestCase):
@@ -1251,7 +1256,7 @@ class SetupTestCase(SandboxedTestCase):
         os.chmod(self.foo_sh, stat.S_IRWXU)
 
         self.foo_tar_gz = os.path.join(self.tmp_dir, 'foo.tar.gz')
-        tar_and_gzip(self.foo_dir, self.foo_tar_gz)
+        _tar_and_gzip(self.foo_dir, self.foo_tar_gz)
 
         self.foo_zip = os.path.join(self.tmp_dir, 'foo.zip')
         zf = ZipFile(self.foo_zip, 'w', ZIP_DEFLATED)
@@ -1315,52 +1320,6 @@ class SetupTestCase(SandboxedTestCase):
                          self.foo_py_size)
         self.assertEqual(path_to_size.get('./bar/foo.py'),
                          self.foo_py_size)
-
-    def test_deprecated_python_archive_option(self):
-        job = MROSWalkJob(
-            ['-r', 'local',
-             '--python-archive', self.foo_tar_gz])
-        job.sandbox()
-
-        with job.make_runner() as r:
-            r.run()
-
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
-
-        # foo.py should be there, and getsize() should be patched to return
-        # double the number of bytes
-        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
-                         self.foo_py_size * 2)
-
-    def test_deprecated_setup_cmd_option(self):
-        job = MROSWalkJob(
-            ['-r', 'local',
-             '--setup-cmd', 'touch bar'])
-        job.sandbox()
-
-        with job.make_runner() as r:
-            r.run()
-
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
-
-        self.assertIn('./bar', path_to_size)
-
-    def test_deprecated_setup_script_option(self):
-        job = MROSWalkJob(
-            ['-r', 'local',
-             '--setup-script', self.foo_sh])
-        job.sandbox()
-
-        with job.make_runner() as r:
-            r.run()
-
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
-
-            self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
-            self.assertIn('./foo.sh-made-this', path_to_size)
 
     def test_python_archive(self):
         job = MROSWalkJob([
@@ -1623,67 +1582,6 @@ class BootstrapMRJobTestCase(TestCase):
         runner = MRJobRunner(
             conf_paths=[], interpreter=['ruby'], bootstrap_mrjob=True)
         self.assertEqual(runner._bootstrap_mrjob(), True)
-
-
-class FSPassthroughTestCase(TestCase):
-
-    def test_passthrough(self):
-        runner = InlineMRJobRunner()
-
-        with no_handlers_for_logger('mrjob.runner'):
-            stderr = StringIO()
-            log_to_stream('mrjob.runner', stderr)
-
-            self.assertEqual(runner.ls, runner.fs.ls)
-            # no special rules for underscore methods
-            self.assertEqual(runner._cat_file, runner.fs._cat_file)
-
-            self.assertIn(
-                'deprecated: call InlineMRJobRunner.fs.ls() directly',
-                stderr.getvalue())
-            self.assertIn(
-                'deprecated: call InlineMRJobRunner.fs._cat_file() directly',
-                stderr.getvalue())
-
-    def test_prefer_own_methods(self):
-        # TODO: currently can't initialize HadoopRunner without setting these
-        runner = HadoopJobRunner(
-            hadoop_bin='hadoop',
-            hadoop_home='kansas',
-            hadoop_streaming_jar='streaming.jar')
-
-        with no_handlers_for_logger('mrjob.runner'):
-            stderr = StringIO()
-            log_to_stream('mrjob.runner', stderr)
-
-            self.assertEqual(runner.ls, runner.fs.ls)
-
-            # Hadoop Runner has its own version
-            self.assertNotEqual(runner.get_hadoop_version,
-                                runner.fs.get_hadoop_version)
-
-            self.assertIn(
-                'deprecated: call HadoopJobRunner.fs.ls() directly',
-                stderr.getvalue())
-            self.assertNotIn('get_hadoop_version', stderr.getvalue())
-
-    def test_pass_through_fields(self):
-        # TODO: currently can't initialize HadoopRunner without setting these
-        runner = HadoopJobRunner(
-            hadoop_bin='hadoooooooooop',
-            hadoop_home='kansas',
-            hadoop_streaming_jar='streaming.jar')
-
-        with no_handlers_for_logger('mrjob.runner'):
-            stderr = StringIO()
-            log_to_stream('mrjob.runner', stderr)
-
-            self.assertEqual(runner._hadoop_bin, runner.fs._hadoop_bin)
-
-            # deprecation warning is different for non-functions
-            self.assertIn(
-                'deprecated: access HadoopJobRunner.fs._hadoop_bin directly',
-                stderr.getvalue())
 
 
 class StepInputAndOutputURIsTestCase(SandboxedTestCase):
@@ -2043,20 +1941,6 @@ class SortValuesTestCase(SandboxedTestCase):
             self.assertEqual(
                 hadoop_args[hadoop_args.index('-partitioner') + 1],
                 'org.apache.hadoop.mapred.lib.HashPartitioner')
-
-    def test_cmd_line_can_override_partitioner(self):
-        # the --partitioner option is deprecated
-        mr_job = MRSortValues(['--partitioner', 'FooPartitioner'])
-        mr_job.sandbox()
-
-        self.assertTrue(mr_job.sort_values())
-
-        with mr_job.make_runner() as runner:
-            hadoop_args = runner._hadoop_args_for_step(0)
-            self.assertIn('-partitioner', hadoop_args)
-            self.assertEqual(
-                hadoop_args[hadoop_args.index('-partitioner') + 1],
-                'FooPartitioner')
 
 
 class RenderSubstepTestCase(SandboxedTestCase):

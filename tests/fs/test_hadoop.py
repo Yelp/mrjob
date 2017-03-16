@@ -230,17 +230,6 @@ class FindHadoopBinTestCase(SandboxedTestCase):
 
         self.assertFalse(self.which.called)
 
-    def test_deprecated_hadoop_home_option(self):
-        hadoop_home = join(self.tmp_dir, 'hadoop_home_option')
-        hadoop_bin = self.makefile(join(hadoop_home, 'bin', 'hadoop'),
-                                   executable=True)
-
-        # deprecation warning is in HadoopJobRunner
-        self.fs = HadoopFilesystem(hadoop_home=hadoop_home)
-
-        with no_handlers_for_logger('mrjob.fs.hadoop'):
-            self.assertEqual(self.fs.get_hadoop_bin(), [hadoop_bin])
-
     # environment variable tests
 
     def _test_environment_variable(self, envvar, *dirnames):
@@ -293,10 +282,6 @@ class FindHadoopBinTestCase(SandboxedTestCase):
             self.assertEqual(self.fs.get_hadoop_bin(), ['hadoop'])
 
     # precedence tests
-
-    def test_deprecated_hadoop_home_option_beats_hadoop_prefix(self):
-        self._add_hadoop_bin_for_envvar('HADOOP_PREFIX', 'bin')
-        self.test_deprecated_hadoop_home_option()
 
     def test_hadoop_prefix_beats_hadoop_home_envvar(self):
         self._add_hadoop_bin_for_envvar('HADOOP_HOME', 'bin')

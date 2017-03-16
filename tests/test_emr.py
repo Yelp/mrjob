@@ -26,6 +26,8 @@ from datetime import datetime
 from datetime import timedelta
 from io import BytesIO
 
+import boto3
+
 import mrjob
 import mrjob.emr
 from mrjob.compat import version_gte
@@ -54,10 +56,8 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
-from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
-from mrjob.util import tar_and_gzip
 
 from tests.mockboto import DEFAULT_MAX_STEPS_RETURNED
 from tests.mockboto import MockBotoTestCase
@@ -85,6 +85,7 @@ from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
+from tests.test_local import _bash_wrap
 
 try:
     import boto
@@ -301,7 +302,7 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
         stdin = BytesIO(b'foo\nbar\n')
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
-                               '--s3-log-uri', 's3://walrus/logs',
+                               '--cloud-log-dir', 's3://walrus/logs',
                                '-', '--cleanup', mode])
         mr_job.sandbox(stdin=stdin)
 
@@ -482,14 +483,12 @@ class IAMTestCase(MockBotoTestCase):
     def setUp(self):
         super(IAMTestCase, self).setUp()
 
-        # wrap connect_iam() so we can see if it was called
-        p_iam = patch.object(boto, 'connect_iam', wraps=boto.connect_iam)
-        self.addCleanup(p_iam.stop)
-        p_iam.start()
+        # wrap boto3.client() so we can see if it was called
+        self.start(patch('boto3.client', wraps=boto3.client))
 
     def test_role_auto_creation(self):
         cluster = self.run_and_get_cluster()
-        self.assertTrue(boto.connect_iam.called)
+        self.assertTrue(boto3.client.called)
 
         # check instance_profile
         instance_profile_name = (
@@ -521,7 +520,7 @@ class IAMTestCase(MockBotoTestCase):
     def test_iam_instance_profile_option(self):
         cluster = self.run_and_get_cluster(
             '--iam-instance-profile', 'EMR_EC2_DefaultRole')
-        self.assertTrue(boto.connect_iam.called)
+        self.assertTrue(boto3.client.called)
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
@@ -529,7 +528,7 @@ class IAMTestCase(MockBotoTestCase):
     def test_iam_service_role_option(self):
         cluster = self.run_and_get_cluster(
             '--iam-service-role', 'EMR_DefaultRole')
-        self.assertTrue(boto.connect_iam.called)
+        self.assertTrue(boto3.client.called)
 
         self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
@@ -540,7 +539,7 @@ class IAMTestCase(MockBotoTestCase):
 
         # users with limited access may not be able to connect to the IAM API.
         # This gives them a plan B
-        self.assertFalse(boto.connect_iam.called)
+        self.assertFalse(boto3.client.called)
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
@@ -548,13 +547,13 @@ class IAMTestCase(MockBotoTestCase):
 
     def test_no_iam_access(self):
         ex = boto.exception.BotoServerError(403, 'Forbidden')
-        self.assertIsInstance(boto.connect_iam, Mock)
-        boto.connect_iam.side_effect = ex
+        self.assertIsInstance(boto3.client, Mock)
+        boto3.client.side_effect = ex
 
         with logger_disabled('mrjob.emr'):
             cluster = self.run_and_get_cluster()
 
-        self.assertTrue(boto.connect_iam.called)
+        self.assertTrue(boto3.client.called)
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
@@ -1174,54 +1173,6 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
             master=(1, 'm1.medium', None),
             task=(20, 'c1.medium', None))
 
-    def test_deprecated_num_ec2_instances(self):
-        self._test_instance_groups(
-            {'num_ec2_instances': 3},
-            core=(2, 'm1.medium', None),
-            master=(1, 'm1.medium', None))
-
-    def test_deprecated_num_ec2_instances_conflict_on_cmd_line(self):
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.emr', stderr)
-            self._test_instance_groups(
-                {'num_ec2_instances': 4,
-                 'num_core_instances': 10},
-                core=(10, 'm1.medium', None),
-                master=(1, 'm1.medium', None))
-
-        self.assertIn('does not make sense', stderr.getvalue())
-
-    def test_deprecated_num_ec2_instances_conflict_in_mrjob_conf(self):
-        self.set_in_mrjob_conf(num_ec2_instances=3,
-                               num_core_instances=5,
-                               num_task_instances=9)
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.emr', stderr)
-            self._test_instance_groups(
-                {},
-                core=(5, 'm1.medium', None),
-                master=(1, 'm1.medium', None),
-                task=(9, 'm1.medium', None))
-
-        self.assertIn('does not make sense', stderr.getvalue())
-
-    def test_deprecated_num_ec2_instances_cmd_line_beats_mrjob_conf(self):
-        self.set_in_mrjob_conf(num_core_instances=5,
-                               num_task_instances=9)
-
-        stderr = StringIO()
-        with no_handlers_for_logger():
-            log_to_stream('mrjob.emr', stderr)
-            self._test_instance_groups(
-                {'num_ec2_instances': 3},
-                core=(2, 'm1.medium', None),
-                master=(1, 'm1.medium', None))
-
-        self.assertNotIn('does not make sense', stderr.getvalue())
-
 
 ### tests for error parsing ###
 
@@ -1441,9 +1392,6 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         with open(foo_py_path, 'w'):
             pass
 
-        yelpy_tar_gz_path = os.path.join(self.tmp_dir, 'yelpy.tar.gz')
-        tar_and_gzip(self.tmp_dir, yelpy_tar_gz_path, prefix='yelpy')
-
         # use all the bootstrap options
         runner = EMRJobRunner(conf_paths=[],
                               image_version=image_version,
@@ -1451,11 +1399,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
                                   expected_python_bin + ' ' +
                                   foo_py_path + '#bar.py',
                                   's3://walrus/scripts/ohnoes.sh#'],
-                              bootstrap_cmds=['echo "Hi!"', 'true', 'ls'],
-                              bootstrap_files=['/tmp/quz'],
-                              bootstrap_mrjob=True,
-                              bootstrap_python_packages=[yelpy_tar_gz_path],
-                              bootstrap_scripts=['speedups.sh', '/tmp/s.sh'])
+                              bootstrap_mrjob=True)
 
         runner._add_bootstrap_files_for_upload()
 
@@ -1495,12 +1439,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         # check files get downloaded
         assertScriptDownloads(foo_py_path, 'bar.py')
         assertScriptDownloads('s3://walrus/scripts/ohnoes.sh')
-        assertScriptDownloads('/tmp/quz', 'quz')
         assertScriptDownloads(runner._mrjob_zip_path)
-        assertScriptDownloads('speedups.sh')
-        assertScriptDownloads('/tmp/s.sh')
-        if PY2:
-            assertScriptDownloads(yelpy_tar_gz_path)
 
         # check scripts get run
 
@@ -1508,10 +1447,6 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
         self.assertIn('  ' + expected_python_bin + ' $__mrjob_PWD/bar.py',
                       lines)
         self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
-        # bootstrap_cmds
-        self.assertIn('  echo "Hi!"', lines)
-        self.assertIn('  true', lines)
-        self.assertIn('  ls', lines)
         # bootstrap_mrjob
         mrjob_zip_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_zip_path)
@@ -1522,16 +1457,6 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
                       ' -d $__mrjob_PYTHON_LIB', lines)
         self.assertIn('  sudo ' + expected_python_bin + ' -m compileall -q -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
-        # bootstrap_python_packages
-        if expect_pip_binary:
-            self.assertIn('  sudo pip install $__mrjob_PWD/yelpy.tar.gz',
-                          lines)
-        else:
-            self.assertIn(('  sudo ' + expected_python_bin +
-                           ' -m pip install $__mrjob_PWD/yelpy.tar.gz'), lines)
-        # bootstrap_scripts
-        self.assertIn('  $__mrjob_PWD/speedups.sh', lines)
-        self.assertIn('  $__mrjob_PWD/s.sh', lines)
 
     def test_create_master_bootstrap_script(self):
         # this tests 4.x
@@ -2252,8 +2177,8 @@ class PoolMatchingTestCase(MockBotoTestCase):
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--num-ec2-core-instances', '2',
-            '--num-ec2-task-instances', '10',  # more instances, but smaller
+            '--num-core-instances', '2',
+            '--num-task-instances', '10',  # more instances, but smaller
             '--core-instance-bid-price', '0.10',
             '--master-instance-bid-price', '77.77',
             '--task-instance-bid-price', '22.00'])
@@ -2470,33 +2395,21 @@ class PoolMatchingTestCase(MockBotoTestCase):
             mrjob.__version__ = old_version
 
     def test_join_similarly_bootstrapped_pool(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
         _, cluster_id = self.make_pooled_cluster(
-            bootstrap_files=[local_input_path])
+            bootstrap=['true'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--bootstrap-file', local_input_path])
+            '--bootstrap', 'true'])
 
     def test_dont_join_differently_bootstrapped_pool(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--bootstrap-file', local_input_path])
+            '--bootstrap', 'true'])
 
     def test_dont_join_differently_bootstrapped_pool_2(self):
-        local_input_path = os.path.join(self.tmp_dir, 'input')
-        with open(local_input_path, 'w') as input_file:
-            input_file.write('bar\nfoo\n')
-
         bootstrap_path = os.path.join(self.tmp_dir, 'go.sh')
         with open(bootstrap_path, 'w') as f:
             f.write('#!/usr/bin/sh\necho "hi mom"\n')
@@ -3402,7 +3315,7 @@ class BuildStreamingStepTestCase(MockBotoTestCase):
             dict(type='streaming',
                  mapper=dict(
                      type='script',
-                     pre_filter=bash_wrap("grep 'anything'"))))
+                     pre_filter=_bash_wrap("grep 'anything'"))))
 
         self.assertEqual(
             ss['mapper'],
@@ -3577,37 +3490,6 @@ class StreamingJarAndStepArgPrefixTestCase(MockBotoTestCase):
                          ('justice.jar', []))
 
 
-class DeprecatedHadoopStreamingJarOnEMROptionTestCase(MockBotoTestCase):
-
-    def setUp(self):
-        super(DeprecatedHadoopStreamingJarOnEMROptionTestCase, self).setUp()
-        self.log = self.start(patch('mrjob.emr.log'))
-
-    def assert_deprecation_warning(self):
-        self.assertTrue(self.log.warning.called)
-        self.assertIn('hadoop_streaming_jar_on_emr is deprecated',
-                      self.log.warning.call_args[0][0])
-
-    def test_absolute_path(self):
-        runner = EMRJobRunner(hadoop_streaming_jar_on_emr='/fridge/pickle.jar')
-        self.assert_deprecation_warning()
-        self.assertEqual(runner._opts['hadoop_streaming_jar'],
-                         'file:///fridge/pickle.jar')
-
-    def test_relative_path(self):
-        runner = EMRJobRunner(hadoop_streaming_jar_on_emr='mason.jar')
-        self.assert_deprecation_warning()
-        self.assertEqual(runner._opts['hadoop_streaming_jar'],
-                         'file://mason.jar')
-
-    def test_dont_override_hadoop_streaming_jar(self):
-        runner = EMRJobRunner(hadoop_streaming_jar='s3://bucket/nice.jar',
-                              hadoop_streaming_jar_on_emr='/path/to/bad.jar')
-        self.assert_deprecation_warning()
-        self.assertEqual(runner._opts['hadoop_streaming_jar'],
-                         's3://bucket/nice.jar')
-
-
 class JarStepTestCase(MockBotoTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {
@@ -3761,7 +3643,7 @@ class SparkStepTestCase(MockBotoTestCase):
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
     def test_3_x_ami(self):
-        job = MRNullSpark(['-r', 'emr', '--ami-version', '3.11.0'])
+        job = MRNullSpark(['-r', 'emr', '--image-version', '3.11.0'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -3778,7 +3660,7 @@ class SparkStepTestCase(MockBotoTestCase):
                 _3_X_SPARK_SUBMIT)
 
     def test_4_x_ami(self):
-        job = MRNullSpark(['-r', 'emr', '--ami-version', '4.7.2'])
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.7.2'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -3897,7 +3779,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
 
     def test_3_x_ami(self):
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
-                             '--ami-version', '3.11.0'])
+                             '--image-version', '3.11.0'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -3915,7 +3797,7 @@ class SparkScriptStepTestCase(MockBotoTestCase):
 
     def test_4_x_ami(self):
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
-                             '--ami-version', '4.7.2'])
+                             '--image-version', '4.7.2'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4109,7 +3991,7 @@ class SecurityTokenTestCase(MockBotoTestCase):
         super(SecurityTokenTestCase, self).setUp()
 
         self.mock_emr = self.start(patch('boto.emr.connection.EmrConnection'))
-        self.mock_iam = self.start(patch('boto.connect_iam'))
+        self.mock_client = self.start(patch('boto3.client'))
 
         # runner needs to do stuff with S3 on initialization
         self.mock_s3 = self.start(patch('boto.connect_s3',
@@ -4123,12 +4005,14 @@ class SecurityTokenTestCase(MockBotoTestCase):
         self.assertIn('security_token', emr_kwargs)
         self.assertEqual(emr_kwargs['security_token'], security_token)
 
-        runner.make_iam_conn()
+        runner.make_iam_client()
 
-        self.assertTrue(self.mock_iam.called)
-        iam_kwargs = self.mock_iam.call_args[1]
-        self.assertIn('security_token', iam_kwargs)
-        self.assertEqual(iam_kwargs['security_token'], security_token)
+        # TODO: once we use boto3.client() for other services, we'll need
+        # to separate out IAM calls
+        self.assertTrue(self.mock_client.called)
+        iam_kwargs = self.mock_client.call_args[1]
+        self.assertIn('aws_session_token', iam_kwargs)
+        self.assertEqual(iam_kwargs['aws_session_token'], security_token)
 
         runner.fs.make_s3_conn()
 
@@ -4446,27 +4330,32 @@ class EMRTagsTestCase(MockBotoTestCase):
         ])
 
 
+# this isn't actually enough to support GovCloud; see:
+# http://docs.aws.amazon.com/govcloud-us/latest/UserGuide/using-govcloud-arns.html
 class IAMEndpointTestCase(MockBotoTestCase):
 
     def test_default(self):
         runner = EMRJobRunner()
 
-        iam_conn = runner.make_iam_conn()
-        self.assertEqual(iam_conn.host, 'iam.amazonaws.com')
+        iam_client = runner.make_iam_client()
+        self.assertEqual(iam_client.endpoint_url, 'https://iam.amazonaws.com')
 
     def test_explicit_iam_endpoint(self):
-        runner = EMRJobRunner(iam_endpoint='iam.us-gov.amazonaws.com')
+        runner = EMRJobRunner(iam_endpoint='https://iam.us-gov.amazonaws.com')
 
-        iam_conn = runner.make_iam_conn()
-        self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')
+        iam_client = runner.make_iam_client()
+        self.assertEqual(iam_client.endpoint_url,
+                         'https://iam.us-gov.amazonaws.com')
 
     def test_iam_endpoint_option(self):
+        # also test hostname without scheme
         mr_job = MRJob(
             ['-r', 'emr', '--iam-endpoint', 'iam.us-gov.amazonaws.com'])
 
         with mr_job.make_runner() as runner:
-            iam_conn = runner.make_iam_conn()
-            self.assertEqual(iam_conn.host, 'iam.us-gov.amazonaws.com')
+            iam_client = runner.make_iam_client()
+            self.assertEqual(iam_client.endpoint_url,
+                             'https://iam.us-gov.amazonaws.com')
 
 
 class SetupLineEncodingTestCase(MockBotoTestCase):
@@ -5044,17 +4933,6 @@ class PartitionerTestCase(MockBotoTestCase):
                     '-D', 'stream.num.map.output.key.fields=2',
                     '-partitioner',
                     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner',
-                ])
-
-    def test_switch_overrides_sort_values(self):
-        job = MRSortValues(['-r', 'emr', '--partitioner', 'java.lang.Object'])
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._hadoop_args_for_step(0), [
-                    '-D', 'mapred.text.key.partitioner.options=-k1,1',
-                    '-D', 'stream.num.map.output.key.fields=2',
-                    '-partitioner', 'java.lang.Object',
                 ])
 
 
@@ -5936,7 +5814,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_spark_application(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--application', 'Spark'])
         job.sandbox()
 
@@ -5946,7 +5824,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_spark_application_lowercase(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--application', 'spark'])
         job.sandbox()
 
@@ -5956,7 +5834,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--application', 'Mahout'])
         job.sandbox()
 
@@ -5966,7 +5844,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_spark_and_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--application', 'Mahout',
                             '--application', 'Spark'])
         job.sandbox()
@@ -5996,7 +5874,7 @@ class UsesSparkTestCase(MockBotoTestCase):
 
     def test_ignores_application_api_param(self):
         job = MRTwoStepJob(['-r', 'emr',
-                            '--ami-version', '4.0.0',
+                            '--image-version', '4.0.0',
                             '--emr-api-param',
                             'Application.member.1.Name=Spark'])
         job.sandbox()
@@ -6029,23 +5907,6 @@ class SparkPyFilesTestCase(MockBotoTestCase):
                 [runner._upload_mgr.uri(egg1_path),
                  runner._upload_mgr.uri(egg2_path)]
             )
-
-
-class DeprecatedAMIVersionKeywordOptionTestCase(MockBotoTestCase):
-    # regression test for #1421
-
-    def test_ami_version_4_0_0(self):
-        runner = EMRJobRunner(ami_version='4.0.0')
-        runner.make_persistent_cluster()
-
-        self.assertEqual(runner.get_image_version(), '4.0.0')
-
-        cluster = runner._describe_cluster()
-        self.assertEqual(cluster.releaselabel, 'emr-4.0.0')
-        self.assertFalse(hasattr(cluster, 'runningamiversion'))
-
-        self.assertEqual(runner._opts['image_version'], '4.0.0')
-        self.assertEqual(runner._opts['release_label'], 'emr-4.0.0')
 
 
 class TestClusterSparkSupportWarning(MockBotoTestCase):

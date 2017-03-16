@@ -118,10 +118,6 @@ class JarStepTestCase(TestCase):
     def test_bad_arg(self):
         self.assertRaises(TypeError, JarStep, 'dora.jar', pickle='dill')
 
-    def test_deprecated_INPUT_and_OUTPUT_attrs(self):
-        self.assertEqual(JarStep.INPUT, INPUT)
-        self.assertEqual(JarStep.OUTPUT, OUTPUT)
-
 
 class MRStepInitTestCase(TestCase):
 

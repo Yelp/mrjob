@@ -20,7 +20,6 @@ from mrjob.fs.base import Filesystem
 from mrjob.ssh import _ssh_cat
 from mrjob.ssh import _ssh_copy_key
 from mrjob.ssh import _ssh_ls
-from mrjob.ssh import _ssh_slave_addresses
 from mrjob.util import random_identifier
 from mrjob.util import read_file
 
@@ -52,9 +51,6 @@ class SSHFilesystem(Filesystem):
         # keep track of which hosts we've copied our key to, and
         # what the (random) name of the key file is on that host
         self._host_to_key_filename = {}
-
-        # keep track of the slave hosts accessible through each host
-        self._host_to_slave_hosts = {}
 
         # should we use sudo (for EMR)? Enable with use_sudo_over_ssh()
         self._sudo = False
@@ -150,17 +146,6 @@ class SSHFilesystem(Filesystem):
 
     def touchz(self, dest):
         raise IOError()  # not implemented
-
-    def ssh_slave_hosts(self, host, force=False):
-        """Get a list of the slave hosts reachable through *hosts*"""
-        log.warning('ssh_slave_hosts() is deprecated and will be removed'
-                    ' in v0.6.0')
-
-        if force or host not in self._host_to_slave_hosts:
-            self._host_to_slave_hosts[host] = _ssh_slave_addresses(
-                self._ssh_bin, host, self._ec2_key_pair_file)
-
-        return self._host_to_slave_hosts[host]
 
     def use_sudo_over_ssh(self, sudo=True):
         """Use this to turn on *sudo* (we do this depending on the AMI

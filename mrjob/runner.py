@@ -49,7 +49,6 @@ from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.options import CLEANUP_CHOICES
-from mrjob.options import _CLEANUP_DEPRECATED_ALIASES
 from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
@@ -137,7 +136,6 @@ class RunnerOptionStore(OptionStore):
             'local_tmp_dir': tempfile.gettempdir(),
             'owner': owner,
             'sh_bin': ['sh', '-ex'],
-            'strict_protocols': True,
         })
 
     def validated_options(self, opts, from_where=''):
@@ -165,14 +163,6 @@ class RunnerOptionStore(OptionStore):
         def handle_cleanup_opt(opt):
             if opt in CLEANUP_CHOICES:
                 return opt
-
-            if opt in _CLEANUP_DEPRECATED_ALIASES:
-                aliased_opt = _CLEANUP_DEPRECATED_ALIASES[opt]
-                # TODO: don't do this when option value is None
-                log.warning(
-                    'Deprecated %s option %s%s has been renamed to %s' % (
-                        opt_key, opt, from_where, aliased_opt))
-                return aliased_opt
 
             raise ValueError('%s must be one of %s, not %s' % (
                 opt_key, ', '.join(CLEANUP_CHOICES), opt))
@@ -361,9 +351,9 @@ class MRJobRunner(object):
                 'archive', archive_path, name=ud['name'])
             self._spark_archives.append((ud['name'], archive_path))
 
-        # py_files, python_archives, setup, setup_cmds, and setup_scripts
+        # py_files and setup
         # self._setup is a list of shell commands with path dicts
-        # interleaved; see mrjob.setup.parse_setup_cmds() for details
+        # interleaved; see mrjob.setup.parse_setup_cmd() for details
         self._setup = self._parse_setup()
         for cmd in self._setup:
             for token in cmd:
@@ -419,36 +409,13 @@ class MRJobRunner(object):
     @property
     def fs(self):
         """:py:class:`~mrjob.fs.base.Filesystem` object for the local
-        filesystem. Methods on :py:class:`~mrjob.fs.base.Filesystem` objects
-        will be forwarded to :py:class:`~mrjob.runner.MRJobRunner` until mrjob
-        0.6.0, but **this behavior is deprecated.**
+        filesystem.
         """
         if self._fs is None:
             # wrap LocalFilesystem in CompositeFilesystem to get IOError
             # on URIs (see #1185)
             self._fs = CompositeFilesystem(LocalFilesystem())
         return self._fs
-
-    def __getattr__(self, name):
-        # For backward compatibility, forward filesystem methods
-        try:
-            value = getattr(self.fs, name)
-        except AttributeError:
-            raise AttributeError(name)
-
-        # friendly deprecation warning
-        is_func = ismethod(value) or isfunction(value)
-        log.warning(
-            'deprecated: %s %s.fs.%s%s directly'
-            ' (%s.%s is going away in v0.6.0)' % (
-                'call' if is_func else 'access',
-                self.__class__.__name__,
-                name,
-                '()' if is_func else '',
-                self.__class__.__name__,
-                name))
-
-        return value
 
     ### Running the job and parsing output ###
 
@@ -465,12 +432,6 @@ class MRJobRunner(object):
 
         if self._ran_job:
             raise AssertionError("Job already ran!")
-
-        if not self._opts['strict_protocols']:
-            log.warning('\nNon-strict protocols are deprecated and will be'
-                        ' removed in v0.6.0. Please run your job with'
-                        ' --strict-protocols and fix any underlying'
-                        ' encoding issues\n')
 
         self._create_dir_archives()
         self._run()
@@ -635,15 +596,6 @@ class MRJobRunner(object):
         This has the format ``label.owner.date.time.microseconds``
         """
         return self._job_key
-
-    def get_job_name(self):
-        """Alias for :py:meth:`get_job_key`. Will be removed in v0.6.0.
-
-        .. deprecated:: 0.5.0
-        """
-        log.warning('get_job_name() has been renamed to get_job_key().'
-                    ' get_job_name() will be removed in v0.6.0')
-        return self.get_job_key()
 
     def get_output_dir(self):
         """Find the directory containing the job output. If the job hasn't
@@ -906,7 +858,6 @@ class MRJobRunner(object):
             the path they'll have inside Hadoop streaming
         """
         return (self._get_file_upload_args(local=local) +
-                self._get_strict_protocols_args() +
                 self._extra_args)
 
     def _get_file_upload_args(self, local=False):
@@ -925,20 +876,6 @@ class MRJobRunner(object):
             else:
                 args.append(self._working_dir_mgr.name(**path_dict))
         return args
-
-    def _get_strict_protocols_args(self):
-        """Arguments used to control protocol behavior in the job.
-
-        This just adds --no-strict-protocols when strict_protocols
-        is false.
-        """
-        # These are only in the runner so that we can default them from
-        # mrjob.conf, which will allow us to eventually remove them.
-        # See issue #726.
-        if not self._opts['strict_protocols']:
-            return ['--no-strict-protocols']
-        else:
-            return []
 
     def _sh_bin(self):
         """The sh binary and any arguments, as a list. Override this
@@ -1005,17 +942,7 @@ class MRJobRunner(object):
 
     def _parse_setup(self):
         """Parse the *setup* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`.
-
-        If *bootstrap_mrjob* and ``self.BOOTSTRAP_MRJOB_IN_SETUP`` are both
-        true, create mrjob.zip (if it doesn't exist already) and
-        prepend a setup command that adds it to PYTHONPATH.
-
-        Patch in *py_files*.
-
-        Also patch in the deprecated
-        options *python_archives*, *setup_cmd*, and *setup_script*
-        as setup commands.
+        :py:func:`mrjob.setup.parse_setup_cmd()`, and patch in *py_files*.
         """
         setup = []
 
@@ -1028,38 +955,9 @@ class MRJobRunner(object):
             path_dict = parse_legacy_hash_path('file', path)
             setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
 
-        # python_archives
-        if self._opts['python_archives']:
-            log.warning('python_archives is deprecated and will be removed'
-                        ' in v0.6.0. Try py_files instead')
-            for path in self._opts['python_archives']:
-                path_dict = parse_legacy_hash_path('archive', path)
-                setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
-
         # setup
         for cmd in self._opts['setup']:
             setup.append(parse_setup_cmd(cmd))
-
-        # setup_cmds
-        if self._opts['setup_cmds']:
-            log.warning(
-                "setup_cmds is deprecated since v0.4.2 and will be removed"
-                " in v0.6.0. Consider using setup instead.")
-
-        for cmd in self._opts['setup_cmds']:
-            if not isinstance(cmd, string_types):
-                cmd = cmd_line(cmd)
-            setup.append([cmd])
-
-        # setup_scripts
-        if self._opts['setup_scripts']:
-            log.warning(
-                "setup_scripts is deprecated since v0.4.2 and will be removed"
-                " in v0.6.0. Consider using setup instead.")
-
-        for path in self._opts['setup_scripts']:
-            path_dict = parse_legacy_hash_path('file', path)
-            setup.append([path_dict])
 
         return setup
 

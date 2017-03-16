@@ -142,8 +142,8 @@ The following are deprecated and will be removed in v0.6.0:
   instead
 * :py:class:`~mrjob.step.JarStep`.``OUTPUT``; use :py:data:`mrjob.step.OUTPUT`
   instead
-* non-strict protocols (see :mrjob-opt:`strict_protocols`)
-* the :mrjob-opt:`python_archives` option (try
+* non-strict protocols (see `strict_protocols`)
+* the *python_archives* option (try
   :ref:`this <cookbook-src-tree-pythonpath>` instead)
 * :py:func:`~mrjob.parse.is_windows_path`
 * :py:func:`~mrjob.parse.parse_key_value_list`
@@ -250,7 +250,7 @@ The old option names and command-line switches are now deprecated but will
 continue to work until v0.6.0. (Exception: *ami_version* was accidentally
 removed; if you need it, use :ref:`v0.5.5` or later.)
 
-:mrjob-opt:`num_ec2_instances` has simply been deprecated (it's just
+`num_ec2_instances` has simply been deprecated (it's just
 :mrjob-opt:`num_core_instances` plus one).
 
 :mrjob-opt:`hadoop_streaming_jar_on_emr` has also been deprecated; in its
@@ -384,7 +384,7 @@ Fixes a bug in the previous relase that broke
 to set the partitioner. The ``--partitioner`` switch is now deprecated
 (the choice of partitioner is part of your job semantics).
 
-Fixes a bug in the previous release that caused :mrjob-opt:`strict_protocols`
+Fixes a bug in the previous release that caused `strict_protocols`
 and :mrjob-opt:`check_input_paths` to be ignored in :file:`mrjob.conf`. (We
 would much prefer you fixed jobs that are using "loose protocols" rather than
 setting ``strict_protocols: false`` in your config file, but we didn't break
@@ -481,7 +481,7 @@ Protocols
 
 Protocols are now strict by default (they simply raise an exception on
 unencodable data). "Loose" protocols can be re-enabled with the
-``--no-strict-protocols`` switch; see :mrjob-opt:`strict_protocols` for
+``--no-strict-protocols`` switch; see `strict_protocols` for
 why this is a bad idea.
 
 Protocols will now use the much faster :py:mod:`ujson` library, if installed,
@@ -740,7 +740,7 @@ Java libraries such as `Mahout <http://mahout.apache.org/>`_ in your MRJobs.
 For more information, see :ref:`non-hadoop-streaming-jar-steps`.
 
 Many options for setting up your task's environment (``--python-archive``,
-``setup-cmd`` and ``--setup-script``) have been replaced by a powerful
+``--setup-cmd`` and ``--setup-script``) have been replaced by a powerful
 ``--setup`` option. See the :doc:`guides/setup-cookbook` for examples.
 
 Similarly, many options for bootstrapping nodes on EMR (``--bootstrap-cmd``,

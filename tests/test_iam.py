@@ -15,11 +15,8 @@
 import json
 
 from mrjob.iam import _MRJOB_SERVICE_ROLE
-from mrjob.iam import _unwrap_response
-from mrjob.iam import _yield_instance_profiles
-from mrjob.iam import _yield_roles
 
-from tests.mockboto import MockIAMConnection
+from tests.mockboto import MockIAMClient
 from tests.py2 import TestCase
 
 
@@ -29,28 +26,32 @@ from tests.py2 import TestCase
 class PaginationTestCase(TestCase):
 
     def test_many_instance_profiles(self):
-        conn = MockIAMConnection()
-        max_items = conn.DEFAULT_MAX_ITEMS
+        client = MockIAMClient()
+        max_items = client.DEFAULT_MAX_ITEMS
 
         for i in range(2 * max_items):
-            conn.create_instance_profile('ip-%03d' % i)
+            client.create_instance_profile(InstanceProfileName=('ip-%03d' % i))
 
-        instance_profiles_page = _unwrap_response(
-            conn.list_instance_profiles())['instance_profiles']
-        self.assertEqual(len(instance_profiles_page), max_items)
+        paginator = client.get_paginator('list_instance_profiles')
+        pages = list(paginator.paginate())
 
-        instance_profiles = list(_yield_instance_profiles(conn))
-        self.assertEqual(len(instance_profiles), 2 * max_items)
+        self.assertEqual(len(pages), 2)
+        self.assertEqual(len(pages[0]['InstanceProfiles']), max_items)
+        self.assertEqual(len(pages[1]['InstanceProfiles']), max_items)
 
     def test_many_roles(self):
-        conn = MockIAMConnection()
-        max_items = conn.DEFAULT_MAX_ITEMS
+        client = MockIAMClient()
+        max_items = client.DEFAULT_MAX_ITEMS
 
-        for i in range(2 * max_items):
-            conn.create_role('r-%03d' % i, json.dumps(_MRJOB_SERVICE_ROLE))
+        for i in range(2 * max_items + 1):
+            client.create_role(
+                AssumeRolePolicyDocument=json.dumps(_MRJOB_SERVICE_ROLE),
+                RoleName=('r-%03d' % i),)
 
-        roles_page = _unwrap_response(conn.list_roles())['roles']
-        self.assertEqual(len(roles_page), max_items)
+        paginator = client.get_paginator('list_roles')
+        pages = list(paginator.paginate())
 
-        roles = list(_yield_roles(conn))
-        self.assertEqual(len(roles), 2 * max_items)
+        self.assertEqual(len(pages), 3)
+        self.assertEqual(len(pages[0]['Roles']), max_items)
+        self.assertEqual(len(pages[1]['Roles']), max_items)
+        self.assertEqual(len(pages[2]['Roles']), 1)

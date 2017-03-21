@@ -17,7 +17,7 @@ from mrjob.protocol import RawValueProtocol
 from mrjob.step import MRStep
 
 
-class CmdJob(MRJob):
+class MRCmdJob(MRJob):
 
     INPUT_PROTOCOL = RawValueProtocol
 
@@ -26,7 +26,7 @@ class CmdJob(MRJob):
     OUTPUT_PROTOCOL = RawValueProtocol
 
     def configure_options(self):
-        super(CmdJob, self).configure_options()
+        super(MRCmdJob, self).configure_options()
         self.add_passthrough_option('--mapper-cmd', default=None)
         self.add_passthrough_option('--combiner-cmd', default=None)
         self.add_passthrough_option('--reducer-cmd', default=None)
@@ -49,4 +49,4 @@ class CmdJob(MRJob):
 
 
 if __name__ == '__main__':
-    CmdJob().run()
+    MRCmdJob().run()

@@ -1,5 +1,5 @@
 # Copyright 2009-2013 Yelp and Contributors
-# Copyright 2015-2016 Yelp
+# Copyright 2015-2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -32,6 +32,7 @@ class ClusterInspectionTestCase(ToolTestCase):
         self.assertEqual(
             _runner_kwargs(), {
                 'additional_emr_info': None,
+                'applications': [],
                 'bootstrap': [],
                 'bootstrap_actions': [],
                 'bootstrap_mrjob': None,
@@ -46,7 +47,6 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'core_instance_type': None,
                 'ec2_key_pair': None,
                 'emr_api_params': None,
-                'emr_applications': [],
                 'emr_configurations': None,
                 'emr_endpoint': None,
                 'enable_emr_debugging': None,

@@ -62,7 +62,7 @@ bootstrap configuration. Other options that affect which cluster a job can
 join:
 
 * :mrjob-opt:`image_version`\/:mrjob-opt:`release_label`: must match
-* :mrjob-opt:`emr_applications`: require *at least* these applications
+* :mrjob-opt:`applications`: require *at least* these applications
   (extra ones okay)
 * :mrjob-opt:`emr_configurations`: must match
 * :mrjob-opt:`ec2_key_pair`: if specified, only join clusters with the same key

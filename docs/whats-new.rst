@@ -4,6 +4,36 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.9:
+
+0.5.9
+-----
+
+Fixed a bug that prevented :mrjob-opt:`setup` scripts from working on EMR AMIs
+5.2.0 and later. Our workaround should be completely transparent unless
+you use a custom shell binary; see :mrjob-opt:`sh_bin` for details.
+
+The EMR runner now correctly re-starts the SSH tunnel to the job
+tracker/resource manager when a cluster it tries to run a job on
+auto-terminates. It also no longer requires a working SSH tunnel to
+fetch job progress (you still a working SSH; see
+:mrjob-opt:`ec2_key_pair_file`).
+
+The `emr_applications` option has been renamed to :mrjob-opt:`applications`.
+
+The :ref:`terminate-idle-clusters` utility is now slightly more robust in
+cases where your S3 temp directory is an different region from your clusters.
+
+Finally, there a couple of changes that probably only matter if you're trying
+to wrap your Hadoop tasks (mappers, reducers, etc.) in :command:`docker`:
+
+* You can set *just* the python binary for tasks with
+  :mrjob-opt:`task_python_bin`. This allows you to use a wrapper script in
+  place of Python without perturbing :mrjob-opt:`setup` scripts.
+* Local mode now no longer relies on an absolute path to access the
+  :py:mod:`mrjob.cat` utility it uses to handle compressed input files;
+  copying the job's working directory into Docker is enough.
+
 .. _v0.5.8:
 
 0.5.8
@@ -356,8 +386,7 @@ This release adds basic support for `Google Cloud Dataproc <https://cloud.google
 * finding probable cause of errors
 * running Java JARs as steps
 
-Added the :mrjob-opt:`emr_applications` option, which helps you configure
-4.x AMIs.
+Added the `emr_applications` option, which helps you configure 4.x AMIs.
 
 Fixed an EMR bug (introduced in v0.5.0) where we were waiting for steps
 to complete in the wrong order (in a multi-step job, we wouldn't register

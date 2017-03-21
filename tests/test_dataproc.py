@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2009-2016 Yelp and Contributors
+# Copyright 2009-2017 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -784,6 +784,31 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
             content = f.read()
 
         self.assertIn('sudo anaconda -m compileall -q -f', content)
+
+    def test_bootstrap_script_respects_sh_bin(self):
+        runner = DataprocJobRunner(conf_paths=[])
+
+        self.start(patch('mrjob.dataproc.DataprocJobRunner._sh_bin',
+                         return_value=['/bin/bash']))
+        runner._add_bootstrap_files_for_upload()
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        with open(runner._master_bootstrap_script_path) as f:
+            lines = list(f)
+
+        self.assertEqual(lines[0].strip(), '#!/bin/bash')
+
+    def test_bootstrap_script_respects_sh_pre_commands(self):
+        runner = DataprocJobRunner(conf_paths=[])
+
+        self.start(patch('mrjob.dataproc.DataprocJobRunner._sh_pre_commands',
+                         return_value=['garply', 'quux']))
+        runner._add_bootstrap_files_for_upload()
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        with open(runner._master_bootstrap_script_path) as f:
+            lines = list(f)
+
+        self.assertEqual([line.strip() for line in lines[1:3]],
+                         ['garply', 'quux'])
 
 
 class DataprocNoMapperTestCase(MockGoogleAPITestCase):

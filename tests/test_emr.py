@@ -56,6 +56,7 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
+from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 
 from tests.mockboto import DEFAULT_MAX_STEPS_RETURNED
@@ -976,14 +977,14 @@ class EC2InstanceGroupTestCase(MockBotoTestCase):
     def test_spark_defaults_single_node(self):
         # Spark needs at least m1.large
         self._test_instance_groups(
-            dict(image_version='4.0.0', emr_applications=['Spark']),
+            dict(image_version='4.0.0', applications=['Spark']),
             master=(1, 'm1.large', None))
 
     def test_spark_defaults_multiple_nodes(self):
         # Spark can get away with m1.medium for the resource manager
         self._test_instance_groups(
             dict(image_version='4.0.0',
-                 emr_applications=['Spark'],
+                 applications=['Spark'],
                  num_core_instances=2),
             core=(2, 'm1.large', None),
             master=(1, 'm1.medium', None))
@@ -1873,42 +1874,42 @@ class PoolMatchingTestCase(MockBotoTestCase):
             '--release-label', 'emr-4.0.0',
             '--image-version', '1.0.0'])
 
-    def test_matching_emr_applications(self):
+    def test_matching_applications(self):
         _, cluster_id = self.make_pooled_cluster(
-            image_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', applications=['Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--emr-application', 'Mahout'])
+            '--application', 'Mahout'])
 
-    def test_extra_emr_applications_okay(self):
+    def test_extra_applications_okay(self):
         _, cluster_id = self.make_pooled_cluster(
-            image_version='4.0.0', emr_applications=['Ganglia', 'Mahout'])
+            image_version='4.0.0', applications=['Ganglia', 'Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--emr-application', 'Mahout'])
+            '--application', 'Mahout'])
 
-    def test_missing_emr_applications_not_okay(self):
+    def test_missing_applications_not_okay(self):
         _, cluster_id = self.make_pooled_cluster(
-            image_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', applications=['Mahout'])
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--emr-application', 'Ganglia',
-            '--emr-application', 'Mahout'])
+            '--application', 'Ganglia',
+            '--application', 'Mahout'])
 
-    def test_emr_application_matching_is_case_insensitive(self):
+    def test_application_matching_is_case_insensitive(self):
         _, cluster_id = self.make_pooled_cluster(
-            image_version='4.0.0', emr_applications=['Mahout'])
+            image_version='4.0.0', applications=['Mahout'])
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--image-version', '4.0.0',
-            '--emr-application', 'mahout'])
+            '--application', 'mahout'])
 
     def test_matching_emr_configurations(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -2590,7 +2591,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
     def test_join_cluster_with_spark_4_x_ami(self):
         _, cluster_id = self.make_pooled_cluster(
             image_version='4.7.2',
-            emr_applications=['Spark'])
+            applications=['Spark'])
 
         self.assertJoins(
             cluster_id,
@@ -2664,6 +2665,46 @@ class PoolingRecoveryTestCase(MockBotoTestCase):
 
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+    def test_restart_ssh_tunnel_on_launch(self):
+        # regression test for #1549
+        ssh_tunnel_cluster_ids = []
+
+        def _set_up_ssh_tunnel(self):
+            if self._ssh_proc is None:
+                ssh_tunnel_cluster_ids.append(self._cluster_id)
+                self._ssh_proc = Mock()
+
+        self.start(patch(
+            'mrjob.emr.EMRJobRunner._set_up_ssh_tunnel',
+            side_effect=_set_up_ssh_tunnel, autospec=True))
+
+        def _kill_ssh_tunnel(self):
+            self._ssh_proc = None
+
+        mock_kill_ssh_tunnel = self.start(patch(
+            'mrjob.emr.EMRJobRunner._kill_ssh_tunnel',
+            side_effect=_kill_ssh_tunnel,
+            autospec=True))
+
+        cluster_id = self.make_pooled_cluster()
+        self.mock_emr_self_termination.add(cluster_id)
+
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # tried to add steps to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 2)
+
+            self.assertNotEqual(runner.get_cluster_id(), cluster_id)
+            self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+            self.assertEqual(len(mock_kill_ssh_tunnel.call_args_list), 1)
+            self.assertEqual(ssh_tunnel_cluster_ids,
+                             [cluster_id, runner.get_cluster_id()])
 
     def test_join_pooled_cluster_after_self_termination(self):
         # cluster 1 should be preferable
@@ -4163,7 +4204,7 @@ class BootstrapSparkTestCase(MockBotoTestCase):
 
         cluster = self.get_cluster(
             '--image-version', '4.7.2',
-            '--emr-application', 'spark')
+            '--application', 'spark')
 
         # shouldn't add "Spark" application on top of "spark"
         self.assertTrue(self.installed_spark_application(cluster, 'spark'))
@@ -4923,12 +4964,12 @@ class EMRApplicationsTestCase(MockBotoTestCase):
             applications = set(a.name for a in cluster.applications)
             self.assertEqual(applications, set(['Hadoop']))
 
-    def test_emr_applications_requires_4_x_ami(self):
+    def test_applications_requires_4_x_ami(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
              '--image-version', '3.11.0',
-             '--emr-application', 'Hadoop',
-             '--emr-application', 'Mahout'])
+             '--application', 'Hadoop',
+             '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4937,8 +4978,8 @@ class EMRApplicationsTestCase(MockBotoTestCase):
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
-             '--emr-application', 'Hadoop',
-             '--emr-application', 'Mahout'])
+             '--application', 'Hadoop',
+             '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4955,7 +4996,7 @@ class EMRApplicationsTestCase(MockBotoTestCase):
     def test_implicit_hadoop(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
-             '--emr-application', 'Mahout'])
+             '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -4974,8 +5015,8 @@ class EMRApplicationsTestCase(MockBotoTestCase):
     def test_api_param_serialization(self):
         job = MRTwoStepJob(
             ['-r', 'emr',
-             '--emr-application', 'Hadoop',
-             '--emr-application', 'Mahout'])
+             '--application', 'Hadoop',
+             '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5771,7 +5812,7 @@ class UsesSparkTestCase(MockBotoTestCase):
     def test_spark_application(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--image-version', '4.0.0',
-                            '--emr-application', 'Spark'])
+                            '--application', 'Spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5781,7 +5822,7 @@ class UsesSparkTestCase(MockBotoTestCase):
     def test_spark_application_lowercase(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--image-version', '4.0.0',
-                            '--emr-application', 'spark'])
+                            '--application', 'spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5791,7 +5832,7 @@ class UsesSparkTestCase(MockBotoTestCase):
     def test_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--image-version', '4.0.0',
-                            '--emr-application', 'Mahout'])
+                            '--application', 'Mahout'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -5801,8 +5842,8 @@ class UsesSparkTestCase(MockBotoTestCase):
     def test_spark_and_other_application(self):
         job = MRTwoStepJob(['-r', 'emr',
                             '--image-version', '4.0.0',
-                            '--emr-application', 'Mahout',
-                            '--emr-application', 'Spark'])
+                            '--application', 'Mahout',
+                            '--application', 'Spark'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -6044,3 +6085,267 @@ class SSHWorkerHostsTestCase(MockBotoTestCase):
             len(self._ssh_worker_hosts('--num-core-instances', '2',
                                        '--num-task-instances', '3')),
             5)
+
+
+class BadBashWorkaroundTestCase(MockBotoTestCase):
+    # regression test for 1548
+
+    def _test_sh_bin(self, image_version, expected_bin, expected_pre_commands):
+        cookie_jar = self.makefile('cookie.jar')
+
+        job = MRTwoStepJob(['-r', 'emr', '--image-version', image_version,
+                            '--libjar', cookie_jar])
+        job.sandbox()
+
+        def check_script(path):
+            self.assertTrue(path)
+            with open(path) as script:
+                lines = list(script)
+                self.assertEqual(lines[0].strip(),
+                                 '#!%s' % cmd_line(expected_bin))
+                # everything up to first newline is a pre-command
+                pre_commands = []
+                for line in lines[1:]:
+                    cmd = line.strip()
+                    if not cmd:
+                        break
+                    pre_commands.append(cmd)
+
+                self.assertEqual(pre_commands, expected_pre_commands)
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(runner._sh_bin(), expected_bin)
+            self.assertEqual(runner._sh_pre_commands(), expected_pre_commands)
+
+            check_script(runner._master_bootstrap_script_path)
+            check_script(runner._master_node_setup_script_path)
+
+    def test_good_bash(self):
+        self._test_sh_bin('5.0.0', ['/bin/sh', '-ex'], [])
+
+    def test_bad_bash(self):
+        self._test_sh_bin('5.2.0', ['/bin/sh', '-x'], ['set -e'])
+
+
+class LogProgressTestCase(MockBotoTestCase):
+
+    def setUp(self):
+        super(LogProgressTestCase, self).setUp()
+
+        self._progress_html_from_tunnel = self.start(patch(
+            'mrjob.emr.EMRJobRunner._progress_html_from_tunnel'))
+        self._progress_html_over_ssh = self.start(patch(
+            'mrjob.emr.EMRJobRunner._progress_html_over_ssh'))
+
+        self._parse_progress_from_job_tracker = self.start(patch(
+            'mrjob.emr._parse_progress_from_job_tracker',
+            return_value=(100, 50)))
+
+        self._parse_progress_from_resource_manager = self.start(patch(
+            'mrjob.emr._parse_progress_from_resource_manager',
+            return_value=61.3))
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        # don't clean up our mock cluster; this causes unwanted logging
+        self.start(patch('mrjob.emr.EMRJobRunner.cleanup'))
+
+    def _launch_and_log_progress(self, *args):
+        job = MRTwoStepJob(['-r', 'emr'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            self.log.info.reset_mock()
+
+            runner._log_step_progress()
+
+    def test_default(self):
+        # by default, we fetch progress from the resource manager, through
+        # the SSH tunnel
+        self._launch_and_log_progress()
+
+        self.log.info.assert_called_once_with('    61.3% complete')
+
+        self.assertTrue(self._progress_html_from_tunnel.called)
+        self.assertFalse(self._progress_html_over_ssh.called)
+
+        self.assertFalse(self._parse_progress_from_job_tracker.called)
+        self._parse_progress_from_resource_manager.assert_called_once_with(
+            self._progress_html_from_tunnel.return_value)
+
+    def test_fallback_to_direct_ssh(self):
+        self._progress_html_from_tunnel.return_value = None
+
+        self._launch_and_log_progress()
+
+        self.log.info.assert_called_once_with('    61.3% complete')
+
+        self.assertTrue(self._progress_html_from_tunnel.called)
+        self.assertTrue(self._progress_html_over_ssh.called)
+
+        self.assertFalse(self._parse_progress_from_job_tracker.called)
+        self._parse_progress_from_resource_manager.assert_called_once_with(
+            self._progress_html_over_ssh.return_value)
+
+    def test_no_progress_available(self):
+        self._progress_html_from_tunnel.return_value = None
+        self._progress_html_over_ssh.return_value = None
+
+        self._launch_and_log_progress()
+
+        self.assertFalse(self.log.info.called)
+
+        self.assertTrue(self._progress_html_from_tunnel.called)
+        self.assertTrue(self._progress_html_over_ssh.called)
+
+        self.assertFalse(self._parse_progress_from_job_tracker.called)
+        self.assertFalse(self._parse_progress_from_resource_manager.called)
+
+    def test_use_job_tracker_on_2_x_amis(self):
+        # by default, we fetch progress from the resource manager, through
+        # the SSH tunnel
+        self._launch_and_log_progress('--image-version', '2.4.9')
+
+        self.log.info.assert_called_once_with('   map 100% reduce  50%')
+
+        self.assertTrue(self._progress_html_from_tunnel.called)
+        self.assertFalse(self._progress_html_over_ssh.called)
+
+        self._parse_progress_from_job_tracker.assert_called_once_with(
+            self._progress_html_from_tunnel.return_value)
+        self.assertFalse(self._parse_progress_from_resource_manager.called)
+
+
+class ProgressHtmlFromTunnelTestCase(MockBotoTestCase):
+
+    MOCK_TUNNEL_URL = 'http://foohost:12345/cluster'
+
+    def setUp(self):
+        super(ProgressHtmlFromTunnelTestCase, self).setUp()
+
+        self.urlopen = self.start(patch('mrjob.emr.urlopen'))
+
+        self.log = self.start(patch('mrjob.emr.log'))
+
+        # don't clean up our mock cluster; this causes unwanted logging
+        self.start(patch('mrjob.emr.EMRJobRunner.cleanup'))
+
+    def _launch_and_get_progress_html(self, ssh_tunnel=True):
+        job = MRTwoStepJob(['-r', 'emr'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            if ssh_tunnel:
+                runner._ssh_tunnel_url = self.MOCK_TUNNEL_URL
+
+            self.log.debug.reset_mock()
+
+            return runner._progress_html_from_tunnel()
+
+    def test_no_tunnel(self):
+        self.assertIsNone(self._launch_and_get_progress_html(ssh_tunnel=False))
+
+        self.assertFalse(self.urlopen.called)
+
+    def test_tunnel(self):
+        html = self._launch_and_get_progress_html()
+
+        self.urlopen.assert_called_once_with(self.MOCK_TUNNEL_URL)
+        self.assertTrue(self.urlopen.return_value.read.called)
+
+        self.assertEqual(html, self.urlopen.return_value.read.return_value)
+
+        self.assertTrue(self.urlopen.return_value.close.called)
+
+    def test_urlopen_exception(self):
+        self.urlopen.side_effect = Exception('BOOM')
+
+        self.assertIsNone(self._launch_and_get_progress_html())
+
+        self.urlopen.assert_called_once_with(self.MOCK_TUNNEL_URL)
+        self.assertFalse(self.urlopen.return_value.read.called)
+
+        self.assertFalse(self.urlopen.return_value.close.called)
+
+    def test_urlopen_read_exception(self):
+        self.urlopen.return_value.read.side_effect = Exception('BOOM')
+
+        self.assertIsNone(self._launch_and_get_progress_html())
+
+        self.urlopen.assert_called_once_with(self.MOCK_TUNNEL_URL)
+        self.assertTrue(self.urlopen.return_value.read.called)
+
+        self.assertTrue(self.urlopen.return_value.close.called)
+
+
+class ProgressHtmlOverSshTestCase(MockBotoTestCase):
+
+    MOCK_MASTER = 'mockmaster'
+    MOCK_JOB_TRACKER_URL = 'http://1.2.3.4:8088/cluster'
+
+    MOCK_EC2_KEY_PAIR_FILE = 'mock.pem'
+
+    def setUp(self):
+        super(ProgressHtmlOverSshTestCase, self).setUp()
+
+        self._ssh_run = self.start(patch('mrjob.emr._ssh_run',
+                                         return_value=(Mock(), Mock())))
+
+        self._address_of_master = self.start(patch(
+            'mrjob.emr.EMRJobRunner._address_of_master',
+            return_value=self.MOCK_MASTER))
+
+        self._job_tracker_url = self.start(patch(
+            'mrjob.emr.EMRJobRunner._job_tracker_url',
+            return_value=self.MOCK_JOB_TRACKER_URL))
+
+    def _launch_and_get_progress_html(self, *args):
+        job = MRTwoStepJob(
+            ['-r', 'emr', '--ec2-key-pair-file', self.MOCK_EC2_KEY_PAIR_FILE] +
+            list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            return runner._progress_html_over_ssh()
+
+    def test_default(self):
+        html = self._launch_and_get_progress_html()
+
+        self.assertIsNotNone(html)
+        self._ssh_run.assert_called_once_with(
+            ['ssh'],
+            self.MOCK_MASTER,
+            self.MOCK_EC2_KEY_PAIR_FILE,
+            ['curl', self.MOCK_JOB_TRACKER_URL])
+
+        self.assertEqual(html, self._ssh_run.return_value[0])
+
+    def test_no_master_node(self):
+        self._address_of_master.return_value = None
+
+        self.assertIsNone(self._launch_and_get_progress_html())
+
+        self.assertFalse(self._ssh_run.called)
+
+    def test_no_ssh_bin(self):
+        self.assertIsNone(self._launch_and_get_progress_html('--ssh-bin', ''))
+
+        self.assertFalse(self._ssh_run.called)
+
+    def test_no_key_pair_file(self):
+        self.assertIsNone(self._launch_and_get_progress_html(
+            '--ec2-key-pair-file', ''))
+
+        self.assertFalse(self._ssh_run.called)
+
+    def test_ssh_run_exception(self):
+        self._ssh_run.side_effect = Exception('BOOM')
+
+        self.assertIsNone(self._launch_and_get_progress_html())
+
+        self.assertTrue(self._ssh_run.called)

@@ -43,7 +43,7 @@ from mrjob.step import SparkStep
 from mrjob.util import log_to_stream
 
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
-from tests.mr_cmd_job import CmdJob
+from tests.mr_cmd_job import MRCmdJob
 from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
@@ -997,7 +997,7 @@ class StepsTestCase(TestCase):
         def jobconf(self):
             return {'mapred.baz': 'bar'}
 
-    class PreFilterJob(MRJob):
+    class PreMRFilterJob(MRJob):
 
         def mapper_pre_filter(self):
             return 'grep m'
@@ -1045,7 +1045,7 @@ class StepsTestCase(TestCase):
             MRStep(mapper=j.mapper))
 
     def test_pre_filters(self):
-        j = self.PreFilterJob(['--no-conf'])
+        j = self.PreMRFilterJob(['--no-conf'])
         self.assertEqual(
             j._steps_desc(),
             [
@@ -1249,7 +1249,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         self.assertNotIn('--s3-endpoint', output)
 
     def test_passthrough_options(self):
-        CmdJob(['--help'])
+        MRCmdJob(['--help'])
         self.exit.assert_called_once_with(0)
 
         output = self.stdout.getvalue()

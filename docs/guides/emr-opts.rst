@@ -81,6 +81,28 @@ Cluster creation and configuration
     structures in the config file (which is itself basically JSON).
 
 .. mrjob-opt::
+   :config: applications
+   :switch: --application
+   :type: :ref:`string list <data-type-string-list>`
+   :set: emr
+   :default: ``[]``
+
+   Additional applications to run on 4.x AMIs (e.g. ``'Ganglia'``,
+   ``'Mahout'``, ``'Spark'``).
+
+   You do not need to specify ``'Hadoop'``; mrjob will always include it
+   automatically. In most cases it'll auto-detect when to include ``'Spark'``
+   as well.
+
+   See `Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-release-components.html>`_ in the EMR docs for more details.
+
+   .. versionadded:: 0.5.2
+
+   .. versionchanged:: 0.5.9
+
+      This used to be called *emr_applications*.
+
+.. mrjob-opt::
     :config: emr_api_params
     :switch: --emr-api-param, --no-emr-api-param
     :type: :ref:`dict <data-type-plain-dict>`
@@ -118,21 +140,6 @@ Cluster creation and configuration
             emr_api_params:
               Instances.Ec2SubnetId: someID
               VisibleToAllUsers: null
-
-.. mrjob-opt::
-   :config: emr_applications
-   :switch: --emr-application
-   :type: :ref:`string list <data-type-string-list>`
-   :set: emr
-   :default: ``[]``
-
-   Additional applications to run on 4.x AMIs (e.g. ``'Ganglia'``,
-   ``'Mahout'``, ``'Spark'``). You do not need to specify ``'Hadoop'``;
-   mrjob will always include it automatically.
-
-   See `Applications <http://docs.aws.amazon.com/ElasticMapReduce/latest/ReleaseGuide/emr-release-components.html>`_ in the EMR docs for more details.
-
-   .. versionadded:: 0.5.2
 
 .. mrjob-opt::
     :config: emr_configurations
@@ -485,7 +492,7 @@ and install another Python binary.
    * any :py:class:`~mrjob.step.SparkStep` or
      :py:class:`~mrjob.step.SparkScriptStep` in your job's steps (including
      implicitly through the :py:class:`~mrjob.job.MRJob.spark` method)
-   * "Spark" included in :mrjob-opt:`emr_applications` option
+   * "Spark" included in :mrjob-opt:`applications` option
    * any bootstrap action (see :mrjob-opt:`bootstrap_actions`) ending in
      ``/spark-install`` (this is how you install Spark on 3.x AMIs)
 

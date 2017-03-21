@@ -154,8 +154,13 @@ class S3FSRegionTestCase(MockBotoTestCase):
     def test_default_endpoint(self):
         fs = S3Filesystem()
 
-        s3_conn = fs.make_s3_conn()
-        self.assertEqual(s3_conn.host, 's3.amazonaws.com')
+        client = fs.make_s3_client()
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
+
+        resource = fs.make_s3_resource()
+        self.assertEqual(resource.meta.client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
 
     def test_force_s3_endpoint(self):
         fs = S3Filesystem(s3_endpoint='s3-us-west-1.amazonaws.com')

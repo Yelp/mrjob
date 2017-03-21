@@ -26,8 +26,8 @@ from datetime import datetime
 from io import BytesIO
 
 import boto3
+import botocore.config
 from botocore.exceptions import ClientError
-
 
 try:
     import boto.emr.connection
@@ -53,9 +53,13 @@ from mrjob.parse import parse_s3_uri
 from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
+
+# allow working around mocks
+real_boto3_client = boto3.client
 
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
@@ -174,6 +178,8 @@ class MockBotoTestCase(SandboxedTestCase):
 
         self.emr_conn_iterator = itertools.repeat(
             None, self.MAX_EMR_CONNECTIONS)
+
+        self.boto3_client = boto3.client
 
         self.start(patch.object(boto3, 'client', self.client))
         self.start(patch.object(boto3, 'resource', self.resource))
@@ -318,12 +324,21 @@ class MockBotoTestCase(SandboxedTestCase):
             kwargs['mock_iam_role_attached_policies'] = (
                 self.mock_iam_role_attached_policies)
             return MockIAMClient(**kwargs)
+        elif service_name == 's3':
+            kwargs['mock_s3_fs'] = self.mock_s3_fs
+            return MockS3Client(**kwargs)
         else:
-            raise ValueError
+            raise NotImplementedError(
+                'mock %s service not supported' % service_name)
 
     # mock boto3.resource()
     def resource(self, service_name, **kwargs):
-        raise NotImplementedError
+        if service_name == 's3':
+            kwargs['mock_s3_fs'] = self.mock_s3_fs
+            return MockS3Resource(**kwargs)
+        else:
+            raise NotImplementedError(
+                'mock %s resource not supported' % service_name)
 
 
 ### S3 ###
@@ -345,6 +360,54 @@ def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
 
         if location is not None:
             bucket['location'] = location
+
+
+class MockS3Client(object):
+    """Mock out boto3 S3 client"""
+    def __init__(self,
+                 aws_access_key_id=None,
+                 aws_secret_access_key=None,
+                 aws_session_token=None,
+                 endpoint_url=None,
+                 region_name=None,
+                 mock_s3_fs=None):
+
+        self.mock_s3_fs = mock_s3_fs
+
+        # use botocore to translate region_name to endpoint_url
+        real_client = real_boto3_client(
+            's3',
+            endpoint_url=endpoint_url,
+            region_name=region_name,
+            config=botocore.config.Config(region_name='us-east-1'))
+
+        self.meta = MockObject(
+            endpoint_url=real_client.meta.endpoint_url,
+            region_name=real_client.meta.region_name)
+
+
+class MockS3Resource(object):
+    """Mock out boto3 S3 resource"""
+    def __init__(self,
+                 aws_access_key_id=None,
+                 aws_secret_access_key=None,
+                 aws_session_token=None,
+                 endpoint_url=None,
+                 region_name=None,
+                 mock_s3_fs=None):
+
+        self.mock_s3_fs = mock_s3_fs
+
+        self.meta = MockObject(
+            client=MockS3Client(
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token,
+                endpoint_url=endpoint_url,
+                region_name=region_name,
+                mock_s3_fs=mock_s3_fs
+            )
+        )
 
 
 class MockS3Connection(object):
@@ -1462,7 +1525,7 @@ class MockEmrConnection(object):
         return
 
 
-class MockEmrObject(object):
+class MockObject(object):
     """Mock out boto.emr.EmrObject. This is just a generic object that you
     can set any attribute on."""
 
@@ -1502,6 +1565,8 @@ class MockEmrObject(object):
             ', '.join('%s=%r' % (k, v)
                       for k, v in sorted(self.__dict__.items()))))
 
+# old name for this
+MockEmrObject = MockObject
 
 class MockPaginator(object):
     """Mock botocore paginators.

@@ -1,4 +1,4 @@
-v0.6.0, 2017-03-?? -- ???
+v0.6.0, 2017-04-?? -- ???
  * removed deprecated INPUT, OUTPUT attributes from JarStep
  * removed deprecated filesystem methods:
    * path_exists()
@@ -75,6 +75,17 @@ v0.6.0, 2017-03-?? -- ???
  * removed deprecated switches:
    * --partitioner
  * removed deprecated JOB_FLOW and *SCRATCH cleanup types
+
+v0.5.9, 2017-03-20 -- Docker hooks
+ * fixes which affect Docker:
+   * task_python_bin option, used by tasks but not setup script (#1394)
+   * local mode references mrjob/cat.py by relative path, not absolute (#1540)
+ * EMR runner
+   * re-launch SSH tunnel when cluster pooling auto-recovers (#1549)
+   * get job progress using `ssh curl` when tunnel is unavailable (#1547)
+   * work around `sh -e` setup script bug on AMI 5.2.0+ (#1548)
+   * renamed emr_applications option to "applications" (#1420)
+ * small fix to terminate-idle-cluster command's S3 "locking" code (#1545)
 
 v0.5.8, 2017-02-01 -- upload_dirs, pre-filters
  * automatically tarball and upload directories with --dir, setup hooks (#23)

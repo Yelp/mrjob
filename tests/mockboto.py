@@ -385,6 +385,24 @@ class MockS3Client(object):
             endpoint_url=real_client.meta.endpoint_url,
             region_name=real_client.meta.region_name)
 
+    def get_bucket_location(self, Bucket):
+        if Bucket not in self.mock_s3_fs:
+             raise ClientError(
+                dict(
+                    Error=dict(
+                        Code='NoSuchBucket',
+                        Message='The specified bucket does not exist',
+                    ),
+                    ResponseMetadata=dict(
+                        HTTPStatusCode=404
+                    ),
+                ),
+                'GetBucketLocation')
+
+        location_constraint = self.mock_s3_fs[Bucket].get('location') or None
+
+        return dict(LocationConstraint=location_constraint)
+
 
 class MockS3Resource(object):
     """Mock out boto3 S3 resource"""
@@ -408,6 +426,10 @@ class MockS3Resource(object):
                 mock_s3_fs=mock_s3_fs
             )
         )
+
+    def Bucket(self, name):
+        # boto3's Bucket() doesn't care if the bucket exists
+        return MockBucket(self.meta.client, name)
 
 
 class MockS3Connection(object):
@@ -464,15 +486,13 @@ class MockS3Connection(object):
 
 
 class MockBucket(object):
-    """Mock out boto.s3.Bucket
+    """Mock out boto3 bucket
     """
-    def __init__(self, connection=None, name=None, location=None):
-        """You can optionally specify a 'data' argument, which will instantiate
-        mock keys and mock data. data should be a map from key name to bytes
-        and time last modified.
+    def __init__(self, client, name):
+        """Create a mock bucket with the given name and client
         """
         self.name = name
-        self.connection = connection
+        self.meta = MockObject(client=client)
 
     def mock_state(self):
         """Returns a dictionary from key to data representing the

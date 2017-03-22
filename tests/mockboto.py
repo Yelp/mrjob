@@ -617,6 +617,15 @@ class MockS3Object(object):
             LastModified=mtime,
         )
 
+    @property
+    def size(self):
+        try:
+            key_data, mtime = self._get_key_data_and_mtime()
+            return len(key_data)
+        except ClientError:
+            # implemented through __getattr__()
+            raise AttributeError("'s3.Object' object has no attribute 'size'")
+
 #    def read_mock_data(self):
 #        """Read the bytes for this key out of the fake boto state."""
 #        if self.name in self.bucket.mock_state():

@@ -435,9 +435,20 @@ class MockS3Resource(object):
             )
         )
 
+        self.buckets = MockObject(
+            all=self._buckets_all,
+        )
+
+
     def Bucket(self, name):
         # boto3's Bucket() doesn't care if the bucket exists
         return MockS3Bucket(self.meta.client, name)
+
+    def _buckets_all(self):
+        # technically, this only lists buckets we own, but our mock fs
+        # doesn't simulate buckets owned by others
+        for bucket_name in sorted(self.meta.client.mock_s3_fs):
+            yield self.Bucket(bucket_name)
 
 
 #class MockS3Connection(object):
@@ -650,6 +661,8 @@ class MockS3Object(object):
     def _get_key_data_and_mtime(self):
         """Return (key_data, time_modified)."""
         self._check_key_exists()
+
+        # TODO: check if we're accessing bucket from wrong endpoint
 
         mock_s3_fs = self.meta.client.mock_s3_fs
         return mock_s3_fs[self.bucket_name]['keys'][self.key]

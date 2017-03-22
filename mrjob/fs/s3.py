@@ -93,6 +93,7 @@ def _is_retriable_client_error(ex):
     """Is the exception from a boto client retriable?"""
     if isinstance(ex, botocore.exceptions.ClientError):
         code = _client_error_code(ex)
+        # "Throttl" catches "Throttled" and "Throttling"
         if any(c in code for c in ('Throttl', 'RequestExpired', 'Timeout')):
             return True
         # spurious 505s thought to be part of an AWS load balancer issue

@@ -3926,7 +3926,7 @@ class MultiPartUploadTestCase(MockBotoTestCase):
         with patch.object(runner, '_upload_parts', wraps=runner._upload_parts):
             self.upload_data(runner, data)
 
-            s3_key = runner.fs.get_s3_key(self.TEST_S3_URI)
+            s3_key = runner.fs._get_s3_key(self.TEST_S3_URI)
             self.assertEqual(s3_key.get_contents_as_string(), data)
             self.assertEqual(runner._upload_parts.called, expect_multipart)
 
@@ -3981,7 +3981,7 @@ class MultiPartUploadTestCase(MockBotoTestCase):
         with patch.object(runner, '_upload_parts', side_effect=IOError):
             self.assertRaises(IOError, self.upload_data, runner, data)
 
-            s3_key = runner.fs.get_s3_key(self.TEST_S3_URI)
+            s3_key = runner.fs._get_s3_key(self.TEST_S3_URI)
             self.assertTrue(s3_key.mock_multipart_upload_was_cancelled())
 
 

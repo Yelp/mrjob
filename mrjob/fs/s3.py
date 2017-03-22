@@ -207,12 +207,12 @@ class S3Filesystem(Filesystem):
             yield uri, key
 
     def md5sum(self, path):
-        k = self.get_s3_key(path)
+        k = self._get_s3_key(path)
         return k.e_tag.strip('"')
 
     def _cat_file(self, filename):
         # stream lines from the s3 key
-        s3_key = self.get_s3_key(filename)
+        s3_key = self._get_s3_key(filename)
         body = s3_key.get()['Body']
 
         return read_file(filename, fileobj=body, yields_lines=False)
@@ -241,7 +241,7 @@ class S3Filesystem(Filesystem):
     def touchz(self, dest):
         """Make an empty file in the given location. Raises an error if
         a non-empty file already exists in that location."""
-        key = self.get_s3_key(dest)
+        key = self._get_s3_key(dest)
 
         data = None
         try:
@@ -334,7 +334,7 @@ class S3Filesystem(Filesystem):
         resource = self.make_s3_resource(region_name)
         return resource.Bucket(bucket_name)
 
-    def get_s3_key(self, uri):
+    def _get_s3_key(self, uri):
         """Get the boto Key object matching the given S3 uri, or
         return None if that key doesn't exist.
 

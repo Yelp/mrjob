@@ -383,7 +383,7 @@ def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
 # helpers for _attempt_to_acquire_lock()
 
 def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
-    s3_key = s3_fs.get_s3_key(lock_uri)
+    s3_key = s3_fs._get_s3_key(lock_uri)
 
     try:
         key_data = s3_key.get()
@@ -1045,7 +1045,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _upload_contents(self, s3_uri, path):
         """Uploads the file at the given path to S3, possibly using
         multipart upload."""
-        s3_key = self.fs.get_s3_key(s3_uri)
+        s3_key = self.fs._get_s3_key(s3_uri)
 
         # you can also disable multipart upload by using s3_key.put()
         # directly, but I didn't want to have to maintain/test multiple

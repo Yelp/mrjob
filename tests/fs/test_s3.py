@@ -162,11 +162,43 @@ class S3FSRegionTestCase(MockBotoTestCase):
         self.assertEqual(resource.meta.client.meta.endpoint_url,
                          'https://s3.amazonaws.com')
 
-    def test_force_s3_endpoint(self):
-        fs = S3Filesystem(s3_endpoint='s3-us-west-1.amazonaws.com')
+    def test_force_s3_endpoint_host(self):
+        fs = S3Filesystem(s3_endpoint='myproxy')
 
-        s3_conn = fs.make_s3_conn()
-        self.assertEqual(s3_conn.host, 's3-us-west-1.amazonaws.com')
+        client = fs.make_s3_client()
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://myproxy')
+
+        resource = fs.make_s3_resource()
+        self.assertEqual(resource.meta.client.meta.endpoint_url,
+                         'https://myproxy')
+
+    def test_force_s3_endpoint_url(self):
+        fs = S3Filesystem(s3_endpoint='https://myproxy:8080')
+
+        client = fs.make_s3_client()
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://myproxy:8080')
+
+        resource = fs.make_s3_resource()
+        self.assertEqual(resource.meta.client.meta.endpoint_url,
+                         'https://myproxy:8080')
+
+    def test_force_s3_endpoint_region(self):
+        # this is the actual mrjob default region
+        fs = S3Filesystem(s3_region='us-west-2')
+
+        client = fs.make_s3_client()
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(client.meta.region_name,
+                         'us-west-2')
+
+        resource = fs.make_s3_resource()
+        self.assertEqual(resource.meta.client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(resource.meta.client.meta.region_name,
+                         'us-west-2')
 
     def test_endpoint_for_bucket_in_us_west_2(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')

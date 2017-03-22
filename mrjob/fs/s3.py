@@ -297,7 +297,7 @@ class S3Filesystem(Filesystem):
         if boto3 is None:
             raise ImportError('You must install boto3 to connect to S3')
 
-        kwargs = self._client_kwargs(region_name)
+        kwargs = self._client_kwargs(region_name or self._s3_region)
 
         log.debug('creating S3 client (%s)' % (
             kwargs['endpoint_url'] or kwargs['region_name'] or 'default'))
@@ -307,18 +307,12 @@ class S3Filesystem(Filesystem):
     def _client_kwargs(self, region_name):
         """Keyword args for creating resources or clients."""
 
-        # self._s3_endpoint overrides region
-        endpoint_url = None
-        if self._s3_endpoint_url:
-            endpoint_url = self._s3_endpoint_url
-            region_name = self._s3_region
-
         return dict(
             aws_access_key_id=self._aws_access_key_id,
             aws_secret_access_key=self._aws_secret_access_key,
             aws_session_token=self._aws_session_token,
-            endpoint_url=endpoint_url,
-            region_name=region_name,
+            endpoint_url=self._s3_endpoint_url,
+            region_name=(region_name or self._s3_region),
         )
 
     def get_bucket(self, bucket_name):

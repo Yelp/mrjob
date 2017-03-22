@@ -157,6 +157,8 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(self.fs.md5sum('s3://walrus/data/foo'),
                          'e2fc714c4727ee9395f324cd2e7f331f')
 
+    # TODO: test touchz, mkdir, get_bucket, create_bucket
+
     # S3-specific utilities
 
     def test_get_all_bucket_names(self):
@@ -164,8 +166,6 @@ class S3FSTestCase(MockBotoTestCase):
 
         self.assertEqual(list(self.fs.get_all_bucket_names()),
                          ['kitteh', 'walrus'])
-
-
 
 
 class S3FSRegionTestCase(MockBotoTestCase):

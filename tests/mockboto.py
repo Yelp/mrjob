@@ -439,7 +439,6 @@ class MockS3Resource(object):
             all=self._buckets_all,
         )
 
-
     def Bucket(self, name):
         # boto3's Bucket() doesn't care if the bucket exists
         return MockS3Bucket(self.meta.client, name)

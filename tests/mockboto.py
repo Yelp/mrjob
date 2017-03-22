@@ -568,10 +568,37 @@ class MockS3Object(object):
 
         self.meta = MockObject(client=client)
 
-    def _check_key_exists(self):
-        mock_s3_fs = self.meta.client.mock_s3_fs
+    def delete(self):
+        self._check_bucket_exists('DeleteObject')
 
-        if self.bucket_name not in mock_s3_fs:
+        bucket_keys = self.meta.client.mock_s3_fs[self.bucket_name]['keys']
+
+        # okay if key doesn't exist
+        if self.key in bucket_keys:
+            del bucket_keys[self.key]
+
+        return {}
+
+    def get(self):
+        key_data, mtime = self._get_key_data_and_mtime()
+
+        return dict(
+            Body=BytesIO(key_data),
+            ContentLength=len(key_data),
+            LastModified=mtime,
+        )
+
+    @property
+    def size(self):
+        try:
+            key_data, mtime = self._get_key_data_and_mtime()
+            return len(key_data)
+        except ClientError:
+            # implemented through __getattr__()
+            raise AttributeError("'s3.Object' object has no attribute 'size'")
+
+    def _check_bucket_exists(self, operation_name):
+        if self.bucket_name not in self.meta.client.mock_s3_fs:
             raise ClientError(
                 dict(
                     Error=dict(
@@ -583,8 +610,13 @@ class MockS3Object(object):
                         HTTPStatusCode=404,
                     ),
                 ),
-                'GetBucket',
+                operation_name,
             )
+
+    def _check_key_exists(self):
+        mock_s3_fs = self.meta.client.mock_s3_fs
+
+        self._check_bucket_exists('GetBucket')
 
         if self.key not in mock_s3_fs[self.bucket_name]['keys']:
             raise ClientError(
@@ -607,24 +639,6 @@ class MockS3Object(object):
 
         mock_s3_fs = self.meta.client.mock_s3_fs
         return mock_s3_fs[self.bucket_name]['keys'][self.key]
-
-    def get(self):
-        key_data, mtime = self._get_key_data_and_mtime()
-
-        return dict(
-            Body=BytesIO(key_data),
-            ContentLength=len(key_data),
-            LastModified=mtime,
-        )
-
-    @property
-    def size(self):
-        try:
-            key_data, mtime = self._get_key_data_and_mtime()
-            return len(key_data)
-        except ClientError:
-            # implemented through __getattr__()
-            raise AttributeError("'s3.Object' object has no attribute 'size'")
 
 #    def read_mock_data(self):
 #        """Read the bytes for this key out of the fake boto state."""

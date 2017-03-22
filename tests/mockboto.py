@@ -608,7 +608,7 @@ class MockS3Object(object):
         if hasattr(self, key):
             return getattr(self, key)
         else:
-            raise AttributeException(
+            raise AttributeError(
                 "'s3.Object' object has no attribute '%s'" % key)
 
     def _check_bucket_exists(self, operation_name):

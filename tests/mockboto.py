@@ -377,6 +377,22 @@ def _no_such_bucket_error(bucket_name, operation_name):
         operation_name)
 
 
+def _no_such_key_error(key_name, operation_name):
+    return ClientError(
+        dict(
+            Error=dict(
+                Code='NoSuchKey',
+                Key=key_name,
+                Message='The specified key does not exist',
+            ),
+            ResponseMetadata=dict(
+                HTTPStatusCode=404,
+            ),
+        ),
+        operation_name,
+    )
+
+
 class MockS3Client(object):
     """Mock out boto3 S3 client"""
     def __init__(self,
@@ -580,13 +596,11 @@ class MockS3Object(object):
         self.meta = MockObject(client=client)
 
     def delete(self):
-        self._check_bucket_exists('DeleteObject')
-
-        bucket_keys = self.meta.client.mock_s3_fs[self.bucket_name]['keys']
+        mock_keys = self._mock_bucket_keys('DeleteObject')
 
         # okay if key doesn't exist
-        if self.key in bucket_keys:
-            del bucket_keys[self.key]
+        if self.key in mock_keys:
+            del mock_keys[self.key]
 
         return {}
 
@@ -608,6 +622,14 @@ class MockS3Object(object):
             LastModified=self.last_modified,
         )
 
+    def put(self, Body):
+        if not isinstance(Body, bytes):
+            raise NotImplementedError('mock put() only support bytes')
+
+        mock_keys = self._mock_bucket_keys('PutObject')
+
+        mock_keys[self.key] = (Body, datetime.utcnow())
+
     def __getattr__(self, key):
         if key in ('e_tag', 'last_modified', 'size'):
             try:
@@ -621,50 +643,23 @@ class MockS3Object(object):
             raise AttributeError(
                 "'s3.Object' object has no attribute '%s'" % key)
 
+    def _mock_bucket_keys(self, operation_name):
+        self._check_bucket_exists(operation_name)
+
+        return self.meta.client.mock_s3_fs[self.bucket_name]['keys']
+
     def _check_bucket_exists(self, operation_name):
         if self.bucket_name not in self.meta.client.mock_s3_fs:
-            raise ClientError(
-                dict(
-                    Error=dict(
-                        BucketName=self.bucket_name,
-                        Code='NoSuchBucket',
-                        Message='The specified bucket does not exist',
-                    ),
-                    ResponseMetadata=dict(
-                        HTTPStatusCode=404,
-                    ),
-                ),
-                operation_name,
-            )
-
-    def _check_key_exists(self):
-        mock_s3_fs = self.meta.client.mock_s3_fs
-
-        self._check_bucket_exists('GetBucket')
-
-        if self.key not in mock_s3_fs[self.bucket_name]['keys']:
-            raise ClientError(
-                dict(
-                    Error=dict(
-                        BucketName=self.bucket_name,
-                        Code='NoSuchKey',
-                        Message='The specified key does not exist',
-                    ),
-                    ResponseMetadata=dict(
-                        HTTPStatusCode=404,
-                    ),
-                ),
-                'GetObject',
-            )
+            raise _no_such_bucket_error(self.bucket_name, operation_name)
 
     def _get_key_data_and_mtime(self):
         """Return (key_data, time_modified)."""
-        self._check_key_exists()
+        mock_keys = self._mock_bucket_keys('GetBucket')
 
-        # TODO: check if we're accessing bucket from wrong endpoint
+        if self.key not in mock_keys:
+            raise _no_such_key_error(self.key, 'GetObject')
 
-        mock_s3_fs = self.meta.client.mock_s3_fs
-        return mock_s3_fs[self.bucket_name]['keys'][self.key]
+        return mock_keys[self.key]
 
 #    def read_mock_data(self):
 #        """Read the bytes for this key out of the fake boto state."""

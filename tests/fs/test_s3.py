@@ -149,13 +149,40 @@ class S3FSTestCase(MockBotoTestCase):
         self.fs.rm('s3://walrus/data')
         self.assertEqual(self.fs.exists('s3://walrus/data/foo'), False)
         self.assertEqual(self.fs.exists('s3://walrus/data/bar/baz'), False)
-
     def test_md5sum(self):
         self.add_mock_s3_data({
             'walrus': {'data/foo': b'abcd'}})
 
         self.assertEqual(self.fs.md5sum('s3://walrus/data/foo'),
                          'e2fc714c4727ee9395f324cd2e7f331f')
+
+    def test_touchz(self):
+        self.add_mock_s3_data({'walrus': {}})
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
+
+        self.fs.touchz('s3://walrus/empty')
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')),
+                         ['s3://walrus/empty'])
+
+    def test_okay_to_touchz_empty_file(self):
+        self.add_mock_s3_data({'walrus': {'empty': b''}})
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')),
+                         ['s3://walrus/empty'])
+
+        self.fs.touchz('s3://walrus/empty')
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')),
+                         ['s3://walrus/empty'])
+
+    def test_cant_touchz_file_with_contents(self):
+        self.add_mock_s3_data({'walrus': {'full': b'contents'}})
+
+        self.assertRaises(OSError,
+                          self.fs.touchz, 's3://walrus/full')
+
 
     # TODO: test touchz, mkdir, get_bucket, create_bucket
 

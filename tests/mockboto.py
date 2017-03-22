@@ -521,9 +521,10 @@ class MockS3Bucket(object):
             if Prefix and not key.startswith(Prefix):
                 continue
 
-            # technically yields a different kind of object (ObjectSummary)
-            # good enough for mocking though
-            yield self.Object(key)
+            key = self.Object(key)
+            # emulate ObjectSummary by pre-filling size, e_tag, etc.
+            key.get()
+            yield key
 
 #    def mock_state(self):
 #        """Returns a dictionary from key to data representing the
@@ -582,20 +583,33 @@ class MockS3Object(object):
     def get(self):
         key_data, mtime = self._get_key_data_and_mtime()
 
+        # fill in known attributes
+        m = hashlib.md5()
+        m.update(key_data)
+
+        self.e_tag = '"%s"' % m.hexdigest()
+        self.last_modified = mtime
+        self.size = len(key_data)
+
         return dict(
             Body=BytesIO(key_data),
-            ContentLength=len(key_data),
-            LastModified=mtime,
+            ContentLength=self.size,
+            ETag=self.e_tag,
+            LastModified=self.last_modified,
         )
 
-    @property
-    def size(self):
-        try:
-            key_data, mtime = self._get_key_data_and_mtime()
-            return len(key_data)
-        except ClientError:
-            # implemented through __getattr__()
-            raise AttributeError("'s3.Object' object has no attribute 'size'")
+    def __getattr__(self, key):
+        if key in ('e_tag', 'last_modified', 'size'):
+            try:
+                self.get()
+            except ClientError:
+                pass
+
+        if hasattr(self, key):
+            return getattr(self, key)
+        else:
+            raise AttributeException(
+                "'s3.Object' object has no attribute '%s'" % key)
 
     def _check_bucket_exists(self, operation_name):
         if self.bucket_name not in self.meta.client.mock_s3_fs:

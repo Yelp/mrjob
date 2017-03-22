@@ -150,6 +150,12 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(self.fs.exists('s3://walrus/data/foo'), False)
         self.assertEqual(self.fs.exists('s3://walrus/data/bar/baz'), False)
 
+    def test_md5sum(self):
+        self.add_mock_s3_data({
+            'walrus': {'data/foo': b'abcd'}})
+
+        self.assertEqual(self.fs.md5sum('s3://walrus/data/foo'),
+                         'e2fc714c4727ee9395f324cd2e7f331f')
 
 class S3FSRegionTestCase(MockBotoTestCase):
 

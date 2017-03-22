@@ -157,6 +157,7 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(self.fs.md5sum('s3://walrus/data/foo'),
                          'e2fc714c4727ee9395f324cd2e7f331f')
 
+
 class S3FSRegionTestCase(MockBotoTestCase):
 
     def test_default_endpoint(self):

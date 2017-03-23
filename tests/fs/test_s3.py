@@ -149,6 +149,7 @@ class S3FSTestCase(MockBotoTestCase):
         self.fs.rm('s3://walrus/data')
         self.assertEqual(self.fs.exists('s3://walrus/data/foo'), False)
         self.assertEqual(self.fs.exists('s3://walrus/data/bar/baz'), False)
+
     def test_md5sum(self):
         self.add_mock_s3_data({
             'walrus': {'data/foo': b'abcd'}})
@@ -369,7 +370,3 @@ class S3FSRegionTestCase(MockBotoTestCase):
                          'https://s3-us-west-2.amazonaws.com')
         self.assertEqual(bucket.meta.client.meta.region_name,
                          'us-west-2')
-
-
-
-# TODO: check buckets that cross regions

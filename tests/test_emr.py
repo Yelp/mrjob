@@ -4345,13 +4345,14 @@ class IAMEndpointTestCase(MockBotoTestCase):
         runner = EMRJobRunner()
 
         iam_client = runner.make_iam_client()
-        self.assertEqual(iam_client.endpoint_url, 'https://iam.amazonaws.com')
+        self.assertEqual(iam_client.meta.endpoint_url,
+                         'https://iam.amazonaws.com')
 
     def test_explicit_iam_endpoint(self):
         runner = EMRJobRunner(iam_endpoint='https://iam.us-gov.amazonaws.com')
 
         iam_client = runner.make_iam_client()
-        self.assertEqual(iam_client.endpoint_url,
+        self.assertEqual(iam_client.meta.endpoint_url,
                          'https://iam.us-gov.amazonaws.com')
 
     def test_iam_endpoint_option(self):
@@ -4361,7 +4362,7 @@ class IAMEndpointTestCase(MockBotoTestCase):
 
         with mr_job.make_runner() as runner:
             iam_client = runner.make_iam_client()
-            self.assertEqual(iam_client.endpoint_url,
+            self.assertEqual(iam_client.meta.endpoint_url,
                              'https://iam.us-gov.amazonaws.com')
 
 

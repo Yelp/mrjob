@@ -1805,8 +1805,15 @@ class MockIAMClient(object):
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
-        # so we can easily check this
-        self.endpoint_url = endpoint_url
+        # use botocore to translate region_name to endpoint_url
+        real_client = real_boto3_client(
+            'iam',
+            endpoint_url=endpoint_url,
+            config=botocore.config.Config(region_name='aws-global'))
+
+        self.meta = MockObject(
+            endpoint_url=real_client.meta.endpoint_url,
+            region_name=real_client.meta.region_name)
 
     def get_paginator(self, operation_name):
         return MockPaginator(

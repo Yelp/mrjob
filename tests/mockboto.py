@@ -539,14 +539,15 @@ class MockS3Bucket(object):
         self.name = name
         self.meta = MockObject(client=client)
 
-        self.objects = MockObject(filter=self._objects_filter)
+        self.objects = MockObject(
+            all=self._objects_all,
+            filter=self._objects_filter)
 
     def Object(self, key):
         return MockS3Object(self.meta.client, self.name, key)
 
-    def _check_bucket_exists(self, operation_name):
-        if self.name not in self.meta.client.mock_s3_fs:
-            raise _no_such_bucket_error(self.name, operation_name)
+    def _objects_all(self):
+        return self._objects_filter()
 
     def _objects_filter(self, Prefix=None):
         self._check_bucket_exists('ListObjects')
@@ -562,6 +563,11 @@ class MockS3Bucket(object):
             # emulate ObjectSummary by pre-filling size, e_tag, etc.
             key.get()
             yield key
+
+    def _check_bucket_exists(self, operation_name):
+        if self.name not in self.meta.client.mock_s3_fs:
+            raise _no_such_bucket_error(self.name, operation_name)
+
 
 #    def mock_state(self):
 #        """Returns a dictionary from key to data representing the

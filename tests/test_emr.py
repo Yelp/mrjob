@@ -316,12 +316,11 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
             list(runner.stream_output())
 
-        conn = runner.fs.make_s3_conn()
-        bucket = conn.get_bucket(tmp_bucket)
-        self.assertEqual(len(list(bucket.list())), tmp_len)
+        bucket = runner.fs.get_bucket(tmp_bucket)
+        self.assertEqual(len(list(bucket.objects.all())), tmp_len)
 
-        bucket = conn.get_bucket(log_bucket)
-        self.assertEqual(len(list(bucket.list())), log_len)
+        bucket = runner.fs.get_bucket(log_bucket)
+        self.assertEqual(len(list(bucket.objects.all())), log_len)
 
     def test_cleanup_all(self):
         self._test_cloud_tmp_cleanup('ALL', 0, 0)
@@ -3989,6 +3988,7 @@ class SecurityTokenTestCase(MockBotoTestCase):
 
         self.mock_emr = self.start(patch('boto.emr.connection.EmrConnection'))
         self.mock_client = self.start(patch('boto3.client'))
+        self.mock_resource = self.start(patch('boto3.resource'))
 
         # runner needs to do stuff with S3 on initialization
         self.mock_s3 = self.start(patch('boto.connect_s3',
@@ -4002,21 +4002,31 @@ class SecurityTokenTestCase(MockBotoTestCase):
         self.assertIn('security_token', emr_kwargs)
         self.assertEqual(emr_kwargs['security_token'], security_token)
 
+        self.mock_client.reset_mock()
         runner.make_iam_client()
 
-        # TODO: once we use boto3.client() for other services, we'll need
-        # to separate out IAM calls
         self.assertTrue(self.mock_client.called)
-        iam_kwargs = self.mock_client.call_args[1]
+        iam_args, iam_kwargs = self.mock_client.call_args
+        self.assertEqual(iam_args, ('iam',))
         self.assertIn('aws_session_token', iam_kwargs)
         self.assertEqual(iam_kwargs['aws_session_token'], security_token)
 
-        runner.fs.make_s3_conn()
+        self.mock_client.reset_mock()
+        runner.fs.make_s3_client()
 
-        self.assertTrue(self.mock_s3.called)
-        s3_kwargs = self.mock_s3.call_args[1]
-        self.assertIn('security_token', s3_kwargs)
-        self.assertEqual(s3_kwargs['security_token'], security_token)
+        self.assertTrue(self.mock_client.called)
+        s3_client_args, s3_client_kwargs = self.mock_client.call_args
+        self.assertEqual(s3_client_args, ('s3',))
+        self.assertIn('aws_session_token', s3_client_kwargs)
+        self.assertEqual(s3_client_kwargs['aws_session_token'], security_token)
+
+        runner.fs.make_s3_resource()
+        self.assertTrue(self.mock_client.called)
+        s3_resource_args, s3_resource_kwargs = self.mock_client.call_args
+        self.assertEqual(s3_resource_args, ('s3',))
+        self.assertIn('aws_session_token', s3_resource_kwargs)
+        self.assertEqual(s3_resource_kwargs['aws_session_token'],
+                         security_token)
 
     def test_connections_without_security_token(self):
         runner = EMRJobRunner()

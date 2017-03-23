@@ -27,6 +27,7 @@ from io import BytesIO
 
 import boto3
 import botocore.config
+from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
 
 try:
@@ -639,6 +640,18 @@ class MockS3Object(object):
         mock_keys = self._mock_bucket_keys('PutObject')
 
         mock_keys[self.key] = (Body, datetime.utcnow())
+
+    def upload_file(self, path, Config=None):
+        if self.bucket_name not in self.meta.client.mock_s3_fs:
+            # upload_file() is a higher-order operation, has fancy errors
+            raise S3UploadFailedError(
+                'Failed to upload %s to %s/%s: %s' % (
+                    path, self.bucket_name, self.key,
+                    str(_no_such_bucket_error('PutObject'))))
+
+        mock_keys = self._mock_bucket_keys('PutObject')
+        with open(path, 'rb') as f:
+            mock_keys[self.key] = (f.read(), datetime.utcnow())
 
     def __getattr__(self, key):
         if key in ('e_tag', 'last_modified', 'size'):

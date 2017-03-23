@@ -46,7 +46,6 @@ from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
-from mrjob.emr import filechunkio
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
@@ -3936,7 +3935,6 @@ class MultiPartUploadTestCase(MockBotoTestCase):
 
         self.assert_upload_succeeds(runner, data, expect_multipart=False)
 
-    @skipIf(filechunkio is None, 'need filechunkio')
     def test_large_file(self):
         # Real S3 has a minimum chunk size of 5MB, but I'd rather not
         # store that in memory (in our mock S3 filesystem)
@@ -3970,7 +3968,6 @@ class MultiPartUploadTestCase(MockBotoTestCase):
                 self.assert_upload_succeeds(runner, data,
                                             expect_multipart=False)
 
-    @skipIf(filechunkio is None, 'need filechunkio')
     def test_exception_while_uploading_large_file(self):
 
         runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)

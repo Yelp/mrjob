@@ -420,6 +420,16 @@ class MockS3Client(object):
         if bucket_name not in self.mock_s3_fs:
             raise _no_such_bucket_error(bucket_name, operation_name)
 
+    def create_bucket(self, Bucket, CreateBucketConfiguration=None):
+        # boto3 doesn't seem to mind if you try to create a bucket that exists
+        if Bucket not in self.mock_s3_fs:
+            location = (CreateBucketConfiguration or {}).get(
+                'LocationConstraint', '')
+            self.mock_s3_fs[Bucket] = dict(keys={}, location=location)
+
+        # "Location" here actually refers to the bucket name
+        return dict(Location=('/' + Bucket))
+
     def get_bucket_location(self, Bucket):
         self._check_bucket_exists(Bucket, 'GetBucketLocation')
 

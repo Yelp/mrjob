@@ -183,8 +183,14 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertRaises(OSError,
                           self.fs.touchz, 's3://walrus/full')
 
+    def test_mkdir_does_nothing(self):
+        self.add_mock_s3_data({'walrus': {}})
 
-    # TODO: test touchz, mkdir, get_bucket, create_bucket
+        self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
+
+        self.fs.mkdir('s3://walrus/data')
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
 
     # S3-specific utilities
 
@@ -312,6 +318,58 @@ class S3FSRegionTestCase(MockBotoTestCase):
                              'https://s3-us-west-2.amazonaws.com')
             # no reason to check bucket location if endpoint is forced
             self.assertFalse(mock_gbl.called)
+
+    def test_create_bucket_with_no_region(self):
+        fs = S3Filesystem()
+
+        fs.create_bucket('walrus')
+
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            None)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-east-1')
+
+    def test_create_bucket_in_us_east_1(self):
+        fs = S3Filesystem()
+
+        fs.create_bucket('walrus', region='us-east-1')
+
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            None)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-east-1')
+
+    def test_create_bucket_in_us_west_2(self):
+        fs = S3Filesystem()
+
+        fs.create_bucket('walrus', region='us-west-2')
+
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            'us-west-2')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-2')
+
 
 
 # TODO: check buckets that cross regions

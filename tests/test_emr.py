@@ -2870,7 +2870,7 @@ class S3LockTestCase(MockBotoTestCase):
         # add an expired lock
         self.add_mock_s3_data({'locks': {
             'expired_lock': b'x',
-        }}, datetime.now(tzutc()) - timedelta(minutes=30))
+        }}, age=timedelta(minutes=30))
 
         did_lock = _attempt_to_acquire_lock(
             runner.fs, 's3://locks/expired_lock', 5.0, 'job_one',

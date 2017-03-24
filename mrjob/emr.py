@@ -1634,67 +1634,44 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         step = self._get_step(step_num)
 
         if step['type'] == 'streaming':
-            return self._build_streaming_step(step_num)
+            method = self._streaming_step_jar_and_args
         elif step['type'] == 'jar':
-            return self._build_jar_step(step_num)
+            method = self._jar_step_jar_and_args
         elif _is_spark_step_type(step['type']):
-            return self._build_spark_step(step_num)
+            method = self._spark_step_jar_and_args
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
-    def _build_streaming_step(self, step_num):
-        jar, step_arg_prefix = self._get_streaming_jar_and_step_arg_prefix()
+        jar, args = method(step_num)
 
-        streaming_step_kwargs = dict(
-            action_on_failure=self._action_on_failure(),
-            input=self._step_input_uris(step_num),
-            jar=jar,
-            name='%s: Step %d of %d' % (
-                self._job_key, step_num + 1, self._num_steps()),
-            output=self._step_output_uri(step_num),
+        return dict(
+            ActionOnFailure=self._action_on_failure(),
+            HadoopJarStep=dict(Jar=jar, Args=args),
+            Name=self._step_name(step_num),
         )
 
-        step_args = []
-        step_args.extend(step_arg_prefix)  # add 'hadoop-streaming' for 4.x
-        step_args.extend(self._upload_args())
-        step_args.extend(self._hadoop_args_for_step(step_num))
+    def _streaming_step_jar_and_args(self, step_num):
+        jar, step_arg_prefix = self._get_streaming_jar_and_step_arg_prefix()
 
-        streaming_step_kwargs['step_args'] = step_args
+        args = (step_arg_prefix +
+                self._hadoop_streaming_jar_args(step_num))
 
-        mapper, combiner, reducer = (
-            self._hadoop_streaming_commands(step_num))
+        return jar, args
 
-        streaming_step_kwargs['mapper'] = mapper
-        streaming_step_kwargs['combiner'] = combiner
-        streaming_step_kwargs['reducer'] = reducer
-
-        return boto.emr.StreamingStep(**streaming_step_kwargs)
-
-    def _build_jar_step(self, step_num):
+    def _jar_step_jar_and_args(self, step_num):
         step = self._get_step(step_num)
 
         jar = self._upload_uri_or_remote_path(step['jar'])
-        step_args = self._interpolate_input_and_output(step['args'], step_num)
 
-        # -libjars, -D comes before jar-specific args
-        step_args = self._hadoop_generic_args_for_step(step_num) + step_args
+        args = (
+            # -libjars, -D comes before jar-specific args
+            self._hadoop_generic_args_for_step(step_num) +
+            self._interpolate_input_and_output(step['args'], step_num))
 
-        return boto.emr.JarStep(
-            name=self._step_name(step_num),
-            jar=jar,
-            main_class=step['main_class'],
-            step_args=step_args,
-            action_on_failure=self._action_on_failure())
+        return jar, args
 
-    def _build_spark_step(self, step_num):
-        """Returns a boto.emr.JarStep suitable for running all Spark
-        step types (``spark``, ``spark_jar``, and ``spark_script``).
-        """
-        return boto.emr.JarStep(
-            name=self._step_name(step_num),
-            jar=self._spark_jar(),
-            step_args=self._args_for_spark_step(step_num),
-            action_on_failure=self._action_on_failure())
+    def _spark_step_jar_and_args(self, step_num):
+        return self._spark_jar(), self._args_for_spark_step(step_num)
 
     def _interpolate_spark_script_path(self, path):
         return self._upload_uri_or_remote_path(path)
@@ -1743,9 +1720,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         jar = self._script_runner_jar_uri()
         step_args = [self._upload_mgr.uri(self._master_node_setup_script_path)]
 
-        return boto.emr.JarStep(
-            name=name, jar=jar, step_args=step_args,
-            action_on_failure=self._action_on_failure())
+        return dict(
+            Name=name,
+            ActionOnFailure=self._action_on_failure(),
+            HadoopJarStep=dict(
+                Jar=jar,
+                Args=step_args,
+            )
+        )
 
     def _libjar_paths(self):
         results = []
@@ -1791,6 +1773,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         its ID.
         """
         self._create_s3_tmp_bucket_if_needed()
+        emr_client = self.make_emr_client()
         emr_conn = self.make_emr_conn()
 
         # try to find a cluster from the pool. basically auto-fill
@@ -1821,9 +1804,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # define our steps
         steps = self._build_steps()
-        log.debug('Calling add_jobflow_steps(%r, %r)' % (
-            self._cluster_id, steps))
-        emr_conn.add_jobflow_steps(self._cluster_id, steps)
+        steps_kwargs = dict(JobFlowId=self._cluster_id, Steps=steps)
+        log.debug('Calling add_job_flow_steps(%s)' % ','.join(
+            ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
+        emr_client.add_job_flow_steps(**steps_kwargs)
 
         # keep track of when we launched our job
         self._emr_job_start = time.time()

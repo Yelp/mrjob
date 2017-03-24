@@ -1254,7 +1254,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 and not self._opts['pool_clusters']:
             log.info('Terminating cluster: %s' % self._cluster_id)
             try:
-                self.make_emr_conn().terminate_jobflow(self._cluster_id)
+                self.make_emr_client().terminate_job_flows(
+                    JobFlowIds=[self._cluster_id]
+                )
             except Exception as e:
                 log.exception(e)
 

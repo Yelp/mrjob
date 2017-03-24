@@ -28,8 +28,6 @@ import shutil
 import sys
 import tarfile
 import tempfile
-from inspect import isfunction
-from inspect import ismethod
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE

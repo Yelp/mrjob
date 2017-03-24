@@ -4,6 +4,7 @@ v0.6.0, 2017-04-?? -- ???
    * changes to S3FileSystem:
      * removed make_s3_conn() (use make_s3_client() or make_s3_resource())
      * removed get_all_buckets() (use get_all_bucket_names())
+     * removed get_s3_key()
      * removed get_s3_keys()
      * create_bucket()'s second arg is now named region, not location
    * mrjob.fs.s3.wrap_aws_conn() removed

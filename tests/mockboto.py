@@ -185,7 +185,6 @@ class MockBotoTestCase(SandboxedTestCase):
         self.start(patch.object(boto3, 'client', self.client))
         self.start(patch.object(boto3, 'resource', self.resource))
 
-        self.start(patch.object(boto, 'connect_s3', self.connect_s3))
         self.start(patch.object(
             boto.emr.connection, 'EmrConnection', self.connect_emr))
 
@@ -298,10 +297,6 @@ class MockBotoTestCase(SandboxedTestCase):
             runner.run()
             return runner._describe_cluster()
 
-    def connect_s3(self, *args, **kwargs):
-        kwargs['mock_s3_fs'] = self.mock_s3_fs
-        return MockS3Connection(*args, **kwargs)
-
     def connect_emr(self, *args, **kwargs):
         try:
             next(self.emr_conn_iterator)
@@ -345,9 +340,11 @@ class MockBotoTestCase(SandboxedTestCase):
 ### S3 ###
 
 def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
-    """Update mock_s3_fs (which is just a dictionary mapping bucket to
-    key to contents) with a map from bucket name to key name to data and
-    time last modified."""
+    """Update mock_s3_fs with a map from bucket name to key name to data.
+
+    :param last_modified: a UTC :py:class:`~datetime.datetime`
+    :param location string: the bucket's location cosntraint (a region name)
+    """
     if time_modified is None:
         time_modified = datetime.utcnow()
     for bucket_name, key_name_to_bytes in data.items():
@@ -395,7 +392,16 @@ def _no_such_key_error(key_name, operation_name):
 
 
 class MockS3Client(object):
-    """Mock out boto3 S3 client"""
+    """Mock out boto3 S3 client
+
+    :param mock_s3_fs: Maps bucket name to a dictionary with the keys *keys*
+                       and *location*. *keys* maps key name to tuples of
+                       ``(data, time_modified)``. *data* is bytes, and
+                        *time_modified* is a UTC
+                        :py:class:`~datetime.datetime`. *location* is an
+                        optional location constraint for the bucket
+                        (a region name).
+    """
     def __init__(self,
                  aws_access_key_id=None,
                  aws_secret_access_key=None,
@@ -662,10 +668,8 @@ class MockEmrConnection(object):
         Step numbers are 0-indexed.
 
         Extra args:
-        :param mock_s3_fs: a mock S3 filesystem to point to. See
-                           :py:meth:`MockS3Connection.__init__`
-                           for format (usually you just want to use an empty
-                           dictionary).
+        :param mock_s3_fs: a mock S3 filesystem to point to (usually you just
+                            want to use an empty dictionary).
         :param mock_emr_clusters: map from cluster ID to an EMRObject, in the
                                   format returned by describe_cluster(), plus
                                  ``_bootstrapactions``, ``_instancegroups``,

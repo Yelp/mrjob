@@ -256,6 +256,8 @@ _CHEAPEST_2_X_INSTANCE_TYPE = 'm1.small'
 # these are the only kinds of instance roles that exist
 _INSTANCE_ROLES = ('master', 'core', 'task')
 
+# use to disable multipart uploading
+_HUGE_PART_THRESHOLD = 2 ** 256
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -1047,16 +1049,15 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         multipart upload."""
         s3_key = self.fs._get_s3_key(s3_uri)
 
-        # you can also disable multipart upload by using s3_key.put()
-        # directly, but I didn't want to have to maintain/test multiple
-        # code paths
-        part_size = self._get_upload_part_size() or 2**256
+        # use _HUGE_PART_THRESHOLD to disable multipart uploading
+        # (could use put() directly, but that would be another code path)
+        part_size = self._get_upload_part_size() or _HUGE_PART_THRESHOLD
 
         s3_key.upload_file(
             path,
             Config=boto3.s3.transfer.TransferConfig(
-                multipart_threshold=part_size,
                 multipart_chunksize=part_size,
+                multipart_threshold=part_size,
             ),
         )
 

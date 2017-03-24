@@ -36,6 +36,7 @@ from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
+from mrjob.emr import _HUGE_PART_THRESHOLD
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
@@ -58,6 +59,7 @@ from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 
+import tests.mockboto
 from tests.mockboto import DEFAULT_MAX_STEPS_RETURNED
 from tests.mockboto import MockBotoTestCase
 from tests.mockboto import MockEmrConnection
@@ -3909,6 +3911,8 @@ class ActionOnFailureTestCase(MockBotoTestCase):
 
 class MultiPartUploadTestCase(MockBotoTestCase):
 
+    DEFAULT_PART_SIZE = 100 * 1024 * 1024
+
     PART_SIZE_IN_MB = 50.0 / 1024 / 1024
     TEST_BUCKET = 'walrus'
     TEST_FILENAME = 'data.dat'
@@ -3919,6 +3923,11 @@ class MultiPartUploadTestCase(MockBotoTestCase):
         # create the walrus bucket
         self.add_mock_s3_data({self.TEST_BUCKET: {}})
 
+        self.upload_file = self.start(patch(
+            'tests.mockboto.MockS3Object.upload_file',
+            side_effect=tests.mockboto.MockS3Object.upload_file,
+            autospec=True))
+
     def upload_data(self, runner, data):
         """Upload some bytes to S3"""
         data_path = os.path.join(self.tmp_dir, self.TEST_FILENAME)
@@ -3927,67 +3936,50 @@ class MultiPartUploadTestCase(MockBotoTestCase):
 
         runner._upload_contents(self.TEST_S3_URI, data_path)
 
-    def assert_upload_succeeds(self, runner, data, expect_multipart):
+    def assert_upload_succeeds(self, runner, data, expected_part_size):
         """Write the data to a temp file, and then upload it to (mock) S3,
         checking that the data successfully uploaded."""
-        with patch.object(runner, '_upload_parts', wraps=runner._upload_parts):
-            self.upload_data(runner, data)
+        self.upload_file.reset_mock()
 
-            s3_key = runner.fs._get_s3_key(self.TEST_S3_URI)
-            self.assertEqual(s3_key.get_contents_as_string(), data)
-            self.assertEqual(runner._upload_parts.called, expect_multipart)
+        data_path = os.path.join(self.tmp_dir, self.TEST_FILENAME)
+        with open(data_path, 'wb') as fp:
+            fp.write(data)
 
-    def test_small_file(self):
+        runner._upload_contents(self.TEST_S3_URI, data_path)
+
+        s3_key = runner.fs._get_s3_key(self.TEST_S3_URI)
+        self.assertEqual(s3_key.get()['Body'].read(), data)
+
+        self.assertTrue(self.upload_file.called)
+
+        upload_file_args, upload_file_kwargs = self.upload_file.call_args
+
+        self.assertEqual(upload_file_args[1:], (data_path,))
+
+        self.assertIn('Config', upload_file_kwargs)
+        config = upload_file_kwargs['Config']
+        self.assertEqual(config.multipart_chunksize, expected_part_size)
+        self.assertEqual(config.multipart_threshold, expected_part_size)
+
+    def test_default_part_size(self):
         runner = EMRJobRunner()
         data = b'beavers mate for life'
 
-        self.assert_upload_succeeds(runner, data, expect_multipart=False)
+        self.assert_upload_succeeds(runner, data, 100 * 1024 * 1024)
 
-    def test_large_file(self):
-        # Real S3 has a minimum chunk size of 5MB, but I'd rather not
-        # store that in memory (in our mock S3 filesystem)
-        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
-        self.assertEqual(runner._get_upload_part_size(), 50)
+    def test_custom_part_size(self):
+        # this test used to simulate multipart upload, but now we leave
+        # that to boto3
+        runner = EMRJobRunner(cloud_upload_part_size=50.0 / 1024 / 1024)
 
         data = b'Mew' * 20
-        self.assert_upload_succeeds(runner, data, expect_multipart=True)
-
-    def test_file_size_equals_part_size(self):
-        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
-        self.assertEqual(runner._get_upload_part_size(), 50)
-
-        data = b'o' * 50
-        self.assert_upload_succeeds(runner, data, expect_multipart=False)
+        self.assert_upload_succeeds(runner, data, 50)
 
     def test_disable_multipart(self):
         runner = EMRJobRunner(cloud_upload_part_size=0)
-        self.assertEqual(runner._get_upload_part_size(), 0)
 
         data = b'Mew' * 20
-        self.assert_upload_succeeds(runner, data, expect_multipart=False)
-
-    def test_no_filechunkio(self):
-        with patch.object(mrjob.emr, 'filechunkio', None):
-            runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
-            self.assertEqual(runner._get_upload_part_size(), 50)
-
-            data = b'Mew' * 20
-            with logger_disabled('mrjob.emr'):
-                self.assert_upload_succeeds(runner, data,
-                                            expect_multipart=False)
-
-    def test_exception_while_uploading_large_file(self):
-
-        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
-        self.assertEqual(runner._get_upload_part_size(), 50)
-
-        data = b'Mew' * 20
-
-        with patch.object(runner, '_upload_parts', side_effect=IOError):
-            self.assertRaises(IOError, self.upload_data, runner, data)
-
-            s3_key = runner.fs._get_s3_key(self.TEST_S3_URI)
-            self.assertTrue(s3_key.mock_multipart_upload_was_cancelled())
+        self.assert_upload_succeeds(runner, data, _HUGE_PART_THRESHOLD)
 
 
 class SecurityTokenTestCase(MockBotoTestCase):

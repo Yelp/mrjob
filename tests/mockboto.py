@@ -645,7 +645,15 @@ class MockS3Object(object):
 
         mock_keys = self._mock_bucket_keys('PutObject')
 
-        mock_keys[self.key] = (Body, datetime.utcnow())
+        if isinstance(Body, bytes):
+            contents = Body
+        elif hasattr(Body, 'read'):
+            contents = Body.read()
+
+        if not isinstance(contents, bytes):
+            raise TypeError('Body or Body.read() must be bytes')
+
+        mock_keys[self.key] = (contents, datetime.utcnow())
 
     def upload_file(self, path, Config=None):
         if self.bucket_name not in self.meta.client.mock_s3_fs:

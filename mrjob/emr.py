@@ -269,11 +269,6 @@ _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*The master node was terminated.*$', re.I)
 
 
-def s3_key_to_uri(s3_key):
-    """Convert a boto Key object into an ``s3://`` URI"""
-    return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
-
-
 def _repeat(api_call, *args, **kwargs):
     """Make the same API call repeatedly until we've seen every page
     of the response (sets *marker* automatically).
@@ -2783,6 +2778,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return self._cluster_id
 
     def get_cluster_id(self):
+        """Get the ID of the cluster our job is running on, or ``None``."""
         return self._cluster_id
 
     def _usable_clusters(self, emr_conn=None, exclude=None, num_steps=1):
@@ -3189,7 +3185,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return self._get_app_versions().get('hadoop')
 
     def get_image_version(self):
-        """Get the AMI that our cluster is running.
+        """Get the version of the AMI that our cluster is running, or ``None``.
 
         .. versionchanged:: 0.5.4
 

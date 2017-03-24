@@ -102,6 +102,7 @@ def decompress(fileobj, path, bufsize=1024):
         return _yield_chunks(fileobj, bufsize=bufsize)
 
 
+# TODO: name this to_chunks()
 def _yield_chunks(readable, bufsize=1024):
     while True:
         chunk = readable.read(bufsize)

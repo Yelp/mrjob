@@ -1776,7 +1776,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         self._create_s3_tmp_bucket_if_needed()
         emr_client = self.make_emr_client()
-        emr_conn = self.make_emr_conn()
 
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
@@ -1820,7 +1819,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             log.info('Setting EMR tags: %s' %
                      ', '.join('%s=%s' % (tag, value)
                                for tag, value in tags.items()))
-            emr_conn.add_tags(self._cluster_id, tags)
+            emr_client.add_tags(
+                ResourceId=self._cluster_id,
+                Tags=[dict(Key=k, Value=v) for k, v in tags.items()])
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):

@@ -537,21 +537,30 @@ class IAMTestCase(MockBotoTestCase):
 
         # users with limited access may not be able to connect to the IAM API.
         # This gives them a plan B
-        self.assertFalse(boto3.client.called)
+        self.assertFalse(any(args == ('iam',)
+                             for args, kwargs in boto3.client.call_args_list))
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
         self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
     def test_no_iam_access(self):
-        ex = boto.exception.BotoServerError(403, 'Forbidden')
-        self.assertIsInstance(boto3.client, Mock)
-        boto3.client.side_effect = ex
+        boto3_client = boto3.client
+
+        def forbidding_boto3_client(service_name, **kwargs):
+            if service_name == 'iam':
+                raise boto.exception.BotoServerError(403, 'Forbidden')
+            else:
+                # pass through other services
+                return boto3_client(service_name, **kwargs)
+
+        self.start(patch('boto3.client', side_effect=forbidding_boto3_client))
 
         with logger_disabled('mrjob.emr'):
             cluster = self.run_and_get_cluster()
 
-        self.assertTrue(boto3.client.called)
+        self.assertTrue(any(args == ('iam',)
+                            for args, kwargs in boto3.client.call_args_list))
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')

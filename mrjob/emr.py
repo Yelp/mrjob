@@ -600,8 +600,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         from mrjob.emr import EMRJobRunner
 
-        emr_conn = EMRJobRunner().make_emr_conn()
-        clusters = emr_conn.list_clusters()
+        emr_client = EMRJobRunner().make_emr_client()
+        clusters = emr_client.list_clusters()
         ...
     """
     alias = 'emr'
@@ -3178,6 +3178,27 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     ex, boto.https_connection.InvalidCertificateException))
 
         return _wrap_aws_conn(conn)
+
+    def make_emr_client(self):
+        """Create a :py:mod:`boto3` EMR client.
+
+        :return: a :py:class:`botocore.client.EMR` wrapped in a
+                :py:class:`mrjob.retry.RetryWrapper`
+        """
+        # ...which is then wrapped in bacon! Mmmmm!
+        if boto3 is None:
+            raise ImportError('You must install boto3 to connect to EMR')
+
+        raw_emr_client = boto3.client(
+            'emr',
+            aws_access_key_id=self._opts['aws_access_key_id'],
+            aws_secret_access_key=self._opts['aws_secret_access_key'],
+            aws_session_token=self._opts['aws_security_token'],
+            endpoint_url=_endpoint_url(self._opts['emr_endpoint']),
+            region_name=self._opts['region'],
+        )
+
+        return _wrap_aws_client(raw_emr_client)
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()

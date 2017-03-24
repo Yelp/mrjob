@@ -24,7 +24,7 @@ S3 Utilities
 
 .. autoclass:: S3Filesystem
 
-.. automethod:: S3Filesystem.make_s3_conn
-.. automethod:: S3Filesystem.get_s3_key
-.. automethod:: S3Filesystem.get_s3_keys
-.. automethod:: S3Filesystem.make_s3_key
+.. automethod:: S3Filesystem.create_bucket
+.. automethod:: S3Filesystem.get_all_bucket_names
+.. automethod:: S3Filesystem.make_s3_client
+.. automethod:: S3Filesystem.make_s3_resource

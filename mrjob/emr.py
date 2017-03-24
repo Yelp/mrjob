@@ -395,17 +395,20 @@ def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
         key_data = None
 
     # if there's an unexpired lock, give up
-    if key_data and mins_to_expiration is not None:
-        age = datetime.utcnow() - key_data['LastModified']
-        if age <= timedelta(minutes=mins_to_expiration):
+    if key_data:
+        if mins_to_expiration is None:
             return None
+        else:
+            age = datetime.utcnow() - key_data['LastModified']
+            if age <= timedelta(minutes=mins_to_expiration):
+                return None
 
     s3_key.put(Body=job_key.encode('utf_8'))
     return s3_key
 
 
 def _lock_acquire_step_2(key, job_key):
-    key_value = key.get
+    key_value = key.get()['Body'].read()
     return (key_value == job_key.encode('utf_8'))
 
 

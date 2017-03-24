@@ -2854,17 +2854,17 @@ class S3LockTestCase(MockBotoTestCase):
 
         self.assertEqual(
             True,
-            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
+            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'j-ONE'))
 
         self.assertEqual(
             False,
-            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
+            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'j-TWO'))
 
     def test_lock_expiration(self):
         runner = EMRJobRunner(conf_paths=[])
 
         did_lock = _attempt_to_acquire_lock(
-            runner.fs, self.expired_lock_uri, 0, 'jf1',
+            runner.fs, self.expired_lock_uri, 0, 'j-ONE',
             mins_to_expiration=5)
         self.assertEqual(True, did_lock)
 
@@ -2872,28 +2872,28 @@ class S3LockTestCase(MockBotoTestCase):
         # Test case where one attempt puts the key in existence
         runner = EMRJobRunner(conf_paths=[])
 
-        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf1')
+        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'j-ONE')
         self.assertNotEqual(key, None)
 
-        key2 = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf2')
+        key2 = _lock_acquire_step_1(runner.fs, self.lock_uri, 'j-TWO')
         self.assertEqual(key2, None)
 
     def test_read_race_condition(self):
         # test case where both try to create the key
         runner = EMRJobRunner(conf_paths=[])
 
-        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf1')
+        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'j-ONE')
         self.assertNotEqual(key, None)
 
         # acquire the key by subversive means to simulate contention
         bucket_name, key_prefix = parse_s3_uri(self.lock_uri)
         bucket = runner.fs.get_bucket(bucket_name)
-        key2 = bucket.get_key(key_prefix)
+        key2 = bucket.Object(key_prefix)
 
         # and take the lock!
-        key2.set_contents_from_string(b'jf2')
+        key2.put(b'j-TWO')
 
-        self.assertFalse(_lock_acquire_step_2(key, 'jf1'), 'Lock should fail')
+        self.assertFalse(_lock_acquire_step_2(key, 'j-ONE'), 'Lock should fail')
 
 
 class MaxHoursIdleTestCase(MockBotoTestCase):

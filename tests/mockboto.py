@@ -597,10 +597,6 @@ class MockS3Bucket(object):
 #            if key_name.startswith(prefix):
 #                yield MockS3Object(bucket=self, name=key_name,
 #                              date_to_str=to_iso8601)
-#
-#    def initiate_multipart_upload(self, key_name):
-#        key = self.new_key(key_name)
-#        return MockMultiPartUpload(key)
 
 
 class MockS3Object(object):
@@ -646,14 +642,14 @@ class MockS3Object(object):
         mock_keys = self._mock_bucket_keys('PutObject')
 
         if isinstance(Body, bytes):
-            contents = Body
+            data = Body
         elif hasattr(Body, 'read'):
-            contents = Body.read()
+            data = Body.read()
 
-        if not isinstance(contents, bytes):
+        if not isinstance(data, bytes):
             raise TypeError('Body or Body.read() must be bytes')
 
-        mock_keys[self.key] = (contents, datetime.utcnow())
+        mock_keys[self.key] = (data, datetime.utcnow())
 
     def upload_file(self, path, Config=None):
         if self.bucket_name not in self.meta.client.mock_s3_fs:
@@ -704,9 +700,6 @@ class MockS3Object(object):
 #            return self.bucket.mock_state()[self.name][0]
 #        else:
 #            raise boto.exception.S3ResponseError(404, 'Not Found')
-#
-#    def mock_multipart_upload_was_cancelled(self):
-#        return isinstance(self.read_mock_data(), MultiPartUploadCancelled)
 #
 #    def write_mock_data(self, data):
 #        # real boto automatically UTF-8 encodes unicode, but mrjob should
@@ -793,51 +786,6 @@ class MockS3Object(object):
 #    def size(self):
 #        return len(self.get_contents_as_string())
 
-
-class MultiPartUploadCancelled(bytes):
-    """Thin wrapper for key data, to mark that multipart upload
-    to this key was cancelled."""
-    pass
-
-
-class MockMultiPartUpload(object):
-
-    def __init__(self, key):
-        """Mock out boto.s3.MultiPartUpload
-
-        Note that real MultiPartUpload objects don't actually know which key
-        they're associated with. It's just simpler this way.
-        """
-        self.key = key
-        self.parts = {}
-
-    def upload_part_from_file(self, fp, part_num):
-        part_num = int(part_num)  # boto leaves this to a format string
-
-        # this check is actually in boto
-        if part_num < 1:
-            raise ValueError('Part numbers must be greater than zero')
-
-        self.parts[part_num] = fp.read()
-
-    def complete_upload(self):
-        data = b''
-
-        if self.parts:
-            num_parts = max(self.parts)
-            for part_num in range(1, num_parts + 1):
-                # S3 might be more graceful about missing parts. But we
-                # certainly don't want this to slip past testing
-                data += self.parts[part_num]
-
-        self.key.set_contents_from_string(data)
-
-    def cancel_upload(self):
-        self.parts = None  # should break any further calls
-
-        # record that multipart upload was cancelled
-        cancelled = MultiPartUploadCancelled(self.key.get_contents_as_string())
-        self.key.set_contents_from_string(cancelled)
 
 
 ### EMR ###

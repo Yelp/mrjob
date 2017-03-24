@@ -84,6 +84,7 @@ from tests.py2 import patch
 from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_local import _bash_wrap
@@ -1349,22 +1350,11 @@ class TestSSHLs(MockBotoTestCase):
                           self.runner.fs.ls('ssh://testmaster/does_not_exist'))
 
 
-class TestNoBoto(TestCase):
+class NoBoto3TestCase(SandboxedTestCase):
 
     def setUp(self):
-        self.blank_out_boto()
-
-    def tearDown(self):
-        self.restore_boto()
-
-    def blank_out_boto(self):
-        self._real_boto = mrjob.emr.boto
-        mrjob.emr.boto = None
-        mrjob.fs.s3.boto = None
-
-    def restore_boto(self):
-        mrjob.emr.boto = self._real_boto
-        mrjob.fs.s3.boto = self._real_boto
+        self.start(patch('mrjob.emr.boto3', None))
+        self.start(patch('mrjob.fs.s3.boto3', None))
 
     def test_init(self):
         # merely creating an EMRJobRunner should raise an exception

@@ -41,8 +41,6 @@ from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import _decode_configurations_from_api
-from mrjob.emr import _lock_acquire_step_1
-from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
@@ -2837,16 +2835,15 @@ class PoolingDisablingTestCase(MockBotoTestCase):
 
 class S3LockTestCase(MockBotoTestCase):
 
+    LOCK_URI = 's3://locks/some_lock'
+
     def setUp(self):
         super(S3LockTestCase, self).setUp()
-        self.make_buckets()
 
-    def make_buckets(self):
-        self.add_mock_s3_data({'locks': {
-            'expired_lock': b'x',
-        }}, datetime.utcnow() - timedelta(minutes=30))
-        self.lock_uri = 's3://locks/some_lock'
-        self.expired_lock_uri = 's3://locks/expired_lock'
+        self.sleep = self.start(patch('time.sleep'))
+
+        # create a bucket to put locks on
+        self.add_mock_s3_data({'locks': {}})
 
     def test_lock(self):
         # Most basic test case
@@ -2854,46 +2851,64 @@ class S3LockTestCase(MockBotoTestCase):
 
         self.assertEqual(
             True,
-            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'j-ONE'))
+            _attempt_to_acquire_lock(runner.fs, self.LOCK_URI, 5.0, 'job_one'))
+
+        self.sleep.assert_called_with(5.0)
+
+        self.sleep.reset_mock()
 
         self.assertEqual(
             False,
-            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'j-TWO'))
+            _attempt_to_acquire_lock(runner.fs, self.LOCK_URI, 5.0, 'job_two'))
+
+        self.assertFalse(self.sleep.called)
 
     def test_lock_expiration(self):
         runner = EMRJobRunner(conf_paths=[])
 
+        # add an expired lock
+        self.add_mock_s3_data({'locks': {
+            'expired_lock': b'x',
+        }}, datetime.utcnow() - timedelta(minutes=30))
+
         did_lock = _attempt_to_acquire_lock(
-            runner.fs, self.expired_lock_uri, 0, 'j-ONE',
+            runner.fs, 's3://locks/expired_lock', 5.0, 'job_one',
             mins_to_expiration=5)
         self.assertEqual(True, did_lock)
 
-    def test_key_race_condition(self):
+        self.sleep.assert_called_with(5.0)
+
+    def test_write_race_condition(self):
         # Test case where one attempt puts the key in existence
+        # right before we attempt to lock
         runner = EMRJobRunner(conf_paths=[])
 
-        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'j-ONE')
-        self.assertNotEqual(key, None)
+        self.sleep.side_effect = StopIteration
 
-        key2 = _lock_acquire_step_1(runner.fs, self.lock_uri, 'j-TWO')
-        self.assertEqual(key2, None)
+        self.assertRaises(
+            StopIteration, _attempt_to_acquire_lock,
+            runner.fs, self.LOCK_URI, 5.0, 'job_one')
+
+        did_lock = _attempt_to_acquire_lock(
+            runner.fs, self.LOCK_URI, 5.0, 'job_two')
+        self.assertFalse(did_lock)
 
     def test_read_race_condition(self):
-        # test case where both try to create the key
+        # test case where lock is created while we're waiting
+        # for S3 to sync
         runner = EMRJobRunner(conf_paths=[])
 
-        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'j-ONE')
-        self.assertNotEqual(key, None)
+        def _while_you_were_sleeping(*args, **kwargs):
+            key = runner.fs._get_s3_key(self.LOCK_URI)
+            key.put(b'job_two')
 
-        # acquire the key by subversive means to simulate contention
-        bucket_name, key_prefix = parse_s3_uri(self.lock_uri)
-        bucket = runner.fs.get_bucket(bucket_name)
-        key2 = bucket.Object(key_prefix)
+        self.sleep.side_effect = _while_you_were_sleeping
 
-        # and take the lock!
-        key2.put(b'j-TWO')
+        did_lock = _attempt_to_acquire_lock(
+            runner.fs, self.LOCK_URI, 5.0, 'job_one')
+        self.assertFalse(did_lock)
 
-        self.assertFalse(_lock_acquire_step_2(key, 'j-ONE'), 'Lock should fail')
+        self.sleep.assert_called_with(5.0)
 
 
 class MaxHoursIdleTestCase(MockBotoTestCase):

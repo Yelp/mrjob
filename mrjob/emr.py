@@ -382,11 +382,14 @@ def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
     return cloud_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
 
 
-# helpers for _attempt_to_acquire_lock()
-
-def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
+def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
+                             mins_to_expiration=None):
+    """Returns True if this session successfully took ownership of the lock
+    specified by ``lock_uri``.
+    """
     s3_key = s3_fs._get_s3_key(lock_uri)
 
+    # check if the lock already exists
     try:
         key_data = s3_key.get()
     except botocore.exceptions.ClientError as ex:
@@ -397,32 +400,21 @@ def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
     # if there's an unexpired lock, give up
     if key_data:
         if mins_to_expiration is None:
-            return None
+            return False
         else:
             age = datetime.utcnow() - key_data['LastModified']
             if age <= timedelta(minutes=mins_to_expiration):
-                return None
+                return False
 
+    # try to write our job's key
     s3_key.put(Body=job_key.encode('utf_8'))
-    return s3_key
 
-
-def _lock_acquire_step_2(key, job_key):
-    key_value = key.get()['Body'].read()
-    return (key_value == job_key.encode('utf_8'))
-
-
-def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
-                             mins_to_expiration=None):
-    """Returns True if this session successfully took ownership of the lock
-    specified by ``lock_uri``.
-    """
-    key = _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration)
-    if key is None:
-        return False
-
+    # wait for S3
     time.sleep(sync_wait_time)
-    return _lock_acquire_step_2(key, job_key)
+
+    # make sure it's still our key there, not someone else's
+    key_value = s3_key.get()['Body'].read()
+    return (key_value == job_key.encode('utf_8'))
 
 
 def _get_reason(cluster_or_step):
@@ -432,8 +424,6 @@ def _get_reason(cluster_or_step):
     return getattr(
         getattr(cluster_or_step.status, 'statechangereason', ''),
         'message', '').rstrip()
-
-
 
 
 # only exists for deprecated boto library support, going away in v0.7.0

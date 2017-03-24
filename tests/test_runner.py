@@ -1806,9 +1806,9 @@ class RemoteCreateDirArchiveTestCase(MockBotoTestCase):
 
         fs = S3Filesystem()
 
-        fs.create_bucket('walrus')
-        fs.make_s3_key('s3://walrus/archive/foo')
-        fs.make_s3_key('s3://walrus/archive/bar/baz')
+        self.add_mock_s3_data(
+            {'walrus': {'archive/foo': b'foo',
+                        'archive/bar/baz': b'baz'}})
 
     def test_archive_remote_data(self):
         runner = EMRJobRunner()

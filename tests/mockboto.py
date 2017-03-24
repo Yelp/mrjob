@@ -26,8 +26,9 @@ from datetime import datetime
 from io import BytesIO
 
 import boto3
+import botocore.config
+from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
-
 
 try:
     import boto.emr.connection
@@ -53,9 +54,13 @@ from mrjob.parse import parse_s3_uri
 from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
+
+# allow working around mocks
+real_boto3_client = boto3.client
 
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
@@ -63,7 +68,7 @@ DEFAULT_MAX_CLUSTERS_RETURNED = 50
 # list_steps() only returns this many results at a time
 DEFAULT_MAX_STEPS_RETURNED = 50
 
-# Size of each chunk returned by the MockKey iterator
+# Size of each chunk returned by the MockS3Object iterator
 SIMULATED_BUFFER_SIZE = 256
 
 # what partial versions and "latest" map to, as of 2015-07-15
@@ -175,9 +180,11 @@ class MockBotoTestCase(SandboxedTestCase):
         self.emr_conn_iterator = itertools.repeat(
             None, self.MAX_EMR_CONNECTIONS)
 
-        self.start(patch.object(boto3, 'client', self.client))
+        self.boto3_client = boto3.client
 
-        self.start(patch.object(boto, 'connect_s3', self.connect_s3))
+        self.start(patch.object(boto3, 'client', self.client))
+        self.start(patch.object(boto3, 'resource', self.resource))
+
         self.start(patch.object(
             boto.emr.connection, 'EmrConnection', self.connect_emr))
 
@@ -290,10 +297,6 @@ class MockBotoTestCase(SandboxedTestCase):
             runner.run()
             return runner._describe_cluster()
 
-    def connect_s3(self, *args, **kwargs):
-        kwargs['mock_s3_fs'] = self.mock_s3_fs
-        return MockS3Connection(*args, **kwargs)
-
     def connect_emr(self, *args, **kwargs):
         try:
             next(self.emr_conn_iterator)
@@ -317,16 +320,31 @@ class MockBotoTestCase(SandboxedTestCase):
             kwargs['mock_iam_role_attached_policies'] = (
                 self.mock_iam_role_attached_policies)
             return MockIAMClient(**kwargs)
+        elif service_name == 's3':
+            kwargs['mock_s3_fs'] = self.mock_s3_fs
+            return MockS3Client(**kwargs)
         else:
-            raise ValueError
+            raise NotImplementedError(
+                'mock %s service not supported' % service_name)
+
+    # mock boto3.resource()
+    def resource(self, service_name, **kwargs):
+        if service_name == 's3':
+            kwargs['mock_s3_fs'] = self.mock_s3_fs
+            return MockS3Resource(**kwargs)
+        else:
+            raise NotImplementedError(
+                'mock %s resource not supported' % service_name)
 
 
 ### S3 ###
 
 def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
-    """Update mock_s3_fs (which is just a dictionary mapping bucket to
-    key to contents) with a map from bucket name to key name to data and
-    time last modified."""
+    """Update mock_s3_fs with a map from bucket name to key name to data.
+
+    :param last_modified: a UTC :py:class:`~datetime.datetime`
+    :param location string: the bucket's location cosntraint (a region name)
+    """
     if time_modified is None:
         time_modified = datetime.utcnow()
     for bucket_name, key_name_to_bytes in data.items():
@@ -342,254 +360,262 @@ def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
             bucket['location'] = location
 
 
-class MockS3Connection(object):
-    """Mock out boto.s3.Connection
+def _no_such_bucket_error(bucket_name, operation_name):
+    return ClientError(
+        dict(
+            Error=dict(
+                Bucket=bucket_name,
+                Code='NoSuchBucket',
+                Message='The specified bucket does not exist',
+            ),
+            ResponseMetadata=dict(
+                HTTPStatusCode=404
+            ),
+        ),
+        operation_name)
+
+
+def _no_such_key_error(key_name, operation_name):
+    return ClientError(
+        dict(
+            Error=dict(
+                Code='NoSuchKey',
+                Key=key_name,
+                Message='The specified key does not exist',
+            ),
+            ResponseMetadata=dict(
+                HTTPStatusCode=404,
+            ),
+        ),
+        operation_name,
+    )
+
+
+class MockS3Client(object):
+    """Mock out boto3 S3 client
+
+    :param mock_s3_fs: Maps bucket name to a dictionary with the keys *keys*
+                       and *location*. *keys* maps key name to tuples of
+                       ``(data, time_modified)``. *data* is bytes, and
+                        *time_modified* is a UTC
+                        :py:class:`~datetime.datetime`. *location* is an
+                        optional location constraint for the bucket
+                        (a region name).
     """
-    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
-                 is_secure=True, port=None, proxy=None, proxy_port=None,
-                 proxy_user=None, proxy_pass=None,
-                 host=None, debug=0, https_connection_factory=None,
-                 calling_format=None, path='/', provider='aws',
-                 bucket_class=None, mock_s3_fs=None, security_token=None):
-        """Mock out a connection to S3. Most of these args are the same
-        as for the real S3Connection, and are ignored.
+    def __init__(self,
+                 aws_access_key_id=None,
+                 aws_secret_access_key=None,
+                 aws_session_token=None,
+                 endpoint_url=None,
+                 region_name=None,
+                 mock_s3_fs=None):
 
-        You can set up a mock filesystem to share with other objects
-        by specifying mock_s3_fs, which is a map from bucket name to
-        a dictionary with fields 'location' (bucket location constraint,
-        a string) and 'keys' (a map from key to (bytes, time_modified).
-        """
-        # use mock_s3_fs even if it's {}
-        self.mock_s3_fs = combine_values({}, mock_s3_fs)
-        self.host = host or 's3.amazonaws.com'
+        self.mock_s3_fs = mock_s3_fs
 
-    def _region(self):
-        """Infer region from self.host. Return '' if on regionless
-        endpoint."""
-        return self.host.split('.')[0][3:]
+        # use botocore to translate region_name to endpoint_url
+        real_client = real_boto3_client(
+            's3',
+            endpoint_url=endpoint_url,
+            region_name=region_name,
+            config=botocore.config.Config(region_name='us-east-1'))
 
-    def get_bucket(self, bucket_name, validate=True, headers=None):
-        if bucket_name in self.mock_s3_fs:
-            # can't access buckets through wrong region's endpoint
-            region = self._region()
-            if region and self.mock_s3_fs[bucket_name]['location'] != region:
-                raise boto.exception.S3ResponseError(301, 'Moved Permanently')
+        self.meta = MockObject(
+            endpoint_url=real_client.meta.endpoint_url,
+            region_name=real_client.meta.region_name)
 
-            return MockBucket(connection=self, name=bucket_name)
-        else:
-            raise boto.exception.S3ResponseError(404, 'Not Found')
+    def _check_bucket_exists(self, bucket_name, operation_name):
+        if bucket_name not in self.mock_s3_fs:
+            raise _no_such_bucket_error(bucket_name, operation_name)
 
-    def get_all_buckets(self):
-        return [self.get_bucket(name) for name in self.mock_s3_fs]
+    def create_bucket(self, Bucket, CreateBucketConfiguration=None):
+        # boto3 doesn't seem to mind if you try to create a bucket that exists
+        if Bucket not in self.mock_s3_fs:
+            location = (CreateBucketConfiguration or {}).get(
+                'LocationConstraint', '')
+            self.mock_s3_fs[Bucket] = dict(keys={}, location=location)
 
-    def create_bucket(self, bucket_name, headers=None, location='',
-                      policy=None):
-        if bucket_name in self.mock_s3_fs:
-            raise boto.exception.S3CreateError(409, 'Conflict')
+        # "Location" here actually refers to the bucket name
+        return dict(Location=('/' + Bucket))
 
-        # for region endpoints, location constraint must match
-        region = self._region()
-        if region and region != location:
-            raise boto.exception.S3CreateError(409, 'Bad Request')
+    def get_bucket_location(self, Bucket):
+        self._check_bucket_exists(Bucket, 'GetBucketLocation')
 
-        self.mock_s3_fs[bucket_name] = {'keys': {}, 'location': location}
+        location_constraint = self.mock_s3_fs[Bucket].get('location') or None
+
+        return dict(LocationConstraint=location_constraint)
 
 
-class MockBucket(object):
-    """Mock out boto.s3.Bucket
+class MockS3Resource(object):
+    """Mock out boto3 S3 resource"""
+    def __init__(self,
+                 aws_access_key_id=None,
+                 aws_secret_access_key=None,
+                 aws_session_token=None,
+                 endpoint_url=None,
+                 region_name=None,
+                 mock_s3_fs=None):
+
+        self.mock_s3_fs = mock_s3_fs
+
+        self.meta = MockObject(
+            client=MockS3Client(
+                aws_access_key_id=aws_access_key_id,
+                aws_secret_access_key=aws_secret_access_key,
+                aws_session_token=aws_session_token,
+                endpoint_url=endpoint_url,
+                region_name=region_name,
+                mock_s3_fs=mock_s3_fs
+            )
+        )
+
+        self.buckets = MockObject(
+            all=self._buckets_all,
+        )
+
+    def Bucket(self, name):
+        # boto3's Bucket() doesn't care if the bucket exists
+        return MockS3Bucket(self.meta.client, name)
+
+    def _buckets_all(self):
+        # technically, this only lists buckets we own, but our mock fs
+        # doesn't simulate buckets owned by others
+        for bucket_name in sorted(self.meta.client.mock_s3_fs):
+            yield self.Bucket(bucket_name)
+
+
+class MockS3Bucket(object):
+    """Mock out boto3 bucket
     """
-    def __init__(self, connection=None, name=None, location=None):
-        """You can optionally specify a 'data' argument, which will instantiate
-        mock keys and mock data. data should be a map from key name to bytes
-        and time last modified.
+    def __init__(self, client, name):
+        """Create a mock bucket with the given name and client
         """
         self.name = name
-        self.connection = connection
+        self.meta = MockObject(client=client)
 
-    def mock_state(self):
-        """Returns a dictionary from key to data representing the
-        state of this bucket."""
-        if self.name in self.connection.mock_s3_fs:
-            return self.connection.mock_s3_fs[self.name]['keys']
-        else:
-            raise boto.exception.S3ResponseError(404, 'Not Found')
+        self.objects = MockObject(
+            all=self._objects_all,
+            filter=self._objects_filter)
 
-    def new_key(self, key_name):
-        if key_name not in self.mock_state():
-            self.mock_state()[key_name] = (
-                b'', to_iso8601(datetime.utcnow()))
-        return MockKey(bucket=self, name=key_name)
+    def Object(self, key):
+        return MockS3Object(self.meta.client, self.name, key)
 
-    def get_key(self, key_name):
-        if key_name in self.mock_state():
-            return MockKey(bucket=self, name=key_name, date_to_str=to_rfc1123)
-        else:
-            return None
+    def _objects_all(self):
+        return self._objects_filter()
 
-    def get_location(self):
-        return self.connection.mock_s3_fs[self.name]['location']
+    def _objects_filter(self, Prefix=None):
+        self._check_bucket_exists('ListObjects')
 
-    def list(self, prefix=''):
-        for key_name in sorted(self.mock_state()):
-            if key_name.startswith(prefix):
-                yield MockKey(bucket=self, name=key_name,
-                              date_to_str=to_iso8601)
+        # there are several other keyword arguments that we don't support
+        mock_s3_fs = self.meta.client.mock_s3_fs
 
-    def initiate_multipart_upload(self, key_name):
-        key = self.new_key(key_name)
-        return MockMultiPartUpload(key)
+        for key in sorted(mock_s3_fs[self.name]['keys']):
+            if Prefix and not key.startswith(Prefix):
+                continue
+
+            key = self.Object(key)
+            # emulate ObjectSummary by pre-filling size, e_tag, etc.
+            key.get()
+            yield key
+
+    def _check_bucket_exists(self, operation_name):
+        if self.name not in self.meta.client.mock_s3_fs:
+            raise _no_such_bucket_error(self.name, operation_name)
 
 
-class MockKey(object):
+class MockS3Object(object):
     """Mock out boto.s3.Key"""
 
-    def __init__(self, bucket=None, name=None, date_to_str=None):
-        self.bucket = bucket
-        self.name = name
-        self.date_to_str = date_to_str or to_iso8601
-        # position in data, for read() and next()
-        self._pos = 0
+    def __init__(self, client, bucket_name, key):
+        self.bucket_name = bucket_name
+        self.key = key
 
-    def read_mock_data(self):
-        """Read the bytes for this key out of the fake boto state."""
-        if self.name in self.bucket.mock_state():
-            return self.bucket.mock_state()[self.name][0]
-        else:
-            raise boto.exception.S3ResponseError(404, 'Not Found')
-
-    def mock_multipart_upload_was_cancelled(self):
-        return isinstance(self.read_mock_data(), MultiPartUploadCancelled)
-
-    def write_mock_data(self, data):
-        # real boto automatically UTF-8 encodes unicode, but mrjob should
-        # always pass bytes
-        if not isinstance(data, bytes):
-            #data = data.encode('utf_8')
-            raise TypeError('mock s3 data must be bytes')
-
-        if self.name in self.bucket.mock_state():
-            self.bucket.mock_state()[self.name] = (data, datetime.utcnow())
-        else:
-            raise boto.exception.S3ResponseError(404, 'Not Found')
-
-    def get_contents_to_filename(self, path, headers=None):
-        with open(path, 'wb') as f:
-            f.write(self.read_mock_data())
-
-    def set_contents_from_filename(self, path):
-        with open(path, 'rb') as f:
-            self.write_mock_data(f.read())
-
-    def get_contents_as_string(self):
-        return self.read_mock_data()
-
-    def set_contents_from_string(self, string):
-        self.write_mock_data(string)
+        self.meta = MockObject(client=client)
 
     def delete(self):
-        if self.name in self.bucket.mock_state():
-            del self.bucket.mock_state()[self.name]
-        else:
-            raise boto.exception.S3ResponseError(404, 'Not Found')
+        mock_keys = self._mock_bucket_keys('DeleteObject')
 
-    def make_public(self):
-        pass
+        # okay if key doesn't exist
+        if self.key in mock_keys:
+            del mock_keys[self.key]
 
-    def read(self, size=None):
-        data = self.read_mock_data()
-        if size is None or size < 0:
-            chunk = data[self._pos:]
-        else:
-            chunk = data[self._pos:self._pos + size]
-        self._pos += len(chunk)
-        return chunk
+        return {}
 
-    # need this for Python 2
-    def next(self):
-        return self.__next__()
+    def get(self):
+        key_data, mtime = self._get_key_data_and_mtime()
 
-    def __next__(self):
-        chunk = self.read(SIMULATED_BUFFER_SIZE)
-        if chunk:
-            return chunk
-        else:
-            raise StopIteration
-
-    def __iter__(self):
-        return self
-
-    def _get_last_modified(self):
-        if self.name in self.bucket.mock_state():
-            return self.date_to_str(self.bucket.mock_state()[self.name][1])
-        else:
-            raise boto.exception.S3ResponseError(404, 'Not Found')
-
-    # option to change last_modified time for testing purposes
-    def _set_last_modified(self, time_modified):
-        if self.name in self.bucket.mock_state():
-            data = self.bucket.mock_state()[self.name][0]
-            self.bucket.mock_state()[self.name] = (data, time_modified)
-        else:
-            raise boto.exception.S3ResponseError(404, 'Not Found')
-
-    last_modified = property(_get_last_modified, _set_last_modified)
-
-    def _get_etag(self):
+        # fill in known attributes
         m = hashlib.md5()
-        m.update(self.get_contents_as_string())
-        return m.hexdigest()
+        m.update(key_data)
 
-    etag = property(_get_etag)
+        self.e_tag = '"%s"' % m.hexdigest()
+        self.last_modified = mtime
+        self.size = len(key_data)
 
-    @property
-    def size(self):
-        return len(self.get_contents_as_string())
+        return dict(
+            Body=BytesIO(key_data),
+            ContentLength=self.size,
+            ETag=self.e_tag,
+            LastModified=self.last_modified,
+        )
 
+    def put(self, Body):
+        if not isinstance(Body, bytes):
+            raise NotImplementedError('mock put() only support bytes')
 
-class MultiPartUploadCancelled(bytes):
-    """Thin wrapper for key data, to mark that multipart upload
-    to this key was cancelled."""
-    pass
+        mock_keys = self._mock_bucket_keys('PutObject')
 
+        if isinstance(Body, bytes):
+            data = Body
+        elif hasattr(Body, 'read'):
+            data = Body.read()
 
-class MockMultiPartUpload(object):
+        if not isinstance(data, bytes):
+            raise TypeError('Body or Body.read() must be bytes')
 
-    def __init__(self, key):
-        """Mock out boto.s3.MultiPartUpload
+        mock_keys[self.key] = (data, datetime.utcnow())
 
-        Note that real MultiPartUpload objects don't actually know which key
-        they're associated with. It's just simpler this way.
-        """
-        self.key = key
-        self.parts = {}
+    def upload_file(self, path, Config=None):
+        if self.bucket_name not in self.meta.client.mock_s3_fs:
+            # upload_file() is a higher-order operation, has fancy errors
+            raise S3UploadFailedError(
+                'Failed to upload %s to %s/%s: %s' % (
+                    path, self.bucket_name, self.key,
+                    str(_no_such_bucket_error('PutObject'))))
 
-    def upload_part_from_file(self, fp, part_num):
-        part_num = int(part_num)  # boto leaves this to a format string
+        mock_keys = self._mock_bucket_keys('PutObject')
+        with open(path, 'rb') as f:
+            mock_keys[self.key] = (f.read(), datetime.utcnow())
 
-        # this check is actually in boto
-        if part_num < 1:
-            raise ValueError('Part numbers must be greater than zero')
+    def __getattr__(self, key):
+        if key in ('e_tag', 'last_modified', 'size'):
+            try:
+                self.get()
+            except ClientError:
+                pass
 
-        self.parts[part_num] = fp.read()
+        if hasattr(self, key):
+            return getattr(self, key)
+        else:
+            raise AttributeError(
+                "'s3.Object' object has no attribute '%s'" % key)
 
-    def complete_upload(self):
-        data = b''
+    def _mock_bucket_keys(self, operation_name):
+        self._check_bucket_exists(operation_name)
 
-        if self.parts:
-            num_parts = max(self.parts)
-            for part_num in range(1, num_parts + 1):
-                # S3 might be more graceful about missing parts. But we
-                # certainly don't want this to slip past testing
-                data += self.parts[part_num]
+        return self.meta.client.mock_s3_fs[self.bucket_name]['keys']
 
-        self.key.set_contents_from_string(data)
+    def _check_bucket_exists(self, operation_name):
+        if self.bucket_name not in self.meta.client.mock_s3_fs:
+            raise _no_such_bucket_error(self.bucket_name, operation_name)
 
-    def cancel_upload(self):
-        self.parts = None  # should break any further calls
+    def _get_key_data_and_mtime(self):
+        """Return (key_data, time_modified)."""
+        mock_keys = self._mock_bucket_keys('GetBucket')
 
-        # record that multipart upload was cancelled
-        cancelled = MultiPartUploadCancelled(self.key.get_contents_as_string())
-        self.key.set_contents_from_string(cancelled)
+        if self.key not in mock_keys:
+            raise _no_such_key_error(self.key, 'GetObject')
+
+        return mock_keys[self.key]
 
 
 ### EMR ###
@@ -642,10 +668,8 @@ class MockEmrConnection(object):
         Step numbers are 0-indexed.
 
         Extra args:
-        :param mock_s3_fs: a mock S3 filesystem to point to. See
-                           :py:meth:`MockS3Connection.__init__`
-                           for format (usually you just want to use an empty
-                           dictionary).
+        :param mock_s3_fs: a mock S3 filesystem to point to (usually you just
+                            want to use an empty dictionary).
         :param mock_emr_clusters: map from cluster ID to an EMRObject, in the
                                   format returned by describe_cluster(), plus
                                  ``_bootstrapactions``, ``_instancegroups``,
@@ -1457,7 +1481,7 @@ class MockEmrConnection(object):
         return
 
 
-class MockEmrObject(object):
+class MockObject(object):
     """Mock out boto.emr.EmrObject. This is just a generic object that you
     can set any attribute on."""
 
@@ -1497,6 +1521,8 @@ class MockEmrObject(object):
             ', '.join('%s=%r' % (k, v)
                       for k, v in sorted(self.__dict__.items()))))
 
+# old name for this
+MockEmrObject = MockObject
 
 class MockPaginator(object):
     """Mock botocore paginators.
@@ -1563,8 +1589,15 @@ class MockIAMClient(object):
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
-        # so we can easily check this
-        self.endpoint_url = endpoint_url
+        # use botocore to translate region_name to endpoint_url
+        real_client = real_boto3_client(
+            'iam',
+            endpoint_url=endpoint_url,
+            config=botocore.config.Config(region_name='aws-global'))
+
+        self.meta = MockObject(
+            endpoint_url=real_client.meta.endpoint_url,
+            region_name=real_client.meta.region_name)
 
     def get_paginator(self, operation_name):
         return MockPaginator(

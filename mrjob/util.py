@@ -343,6 +343,21 @@ def to_lines(chunks):
     Only breaks lines on ``\\n`` (not ``\\r``), and does not add
     a trailing newline.
 
+    For efficiency, passes through anything with a ``readline()`` attribute.
+    """
+    # hopefully this is good enough for anything mrjob will encounter
+    if hasattr(chunks, 'readline'):
+        return chunks
+    else:
+        return _to_lines(chunks)
+
+
+def _to_lines(chunks):
+    """Take in data as a sequence of bytes, and yield it, one line at a time.
+
+    Only breaks lines on ``\\n`` (not ``\\r``), and does not add
+    a trailing newline.
+
     Optimizes for:
 
     * chunks bigger than lines (e.g. reading test files)

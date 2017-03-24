@@ -49,9 +49,15 @@ except ImportError:
     # inside hadoop streaming
     boto = None
 
+try:
+    import botocore.client
+    botocore  # quiet "redefinition of unused ..." warning from pyflakes
+except ImportError:
+    botocore = None
 
 try:
     import boto3
+    import boto3.s3.transfer
     boto3  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
     # don't require boto; MRJobs don't actually need it when running
@@ -59,26 +65,25 @@ except ImportError:
     boto3 = None
 
 
-try:
-    import filechunkio
-except ImportError:
-    # that's cool; filechunkio is only for multipart uploading
-    filechunkio = None
-
 import mrjob
 import mrjob.step
+from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
-from mrjob.aws import s3_location_constraint_for_region
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import wrap_aws_conn
+from mrjob.fs.s3 import _EMR_BACKOFF
+from mrjob.fs.s3 import _EMR_BACKOFF_MULTIPLIER
+from mrjob.fs.s3 import _EMR_MAX_TRIES
+from mrjob.fs.s3 import _client_error_status
+from mrjob.fs.s3 import _endpoint_url
+from mrjob.fs.s3 import _get_bucket_region
 from mrjob.fs.s3 import _wrap_aws_client
 from mrjob.fs.ssh import SSHFilesystem
 from mrjob.iam import _FALLBACK_INSTANCE_PROFILE
@@ -101,9 +106,7 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
-from mrjob.parse import iso8601_to_datetime
 from mrjob.parse import iso8601_to_timestamp
-from mrjob.parse import parse_s3_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.patched_boto import _patched_describe_cluster
@@ -116,11 +119,11 @@ from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
 from mrjob.retry import RetryGoRound
+from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.ssh import _ssh_run
 from mrjob.step import StepFailedException
@@ -186,7 +189,7 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 
 # default AWS region to use for EMR. Using us-west-2 because it is the default
 # for new (since October 10, 2012) accounts (see #1025)
-_DEFAULT_REGION = 'us-west-2'
+_DEFAULT_EMR_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_IMAGE_VERSION = '4.8.2'
@@ -253,6 +256,8 @@ _CHEAPEST_2_X_INSTANCE_TYPE = 'm1.small'
 # these are the only kinds of instance roles that exist
 _INSTANCE_ROLES = ('master', 'core', 'task')
 
+# use to disable multipart uploading
+_HUGE_PART_THRESHOLD = 2 ** 256
 
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
@@ -262,11 +267,6 @@ class _PooledClusterSelfTerminatedException(Exception):
 # non-master nodes won't shut down the cluster, so don't need to match that.
 _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*The master node was terminated.*$', re.I)
-
-
-def s3_key_to_uri(s3_key):
-    """Convert a boto Key object into an ``s3://`` URI"""
-    return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
 
 
 def _repeat(api_call, *args, **kwargs):
@@ -377,45 +377,39 @@ def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
     return cloud_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
 
 
-def _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration=None):
-    bucket_name, key_prefix = parse_s3_uri(lock_uri)
-    bucket = s3_fs.get_bucket(bucket_name)
-    key = bucket.get_key(key_prefix)
-
-    # EMRJobRunner should start using a cluster within about a second of
-    # locking it, so if it's been a while, then it probably crashed and we
-    # can just use this cluster.
-    key_expired = False
-    if key and mins_to_expiration is not None:
-        last_modified = iso8601_to_datetime(key.last_modified)
-        age = datetime.utcnow() - last_modified
-        if age > timedelta(minutes=mins_to_expiration):
-            key_expired = True
-
-    if key is None or key_expired:
-        key = bucket.new_key(key_prefix)
-        key.set_contents_from_string(job_key.encode('utf_8'))
-        return key
-    else:
-        return None
-
-
-def _lock_acquire_step_2(key, job_key):
-    key_value = key.get_contents_as_string()
-    return (key_value == job_key.encode('utf_8'))
-
-
 def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
                              mins_to_expiration=None):
     """Returns True if this session successfully took ownership of the lock
     specified by ``lock_uri``.
     """
-    key = _lock_acquire_step_1(s3_fs, lock_uri, job_key, mins_to_expiration)
-    if key is None:
-        return False
+    s3_key = s3_fs._get_s3_key(lock_uri)
 
+    # check if the lock already exists
+    try:
+        key_data = s3_key.get()
+    except botocore.exceptions.ClientError as ex:
+        if _client_error_status(ex) != 404:
+            raise
+        key_data = None
+
+    # if there's an unexpired lock, give up
+    if key_data:
+        if mins_to_expiration is None:
+            return False
+        else:
+            age = datetime.utcnow() - key_data['LastModified']
+            if age <= timedelta(minutes=mins_to_expiration):
+                return False
+
+    # try to write our job's key
+    s3_key.put(Body=job_key.encode('utf_8'))
+
+    # wait for S3
     time.sleep(sync_wait_time)
-    return _lock_acquire_step_2(key, job_key)
+
+    # make sure it's still our key there, not someone else's
+    key_value = s3_key.get()['Body'].read()
+    return (key_value == job_key.encode('utf_8'))
 
 
 def _get_reason(cluster_or_step):
@@ -425,6 +419,30 @@ def _get_reason(cluster_or_step):
     return getattr(
         getattr(cluster_or_step.status, 'statechangereason', ''),
         'message', '').rstrip()
+
+
+# only exists for deprecated boto library support, going away in v0.7.0
+def _wrap_aws_conn(raw_conn):
+    """Wrap a given boto Connection object so that it can retry when
+    throttled."""
+    def retry_if(ex):
+        """Retry if we get a server error indicating throttling. Also
+        handle spurious 505s that are thought to be part of a load
+        balancer issue inside AWS."""
+        return ((isinstance(ex, boto.exception.BotoServerError) and
+                 ('Throttling' in ex.body or
+                  'RequestExpired' in ex.body or
+                  ex.status == 505)) or
+                (isinstance(ex, socket.error) and
+                 ex.args in ((104, 'Connection reset by peer'),
+                             (110, 'Connection timed out'))))
+
+    return RetryWrapper(raw_conn,
+                        retry_if=retry_if,
+                        backoff=_EMR_BACKOFF,
+                        multiplier=_EMR_BACKOFF_MULTIPLIER,
+                        max_tries=_EMR_MAX_TRIES)
+
 
 
 class EMRRunnerOptionStore(RunnerOptionStore):
@@ -438,7 +456,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
         # don't allow region to be ''
         if not self['region']:
-            self['region'] = _DEFAULT_REGION
+            self['region'] = _DEFAULT_EMR_REGION
 
         self._fix_emr_configurations_opt()
         self._fix_instance_opts()
@@ -449,7 +467,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
             'image_version': _DEFAULT_IMAGE_VERSION,
-            'region': _DEFAULT_REGION,
+            'region': _DEFAULT_EMR_REGION,
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
@@ -770,30 +788,24 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _set_cloud_tmp_dir(self):
         """Helper for _fix_s3_tmp_and_log_uri_opts"""
-        buckets = self.fs.get_all_buckets()
-        mrjob_buckets = [b for b in buckets if b.name.startswith('mrjob-')]
+        client = self.fs.make_s3_client()
 
-        # Loop over buckets until we find one that is not region-
-        #   restricted, matches region, or can be used to
-        #   infer region if no region is specified
-        for tmp_bucket in mrjob_buckets:
-            tmp_bucket_name = tmp_bucket.name
+        for bucket_name in self.fs.get_all_bucket_names():
+            if not bucket_name.startswith('mrjob-'):
+                continue
 
-            if (tmp_bucket.get_location() == s3_location_constraint_for_region(
-                    self._opts['region'])):
-
+            bucket_region = _get_bucket_region(client, bucket_name)
+            if bucket_region == self._opts['region']:
                 # Regions are both specified and match
-                log.debug("using existing temp bucket %s" %
-                          tmp_bucket_name)
-                self._opts['cloud_tmp_dir'] = ('s3://%s/tmp/' %
-                                               tmp_bucket_name)
+                log.debug("using existing temp bucket %s" % bucket_name)
+                self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % bucket_name
                 return
 
         # That may have all failed. If so, pick a name.
-        tmp_bucket_name = 'mrjob-' + random_identifier()
-        self._s3_tmp_bucket_to_create = tmp_bucket_name
-        self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % tmp_bucket_name
-        log.info('Auto-created temp S3 bucket %s' % tmp_bucket_name)
+        bucket_name = 'mrjob-' + random_identifier()
+        self._s3_tmp_bucket_to_create = bucket_name
+        self._opts['cloud_tmp_dir'] = 's3://%s/tmp/' % bucket_name
+        log.info('Auto-created temp S3 bucket %s' % bucket_name)
         self._wait_for_s3_eventual_consistency()
 
     def _s3_log_dir(self):
@@ -812,10 +824,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._s3_tmp_bucket_to_create:
             log.debug('creating S3 bucket %r to use as temp space' %
                       self._s3_tmp_bucket_to_create)
-            location = s3_location_constraint_for_region(
-                self._opts['region'])
-            self.fs.create_bucket(
-                self._s3_tmp_bucket_to_create, location=location)
+            self.fs.create_bucket(self._s3_tmp_bucket_to_create,
+                                  self._opts['region'])
             self._s3_tmp_bucket_to_create = None
 
     def _check_and_fix_s3_dir(self, s3_uri):
@@ -855,8 +865,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_fs = S3Filesystem(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
-                aws_security_token=self._opts['aws_security_token'],
-                s3_endpoint=self._opts['s3_endpoint'])
+                aws_session_token=self._opts['aws_security_token'],
+                s3_endpoint=self._opts['s3_endpoint'],
+                s3_region=self._opts['region'])
 
             if self._opts['ec2_key_pair_file']:
                 self._ssh_fs = SSHFilesystem(
@@ -1024,61 +1035,23 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _upload_contents(self, s3_uri, path):
         """Uploads the file at the given path to S3, possibly using
         multipart upload."""
-        fsize = os.stat(path).st_size
-        part_size = self._get_upload_part_size()
+        s3_key = self.fs._get_s3_key(s3_uri)
 
-        s3_key = self.fs.make_s3_key(s3_uri)
+        # use _HUGE_PART_THRESHOLD to disable multipart uploading
+        # (could use put() directly, but that would be another code path)
+        part_size = self._get_upload_part_size() or _HUGE_PART_THRESHOLD
 
-        if self._should_use_multipart_upload(fsize, part_size, path):
-            log.debug("Starting multipart upload of %s" % (path,))
-            mpul = s3_key.bucket.initiate_multipart_upload(s3_key.name)
-
-            try:
-                self._upload_parts(mpul, path, fsize, part_size)
-            except:
-                mpul.cancel_upload()
-                raise
-
-            mpul.complete_upload()
-            log.debug("Completed multipart upload of %s to %s" % (
-                      path, s3_key.name))
-        else:
-            s3_key.set_contents_from_filename(path)
-
-    def _upload_parts(self, mpul, path, fsize, part_size):
-        offsets = range(0, fsize, part_size)
-
-        for i, offset in enumerate(offsets):
-            part_num = i + 1
-
-            log.debug("uploading %d/%d of %s" % (
-                part_num, len(offsets), path))
-            chunk_bytes = min(part_size, fsize - offset)
-
-            with filechunkio.FileChunkIO(
-                    path, 'r', offset=offset, bytes=chunk_bytes) as fp:
-                mpul.upload_part_from_file(fp, part_num)
+        s3_key.upload_file(
+            path,
+            Config=boto3.s3.transfer.TransferConfig(
+                multipart_chunksize=part_size,
+                multipart_threshold=part_size,
+            ),
+        )
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB
         return int((self._opts['cloud_upload_part_size'] or 0) * 1024 * 1024)
-
-    def _should_use_multipart_upload(self, fsize, part_size, path):
-        """Decide if we want to use multipart uploading.
-
-        path is only used to log warnings."""
-        if not part_size:  # disabled
-            return False
-
-        if fsize <= part_size:
-            return False
-
-        if filechunkio is None:
-            log.warning("Can't use S3 multipart upload for %s because"
-                        " filechunkio is not installed" % path)
-            return False
-
-        return True
 
     def _ssh_tunnel_config(self):
         """Look up AMI version, and return a dict with the following keys:
@@ -2027,8 +2000,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         cluster, step)
                     # was it caused by IAM roles?
                     self._check_for_missing_default_iam_roles(cluster)
-                    # was it caused by a key pair from the wrong region?
-                    self._check_for_key_pair_from_wrong_region(cluster)
                     # was it because a bootstrap action failed?
                     self._check_for_failed_bootstrap_action(cluster)
 
@@ -2198,23 +2169,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 ' by following:\n\n'
                 '    http://docs.aws.amazon.com/ElasticMapReduce/latest'
                 '/DeveloperGuide/emr-iam-roles-creatingroles.html\n')
-
-    def _check_for_key_pair_from_wrong_region(self, cluster):
-        """Help users tripped up by the default AWS region changing
-        in mrjob v0.5.0 (see #1111) by pointing them to the
-        docs for creating EC2 key pairs."""
-        if not self._opts.is_default('region'):
-            return
-
-        reason = _get_reason(cluster)
-        if reason == 'The given SSH key name was invalid':
-            log.warning(
-                '\n'
-                'The default AWS region is now %s. Create SSH keys for'
-                ' %s by following:\n\n'
-                '    https://pythonhosted.org/mrjob/guides'
-                '/emr-quickstart.html#configuring-ssh-credentials\n' %
-                (_DEFAULT_REGION, _DEFAULT_REGION))
 
     def _default_step_output_dir(self):
         # put intermediate data in HDFS
@@ -2824,6 +2778,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return self._cluster_id
 
     def get_cluster_id(self):
+        """Get the ID of the cluster our job is running on, or ``None``."""
         return self._cluster_id
 
     def _usable_clusters(self, emr_conn=None, exclude=None, num_steps=1):
@@ -3220,7 +3175,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 lambda ex: isinstance(
                     ex, boto.https_connection.InvalidCertificateException))
 
-        return wrap_aws_conn(conn)
+        return _wrap_aws_conn(conn)
 
     def _describe_cluster(self):
         emr_conn = self.make_emr_conn()
@@ -3230,7 +3185,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return self._get_app_versions().get('hadoop')
 
     def get_image_version(self):
-        """Get the AMI that our cluster is running.
+        """Get the version of the AMI that our cluster is running, or ``None``.
 
         .. versionchanged:: 0.5.4
 
@@ -3322,21 +3277,25 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if boto3 is None:
             raise ImportError('You must install boto3 to connect to IAM')
 
-        endpoint_url = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
-        if not is_uri(endpoint_url):
-            endpoint_url = 'https://' + endpoint_url
+        # special logic for setting IAM endpoint (which you don't usually
+        # want to do, because IAM is regionless).
+        endpoint_url = _endpoint_url(self._opts['iam_endpoint'])
+        if endpoint_url:
+            # keep boto3 from loading a nonsensical region name from configs
+            # (see https://github.com/boto/boto3/issues/985)
+            region_name = _DEFAULT_AWS_REGION
+            log.debug('creating IAM client to %s' % endpoint_url)
+        else:
+            region_name = None
+            log.debug('creating IAM client')
 
-        log.debug('creating IAM connection to %s' % endpoint_url)
-
-        # IAM only has a single region. Setting region_name stops
-        # another region being loaded from configs, environment variables, etc.
         raw_iam_client = boto3.client(
             'iam',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             aws_session_token=self._opts['aws_security_token'],
             endpoint_url=endpoint_url,
-            region_name='us-east-1',
+            region_name=region_name,
         )
 
         return _wrap_aws_client(raw_iam_client)
@@ -3414,35 +3373,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         ' your job may stall forever' % ig.instancetype)
 
         return None
-
-    ### deprecated boto (not boto3) connections ###
-
-    def make_iam_conn(self):
-        """Create a connection to IAM.
-
-        :return: a :py:class:`boto.iam.connection.IAMConnection`, wrapped in a
-                 :py:class:`mrjob.retry.RetryWrapper`
-        """
-        # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to use make_iam_conn()')
-
-        log.warning('make_iam_conn() is deprecated and will be removed in'
-                    ' v0.7.0. Use make_iam_client(), which uses boto3,'
-                    ' instead.')
-
-        host = self._opts['iam_endpoint'] or 'iam.amazonaws.com'
-
-        log.debug('creating IAM connection to %s' % host)
-
-        raw_iam_conn = boto.connect_iam(
-            aws_access_key_id=self._opts['aws_access_key_id'],
-            aws_secret_access_key=self._opts['aws_secret_access_key'],
-            host=host,
-            security_token=self._opts['aws_security_token'])
-
-        return wrap_aws_conn(raw_iam_conn)
-
 
 
 def _encode_emr_api_params(x):

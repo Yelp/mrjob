@@ -179,7 +179,7 @@ _ALIAS_TO_REGION = {
 }
 
 # The region to assume if none is specified
-_DEFAULT_REGION = 'us-east-1'
+_DEFAULT_AWS_REGION = 'us-east-1'
 
 
 def _fix_region(region):

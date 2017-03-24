@@ -19,6 +19,7 @@ import sys
 from datetime import datetime
 from datetime import timedelta
 
+from mrjob.fs.s3 import S3Filesystem
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
@@ -391,15 +392,12 @@ class ClusterTerminationTestCase(MockBotoTestCase):
                          _is_cluster_running(mock_cluster._steps))
 
     def _lock_contents(self, mock_cluster, steps_ahead=0):
-        conn = self.connect_s3()
-        bucket = conn.get_bucket('my_bucket')
-        lock_key_name = 'locks/%s/%d' % (
-            mock_cluster.id, len(mock_cluster._steps) + steps_ahead)
-        key = bucket.get_key(lock_key_name)
-        if key is None:
-            return None
-        else:
-            return key.get_contents_as_string()
+        fs = S3Filesystem()
+
+        contents = b''.join(fs.cat('s3://my_bucket/locks/%s/%d' % (
+            mock_cluster.id, len(mock_cluster._steps) + steps_ahead)))
+
+        return contents or None
 
     def assert_locked_by_terminate(self, mock_cluster, steps_ahead=1):
         contents = self._lock_contents(mock_cluster, steps_ahead=steps_ahead)

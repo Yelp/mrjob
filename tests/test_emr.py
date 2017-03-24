@@ -36,17 +36,15 @@ from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
+from mrjob.emr import _HUGE_PART_THRESHOLD
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import _decode_configurations_from_api
-from mrjob.emr import _lock_acquire_step_1
-from mrjob.emr import _lock_acquire_step_2
 from mrjob.emr import _list_all_steps
 from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.emr import _yield_all_clusters
 from mrjob.emr import _yield_all_instance_groups
-from mrjob.emr import filechunkio
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
@@ -59,6 +57,7 @@ from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 
+import tests.mockboto
 from tests.mockboto import DEFAULT_MAX_STEPS_RETURNED
 from tests.mockboto import MockBotoTestCase
 from tests.mockboto import MockEmrConnection
@@ -83,6 +82,7 @@ from tests.py2 import patch
 from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_local import _bash_wrap
@@ -317,12 +317,11 @@ class EMRJobRunnerEndToEndTestCase(MockBotoTestCase):
 
             list(runner.stream_output())
 
-        conn = runner.fs.make_s3_conn()
-        bucket = conn.get_bucket(tmp_bucket)
-        self.assertEqual(len(list(bucket.list())), tmp_len)
+        bucket = runner.fs.get_bucket(tmp_bucket)
+        self.assertEqual(len(list(bucket.objects.all())), tmp_len)
 
-        bucket = conn.get_bucket(log_bucket)
-        self.assertEqual(len(list(bucket.list())), log_len)
+        bucket = runner.fs.get_bucket(log_bucket)
+        self.assertEqual(len(list(bucket.objects.all())), log_len)
 
     def test_cleanup_all(self):
         self._test_cloud_tmp_cleanup('ALL', 0, 0)
@@ -539,21 +538,30 @@ class IAMTestCase(MockBotoTestCase):
 
         # users with limited access may not be able to connect to the IAM API.
         # This gives them a plan B
-        self.assertFalse(boto3.client.called)
+        self.assertFalse(any(args == ('iam',)
+                             for args, kwargs in boto3.client.call_args_list))
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
         self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
     def test_no_iam_access(self):
-        ex = boto.exception.BotoServerError(403, 'Forbidden')
-        self.assertIsInstance(boto3.client, Mock)
-        boto3.client.side_effect = ex
+        boto3_client = boto3.client
+
+        def forbidding_boto3_client(service_name, **kwargs):
+            if service_name == 'iam':
+                raise boto.exception.BotoServerError(403, 'Forbidden')
+            else:
+                # pass through other services
+                return boto3_client(service_name, **kwargs)
+
+        self.start(patch('boto3.client', side_effect=forbidding_boto3_client))
 
         with logger_disabled('mrjob.emr'):
             cluster = self.run_and_get_cluster()
 
-        self.assertTrue(boto3.client.called)
+        self.assertTrue(any(args == ('iam',)
+                            for args, kwargs in boto3.client.call_args_list))
 
         self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
@@ -1340,22 +1348,11 @@ class TestSSHLs(MockBotoTestCase):
                           self.runner.fs.ls('ssh://testmaster/does_not_exist'))
 
 
-class TestNoBoto(TestCase):
+class NoBoto3TestCase(SandboxedTestCase):
 
     def setUp(self):
-        self.blank_out_boto()
-
-    def tearDown(self):
-        self.restore_boto()
-
-    def blank_out_boto(self):
-        self._real_boto = mrjob.emr.boto
-        mrjob.emr.boto = None
-        mrjob.fs.s3.boto = None
-
-    def restore_boto(self):
-        mrjob.emr.boto = self._real_boto
-        mrjob.fs.s3.boto = self._real_boto
+        self.start(patch('mrjob.emr.boto3', None))
+        self.start(patch('mrjob.fs.s3.boto3', None))
 
     def test_init(self):
         # merely creating an EMRJobRunner should raise an exception
@@ -2838,16 +2835,15 @@ class PoolingDisablingTestCase(MockBotoTestCase):
 
 class S3LockTestCase(MockBotoTestCase):
 
+    LOCK_URI = 's3://locks/some_lock'
+
     def setUp(self):
         super(S3LockTestCase, self).setUp()
-        self.make_buckets()
 
-    def make_buckets(self):
-        self.add_mock_s3_data({'locks': {
-            'expired_lock': b'x',
-        }}, datetime.utcnow() - timedelta(minutes=30))
-        self.lock_uri = 's3://locks/some_lock'
-        self.expired_lock_uri = 's3://locks/expired_lock'
+        self.sleep = self.start(patch('time.sleep'))
+
+        # create a bucket to put locks on
+        self.add_mock_s3_data({'locks': {}})
 
     def test_lock(self):
         # Most basic test case
@@ -2855,46 +2851,64 @@ class S3LockTestCase(MockBotoTestCase):
 
         self.assertEqual(
             True,
-            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf1'))
+            _attempt_to_acquire_lock(runner.fs, self.LOCK_URI, 5.0, 'job_one'))
+
+        self.sleep.assert_called_with(5.0)
+
+        self.sleep.reset_mock()
 
         self.assertEqual(
             False,
-            _attempt_to_acquire_lock(runner.fs, self.lock_uri, 0, 'jf2'))
+            _attempt_to_acquire_lock(runner.fs, self.LOCK_URI, 5.0, 'job_two'))
+
+        self.assertFalse(self.sleep.called)
 
     def test_lock_expiration(self):
         runner = EMRJobRunner(conf_paths=[])
 
+        # add an expired lock
+        self.add_mock_s3_data({'locks': {
+            'expired_lock': b'x',
+        }}, datetime.utcnow() - timedelta(minutes=30))
+
         did_lock = _attempt_to_acquire_lock(
-            runner.fs, self.expired_lock_uri, 0, 'jf1',
+            runner.fs, 's3://locks/expired_lock', 5.0, 'job_one',
             mins_to_expiration=5)
         self.assertEqual(True, did_lock)
 
-    def test_key_race_condition(self):
+        self.sleep.assert_called_with(5.0)
+
+    def test_write_race_condition(self):
         # Test case where one attempt puts the key in existence
+        # right before we attempt to lock
         runner = EMRJobRunner(conf_paths=[])
 
-        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf1')
-        self.assertNotEqual(key, None)
+        self.sleep.side_effect = StopIteration
 
-        key2 = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf2')
-        self.assertEqual(key2, None)
+        self.assertRaises(
+            StopIteration, _attempt_to_acquire_lock,
+            runner.fs, self.LOCK_URI, 5.0, 'job_one')
+
+        did_lock = _attempt_to_acquire_lock(
+            runner.fs, self.LOCK_URI, 5.0, 'job_two')
+        self.assertFalse(did_lock)
 
     def test_read_race_condition(self):
-        # test case where both try to create the key
+        # test case where lock is created while we're waiting
+        # for S3 to sync
         runner = EMRJobRunner(conf_paths=[])
 
-        key = _lock_acquire_step_1(runner.fs, self.lock_uri, 'jf1')
-        self.assertNotEqual(key, None)
+        def _while_you_were_sleeping(*args, **kwargs):
+            key = runner.fs._get_s3_key(self.LOCK_URI)
+            key.put(b'job_two')
 
-        # acquire the key by subversive means to simulate contention
-        bucket_name, key_prefix = parse_s3_uri(self.lock_uri)
-        bucket = runner.fs.get_bucket(bucket_name)
-        key2 = bucket.get_key(key_prefix)
+        self.sleep.side_effect = _while_you_were_sleeping
 
-        # and take the lock!
-        key2.set_contents_from_string(b'jf2')
+        did_lock = _attempt_to_acquire_lock(
+            runner.fs, self.LOCK_URI, 5.0, 'job_one')
+        self.assertFalse(did_lock)
 
-        self.assertFalse(_lock_acquire_step_2(key, 'jf1'), 'Lock should fail')
+        self.sleep.assert_called_with(5.0)
 
 
 class MaxHoursIdleTestCase(MockBotoTestCase):
@@ -3902,6 +3916,8 @@ class ActionOnFailureTestCase(MockBotoTestCase):
 
 class MultiPartUploadTestCase(MockBotoTestCase):
 
+    DEFAULT_PART_SIZE = 100 * 1024 * 1024
+
     PART_SIZE_IN_MB = 50.0 / 1024 / 1024
     TEST_BUCKET = 'walrus'
     TEST_FILENAME = 'data.dat'
@@ -3912,6 +3928,11 @@ class MultiPartUploadTestCase(MockBotoTestCase):
         # create the walrus bucket
         self.add_mock_s3_data({self.TEST_BUCKET: {}})
 
+        self.upload_file = self.start(patch(
+            'tests.mockboto.MockS3Object.upload_file',
+            side_effect=tests.mockboto.MockS3Object.upload_file,
+            autospec=True))
+
     def upload_data(self, runner, data):
         """Upload some bytes to S3"""
         data_path = os.path.join(self.tmp_dir, self.TEST_FILENAME)
@@ -3920,69 +3941,50 @@ class MultiPartUploadTestCase(MockBotoTestCase):
 
         runner._upload_contents(self.TEST_S3_URI, data_path)
 
-    def assert_upload_succeeds(self, runner, data, expect_multipart):
+    def assert_upload_succeeds(self, runner, data, expected_part_size):
         """Write the data to a temp file, and then upload it to (mock) S3,
         checking that the data successfully uploaded."""
-        with patch.object(runner, '_upload_parts', wraps=runner._upload_parts):
-            self.upload_data(runner, data)
+        self.upload_file.reset_mock()
 
-            s3_key = runner.fs.get_s3_key(self.TEST_S3_URI)
-            self.assertEqual(s3_key.get_contents_as_string(), data)
-            self.assertEqual(runner._upload_parts.called, expect_multipart)
+        data_path = os.path.join(self.tmp_dir, self.TEST_FILENAME)
+        with open(data_path, 'wb') as fp:
+            fp.write(data)
 
-    def test_small_file(self):
+        runner._upload_contents(self.TEST_S3_URI, data_path)
+
+        s3_key = runner.fs._get_s3_key(self.TEST_S3_URI)
+        self.assertEqual(s3_key.get()['Body'].read(), data)
+
+        self.assertTrue(self.upload_file.called)
+
+        upload_file_args, upload_file_kwargs = self.upload_file.call_args
+
+        self.assertEqual(upload_file_args[1:], (data_path,))
+
+        self.assertIn('Config', upload_file_kwargs)
+        config = upload_file_kwargs['Config']
+        self.assertEqual(config.multipart_chunksize, expected_part_size)
+        self.assertEqual(config.multipart_threshold, expected_part_size)
+
+    def test_default_part_size(self):
         runner = EMRJobRunner()
         data = b'beavers mate for life'
 
-        self.assert_upload_succeeds(runner, data, expect_multipart=False)
+        self.assert_upload_succeeds(runner, data, 100 * 1024 * 1024)
 
-    @skipIf(filechunkio is None, 'need filechunkio')
-    def test_large_file(self):
-        # Real S3 has a minimum chunk size of 5MB, but I'd rather not
-        # store that in memory (in our mock S3 filesystem)
-        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
-        self.assertEqual(runner._get_upload_part_size(), 50)
+    def test_custom_part_size(self):
+        # this test used to simulate multipart upload, but now we leave
+        # that to boto3
+        runner = EMRJobRunner(cloud_upload_part_size=50.0 / 1024 / 1024)
 
         data = b'Mew' * 20
-        self.assert_upload_succeeds(runner, data, expect_multipart=True)
-
-    def test_file_size_equals_part_size(self):
-        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
-        self.assertEqual(runner._get_upload_part_size(), 50)
-
-        data = b'o' * 50
-        self.assert_upload_succeeds(runner, data, expect_multipart=False)
+        self.assert_upload_succeeds(runner, data, 50)
 
     def test_disable_multipart(self):
         runner = EMRJobRunner(cloud_upload_part_size=0)
-        self.assertEqual(runner._get_upload_part_size(), 0)
 
         data = b'Mew' * 20
-        self.assert_upload_succeeds(runner, data, expect_multipart=False)
-
-    def test_no_filechunkio(self):
-        with patch.object(mrjob.emr, 'filechunkio', None):
-            runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
-            self.assertEqual(runner._get_upload_part_size(), 50)
-
-            data = b'Mew' * 20
-            with logger_disabled('mrjob.emr'):
-                self.assert_upload_succeeds(runner, data,
-                                            expect_multipart=False)
-
-    @skipIf(filechunkio is None, 'need filechunkio')
-    def test_exception_while_uploading_large_file(self):
-
-        runner = EMRJobRunner(cloud_upload_part_size=self.PART_SIZE_IN_MB)
-        self.assertEqual(runner._get_upload_part_size(), 50)
-
-        data = b'Mew' * 20
-
-        with patch.object(runner, '_upload_parts', side_effect=IOError):
-            self.assertRaises(IOError, self.upload_data, runner, data)
-
-            s3_key = runner.fs.get_s3_key(self.TEST_S3_URI)
-            self.assertTrue(s3_key.mock_multipart_upload_was_cancelled())
+        self.assert_upload_succeeds(runner, data, _HUGE_PART_THRESHOLD)
 
 
 class SecurityTokenTestCase(MockBotoTestCase):
@@ -3992,10 +3994,7 @@ class SecurityTokenTestCase(MockBotoTestCase):
 
         self.mock_emr = self.start(patch('boto.emr.connection.EmrConnection'))
         self.mock_client = self.start(patch('boto3.client'))
-
-        # runner needs to do stuff with S3 on initialization
-        self.mock_s3 = self.start(patch('boto.connect_s3',
-                                        wraps=boto.connect_s3))
+        self.mock_resource = self.start(patch('boto3.resource'))
 
     def assert_conns_use_security_token(self, runner, security_token):
         runner.make_emr_conn()
@@ -4005,21 +4004,31 @@ class SecurityTokenTestCase(MockBotoTestCase):
         self.assertIn('security_token', emr_kwargs)
         self.assertEqual(emr_kwargs['security_token'], security_token)
 
+        self.mock_client.reset_mock()
         runner.make_iam_client()
 
-        # TODO: once we use boto3.client() for other services, we'll need
-        # to separate out IAM calls
         self.assertTrue(self.mock_client.called)
-        iam_kwargs = self.mock_client.call_args[1]
+        iam_args, iam_kwargs = self.mock_client.call_args
+        self.assertEqual(iam_args, ('iam',))
         self.assertIn('aws_session_token', iam_kwargs)
         self.assertEqual(iam_kwargs['aws_session_token'], security_token)
 
-        runner.fs.make_s3_conn()
+        self.mock_client.reset_mock()
+        runner.fs.make_s3_client()
 
-        self.assertTrue(self.mock_s3.called)
-        s3_kwargs = self.mock_s3.call_args[1]
-        self.assertIn('security_token', s3_kwargs)
-        self.assertEqual(s3_kwargs['security_token'], security_token)
+        self.assertTrue(self.mock_client.called)
+        s3_client_args, s3_client_kwargs = self.mock_client.call_args
+        self.assertEqual(s3_client_args, ('s3',))
+        self.assertIn('aws_session_token', s3_client_kwargs)
+        self.assertEqual(s3_client_kwargs['aws_session_token'], security_token)
+
+        runner.fs.make_s3_resource()
+        self.assertTrue(self.mock_client.called)
+        s3_resource_args, s3_resource_kwargs = self.mock_client.call_args
+        self.assertEqual(s3_resource_args, ('s3',))
+        self.assertIn('aws_session_token', s3_resource_kwargs)
+        self.assertEqual(s3_resource_kwargs['aws_session_token'],
+                         security_token)
 
     def test_connections_without_security_token(self):
         runner = EMRJobRunner()
@@ -4338,13 +4347,14 @@ class IAMEndpointTestCase(MockBotoTestCase):
         runner = EMRJobRunner()
 
         iam_client = runner.make_iam_client()
-        self.assertEqual(iam_client.endpoint_url, 'https://iam.amazonaws.com')
+        self.assertEqual(iam_client.meta.endpoint_url,
+                         'https://iam.amazonaws.com')
 
     def test_explicit_iam_endpoint(self):
         runner = EMRJobRunner(iam_endpoint='https://iam.us-gov.amazonaws.com')
 
         iam_client = runner.make_iam_client()
-        self.assertEqual(iam_client.endpoint_url,
+        self.assertEqual(iam_client.meta.endpoint_url,
                          'https://iam.us-gov.amazonaws.com')
 
     def test_iam_endpoint_option(self):
@@ -4354,7 +4364,7 @@ class IAMEndpointTestCase(MockBotoTestCase):
 
         with mr_job.make_runner() as runner:
             iam_client = runner.make_iam_client()
-            self.assertEqual(iam_client.endpoint_url,
+            self.assertEqual(iam_client.meta.endpoint_url,
                              'https://iam.us-gov.amazonaws.com')
 
 
@@ -5393,8 +5403,6 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
         self.start(patch.object(
             runner, '_check_for_missing_default_iam_roles'))
         self.start(patch.object(
-            runner, '_check_for_key_pair_from_wrong_region'))
-        self.start(patch.object(
             runner, '_check_for_failed_bootstrap_action',
             side_effect=self.StopTest))
 
@@ -5402,7 +5410,6 @@ class WaitForStepsToCompleteTestCase(MockBotoTestCase):
                           runner._wait_for_steps_to_complete)
 
         self.assertTrue(runner._check_for_missing_default_iam_roles.called)
-        self.assertTrue(runner._check_for_key_pair_from_wrong_region.called)
         self.assertTrue(runner._check_for_failed_bootstrap_action.called)
 
 

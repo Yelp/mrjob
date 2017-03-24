@@ -20,6 +20,8 @@ try:
 except ImportError:
     boto = None
 
+from botocore.exceptions import ClientError
+
 from mrjob.fs.s3 import S3Filesystem
 
 from tests.compress import gzip_compress
@@ -148,54 +150,149 @@ class S3FSTestCase(MockBotoTestCase):
         self.assertEqual(self.fs.exists('s3://walrus/data/foo'), False)
         self.assertEqual(self.fs.exists('s3://walrus/data/bar/baz'), False)
 
+    def test_md5sum(self):
+        self.add_mock_s3_data({
+            'walrus': {'data/foo': b'abcd'}})
+
+        self.assertEqual(self.fs.md5sum('s3://walrus/data/foo'),
+                         'e2fc714c4727ee9395f324cd2e7f331f')
+
+    def test_touchz(self):
+        self.add_mock_s3_data({'walrus': {}})
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
+
+        self.fs.touchz('s3://walrus/empty')
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')),
+                         ['s3://walrus/empty'])
+
+    def test_okay_to_touchz_empty_file(self):
+        self.add_mock_s3_data({'walrus': {'empty': b''}})
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')),
+                         ['s3://walrus/empty'])
+
+        self.fs.touchz('s3://walrus/empty')
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')),
+                         ['s3://walrus/empty'])
+
+    def test_cant_touchz_file_with_contents(self):
+        self.add_mock_s3_data({'walrus': {'full': b'contents'}})
+
+        self.assertRaises(OSError,
+                          self.fs.touchz, 's3://walrus/full')
+
+    def test_mkdir_does_nothing(self):
+        self.add_mock_s3_data({'walrus': {}})
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
+
+        self.fs.mkdir('s3://walrus/data')
+
+        self.assertEqual(list(self.fs.ls('s3://walrus/')), [])
+
+    # S3-specific utilities
+
+    def test_get_all_bucket_names(self):
+        self.add_mock_s3_data({'walrus': {}, 'kitteh': {}})
+
+        self.assertEqual(list(self.fs.get_all_bucket_names()),
+                         ['kitteh', 'walrus'])
+
 
 class S3FSRegionTestCase(MockBotoTestCase):
 
     def test_default_endpoint(self):
         fs = S3Filesystem()
 
-        s3_conn = fs.make_s3_conn()
-        self.assertEqual(s3_conn.host, 's3.amazonaws.com')
+        client = fs.make_s3_client()
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
 
-    def test_force_s3_endpoint(self):
-        fs = S3Filesystem(s3_endpoint='s3-us-west-1.amazonaws.com')
+        resource = fs.make_s3_resource()
+        self.assertEqual(resource.meta.client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
 
-        s3_conn = fs.make_s3_conn()
-        self.assertEqual(s3_conn.host, 's3-us-west-1.amazonaws.com')
+    def test_force_s3_endpoint_host(self):
+        fs = S3Filesystem(s3_endpoint='myproxy')
 
-    def test_endpoint_for_bucket_in_us_west_2(self):
-        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
+        client = fs.make_s3_client()
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://myproxy')
+
+        resource = fs.make_s3_resource()
+        self.assertEqual(resource.meta.client.meta.endpoint_url,
+                         'https://myproxy')
+
+    def test_force_s3_endpoint_url(self):
+        fs = S3Filesystem(s3_endpoint='https://myproxy:8080')
+
+        client = fs.make_s3_client()
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://myproxy:8080')
+
+        resource = fs.make_s3_resource()
+        self.assertEqual(resource.meta.client.meta.endpoint_url,
+                         'https://myproxy:8080')
+
+    def test_force_s3_endpoint_region(self):
+        # this is the actual mrjob default region
+        fs = S3Filesystem(s3_region='us-west-2')
+
+        client = fs.make_s3_client()
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(client.meta.region_name,
+                         'us-west-2')
+
+        resource = fs.make_s3_resource()
+        self.assertEqual(resource.meta.client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(resource.meta.client.meta.region_name,
+                         'us-west-2')
+
+    def test_endpoint_for_bucket_in_us_west_1(self):
+        self.add_mock_s3_data({'walrus': {}}, location='us-west-1')
 
         fs = S3Filesystem()
 
         bucket = fs.get_bucket('walrus')
-        self.assertEqual(bucket.connection.host,
-                         's3-us-west-2.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-1')
 
     def test_get_location_is_forbidden(self):
         self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
 
         fs = S3Filesystem()
 
+        access_denied_error = ClientError(
+            dict(
+                Error=dict(
+                    Code='AccessDenied',
+                    Message='Access Denied',
+                ),
+                ResponseMetadata=dict(
+                    HTTPStatusCode=403
+                ),
+            ),
+            'GetBucketLocation')
+
         with patch(
-                'tests.mockboto.MockBucket.get_location',
-                side_effect=boto.exception.S3ResponseError(403, 'Forbidden')):
+                'tests.mockboto.MockS3Client.get_bucket_location',
+                side_effect=access_denied_error):
 
             bucket = fs.get_bucket('walrus')
 
-        self.assertEqual(bucket.connection.host, 's3.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name, 'us-east-1')
 
-    def test_get_location_other_error(self):
-        self.add_mock_s3_data({'walrus': {}}, location='us-west-2')
-
+    def test_bucket_does_not_exist(self):
         fs = S3Filesystem()
 
-        with patch(
-                'tests.mockboto.MockBucket.get_location',
-                side_effect=boto.exception.S3ResponseError(404, 'Not Found')):
-
-            self.assertRaises(boto.exception.S3ResponseError,
-                              fs.get_bucket, 'walrus')
+        self.assertRaises(ClientError, fs.get_bucket, 'walrus')
 
     def test_endpoint_for_bucket_in_us_east_1(self):
         # location constraint for us-east-1 is '', not 'us-east-1'
@@ -204,22 +301,72 @@ class S3FSRegionTestCase(MockBotoTestCase):
         fs = S3Filesystem()
 
         bucket = fs.get_bucket('walrus')
-        self.assertEqual(bucket.connection.host, 's3.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
 
     def test_buckets_from_forced_s3_endpoint(self):
         self.add_mock_s3_data({'walrus-east': {}}, location='us-east-2')
-        self.add_mock_s3_data({'walrus-west': {}}, location='us-west-2')
 
-        fs = S3Filesystem(s3_endpoint='s3-us-east-2.amazonaws.com')
+        fs = S3Filesystem(s3_endpoint='s3-us-west-2.amazonaws.com')
 
         bucket_east = fs.get_bucket('walrus-east')
 
-        with patch('tests.mockboto.MockBucket.get_location') as mock_get_loc:
-            self.assertEqual(bucket_east.connection.host,
-                             's3-us-east-2.amazonaws.com')
+        with patch(
+                'tests.mockboto.MockS3Client.get_bucket_location') as mock_gbl:
+            # won't actually be able to access this bucket from this endpoint,
+            # but boto3 doesn't check that on bucket creation
+            self.assertEqual(bucket_east.meta.client.meta.endpoint_url,
+                             'https://s3-us-west-2.amazonaws.com')
             # no reason to check bucket location if endpoint is forced
-            self.assertFalse(mock_get_loc.called)
+            self.assertFalse(mock_gbl.called)
 
-        # can't access this bucket from wrong endpoint!
-        self.assertRaises(boto.exception.S3ResponseError,
-                          fs.get_bucket, 'walrus-west')
+    def test_create_bucket_with_no_region(self):
+        fs = S3Filesystem()
+
+        fs.create_bucket('walrus')
+
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            None)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-east-1')
+
+    def test_create_bucket_in_us_east_1(self):
+        fs = S3Filesystem()
+
+        fs.create_bucket('walrus', region='us-east-1')
+
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            None)
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-east-1')
+
+    def test_create_bucket_in_us_west_2(self):
+        fs = S3Filesystem()
+
+        fs.create_bucket('walrus', region='us-west-2')
+
+        s3_client = fs.make_s3_client()
+        self.assertEqual(
+            s3_client.get_bucket_location('walrus')['LocationConstraint'],
+            'us-west-2')
+
+        bucket = fs.get_bucket('walrus')
+
+        self.assertEqual(bucket.meta.client.meta.endpoint_url,
+                         'https://s3-us-west-2.amazonaws.com')
+        self.assertEqual(bucket.meta.client.meta.region_name,
+                         'us-west-2')

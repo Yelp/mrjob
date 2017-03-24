@@ -18,6 +18,8 @@ from datetime import timedelta
 import tempfile
 import shutil
 
+from dateutil.tz import tzutc
+
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.s3_tmpwatch import _s3_cleanup
 from tests.mockboto import MockBotoTestCase
@@ -52,12 +54,12 @@ class S3TmpWatchTestCase(MockBotoTestCase):
         self.add_mock_s3_data(
             {'walrus': {'data/bar': b'bar\n',
                         'other/baz': b'baz\n'}},
-            time_modified=(datetime.utcnow() - timedelta(days=45)))
+            age=timedelta(days=45))
 
         # qux is a little more than two days old
         self.add_mock_s3_data(
             {'walrus': {'data/qux': b'qux\n'}},
-            time_modified=(datetime.utcnow() - timedelta(hours=50)))
+            age=timedelta(hours=50))
 
         self.assertEqual(
             sorted(runner.fs.ls('s3://walrus/')),

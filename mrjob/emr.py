@@ -1287,10 +1287,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # If we don't have a cluster, then we can't terminate it.
             return
 
-        emr_conn = self.make_emr_conn()
+        emr_client = self.make_emr_client()
         try:
             log.info("Attempting to terminate cluster")
-            emr_conn.terminate_jobflow(self._cluster_id)
+            emr_client.terminate_job_flows(
+                JobFlowIds=[self._cluster_id]
+            )
         except Exception as e:
             # Something happened with boto and the user should know.
             log.exception(e)

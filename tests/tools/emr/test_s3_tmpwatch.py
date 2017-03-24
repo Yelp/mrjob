@@ -18,17 +18,8 @@ from datetime import timedelta
 import tempfile
 import shutil
 
-try:
-    import boto
-    import boto.utils
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    boto = None
-
 from mrjob.emr import EMRJobRunner
-from mrjob.parse import parse_s3_uri
 from mrjob.tools.emr.s3_tmpwatch import _s3_cleanup
-from tests.mockboto import MockKey
 from tests.mockboto import MockBotoTestCase
 
 
@@ -51,54 +42,58 @@ class S3TmpWatchTestCase(MockBotoTestCase):
     def test_cleanup(self):
         runner = EMRJobRunner(conf_paths=[], cloud_fs_sync_secs=0.01)
 
-        # add some mock data and change last_modified
-        remote_input_path = 's3://walrus/data/'
-        self.add_mock_s3_data({'walrus': {'data/foo': b'foo\n',
-                                          'data/bar': b'bar\n',
-                                          'data/qux': b'qux\n'}})
+        # add some mock data
 
-        s3_conn = runner.fs.make_s3_conn()
-        bucket_name, key_name = parse_s3_uri(remote_input_path)
-        bucket = s3_conn.get_bucket(bucket_name)
+        # foo is current
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo': b'foo\n'}})
 
-        key_foo = bucket.get_key('data/foo')
-        key_bar = bucket.get_key('data/bar')
-        key_qux = bucket.get_key('data/qux')
-        key_bar.last_modified = datetime.now() - timedelta(days=45)
-        key_qux.last_modified = datetime.now() - timedelta(hours=50)
+        # bar and baz are very old (but baz isn't in data/)
+        self.add_mock_s3_data(
+            {'walrus': {'data/bar': b'bar\n',
+                        'other/baz': b'baz\n'}},
+            time_modified=(datetime.utcnow() - timedelta(days=45)))
 
-        # make sure keys are there
-        assert isinstance(key_foo, MockKey)
-        assert isinstance(key_bar, MockKey)
-        assert isinstance(key_qux, MockKey)
+        # qux is a little more than two days old
+        self.add_mock_s3_data(
+            {'walrus': {'data/qux': b'qux\n'}},
+            time_modified=(datetime.utcnow() - timedelta(hours=50)))
 
-        _s3_cleanup(remote_input_path, timedelta(days=30), dry_run=True,
+        self.assertEqual(
+            sorted(runner.fs.ls('s3://walrus/')),
+            ['s3://walrus/data/bar', 's3://walrus/data/foo',
+             's3://walrus/data/qux', 's3://walrus/other/baz'],
+        )
+
+        # try a dry run, which shouldn't delete anything
+        _s3_cleanup('s3://walrus/data/', timedelta(days=30), dry_run=True,
                     conf_paths=[])
 
-        # dry-run shouldn't delete anything
-        assert isinstance(key_foo, MockKey)
-        assert isinstance(key_bar, MockKey)
-        assert isinstance(key_qux, MockKey)
+        self.assertEqual(
+            sorted(runner.fs.ls('s3://walrus/')), [
+                's3://walrus/data/bar',
+                's3://walrus/data/foo',
+                's3://walrus/data/qux',
+                's3://walrus/other/baz',
+            ],
+        )
+        # now do it for real. should hit bar (baz isn't in data/)
+        _s3_cleanup('s3://walrus/data', timedelta(days=30), conf_paths=[])
 
-        _s3_cleanup(remote_input_path, timedelta(days=30), conf_paths=[])
+        self.assertEqual(
+            sorted(runner.fs.ls('s3://walrus/')), [
+                's3://walrus/data/foo',
+                's3://walrus/data/qux',
+                's3://walrus/other/baz',
+            ],
+        )
 
-        key_foo = bucket.get_key('data/foo')
-        key_bar = bucket.get_key('data/bar')
-        key_qux = bucket.get_key('data/qux')
+        # now try to delete qux too
+        _s3_cleanup('s3://walrus/data', timedelta(hours=48), conf_paths=[])
 
-        # make sure key_bar is deleted
-        assert isinstance(key_foo, MockKey)
-        self.assertEqual(key_bar, None)
-        assert isinstance(key_qux, MockKey)
-
-        _s3_cleanup(remote_input_path, timedelta(hours=48), conf_paths=[])
-
-        key_foo = bucket.get_key('data/foo')
-        key_bar = bucket.get_key('data/bar')
-        key_qux = bucket.get_key('data/qux')
-
-        # make sure key_qux is deleted
-        assert isinstance(key_foo, MockKey)
-        self.assertEqual(key_bar, None)
-        # Failing as of d0c07eb:
-        # self.assertEqual(key_qux, None)
+        self.assertEqual(
+            sorted(runner.fs.ls('s3://walrus/')), [
+                's3://walrus/data/foo',
+                's3://walrus/other/baz',
+            ],
+        )

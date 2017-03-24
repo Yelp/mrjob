@@ -50,12 +50,10 @@ import logging
 from optparse import OptionParser
 
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import iso8601_to_datetime
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
-from mrjob.parse import parse_s3_uri
 
 
 log = logging.getLogger(__name__)
@@ -90,18 +88,13 @@ def _s3_cleanup(glob_path, time_old, dry_run=False, **runner_kwargs):
     log.info('Deleting all files in %s that are older than %s' %
              (glob_path, time_old))
 
-    for path in runner.fs.ls(glob_path):
-        bucket_name, key_name = parse_s3_uri(path)
-        bucket = runner.fs.get_bucket(bucket_name)
-
-        for key in bucket.list(key_name):
-            last_modified = iso8601_to_datetime(key.last_modified)
-            age = datetime.utcnow() - last_modified
-            if age > time_old:
-                # Delete it
-                log.info('Deleting %s; is %s old' % (key.name, age))
-                if not dry_run:
-                    key.delete()
+    for path, key in runner.fs._ls(glob_path):
+        age = datetime.utcnow() - key.last_modified
+        if age > time_old:
+            # Delete it
+            log.info('Deleting %s; is %s old' % (path, age))
+            if not dry_run:
+                key.delete()
 
 
 def _runner_kwargs(options):

@@ -29,6 +29,7 @@ import boto3
 import botocore.config
 from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
+from dateutil.tz import tzutc
 
 try:
     import boto.emr.connection
@@ -346,7 +347,7 @@ def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
     :param location string: the bucket's location cosntraint (a region name)
     """
     if time_modified is None:
-        time_modified = datetime.utcnow()
+        time_modified = datetime.now(tzutc())
     for bucket_name, key_name_to_bytes in data.items():
         bucket = mock_s3_fs.setdefault(bucket_name,
                                        {'keys': {}, 'location': ''})
@@ -572,7 +573,7 @@ class MockS3Object(object):
         if not isinstance(data, bytes):
             raise TypeError('Body or Body.read() must be bytes')
 
-        mock_keys[self.key] = (data, datetime.utcnow())
+        mock_keys[self.key] = (data, datetime.now(tzutc()))
 
     def upload_file(self, path, Config=None):
         if self.bucket_name not in self.meta.client.mock_s3_fs:
@@ -584,7 +585,7 @@ class MockS3Object(object):
 
         mock_keys = self._mock_bucket_keys('PutObject')
         with open(path, 'rb') as f:
-            mock_keys[self.key] = (f.read(), datetime.utcnow())
+            mock_keys[self.key] = (f.read(), datetime.now(tzutc()))
 
     def __getattr__(self, key):
         if key in ('e_tag', 'last_modified', 'size'):
@@ -1616,7 +1617,7 @@ class MockIAMClient(object):
         role = dict(
             Arn=('arn:aws:iam::012345678901:role/%s' % RoleName),
             AssumeRolePolicyDocument=json.loads(AssumeRolePolicyDocument),
-            CreateDate=datetime.utcnow(),
+            CreateDate=datetime.now(tzutc()),
             Path='/',
             RoleId='AROAMOCKMOCKMOCKMOCK',
             RoleName=RoleName,
@@ -1682,7 +1683,7 @@ class MockIAMClient(object):
         profile = dict(
             Arn=('arn:aws:iam::012345678901:instance-profile/%s' %
                  InstanceProfileName),
-            CreateDate=datetime.utcnow(),
+            CreateDate=datetime.now(tzutc()),
             InstanceProfileId='AIPAMOCKMOCKMOCKMOCK',
             InstanceProfileName=InstanceProfileName,
             Path='/',

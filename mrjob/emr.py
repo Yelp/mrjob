@@ -397,7 +397,9 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
         if mins_to_expiration is None:
             return False
         else:
-            age = datetime.utcnow() - key_data['LastModified']
+            # dateutil is a boto3 dependency
+            from dateutil.tz import tzutc
+            age = datetime.now(tzutc()) - key_data['LastModified']
             if age <= timedelta(minutes=mins_to_expiration):
                 return False
 

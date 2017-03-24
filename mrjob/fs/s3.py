@@ -51,11 +51,6 @@ _EMR_BACKOFF_MULTIPLIER = 1.5
 _EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
 
-def s3_key_to_uri(s3_key):
-    """Convert a boto Key object into an ``s3://`` URI"""
-    return 's3://%s/%s' % (s3_key.bucket.name, s3_key.name)
-
-
 def _client_error_code(ex):
     """Get the error code for the given ClientError"""
     return ex.response.get('Error', {}).get('Code', '')
@@ -266,13 +261,16 @@ class S3Filesystem(Filesystem):
     # correct region
 
     def make_s3_resource(self, region_name=None):
-        """Create a :py:mod:`boto3` S3 resource.
+        """Create a :py:mod:`boto3` S3 resource, with its client
+        wrapped in a :py:class:`mrjob.retry.RetryWrapper`
 
-        :param region: region to use to choose S3 endpoint.
+        :param region: region to use to choose S3 endpoint
 
         It's best to use :py:meth:`get_bucket` because it chooses the
         appropriate S3 endpoint automatically. If you are trying to get
         bucket metadata, use :py:meth:`make_s3_client`.
+
+        .. versionadded:: 0.6.0
         """
         # give a non-cryptic error message if boto isn't installed
         if boto3 is None:
@@ -289,9 +287,12 @@ class S3Filesystem(Filesystem):
         return s3_resource
 
     def make_s3_client(self, region_name=None):
-        """Create a :py:mod:`boto3` S3 client.
+        """Create a :py:mod:`boto3` S3 client,
+        wrapped in a :py:class:`mrjob.retry.RetryWrapper`
 
         :param region: region to use to choose S3 endpoint.
+
+        .. versionadded:: 0.6.0
         """
         # give a non-cryptic error message if boto isn't installed
         if boto3 is None:
@@ -345,7 +346,10 @@ class S3Filesystem(Filesystem):
 
     def get_all_bucket_names(self):
         """Get a stream of the names of all buckets owned by this user
-        on S3."""
+        on S3.
+
+        .. versionadded:: 0.6.0
+        """
         # we don't actually want to return these Bucket objects to
         # the user because their client might connect to the wrong region
         # endpoint
@@ -355,7 +359,12 @@ class S3Filesystem(Filesystem):
 
     def create_bucket(self, bucket_name, region=None):
         """Create a bucket on S3 with a location constraint
-        matching the given region."""
+        matching the given region.
+
+        .. versionchanged:: 0.6.0
+
+           The *region* argument used to be called *location*.
+        """
         client = self.make_s3_client()
 
         conf = {}

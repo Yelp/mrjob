@@ -1,6 +1,7 @@
 v0.6.0, 2017-04-?? -- ???
  * use boto3 instead of boto
    * removed make_*_conn() from EMRJobRunner (use make_*_client())
+   * removed s3_key_to_uri() functions
    * changes to S3FileSystem:
      * removed make_s3_conn() (use make_s3_client() or make_s3_resource())
      * removed get_all_buckets() (use get_all_bucket_names())

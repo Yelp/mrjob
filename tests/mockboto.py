@@ -555,7 +555,7 @@ class MockS3Object(object):
         self.size = len(key_data)
 
         return dict(
-            Body=BytesIO(key_data),
+            Body=MockStreamingBody(key_data),
             ContentLength=self.size,
             ETag=self.e_tag,
             LastModified=self.last_modified,
@@ -619,6 +619,28 @@ class MockS3Object(object):
             raise _no_such_key_error(self.key, 'GetObject')
 
         return mock_keys[self.key]
+
+
+class MockStreamingBody(object):
+    """Mock of boto3's not-really-a-fileobj for reading from S3"""
+
+    def __init__(self, data):
+        if not isinstance(data, bytes):
+            raise TypeError
+
+        self._data = data
+        self._offset = 0
+
+    def read(self, amt=None):
+        start = self._offset
+
+        if amt is None:
+            end = len(self._data)
+        else:
+            end = start + amt
+
+        self._offset = end
+        return self._data[start:end]
 
 
 ### EMR ###

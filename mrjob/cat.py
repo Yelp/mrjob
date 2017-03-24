@@ -82,7 +82,7 @@ def gunzip_stream(fileobj, bufsize=1024):
             yield data
 
 
-def decompress(fileobj, path):
+def decompress(fileobj, path, bufsize=1024):
     """Take a *fileobj* correponding to the given path and returns an iterator
     that yield chunks of bytes, or, if *path* doesn't correspond to a
     compressed file type, *fileobj* itself.
@@ -95,8 +95,21 @@ def decompress(fileobj, path):
                             ' (likely not installed).')
         else:
             return bunzip2_stream(fileobj)
-    else:
+    elif hasattr(fileobj, '__iter__'):
         return fileobj
+    else:
+        # not a real fileobj (e.g. boto3 StreamingBody)
+        return _yield_chunks(fileobj, bufsize=bufsize)
+
+
+# TODO: name this to_chunks()
+def _yield_chunks(readable, bufsize=1024):
+    while True:
+        chunk = readable.read(bufsize)
+        if chunk:
+            yield chunk
+        else:
+            return
 
 
 def _main():

@@ -23,6 +23,7 @@ import shutil
 import tempfile
 import time
 from datetime import datetime
+from datetime import timedelta
 from io import BytesIO
 
 import boto3
@@ -202,10 +203,10 @@ class MockBotoTestCase(SandboxedTestCase):
 
         self.start(patch.object(time, 'sleep'))
 
-    def add_mock_s3_data(self, data, time_modified=None, location=None):
+    def add_mock_s3_data(self, data, age=None, location=None):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
-        add_mock_s3_data(self.mock_s3_fs, data, time_modified, location)
+        add_mock_s3_data(self.mock_s3_fs, data, age, location)
 
     def add_mock_emr_cluster(self, cluster):
         if cluster.id in self.mock_emr_clusters:
@@ -340,14 +341,15 @@ class MockBotoTestCase(SandboxedTestCase):
 
 ### S3 ###
 
-def add_mock_s3_data(mock_s3_fs, data, time_modified=None, location=None):
+def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
     """Update mock_s3_fs with a map from bucket name to key name to data.
 
-    :param last_modified: a UTC :py:class:`~datetime.datetime`
+    :param age: a timedelta
     :param location string: the bucket's location cosntraint (a region name)
     """
-    if time_modified is None:
-        time_modified = datetime.now(tzutc())
+    age = age or timedelta(0)
+    time_modified = datetime.now(tzutc()) - age
+
     for bucket_name, key_name_to_bytes in data.items():
         bucket = mock_s3_fs.setdefault(bucket_name,
                                        {'keys': {}, 'location': ''})

@@ -185,7 +185,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             'my_bucket': {
                 'locks/j-IDLE_AND_LOCKED/2': b'not_you',
             },
-        }, time_modified=self.now)
+        })
 
         # idle cluster with an expired lock
         self.add_mock_emr_cluster(MockEmrObject(
@@ -203,7 +203,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             'my_bucket': {
                 'locks/j-IDLE_AND_EXPIRED/2': b'not_you',
             },
-        }, time_modified=(self.now - timedelta(minutes=5)))
+        }, age=timedelta(minutes=5))
 
         # idle cluster with an expired lock
         self.add_mock_emr_cluster(MockEmrObject(

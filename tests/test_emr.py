@@ -3996,10 +3996,6 @@ class SecurityTokenTestCase(MockBotoTestCase):
         self.mock_client = self.start(patch('boto3.client'))
         self.mock_resource = self.start(patch('boto3.resource'))
 
-        # runner needs to do stuff with S3 on initialization
-        self.mock_s3 = self.start(patch('boto.connect_s3',
-                                        wraps=boto.connect_s3))
-
     def assert_conns_use_security_token(self, runner, security_token):
         runner.make_emr_conn()
 

@@ -1460,13 +1460,24 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('Cluster created with ID: %s' % cluster_id)
 
         # set EMR tags for the cluster, if any
-        tags = self._opts['tags']
-        if tags:
-            log.info('Setting EMR tags: %s' % ', '.join(
-                '%s=%s' % (tag, value or '') for tag, value in tags.items()))
-            emr_conn.add_tags(cluster_id, tags)
+        self._add_tags(self._opts['tags'], cluster_id)
 
         return cluster_id
+
+    def _add_tags(self, tags, cluster_id):
+        """Add tags in the dict *tags* to cluster *cluster_id*. Do nothing
+        if *tags* is empty or ``None``"""
+        if not tags:
+            return
+
+        tags_items = sorted(tags.items())
+        log.info('Add EMR tags to cluster %s: %s' % (
+            cluster_id,
+            ', '.join('%s=%s' % (tag, value) for tag, value in tags_items)))
+
+        self.make_emr_client().add_tags(
+            ResourceId=cluster_id,
+            Tags=[dict(Key=k, Value=v) for k, v in tags_items])
 
     # TODO: could break this into sub-methods for clarity
     def _cluster_args(self, persistent=False, steps=None):
@@ -1814,14 +1825,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._emr_job_start = time.time()
 
         # set EMR tags for the job, if any
-        tags = self._opts['tags']
-        if tags:
-            log.info('Setting EMR tags: %s' %
-                     ', '.join('%s=%s' % (tag, value)
-                               for tag, value in tags.items()))
-            emr_client.add_tags(
-                ResourceId=self._cluster_id,
-                Tags=[dict(Key=k, Value=v) for k, v in tags.items()])
+        self._add_tags(self._opts['tags'], self._cluster_id)
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):

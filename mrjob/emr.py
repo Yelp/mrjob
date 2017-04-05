@@ -3416,38 +3416,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return None
 
 
-def _encode_emr_api_params(x):
-    """Recursively unpack parameters to the EMR API."""
-    # recursively unpack values, and flatten into main dict
-    if isinstance(x, dict):
-        result = {}
-
-        for key, value in x.items():
-            # special case for Properties dicts, which have to be
-            # represented as KeyValue objects
-            if key == 'Properties' and isinstance(value, dict):
-                value = [{'Key': k, 'Value': v}
-                         for k, v in sorted(value.items())]
-
-            unpacked_value = _encode_emr_api_params(value)
-            if isinstance(unpacked_value, dict):
-                for subkey, subvalue in unpacked_value.items():
-                    result['%s.%s' % (key, subkey)] = subvalue
-            else:
-                result[key] = unpacked_value
-
-        return result
-
-    # treat lists like dicts mapping "member.N" (1-indexed) to value
-    if isinstance(x, (list, tuple)):
-        return _encode_emr_api_params(dict(
-            ('member.%d' % (i + 1), item)
-            for i, item in enumerate(x)))
-
-    # base case, not a dict or list
-    return x
-
-
 def _fix_configuration_opt(c):
     """Return copy of *c* with *Properties* is always set
     (defaults to {}) and with *Configurations* is not set if empty.

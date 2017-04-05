@@ -1,4 +1,5 @@
 v0.6.0, 2017-04-?? -- ???
+ * enable_emr_debugging works with 4.x AMIs and later
  * use boto3 instead of boto
    * removed make_*_conn() from EMRJobRunner (use make_*_client())
    * removed s3_key_to_uri() functions

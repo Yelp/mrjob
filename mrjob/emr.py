@@ -1431,7 +1431,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             name=role,  # just name the groups "core", "master", and "task"
             bidprice=bid_price)
 
-    def _create_cluster(self, persistent=False, steps=None):
+    def _create_cluster(self, persistent=False):
         """Create an empty cluster on EMR, and return the ID of that
         job.
 
@@ -1445,14 +1445,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._wait_for_s3_eventual_consistency()
 
         log.debug('Creating Elastic MapReduce cluster')
-        args = self._cluster_args(persistent, steps)
+        emr_client = self.make_emr_client()
 
-        emr_conn = self.make_emr_conn()
-        log.debug('Calling run_jobflow(%r, %r, %s)' % (
-            self._job_key, self._opts['cloud_log_dir'],
-            ', '.join('%s=%r' % (k, v) for k, v in args.items())))
-        cluster_id = emr_conn.run_jobflow(
-            self._job_key, self._opts['cloud_log_dir'], **args)
+        kwargs = self._cluster_kwargs(persistent)
+        log.debug('Calling run_job_flow(%s)' % (
+            ', '.join('%s=%r' % (k, v)
+                      for k, v in sorted(kwargs.items()))))
+        cluster_id = emr_client.run_job_flow(**kwargs)['JobFlowId']
 
          # keep track of when we started our job
         self._emr_job_start = time.time()
@@ -1480,49 +1479,58 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             Tags=[dict(Key=k, Value=v) for k, v in tags_items])
 
     # TODO: could break this into sub-methods for clarity
-    def _cluster_args(self, persistent=False, steps=None):
-        """Build kwargs for emr_conn.run_jobflow()"""
-        args = {}
-        api_params = {}
+    def _cluster_kwargs(self, persistent=False):
+        """Build kwargs for emr_client.run_job_flow()"""
+        kwargs = {}
+
+        kwargs['Name'] = self._job_key
+
+        kwargs['LogUri'] = self._opts['cloud_log_dir']
 
         if self._opts['release_label']:
-            api_params['ReleaseLabel'] = self._opts['release_label']
+            kwargs['ReleaseLabel'] = self._opts['release_label']
         else:
-            args['ami_version'] = self._opts['image_version']
+            kwargs['AmiVersion'] = self._opts['image_version']
+
+        # capitalizing Instances because it's just an API parameter
+        kwargs['Instances'] = Instances = {}
 
         if self._opts['zone']:
-            args['availability_zone'] = self._opts['zone']
+            Instances['Placement'] = dict(AvailabilityZone=self._opts['zone'])
+
         # The old, simple API, available if we're not using task instances
         # or bid prices
         if not (self._num_instances('task') or
                 any(self._instance_bid_price(role)
                     for role in _INSTANCE_ROLES)):
-            args['num_instances'] = self._num_instances('core') + 1
-            args['master_instance_type'] = self._instance_type('master')
-            args['slave_instance_type'] = self._instance_type('core')
+            Instances['InstanceCount'] = self._num_instances('core') + 1
+            Instances['MasterInstanceType'] = self._instance_type('master')
+            Instances['SlaveInstanceType'] = self._instance_type('core')
         else:
-            # Create a list of InstanceGroups
-            args['instance_groups'] = []
+            Instances['InstanceGroups'] = []
 
+            # Create a list of InstanceGroups
             for role in _INSTANCE_ROLES:
                 num_instances = self._num_instances(role)
 
                 if num_instances:
-                    args['instance_groups'].append(
-                        self._create_instance_group(
+                    Instances['InstanceGroups'].append(
+                        _build_instance_group(
                             role=role,
                             instance_type=self._instance_type(role),
                             num_instances=self._num_instances(role),
                             bid_price=self._instance_bid_price(role)))
 
         # bootstrap actions
-        bootstrap_action_args = []
+        kwargs['BootstrapActions'] = BootstrapActions = []
 
         for i, bootstrap_action in enumerate(self._bootstrap_actions()):
             uri = self._upload_mgr.uri(bootstrap_action['path'])
-            bootstrap_action_args.append(
-                boto.emr.BootstrapAction(
-                    'action %d' % i, uri, bootstrap_action['args']))
+            BootstrapActions.append(dict(
+                Name=('action %d' % i),
+                ScriptBootstrapAction=dict(
+                    Path=uri,
+                    Args=bootstrap_action['args'])))
 
         if self._master_bootstrap_script_path:
             master_bootstrap_script_args = []
@@ -1531,67 +1539,64 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     'pool-' + self._pool_hash(),
                     self._opts['pool_name'],
                 ]
-            bootstrap_action_args.append(
-                boto.emr.BootstrapAction(
-                    'master',
-                    self._upload_mgr.uri(self._master_bootstrap_script_path),
-                    master_bootstrap_script_args))
+            uri = self._upload_mgr.uri(self._master_bootstrap_script_path)
+
+            BootstrapActions.append(dict(
+                Name='master',
+                ScriptBootstrapAction=dict(
+                    Path=uri,
+                    Args=master_bootstrap_script_args)))
 
         if persistent or self._opts['pool_clusters']:
-            args['keep_alive'] = True
+            Instances['KeepJobFlowAliveWhenNoSteps'] = True
 
             # only use idle termination script on persistent clusters
             # add it last, so that we don't count bootstrapping as idle time
             if self._opts['max_hours_idle']:
-                s3_uri = self._upload_mgr.uri(
+                uri = self._upload_mgr.uri(
                     _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
                 # script takes args in (integer) seconds
-                ba_args = [int(self._opts['max_hours_idle'] * 3600),
-                           int(self._opts['mins_to_end_of_hour'] * 60)]
-                bootstrap_action_args.append(
-                    boto.emr.BootstrapAction('idle timeout', s3_uri, ba_args))
-
-        if bootstrap_action_args:
-            args['bootstrap_actions'] = bootstrap_action_args
+                ba_args = [str(int(self._opts['max_hours_idle'] * 3600)),
+                           str(int(self._opts['mins_to_end_of_hour'] * 60))]
+                BootstrapActions.append(dict(
+                    Name='idle timeout',
+                    ScriptBootstrapAction=dict(
+                        Path=uri,
+                        Args=ba_args)))
 
         if self._opts['ec2_key_pair']:
-            args['ec2_keyname'] = self._opts['ec2_key_pair']
+            Instances['Ec2KeyName'] = self._opts['ec2_key_pair']
+
+        kwargs['Steps'] = Steps = []
 
         if self._opts['enable_emr_debugging']:
-            args['enable_debugging'] = True
+            # other steps are added separately
+            Steps.append(self._build_debugging_step())
 
         if self._opts['additional_emr_info']:
-            args['additional_info'] = self._opts['additional_emr_info']
+            kwargs['AdditionalInfo'] = self._opts['additional_emr_info']
 
-        # boto's connect_emr() has keyword args for these, but they override
-        # emr_api_params, which is not what we want.
-        api_params['VisibleToAllUsers'] = str(bool(
-            self._opts['visible_to_all_users'])).lower()
+        kwargs['VisibleToAllUsers'] = bool(
+            self._opts['visible_to_all_users'])
 
-        api_params['JobFlowRole'] = self._instance_profile()
-        api_params['ServiceRole'] = self._service_role()
+        kwargs['JobFlowRole'] = self._instance_profile()
+        kwargs['ServiceRole'] = self._service_role()
 
         applications = self._applications()
         if applications:
-            api_params['Applications'] = [
+            kwargs['Applications'] = [
                 dict(Name=a) for a in sorted(applications)]
 
         if self._opts['emr_configurations']:
-            # Properties will be automatically converted to KeyValue objects
-            api_params['Configurations'] = self._opts['emr_configurations']
+            kwargs['Configurations'] = self._opts['emr_configurations']
 
         if self._opts['subnet']:
-            api_params['Instances.Ec2SubnetId'] = self._opts['subnet']
+            Instances['Ec2SubnetId'] = self._opts['subnet']
 
         if self._opts['emr_api_params']:
-            api_params.update(self._opts['emr_api_params'])
+            kwargs.update(self._opts['emr_api_params'])
 
-        args['api_params'] = _encode_emr_api_params(api_params)
-
-        if steps:
-            args['steps'] = steps
-
-        return args
+        return kwargs
 
     def _instance_profile(self):
         try:
@@ -2752,6 +2757,26 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             's3://%s.elasticmapreduce/libs/script-runner/script-runner.jar' %
             self._opts['region'])
 
+    def _build_debugging_step(self):
+        if self._opts['release_label']:
+            jar = _4_X_COMMAND_RUNNER_JAR
+            args = ['state-pusher-script']
+        else:
+            jar = self._script_runner_jar_uri()
+            args = (
+                's3://%s.elasticmapreduce/libs/state-pusher/0.1/fetch' %
+                self._opts['region'])
+
+        return dict(
+            Name='Setup Hadoop Debugging',
+            HadoopJarStep=dict(Jar=jar, Args=args),
+        )
+
+    def _debug_script_uri(self):
+        return (
+            's3://%s.elasticmapreduce/libs/state-pusher/0.1/fetch' %
+            self._opts['region'])
+
     ### EMR JOB MANAGEMENT UTILS ###
 
     def make_persistent_cluster(self):
@@ -3500,3 +3525,40 @@ def _decode_configurations_from_api(configurations):
         results.append(result)
 
     return results
+
+
+def _build_instance_group(
+        self, role, instance_type, num_instances, bid_price):
+    """Helper method for creating instance groups. For use when
+    creating a cluster using a list of InstanceGroups
+
+        - Role is either 'master', 'core', or 'task'.
+        - instance_type is an EC2 instance type
+        - count is an int
+        - bid_price is a number, a string, or None. If None,
+          this instance group will be use the ON-DEMAND market
+          instead of the SPOT market.
+    """
+    if role not in _INSTANCE_ROLES:
+        raise ValueError
+
+    if not instance_type:
+        raise ValueError
+
+    if not num_instances:
+        raise ValueError
+
+    if bid_price:
+        market = 'SPOT'
+        bid_price = str(bid_price)  # must be a string
+    else:
+        market = 'ON_DEMAND'
+        bid_price = None
+
+    return dict(
+        InstanceCount=num_instances,
+        InstanceRole=role.upper(),
+        InstanceType=instance_type,
+        Market=market,
+        Name=role,  # just name the groups "core", "master", and "task"
+        BidPrice=bid_price)

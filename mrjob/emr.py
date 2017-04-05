@@ -2369,14 +2369,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         (This currently returns IP addresses rather than full hostnames
         because they're shorter.)
         """
-        return [
-            instance.privateipaddress for instance in
-            _yield_all_instances(
-                self.make_emr_conn(),
-                self._cluster_id,
-                instance_group_types=['CORE', 'TASK'])
-            if instance.status.state == 'RUNNING'
-        ]
+        emr_client = self.make_emr_client()
+
+        instance_pages = emr_client.get_paginator('list_instances').paginate(
+            ClusterId=self._cluster_id,
+            InstanceGroupTypes=['CORE', 'TASK'],
+            InstanceStates=['RUNNING'])
+
+        hosts = []
+
+        for instance_page in instance_pages:
+            for instance in instance_page['Instances']:
+                hosts.append(instance['PrivateIpAddress'])
+
+        return hosts
 
     def _wait_for_logs_on_s3(self):
         """If the cluster is already terminating, wait for it to terminate,

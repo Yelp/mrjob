@@ -276,6 +276,25 @@ _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*The master node was terminated.*$', re.I)
 
 
+def _paginate(what, boto3_client, api_call, **api_params):
+    """Yield results from a paginatable API client call."""
+    paginator = boto3_client.get_paginator(api_call)
+    for page in paginator.paginate(**api_params):
+        for item in page[what]:
+            yield item
+
+
+def _list_all(field, emr_client, api_call, **kwargs):
+    """For an api call that can paginate, get all results.
+
+    We mostly use this for calls where we need to know the number
+    of results.
+    """
+    paginator = emr_client.get_paginator(api_call)
+    pages = paginator.paginate(**kwargs)
+    return [item for page in pages for item in page[field]]
+
+
 def _repeat(api_call, *args, **kwargs):
     """Make the same API call repeatedly until we've seen every page
     of the response (sets *marker* automatically).
@@ -2891,10 +2910,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             # match pool name, and (bootstrap) hash
-            ba_paginator = emr_client.get_paginator('list_bootstrap_actions')
-            ba_pages = ba_paginator.paginate(ClusterId=cluster.id)
-            bootstrap_actions = [ba for ba_page in ba_pages
-                                 for ba in ba_page['BootstrapActions']]
+            bootstrap_actions = list(_paginate(
+                'BootstrapActions',
+                emr_client, 'list_bootstrap_actions', ClusterId=cluster.id))
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
 
             if req_hash != pool_hash:
@@ -2957,7 +2975,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 log.debug('    subnet mismatch')
                 return
 
-            steps = _list_all_steps(emr_conn, cluster.id)
+            steps = list(_paginate(
+                'Steps',
+                emr_client, 'list_steps', ClusterId=cluster.id))
 
             # don't add more steps than EMR will allow/display through the API
             if len(steps) + num_steps > max_steps:
@@ -2967,14 +2987,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # in rare cases, cluster can be WAITING *and* have incomplete
             # steps. We could just check for PENDING steps, but we're
             # trying to be defensive about EMR adding a new step state.
-            #
-            # TODO: checking for PENDING steps seems pretty safe
+            # Not entirely sure what to make of CANCEL_PENDING
             for step in steps:
-                if ((getattr(step.status, 'timeline', None) is None or
-                     getattr(step.status.timeline, 'enddatetime', None)
-                     is None) and
-                    getattr(step.status, 'state', None) not in
-                        ('CANCELLED', 'INTERRUPTED')):
+                if (step['Status']['State'] not in ('CANCELLED', 'INTERRUPTED')
+                        and not step['Status'].get('Timeline', {}).get(
+                            'EndDateTime')):
                     log.debug('    unfinished steps')
                     return
 

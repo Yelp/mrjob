@@ -207,28 +207,3 @@ def emr_ssl_host_for_region(region):
         return _EMR_REGIONLESS_ENDPOINT
     else:
         return _EMR_REGION_SSL_HOST % {'region': region}
-
-
-def s3_endpoint_for_region(region):
-    """Get the host for S3 in the given AWS region.
-
-    This will accept ``''`` for region as well, so it's fine to
-    use location constraint in place of region.
-    """
-    region = _fix_region(region)
-
-    if not region or region == _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
-        return _S3_REGIONLESS_ENDPOINT
-    else:
-        return _S3_REGION_ENDPOINT % {'region': region}
-
-
-def s3_location_constraint_for_region(region):
-    """Get the location constraint an S3 bucket needs so that other AWS
-    services can connect to it in the given region."""
-    region = _fix_region(region)
-
-    if not region or region == _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
-        return ''
-    else:
-        return region

@@ -65,6 +65,14 @@ except ImportError:
     boto3 = None
 
 
+# dateutil is a boto3 dependency
+try:
+    from dateutil.tz import tzutc
+    tzutc
+except ImportError:
+    tzutc = None
+
+
 import mrjob
 import mrjob.step
 from mrjob.aws import _DEFAULT_AWS_REGION
@@ -130,6 +138,7 @@ from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
+from mrjob.util import strip_microseconds
 from mrjob.util import random_identifier
 
 
@@ -310,14 +319,6 @@ def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
             yield action
 
 
-def _yield_all_instances(emr_conn, cluster_id, *args, **kwargs):
-    """Get information about all instances for the given cluster."""
-    for resp in _repeat(emr_conn.list_instances,
-                        cluster_id, *args, **kwargs):
-        for instance in getattr(resp, 'instances', []):
-            yield instance
-
-
 def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
     """Get all instance groups for the given cluster.
 
@@ -398,7 +399,6 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
             return False
         else:
             # dateutil is a boto3 dependency
-            from dateutil.tz import tzutc
             age = datetime.now(tzutc()) - key_data['LastModified']
             if age <= timedelta(minutes=mins_to_expiration):
                 return False
@@ -415,12 +415,9 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
 
 
 def _get_reason(cluster_or_step):
-    """Extract statechangereason.message from a boto Cluster or Step.
-
-    Default to ``''``."""
-    return getattr(
-        getattr(cluster_or_step.status, 'statechangereason', ''),
-        'message', '').rstrip()
+    """Get state change reason message."""
+    # StateChangeReason is {} before the first state change
+    return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
 # only exists for deprecated boto library support, going away in v0.7.0
@@ -814,7 +811,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Get the URI of the log directory for this job's cluster."""
         if not self._s3_log_dir_uri:
             cluster = self._describe_cluster()
-            log_uri = getattr(cluster, 'loguri', '')
+            log_uri = cluster.get('LogUri')
             if log_uri:
                 self._s3_log_dir_uri = '%s%s/' % (
                     log_uri.replace('s3n://', 's3://'), self._cluster_id)
@@ -1313,17 +1310,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             cluster = self._describe_cluster()
 
         log.info('Waiting for cluster (%s) to terminate...' %
-                 cluster.id)
+                 cluster['Id'])
 
-        if (cluster.status.state == 'WAITING' and
-                cluster.autoterminate != 'true'):
+        if (cluster['Status']['State'] == 'WAITING' and
+                cluster['AutoTerminate']):
             raise Exception('Operation requires cluster to terminate, but'
                             ' it may never do so.')
 
         while True:
-            log.info('  %s' % cluster.status.state)
+            log.info('  %s' % cluster['Status']['State'])
 
-            if cluster.status.state in (
+            if cluster['Status']['State'] in (
                     'TERMINATED', 'TERMINATED_WITH_ERRORS'):
                 return
 
@@ -1877,7 +1874,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # open SSH tunnel if cluster is already ready
         # (this happens with pooling). See #1115
         cluster = self._describe_cluster()
-        if cluster.status.state in ('RUNNING', 'WAITING'):
+        if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
             self._set_up_ssh_tunnel()
 
         # treat master node setup as step -1
@@ -1924,7 +1921,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             self._log_interpretations.append(log_interpretation)
 
-        emr_conn = self.make_emr_conn()
+        emr_client = self.make_emr_client()
 
         while True:
             # don't antagonize EMR's throttling
@@ -1932,30 +1929,30 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                       self._opts['check_cluster_every'])
             time.sleep(self._opts['check_cluster_every'])
 
-            step = _patched_describe_step(emr_conn, self._cluster_id, step_id)
+            step = emr_client.describe_step(
+                ClusterId=self._cluster_id, StepId=step_id)['Step']
 
-            if step.status.state == 'PENDING':
+            if step['Status']['State'] == 'PENDING':
                 cluster = self._describe_cluster()
 
-                reason = _get_reason(cluster)
+                reason =_get_reason(cluster)
                 reason_desc = (': %s' % reason) if reason else ''
 
                 # we can open the ssh tunnel if cluster is ready (see #1115)
-                if cluster.status.state in ('RUNNING', 'WAITING'):
+                if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
                     self._set_up_ssh_tunnel()
 
                 log.info('  PENDING (cluster is %s%s)' % (
-                    cluster.status.state, reason_desc))
+                    cluster['Status']['State'], reason_desc))
                 continue
 
-            if step.status.state == 'RUNNING':
+            elif step['Status']['State'] == 'RUNNING':
                 time_running_desc = ''
 
-                startdatetime = getattr(
-                    getattr(step.status, 'timeline', ''), 'startdatetime', '')
-                if startdatetime:
-                    start = iso8601_to_timestamp(startdatetime)
-                    time_running_desc = ' for %.1fs' % (time.time() - start)
+                start = step['Status']['Timeline'].get('StartDateTime')
+                if start:
+                    time_running_desc = ' for %s' % strip_microseconds(
+                        datetime.now(tzutc()) - start)
 
                 # now is the time to tunnel, if we haven't already
                 self._set_up_ssh_tunnel()
@@ -1969,7 +1966,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 continue
 
             # we're done, will return at the end of this
-            if step.status.state == 'COMPLETED':
+            elif step['Status']['State'] == 'COMPLETED':
                 log.info('  COMPLETED')
                 # will fetch counters, below, and then return
             else:
@@ -1979,7 +1976,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 reason_desc = (' (%s)' % reason) if reason else ''
 
                 log.info('  %s%s' % (
-                    step.status.state, reason_desc))
+                    step['Status']['State'], reason_desc))
 
                 # print cluster status; this might give more context
                 # why step didn't succeed
@@ -1987,12 +1984,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 reason = _get_reason(cluster)
                 reason_desc = (': %s' % reason) if reason else ''
                 log.info('Cluster %s %s %s%s' % (
-                    cluster.id,
-                    'was' if 'ED' in cluster.status.state else 'is',
-                    cluster.status.state,
+                    cluster['Id'],
+                    'was' if 'ED' in cluster['Status']['State'] else 'is',
+                    cluster['Status']['State'],
                     reason_desc))
 
-                if cluster.status.state in (
+                if cluster['Status']['State'] in (
                         'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
                     # was it caused by a pooled cluster self-terminating?
                     # (if so, raise _PooledClusterSelfTerminatedException)
@@ -2012,7 +2009,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters. (Except for master node setup
             # and Spark, which has no counters.)
-            if step.status.state != 'CANCELLED':
+            if step['Status']['State'] != 'CANCELLED':
                 if step_num >= 0 and not _is_spark_step_type(step_type):
                     counters = self._pick_counters(
                         log_interpretation, step_type)
@@ -2021,10 +2018,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     else:
                         log.warning('No counters found')
 
-            if step.status.state == 'COMPLETED':
+            if step['Status']['State'] == 'COMPLETED':
                 return
 
-            if step.status.state == 'FAILED':
+            if step['Status']['State'] == 'FAILED':
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
                     log.error('Probable cause of failure:\n\n%s\n\n' %
@@ -2135,7 +2132,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # not other bootstrap actions)
 
         # our step should be CANCELLED (not failed)
-        if step.status.state != 'CANCELLED':
+        if step['Status']['State'] != 'CANCELLED':
             return
 
         # we *could* check if the step had a chance to start by checking if
@@ -2392,11 +2389,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         cluster = self._describe_cluster()
 
-        if cluster.status.state in (
+        if cluster['Status']['State'] in (
                 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
             return  # already terminated
 
-        if cluster.status.state != 'TERMINATING':
+        if cluster['Status']['State'] != 'TERMINATING':
             # going to need to wait for logs to get archived to S3
 
             # "step_num" is just a unique ID for the step; using -1
@@ -3225,8 +3222,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return _wrap_aws_client(raw_emr_client)
 
     def _describe_cluster(self):
-        emr_conn = self.make_emr_conn()
-        return _patched_describe_cluster(emr_conn, self._cluster_id)
+        emr_client = self.make_emr_client()
+        return emr_client.describe_cluster(
+            ClusterId=self._cluster_id)['Cluster']
 
     def get_hadoop_version(self):
         return self._get_app_versions().get('hadoop')
@@ -3281,17 +3279,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # AMI version might be in RunningAMIVersion (2.x, 3.x)
         # or ReleaseLabel (4.x)
-        cache['image_version'] = getattr(cluster, 'runningamiversion', None)
+        cache['image_version'] = cluster.get('RunningAmiVersion')
         if not cache['image_version']:
-            release_label = getattr(cluster, 'releaselabel', None)
+            release_label = cluster.get('ReleaseLabel')
             if release_label:
                 cache['image_version'] = release_label.lstrip('emr-')
 
         cache['app_versions'] = dict(
-            (a.name.lower(), a.version) for a in cluster.applications)
+            (a['Name'].lower(), a['Version'])
+            for a in cluster['Applications'])
 
-        if cluster.status.state in ('RUNNING', 'WAITING'):
-            cache['master_public_dns'] = cluster.masterpublicdnsname
+        if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
+            cache['master_public_dns'] = cluster['MasterPublicDnsName']
 
     def _store_master_instance_info(self):
         """List master instance for our cluster, and cache

@@ -3302,10 +3302,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         cache = self._cluster_to_cache[self._cluster_id]
 
-        emr_conn = self.make_emr_conn()
+        emr_client = self.make_emr_client()
 
-        instances = emr_conn.list_instances(
-            self._cluster_id, instance_group_types=['MASTER']).instances
+        instances = emr_client.list_instances(
+            ClusterId=self._cluster_id,
+            InstanceGroupTypes=['MASTER'])['Instances']
 
         if not instances:
             return
@@ -3313,8 +3314,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         master = instances[0]
 
         # can also get private DNS and public IP/DNS, but we don't use this
-        if hasattr(master, 'privateipaddress'):
-            cache['master_private_ip'] = master.privateipaddress
+        master_private_ip = master.get('PrivateIpAddress')
+        if master_private_ip:  # may not have been assigned yet
+            cache['master_private_ip'] = master_private_ip
 
     def make_iam_client(self):
         """Create a :py:mod:`boto3` IAM client.

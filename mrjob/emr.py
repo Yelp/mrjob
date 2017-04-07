@@ -80,6 +80,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
+from mrjob.aws import _paginate
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
@@ -274,25 +275,6 @@ class _PooledClusterSelfTerminatedException(Exception):
 # non-master nodes won't shut down the cluster, so don't need to match that.
 _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*The master node was terminated.*$', re.I)
-
-
-def _paginate(what, boto3_client, api_call, **api_params):
-    """Yield results from a paginatable API client call."""
-    paginator = boto3_client.get_paginator(api_call)
-    for page in paginator.paginate(**api_params):
-        for item in page[what]:
-            yield item
-
-
-def _list_all(field, emr_client, api_call, **kwargs):
-    """For an api call that can paginate, get all results.
-
-    We mostly use this for calls where we need to know the number
-    of results.
-    """
-    paginator = emr_client.get_paginator(api_call)
-    pages = paginator.paginate(**kwargs)
-    return [item for page in pages for item in page[field]]
 
 
 def _repeat(api_call, *args, **kwargs):
@@ -1860,12 +1842,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # yield all steps whose name matches our job key
         def yield_step_ids():
             emr_client = self.make_emr_client()
-            paginator = emr_client.get_paginator('list_steps')
-
-            for step_page in paginator.paginate(ClusterId=self._cluster_id):
-                for step in step_page['Steps']:
-                    if step['Name'].startswith(self._job_key):
-                        yield step['Id']
+            for step in _paginate('Steps', emr_client, 'list_steps',
+                                  ClusterId=self._cluster_id):
+                if step['Name'].startswith(self._job_key):
+                    yield step['Id']
 
         # list_steps() returns steps in reverse chronological order.
         # put them in (forward) chronological order, only keeping the
@@ -2389,16 +2369,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        instance_pages = emr_client.get_paginator('list_instances').paginate(
+        instances = _paginate(
+            'Instances', emr_client, 'list_instances',
             ClusterId=self._cluster_id,
             InstanceGroupTypes=['CORE', 'TASK'],
             InstanceStates=['RUNNING'])
 
-        hosts = []
-
-        for instance_page in instance_pages:
-            for instance in instance_page['Instances']:
-                hosts.append(instance['PrivateIpAddress'])
+        for instance in instances:
+            hosts.append(instance['PrivateIpAddress'])
 
         return hosts
 
@@ -3429,12 +3407,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         emr_client = self.make_emr_client()
 
         # make sure instance groups have enough memory to run Spark
-        ig_paginator = emr_client.get_paginator('list_instance_groups')
-        ig_pages = ig_paginator.paginate(ClusterId=self.get_cluster_id())
-
-        # get entire list of instance groups, since we need to know how
-        # long it is
-        igs = [ig for ig_page in ig_pages for ig in ig_page['InstanceGroups']]
+        igs = list(_paginate(
+            'InstanceGroups', emr_client, 'list_instance_groups',
+            ClusterId=self.get_cluster_id()))
 
         for ig in igs:
             # master doesn't matter if it's not running tasks

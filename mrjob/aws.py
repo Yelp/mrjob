@@ -188,6 +188,21 @@ def _fix_region(region):
     return _ALIAS_TO_REGION.get(region) or region
 
 
+def _paginate(what, boto3_client, api_call, **api_params):
+    """Yield results from a paginatable API client call.
+
+    *what* is the name of the field the holds the list of items
+    in each page (e.g. ``'InstanceGroups'``).
+
+    This doesn't do anything magical; it just saves the trouble of creating
+    variable names for your paginator and its pages.
+    """
+    paginator = boto3_client.get_paginator(api_call)
+    for page in paginator.paginate(**api_params):
+        for item in page[what]:
+            yield item
+
+
 def emr_endpoint_for_region(region):
     """Get the host for Elastic MapReduce in the given AWS region."""
     region = _fix_region(region)

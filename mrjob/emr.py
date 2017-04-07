@@ -2806,8 +2806,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Get the ID of the cluster our job is running on, or ``None``."""
         return self._cluster_id
 
-    def _usable_clusters(self, emr_conn=None, exclude=None, num_steps=1):
-        """Get clusters that this runner can join.
+    def _usable_clusters(self, exclude=None, num_steps=1):
+        """Get clusters that this runner can join, returning a list of
+        ``(cluster_id, num_steps)`` (number of steps is used for locking).
 
         We basically expect to only join available clusters with the exact
         same setup as our own, that is:
@@ -2834,7 +2835,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         :return: tuple of (:py:class:`botoemr.emrobject.Cluster`,
                            num_steps_in_cluster)
         """
-        emr_conn = emr_conn or self.make_emr_conn()
+        emr_conn = self.make_emr_conn()
+        emr_client = self.make_emr_client()
         exclude = exclude or set()
 
         req_hash = self._pool_hash()
@@ -2889,8 +2891,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             # match pool name, and (bootstrap) hash
-            bootstrap_actions = list(_yield_all_bootstrap_actions(
-                emr_conn, cluster.id))
+            ba_paginator = emr_client.get_paginator('list_bootstrap_actions')
+            ba_pages = ba_paginator.paginate(ClusterId=cluster.id)
+            bootstrap_actions = [ba for ba_page in ba_pages
+                                 for ba in ba_page['BootstrapActions']]
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
 
             if req_hash != pool_hash:
@@ -3069,7 +3073,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         Return ``None`` if no suitable clusters exist.
         """
         exclude = set()
-        emr_conn = self.make_emr_conn()
         max_wait_time = self._opts['pool_wait_minutes']
         now = datetime.now()
         end_time = now + timedelta(minutes=max_wait_time)
@@ -3078,7 +3081,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.info('Attempting to find an available cluster...')
         while now <= end_time:
             cluster_info_list = self._usable_clusters(
-                emr_conn=emr_conn,
                 exclude=exclude,
                 num_steps=num_steps)
             log.debug(

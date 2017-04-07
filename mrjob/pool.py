@@ -57,10 +57,10 @@ def _est_time_to_hour(cluster_summary, now=None):
 def _pool_hash_and_name(bootstrap_actions):
     """Return the hash and pool name for the given cluster, or
     ``(None, None)`` if it isn't pooled."""
-    for bootstrap_action in bootstrap_actions:
-        if bootstrap_action.name == 'master':
-            args = [arg.value for arg in bootstrap_action.args]
+    for ba in bootstrap_actions:
+        if ba['Name'] == 'master':
+            args = ba['Args']
             if len(args) == 2 and args[0].startswith('pool-'):
                 return args[0][5:], args[1]
 
-    return (None, None)
+    return None, None

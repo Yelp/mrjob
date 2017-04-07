@@ -3407,20 +3407,25 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         '  (try --image-version %s or later)' % (
                             image_version, _MIN_SPARK_PY3_AMI_VERSION))
 
-        # make sure there's enough memory to run Spark
-        instance_groups = list(_yield_all_instance_groups(
-            self.make_emr_conn(), self.get_cluster_id()))
+        emr_client = self.make_emr_client()
 
-        for ig in instance_groups:
+        # make sure instance groups have enough memory to run Spark
+        ig_paginator = emr_client.get_paginator('list_instance_groups')
+        ig_pages = ig_paginator.paginate(ClusterId=self.get_cluster_id())
+
+        # get entire list of instance groups, since we need to know how
+        # long it is
+        igs = [ig for ig_page in ig_pages for ig in ig_page['InstanceGroups']]
+
+        for ig in igs:
             # master doesn't matter if it's not running tasks
-            if ig.instancegrouptype.lower() == 'master' and (
-                    len(instance_groups) > 1):
+            if ig['InstanceGroupType'] == 'MASTER' and len(igs) > 1:
                 continue
 
-            mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype)
+            mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig['InstanceType'])
             if mem and mem < _MIN_SPARK_INSTANCE_MEMORY:
                 return ('  instance type %s is too small for Spark;'
-                        ' your job may stall forever' % ig.instancetype)
+                        ' your job may stall forever' % ig['InstanceType'])
 
         return None
 

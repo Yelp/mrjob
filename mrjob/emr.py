@@ -114,11 +114,9 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
-from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.patched_boto import _patched_describe_cluster
-from mrjob.patched_boto import _patched_describe_step
 from mrjob.patched_boto import _patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
@@ -1833,23 +1831,27 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
-    def _job_steps(self, max_steps=None):
-        """Get the steps we submitted for this job in chronological order,
-        ignoring steps from other jobs.
+    def _job_step_ids(self, max_steps=None):
+        """Get the IDs of the steps we submitted for this job
+         in chronological order, ignoring steps from other jobs.
 
         Generally, you want to set *max_steps*, so we can make as few API
         calls as possible.
         """
-        # the API yields steps in reversed order. Once we've found the expected
-        # number of steps, stop.
-        #
-        # This implicitly excludes the master node setup script, which
-        # is what we want for now.
-        return list(reversed(list(islice(
-            (step for step in
-             _yield_all_steps(self.make_emr_conn(), self.get_cluster_id())
-             if step.name.startswith(self._job_key)),
-            max_steps))))
+        # yield all steps whose name matches our job key
+        def yield_step_ids():
+            emr_client = self.make_emr_client()
+            paginator = emr_client.get_paginator('list_steps')
+
+            for step_page in paginator.paginate(ClusterId=self._cluster_id):
+                for step in step_page['Steps']:
+                    if step['Name'].startswith(self._job_key):
+                        yield step['Id']
+
+        # list_steps() returns steps in reverse chronological order.
+        # put them in (forward) chronological order, only keeping the
+        # last *max_steps* steps.
+        return list(reversed(list(islice(yield_step_ids(), max_steps))))
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
@@ -1862,9 +1864,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             max_steps = num_steps
 
-        job_steps = self._job_steps(max_steps=max_steps)
+        step_ids = self._job_step_ids(max_steps=max_steps)
 
-        if len(job_steps) < max_steps:
+        if len(step_ids) < max_steps:
             raise AssertionError("Can't find our steps in the cluster!")
 
         # clear out log interpretations if they were filled somehow
@@ -1883,17 +1885,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             start = 0
 
-        for step_num, step in enumerate(job_steps, start=start):
+        for step_num, step_id in enumerate(step_ids, start=start):
             # this will raise an exception if a step fails
             if step_num == -1:
                 log.info(
                     'Waiting for master node setup step (%s) to complete...' %
-                    step.id)
+                    step_id)
             else:
                 log.info('Waiting for step %d of %d (%s) to complete...' % (
-                    step_num + 1, num_steps, step.id))
+                    step_num + 1, num_steps, step_id))
 
-            self._wait_for_step_to_complete(step.id, step_num, num_steps)
+            self._wait_for_step_to_complete(step_id, step_num, num_steps)
 
     def _wait_for_step_to_complete(
             self, step_id, step_num=None, num_steps=None):

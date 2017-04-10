@@ -2375,6 +2375,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             InstanceGroupTypes=['CORE', 'TASK'],
             InstanceStates=['RUNNING'])
 
+        hosts = []
+
         for instance in instances:
             hosts.append(instance['PrivateIpAddress'])
 
@@ -2981,10 +2983,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
-            for ig in _yield_all_instance_groups(emr_conn, cluster.id):
-                # if you edit this code, please don't rely on any particular
-                # ordering of instance groups (see #1316)
-                role = ig.instancegrouptype.lower()
+            for ig in _paginate(
+                    'InstanceGroups', emr_client, 'list_instance_groups',
+                    ClusterId=cluster.id):
+                role = ig['InstanceGroupType'].lower()
 
                 # unknown, new kind of role; bail out!
                 if role not in ('core', 'master', 'task'):
@@ -2992,9 +2994,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     return
 
                 req_instance_type = role_to_req_instance_type[role]
-                if ig.instancetype != req_instance_type:
+                if ig['InstanceType'] != req_instance_type:
                     # if too little memory, bail out
-                    mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype, 0.0)
+                    mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(
+                        ig['InstanceType'], 0.0)
                     req_mem = role_to_req_mem.get(role, 0.0)
                     if mem < req_mem:
                         log.debug('    too little memory')
@@ -3002,7 +3005,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
                 # if bid price is too low, don't count compute units
                 req_bid_price = role_to_req_bid_price[role]
-                bid_price = getattr(ig, 'bidprice', None)
+                bid_price = ig.get('BidPrice')
 
                 # if the instance is on-demand (no bid price) or bid prices
                 # are the same, we're okay
@@ -3023,16 +3026,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # we started our own cluster from scratch. (This can happen if
                 # the previous job finished while some task instances were
                 # still being provisioned.)
-                cu = (int(ig.requestedinstancecount) *
+                cu = (ig['RequestedInstanceCount'] *
                       EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
-                          ig.instancetype, 0.0))
+                          ig['InstanceType'], 0.0))
                 role_to_cu.setdefault(role, 0.0)
                 role_to_cu[role] += cu
 
                 # track number of instances of the same type
-                if ig.instancetype == req_instance_type:
+                if ig['InstanceType'] == req_instance_type:
                     role_to_matched_instances[role] += (
-                        int(ig.requestedinstancecount))
+                        int(ig['RequestedInstanceCount']))
 
             # check if there are enough compute units
             for role, req_cu in role_to_req_cu.items():

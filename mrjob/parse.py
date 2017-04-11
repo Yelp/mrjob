@@ -27,13 +27,6 @@ from mrjob.py2 import ParseResult
 from mrjob.py2 import to_string
 from mrjob.py2 import urlparse as urlparse_buggy
 
-try:
-    import boto.utils
-except ImportError:
-    # don't require boto; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    boto = None
-
 log = logging.getLogger(__name__)
 
 
@@ -279,31 +272,3 @@ def _parse_progress_from_resource_manager(html_bytes):
             return float(m.group('percent'))
 
     return None
-
-
-### AWS Date-time parsing ###
-
-# sometimes AWS gives us seconds as a decimal, which we can't parse
-# with boto.utils.ISO8601
-_SUBSECOND_RE = re.compile('\.[0-9]+')
-
-
-# Thu, 29 Mar 2012 04:55:44 GMT
-_RFC1123 = '%a, %d %b %Y %H:%M:%S %Z'
-
-
-# TODO: test this, now that it uses UTC time
-def iso8601_to_timestamp(iso8601_time):
-    iso8601_time = _SUBSECOND_RE.sub('', iso8601_time)
-    try:
-        return calendar.timegm(time.strptime(iso8601_time, boto.utils.ISO8601))
-    except ValueError:
-        return calendar.timegm(time.strptime(iso8601_time, _RFC1123))
-
-
-def iso8601_to_datetime(iso8601_time):
-    iso8601_time = _SUBSECOND_RE.sub('', iso8601_time)
-    try:
-        return datetime.strptime(iso8601_time, boto.utils.ISO8601)
-    except ValueError:
-        return datetime.strptime(iso8601_time, _RFC1123)

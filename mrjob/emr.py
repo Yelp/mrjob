@@ -117,7 +117,6 @@ from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.patched_boto import _patched_describe_cluster
 from mrjob.patched_boto import _patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
@@ -2834,7 +2833,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         :return: tuple of (:py:class:`botoemr.emrobject.Cluster`,
                            num_steps_in_cluster)
         """
-        emr_conn = self.make_emr_conn()
         emr_client = self.make_emr_client()
         exclude = exclude or set()
 
@@ -2868,31 +2866,29 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         key_cluster_steps_list = []
 
         def add_if_match(cluster):
-            log.debug('  Considering joining cluster %s...' % cluster.id)
+            log.debug('  Considering joining cluster %s...' % cluster['Id'])
 
             # skip if user specified a key pair and it doesn't match
             if (self._opts['ec2_key_pair'] and
-                self._opts['ec2_key_pair'] !=
-                getattr(getattr(cluster,
-                                'ec2instanceattributes', None),
-                        'ec2keyname', None)):
+                    self._opts['ec2_key_pair'] !=
+                    cluster['Ec2InstanceAttributes'].get('Ec2KeyName')):
                 log.debug('    ec2 key pair mismatch')
                 return
 
             # this may be a retry due to locked clusters
-            if cluster.id in exclude:
+            if cluster['Id'] in exclude:
                 log.debug('    excluded')
                 return
 
             # only take persistent clusters
-            if cluster.autoterminate != 'false':
+            if cluster['AutoTerminate']:
                 log.debug('    not persistent')
                 return
 
             # match pool name, and (bootstrap) hash
             bootstrap_actions = list(_paginate(
                 'BootstrapActions',
-                emr_client, 'list_bootstrap_actions', ClusterId=cluster.id))
+                emr_client, 'list_bootstrap_actions', ClusterId=cluster['Id']))
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
 
             if req_hash != pool_hash:
@@ -2906,7 +2902,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if self._opts['release_label']:
                 # just check for exact match. EMR doesn't have a concept
                 # of partial release labels like it does for AMI versions.
-                release_label = getattr(cluster, 'releaselabel', '')
+                release_label = cluster.get('ReleaseLabel')
 
                 if release_label != self._opts['release_label']:
                     log.debug('    release label mismatch')
@@ -2916,7 +2912,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 max_steps = _4_X_MAX_STEPS
             else:
                 # match actual AMI version
-                image_version = getattr(cluster, 'runningamiversion', '')
+                image_version = cluster.get('RunningAmiVersion', '')
                 # Support partial matches, e.g. let a request for
                 # '2.4' pass if the version is '2.4.2'. The version
                 # extracted from the existing cluster should always
@@ -2932,32 +2928,29 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             applications = self._applications()
             if applications:
                 # use case-insensitive mapping (see #1417)
-                cluster_applications = set(
-                    a.name.lower() for a in cluster.applications)
+                expected_applications = set(a.lower() for a in applications)
 
-                expected_applications = set(
-                    a.lower() for a in applications)
+                cluster_applications = set(
+                    a['Name'].lower() for a in cluster.get('Applications', []))
 
                 if not expected_applications <= cluster_applications:
                     log.debug('    missing applications: %s' % ', '.join(
                         sorted(expected_applications - cluster_applications)))
                     return
 
-            emr_configurations = _decode_configurations_from_api(
-                getattr(cluster, 'configurations', []))
+            emr_configurations = cluster.get('Configurations', [])
             if self._opts['emr_configurations'] != emr_configurations:
                 log.debug('    emr configurations mismatch')
                 return
 
-            subnet = getattr(
-                cluster.ec2instanceattributes, 'ec2subnetid', None)
+            subnet = cluster['Ec2InstanceAttributes'].get('Ec2SubnetId')
             if subnet != (self._opts['subnet'] or None):
                 log.debug('    subnet mismatch')
                 return
 
             steps = list(_paginate(
                 'Steps',
-                emr_client, 'list_steps', ClusterId=cluster.id))
+                emr_client, 'list_steps', ClusterId=cluster['Id']))
 
             # don't add more steps than EMR will allow/display through the API
             if len(steps) + num_steps > max_steps:
@@ -2985,7 +2978,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # an instance with too little memory
             for ig in _paginate(
                     'InstanceGroups', emr_client, 'list_instance_groups',
-                    ClusterId=cluster.id):
+                    ClusterId=cluster['Id']):
                 role = ig['InstanceGroupType'].lower()
 
                 # unknown, new kind of role; bail out!
@@ -3054,11 +3047,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         _est_time_to_hour(cluster))
 
             log.debug('    OK')
-            key_cluster_steps_list.append((sort_key, cluster.id, len(steps)))
+            key_cluster_steps_list.append(
+                (sort_key, cluster['Id'], len(steps)))
 
-        for cluster_summary in _yield_all_clusters(
-                emr_conn, cluster_states=['WAITING']):
-            cluster = _patched_describe_cluster(emr_conn, cluster_summary.id)
+        for cluster_summary in _paginate(
+                'Clusters', emr_client, 'list_clusters',
+                ClusterStates=['WAITING']):
+
+            cluster = emr_client.describe_cluster(
+                ClusterId=cluster_summary['Id'])['Cluster']
+
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for

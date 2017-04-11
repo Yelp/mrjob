@@ -25,6 +25,14 @@ from mrjob.parse import iso8601_to_datetime
 log = getLogger(__name__)
 
 
+# dateutil is a boto3 dependency
+try:
+    from dateutil.tz import tzutc
+    tzutc
+except ImportError:
+    tzutc = None
+
+
 ### current versions of these functions, using "cluster" API calls ###
 
 # these are "hidden" because there's no need to access them directly
@@ -37,20 +45,17 @@ def _est_time_to_hour(cluster_summary, now=None):
     one hour, not zero.
     """
     if now is None:
-        now = datetime.utcnow()
+        now = datetime.now(tzutc())
 
-    timeline = getattr(
-        getattr(cluster_summary, 'status', None), 'timeline', None)
+    timeline = cluster_summary.get('Status', {}).get('Timeline', {})
 
-    creationdatetime = getattr(timeline, 'creationdatetime', None)
+    creationdatetime = timeline.get('CreationDateTime')
 
-    if creationdatetime:
-        start = iso8601_to_datetime(creationdatetime)
-    else:
+    if not creationdatetime:
         # do something reasonable if creationdatetime isn't set
         return timedelta(minutes=60)
 
-    run_time = now - start
+    run_time = now - creationdatetime
     return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
 
 

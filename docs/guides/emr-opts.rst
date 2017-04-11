@@ -763,7 +763,7 @@ Choosing/creating a cluster to join
 
 S3 paths and options
 --------------------
-MRJob uses boto to manipulate/access S3.
+MRJob uses boto3 to manipulate/access S3.
 
 .. mrjob-opt::
     :config: cloud_log_dir

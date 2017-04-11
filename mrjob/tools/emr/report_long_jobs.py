@@ -105,8 +105,7 @@ def _runner_kwargs(options):
 def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
     """Identify jobs that have been running or pending for a long time.
 
-    :param clusters: a list of :py:class:`boto.emr.emrobject.Cluster`
-                      objects to inspect.
+    :param clusters: a list of :py:mod:`boto3` cluster summary data structures
     :param min_time: a :py:class:`datetime.timedelta`: report jobs running or
                      pending longer than this
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.

@@ -253,7 +253,7 @@ def _cluster_to_full_summary(cluster, now=None):
     """Convert a cluster to a full summary for use in creating a report,
     including billing/usage information.
 
-    :param cluster: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:mod:`boto3` cluster data structure
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
@@ -288,7 +288,7 @@ def _cluster_to_full_summary(cluster, now=None):
 def _cluster_to_basic_summary(cluster, now=None):
     """Extract fields such as creation time, owner, etc. from the cluster.
 
-    :param cluster: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:mod:`boto3` cluster data structure
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
@@ -356,7 +356,7 @@ def _cluster_to_basic_summary(cluster, now=None):
 def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
     """Break billing/usage information for a cluster down by job.
 
-    :param cluster: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:mod:`boto3` cluster data structure
     :param basic_summary: a basic summary of the cluster, returned by
                           :py:func:`_cluster_to_basic_summary`. If this
                           is ``None``, we'll call

@@ -42,7 +42,7 @@ try:
 except ImportError:
     boto = None
 
-
+from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
@@ -60,9 +60,6 @@ from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
-
-# allow working around mocks
-real_boto3_client = boto3.client
 
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
@@ -415,16 +412,16 @@ class MockS3Client(object):
 
         self.mock_s3_fs = mock_s3_fs
 
-        # use botocore to translate region_name to endpoint_url
-        real_client = real_boto3_client(
-            's3',
-            endpoint_url=endpoint_url,
-            region_name=region_name,
-            config=botocore.config.Config(region_name='us-east-1'))
+        region_name = region_name or _DEFAULT_AWS_REGION
+        if not endpoint_url:
+            if region_name == _DEFAULT_AWS_REGION:
+                endpoint_url = 'https://s3.amazonaws.com'
+            else:
+                endpoint_url = 'https://s3-%s.amazonaws.com' % region_name
 
         self.meta = MockObject(
-            endpoint_url=real_client.meta.endpoint_url,
-            region_name=real_client.meta.region_name)
+            endpoint_url=endpoint_url,
+            region_name=region_name)
 
     def _check_bucket_exists(self, bucket_name, operation_name):
         if bucket_name not in self.mock_s3_fs:
@@ -1614,15 +1611,12 @@ class MockIAMClient(object):
         self.mock_iam_role_attached_policies = combine_values(
             {}, mock_iam_role_attached_policies)
 
-        # use botocore to translate region_name to endpoint_url
-        real_client = real_boto3_client(
-            'iam',
-            endpoint_url=endpoint_url,
-            config=botocore.config.Config(region_name='aws-global'))
+        endpoint_url = endpoint_url or 'https://iam.amazonaws.com'
+        region_name = region_name or 'aws-global'
 
         self.meta = MockObject(
-            endpoint_url=real_client.meta.endpoint_url,
-            region_name=real_client.meta.region_name)
+            endpoint_url=endpoint_url,
+            region_name=region_name)
 
     def get_paginator(self, operation_name):
         return MockPaginator(

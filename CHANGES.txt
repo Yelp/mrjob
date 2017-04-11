@@ -41,6 +41,7 @@ v0.6.0, 2017-04-?? -- ???
      * populate_option_groups_with_options()
      * scrape_options_and_index_by_dest()
      * scrape_options_into_new_groups()
+ * removed mrjob.retry.RetryGoRound
  * removed deprecated options:
    * bootstrap_cmds
    * bootstrap_files

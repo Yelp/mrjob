@@ -116,7 +116,6 @@ from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
-from mrjob.retry import RetryGoRound
 from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore

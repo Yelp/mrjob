@@ -31,17 +31,6 @@ import botocore.config
 from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
 
-try:
-    import boto.emr.connection
-    from boto.emr.instance_group import InstanceGroup
-    from boto.emr.step import JarStep
-    import boto.exception
-    import boto.utils
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    boto = None
-
-
 from mrjob.aws import _boto3_now
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
@@ -49,7 +38,6 @@ from mrjob.conf import combine_dicts
 from mrjob.conf import combine_values
 from mrjob.emr import _EMR_LOG_DIR
 from mrjob.emr import EMRJobRunner
-from mrjob.parse import _RFC1123
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 
@@ -114,24 +102,6 @@ AMI_HADOOP_VERSION_UPDATES = {
 # need to fill in a version for non-Hadoop applications
 DUMMY_APPLICATION_VERSION = '0.0.0'
 
-# hard-coded EmrConnection.DebuggingJar from boto 2.39.0. boto 2.40.0 more
-# correctly uses a template with the correct region (see #1306), but
-# mockboto's EMR stuff doesn't have any other reason to be region-aware.
-DEBUGGING_JAR = (
-    's3n://us-east-1.elasticmapreduce/libs/script-runner/script-runner.jar')
-
-# likewise, this is EmrConnection.DebuggingArgs from boto 2.39.0
-DEBUGGING_ARGS = (
-    's3n://us-east-1.elasticmapreduce/libs/state-pusher/0.1/fetch')
-
-# extra step to use when debugging_step=True is passed to run_jobflow()
-DEBUGGING_STEP = JarStep(
-    name='Setup Hadoop Debugging',
-    action_on_failure='TERMINATE_CLUSTER',
-    main_class=None,
-    jar=DEBUGGING_JAR,
-    step_args=DEBUGGING_ARGS)
-
 
 ### Errors ###
 
@@ -152,9 +122,9 @@ def err_xml(message, type='Sender', code='ValidationError'):
 
 class MockBotoTestCase(SandboxedTestCase):
 
-    # if a test needs to create an EMR connection more than this many
+    # if a test needs to create an EMR client more than this many
     # times, there's probably a problem with simulating progress
-    MAX_EMR_CONNECTIONS = 100
+    MAX_EMR_CLIENTS = 100
 
     @classmethod
     def setUpClass(cls):
@@ -179,16 +149,11 @@ class MockBotoTestCase(SandboxedTestCase):
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
 
-        self.emr_conn_iterator = itertools.repeat(
-            None, self.MAX_EMR_CONNECTIONS)
-
-        self.boto3_client = boto3.client
+        self.emr_client_counter = itertools.repeat(
+            None, self.MAX_EMR_CLIENTS)
 
         self.start(patch.object(boto3, 'client', self.client))
         self.start(patch.object(boto3, 'resource', self.resource))
-
-        self.start(patch.object(
-            boto.emr.connection, 'EmrConnection', self.connect_emr))
 
         super(MockBotoTestCase, self).setUp()
 
@@ -299,29 +264,31 @@ class MockBotoTestCase(SandboxedTestCase):
             runner.run()
             return runner._describe_cluster()
 
-    def connect_emr(self, *args, **kwargs):
-        try:
-            next(self.emr_conn_iterator)
-        except StopIteration:
-            raise AssertionError(
-                'Too many connections to mock EMR, may be stalled')
-
-        kwargs['mock_s3_fs'] = self.mock_s3_fs
-        kwargs['mock_emr_clusters'] = self.mock_emr_clusters
-        kwargs['mock_emr_failures'] = self.mock_emr_failures
-        kwargs['mock_emr_self_termination'] = self.mock_emr_self_termination
-        kwargs['mock_emr_output'] = self.mock_emr_output
-        return MockEmrConnection(*args, **kwargs)
-
     # mock boto3.client()
     def client(self, service_name, **kwargs):
-        if service_name == 'iam':
+        if service_name == 'emr':
+            try:
+                next(self.emr_client_counter)
+            except StopIteration:
+                raise AssertionError(
+                    'Too many connections to mock EMR, may be stalled')
+
+            kwargs['mock_s3_fs'] = self.mock_s3_fs
+            kwargs['mock_emr_clusters'] = self.mock_emr_clusters
+            kwargs['mock_emr_failures'] = self.mock_emr_failures
+            kwargs['mock_emr_self_termination'] = (
+                self.mock_emr_self_termination)
+            kwargs['mock_emr_output'] = self.mock_emr_output
+            return MockEMRClient(**kwargs)
+
+        elif service_name == 'iam':
             kwargs['mock_iam_instance_profiles'] = (
                 self.mock_iam_instance_profiles)
             kwargs['mock_iam_roles'] = self.mock_iam_roles
             kwargs['mock_iam_role_attached_policies'] = (
                 self.mock_iam_role_attached_policies)
             return MockIAMClient(**kwargs)
+
         elif service_name == 's3':
             kwargs['mock_s3_fs'] = self.mock_s3_fs
             return MockS3Client(**kwargs)
@@ -660,29 +627,24 @@ def to_rfc1123(when):
     return when.strftime(_RFC1123) + 'GMT'
 
 
-class MockEmrConnection(object):
-    """Mock out boto.emr.EmrConnection. This actually handles a small
+class MockEMRClient(object):
+    """Mock out boto3 EMR clients. This actually handles a small
     state machine that simulates EMR clusters."""
 
-    # hook for simulating SSL cert errors. To use this, do:
-    #
-    # with patch.object(MockEmrConnection, 'STRICT_SSL', True):
-    #     ...
-    STRICT_SSL = False
-
-    def __init__(self, aws_access_key_id=None, aws_secret_access_key=None,
-                 is_secure=True, port=None, proxy=None, proxy_port=None,
-                 proxy_user=None, proxy_pass=None, debug=0,
-                 https_connection_factory=None, region=None,
-                 security_token=None,
-                 mock_s3_fs=None, mock_emr_clusters=None,
+    def __init__(self,
+                 aws_access_key_id=None,
+                 aws_secret_access_key=None,
+                 aws_session_token=None,
+                 endpoint_url=None,
+                 region_name=None,
+                 mock_s3_fs=None,
+                 mock_emr_clusters=None,
                  mock_emr_failures=None,
                  mock_emr_self_termination=None,
                  mock_emr_output=None,
                  max_clusters_returned=DEFAULT_MAX_CLUSTERS_RETURNED,
                  max_steps_returned=DEFAULT_MAX_STEPS_RETURNED):
-        """Create a mock version of EmrConnection. Most of these args are
-        the same as for the real EmrConnection, and are ignored.
+        """Create a mock version boto3 EMR clients.
 
         By default, jobs will run to conclusion, and if their output dir
         is on S3, create a single empty output file. You can manually
@@ -734,17 +696,16 @@ class MockEmrConnection(object):
         self.max_clusters_returned = max_clusters_returned
         self.max_steps_returned = max_steps_returned
 
-        if region is not None:
-            self.host = region.endpoint
-        else:
-            self.host = 'elasticmapreduce.amazonaws.com'
+        # use botocore to translate region_name to endpoint_url
+        real_client = real_boto3_client(
+            'emr',
+            endpoint_url=endpoint_url,
+            region_name=region_name,
+            config=botocore.config.Config(region_name='us-east-1'))
 
-    def _enforce_strict_ssl(self):
-        if (self.STRICT_SSL and
-                not self.host.endswith('elasticmapreduce.amazonaws.com')):
-            from boto.https_connection import InvalidCertificateException
-            raise InvalidCertificateException(
-                self.host, None, 'hostname mismatch')
+        self.meta = MockObject(
+            endpoint_url=real_client.meta.endpoint_url,
+            region_name=real_client.meta.region_name)
 
     # TODO: *now* is not a param to the real run_jobflow(), rename to _now
     def run_jobflow(self,
@@ -768,10 +729,8 @@ class MockEmrConnection(object):
                     _id=None):
         """Mock of run_jobflow().
         """
-        self._enforce_strict_ssl()
-
         if now is None:
-            now = datetime.utcnow()
+            now = _boto3_now()
 
         # convert api_params into MockEmrObject
         api_params_obj = _api_params_to_emr_object(api_params or {})
@@ -1101,7 +1060,7 @@ class MockEmrConnection(object):
         self._enforce_strict_ssl()
 
         if now is None:
-            now = datetime.utcnow()
+            now = _boto3_now()
 
         cluster = self._get_mock_cluster(jobflow_id)
 
@@ -1372,7 +1331,7 @@ class MockEmrConnection(object):
         # TODO: this doesn't actually update steps to CANCELLED when
         # cluster is shut down
         if now is None:
-            now = datetime.utcnow()
+            now = _boto3_now()
 
         cluster = self._get_mock_cluster(cluster_id)
 

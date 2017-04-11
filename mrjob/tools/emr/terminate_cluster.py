@@ -69,7 +69,8 @@ def main(cl_args=None):
     # create the persistent job
     runner = EMRJobRunner(**_runner_kwargs(options))
     log.debug('Terminating cluster %s' % cluster_id)
-    runner.make_emr_conn().terminate_jobflow(cluster_id)
+    runner.make_emr_client().terminate_job_flows(
+        JobFlowIds=[cluster_id])
     log.info('Terminated cluster %s' % cluster_id)
 
 

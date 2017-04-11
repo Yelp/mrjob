@@ -14,12 +14,6 @@
 # limitations under the License.
 import bz2
 
-try:
-    import boto
-    boto  # pyflakes
-except ImportError:
-    boto = None
-
 from botocore.exceptions import ClientError
 
 from mrjob.fs.s3 import S3Filesystem

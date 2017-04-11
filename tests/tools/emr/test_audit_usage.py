@@ -19,7 +19,6 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 
-import boto.emr.connection
 from mrjob.tools.emr.audit_usage import _cluster_to_full_summary
 from mrjob.tools.emr.audit_usage import _percent
 from mrjob.tools.emr.audit_usage import _subdivide_interval_by_date

@@ -40,11 +40,6 @@ from mrjob.emr import _HUGE_PART_THRESHOLD
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
-from mrjob.emr import _decode_configurations_from_api
-from mrjob.emr import _list_all_steps
-from mrjob.emr import _yield_all_bootstrap_actions
-from mrjob.emr import _yield_all_clusters
-from mrjob.emr import _yield_all_instance_groups
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _pool_hash_and_name
@@ -60,8 +55,6 @@ from mrjob.util import log_to_stream
 import tests.mockboto
 from tests.mockboto import DEFAULT_MAX_STEPS_RETURNED
 from tests.mockboto import MockBotoTestCase
-from tests.mockboto import MockEmrConnection
-from tests.mockboto import MockEmrObject
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
@@ -86,15 +79,6 @@ from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_local import _bash_wrap
-
-try:
-    import boto
-    import boto.emr
-    import boto.emr.connection
-    import boto.exception
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    boto = None
 
 # used to match command lines
 if PY2:

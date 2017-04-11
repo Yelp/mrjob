@@ -13,7 +13,7 @@
 # limitations under the License.
 """Mercilessly taunt an Amazonian river dolphin.
 
-This is by no means a complete mock of boto, just what we need for tests.
+This is by no means a complete mock of boto3, just what we need for tests.
 """
 import hashlib
 import itertools
@@ -139,7 +139,7 @@ class MockBotoTestCase(SandboxedTestCase):
             os.remove(cls.fake_mrjob_zip_path)
 
     def setUp(self):
-        # patch boto
+        # patch boto3
         self.mock_emr_failures = set()
         self.mock_emr_self_termination = set()
         self.mock_emr_clusters = {}
@@ -493,7 +493,7 @@ class MockS3Bucket(object):
 
 
 class MockS3Object(object):
-    """Mock out boto.s3.Key"""
+    """Mock out s3.Object"""
 
     def __init__(self, client, bucket_name, key):
         self.bucket_name = bucket_name
@@ -611,21 +611,6 @@ class MockStreamingBody(object):
 
 
 ### EMR ###
-
-def to_iso8601(when):
-    """Convert a datetime to ISO8601 format.
-    """
-    return when.strftime(boto.utils.ISO8601_MS)
-
-
-def to_rfc1123(when):
-    """Convert a datetime to RFC1123 format.
-    """
-    # AWS sends us a time zone in all cases, but in Python it's more
-    # annoying to figure out time zones, so just fake it.
-    assert when.tzinfo is None
-    return when.strftime(_RFC1123) + 'GMT'
-
 
 class MockEMRClient(object):
     """Mock out boto3 EMR clients. This actually handles a small

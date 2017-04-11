@@ -159,43 +159,11 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
 
 ### Regions ###
 
-# Based on http://docs.aws.amazon.com/general/latest/gr/rande.html
-
-# See Issue #658 for why we don't just let boto handle this.
-
-
-# where to connect to EMR. The docs say
-# elasticmapreduce.<region>.amazonaws.com, but the SSL certificates,
-# they tell a different story. See Issue #621.
-
-# where the AWS docs say to connect to EMR
-_EMR_REGION_ENDPOINT = 'elasticmapreduce.%(region)s.amazonaws.com'
-# the host that currently works with EMR's SSL certificate
-_EMR_REGION_SSL_HOST = '%(region)s.elasticmapreduce.amazonaws.com'
-# the regionless endpoint doesn't have SSL issues
-_EMR_REGIONLESS_ENDPOINT = 'elasticmapreduce.amazonaws.com'
-
-# where to connect to S3
-_S3_REGION_ENDPOINT = 's3-%(region)s.amazonaws.com'
-_S3_REGIONLESS_ENDPOINT = 's3.amazonaws.com'
-
 # us-east-1 doesn't have its own endpoint or need bucket location constraints
 _S3_REGION_WITH_NO_LOCATION_CONSTRAINT = 'us-east-1'
 
-
-# "EU" is an alias for the eu-west-1 region
-_ALIAS_TO_REGION = {
-    'eu': 'eu-west-1',
-}
-
 # The region to assume if none is specified
 _DEFAULT_AWS_REGION = 'us-east-1'
-
-
-def _fix_region(region):
-    """Convert "EU" to "eu-west-1", None to '', and convert to lowercase."""
-    region = (region or '').lower()
-    return _ALIAS_TO_REGION.get(region) or region
 
 
 def _boto3_now():
@@ -231,24 +199,3 @@ def _boto3_paginate(what, boto3_client, api_call, **api_params):
 
         for item in page[what]:
             yield item
-
-
-def emr_endpoint_for_region(region):
-    """Get the host for Elastic MapReduce in the given AWS region."""
-    region = _fix_region(region)
-
-    if not region:
-        return _EMR_REGIONLESS_ENDPOINT
-    else:
-        return _EMR_REGION_ENDPOINT % {'region': region}
-
-
-def emr_ssl_host_for_region(region):
-    """Get the host for Elastic MapReduce that matches their SSL cert
-    for the given region. (See Issue #621.)"""
-    region = _fix_region(region)
-
-    if not region:
-        return _EMR_REGIONLESS_ENDPOINT
-    else:
-        return _EMR_REGION_SSL_HOST % {'region': region}

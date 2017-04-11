@@ -11,8 +11,11 @@ v0.6.0, 2017-04-?? -- ???
      * create_bucket()'s second arg is now named region, not location
    * mrjob.fs.s3.wrap_aws_conn() removed
    * removed utility functions from mrjob.aws:
+     * emr_endpoint_for_region()
+     * emr_ssl_host_for_region()
      * s3_endpoint_for_region()
      * s3_location_constraint_for_region()
+   * 'EU' alias for region 'us-west-1' no longer works
  * removed deprecated INPUT, OUTPUT attributes from JarStep
  * removed deprecated filesystem methods:
    * path_exists()

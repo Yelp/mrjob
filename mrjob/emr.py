@@ -70,8 +70,6 @@ import mrjob.step
 from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
-from mrjob.aws import emr_endpoint_for_region
-from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
 from mrjob.compat import map_version

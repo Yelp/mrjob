@@ -16,6 +16,7 @@
 """General information about Amazon Web Services, such as region-to-endpoint
 mappings, plus a couple of utilities for working with boto3.
 """
+import time
 from datetime import datetime
 
 # dateutil is a boto3 dependency
@@ -216,9 +217,18 @@ def _boto3_paginate(what, boto3_client, api_call, **api_params):
 
     This doesn't do anything magical; it just saves the trouble of creating
     variable names for your paginator and its pages.
+
+    You can add the keyword ``_delay`` to *api_params* to sleep that many
+    seconds after each API call
     """
+    # added the _delay kwarg for the audit-emr-usage tool; see #1091
+    _delay = api_params.pop('_delay', None)
+
     paginator = boto3_client.get_paginator(api_call)
     for page in paginator.paginate(**api_params):
+        if _delay:
+            time.sleep(_delay)
+
         for item in page[what]:
             yield item
 

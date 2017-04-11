@@ -110,7 +110,6 @@ from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.patched_boto import _patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
@@ -267,101 +266,6 @@ class _PooledClusterSelfTerminatedException(Exception):
 # non-master nodes won't shut down the cluster, so don't need to match that.
 _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*The master node was terminated.*$', re.I)
-
-
-def _repeat(api_call, *args, **kwargs):
-    """Make the same API call repeatedly until we've seen every page
-    of the response (sets *marker* automatically).
-
-    Yields one or more responses.
-    """
-    # the _delay kwarg sleeps that many seconds before each API call
-    # (including the first). This was added for audit-emr-usage; should
-    # re-visit if we need to use more generally. See #1091
-
-    marker = None
-
-    _delay = kwargs.pop('_delay', None)
-
-    while True:
-        if _delay:
-            time.sleep(_delay)
-
-        resp = api_call(*args, marker=marker, **kwargs)
-        yield resp
-
-        # go to next page, if any
-        marker = getattr(resp, 'marker', None)
-        if not marker:
-            return
-
-
-def _yield_all_clusters(emr_conn, *args, **kwargs):
-    """Make successive API calls, yielding cluster summaries."""
-    for resp in _repeat(emr_conn.list_clusters, *args, **kwargs):
-        for cluster in getattr(resp, 'clusters', []):
-            yield cluster
-
-
-def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
-    for resp in _repeat(emr_conn.list_bootstrap_actions,
-                        cluster_id, *args, **kwargs):
-        for action in getattr(resp, 'actions', []):
-            yield action
-
-
-def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
-    """Get all instance groups for the given cluster.
-
-    Not sure what order the API returns instance groups in (see #1316);
-    please treat it as undefined (make a dictionary, etc.)
-    """
-    for resp in _repeat(emr_conn.list_instance_groups,
-                        cluster_id, *args, **kwargs):
-        for group in getattr(resp, 'instancegroups', []):
-            yield group
-
-
-def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
-    """Get all steps for the cluster, making successive API calls
-    if necessary.
-
-    Calls :py:func:`~mrjob.patched_boto._patched_list_steps`, to work around
-    `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
-
-    Note that this returns steps in *reverse* order, because that's what
-    the ``ListSteps`` API call does (see #1316). If you want to see all steps
-    in chronological order, use :py:func:`_list_all_steps`.
-    """
-    for resp in _repeat(_patched_list_steps, emr_conn, cluster_id,
-                        *args, **kwargs):
-        for step in getattr(resp, 'steps', []):
-            yield step
-
-
-def _list_all_steps(emr_conn, cluster_id, *args, **kwargs):
-    """Return all steps for the cluster as a list, in chronological order
-    (the reverse of :py:func:`_yield_all_steps`).
-    """
-    return list(reversed(list(
-        _yield_all_steps(emr_conn, cluster_id, *args, **kwargs))))
-
-
-def _step_ids_for_job(steps, job_key):
-    """Given a list of steps for a cluster, return a list of the (EMR) step
-    IDs for the job with the given key, in the same order.
-
-    Note that :py:func:`_yield_all_steps` returns steps in reverse order;
-    you probably want to use the value returned by
-    :pyfunc:`_list_all_steps` for *steps*.
-    """
-    step_ids = []
-
-    for step in steps:
-        if step.name.startswith(job_key):
-            step_ids.append(step.id)
-
-    return step_ids
 
 
 def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
@@ -3148,50 +3052,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         return m.hexdigest()
 
     ### EMR-specific Stuff ###
-
-    def make_emr_conn(self):
-        """Create a connection to EMR.
-
-        :return: a :py:class:`boto.emr.connection.EmrConnection`,
-                 wrapped in a :py:class:`mrjob.retry.RetryWrapper`
-        """
-        # ...which is then wrapped in bacon! Mmmmm!
-
-        # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to connect to EMR')
-
-        def emr_conn_for_endpoint(endpoint):
-            conn = boto.emr.connection.EmrConnection(
-                aws_access_key_id=self._opts['aws_access_key_id'],
-                aws_secret_access_key=self._opts['aws_secret_access_key'],
-                region=boto.regioninfo.RegionInfo(
-                    name=self._opts['region'], endpoint=endpoint,
-                    connection_cls=boto.emr.connection.EmrConnection),
-                security_token=self._opts['aws_security_token'])
-
-            return conn
-
-        endpoint = (self._opts['emr_endpoint'] or
-                    emr_endpoint_for_region(self._opts['region']))
-
-        log.debug('creating EMR connection (to %s)' % endpoint)
-        conn = emr_conn_for_endpoint(endpoint)
-
-        # Issue #621: if we're using a region-specific endpoint,
-        # try both the canonical version of the hostname and the one
-        # that matches the SSL cert
-        if not self._opts['emr_endpoint']:
-
-            ssl_host = emr_ssl_host_for_region(self._opts['region'])
-            fallback_conn = emr_conn_for_endpoint(ssl_host)
-
-            conn = RetryGoRound(
-                [conn, fallback_conn],
-                lambda ex: isinstance(
-                    ex, boto.https_connection.InvalidCertificateException))
-
-        return _wrap_aws_conn(conn)
 
     def make_emr_client(self):
         """Create a :py:mod:`boto3` EMR client.

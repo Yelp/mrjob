@@ -44,7 +44,6 @@ Options::
                         would
   -v, --verbose         print more messages to stderr
 """
-from datetime import datetime
 from datetime import timedelta
 import logging
 from optparse import OptionParser

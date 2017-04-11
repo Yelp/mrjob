@@ -1840,7 +1840,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     yield step['Id']
 
         # list_steps() returns steps in reverse chronological order.
-        # put them in (forward) chronological order, only keeping the
+        # put them in forward chronological order, only keeping the
         # last *max_steps* steps.
         return list(reversed(list(islice(yield_step_ids(), max_steps))))
 

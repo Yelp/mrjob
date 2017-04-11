@@ -197,7 +197,18 @@ def _fix_region(region):
     return _ALIAS_TO_REGION.get(region) or region
 
 
-def _paginate(what, boto3_client, api_call, **api_params):
+def _boto3_now():
+    """Get a ``datetime`` that's compatible with :py:mod:`boto3`.
+    These are always UTC time, with time zone ``dateutil.tz.tzutc()``.
+    """
+    if tzutc is None:
+        raise ImportError(
+            'You must install dateutil to get boto3-compatible datetimes')
+
+    return datetime.now(tzutc())
+
+
+def _boto3_paginate(what, boto3_client, api_call, **api_params):
     """Yield results from a paginatable API client call.
 
     *what* is the name of the field the holds the list of items
@@ -210,17 +221,6 @@ def _paginate(what, boto3_client, api_call, **api_params):
     for page in paginator.paginate(**api_params):
         for item in page[what]:
             yield item
-
-
-def _boto3_now():
-    """Get a ``datetime`` that's compatible with :py:mod:`boto3`.
-    These are always UTC time, with time zone ``dateutil.tz.tzutc()``.
-    """
-    if tzutc is None:
-        raise ImportError(
-            'You must install dateutil to get boto3-compatible datetimes')
-
-    return datetime.now(tzutc())
 
 
 def emr_endpoint_for_region(region):

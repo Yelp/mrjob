@@ -73,7 +73,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
 from mrjob.aws import _boto3_now
-from mrjob.aws import _paginate
+from mrjob.aws import _boto3_paginate
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
@@ -1834,7 +1834,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # yield all steps whose name matches our job key
         def yield_step_ids():
             emr_client = self.make_emr_client()
-            for step in _paginate('Steps', emr_client, 'list_steps',
+            for step in _boto3_paginate('Steps', emr_client, 'list_steps',
                                   ClusterId=self._cluster_id):
                 if step['Name'].startswith(self._job_key):
                     yield step['Id']
@@ -2361,7 +2361,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         emr_client = self.make_emr_client()
 
-        instances = _paginate(
+        instances = _boto3_paginate(
             'Instances', emr_client, 'list_instances',
             ClusterId=self._cluster_id,
             InstanceGroupTypes=['CORE', 'TASK'],
@@ -2879,7 +2879,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             # match pool name, and (bootstrap) hash
-            bootstrap_actions = list(_paginate(
+            bootstrap_actions = list(_boto3_paginate(
                 'BootstrapActions',
                 emr_client, 'list_bootstrap_actions', ClusterId=cluster['Id']))
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
@@ -2941,7 +2941,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 log.debug('    subnet mismatch')
                 return
 
-            steps = list(_paginate(
+            steps = list(_boto3_paginate(
                 'Steps',
                 emr_client, 'list_steps', ClusterId=cluster['Id']))
 
@@ -2969,7 +2969,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
-            for ig in _paginate(
+            for ig in _boto3_paginate(
                     'InstanceGroups', emr_client, 'list_instance_groups',
                     ClusterId=cluster['Id']):
                 role = ig['InstanceGroupType'].lower()
@@ -3043,7 +3043,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             key_cluster_steps_list.append(
                 (sort_key, cluster['Id'], len(steps)))
 
-        for cluster_summary in _paginate(
+        for cluster_summary in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',
                 ClusterStates=['WAITING']):
 
@@ -3401,7 +3401,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         emr_client = self.make_emr_client()
 
         # make sure instance groups have enough memory to run Spark
-        igs = list(_paginate(
+        igs = list(_boto3_paginate(
             'InstanceGroups', emr_client, 'list_instance_groups',
             ClusterId=self.get_cluster_id()))
 

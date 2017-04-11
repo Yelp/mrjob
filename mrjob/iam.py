@@ -26,7 +26,7 @@ idential to the ones it needs before attempting to create them.
 import json
 from logging import getLogger
 
-from mrjob.aws import _paginate
+from mrjob.aws import _boto3_paginate
 from mrjob.py2 import unquote
 from mrjob.util import random_identifier
 
@@ -93,7 +93,7 @@ def get_or_create_mrjob_service_role(client):
 
     # look for matching role. Must have same policy document
     # and attached role policy
-    for role in _paginate('Roles', client, 'list_roles'):
+    for role in _boto3_paginate('Roles', client, 'list_roles'):
         if _role_matches(client, role, _MRJOB_SERVICE_ROLE,
                          _EMR_SERVICE_ROLE_POLICY_ARN):
             return role['RoleName']
@@ -112,8 +112,8 @@ def get_or_create_mrjob_instance_profile(client):
     create one."""
     # look for matching instance profile. Must point to a role with
     # the right policy document and attached role policy
-    profiles = _paginate('InstanceProfiles', client, 'list_instance_profiles')
-    for profile in profiles:
+    for profile in _boto3_paginate(
+            'InstanceProfiles', client, 'list_instance_profiles'):
         roles = profile['Roles']
         if len(roles) != 1:
             continue

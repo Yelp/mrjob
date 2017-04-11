@@ -1,5 +1,5 @@
 # Copyright 2009-2010 Yelp
-# Copyright 2015-2016 Yelp
+# Copyright 2015-2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -62,7 +62,7 @@ from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
-from mrjob.patched_boto import _patched_describe_cluster
+from mrjob.pool import _pool_hash_and_name
 from mrjob.util import strip_microseconds
 
 # match an mrjob job key (used to uniquely identify the job)
@@ -340,12 +340,7 @@ def _cluster_to_basic_summary(cluster, now=None):
 
     bcs['num_steps'] = len(cluster['Steps'])
 
-    bcs['pool'] = None
-    bootstrap_actions = cluster.get('BootstrapActions')
-    if bootstrap_actions:
-        args = bootstrap_actions[-1].get('Args', [])
-        if len(args) == 2 and args[0].startswith('pool-'):
-            bcs['pool'] = args[1]
+    _, bcs['pool'] = _pool_hash_and_name(cluster['BootstrapActions'])
 
     m = _JOB_KEY_RE.match(bcs['name'] or '')
     if m:

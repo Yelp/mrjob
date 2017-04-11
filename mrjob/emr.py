@@ -33,23 +33,6 @@ from subprocess import Popen
 from subprocess import PIPE
 
 try:
-    import boto
-    import boto.ec2
-    import boto.emr
-    import boto.emr.connection
-    import boto.emr.instance_group
-    import boto.emr.emrobject
-    import boto.exception
-    import boto.https_connection
-    import boto.regioninfo
-    import boto.utils
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    # don't require boto; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    boto = None
-
-try:
     import botocore.client
     botocore  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
@@ -60,7 +43,7 @@ try:
     import boto3.s3.transfer
     boto3  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    # don't require boto; MRJobs don't actually need it when running
+    # don't require boto3; MRJobs don't actually need it when running
     # inside hadoop streaming
     boto3 = None
 
@@ -312,30 +295,6 @@ def _get_reason(cluster_or_step):
     return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
-# only exists for deprecated boto library support, going away in v0.7.0
-def _wrap_aws_conn(raw_conn):
-    """Wrap a given boto Connection object so that it can retry when
-    throttled."""
-    def retry_if(ex):
-        """Retry if we get a server error indicating throttling. Also
-        handle spurious 505s that are thought to be part of a load
-        balancer issue inside AWS."""
-        return ((isinstance(ex, boto.exception.BotoServerError) and
-                 ('Throttling' in ex.body or
-                  'RequestExpired' in ex.body or
-                  ex.status == 505)) or
-                (isinstance(ex, socket.error) and
-                 ex.args in ((104, 'Connection reset by peer'),
-                             (110, 'Connection timed out'))))
-
-    return RetryWrapper(raw_conn,
-                        retry_if=retry_if,
-                        backoff=_EMR_BACKOFF,
-                        multiplier=_EMR_BACKOFF_MULTIPLIER,
-                        max_tries=_EMR_MAX_TRIES)
-
-
-
 class EMRRunnerOptionStore(RunnerOptionStore):
 
     ALLOWED_KEYS = _allowed_keys('emr')
@@ -507,7 +466,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
 
         *aws_access_key_id* and *aws_secret_access_key* are required if you
-        haven't set them up already for boto (e.g. by setting the environment
+        haven't set them up already for boto3 (e.g. by setting the environment
         variables :envvar:`AWS_ACCESS_KEY_ID` and
         :envvar:`AWS_SECRET_ACCESS_KEY`)
 
@@ -835,7 +794,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if self.fs.exists(self._output_dir):
                 raise IOError(
                     'Output path %s already exists!' % (self._output_dir,))
-        except boto.exception.S3ResponseError:
+        except botocore.exceptions.ClientError:
             pass
 
     def _add_bootstrap_files_for_upload(self, persistent=False):
@@ -1185,7 +1144,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 JobFlowIds=[self._cluster_id]
             )
         except Exception as e:
-            # Something happened with boto and the user should know.
+            # Something happened with boto3 and the user should know.
             log.exception(e)
             return
         log.info('Cluster %s successfully terminated' % self._cluster_id)
@@ -1283,42 +1242,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             raise ValueError
 
         return self._opts[role + '_instance_bid_price']
-
-    def _create_instance_group(
-            self, role, instance_type, num_instances, bid_price):
-        """Helper method for creating instance groups. For use when
-        creating a cluster using a list of InstanceGroups
-
-            - Role is either 'master', 'core', or 'task'.
-            - instance_type is an EC2 instance type
-            - count is an int
-            - bid_price is a number, a string, or None. If None,
-              this instance group will be use the ON-DEMAND market
-              instead of the SPOT market.
-        """
-        if role not in _INSTANCE_ROLES:
-            raise ValueError
-
-        if not instance_type:
-            raise ValueError
-
-        if not num_instances:
-            raise ValueError
-
-        if bid_price:
-            market = 'SPOT'
-            bid_price = str(bid_price)  # must be a string
-        else:
-            market = 'ON_DEMAND'
-            bid_price = None
-
-        return boto.emr.instance_group.InstanceGroup(
-            num_instances=num_instances,
-            role=role.upper(),
-            type=instance_type,
-            market=market,
-            name=role,  # just name the groups "core", "master", and "task"
-            bidprice=bid_price)
 
     def _create_cluster(self, persistent=False):
         """Create an empty cluster on EMR, and return the ID of that
@@ -1490,9 +1413,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
     def _instance_profile(self):
         try:
             return (self._opts['iam_instance_profile'] or
-                    get_or_create_mrjob_instance_profile(self.make_iam_client()))
-        except boto.exception.BotoServerError as ex:
-            if ex.status != 403:
+                    get_or_create_mrjob_instance_profile(
+                        self.make_iam_client()))
+        except botocore.exceptions.ClientError as ex:
+            if _client_error_status(ex) != 403:
                 raise
             log.warning(
                 "Can't access IAM API, trying default instance profile: %s" %
@@ -1503,8 +1427,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         try:
             return (self._opts['iam_service_role'] or
                     get_or_create_mrjob_service_role(self.make_iam_client()))
-        except boto.exception.BotoServerError as ex:
-            if ex.status != 403:
+        except botocore.exceptions.ClientError as ex:
+             if _client_error_status(ex) != 403:
                 raise
             log.warning(
                 "Can't access IAM API, trying default service role: %s" %
@@ -1522,8 +1446,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return 'TERMINATE_CLUSTER'
 
     def _build_steps(self):
-        """Return a list of boto Step objects corresponding to the
-        steps we want to run."""
+        """Return a step data structures to pass to ``boto3``"""
         # quick, add the other steps before the job spins up and
         # then shuts itself down! (in practice that won't happen
         # for several minutes)

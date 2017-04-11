@@ -85,7 +85,7 @@ def _get_bucket_region(client, bucket_name):
 
 
 def _is_retriable_client_error(ex):
-    """Is the exception from a boto client retriable?"""
+    """Is the exception from a boto3 client retriable?"""
     if isinstance(ex, botocore.exceptions.ClientError):
         code = _client_error_code(ex)
         # "Throttl" catches "Throttled" and "Throttling"
@@ -162,8 +162,8 @@ class S3Filesystem(Filesystem):
         """Helper method for :py:meth:`ls`; yields tuples of
         ``(uri, key)`` where *key* is the corresponding boto3 s3.ObjectSummary.
         """
-        # clean up the  base uri to ensure we have an equal uri to boto (s3://)
-        # just in case we get passed s3n://
+        # clean up the  base uri to ensure we have pass boto3 an s3:// URI
+        # (not s3n://)
         scheme = urlparse(path_glob).scheme
 
         # support globs
@@ -272,7 +272,7 @@ class S3Filesystem(Filesystem):
 
         .. versionadded:: 0.6.0
         """
-        # give a non-cryptic error message if boto isn't installed
+        # give a non-cryptic error message if boto3 isn't installed
         if boto3 is None:
             raise ImportError('You must install boto3 to connect to S3')
 
@@ -294,7 +294,7 @@ class S3Filesystem(Filesystem):
 
         .. versionadded:: 0.6.0
         """
-        # give a non-cryptic error message if boto isn't installed
+        # give a non-cryptic error message if boto3 isn't installed
         if boto3 is None:
             raise ImportError('You must install boto3 to connect to S3')
 
@@ -336,7 +336,7 @@ class S3Filesystem(Filesystem):
         return resource.Bucket(bucket_name)
 
     def _get_s3_key(self, uri):
-        """Get the boto Key object matching the given S3 uri, or
+        """Get the boto3 s3.Object matching the given S3 uri, or
         return None if that key doesn't exist.
 
         uri is an S3 URI: ``s3://foo/bar``

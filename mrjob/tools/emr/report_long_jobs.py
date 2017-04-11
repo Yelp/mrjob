@@ -1,7 +1,7 @@
 # Copyright 2012 Yelp
 # Copyright 2013 David Marin and Steve Johnson
 # Copyright 2014 Brett Gibson
-# Copyright 2015-2016 Yelp
+# Copyright 2015-2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -45,20 +45,18 @@ Options::
 """
 from __future__ import print_function
 
-from datetime import datetime
 from datetime import timedelta
 import logging
 from optparse import OptionParser
 
+from mrjob.aws import _boto3_now
+from mrjob.aws import _boto3_paginate
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import _list_all_steps
-from mrjob.emr import _yield_all_clusters
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
-from mrjob.parse import iso8601_to_datetime
 from mrjob.util import strip_microseconds
 
 # default minimum number of hours a job can run before we report it.
@@ -68,7 +66,7 @@ log = logging.getLogger(__name__)
 
 
 def main(args=None):
-    now = datetime.utcnow()
+    now = _boto3_now()
 
     option_parser = _make_option_parser()
     options, args = option_parser.parse_args(args)
@@ -79,14 +77,16 @@ def main(args=None):
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     log.info('getting information about running jobs')
-    emr_conn = EMRJobRunner(**_runner_kwargs(options)).make_emr_conn()
-    cluster_summaries = _yield_all_clusters(
-        emr_conn, cluster_states=['STARTING', 'BOOTSTRAPPING', 'RUNNING'])
 
     min_time = timedelta(hours=options.min_hours)
 
+    emr_client = EMRJobRunner(**_runner_kwargs(options)).make_emr_client()
+    cluster_summaries = _boto3_paginate(
+        'Clusters', emr_client, 'list_clusters',
+        ClusterStates=['STARTING', 'BOOTSTRAPPING', 'RUNNING'])
+
     job_info = _find_long_running_jobs(
-        emr_conn, cluster_summaries, min_time, now=now)
+        emr_client, cluster_summaries, min_time, now=now)
 
     _print_report(job_info)
 
@@ -102,7 +102,7 @@ def _runner_kwargs(options):
     return kwargs
 
 
-def _find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
+def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
     """Identify jobs that have been running or pending for a long time.
 
     :param clusters: a list of :py:class:`boto.emr.emrobject.Cluster`
@@ -123,31 +123,31 @@ def _find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
               :py:class:`datetime.timedelta`
     """
     if now is None:
-        now = datetime.utcnow()
+        now = _boto3_now()
 
     for cs in cluster_summaries:
 
         # special case for jobs that are taking a long time to bootstrap
-        if cs.status.state in ('STARTING', 'BOOTSTRAPPING'):
+        if cs['Status']['State'] in ('STARTING', 'BOOTSTRAPPING'):
             # there isn't a way to tell when the cluster stopped being
             # provisioned and started bootstrapping, so just measure
             # from cluster creation time
-            created_timestamp = cs.status.timeline.creationdatetime
-            created = iso8601_to_datetime(created_timestamp)
+            created = cs['Status']['Timeline']['CreationDateTime']
 
             time_running = now - created
 
             if time_running >= min_time:
-                yield({'cluster_id': cs.id,
-                       'name': cs.name,
-                       'state': cs.status.state,
+                yield({'cluster_id': cs['Id'],
+                       'name': cs['Name'],
+                       'state': cs['Status']['State'],
                        'time': time_running})
 
         # the default case: running clusters
-        if cs.status.state != 'RUNNING':
+        if cs['Status']['State'] != 'RUNNING':
             continue
 
-        steps = _list_all_steps(emr_conn, cs.id)
+        steps = list(reversed(list(_boto3_paginate(
+            'Steps', emr_client, 'list_steps', ClusterId=cs['Id']))))
 
         running_steps = [
             step for step in steps if step.status.state == 'RUNNING']
@@ -158,15 +158,14 @@ def _find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
             # should be only one, but if not, we should know about it
             for step in running_steps:
 
-                start_timestamp = step.status.timeline.startdatetime
-                start = iso8601_to_datetime(start_timestamp)
+                start = step['Status']['Timeline']['StartDateTime']
 
                 time_running = now - start
 
                 if time_running >= min_time:
-                    yield({'cluster_id': cs.id,
-                           'name': step.name,
-                           'state': step.status.state,
+                    yield({'cluster_id': cs['Id'],
+                           'name': step['Name'],
+                           'state': step['Status']['State'],
                            'time': time_running})
 
         # sometimes EMR says it's "RUNNING" but doesn't actually run steps!
@@ -175,18 +174,17 @@ def _find_long_running_jobs(emr_conn, cluster_summaries, min_time, now=None):
 
             # PENDING job should have run starting when the cluster
             # became ready, or the previous step completed
-            start_timestamp = cs.status.timeline.readydatetime
+            start = cs['Status']['Timeline']['ReadyDateTime']
             for step in steps:
-                if step.status.state == 'COMPLETED':
-                    start_timestamp = step.status.timeline.enddatetime
+                if step['Status']['State'] == 'COMPLETED':
+                    start = cs['Status']['Timeline']['EndDateTime']
 
-            start = iso8601_to_datetime(start_timestamp)
             time_pending = now - start
 
             if time_pending >= min_time:
-                yield({'cluster_id': cs.id,
-                       'name': step.name,
-                       'state': step.status.state,
+                yield({'cluster_id': cs['Id'],
+                       'name': step['Name'],
+                       'state': step['Status']['State'],
                        'time': time_pending})
 
 

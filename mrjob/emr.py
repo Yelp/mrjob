@@ -1428,7 +1428,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return (self._opts['iam_service_role'] or
                     get_or_create_mrjob_service_role(self.make_iam_client()))
         except botocore.exceptions.ClientError as ex:
-             if _client_error_status(ex) != 403:
+            if _client_error_status(ex) != 403:
                 raise
             log.warning(
                 "Can't access IAM API, trying default service role: %s" %

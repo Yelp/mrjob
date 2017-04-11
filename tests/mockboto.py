@@ -30,7 +30,6 @@ import boto3
 import botocore.config
 from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
-from dateutil.tz import tzutc
 
 try:
     import boto.emr.connection
@@ -43,6 +42,7 @@ except ImportError:
     boto = None
 
 
+from mrjob.aws import _boto3_now
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
@@ -348,7 +348,7 @@ def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
     :param location string: the bucket's location cosntraint (a region name)
     """
     age = age or timedelta(0)
-    time_modified = datetime.now(tzutc()) - age
+    time_modified = _boto3_now() - age
 
     for bucket_name, key_name_to_bytes in data.items():
         bucket = mock_s3_fs.setdefault(bucket_name,
@@ -575,7 +575,7 @@ class MockS3Object(object):
         if not isinstance(data, bytes):
             raise TypeError('Body or Body.read() must be bytes')
 
-        mock_keys[self.key] = (data, datetime.now(tzutc()))
+        mock_keys[self.key] = (data, _boto3_now())
 
     def upload_file(self, path, Config=None):
         if self.bucket_name not in self.meta.client.mock_s3_fs:
@@ -587,7 +587,7 @@ class MockS3Object(object):
 
         mock_keys = self._mock_bucket_keys('PutObject')
         with open(path, 'rb') as f:
-            mock_keys[self.key] = (f.read(), datetime.now(tzutc()))
+            mock_keys[self.key] = (f.read(), _boto3_now())
 
     def __getattr__(self, key):
         if key in ('e_tag', 'last_modified', 'size'):
@@ -1641,7 +1641,7 @@ class MockIAMClient(object):
         role = dict(
             Arn=('arn:aws:iam::012345678901:role/%s' % RoleName),
             AssumeRolePolicyDocument=json.loads(AssumeRolePolicyDocument),
-            CreateDate=datetime.now(tzutc()),
+            CreateDate=_boto3_now(),
             Path='/',
             RoleId='AROAMOCKMOCKMOCKMOCK',
             RoleName=RoleName,
@@ -1707,7 +1707,7 @@ class MockIAMClient(object):
         profile = dict(
             Arn=('arn:aws:iam::012345678901:instance-profile/%s' %
                  InstanceProfileName),
-            CreateDate=datetime.now(tzutc()),
+            CreateDate=_boto3_now(),
             InstanceProfileId='AIPAMOCKMOCKMOCKMOCK',
             InstanceProfileName=InstanceProfileName,
             Path='/',

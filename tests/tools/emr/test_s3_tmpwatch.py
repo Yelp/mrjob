@@ -18,8 +18,6 @@ from datetime import timedelta
 import tempfile
 import shutil
 
-from dateutil.tz import tzutc
-
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.s3_tmpwatch import _s3_cleanup
 from tests.mockboto import MockBotoTestCase

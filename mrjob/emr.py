@@ -65,14 +65,6 @@ except ImportError:
     boto3 = None
 
 
-# dateutil is a boto3 dependency
-try:
-    from dateutil.tz import tzutc
-    tzutc
-except ImportError:
-    tzutc = None
-
-
 import mrjob
 import mrjob.step
 from mrjob.aws import _DEFAULT_AWS_REGION
@@ -80,6 +72,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import emr_endpoint_for_region
 from mrjob.aws import emr_ssl_host_for_region
+from mrjob.aws import _boto3_now
 from mrjob.aws import _paginate
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
@@ -397,7 +390,7 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
             return False
         else:
             # dateutil is a boto3 dependency
-            age = datetime.now(tzutc()) - key_data['LastModified']
+            age = _boto3_now() - key_data['LastModified']
             if age <= timedelta(minutes=mins_to_expiration):
                 return False
 
@@ -1952,7 +1945,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 start = step['Status']['Timeline'].get('StartDateTime')
                 if start:
                     time_running_desc = ' for %s' % strip_microseconds(
-                        datetime.now(tzutc()) - start)
+                        _boto3_now() - start)
 
                 # now is the time to tunnel, if we haven't already
                 self._set_up_ssh_tunnel()

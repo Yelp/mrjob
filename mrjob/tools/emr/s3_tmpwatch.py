@@ -49,8 +49,7 @@ from datetime import timedelta
 import logging
 from optparse import OptionParser
 
-from dateutil.tz import tzutc
-
+from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_options
@@ -91,7 +90,7 @@ def _s3_cleanup(glob_path, time_old, dry_run=False, **runner_kwargs):
              (glob_path, time_old))
 
     for path, key in runner.fs._ls(glob_path):
-        age = datetime.now(tzutc()) - key.last_modified
+        age = _boto3_now() - key.last_modified
         if age > time_old:
             # Delete it
             log.info('Deleting %s; is %s old' % (path, age))

@@ -16,21 +16,12 @@
 # limitations under the License.
 """Utilities related to cluster pooling. This code used to be in mrjob.emr.
 """
-from datetime import datetime
 from datetime import timedelta
 from logging import getLogger
 
-from mrjob.parse import iso8601_to_datetime
+from mrjob.aws import _boto3_now
 
 log = getLogger(__name__)
-
-
-# dateutil is a boto3 dependency
-try:
-    from dateutil.tz import tzutc
-    tzutc
-except ImportError:
-    tzutc = None
 
 
 ### current versions of these functions, using "cluster" API calls ###
@@ -45,7 +36,7 @@ def _est_time_to_hour(cluster_summary, now=None):
     one hour, not zero.
     """
     if now is None:
-        now = datetime.now(tzutc())
+        now = _boto3_now()
 
     timeline = cluster_summary.get('Status', {}).get('Timeline', {})
 

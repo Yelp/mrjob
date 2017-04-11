@@ -27,7 +27,6 @@ from datetime import timedelta
 from io import BytesIO
 
 import boto3
-from dateutil.tz import tzutc
 
 import mrjob
 import mrjob.emr

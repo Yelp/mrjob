@@ -790,6 +790,49 @@ class MockEMRClient(object):
 
         # raise NotImplementedError for remaining params
 
+        self.mock_emr_clusters[cluster['Id']] = cluster
+
+        return dict(JobFlowId=cluster['Id'])
+
+    def _run_job_flow_instances(self, Instances):
+        Instances = dict(Instances)
+
+        result = dict(
+            _InstanceGroups=[],
+        )
+
+        # TODO: fill this in
+
+        # minimal InstanceGroups:
+        #[{u'Configurations': [],
+        #  u'EbsBlockDevices': [],
+        #  u'Id': u'ig-1L5JGFDPZQ02K',
+        #  u'InstanceGroupType': u'MASTER',
+        #  u'InstanceType': u'm1.medium',
+        #  u'Market': u'ON_DEMAND',
+        #  u'Name': u'master',
+        #  u'RequestedInstanceCount': 1,
+        #  u'RunningInstanceCount': 0,
+        #  u'ShrinkPolicy': {},
+        #  u'Status': {u'State': u'TERMINATED',
+        #   u'StateChangeReason': {u'Code': u'CLUSTER_TERMINATED',
+        #    u'Message': u'Job flow terminated'},
+        #   u'Timeline': {u'CreationDateTime': datetime.datetime(2017, 4, 11, 22, 39, 47, 26000, tzinfo=tzlocal()),
+        #    u'EndDateTime': datetime.datetime(2017, 4, 11, 22, 48, 22, 648000, tzinfo=tzlocal()),
+        #    u'ReadyDateTime': datetime.datetime(2017, 4, 11, 22, 46, 20, 372000, tzinfo=tzlocal())}}}]
+
+        return result
+
+    def _add_steps(self, operation_name, Steps, cluster):
+        if not isinstance(Steps, list):
+            raise ValidationError
+
+        # TODO: fill this in
+
+    def _add_tags(self, operation_name, Tags, cluster):
+        if not isinstance(Tags, list):
+            raise ValidationError
+
     # TODO: *now* is not a param to the real run_jobflow(), rename to _now
     def run_jobflow(self,
                     name, log_uri=None, ec2_keyname=None,

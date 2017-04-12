@@ -25,14 +25,24 @@ from mrjob.parse import parse_s3_uri
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
 
+from ..py2 import unittest
 from .s3 import add_mock_s3_data
 from .util import MockObject
 
-# these are going away, quiet pyflakes for now
-MockEmrObject = None
-boto = None
-err_xml = None
-to_iso8601 = None
+
+# skip tests that use these old boto 2 utils
+def _skip_boto_2_test(*args, **kind):
+    raise unittest.SkipTest('old boto 2 test')
+
+
+class MockBoto2Module(object):
+    def __getattr__(self, name):
+        _skip_boto_2_test()
+
+MockEmrObject = _skip_boto_2_test
+boto = MockBoto2Module()
+err_xml = _skip_boto_2_test
+to_iso8601 = _skip_boto_2_test
 
 
 # what partial versions and "latest" map to, as of 2015-07-15

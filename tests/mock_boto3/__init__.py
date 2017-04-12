@@ -16,12 +16,7 @@
 This is by no means a complete mock of boto3, just what we need for tests.
 """
 from .case import MockBoto3TestCase
-from .iam import MockIAMClient
+MockBoto3TestCase  # shh, pyflakes
 
 # temporary shim
-from .util import MockObject as MockEmrObject
-
-# quiet pyflakes
-MockBoto3TestCase
-MockEmrObject
-MockIAMClient
+MockEmrObject = None

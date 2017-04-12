@@ -22,12 +22,10 @@ import os
 import shutil
 import tempfile
 import time
-from datetime import datetime
 from datetime import timedelta
 from io import BytesIO
 
 import boto3
-import botocore.config
 from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
 from botocore.exceptions import ParamValidationError
@@ -48,7 +46,6 @@ from mrjob.py2 import string_types
 from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
@@ -837,7 +834,7 @@ class MockEMRClient(object):
         hadoop_version = map_version(
             running_ami_version, AMI_HADOOP_VERSION_UPDATES)
 
-        if version_get(running_ami_version, '4'):
+        if version_gte(running_ami_version, '4'):
             application_names = set(
                 a['Name'] for a in kwargs.get('Applications', []))
 
@@ -868,7 +865,7 @@ class MockEMRClient(object):
 
         # Configurations
         if 'Configurations' in kwargs:
-            cluster['Configurations'] = normalized_configurations(
+            cluster['Configurations'] = _normalized_configurations(
                 kwargs.pop('Configurations'))
 
         # VisibleToAllUsers
@@ -884,7 +881,8 @@ class MockEMRClient(object):
         # pass Instances (required) off to helper
         if 'Instances' not in kwargs:
             raise ParamValidationError
-        self._add_instances('RunJobFlow', kwargs.pop('Instances'), cluster)
+        self._add_instances('RunJobFlow', kwargs.pop('Instances'), cluster,
+                            now=now)
 
         # pass Steps off to helper
         if 'Steps' in kwargs:
@@ -939,8 +937,11 @@ class MockEMRClient(object):
 
         cluster['_BootstrapActions'].extend(new_actions)
 
-    def _add_instances(self, operation_name, Instances, cluster):
+    def _add_instances(self, operation_name, Instances, cluster, now=None):
         """Handle Instances param from run_job_flow()"""
+        if now is None:
+            now = _boto3_now()
+
         _check_param_type(Instances, dict)
 
         Instances = dict(Instances)  # going to pop params from Instances
@@ -1016,11 +1017,11 @@ class MockEMRClient(object):
             self._add_instance_groups(
                 operation_name, instance_groups, cluster, now=now)
 
-        if kwargs:
+        if Instances:
             raise NotImplementedError(
                 'mock %s does not support these parameters: %s' % (
                     operation_name,
-                    ', '.join('Instances.%s' % k for k in sorted(kwargs))))
+                    ', '.join('Instances.%s' % k for k in sorted(Instances))))
 
     def _add_instance_groups(self, operation_name, InstanceGroups, cluster,
                              now=None):
@@ -1138,24 +1139,25 @@ class MockEMRClient(object):
                                  ' instance group.')
 
                 # simulate bid price validation
+                BidPrice = InstanceGroup.pop('BidPrice')
                 try:
-                    if not float(bid_price) > 0:
+                    if not float(BidPrice) > 0:
                         raise _error('The bid price is negative or zero.')
                 except (TypeError, ValueError):
                     raise _error(
                         'The bid price supplied for an instance group is'
                         ' invalid')
 
-                if '.' in bid_price and len(bid_price.split('.', 1)[1]) > 3:
+                if '.' in BidPrice and len(BidPrice.split('.', 1)[1]) > 3:
                     raise _error('No more than 3 digits are allowed after'
                                  ' decimal place in bid price')
 
-                ig['BidPrice'] = InstanceGroup.pop('BidPrice')
+                ig['BidPrice'] = BidPrice
 
-            if kwargs:
+            if InstanceGroup:
                 raise NotImplementedError(
                     'mockboto does not support these InstanceGroup'
-                    ' params: %s' % ', '.join(sorted(kwargs)))
+                    ' params: %s' % ', '.join(sorted(InstanceGroup)))
 
             new_igs.append(ig)
 
@@ -1176,7 +1178,7 @@ class MockEMRClient(object):
             now = _boto3_now()
 
         if not isinstance(Steps, list):
-            raise ValidationError
+            raise ParamValidationError
 
         new_steps = []
 
@@ -1241,7 +1243,7 @@ class MockEMRClient(object):
 
     def _add_tags(self, operation_name, Tags, cluster):
         if not isinstance(Tags, list):
-            raise ValidationError
+            raise ParamValidationError
 
         new_tags = {}
 
@@ -1903,10 +1905,14 @@ class MockIAMClient(object):
 
         profile = self.mock_iam_instance_profiles[InstanceProfileName]
         if profile['Roles']:
-            raise LimitExceededException(
-                'An error occurred (LimitExceeded) when calling the'
-                ' AddRoleToInstanceProfile operation: Cannot exceed quota for'
-                ' InstanceSessionsPerInstanceProfile: 1')
+            raise ClientError(
+                dict(Error=dict(
+                    Code='LimitExceeded',
+                    Message=('Cannot exceed quota for'
+                             ' InstanceSessionsPerInstanceProfile: 1'),
+                )),
+                'AddRoleToInstanceProfile',
+            )
 
         # just point straight at the mock role; never going to redefine it
         profile['Roles'] = [self.mock_iam_roles[RoleName]]
@@ -1948,7 +1954,7 @@ def _normalized_configurations(configurations):
     if not isinstance(configurations, list):
         raise ParamValidationError
 
-    results = []
+    configurations = list(configurations)
 
     for c in configurations:
         if not isinstance(c, dict):
@@ -1963,3 +1969,5 @@ def _normalized_configurations(configurations):
                     c['configurations'])
             else:
                 del c['configurations']
+
+    return configurations

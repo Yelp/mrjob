@@ -3277,8 +3277,7 @@ def _decode_configurations_from_api(configurations):
     return results
 
 
-def _build_instance_group(
-        self, role, instance_type, num_instances, bid_price):
+def _build_instance_group(role, instance_type, num_instances, bid_price):
     """Helper method for creating instance groups. For use when
     creating a cluster using a list of InstanceGroups
 
@@ -3298,17 +3297,16 @@ def _build_instance_group(
     if not num_instances:
         raise ValueError
 
-    if bid_price:
-        market = 'SPOT'
-        bid_price = str(bid_price)  # must be a string
-    else:
-        market = 'ON_DEMAND'
-        bid_price = None
-
-    return dict(
+    ig = dict(
         InstanceCount=num_instances,
         InstanceRole=role.upper(),
         InstanceType=instance_type,
-        Market=market,
+        Market='ON_DEMAND',
         Name=role,  # just name the groups "core", "master", and "task"
-        BidPrice=bid_price)
+    )
+
+    if bid_price:
+        ig['Market'] = 'SPOT'
+        ig['BidPrice'] = str(bid_price)  # must be a string
+
+    return ig

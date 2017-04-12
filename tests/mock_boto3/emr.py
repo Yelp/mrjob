@@ -295,7 +295,7 @@ class MockEMRClient(object):
 
         if version_gte(running_ami_version, '4'):
             application_names = set(
-                a['Name'] for a in kwargs.get('Applications', []))
+                a['Name'] for a in kwargs.pop('Applications', []))
 
             # if Applications is set but doesn't include Hadoop, the
             # cluster description won't either! (Even though Hadoop is
@@ -473,7 +473,7 @@ class MockEMRClient(object):
                 if instance_count > 1:
                     instance_groups.append(dict(
                         InstanceRole='CORE',
-                        InstanceType=Instances.pop('SlaveInstanceType'),
+                        InstanceType=SlaveInstanceType,
                         InstanceCount=instance_count - 1))
 
             self._add_instance_groups(
@@ -799,7 +799,10 @@ class MockEMRClient(object):
 
         return True
 
-    def describe_cluster(self, cluster_id):
+    def _enforce_strict_ssl(self):
+        _skip_boto_2_test()
+
+    def describe_cluster(self, **kwargs):
         self._enforce_strict_ssl()
 
         cluster = self._get_mock_cluster(cluster_id)
@@ -1185,7 +1188,8 @@ def _check_param_type(value, type_or_types):
     """quick way to raise a boto3 ParamValidationError. We don't bother
     constructing the text of the ParamValidationError."""
     if not isinstance(value, type_or_types):
-        raise ParamValidationError
+        raise ParamValidationError(
+            report=('%r is not an instance of %r' % (value, type_or_types)))
 
 
 def _invalid_request_error(operation_name, message):

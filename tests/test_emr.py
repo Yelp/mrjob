@@ -55,6 +55,9 @@ from mrjob.util import log_to_stream
 import tests.mock_boto3
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_boto3.emr import DEFAULT_MAX_STEPS_RETURNED
+from tests.mock_boto3.emr import Boto2TestSkipper
+from tests.mock_boto3.emr import MockEmrObject
+from tests.mock_boto3.emr import MockEmrConnection
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
@@ -69,16 +72,23 @@ from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
-from tests.py2 import TestCase
 from tests.py2 import call
 from tests.py2 import patch
-from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_local import _bash_wrap
+
+# detect and skip boto 2 tests
+_decode_configurations_from_api = Boto2TestSkipper()
+_list_all_steps = Boto2TestSkipper()
+_yield_all_bootstrap_actions = Boto2TestSkipper()
+_yield_all_clusters = Boto2TestSkipper()
+_yield_all_instance_groups = Boto2TestSkipper()
+boto = Boto2TestSkipper()
+
 
 # used to match command lines
 if PY2:

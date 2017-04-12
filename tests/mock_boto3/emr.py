@@ -30,19 +30,21 @@ from .s3 import add_mock_s3_data
 from .util import MockObject
 
 
-# skip tests that use these old boto 2 utils
-def _skip_boto_2_test(*args, **kind):
-    raise unittest.SkipTest('old boto 2 test')
+class Boto2TestSkipper(object):
+    def __call__(self, *args, **kwargs):
+        raise unittest.SkipTest('old boto 2 test')
 
-
-class MockBoto2Module(object):
     def __getattr__(self, name):
-        _skip_boto_2_test()
+        self()
 
-MockEmrObject = _skip_boto_2_test
-boto = MockBoto2Module()
-err_xml = _skip_boto_2_test
-to_iso8601 = _skip_boto_2_test
+MockEmrConnection = Boto2TestSkipper()
+MockEmrObject = Boto2TestSkipper()
+err_xml = Boto2TestSkipper()
+to_iso8601 = Boto2TestSkipper()
+_decode_configurations_from_api = Boto2TestSkipper()
+_list_all_steps = Boto2TestSkipper()
+_yield_all_instance_groups = Boto2TestSkipper()
+_yield_all_clusters = Boto2TestSkipper()
 
 
 # what partial versions and "latest" map to, as of 2015-07-15
@@ -96,6 +98,8 @@ DUMMY_APPLICATION_VERSION = '0.0.0'
 class MockEMRClient(object):
     """Mock out boto3 EMR clients. This actually handles a small
     state machine that simulates EMR clusters."""
+
+    _enforce_strict_ssl = Boto2TestSkipper()
 
     def __init__(self,
                  aws_access_key_id=None,
@@ -798,9 +802,6 @@ class MockEMRClient(object):
                     key=key, value=value))
 
         return True
-
-    def _enforce_strict_ssl(self):
-        _skip_boto_2_test()
 
     def describe_cluster(self, **kwargs):
         self._enforce_strict_ssl()

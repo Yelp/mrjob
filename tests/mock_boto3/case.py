@@ -32,7 +32,7 @@ from ..py2 import patch
 from ..sandbox import SandboxedTestCase
 
 from .emr import MockEMRClient
-from .emr import _skip_boto_2_test
+from .emr import Boto2TestSkipper
 from .iam import MockIAMClient
 from .s3 import MockS3Client
 from .s3 import MockS3Resource
@@ -86,7 +86,7 @@ class MockBoto3TestCase(SandboxedTestCase):
 
         self.start(patch.object(
             EMRJobRunner, 'make_emr_conn',
-            _skip_boto_2_test, create=True))
+            Boto2TestSkipper(), create=True))
 
         self.start(patch.object(time, 'sleep'))
 

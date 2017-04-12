@@ -461,12 +461,15 @@ class MockEMRClient(object):
                 InstanceCount=1))
 
             if 'SlaveInstanceType' in Instances:
-                _check_param_type(
-                    Instances.get('SlaveInstanceType'), string_types)
-                instance_groups.append(dict(
-                    InstanceRole='CORE',
-                    InstanceType=Instances.pop('SlaveInstanceType'),
-                    InstanceCount=instance_count - 1))
+                SlaveInstanceType = Instances.pop('SlaveInstanceType')
+                _check_param_type(SlaveInstanceType, string_types)
+
+                # don't create a group with no instances!
+                if instance_count > 1:
+                    instance_groups.append(dict(
+                        InstanceRole='CORE',
+                        InstanceType=Instances.pop('SlaveInstanceType'),
+                        InstanceCount=instance_count - 1))
 
             self._add_instance_groups(
                 operation_name, instance_groups, cluster, now=now)
@@ -511,7 +514,7 @@ class MockEMRClient(object):
                 InstanceGroupType='',
                 Market='ON_DEMAND',
                 RequestedInstanceCount=0,
-                RunningInstanceCount=1,
+                RunningInstanceCount=0,
                 ShrinkPolicy={},
                 Status=dict(
                     State='PROVISIONING',
@@ -565,7 +568,7 @@ class MockEMRClient(object):
             if role == 'MASTER' and InstanceCount != 1:
                 raise _error(
                     'A master instance group must specify a single instance')
-            ig['InstanceCount'] = InstanceCount
+            ig['RequestedInstanceCount'] = InstanceCount
 
             # Name
             if 'Name' in InstanceGroup:

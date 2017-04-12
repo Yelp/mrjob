@@ -30,6 +30,7 @@ import boto3
 import botocore.config
 from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
+from botocore.exceptions import ParamValidationError
 
 from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import _boto3_now
@@ -350,6 +351,21 @@ def _no_such_key_error(key_name, operation_name):
                 Code='NoSuchKey',
                 Key=key_name,
                 Message='The specified key does not exist',
+            ),
+            ResponseMetadata=dict(
+                HTTPStatusCode=404,
+            ),
+        ),
+        operation_name,
+    )
+
+
+def _validation_error(operation_name, message):
+    return ClientError(
+        dict(
+            Error=dict(
+                Code='ValidationException',
+                Message=message,
             ),
             ResponseMetadata=dict(
                 HTTPStatusCode=404,
@@ -694,6 +710,85 @@ class MockEMRClient(object):
         self.meta = MockObject(
             endpoint_url=endpoint_url,
             region_name=region_name)
+
+    def run_job_flow(self, **kwargs):
+        now = kwargs.pop('_Now', _boto3_now())
+
+        # our newly created cluster, as described by describe_cluster()
+        # plus additional fields _BootstrapActions, _InstanceGroups,
+        # and _Steps
+        cluster = dict(
+            _BootstrapActions=[],
+            _InstanceGroups=[],
+            _Steps=[],
+            Applications=[],
+            AutoTerminate=True,
+            Configurations=[],
+            Ec2InstanceAttributes=dict(
+                EmrManagedMasterSecurityGroup='sg-mockmaster',
+                EmrManagedSlaveSecurityGroup='sg-mockslave',
+                IamInstanceProfile='',
+            ),
+            Id='',
+            Name='',
+            NormalizedInstanceHours=0,
+            ScaleDownBehavior='TERMINATE_AT_TASK_COMPLETION',
+            ServiceRole='',
+            Status=dict(
+                State='STARTING',
+                StateChangeReason={},
+                Timeline=dict(CreationDateTime=now),
+            ),
+            Tags=[],
+            TerminationProtected=False,
+            VisibleToAllUsers=False,
+        )
+
+        cluster['Id'] = (
+            kwargs.pop('_Id', None) or
+            'j-MOCKCLUSTER%d' % len (self.mock_emr_clusters))
+
+        if not isinstance(kwargs.get('Name'), string_types):
+            raise ValidationError
+        cluster['Name'] = kwargs.pop('Name', None)
+
+        if not isinstance(kwargs.get('Instances'), dict):
+            raise ValidationError
+
+        cluster.update(self._run_job_flow_instances(kwargs.pop('Instances')))
+
+        if not isinstance(kwargs.get('JobFlowRole'), string_types):
+            raise ValidationError
+        cluster['Ec2InstanceAttributes']['IamInstanceProfile'] = kwargs.pop(
+            'JobFlowRole')
+
+        if 'ServiceRole' not in kwargs:
+            raise _validation_error(
+                'RunJobFlow', 'ServiceRole is required for creating cluster.')
+        cluster['ServiceRole'] = kwargs.pop('ServiceRole')
+        if not isinstance(cluster['ServiceRole'], string_types):
+            raise ValidationError
+
+        # handle AmiVersion or ReleaseLabel
+
+        # handle BootstrapActions
+
+        # handle Applications
+
+        # handle Configurations
+
+        if 'VisibleToAllUsers' in kwargs:
+            cluster['VisibleToAllUsers'] = kwargs['VisibleToAllUsers']
+            if not isinstance(cluster['VisibleToAllUsers'], bool):
+                raise ValidationError
+
+        if 'Steps' in kwargs:
+            self._add_steps('RunJobFlow', kwargs['Steps'], cluster)
+
+        if 'Tags' in kwargs:
+            self._add_tags('RunJobFlow', kwargs['Tags'], cluster)
+
+        # raise NotImplementedError for remaining params
 
     # TODO: *now* is not a param to the real run_jobflow(), rename to _now
     def run_jobflow(self,

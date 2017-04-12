@@ -42,6 +42,7 @@ from mrjob.emr import _EMR_LOG_DIR
 from mrjob.emr import EMRJobRunner
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
+from mrjob.py2 import string_types
 
 from tests.mockssh import create_mock_ssh_script
 from tests.mockssh import mock_ssh_dir

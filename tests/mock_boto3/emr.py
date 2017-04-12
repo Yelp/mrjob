@@ -230,7 +230,12 @@ class MockEMRClient(object):
 
         # Name (required)
         _check_param_type(kwargs.get('Name'), string_types)
-        cluster['Name'] = kwargs.pop('Name', None)
+        cluster['Name'] = kwargs.pop('Name')
+
+        # LogUri
+        if 'LogUri' in kwargs:
+            _check_param_type(kwargs['LogUri'], string_types)
+            cluster['LogUri'] = kwargs.pop('LogUri')
 
         # JobFlowRole and ServiceRole (required)
         _check_param_type(kwargs.get('JobFlowRole'), string_types)

@@ -919,7 +919,7 @@ class MockEMRClient(object):
         for ba in BootstrapActions:
             _check_param_type(ba, dict)
             _check_param_type(ba.get('Name'), string_types)
-            _check_param_type(ba.get('ScriptBootstrapAction', dict))
+            _check_param_type(ba.get('ScriptBootstrapAction'), dict)
             _check_param_type(ba['ScriptBootstrapAction'].get('Path'),
                               string_types)
 
@@ -1067,7 +1067,7 @@ class MockEMRClient(object):
             )
 
             # InstanceRole (required)
-            _check_param_type(InstanceGroup.get('InstanceRole', string_types))
+            _check_param_type(InstanceGroup.get('InstanceRole'), string_types)
             role = InstanceGroup.pop('InstanceRole')
 
             # bad role type
@@ -1089,7 +1089,7 @@ class MockEMRClient(object):
             ig['InstanceGroupType'] = role
 
             # InstanceType (required)
-            _check_param_type(InstanceGroup.get('InstanceType', string_types))
+            _check_param_type(InstanceGroup.get('InstanceType'), string_types)
 
             # 3.x AMIs (but not 4.x, etc.) reject m1.small explicitly
             if (InstanceGroup.get('InstanceType') == 'm1.small' and
@@ -1210,7 +1210,7 @@ class MockEMRClient(object):
             _check_param_type(Step.get('HadoopJarStep'), dict)
             HadoopJarStep = dict(Step.pop('HadoopJarStep'))
 
-            _check_param_type(HadoopJarStep.get('Jar', string_types))
+            _check_param_type(HadoopJarStep.get('Jar'), string_types)
             new_step['Config']['Jar'] = HadoopJarStep.pop('Jar')
 
             if 'Args' in HadoopJarStep:

@@ -42,6 +42,7 @@ from mrjob.emr import _EMR_LOG_DIR
 from mrjob.emr import EMRJobRunner
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
+from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
 
 from tests.mockssh import create_mock_ssh_script
@@ -330,6 +331,14 @@ def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
             bucket['location'] = location
 
 
+def _invalid_request_error(operation_name, message):
+    # boto3 reports this as a botocore.exceptions.InvalidRequestException,
+    # but that's not something you can actually import
+    return AttributeError(
+        'An error occurred (InvalidRequestException) when calling the'
+        ' %s operation: %s' % (operation_name, message))
+
+
 def _no_such_bucket_error(bucket_name, operation_name):
     return ClientError(
         dict(
@@ -374,6 +383,12 @@ def _validation_error(operation_name, message):
         ),
         operation_name,
     )
+
+def _check_param_type(value, type_or_types):
+    """quick way to raise a boto3 ParamValidationError. We don't bother
+    constructing the text of the ParamValidationError."""
+    if not isinstance(value, type_or_types):
+        raise ParamValidationError
 
 
 class MockS3Client(object):
@@ -713,11 +728,20 @@ class MockEMRClient(object):
             region_name=region_name)
 
     def run_job_flow(self, **kwargs):
+        # going to pop params from kwargs as we process then, and raise
+        # NotImplementedError at the end if any params are left
         now = kwargs.pop('_Now', _boto3_now())
 
-        # our newly created cluster, as described by describe_cluster()
-        # plus additional fields _BootstrapActions, _InstanceGroups,
-        # and _Steps
+        # our newly created cluster, as described by describe_cluster(), plus:
+        #
+        # _BootstrapActions: as described by list_bootstrap_actions()
+        # _InstanceGroups: as described by list_instance_groups()
+        # _Steps: as decribed by list_steps(), but not reversed
+        #
+        # TODO: at some point when we implement instance fleets,
+        # _InstanceGroups will become optional
+        #
+        # TODO: update simulate_progress() to add MasterPublicDnsName
         cluster = dict(
             _BootstrapActions=[],
             _InstanceGroups=[],
@@ -745,199 +769,77 @@ class MockEMRClient(object):
             VisibleToAllUsers=False,
         )
 
+        def _error(message):
+            return _validation_error('RunJobFlow', message)
+
+        # Id
         cluster['Id'] = (
             kwargs.pop('_Id', None) or
             'j-MOCKCLUSTER%d' % len (self.mock_emr_clusters))
 
-        if not isinstance(kwargs.get('Name'), string_types):
-            raise ValidationError
+        # Name (required)
+        _check_param_type(kwargs.get('Name'), string_types)
         cluster['Name'] = kwargs.pop('Name', None)
 
-        if not isinstance(kwargs.get('Instances'), dict):
-            raise ValidationError
-
-        cluster.update(self._run_job_flow_instances(kwargs.pop('Instances')))
-
-        if not isinstance(kwargs.get('JobFlowRole'), string_types):
-            raise ValidationError
+        # JobFlowRole and ServiceRole (required)
+        _check_param_type(kwargs.get('JobFlowRole'), string_types)
         cluster['Ec2InstanceAttributes']['IamInstanceProfile'] = kwargs.pop(
             'JobFlowRole')
 
-        if 'ServiceRole' not in kwargs:
-            raise _validation_error(
-                'RunJobFlow', 'ServiceRole is required for creating cluster.')
+        if 'ServiceRole' not in kwargs:  # required by API, not boto3
+            raise _error('ServiceRole is required for creating cluster.')
+        _check_param_type(kwargs['ServiceRole'], string_types)
         cluster['ServiceRole'] = kwargs.pop('ServiceRole')
-        if not isinstance(cluster['ServiceRole'], string_types):
-            raise ValidationError
 
-        # handle AmiVersion or ReleaseLabel
+        # AmiVersion and ReleaseLabel
+        for version_param in ('AmiVersion', 'ReleaseLabel'):
+            if version_param in kwargs:
+                _check_param_type(kwargs[version_param], string_types)
 
-        # handle BootstrapActions
-
-        # handle Applications
-
-        # handle Configurations
-
-        if 'VisibleToAllUsers' in kwargs:
-            cluster['VisibleToAllUsers'] = kwargs['VisibleToAllUsers']
-            if not isinstance(cluster['VisibleToAllUsers'], bool):
-                raise ValidationError
-
-        if 'Steps' in kwargs:
-            self._add_steps('RunJobFlow', kwargs['Steps'], cluster)
-
-        if 'Tags' in kwargs:
-            self._add_tags('RunJobFlow', kwargs['Tags'], cluster)
-
-        # raise NotImplementedError for remaining params
-
-        self.mock_emr_clusters[cluster['Id']] = cluster
-
-        return dict(JobFlowId=cluster['Id'])
-
-    def _run_job_flow_instances(self, Instances):
-        Instances = dict(Instances)
-
-        result = dict(
-            _InstanceGroups=[],
-        )
-
-        # TODO: fill this in
-
-        # minimal InstanceGroups:
-        #[{u'Configurations': [],
-        #  u'EbsBlockDevices': [],
-        #  u'Id': u'ig-1L5JGFDPZQ02K',
-        #  u'InstanceGroupType': u'MASTER',
-        #  u'InstanceType': u'm1.medium',
-        #  u'Market': u'ON_DEMAND',
-        #  u'Name': u'master',
-        #  u'RequestedInstanceCount': 1,
-        #  u'RunningInstanceCount': 0,
-        #  u'ShrinkPolicy': {},
-        #  u'Status': {u'State': u'TERMINATED',
-        #   u'StateChangeReason': {u'Code': u'CLUSTER_TERMINATED',
-        #    u'Message': u'Job flow terminated'},
-        #   u'Timeline': {u'CreationDateTime': datetime.datetime(2017, 4, 11, 22, 39, 47, 26000, tzinfo=tzlocal()),
-        #    u'EndDateTime': datetime.datetime(2017, 4, 11, 22, 48, 22, 648000, tzinfo=tzlocal()),
-        #    u'ReadyDateTime': datetime.datetime(2017, 4, 11, 22, 46, 20, 372000, tzinfo=tzlocal())}}}]
-
-        return result
-
-    def _add_steps(self, operation_name, Steps, cluster):
-        if not isinstance(Steps, list):
-            raise ValidationError
-
-        # TODO: fill this in
-
-    def _add_tags(self, operation_name, Tags, cluster):
-        if not isinstance(Tags, list):
-            raise ValidationError
-
-    # TODO: *now* is not a param to the real run_jobflow(), rename to _now
-    def run_jobflow(self,
-                    name, log_uri=None, ec2_keyname=None,
-                    availability_zone=None,
-                    master_instance_type='m1.small',
-                    slave_instance_type='m1.small', num_instances=1,
-                    action_on_failure='TERMINATE_CLUSTER', keep_alive=False,
-                    enable_debugging=False,
-                    hadoop_version=None,
-                    steps=None,
-                    bootstrap_actions=[],
-                    instance_groups=None,
-                    additional_info=None,
-                    ami_version=None,
-                    now=None,
-                    api_params=None,
-                    visible_to_all_users=None,
-                    job_flow_role=None,
-                    service_role=None,
-                    _id=None):
-        """Mock of run_jobflow().
-        """
-        if now is None:
-            now = _boto3_now()
-
-        # convert api_params into MockEmrObject
-        api_params_obj = _api_params_to_emr_object(api_params or {})
-
-        # default fields that can be set from api_params
-        if job_flow_role is None:
-            job_flow_role = (api_params or {}).get('JobFlowRole')
-
-        if job_flow_role is None:
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'InstanceProfile is required for creating cluster'))
-
-        if service_role is None:
-            service_role = (api_params or {}).get('ServiceRole')
-
-        if service_role is None:
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'ServiceRole is required for creating cluster'))
-
-        if visible_to_all_users is None:
-            if api_params and 'VisibleToAllUsers' in api_params:
-                if api_params['VisibleToAllUsers'] not in ('true', 'false'):
-                    raise boto.exception.EmrResponseError(
-                        400, 'Bad Request', err_xml(
-                            'boolean must follow xsd1.1 definition',
-                            code='MalformedInput'))
-                visible_to_all_users = (
-                    api_params['VisibleToAllUsers'] == 'true')
-
-        release_label = None
-        if api_params and api_params.get('ReleaseLabel'):
-            release_label = api_params['ReleaseLabel']
-
-        if release_label and ami_version:
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
+        if 'AmiVersion' in kwargs:
+            if 'ReleaseLabel' in kwargs:
+                raise _error(
                     'Only one AMI version and release label may be specified.'
                     ' Provided AMI: %s, release label: %s.' % (
-                        ami_version, release_label)))
+                        kwargs['AmiVersion'], kwargs['ReleaseLabel']))
 
-        # API no longer allows you to explicitly specify 1.x versions
-        if ami_version and ami_version.startswith('1.'):
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
+            AmiVersion = kwargs.pop('AmiVersion')
+
+            running_ami_version = AMI_VERSION_ALIASES.get(
+                AmiVersion, AmiVersion)
+
+            if version_gte(running_ami_version, '4'):
+                raise _error('The supplied ami version is invalid.')
+            elif not version_gte(running_ami_version, '2'):
+                raise _error(
                     'Job flow role is not compatible with the supplied'
-                    ' AMI version'))
+                    ' AMI version')
 
-        # figure out actual ami version (ami_version) and params for
-        # 2.x and 3.x clusters (requested_ami_version,
-        # running_ami_version)
-        if release_label:
-            ami_version = release_label.lstrip('emr-')
-            requested_ami_version = None
-            running_ami_version = None
+            cluster['RequestedAmiVersion'] = AmiVersion
+            cluster['RunningAmiVersion'] = running_ami_version
+
+        elif 'ReleaseLabel' in kwargs:
+            ReleaseLabel = kwargs.pop('ReleaseLabel')
+            running_ami_version = ReleaseLabel.lstrip('emr-')
+
+            if not version_gte(running_ami_version, '4'):
+                raise _error('The supplied release label is invalid: %s.' %
+                             ReleaseLabel)
+
+            cluster['ReleaseLabel'] = ReleaseLabel
         else:
-            requested_ami_version = ami_version
-            # translate "latest" and None
-            ami_version = AMI_VERSION_ALIASES.get(ami_version, ami_version)
-            running_ami_version = ami_version
-
-        # determine hadoop version
-        running_hadoop_version = map_version(
-            ami_version, AMI_HADOOP_VERSION_UPDATES)
-
-        # if hadoop_version is set, it should match AMI version
-        # (this is probably no longer relevant to mrjob)
-        if not (hadoop_version is None or
-                hadoop_version == running_hadoop_version):
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'The requested AMI version does not support the requested'
-                    ' Hadoop version'))
+            # note: you can't actually set Hadoop version through boto3
+            raise _error(
+                'Must specify exactly one of the following:'
+                ' release label, AMI version, or Hadoop version.')
 
         # Applications
-        application_objs = getattr(api_params_obj, 'applications', [])
+        hadoop_version = map_version(
+            running_ami_version, AMI_HADOOP_VERSION_UPDATES)
 
-        if version_gte(ami_version, '4'):
-            application_names = set(a.name for a in application_objs)
+        if version_get(running_ami_version, '4'):
+            application_names = set(
+                a['Name'] for a in kwargs.get('Applications', []))
 
             # if Applications is set but doesn't include Hadoop, the
             # cluster description won't either! (Even though Hadoop is
@@ -945,237 +847,431 @@ class MockEMRClient(object):
             if not application_names:
                 application_names = set(['Hadoop'])
 
-            applications = []
             for app_name in sorted(application_names):
                 if app_name == 'Hadoop':
-                    version = running_hadoop_version
+                    version = hadoop_version
                 else:
                     version = DUMMY_APPLICATION_VERSION
 
-                applications.append(
-                    MockEmrObject(name=app_name, version=version))
+                cluster['Applications'].append(
+                    dict(Name=app_name, Version=version))
         else:
-            if application_objs:
-                raise boto.exception.EmrResponseError(
-                    400, 'Bad Request', body=err_xml(
-                        'Cannot specify applications when AMI version is used.'
-                        ' Specify supported products or new supported products'
-                        ' instead.'))
+             if kwargs.get('Applications'):
+                raise _error(
+                    'Cannot specify applications when AMI version is used.'
+                    ' Specify supported products or new supported products'
+                    ' instead.')
 
-            applications = [MockEmrObject(
-                name='hadoop',  # lowercase on older AMIs
-                version=running_hadoop_version
-            )]
+             # 'hadoop' is lowercase if AmiVersion specified
+             cluster['Applications'].append(
+                 dict(Name='hadoop', Version=hadoop_version))
 
         # Configurations
-        if hasattr(api_params_obj, 'configurations'):
-            configurations = api_params_obj.configurations
-            _normalize_configuration_objs(configurations)
+        if 'Configurations' in kwargs:
+            cluster['Configurations'] = normalized_configurations(
+                kwargs.pop('Configurations'))
+
+        # VisibleToAllUsers
+        if 'VisibleToAllUsers' in kwargs:
+            _check_param_type(kwargs['VisibleToAllUsers'], bool)
+            cluster['VisibleToAllUsers'] = kwargs.pop('VisibleToAllUsers')
+
+        # pass BootstrapActions off to helper
+        if 'BootstrapActions' in kwargs:
+            self._add_bootstrap_actions(
+                'RunJobFlow', kwargs.pop('BootstrapActions'), cluster)
+
+        # pass Instances (required) off to helper
+        if 'Instances' not in kwargs:
+            raise ParamValidationError
+        self._add_instances('RunJobFlow', kwargs.pop('Instances'), cluster)
+
+        # pass Steps off to helper
+        if 'Steps' in kwargs:
+            self._add_steps('RunJobFlow', kwargs.pop('Steps'), cluster)
+
+        # pass Tags off to helper
+        if 'Tags' in kwargs:
+            self._add_tags('RunJobFlow', kwargs.pop('Tags'), cluster)
+
+        # catch extra params
+        if kwargs:
+            raise NotImplementedError(
+                'mock RunJobFlow does not support these parameters: %s' %
+                ', '.join(sorted(kwargs)))
+
+        self.mock_emr_clusters[cluster['Id']] = cluster
+
+        return dict(JobFlowId=cluster['Id'])
+
+    # helper methods for run_job_flow()
+
+    def _add_bootstrap_actions(
+            self, operation_name, BootstrapActions, cluster):
+        """Handle BootstrapActions param from run_job_flow().
+
+        (there isn't any other way to add bootstrap actions)
+        """
+        _check_param_type(BootstrapActions, list)
+
+        operation_name  # currently unused, quiet pyflakes
+
+        new_actions = []  # don't update _BootstrapActions if there's an error
+
+        for ba in BootstrapActions:
+            _check_param_type(ba, dict)
+            _check_param_type(ba.get('Name'), string_types)
+            _check_param_type(ba.get('ScriptBootstrapAction', dict))
+            _check_param_type(ba['ScriptBootstrapAction'].get('Path'),
+                              string_types)
+
+            args = []
+            if 'Args' in ba['ScriptBootstrapAction']:
+                _check_param_type(ba['ScriptBootstrapAction']['Args'], list)
+                for arg in ba['ScriptBootstrapAction']['Args']:
+                    _check_param_type(arg, string_types)
+                    args.append(arg)
+
+            new_actions.append(dict(
+                Name=ba['Name'],
+                ScriptPath=ba['ScriptBootstrapAction']['Path'],
+                Args=args))
+
+        cluster['_BootstrapActions'].extend(new_actions)
+
+    def _add_instances(self, operation_name, Instances, cluster):
+        """Handle Instances param from run_job_flow()"""
+        _check_param_type(Instances, dict)
+
+        Instances = dict(Instances)  # going to pop params from Instances
+
+        def _error(message):
+            return _validation_error(operation_name, message)
+
+        # Ec2KeyName
+        if 'Ec2KeyName' in Instances:
+            _check_param_type(Instances['Ec2KeyName'], string_types)
+            cluster['Ec2InstanceAttributes']['Ec2KeyName'] = Instances.pop(
+                'Ec2KeyName')
+
+        # Ec2SubnetId
+        if 'Ec2SubnetId' in Instances:
+            _check_param_type(Instances['Ec2SubnetId'], string_types)
+            cluster['Ec2InstanceAttributes']['Ec2SubnetId'] = (
+                Instances['Ec2SubnetId'])
+
+        # KeepJobFlowAliveWhenNoSteps
+        if 'KeepJobFlowAliveWhenNoSteps' in Instances:
+            _check_param_type(Instances['KeepJobFlowAliveWhenNoSteps'], bool)
+            cluster['AutoTerminate'] = (
+                not Instances['KeepJobFlowAliveWhenNoSteps'])
+
+        # Placement (availability zone)
+        if 'Placement' in Instances:
+            Placement = Instances.pop('Placement')
+            if not isinstance(Placement, dict):
+                raise ParamValidationError
+
+            # mockboto doesn't support the 'AvailabilityZones' param
+            if not isinstance(Placement.get('AvailabilityZone'), string_types):
+                raise ParamValidationError
+
+            cluster['Ec2AvailabilityZone'] = Placement['AvailabilityZone']
+
+        if 'InstanceGroups' in Instances:
+            if any(x in Instances for x in ('MasterInstanceType',
+                                            'SlaveInstanceType',
+                                            'InstanceCount')):
+                raise _error(
+                    'Please configure instances using one and only one of the'
+                    ' following: instance groups; instance fleets; instance'
+                    ' count, master and slave instance type.')
+
+            self._add_instance_groups(
+                operation_name, Instances.pop('InstanceGroups'), cluster)
+        # TODO: will need to support instance fleets at some point
         else:
-            configurations = None
+            # build our own instance groups
+            instance_groups = []
 
-        if configurations and not version_gte(ami_version, '4'):
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'Cannot specify configurations when AMI version is used.'))
+            instance_count = Instances.pop('InstanceCount', 0)
+            _check_param_type(instance_count, integer_types)
 
-        # optional subnet (we don't do anything with this other than put it
-        # in ec2instanceattributes)
-        ec2_subnet_id = (api_params or {}).get('Instances.Ec2SubnetId')
+            # note: boto3 actually lets 'null' fall through to the API here
+            _check_param_type(
+                Instances.get('MasterInstanceType'), string_types)
+            instance_groups.append(dict(
+                InstanceRole='MASTER',
+                InstanceType=Instances.pop('MasterInstanceType'),
+                InstanceCount=1))
 
-        # create a MockEmrObject corresponding to the job flow. We only
-        # need to fill in the fields that EMRJobRunner uses
-        steps = steps or []
+            if 'SlaveInstanceType' in Instances:
+                _check_param_type(
+                    Instances.get('SlaveInstanceType'), string_types)
+                instance_groups.append(dict(
+                    InstanceRole='CORE',
+                    InstanceType=Instances.pop('SlaveInstanceType'),
+                    InstanceCount=instance_count - 1))
 
-        cluster_id = _id or 'j-MOCKCLUSTER%d' % len(self.mock_emr_clusters)
-        assert cluster_id not in self.mock_emr_clusters
+            self._add_instance_groups(
+                operation_name, instance_groups, cluster, now=now)
 
-        cluster = MockEmrObject(
-            applications=applications,
-            autoterminate=('false' if keep_alive else 'true'),
-            configurations=configurations,
-            ec2instanceattributes=MockEmrObject(
-                ec2availabilityzone=availability_zone,
-                ec2keyname=ec2_keyname,
-                ec2subnetid=ec2_subnet_id,
-                iaminstanceprofile=job_flow_role,
-            ),
-            id=cluster_id,
-            loguri=log_uri,
-            # TODO: set this later, once cluster is running
-            masterpublicdnsname='mockmaster%d' % len(self.mock_emr_clusters),
-            name=name,
-            normalizedinstancehours='0',
-            releaselabel=release_label,
-            requestedamiversion=requested_ami_version,
-            runningamiversion=running_ami_version,
-            servicerole=service_role,
-            status=MockEmrObject(
-                state='STARTING',
-                statechangereason=MockEmrObject(),
-                timeline=MockEmrObject(
-                    creationdatetime=to_iso8601(now)),
-            ),
-            tags=[],
-            terminationprotected='false',
-            visibletoallusers=('true' if visible_to_all_users else 'false')
-        )
+        if kwargs:
+            raise NotImplementedError(
+                'mock %s does not support these parameters: %s' % (
+                    operation_name,
+                    ', '.join('Instances.%s' % k for k in sorted(kwargs))))
 
-        # this other information we want to store about the cluster doesn't
-        # actually get returned by DescribeCluster, so we keep it in
-        # "hidden" fields.
+    def _add_instance_groups(self, operation_name, InstanceGroups, cluster,
+                             now=None):
+        """Add instance groups from *InstanceGroups* to the mock
+        cluster *cluster*.
+        """
+        _check_param_type(InstanceGroups, list)
 
-        # need api_params for testing purposes
-        cluster._api_params = api_params
+        def _error(message):
+            return _validation_error(operation_name, message)
 
-        # bootstrap actions
-        cluster._bootstrapactions = self._build_bootstrap_actions(
-            bootstrap_actions)
+        if now is None:
+            now = _boto3_now()
 
-        # instance groups
-        if instance_groups:
-            cluster._instancegroups = (
-                self._build_instance_groups_from_list(instance_groups))
-        else:
-            cluster._instancegroups = (
-                self._build_instance_groups_from_type_and_count(
-                    master_instance_type, slave_instance_type, num_instances))
+        # currently, this is just a helper method for run_job_flow()
+        if cluster.get('_InstanceGroups'):
+            raise NotImplementedError(
+                "mockboto doesn't support adding instance groups")
 
-        # 3.x AMIs don't support m1.small
-        if version_gte(ami_version, '3') and any(
-                ig.instancetype == 'm1.small'
-                for ig in cluster._instancegroups):
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'm1.small instance type is not supported with AMI'
-                    ' version %s' % ami_version))
+        new_igs = []  # don't update _InstanceGroups if there's an error
 
-        # will handle steps arg in a moment
-        cluster._steps = []
+        roles = set()  # roles already handled
 
-        self.mock_emr_clusters[cluster_id] = cluster
+        for i, InstanceGroup in enumerate(InstanceGroups):
+            _check_param_type(InstanceGroup, dict)
+            InstanceGroup = dict(InstanceGroup)
 
-        # use add_jobflow_steps() to handle steps
-        steps = list(steps or ())
-        if enable_debugging:
-            steps = [DEBUGGING_STEP] + steps
-
-        self.add_jobflow_steps(cluster_id, steps, now=now)
-
-        return cluster_id
-
-    def _build_bootstrap_actions(self, bootstrap_actions):
-        return [
-            MockEmrObject(name=action.name,
-                          scriptpath=action.path,
-                          args=[MockEmrObject(value=str(v)) for v
-                                in action.bootstrap_action_args])
-            for action in bootstrap_actions
-        ]
-
-    def _build_instance_groups_from_list(self, instance_groups):
-        mock_groups = []
-        roles = set()
-
-        for instance_group in instance_groups:
-            # check num_instances
-            if instance_group.num_instances < 1:
-                raise boto.exception.EmrResponseError(
-                    400, 'Bad Request', body=err_xml(
-                        'An instance group must have at least one instance'))
-
-            emr_group = MockEmrObject(
-                id='ig-FAKE',
-                instancegrouptype=instance_group.role,
-                instancetype=instance_group.type,
-                market=instance_group.market,
-                name=instance_group.name,
-                requestedinstancecount=str(instance_group.num_instances),
-                runninginstancecount='0',
-                status=MockEmrObject(state='PROVISIONING'),
+            # our new mock instance group
+            ig = dict(
+                Configurations=[],
+                EbsBlockDevices=[],
+                Id='ig-FAKE',
+                InstanceGroupType='',
+                Market='ON_DEMAND',
+                RequestedInstanceCount=0,
+                RunningInstanceCount=1,
+                ShrinkPolicy={},
+                Status=dict(
+                    State='PROVISIONING',
+                    StateChangeReason=dict(Message=''),
+                    Timeline=dict(CreationDateTime=now),
+                ),
             )
 
-            if instance_group.market == 'SPOT':
-                bid_price = instance_group.bidprice
+            # InstanceRole (required)
+            _check_param_type(InstanceGroup.get('InstanceRole', string_types))
+            role = InstanceGroup.pop('InstanceRole')
 
-                # simulate EMR's bid price validation
+            # bad role type
+            if role not in ('MASTER', 'CORE', 'TASK'):
+                raise _error(
+                    "1 validation error detected: value '%s' at"
+                    " 'instances.instanceGroups.%d.member.instanceRole' failed"
+                    " to satify constraint: Member must satisfy enum value"
+                    " set: [MASTER, TASK, CORE]" % (role, i + 1))
+
+            # check for duplicate roles
+            if role in roles:
+                raise _error(
+                    'Multiple %s instance groups supplied, you'
+                    ' must specify exactly one %s instance group' %
+                    (role.lower(), role.lower()))
+            roles.add(role)
+
+            ig['InstanceGroupType'] = role
+
+            # InstanceType (required)
+            _check_param_type(InstanceGroup.get('InstanceType', string_types))
+
+            # 3.x AMIs (but not 4.x, etc.) reject m1.small explicitly
+            if (InstanceGroup.get('InstanceType') == 'm1.small' and
+                    cluster.get('RunningAmiVersion', '').startswith('3.')):
+                raise _error(
+                    'm1.small instance type is not supported with AMI version'
+                    ' %s.' % cluster['RunningAmiVersion'])
+
+            ig['InstanceType'] = InstanceGroup.pop('InstanceType')
+
+            # InstanceCount (required)
+            _check_param_type(InstanceGroup.get('InstanceCount'),
+                              integer_types)
+            InstanceCount = InstanceGroup.pop('InstanceCount')
+            if InstanceCount < 1:
+                raise _error(
+                    'An instance group must have at least one instance')
+
+            if role == 'MASTER' and InstanceCount != 1:
+                raise _error(
+                    'A master instance group must specify a single instance')
+            ig['InstanceCount'] = InstanceCount
+
+            # Name
+            if 'Name' in InstanceGroup:
+                _check_param_type(InstanceGroup['Name'], string_types)
+                ig['Name'] = InstanceGroup.pop('Name')
+
+            # Market (default set above)
+            if 'Market' in InstanceGroup:
+                _check_param_type(InstanceGroup['Market'], string_types)
+                if InstanceGroup['Market'] not in ('ON_DEMAND', 'SPOT'):
+                    raise _error(
+                    "1 validation error detected: value '%s' at"
+                    " 'instances.instanceGroups.%d.member.market' failed"
+                    " to satify constraint: Member must satisfy enum value"
+                    " set: [SPOT, ON_DEMAND]" % (role, i + 1))
+                ig['Market'] = InstanceGroup.pop('Market')
+
+            # BidPrice
+            if 'BidPrice' in InstanceGroup:
+                # not float, surprisingly
+                _check_param_type(InstanceGroup['BidPrice'], string_types)
+
+                if ig['Market'] != 'SPOT':
+                    raise _error('Attempted to set bid price for on demand'
+                                 ' instance group.')
+
+                # simulate bid price validation
                 try:
-                    float(bid_price)
+                    if not float(bid_price) > 0:
+                        raise _error('The bid price is negative or zero.')
                 except (TypeError, ValueError):
-                    raise boto.exception.EmrResponseError(
-                        400, 'Bad Request', body=err_xml(
-                            'The bid price supplied for an instance group is'
-                            ' invalid'))
+                    raise _error(
+                        'The bid price supplied for an instance group is'
+                        ' invalid')
 
                 if '.' in bid_price and len(bid_price.split('.', 1)[1]) > 3:
-                    raise boto.exception.EmrResponseError(
-                        400, 'Bad Request', body=err_xml(
-                            'No more than 3 digits are allowed after decimal'
-                            ' place in bid price'))
+                    raise _error('No more than 3 digits are allowed after'
+                                 ' decimal place in bid price')
 
-                emr_group.bidprice = bid_price
+                ig['BidPrice'] = InstanceGroup.pop('BidPrice')
 
-            # check for duplicate role
-            if instance_group.role in roles:
-                role_desc = instance_group.role.lower()
-                raise boto.exception.EmrResponseError(
-                    400, 'Bad Request', body=err_xml(
-                        'Multiple %s instance groups supplied, you'
-                        ' must specify exactly one %s instance group' %
-                        (role_desc, role_desc)))
+            if kwargs:
+                raise NotImplementedError(
+                    'mockboto does not support these InstanceGroup'
+                    ' params: %s' % ', '.join(sorted(kwargs)))
 
-            roles.add(instance_group.role)
-
-            # check for multiple master instances
-            if instance_group.role == 'MASTER':
-                if instance_group.num_instances != 1:
-                    raise boto.exception.EmrResponseError(
-                        400, 'Bad Request', body=err_xml(
-                            'A master instance group must specify a single'
-                            ' instance'))
-
-            # add mock instance group
-            mock_groups.append(emr_group)
+            new_igs.append(ig)
 
         # TASK roles require CORE roles (to host HDFS)
         if 'TASK' in roles and 'CORE' not in roles:
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'Clusters with task nodes must also define core'
-                    ' nodes.'))
+            raise _error(
+                'Clusters with task nodes must also define core nodes.')
 
         # MASTER role is required
         if 'MASTER' not in roles:
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'Zero master instance groups supplied, you must'
-                    ' specify exactly one master instance group'))
+            raise _error('Zero master instance groups supplied, you must'
+                         ' specify exactly one master instance group')
 
-        # Done!
-        return mock_groups
+        cluster['_InstanceGroups'].extend(new_igs)
 
-    def _build_instance_groups_from_type_and_count(
-            self, master_instance_type, slave_instance_type, num_instances):
+    def _add_steps(self, operation_name, Steps, cluster, now=None):
+        if now is None:
+            now = _boto3_now()
 
-        # going to pass this to _build_instance_groups_from_list()
-        instance_groups = []
+        if not isinstance(Steps, list):
+            raise ValidationError
 
-        instance_groups.append(
-            InstanceGroup(num_instances=1,
-                          role='MASTER',
-                          type=master_instance_type,
-                          market='ON_DEMAND',
-                          name='master'))
+        new_steps = []
 
-        if num_instances > 1:
-            instance_groups.append(
-                InstanceGroup(num_instances=(num_instances - 1),
-                              role='CORE',
-                              type=slave_instance_type,
-                              market='ON_DEMAND',
-                              name='core'))
+        # TODO: reject if more than 256 steps added at once?
 
-        return self._build_instance_groups_from_list(instance_groups)
+        for i, Step in enumerate(Steps):
+            Step = dict(Step)
+
+            new_step = dict(
+                ActionOnFailure='TERMINATE_CLUSTER',
+                Config=dict(
+                    Args=[],
+                    Jar={},
+                    Properties={},
+                ),
+                Id='s-MOCKSTEP%d' % (len(cluster['_Steps']) + 1),
+                Name='',
+                Status=dict(
+                    State='PENDING',
+                    Timeline=dict(CreationDateTime=now),
+                ),
+            )
+
+            # Name (required)
+            _check_param_type(Step.get('Name'), string_types)
+            new_step['Name'] = Step.pop('Name')
+
+            # HadoopJarStep (required)
+            _check_param_type(Step.get('HadoopJarStep'), dict)
+            HadoopJarStep = dict(Step.pop('HadoopJarStep'))
+
+            _check_param_type(HadoopJarStep.get('Jar', string_types))
+            new_step['Config']['Jar'] = HadoopJarStep.pop('Jar')
+
+            if 'Args' in HadoopJarStep:
+                Args = HadoopJarStep.pop('Args')
+                _check_param_type(Args, list)
+                for arg in Args:
+                    _check_param_type(arg, string_types)
+                new_step['Config']['Args'].extend(Args)
+
+            if 'MainClass' in HadoopJarStep:
+                _check_param_type(HadoopJarStep['MainClass'], string_types)
+                new_step['Config']['MainClass'] = HadoopJarStep.pop(
+                    'MainClass')
+
+            # don't currently support Properties
+            if HadoopJarStep:
+                raise NotImplementedError(
+                    "mockboto doesn't support these HadoopJarStep params: %s" %
+                    ', '.join(sorted(HadoopJarStep)))
+
+            if Step:
+                raise NotImplementedError(
+                    "mockboto doesn't support these step params: %s" %
+                    ', '.join(sorted(Step)))
+
+        cluster['_Steps'].extend(new_steps)
+
+        # add_job_flow_steps() needs to return step IDs
+        return [new_step['Id'] for new_step in new_steps]
+
+    def _add_tags(self, operation_name, Tags, cluster):
+        if not isinstance(Tags, list):
+            raise ValidationError
+
+        new_tags = {}
+
+        for Tag in Tags:
+            _check_param_type(Tag, dict)
+            if set(Tag) > set('Key', 'Value'):
+                raise ParamValidationError
+
+            Key = Tag.get('Key')
+            if not Key or not 1 <= len(Key) <= 128:
+                raise _invalid_request_error(
+                    operation_name,
+                    "Invalid tag key: '%s'. Tag keys must be between 1 and 128"
+                    " characters in length." %
+                    ('null' if Key is None else Key))
+
+            Value = Tag.get('Value') or ''
+            if not 0 <= len(Value) <= 256:
+                raise _invalid_request_error(
+                    operation_name,
+                    "Invalid tag value: '%s'. Tag values must be between 1 and"
+                    " 128 characters in length." % Value)
+
+            new_tags[Key] = Value
+
+        tags_dict = dict((t['Key'], t['Value']) for t in cluster['_Tags'])
+        tags_dict.update(new_tags)
+
+        cluster['_Tags'] = [
+            dict(Key=k, Value=v) for k, v in sorted(tags_dict.items())]
 
     def _get_mock_cluster(self, cluster_id):
         if not cluster_id in self.mock_emr_clusters:
@@ -1846,56 +1942,24 @@ class MockIAMClient(object):
                 OperationName)
 
 
-def _api_params_to_emr_object(params):
-    """Convert emr_api_params into a MockEmrObject."""
-    result = MockEmrObject()
-
-    # iteratively set value, creating MockEmrObjects as needed
-    for key, value in params.items():
-        # boto converts attrs to lowercase
-        attrs = [a.lower() for a in key.split('.')]
-
-        obj = result
-        for attr in attrs[:-1]:
-            if not hasattr(obj, attr):
-                setattr(obj, attr, MockEmrObject())
-            obj = getattr(obj, attr)
-
-        setattr(obj, attrs[-1], str(value))
-
-    # convert objects with "member" key to lists
-    def _convert_lists(x):
-        # base case
-        if not isinstance(x, MockEmrObject):
-            return x
-
-        # recursively convert sub-objects
-        if not hasattr(x, 'member'):
-            for k, v in x.__dict__.items():
-                setattr(x, k, _convert_lists(v))
-            return x
-
-        # special case: this object was meant to be a list
-        result = []
-
-        for k in sorted(x.member.__dict__, key=lambda k: int(k)):
-            assert(len(result) == int(k) - 1)  # verify correct numbering
-            result.append(_convert_lists(getattr(x.member, k)))
-
-        return result
-
-    return _convert_lists(result)
-
-
-def _normalize_configuration_objs(configurations):
+def _normalized_configurations(configurations):
     """The API will return an empty Properties list for configurations
     without properties set, and remove empty sub-configurations"""
-    for c in configurations:
-        if not hasattr(c, 'properties'):
-            c.properties = []
+    if not isinstance(configurations, list):
+        raise ParamValidationError
 
-        if hasattr(c, 'configurations'):
-            if not c.configurations:
-                del c.configurations
+    results = []
+
+    for c in configurations:
+        if not isinstance(c, dict):
+            raise ParamValidationError
+        c = dict(c)  # so we can modify it
+
+        c.setdefault('properties', [])
+
+        if 'configurations' in c:
+            if c['configurations']:
+                c['configurations'] = _normalized_configurations(
+                    c['configurations'])
             else:
-                _normalize_configuration_objs(c.configurations)
+                del c['configurations']

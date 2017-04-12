@@ -21,8 +21,8 @@ from mrjob.py2 import StringIO
 from mrjob.tools.emr.report_long_jobs import _find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
 
-from tests.mockboto import MockEmrObject
-from tests.mockboto import MockBotoTestCase
+from tests.mock_boto3 import MockEmrObject
+from tests.mock_boto3 import MockBoto3TestCase
 
 CLUSTERS = [
     MockEmrObject(
@@ -223,7 +223,7 @@ CLUSTER_SUMMARIES_BY_ID = dict(
     for cluster in CLUSTERS)
 
 
-class ReportLongJobsTestCase(MockBotoTestCase):
+class ReportLongJobsTestCase(MockBoto3TestCase):
 
     def setUp(self):
         super(ReportLongJobsTestCase, self).setUp()
@@ -253,7 +253,7 @@ class ReportLongJobsTestCase(MockBotoTestCase):
         self.assertEqual(len(lines), len(CLUSTERS_BY_ID) - 1)
 
 
-class FindLongRunningJobsTestCase(MockBotoTestCase):
+class FindLongRunningJobsTestCase(MockBoto3TestCase):
 
     maxDiff = None  # show whole diff when tests fail
 

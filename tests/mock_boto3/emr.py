@@ -1,4 +1,4 @@
-# Copyright 2009-2016 Yelp and Contributors
+# Copyright 2009-2017 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,22 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Mercilessly taunt an Amazonian river dolphin.
-
-This is by no means a complete mock of boto3, just what we need for tests.
-"""
-import hashlib
-import itertools
-import json
-import os
-import shutil
-import tempfile
-import time
-from datetime import timedelta
-from io import BytesIO
-
-import boto3
-from boto3.exceptions import S3UploadFailedError
+"""Mock boto3 EMR support."""
 from botocore.exceptions import ClientError
 from botocore.exceptions import ParamValidationError
 
@@ -34,30 +19,21 @@ from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import _boto3_now
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
-from mrjob.conf import combine_dicts
 from mrjob.conf import combine_values
-from mrjob.emr import _EMR_LOG_DIR
-from mrjob.emr import EMRJobRunner
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
 
-from tests.mockssh import create_mock_ssh_script
-from tests.mockssh import mock_ssh_dir
-from tests.mr_two_step_job import MRTwoStepJob
-from tests.py2 import MagicMock
-from tests.py2 import patch
-from tests.sandbox import SandboxedTestCase
+from .s3 import add_mock_s3_data
+from .util import MockObject
 
-# list_clusters() only returns this many results at a time
-DEFAULT_MAX_CLUSTERS_RETURNED = 50
+# these are going away, quiet pyflakes for now
+MockEmrObject = None
+boto = None
+err_xml = None
+to_iso8601 = None
 
-# list_steps() only returns this many results at a time
-DEFAULT_MAX_STEPS_RETURNED = 50
-
-# Size of each chunk returned by the MockS3Object iterator
-SIMULATED_BUFFER_SIZE = 256
 
 # what partial versions and "latest" map to, as of 2015-07-15
 AMI_VERSION_ALIASES = {
@@ -97,547 +73,15 @@ AMI_HADOOP_VERSION_UPDATES = {
     '5.0.3': '2.7.3',
 }
 
+# list_clusters() only returns this many results at a time
+DEFAULT_MAX_CLUSTERS_RETURNED = 50
+
+# list_steps() only returns this many results at a time
+DEFAULT_MAX_STEPS_RETURNED = 50
+
 # need to fill in a version for non-Hadoop applications
 DUMMY_APPLICATION_VERSION = '0.0.0'
 
-
-### Errors ###
-
-def err_xml(message, type='Sender', code='ValidationError'):
-    """Use this to create the body of boto response errors."""
-    return """\
-<ErrorResponse xmlns="http://elasticmapreduce.amazonaws.com/doc/2009-03-31">
-  <Error>
-    <Type>%s</Type>
-    <Code>%s</Code>
-    <Message>%s</Message>
-  </Error>
-  <RequestId>eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee</RequestId>
-</ErrorResponse>""" % (type, code, message)
-
-
-### Test Case ###
-
-class MockBotoTestCase(SandboxedTestCase):
-
-    # if a test needs to create an EMR client more than this many
-    # times, there's probably a problem with simulating progress
-    MAX_EMR_CLIENTS = 100
-
-    @classmethod
-    def setUpClass(cls):
-        # we don't care what's in this file, just want mrjob to stop creating
-        # and deleting a complicated archive.
-        cls.fake_mrjob_zip_path = tempfile.mkstemp(
-            prefix='fake_mrjob_', suffix='.zip')[1]
-
-    @classmethod
-    def tearDownClass(cls):
-        if os.path.exists(cls.fake_mrjob_zip_path):
-            os.remove(cls.fake_mrjob_zip_path)
-
-    def setUp(self):
-        # patch boto3
-        self.mock_emr_failures = set()
-        self.mock_emr_self_termination = set()
-        self.mock_emr_clusters = {}
-        self.mock_emr_output = {}
-        self.mock_iam_instance_profiles = {}
-        self.mock_iam_role_attached_policies = {}
-        self.mock_iam_roles = {}
-        self.mock_s3_fs = {}
-
-        self.emr_client_counter = itertools.repeat(
-            None, self.MAX_EMR_CLIENTS)
-
-        self.start(patch.object(boto3, 'client', self.client))
-        self.start(patch.object(boto3, 'resource', self.resource))
-
-        super(MockBotoTestCase, self).setUp()
-
-        # patch slow things
-        def fake_create_mrjob_zip(mocked_self, *args, **kwargs):
-            mocked_self._mrjob_zip_path = self.fake_mrjob_zip_path
-            return self.fake_mrjob_zip_path
-
-        self.start(patch.object(
-            EMRJobRunner, '_create_mrjob_zip',
-            fake_create_mrjob_zip))
-
-        self.start(patch.object(time, 'sleep'))
-
-    def add_mock_s3_data(self, data, age=None, location=None):
-        """Update self.mock_s3_fs with a map from bucket name
-        to key name to data."""
-        add_mock_s3_data(self.mock_s3_fs, data, age, location)
-
-    def add_mock_emr_cluster(self, cluster):
-        if cluster.id in self.mock_emr_clusters:
-            raise ValueError('mock cluster %s already exists' % cluster.id)
-
-        for field in ('_bootstrapactions', '_instancegroups', '_steps'):
-            if not hasattr(cluster, field):
-                setattr(cluster, field, [])
-
-        if not hasattr(cluster, 'name'):
-            cluster.name = cluster.id[2:]
-
-        if not hasattr(cluster, 'normalizedinstancehours'):
-            cluster.normalizedinstancehours = '0'
-
-        self.mock_emr_clusters[cluster.id] = cluster
-
-    def prepare_runner_for_ssh(self, runner, num_slaves=0):
-        # TODO: Refactor this abomination of a test harness
-
-        # Set up environment variables
-        os.environ['MOCK_SSH_VERIFY_KEY_FILE'] = 'true'
-
-        # Create temporary directories and add them to MOCK_SSH_ROOTS
-        master_ssh_root = tempfile.mkdtemp(prefix='master_ssh_root.')
-        os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % master_ssh_root
-        mock_ssh_dir('testmaster', _EMR_LOG_DIR + '/hadoop/history')
-
-        if not hasattr(self, 'slave_ssh_roots'):
-            self.slave_ssh_roots = []
-
-        self.addCleanup(self.teardown_ssh, master_ssh_root)
-
-        # Make the fake binary
-        os.mkdir(os.path.join(master_ssh_root, 'bin'))
-        self.ssh_bin = os.path.join(master_ssh_root, 'bin', 'ssh')
-        create_mock_ssh_script(self.ssh_bin)
-
-        # Make a fake keyfile so that the 'file exists' requirements are
-        # satsified
-        self.keyfile_path = os.path.join(master_ssh_root, 'key.pem')
-        with open(self.keyfile_path, 'w') as f:
-            f.write('I AM DEFINITELY AN SSH KEY FILE')
-
-        # Tell the runner to use the fake binary
-        runner._opts['ssh_bin'] = [self.ssh_bin]
-        # Also pretend to have an SSH key pair file
-        runner._opts['ec2_key_pair_file'] = self.keyfile_path
-
-        # use fake hostname
-        runner._address_of_master = MagicMock(return_value='testmaster')
-        runner._master_private_ip = MagicMock(return_value='172.172.172.172')
-
-        # re-initialize fs
-        runner._fs = None
-        #runner.fs
-
-    # TODO: this should be replaced
-    def add_slave(self):
-        """Add a mocked slave to the cluster. Caller is responsible for setting
-        runner._opts['num_ec2_instances'] to the correct number.
-        """
-        slave_num = len(self.slave_ssh_roots)
-        new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
-        self.slave_ssh_roots.append(new_dir)
-        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
-                                         % (slave_num, new_dir))
-
-    def teardown_ssh(self, master_ssh_root):
-        shutil.rmtree(master_ssh_root)
-        for path in self.slave_ssh_roots:
-            shutil.rmtree(path)
-
-    def make_runner(self, *args):
-        """create a dummy job, and call make_runner() on it.
-        Use this in a with block:
-
-        with self.make_runner() as runner:
-            ...
-        """
-        stdin = BytesIO(b'foo\nbar\n')
-        mr_job = MRTwoStepJob(['-r', 'emr'] + list(args))
-        mr_job.sandbox(stdin=stdin)
-
-        return mr_job.make_runner()
-
-    def run_and_get_cluster(self, *args):
-        # TODO: not sure why we include -v
-        with self.make_runner('-v', *args) as runner:
-            runner.run()
-            return runner._describe_cluster()
-
-    # mock boto3.client()
-    def client(self, service_name, **kwargs):
-        if service_name == 'emr':
-            try:
-                next(self.emr_client_counter)
-            except StopIteration:
-                raise AssertionError(
-                    'Too many connections to mock EMR, may be stalled')
-
-            kwargs['mock_s3_fs'] = self.mock_s3_fs
-            kwargs['mock_emr_clusters'] = self.mock_emr_clusters
-            kwargs['mock_emr_failures'] = self.mock_emr_failures
-            kwargs['mock_emr_self_termination'] = (
-                self.mock_emr_self_termination)
-            kwargs['mock_emr_output'] = self.mock_emr_output
-            return MockEMRClient(**kwargs)
-
-        elif service_name == 'iam':
-            kwargs['mock_iam_instance_profiles'] = (
-                self.mock_iam_instance_profiles)
-            kwargs['mock_iam_roles'] = self.mock_iam_roles
-            kwargs['mock_iam_role_attached_policies'] = (
-                self.mock_iam_role_attached_policies)
-            return MockIAMClient(**kwargs)
-
-        elif service_name == 's3':
-            kwargs['mock_s3_fs'] = self.mock_s3_fs
-            return MockS3Client(**kwargs)
-        else:
-            raise NotImplementedError(
-                'mock %s service not supported' % service_name)
-
-    # mock boto3.resource()
-    def resource(self, service_name, **kwargs):
-        if service_name == 's3':
-            kwargs['mock_s3_fs'] = self.mock_s3_fs
-            return MockS3Resource(**kwargs)
-        else:
-            raise NotImplementedError(
-                'mock %s resource not supported' % service_name)
-
-
-### S3 ###
-
-def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
-    """Update mock_s3_fs with a map from bucket name to key name to data.
-
-    :param age: a timedelta
-    :param location string: the bucket's location cosntraint (a region name)
-    """
-    age = age or timedelta(0)
-    time_modified = _boto3_now() - age
-
-    for bucket_name, key_name_to_bytes in data.items():
-        bucket = mock_s3_fs.setdefault(bucket_name,
-                                       {'keys': {}, 'location': ''})
-
-        for key_name, key_data in key_name_to_bytes.items():
-            if not isinstance(key_data, bytes):
-                raise TypeError('mock s3 data must be bytes')
-            bucket['keys'][key_name] = (key_data, time_modified)
-
-        if location is not None:
-            bucket['location'] = location
-
-
-def _invalid_request_error(operation_name, message):
-    # boto3 reports this as a botocore.exceptions.InvalidRequestException,
-    # but that's not something you can actually import
-    return AttributeError(
-        'An error occurred (InvalidRequestException) when calling the'
-        ' %s operation: %s' % (operation_name, message))
-
-
-def _no_such_bucket_error(bucket_name, operation_name):
-    return ClientError(
-        dict(
-            Error=dict(
-                Bucket=bucket_name,
-                Code='NoSuchBucket',
-                Message='The specified bucket does not exist',
-            ),
-            ResponseMetadata=dict(
-                HTTPStatusCode=404
-            ),
-        ),
-        operation_name)
-
-
-def _no_such_key_error(key_name, operation_name):
-    return ClientError(
-        dict(
-            Error=dict(
-                Code='NoSuchKey',
-                Key=key_name,
-                Message='The specified key does not exist',
-            ),
-            ResponseMetadata=dict(
-                HTTPStatusCode=404,
-            ),
-        ),
-        operation_name,
-    )
-
-
-def _validation_error(operation_name, message):
-    return ClientError(
-        dict(
-            Error=dict(
-                Code='ValidationException',
-                Message=message,
-            ),
-            ResponseMetadata=dict(
-                HTTPStatusCode=404,
-            ),
-        ),
-        operation_name,
-    )
-
-def _check_param_type(value, type_or_types):
-    """quick way to raise a boto3 ParamValidationError. We don't bother
-    constructing the text of the ParamValidationError."""
-    if not isinstance(value, type_or_types):
-        raise ParamValidationError
-
-
-class MockS3Client(object):
-    """Mock out boto3 S3 client
-
-    :param mock_s3_fs: Maps bucket name to a dictionary with the keys *keys*
-                       and *location*. *keys* maps key name to tuples of
-                       ``(data, time_modified)``. *data* is bytes, and
-                        *time_modified* is a UTC
-                        :py:class:`~datetime.datetime`. *location* is an
-                        optional location constraint for the bucket
-                        (a region name).
-    """
-    def __init__(self,
-                 aws_access_key_id=None,
-                 aws_secret_access_key=None,
-                 aws_session_token=None,
-                 endpoint_url=None,
-                 region_name=None,
-                 mock_s3_fs=None):
-
-        self.mock_s3_fs = mock_s3_fs
-
-        region_name = region_name or _DEFAULT_AWS_REGION
-        if not endpoint_url:
-            if region_name == _DEFAULT_AWS_REGION:
-                endpoint_url = 'https://s3.amazonaws.com'
-            else:
-                endpoint_url = 'https://s3-%s.amazonaws.com' % region_name
-
-        self.meta = MockObject(
-            endpoint_url=endpoint_url,
-            region_name=region_name)
-
-    def _check_bucket_exists(self, bucket_name, operation_name):
-        if bucket_name not in self.mock_s3_fs:
-            raise _no_such_bucket_error(bucket_name, operation_name)
-
-    def create_bucket(self, Bucket, CreateBucketConfiguration=None):
-        # boto3 doesn't seem to mind if you try to create a bucket that exists
-        if Bucket not in self.mock_s3_fs:
-            location = (CreateBucketConfiguration or {}).get(
-                'LocationConstraint', '')
-            self.mock_s3_fs[Bucket] = dict(keys={}, location=location)
-
-        # "Location" here actually refers to the bucket name
-        return dict(Location=('/' + Bucket))
-
-    def get_bucket_location(self, Bucket):
-        self._check_bucket_exists(Bucket, 'GetBucketLocation')
-
-        location_constraint = self.mock_s3_fs[Bucket].get('location') or None
-
-        return dict(LocationConstraint=location_constraint)
-
-
-class MockS3Resource(object):
-    """Mock out boto3 S3 resource"""
-    def __init__(self,
-                 aws_access_key_id=None,
-                 aws_secret_access_key=None,
-                 aws_session_token=None,
-                 endpoint_url=None,
-                 region_name=None,
-                 mock_s3_fs=None):
-
-        self.mock_s3_fs = mock_s3_fs
-
-        self.meta = MockObject(
-            client=MockS3Client(
-                aws_access_key_id=aws_access_key_id,
-                aws_secret_access_key=aws_secret_access_key,
-                aws_session_token=aws_session_token,
-                endpoint_url=endpoint_url,
-                region_name=region_name,
-                mock_s3_fs=mock_s3_fs
-            )
-        )
-
-        self.buckets = MockObject(
-            all=self._buckets_all,
-        )
-
-    def Bucket(self, name):
-        # boto3's Bucket() doesn't care if the bucket exists
-        return MockS3Bucket(self.meta.client, name)
-
-    def _buckets_all(self):
-        # technically, this only lists buckets we own, but our mock fs
-        # doesn't simulate buckets owned by others
-        for bucket_name in sorted(self.meta.client.mock_s3_fs):
-            yield self.Bucket(bucket_name)
-
-
-class MockS3Bucket(object):
-    """Mock out boto3 bucket
-    """
-    def __init__(self, client, name):
-        """Create a mock bucket with the given name and client
-        """
-        self.name = name
-        self.meta = MockObject(client=client)
-
-        self.objects = MockObject(
-            all=self._objects_all,
-            filter=self._objects_filter)
-
-    def Object(self, key):
-        return MockS3Object(self.meta.client, self.name, key)
-
-    def _objects_all(self):
-        return self._objects_filter()
-
-    def _objects_filter(self, Prefix=None):
-        self._check_bucket_exists('ListObjects')
-
-        # there are several other keyword arguments that we don't support
-        mock_s3_fs = self.meta.client.mock_s3_fs
-
-        for key in sorted(mock_s3_fs[self.name]['keys']):
-            if Prefix and not key.startswith(Prefix):
-                continue
-
-            key = self.Object(key)
-            # emulate ObjectSummary by pre-filling size, e_tag, etc.
-            key.get()
-            yield key
-
-    def _check_bucket_exists(self, operation_name):
-        if self.name not in self.meta.client.mock_s3_fs:
-            raise _no_such_bucket_error(self.name, operation_name)
-
-
-class MockS3Object(object):
-    """Mock out s3.Object"""
-
-    def __init__(self, client, bucket_name, key):
-        self.bucket_name = bucket_name
-        self.key = key
-
-        self.meta = MockObject(client=client)
-
-    def delete(self):
-        mock_keys = self._mock_bucket_keys('DeleteObject')
-
-        # okay if key doesn't exist
-        if self.key in mock_keys:
-            del mock_keys[self.key]
-
-        return {}
-
-    def get(self):
-        key_data, mtime = self._get_key_data_and_mtime()
-
-        # fill in known attributes
-        m = hashlib.md5()
-        m.update(key_data)
-
-        self.e_tag = '"%s"' % m.hexdigest()
-        self.last_modified = mtime
-        self.size = len(key_data)
-
-        return dict(
-            Body=MockStreamingBody(key_data),
-            ContentLength=self.size,
-            ETag=self.e_tag,
-            LastModified=self.last_modified,
-        )
-
-    def put(self, Body):
-        if not isinstance(Body, bytes):
-            raise NotImplementedError('mock put() only support bytes')
-
-        mock_keys = self._mock_bucket_keys('PutObject')
-
-        if isinstance(Body, bytes):
-            data = Body
-        elif hasattr(Body, 'read'):
-            data = Body.read()
-
-        if not isinstance(data, bytes):
-            raise TypeError('Body or Body.read() must be bytes')
-
-        mock_keys[self.key] = (data, _boto3_now())
-
-    def upload_file(self, path, Config=None):
-        if self.bucket_name not in self.meta.client.mock_s3_fs:
-            # upload_file() is a higher-order operation, has fancy errors
-            raise S3UploadFailedError(
-                'Failed to upload %s to %s/%s: %s' % (
-                    path, self.bucket_name, self.key,
-                    str(_no_such_bucket_error('PutObject'))))
-
-        mock_keys = self._mock_bucket_keys('PutObject')
-        with open(path, 'rb') as f:
-            mock_keys[self.key] = (f.read(), _boto3_now())
-
-    def __getattr__(self, key):
-        if key in ('e_tag', 'last_modified', 'size'):
-            try:
-                self.get()
-            except ClientError:
-                pass
-
-        if hasattr(self, key):
-            return getattr(self, key)
-        else:
-            raise AttributeError(
-                "'s3.Object' object has no attribute '%s'" % key)
-
-    def _mock_bucket_keys(self, operation_name):
-        self._check_bucket_exists(operation_name)
-
-        return self.meta.client.mock_s3_fs[self.bucket_name]['keys']
-
-    def _check_bucket_exists(self, operation_name):
-        if self.bucket_name not in self.meta.client.mock_s3_fs:
-            raise _no_such_bucket_error(self.bucket_name, operation_name)
-
-    def _get_key_data_and_mtime(self):
-        """Return (key_data, time_modified)."""
-        mock_keys = self._mock_bucket_keys('GetBucket')
-
-        if self.key not in mock_keys:
-            raise _no_such_key_error(self.key, 'GetObject')
-
-        return mock_keys[self.key]
-
-
-class MockStreamingBody(object):
-    """Mock of boto3's not-really-a-fileobj for reading from S3"""
-
-    def __init__(self, data):
-        if not isinstance(data, bytes):
-            raise TypeError
-
-        self._data = data
-        self._offset = 0
-
-    def read(self, amt=None):
-        start = self._offset
-
-        if amt is None:
-            end = len(self._data)
-        else:
-            end = start + amt
-
-        self._offset = end
-        return self._data[start:end]
-
-
-### EMR ###
 
 class MockEMRClient(object):
     """Mock out boto3 EMR clients. This actually handles a small
@@ -973,7 +417,7 @@ class MockEMRClient(object):
             if not isinstance(Placement, dict):
                 raise ParamValidationError
 
-            # mockboto doesn't support the 'AvailabilityZones' param
+            # mock_boto3 doesn't support the 'AvailabilityZones' param
             if not isinstance(Placement.get('AvailabilityZone'), string_types):
                 raise ParamValidationError
 
@@ -1039,7 +483,7 @@ class MockEMRClient(object):
         # currently, this is just a helper method for run_job_flow()
         if cluster.get('_InstanceGroups'):
             raise NotImplementedError(
-                "mockboto doesn't support adding instance groups")
+                "mock_boto3 doesn't support adding instance groups")
 
         new_igs = []  # don't update _InstanceGroups if there's an error
 
@@ -1156,7 +600,7 @@ class MockEMRClient(object):
 
             if InstanceGroup:
                 raise NotImplementedError(
-                    'mockboto does not support these InstanceGroup'
+                    'mock_boto3 does not support these InstanceGroup'
                     ' params: %s' % ', '.join(sorted(InstanceGroup)))
 
             new_igs.append(ig)
@@ -1228,12 +672,12 @@ class MockEMRClient(object):
             # don't currently support Properties
             if HadoopJarStep:
                 raise NotImplementedError(
-                    "mockboto doesn't support these HadoopJarStep params: %s" %
+                    "mock_boto3 doesn't support these HadoopJarStep params: %s" %
                     ', '.join(sorted(HadoopJarStep)))
 
             if Step:
                 raise NotImplementedError(
-                    "mockboto doesn't support these step params: %s" %
+                    "mock_boto3 doesn't support these step params: %s" %
                     ', '.join(sorted(Step)))
 
         cluster['_Steps'].extend(new_steps)
@@ -1690,263 +1134,7 @@ class MockEMRClient(object):
         return
 
 
-class MockObject(object):
-    """Mock out boto.emr.EmrObject. This is just a generic object that you
-    can set any attribute on."""
-
-    def __init__(self, **kwargs):
-        """Intialize with the given attributes, ignoring fields set to None."""
-        for key, value in kwargs.items():
-            if value is not None:
-                setattr(self, key, value)
-
-    def __setattr__(self, key, value):
-        if isinstance(value, bytes):
-            value = value.decode('utf_8')
-
-        self.__dict__[key] = value
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        if len(self.__dict__) != len(other.__dict__):
-            return False
-
-        for k, v in self.__dict__.items():
-            if not k in other.__dict__:
-                return False
-            else:
-                if v != other.__dict__[k]:
-                    return False
-
-        return True
-
-    # useful for hand-debugging tests
-    def __repr__(self):
-        return('%s.%s(%s)' % (
-            self.__class__.__module__,
-            self.__class__.__name__,
-            ', '.join('%s=%r' % (k, v)
-                      for k, v in sorted(self.__dict__.items()))))
-
-# old name for this
-MockEmrObject = MockObject
-
-class MockPaginator(object):
-    """Mock botocore paginators.
-
-    Rather than mocking pagination, markers, etc. in every mock API call,
-    we have our API calls return the full results, and make our paginators
-    break them into pages.
-    """
-    def __init__(self, method, result_key, page_size):
-        self.result_key = result_key
-        self.method = method
-        self.page_size = page_size
-
-    def paginate(self, **kwargs):
-        result = self.method(**kwargs)
-
-        values = result[self.result_key]
-
-        for page_start in range(0, len(values), self.page_size):
-            page = values[page_start:page_start + self.page_size]
-            yield combine_dicts(result, {self.result_key: page})
-
-
-class MockIAMClient(object):
-
-    DEFAULT_PATH = '/'
-
-    DEFAULT_MAX_ITEMS = 100
-
-    OPERATION_NAME_TO_RESULT_KEY = dict(
-        list_attached_role_policies='AttachedPolicies',
-        list_instance_profiles='InstanceProfiles',
-        list_roles='Roles',
-    )
-
-    def __init__(self, region_name=None, api_version=None,
-                 use_ssl=True, verify=None, endpoint_url=None,
-                 aws_access_key_id=None, aws_secret_access_key=None,
-                 aws_session_token=None, config=None,
-                 mock_iam_instance_profiles=None, mock_iam_roles=None,
-                 mock_iam_role_attached_policies=None):
-        """Mock out connection to IAM.
-
-        mock_iam_instance_profiles maps profile name to a dict containing:
-            create_date -- ISO creation datetime
-            path -- IAM path
-            role_name -- name of single role for this instance profile, or None
-
-        mock_iam_roles maps role name to a dict containing:
-            assume_role_policy_document -- a JSON-then-URI-encoded policy doc
-            create_date -- ISO creation datetime
-            path -- IAM path
-
-        mock_iam_role_attached_policies maps role to a list of ARNs for
-        attached (managed) policies.
-
-        We don't track which managed policies exist or what their contents are.
-        We also don't support role IDs.
-        """
-        # if not passed dictionaries for these mock values, create our own
-        self.mock_iam_instance_profiles = combine_values(
-            {}, mock_iam_instance_profiles)
-        self.mock_iam_roles = combine_values({}, mock_iam_roles)
-        self.mock_iam_role_attached_policies = combine_values(
-            {}, mock_iam_role_attached_policies)
-
-        endpoint_url = endpoint_url or 'https://iam.amazonaws.com'
-        region_name = region_name or 'aws-global'
-
-        self.meta = MockObject(
-            endpoint_url=endpoint_url,
-            region_name=region_name)
-
-    def get_paginator(self, operation_name):
-        return MockPaginator(
-            getattr(self, operation_name),
-            self.OPERATION_NAME_TO_RESULT_KEY[operation_name],
-            self.DEFAULT_MAX_ITEMS)
-
-    # roles
-
-    def create_role(self, AssumeRolePolicyDocument, RoleName):
-        # Path not supported
-        # mock RoleIds are all the same
-
-        self._check_role_does_not_exist(RoleName, 'CreateRole')
-
-        role = dict(
-            Arn=('arn:aws:iam::012345678901:role/%s' % RoleName),
-            AssumeRolePolicyDocument=json.loads(AssumeRolePolicyDocument),
-            CreateDate=_boto3_now(),
-            Path='/',
-            RoleId='AROAMOCKMOCKMOCKMOCK',
-            RoleName=RoleName,
-        )
-        self.mock_iam_roles[RoleName] = role
-
-        return dict(Role=role)
-
-    def list_roles(self):
-        # PathPrefix not supported
-
-        roles = list(data for name, data in
-                     sorted(self.mock_iam_roles.items()))
-
-        return dict(Roles=roles)
-
-    def _check_role_does_not_exist(self, RoleName, OperationName):
-        if RoleName in self.mock_iam_roles:
-            raise ClientError(
-                dict(Error=dict(
-                    Code='EntityAlreadyExists',
-                    Message=('Role with name %s already exists' % RoleName))),
-                OperationName)
-
-    def _check_role_exists(self, RoleName, OperationName):
-        if RoleName not in self.mock_iam_roles:
-            raise ClientError(
-                dict(Error=dict(
-                    Code='NoSuchEntity',
-                    Message=('Role not found for %s' % RoleName))),
-                OperationName)
-
-    # attached role policies
-
-    def attach_role_policy(self, PolicyArn, RoleName):
-        self._check_role_exists(RoleName, 'AttachRolePolicy')
-
-        arns = self.mock_iam_role_attached_policies.setdefault(RoleName, [])
-        if PolicyArn not in arns:
-            arns.append(PolicyArn)
-
-        return {}
-
-    def list_attached_role_policies(self, RoleName):
-        self._check_role_exists(RoleName, 'ListAttachedRolePolicies')
-
-        arns = self.mock_iam_role_attached_policies.get(RoleName, [])
-
-        return dict(AttachedPolicies=[
-            dict(PolicyArn=arn, PolicyName=arn.split('/')[-1])
-            for arn in arns
-        ])
-
-    # instance profiles
-
-    def create_instance_profile(self, InstanceProfileName):
-        # Path not implemented
-        # mock InstanceProfileIds are all the same
-
-        self._check_instance_profile_does_not_exist(InstanceProfileName,
-                                                    'CreateInstanceProfile')
-
-        profile = dict(
-            Arn=('arn:aws:iam::012345678901:instance-profile/%s' %
-                 InstanceProfileName),
-            CreateDate=_boto3_now(),
-            InstanceProfileId='AIPAMOCKMOCKMOCKMOCK',
-            InstanceProfileName=InstanceProfileName,
-            Path='/',
-            Roles=[],
-        )
-        self.mock_iam_instance_profiles[InstanceProfileName] = profile
-
-        return dict(InstanceProfile=profile)
-
-    def add_role_to_instance_profile(self, InstanceProfileName, RoleName):
-        self._check_role_exists(RoleName, 'AddRoleToInstanceProfile')
-        self._check_instance_profile_exists(
-            InstanceProfileName, 'AddRoleToInstanceProfile')
-
-        profile = self.mock_iam_instance_profiles[InstanceProfileName]
-        if profile['Roles']:
-            raise ClientError(
-                dict(Error=dict(
-                    Code='LimitExceeded',
-                    Message=('Cannot exceed quota for'
-                             ' InstanceSessionsPerInstanceProfile: 1'),
-                )),
-                'AddRoleToInstanceProfile',
-            )
-
-        # just point straight at the mock role; never going to redefine it
-        profile['Roles'] = [self.mock_iam_roles[RoleName]]
-
-    def list_instance_profiles(self):
-        # PathPrefix not implemented
-
-        profiles = list(data for name, data in
-                        sorted(self.mock_iam_instance_profiles.items()))
-
-        return dict(InstanceProfiles=profiles)
-
-    def _check_instance_profile_does_not_exist(
-            self, InstanceProfileName, OperationName):
-
-        if InstanceProfileName in self.mock_iam_instance_profiles:
-            raise ClientError(
-                dict(Error=dict(
-                    Code='EntityAlreadyExists',
-                    Message=('Instance Profile %s already exists' %
-                             InstanceProfileName))),
-                OperationName)
-
-    def _check_instance_profile_exists(
-            self, InstanceProfileName, OperationName):
-
-        if InstanceProfileName not in self.mock_iam_instance_profiles:
-            raise ClientError(
-                dict(Error=dict(
-                    Code='NoSuchEntity',
-                    Message=('Instance Profile %s cannot be found' %
-                             InstanceProfileName))),
-                OperationName)
-
+# configuration munging
 
 def _normalized_configurations(configurations):
     """The API will return an empty Properties list for configurations
@@ -1971,3 +1159,35 @@ def _normalized_configurations(configurations):
                 del c['configurations']
 
     return configurations
+
+
+# errors
+
+def _check_param_type(value, type_or_types):
+    """quick way to raise a boto3 ParamValidationError. We don't bother
+    constructing the text of the ParamValidationError."""
+    if not isinstance(value, type_or_types):
+        raise ParamValidationError
+
+
+def _invalid_request_error(operation_name, message):
+    # boto3 reports this as a botocore.exceptions.InvalidRequestException,
+    # but that's not something you can actually import
+    return AttributeError(
+        'An error occurred (InvalidRequestException) when calling the'
+        ' %s operation: %s' % (operation_name, message))
+
+
+def _validation_error(operation_name, message):
+    return ClientError(
+        dict(
+            Error=dict(
+                Code='ValidationException',
+                Message=message,
+            ),
+            ResponseMetadata=dict(
+                HTTPStatusCode=404,
+            ),
+        ),
+        operation_name,
+    )

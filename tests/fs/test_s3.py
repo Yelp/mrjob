@@ -19,11 +19,11 @@ from botocore.exceptions import ClientError
 from mrjob.fs.s3 import S3Filesystem
 
 from tests.compress import gzip_compress
-from tests.mockboto import MockBotoTestCase
+from tests.mock_boto3 import MockBoto3TestCase
 from tests.py2 import patch
 
 
-class S3FSTestCase(MockBotoTestCase):
+class S3FSTestCase(MockBoto3TestCase):
 
     def setUp(self):
         super(S3FSTestCase, self).setUp()
@@ -196,7 +196,7 @@ class S3FSTestCase(MockBotoTestCase):
                          ['kitteh', 'walrus'])
 
 
-class S3FSRegionTestCase(MockBotoTestCase):
+class S3FSRegionTestCase(MockBoto3TestCase):
 
     def test_default_endpoint(self):
         fs = S3Filesystem()
@@ -274,7 +274,7 @@ class S3FSRegionTestCase(MockBotoTestCase):
             'GetBucketLocation')
 
         with patch(
-                'tests.mockboto.MockS3Client.get_bucket_location',
+                'tests.mock_boto3.s3.MockS3Client.get_bucket_location',
                 side_effect=access_denied_error):
 
             bucket = fs.get_bucket('walrus')
@@ -305,8 +305,8 @@ class S3FSRegionTestCase(MockBotoTestCase):
 
         bucket_east = fs.get_bucket('walrus-east')
 
-        with patch(
-                'tests.mockboto.MockS3Client.get_bucket_location') as mock_gbl:
+        with patch('tests.mock_boto3.s3.MockS3Client.get_bucket_location'
+                   ) as mock_gbl:
             # won't actually be able to access this bucket from this endpoint,
             # but boto3 doesn't check that on bucket creation
             self.assertEqual(bucket_east.meta.client.meta.endpoint_url,

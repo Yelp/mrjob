@@ -31,12 +31,12 @@ from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_starting
 from mrjob.tools.emr.terminate_idle_clusters import _cluster_has_pending_steps
 from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 
-from tests.mockboto import MockBotoTestCase
-from tests.mockboto import MockEmrObject
-from tests.mockboto import to_iso8601
+from tests.mock_boto3 import MockBoto3TestCase
+from tests.mock_boto3 import MockEmrObject
+from tests.mock_boto3 import to_iso8601
 
 
-class ClusterTerminationTestCase(MockBotoTestCase):
+class ClusterTerminationTestCase(MockBoto3TestCase):
 
     maxDiff = None
 
@@ -267,7 +267,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         j_hadoop_debugging.status.timeline.readydatetime = ago(
             hours=4, minutes=55)
 
-        # Need to reset times manually because mockboto resets them
+        # Need to reset times manually because mock_boto3 resets them
         j_hadoop_debugging._steps[0].status.state = 'COMPLETED'
         j_hadoop_debugging._steps[0].status.timeline.enddatetime = ago(hours=5)
         j_hadoop_debugging._steps[1].status.timeline.startdatetime = ago(

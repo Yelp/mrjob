@@ -46,7 +46,7 @@ from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 
 
-from tests.mockboto import MockBotoTestCase
+from tests.mock_boto3 import MockBoto3TestCase
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_filter_job import MRFilterJob
@@ -1798,7 +1798,7 @@ class CreateDirArchiveTestCase(SandboxedTestCase):
         self.assertRaises(OSError, runner._create_dir_archive, qux_path)
 
 
-class RemoteCreateDirArchiveTestCase(MockBotoTestCase):
+class RemoteCreateDirArchiveTestCase(MockBoto3TestCase):
     # additional test cases that archive stuff from (mock) S3
 
     def setUp(self):

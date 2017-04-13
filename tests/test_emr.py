@@ -4300,9 +4300,9 @@ class EMRTagsTestCase(MockBoto3TestCase):
                                            '--tag', 'tag_two=bar')
 
         # tags should be in alphabetical order by key
-        self.assertEqual(cluster.tags, [
-            MockEmrObject(key='tag_one', value='foo'),
-            MockEmrObject(key='tag_two', value='bar'),
+        self.assertEqual(cluster['Tags'], [
+            dict(Key='tag_one', Value='foo'),
+            dict(Key='tag_two', Value='bar'),
         ])
 
     def test_blank_tag_value(self):
@@ -4310,9 +4310,9 @@ class EMRTagsTestCase(MockBoto3TestCase):
                                            '--tag', 'tag_two=')
 
         # tags should be in alphabetical order by key
-        self.assertEqual(cluster.tags, [
-            MockEmrObject(key='tag_one', value='foo'),
-            MockEmrObject(key='tag_two', value=''),
+        self.assertEqual(cluster['Tags'], [
+            dict(Key='tag_one', Value='foo'),
+            dict(Key='tag_two', Value=''),
         ])
 
     def test_tag_values_can_be_none(self):
@@ -4320,8 +4320,8 @@ class EMRTagsTestCase(MockBoto3TestCase):
         cluster_id = runner.make_persistent_cluster()
 
         mock_cluster = self.mock_emr_clusters[cluster_id]
-        self.assertEqual(mock_cluster.tags, [
-            MockEmrObject(key='tag_one', value=''),
+        self.assertEqual(mock_cluster['Tags'], [
+            dict(Key='tag_one', Value=''),
         ])
 
     def test_persistent_cluster(self):
@@ -4332,9 +4332,9 @@ class EMRTagsTestCase(MockBoto3TestCase):
             cluster_id = runner.make_persistent_cluster()
 
         mock_cluster = self.mock_emr_clusters[cluster_id]
-        self.assertEqual(mock_cluster.tags, [
-            MockEmrObject(key='tag_one', value='foo'),
-            MockEmrObject(key='tag_two', value='bar'),
+        self.assertEqual(mock_cluster['Tags'], [
+            dict(Key='tag_one', Value='foo'),
+            dict(Key='tag_two', Value='bar'),
         ])
 
 

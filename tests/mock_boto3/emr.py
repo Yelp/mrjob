@@ -729,7 +729,7 @@ class MockEMRClient(object):
 
         for Tag in Tags:
             _validate_param_type(Tag, dict)
-            if set(Tag) > set('Key', 'Value'):
+            if set(Tag) > set(['Key', 'Value']):
                 raise ParamValidationError(report='Unknown parameter in Tags')
 
             Key = Tag.get('Key')
@@ -749,10 +749,10 @@ class MockEMRClient(object):
 
             new_tags[Key] = Value
 
-        tags_dict = dict((t['Key'], t['Value']) for t in cluster['_Tags'])
+        tags_dict = dict((t['Key'], t['Value']) for t in cluster['Tags'])
         tags_dict.update(new_tags)
 
-        cluster['_Tags'] = [
+        cluster['Tags'] = [
             dict(Key=k, Value=v) for k, v in sorted(tags_dict.items())]
 
     def _get_mock_cluster(self, cluster_id):
@@ -790,32 +790,23 @@ class MockEMRClient(object):
                 status=step_status,
             ))
 
-    def add_tags(self, **kwargs):
+    def add_tags(self, ResourceId, Tags):
         """Simulate successful creation of new metadata tags for the specified
         resource id.
         """
-        self._enforce_strict_ssl()
+        _validate_param_type(ResourceId, string_types)
+        _validate_param_type(Tags, (list, tuple))
 
-        cluster = self._get_mock_cluster(resource_id)
+        if ResourceId not in self.mock_emr_clusters:
+            raise _InvalidRequestException(
+                'AddTags', 'Cluster id %r is not valid.' % ResourceId)
 
-        if not tags:
-            raise boto.exception.EmrResponseError(
-                400, 'Bad Request', body=err_xml(
-                    'Tags cannot be null or empty.',
-                    code='InvalidRequestException'))
+        cluster = self.mock_emr_clusters[ResourceId]
+        if cluster['Status']['State'].startswith('TERMINATED'):
+            raise _InvalidRequestException(
+                'AddTags', 'Tags cannot be modified on terminated clusters.')
 
-        for key, value in sorted(tags.items()):
-            value = value or ''
-
-            for tag_obj in cluster.tags:
-                if tag_obj.key == key:
-                    tag_obj.value == value
-                    break
-            else:
-                cluster.tags.append(MockEmrObject(
-                    key=key, value=value))
-
-        return True
+        self._add_tags('AddTags', Tags, cluster)
 
     def describe_cluster(self, **kwargs):
         self._enforce_strict_ssl()

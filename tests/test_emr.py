@@ -27,6 +27,7 @@ from datetime import timedelta
 from io import BytesIO
 
 import boto3
+from botocore.exceptions import ClientError
 
 import mrjob
 import mrjob.emr
@@ -252,7 +253,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
             emr_conn.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
-        self.assertEqual(cluster.status.state, 'TERMINATED')
+        self.assertEqual(cluster['Status']['State'], 'TERMINATED')
 
         # did we wait for steps in correct order? (regression test for #1316)
         step_ids = [
@@ -283,7 +284,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
                     emr_conn.simulate_progress(cluster_id)
 
                 cluster = runner._describe_cluster()
-                self.assertEqual(cluster.status.state,
+                self.assertEqual(cluster['Status']['State'],
                                  'TERMINATED_WITH_ERRORS')
 
             # job should get terminated on cleanup
@@ -292,7 +293,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
                 emr_conn.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
-        self.assertEqual(cluster.status.state, 'TERMINATED_WITH_ERRORS')
+        self.assertEqual(cluster['Status']['State'], 'TERMINATED_WITH_ERRORS')
 
     def _test_cloud_tmp_cleanup(self, mode, tmp_len, log_len):
         self.add_mock_s3_data({'walrus': {'logs/j-MOCKCLUSTER0/1': b'1\n'}})
@@ -410,7 +411,7 @@ class ExistingClusterTestCase(MockBoto3TestCase):
                 emr_conn.simulate_progress(cluster_id)
 
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster.status.state, 'WAITING')
+            self.assertEqual(cluster['Status']['State'], 'WAITING')
 
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
@@ -419,7 +420,7 @@ class ExistingClusterTestCase(MockBoto3TestCase):
             emr_conn.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
-        self.assertEqual(cluster.status.state, 'WAITING')
+        self.assertEqual(cluster['Status']['State'], 'WAITING')
 
 
 class VisibleToAllUsersTestCase(MockBoto3TestCase):
@@ -1768,7 +1769,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
             emr_conn.simulate_progress(runner.get_cluster_id())
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster.status.state, 'WAITING')
+            self.assertEqual(cluster['Status']['State'], 'WAITING')
 
     def test_join_pooled_cluster(self):
         _, cluster_id = self.make_pooled_cluster()
@@ -2478,7 +2479,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
                 emr_conn.simulate_progress(cluster_id)
 
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster.status.state, 'WAITING')
+            self.assertEqual(cluster['Status']['State'], 'WAITING')
 
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
@@ -2487,7 +2488,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             emr_conn.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
-        self.assertEqual(cluster.status.state, 'WAITING')
+        self.assertEqual(cluster['Status']['State'], 'WAITING')
 
     def test_dont_destroy_other_pooled_cluster_on_failure(self):
         # Issue 242: job failure shouldn't kill the pooled clusters
@@ -2514,7 +2515,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
                 emr_conn.simulate_progress(cluster_id)
 
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster.status.state, 'WAITING')
+            self.assertEqual(cluster['Status']['State'], 'WAITING')
 
         # job shouldn't get terminated by cleanup
         emr_conn = runner.make_emr_conn()
@@ -2523,7 +2524,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             emr_conn.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
-        self.assertEqual(cluster.status.state, 'WAITING')
+        self.assertEqual(cluster['Status']['State'], 'WAITING')
 
     def test_max_hours_idle_doesnt_affect_pool_hash(self):
         # max_hours_idle uses a bootstrap action, but it's not included
@@ -4418,47 +4419,47 @@ class WaitForLogsOnS3TestCase(MockBoto3TestCase):
             waited | set([step_num]))
 
     def assert_silently_exits(self):
-        state = self.cluster.status.state
+        state = self.cluster['Status']['State']
         waited = set(self.runner._waited_for_logs_on_s3)
 
         self.runner._wait_for_logs_on_s3()
 
         self.assertFalse(self.mock_log.info.called)
         self.assertEqual(waited, self.runner._waited_for_logs_on_s3)
-        self.assertEqual(self.runner._describe_cluster().status.state, state)
+        self.assertEqual(self.runner._describe_cluster()['Status']['State'], state)
 
     def test_starting(self):
-        self.cluster.status.state = 'STARTING'
+        self.cluster['Status']['State'] = 'STARTING'
         self.assert_waits_ten_minutes()
 
     def test_bootstrapping(self):
-        self.cluster.status.state = 'BOOTSTRAPPING'
+        self.cluster['Status']['State'] = 'BOOTSTRAPPING'
         self.assert_waits_ten_minutes()
 
     def test_running(self):
-        self.cluster.status.state = 'RUNNING'
+        self.cluster['Status']['State'] = 'RUNNING'
         self.assert_waits_ten_minutes()
 
     def test_waiting(self):
-        self.cluster.status.state = 'WAITING'
+        self.cluster['Status']['State'] = 'WAITING'
         self.assert_waits_ten_minutes()
 
     def test_terminating(self):
-        self.cluster.status.state = 'TERMINATING'
-        self.cluster.delay_progress_simulation = 1
+        self.cluster['Status']['State'] = 'TERMINATING'
+        self.cluster['DelayProgressSimulation'] = True
 
         self.runner._wait_for_logs_on_s3()
 
-        self.assertEqual(self.runner._describe_cluster().status.state,
+        self.assertEqual(self.runner._describe_cluster()['Status']['State'],
                          'TERMINATED')
         self.assertTrue(self.mock_log.info.called)
 
     def test_terminated(self):
-        self.cluster.status.state = 'TERMINATED'
+        self.cluster['Status']['State'] = 'TERMINATED'
         self.assert_silently_exits()
 
     def test_terminated_with_errors(self):
-        self.cluster.status.state = 'TERMINATED_WITH_ERRORS'
+        self.cluster['Status']['State'] = 'TERMINATED_WITH_ERRORS'
         self.assert_silently_exits()
 
     def test_ctrl_c(self):
@@ -4958,7 +4959,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
             runner._launch()
             cluster = runner._describe_cluster()
 
-            applications = set(a.name for a in cluster.applications)
+            applications = set(a['Name'] for a in cluster['Applications'])
             self.assertEqual(applications, set(['hadoop']))
 
     def test_default_on_4_x_ami(self):
@@ -4971,7 +4972,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
             runner._launch()
             cluster = runner._describe_cluster()
 
-            applications = set(a.name for a in cluster.applications)
+            applications = set(a['Name'] for a in cluster['Applications'])
             self.assertEqual(applications, set(['Hadoop']))
 
     def test_applications_requires_4_x_ami(self):
@@ -4999,7 +5000,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
             runner._launch()
             cluster = runner._describe_cluster()
 
-            applications = set(a.name for a in cluster.applications)
+            applications = set(a['Name'] for a in cluster['Applications'])
             self.assertEqual(applications,
                              set(['Hadoop', 'Mahout']))
 
@@ -5018,24 +5019,9 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
             runner._launch()
             cluster = runner._describe_cluster()
 
-            applications = set(a.name for a in cluster.applications)
+            applications = set(a['Name'] for a in cluster['Applications'])
             self.assertEqual(applications,
                              set(['Hadoop', 'Mahout']))
-
-    def test_api_param_serialization(self):
-        job = MRTwoStepJob(
-            ['-r', 'emr',
-             '--application', 'Hadoop',
-             '--application', 'Mahout'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            runner._launch()
-            cluster = runner._describe_cluster()
-
-            self.assertIn('Applications.member.1.Name', cluster._api_params)
-            self.assertIn('Applications.member.2.Name', cluster._api_params)
-            self.assertNotIn('Applications.member.0.Name', cluster._api_params)
 
 
 class EMRConfigurationsTestCase(MockBoto3TestCase):
@@ -5061,10 +5047,9 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertRaises(boto.exception.EmrResponseError, runner._launch)
+            self.assertRaises(ClientError, runner._launch)
 
-    def _test_normalized_emr_configurations(
-            self, emr_configurations, expected_api_response=None):
+    def _test_normalized_emr_configurations(self, emr_configurations):
 
         self.start(mrjob_conf_patcher(dict(runners=dict(emr=dict(
             image_version='4.3.0',
@@ -5080,27 +5065,11 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
             runner._launch()
             cluster = runner._describe_cluster()
 
-            if expected_api_response:
-                self.assertEqual(cluster.configurations, expected_api_response)
-
-            self.assertEqual(
-                _decode_configurations_from_api(cluster.configurations),
-                emr_configurations)
+            self.assertEqual(cluster['Configurations'], emr_configurations)
 
     def test_basic_emr_configuration(self, raw=None):
         self._test_normalized_emr_configurations(
-            [CORE_SITE_EMR_CONFIGURATION],
-            [
-                MockEmrObject(
-                    classification='core-site',
-                    properties=[
-                        MockEmrObject(
-                            key='hadoop.security.groups.cache.secs',
-                            value='250',
-                        ),
-                    ],
-                ),
-            ])
+            [CORE_SITE_EMR_CONFIGURATION])
 
     def test_complex_emr_configurations(self):
         self._test_normalized_emr_configurations(
@@ -5317,7 +5286,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         mock_steps = mock_cluster._steps
 
         self.assertEqual(len(mock_steps), 2)
-        self.assertEqual(mock_steps[0].status.state, 'RUNNING')
+        self.assertEqual(mock_steps[0]['Status']['State'], 'RUNNING')
 
     def test_open_ssh_tunnel_if_cluster_running(self):
         # tests #1115
@@ -5327,7 +5296,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
 
         runner = self.make_runner()
         mock_cluster = runner._describe_cluster()
-        mock_cluster.status.state = 'RUNNING'
+        mock_cluster['Status']['State'] = 'RUNNING'
 
         # run until SSH tunnel is set up
         self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
@@ -5342,7 +5311,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
 
         runner = self.make_runner()
         mock_cluster = runner._describe_cluster()
-        mock_cluster.status.state = 'WAITING'
+        mock_cluster['Status']['State'] = 'WAITING'
 
         # run until SSH tunnel is set up
         self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
@@ -5361,8 +5330,8 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         runner = self.make_runner(
             '--cluster-id', previous_runner.get_cluster_id())
 
-        mock_cluster = runner._describe_cluster()
-        mock_steps = mock_cluster._steps
+        mock_cluster = self.mock_emr_clusters[runner._cluster_id]
+        mock_steps = mock_cluster['_Steps']
 
         # sanity-check: are steps from the previous cluster on there?
         self.assertEqual(len(mock_steps), 4)
@@ -5374,9 +5343,9 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 1)
 
         # cluster should be running, step should still be pending
-        self.assertEqual(mock_cluster.status.state, 'RUNNING')
+        self.assertEqual(mock_cluster['Status']['State'], 'RUNNING')
         self.assertIn(runner._job_key, mock_steps[2].name)
-        self.assertEqual(mock_steps[2].status.state, 'PENDING')
+        self.assertEqual(mock_steps[2]['Status']['State'], 'PENDING')
 
     def test_terminated_cluster(self):
         runner = self.make_runner()
@@ -5625,7 +5594,7 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
             cluster_id = runner.get_cluster_id()
 
             cluster = self.mock_emr_clusters[cluster_id]
-            while cluster.status.state in ('STARTING', 'BOOTSTRAPPING'):
+            while cluster['Status']['State'] in ('STARTING', 'BOOTSTRAPPING'):
                 self.connect_emr().simulate_progress(cluster_id)
 
             runner._set_up_ssh_tunnel()

@@ -89,6 +89,18 @@ AMI_HADOOP_VERSION_UPDATES = {
     '5.0.3': '2.7.3',
 }
 
+# does the AMI have a limit on the *total* number of steps?
+# see http://docs.aws.amazon.com/emr/latest/ManagementGuide/AddMoreThan256Steps.html  # noqa
+LIFETIME_STEP_LIMIT_AMI_VERSIONS = {
+    '1.0.0': True,
+    '2.4.8': False,
+    '3.0.0': True,
+    '3.1.1': False,
+}
+
+STEP_LIMIT = 256
+
+
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
 
@@ -349,6 +361,14 @@ class MockEMRClient(object):
 
         # Configurations
         if 'Configurations' in kwargs:
+            _validate_param(kwargs, 'Configurations', (list, tuple))
+
+            if kwargs['Configurations'] and not version_gte(
+                    running_ami_version, '4'):
+                raise _ValidationException(
+                    'RunJobFlow',
+                    'Cannot specify configurations when AMI version is used.')
+
             cluster['Configurations'] = _normalized_configurations(
                 kwargs.pop('Configurations'))
 
@@ -553,16 +573,9 @@ class MockEMRClient(object):
             )
 
             # InstanceRole (required)
-            _validate_param(InstanceGroup, 'InstanceRole', string_types)
+            _validate_param(InstanceGroup, 'InstanceRole',
+                            ['MASTER', 'CORE', 'TASK'])
             role = InstanceGroup.pop('InstanceRole')
-
-            # bad role type
-            if role not in ('MASTER', 'CORE', 'TASK'):
-                raise _error(
-                    "1 validation error detected: value '%s' at"
-                    " 'instances.instanceGroups.%d.member.instanceRole' failed"
-                    " to satify constraint: Member must satisfy enum value"
-                    " set: [MASTER, TASK, CORE]" % (role, i + 1))
 
             # check for duplicate roles
             if role in roles:
@@ -664,9 +677,35 @@ class MockEMRClient(object):
 
         _validate_param_type(Steps, (list, tuple))
 
-        new_steps = []
+        # only active job flows allowed
+        if cluster['Status']['State'].startswith('TERMINAT'):
+            raise _ValidationException(
+                operation_name,
+                'A job flow that is shutting down, terminated, or finished'
+                ' may not be modified.')
 
-        # TODO: reject if more than 256 steps added at once?
+        # no more than 256 steps allowed
+        if cluster.get('RunningAmiVersion') and map_version(
+                cluster['RunningAmiVersion'],
+                LIFETIME_STEP_LIMIT_AMI_VERSIONS):
+            # for very old AMIs, *all* steps count
+            if len(cluster['_Steps']) + len(Steps) > STEP_LIMIT:
+                raise _ValidationException(
+                    operation_name,
+                    'Maximum number of steps for job flow exceeded')
+        else:
+            # otherwise, only active and pending steps count
+            num_active_steps = sum(
+                1 for step in cluster['_Steps']
+                if step['Status']['State'] in (
+                        'PENDING', 'PENDING_CANCELLED', 'RUNNING'))
+            if num_active_steps + len(Steps) > STEP_LIMIT:
+                raise _ValidationException(
+                    operation_name,
+                    "Maximum number of active steps(State = 'Running',"
+                    " 'Pending' or 'Cancel_Pending') for cluster exceeded.")
+
+        new_steps = []
 
         for i, Step in enumerate(Steps):
             Step = dict(Step)
@@ -690,6 +729,15 @@ class MockEMRClient(object):
             _validate_param(Step, 'Name', string_types)
             new_step['Name'] = Step.pop('Name')
 
+            # ActionOnFailure
+            if 'ActionOnFailure' in Step:
+                _validate_param_enum(
+                    Step['ActionOnFailure'],
+                    ['CANCEL_AND_WAIT', 'CONTINUE',
+                     'TERMINATE_JOB_FLOW', 'TERMINATE_CLUSTER'])
+
+                new_step['ActionOnFailure'] = Step.pop('ActionOnFailure')
+
             # HadoopJarStep (required)
             _validate_param(Step, 'HadoopJarStep', dict)
             HadoopJarStep = dict(Step.pop('HadoopJarStep'))
@@ -709,7 +757,7 @@ class MockEMRClient(object):
                 new_step['Config']['MainClass'] = HadoopJarStep.pop(
                     'MainClass')
 
-            # don't currently support Properties
+            # we don't currently support Properties
             if HadoopJarStep:
                 raise NotImplementedError(
                     "mock_boto3 doesn't support these HadoopJarStep params: %s" %
@@ -761,44 +809,27 @@ class MockEMRClient(object):
     def _get_mock_cluster(self, operation_name, cluster_id):
         """Get the mock cluster with the given ID, or raise
         an InvalidRequestException.
-
-        Note that TerminateJobFlows raises a different error on
-        invalid clusters.
         """
+        _validate_param_type(cluster_id, string_types)
+
         if cluster_id not in self.mock_emr_clusters:
-            raise _InvalidRequestException(
-                operation_name, 'Cluster id %r is not valid.' % ResourceId)
+            # error type and message depends on whether we call them
+            # "job flows" or clusters
+            if 'JobFlow' in operation_name:
+                raise _ValidationException(
+                    operation_name, 'Specified job flow ID not valid')
+            else:
+                raise _InvalidRequestException(
+                    operation_name, 'Cluster id %r is not valid.' % cluster_id)
 
         return self.mock_emr_clusters[cluster_id]
 
-    def add_job_flow_steps(self, **kwargs):
-        self._enforce_strict_ssl()
+    def add_job_flow_steps(self, JobFlowId, Steps):
+        cluster = self._get_mock_cluster('AddJobFlowSteps', JobFlowId)
 
-        if now is None:
-            now = _boto3_now()
+        step_ids = self._add_steps('AddJobFlowSteps', Steps, cluster)
 
-        cluster = self._get_mock_cluster(jobflow_id)
-
-        for step in steps:
-            step_config = MockEmrObject(
-                args=[MockEmrObject(value=a) for a in step.args()],
-                jar=step.jar(),
-                mainclass=step.main_class())
-            # there's also a "properties" field, but boto doesn't handle it
-
-            step_status = MockEmrObject(
-                state='PENDING',
-                timeline=MockEmrObject(
-                    creationdatetime=to_iso8601(now)),
-            )
-
-            cluster._steps.append(MockEmrObject(
-                actiononfailure=step.action_on_failure,
-                config=step_config,
-                id=('s-MOCKSTEP%d' % len(cluster._steps)),
-                name=step.name,
-                status=step_status,
-            ))
+        return dict(StepIds=step_ids)
 
     def add_tags(self, ResourceId, Tags):
         """Simulate successful creation of new metadata tags for the specified
@@ -824,7 +855,12 @@ class MockEMRClient(object):
             # _wait_for_logs_on_s3()
             self.simulate_progress(ClusterId)
 
-        return dict(Cluster=deepcopy(cluster))
+        # hide _ fields
+        cluster = dict(
+            (k, deepcopy(v)) for k, v in cluster.items()
+            if not k.startswith('_'))
+
+        return dict(Cluster=cluster)
 
     def describe_step(self, **kwargs):
         self._enforce_strict_ssl()
@@ -995,16 +1031,15 @@ class MockEMRClient(object):
         cluster_ids_seen = set()
 
         for cluster_id in JobFlowIds:
-            if cluster_id not in self.mock_emr_clusters:
-                raise _ValidationException(
-                    'TerminateJobFlows', 'Specified job flow ID not valid')
-
             # the API doesn't allow duplicate IDs
             if cluster_id in cluster_ids_seen:
                 raise _ValidationException(
                     'TerminateJobFlows',
                     'Specified job flow ID does not exist')
             cluster_ids_seen.add(cluster_id)
+
+            to_terminate.append(
+                self._get_mock_cluster('TerminateJobFlows', cluster_id))
 
         to_terminate.append(self.mock_emr_clusters[cluster_id])
 
@@ -1048,7 +1083,7 @@ class MockEMRClient(object):
         :type now: py:class:`datetime.datetime`
         :param now: alternate time to use as the current time (should be UTC)
         """
-        _enforce_strict_ssl()
+        self._enforce_strict_ssl()
 
         # TODO: this doesn't actually update steps to CANCELLED when
         # cluster is shut down
@@ -1192,14 +1227,11 @@ class MockEMRClient(object):
 def _normalized_configurations(configurations):
     """The API will return an empty Properties list for configurations
     without properties set, and remove empty sub-configurations"""
-    if not isinstance(configurations, list):
-        raise ParamValidationError
-
+    _validate_param_type(configurations, (list, tuple))
     configurations = list(configurations)
 
     for c in configurations:
-        if not isinstance(c, dict):
-            raise ParamValidationError
+        _validate_param_type(c, dict)
         c = dict(c)  # so we can modify it
 
         c.setdefault('properties', [])
@@ -1216,24 +1248,37 @@ def _normalized_configurations(configurations):
 
 # errors
 
-def _validate_param(params, name, type_or_types=None):
+def _validate_param(params, name, type=None):
     """Check that the param *name* is found in *params*, and if
-    *type_or_types* is set, validate that it has the proper type.
+    *type* is set, validate that it has the proper type.
+
+    *type* may also be a tuple (multiple types) or a list
+    (multiple values to match)
     """
     if name not in params:
         raise ParamValidationError(
             report='Missing required parameter in input: "%s"' % name)
 
-    if type_or_types:
-        _validate_param_type(params[name], type_or_types)
+    if type:
+        if isinstance(type, list):
+            _validate_param_enum(params[name], type)
+        else:
+            _validate_param_type(params[name], type)
 
-
-def _validate_param_type(value, type_or_types):
+def _validate_param_type(value, type):
     """Raise ParamValidationError if *value* isn't an instance of
-    *type_or_types*."""
-    if not isinstance(value, type_or_types):
+    *type*."""
+    if not isinstance(value, type):
         raise ParamValidationError(
-            report=('%r is not an instance of %r' % (value, type_or_types)))
+            report=('%r is not an instance of %r' % (value, type)))
+
+
+def _validate_param_enum(value, allowed):
+    if value not in allowed:
+        # the actual error is more verbose than this
+        raise ParamValidationError(
+            report=('Value %r failed to satisfy constraint: Member must'
+                    ' satisfy value enum set: [%s]' % ', '.join(allowed)))
 
 
 def _InvalidRequestException(operation_name, message):

@@ -768,6 +768,8 @@ class MockEMRClient(object):
                     "mock_boto3 doesn't support these step params: %s" %
                     ', '.join(sorted(Step)))
 
+            new_steps.append(new_step)
+
         cluster['_Steps'].extend(new_steps)
 
         # add_job_flow_steps() needs to return step IDs

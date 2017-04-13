@@ -98,8 +98,12 @@ LIFETIME_STEP_LIMIT_AMI_VERSIONS = {
     '3.1.1': False,
 }
 
-STEP_LIMIT = 256
+# a cluster can't have more than this many active steps (or more than this
+# many steps total
+STEP_ADD_LIMIT = 256
 
+# only the last 1000 steps are visible through the API
+STEP_LIST_LIMIT = 1000
 
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
@@ -689,7 +693,7 @@ class MockEMRClient(object):
                 cluster['RunningAmiVersion'],
                 LIFETIME_STEP_LIMIT_AMI_VERSIONS):
             # for very old AMIs, *all* steps count
-            if len(cluster['_Steps']) + len(Steps) > STEP_LIMIT:
+            if len(cluster['_Steps']) + len(Steps) > STEP_ADD_LIMIT:
                 raise _ValidationException(
                     operation_name,
                     'Maximum number of steps for job flow exceeded')
@@ -699,7 +703,7 @@ class MockEMRClient(object):
                 1 for step in cluster['_Steps']
                 if step['Status']['State'] in (
                         'PENDING', 'PENDING_CANCELLED', 'RUNNING'))
-            if num_active_steps + len(Steps) > STEP_LIMIT:
+            if num_active_steps + len(Steps) > STEP_ADD_LIMIT:
                 raise _ValidationException(
                     operation_name,
                     "Maximum number of active steps(State = 'Running',"
@@ -857,33 +861,17 @@ class MockEMRClient(object):
             # _wait_for_logs_on_s3()
             self.simulate_progress(ClusterId)
 
-        # hide _ fields
-        cluster = dict(
-            (k, deepcopy(v)) for k, v in cluster.items()
-            if not k.startswith('_'))
+        # hide _ fields, don't let user mess with mock cluster
+        cluster = deepcopy(_strip_hidden(cluster))
 
         return dict(Cluster=cluster)
 
-    def describe_step(self, **kwargs):
-        self._enforce_strict_ssl()
-
+    def describe_step(self, ClusterId, StepId):
         # simulate progress, to support _wait_for_steps_to_complete()
-        self.simulate_progress(cluster_id)
+        self.simulate_progress(ClusterId)
 
-        # make sure that we only call list_steps() when we've patched
-        # around https://github.com/boto/boto/issues/3268
-        if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
-            raise Exception('called un-patched version of describe_step()!')
-
-        cluster = self._get_mock_cluster(cluster_id)
-
-        for step in cluster._steps:
-            if step.id == step_id:
-                return step
-
-        raise boto.exception.EmrResponseError(
-            400, 'Bad Request', body=err_xml(
-                "Step id '%s' is not valid." % step_id))
+        steps = self._list_steps(ClusterId, StepIds=[StepId])
+        return dict(Step=steps[0])
 
     def list_bootstrap_actions(self, **kwargs):
         self._enforce_strict_ssl()
@@ -997,30 +985,47 @@ class MockEMRClient(object):
 
         return MockEmrObject(instancegroups=cluster._instancegroups)
 
-    def list_steps(self, **kwargs):
-        self._enforce_strict_ssl()
+    def list_steps(self, ClusterId, StepIds=None, StepStates=None):
+        return dict(Steps=self._list_steps(
+            'ListSteps', ClusterId, StepIds=StepIds, StepStates=StepStates))
 
-        # make sure that we only call list_steps() when we've patched
-        # around https://github.com/boto/boto/issues/3268
-        if 'StartDateTime' not in boto.emr.emrobject.ClusterTimeline.Fields:
-            raise Exception('called un-patched version of list_steps()!')
+    def _list_steps(
+            self, operation_name, ClusterId, StepIds=None, StepStates=None):
+        """Helper for list_steps() and describe_step()."""
+        cluster = self._get_mock_cluster(operation_name, ClusterId)
 
-        steps = self._get_mock_cluster(cluster_id)._steps
+        # only last 1000 steps are visible
+        mock_steps = cluster['_Steps'][-STEP_LIST_LIMIT:]
 
-        steps_listed = []
+        # this is triggered even if StepIds and StepStates are []
+        if not (StepIds is None or StepStates is None):
+            raise _InvalidRequestException(
+                operation_name,
+                'Cannot specify both StepIds and StepStates.')
 
-        # *marker* was the index of the last step we listed
-        for index in reversed(range(marker or len(steps))):
-            step = steps[index]
-            if step_states is None or step.status.state in step_states:
-                steps_listed.append(step)
+        results = []
 
-            if len(steps_listed) >= self.max_steps_returned:
-                break
+        if StepIds:
+            _validate_param_type(StepIds, (list, tuple))
+
+            steps_by_id = dict((s['Id'], s) for s in mock_steps)
+
+            for step_id in StepIds:
+                if step_id not in steps_by_id:
+                    raise _InvalidRequestException(
+                        operation_name,
+                        'Step id %r is not valid.' % step_id)
+
+                # duplicate steps are allowed
+                results.append(steps_by_id[step_id])
         else:
-            index = None  # listed all steps, no need to call again
+            for step in reversed(mock_steps):
+                if StepStates and step['Status']['State'] not in StepStates:
+                    continue
 
-        return MockEmrObject(steps=steps_listed, marker=index)
+                results.append(step)
+
+        return [deepcopy(step) for step in results]
 
     def terminate_job_flows(self, JobFlowIds):
         _validate_param_type(JobFlowIds, (list, tuple))
@@ -1225,6 +1230,12 @@ class MockEMRClient(object):
 
 
 # configuration munging
+
+def _strip_hidden(d):
+    """Return a (shallow) copy of the given dict, excluding fields starting
+    with underscore."""
+    return dict((k, v) for k, v in d.items() if not k.startswith('_'))
+
 
 def _normalized_configurations(configurations):
     """The API will return an empty Properties list for configurations

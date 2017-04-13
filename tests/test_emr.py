@@ -3870,8 +3870,7 @@ class BuildMasterNodeSetupStepTestCase(MockBoto3TestCase):
         master_node_setup_uri = runner._upload_mgr.uri(
             runner._master_node_setup_script_path)
 
-        with patch('boto.emr.JarStep', dict):
-            step = runner._build_master_node_setup_step()
+        step = runner._build_master_node_setup_step()
 
         self.assertTrue(step['Name'].endswith(': Master node setup'))
         self.assertEqual(step['HadoopJarStep']['Jar'],
@@ -3986,22 +3985,21 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         self.assert_upload_succeeds(runner, data, _HUGE_PART_THRESHOLD)
 
 
-class SecurityTokenTestCase(MockBoto3TestCase):
+class AWSSessionTokenTestCase(MockBoto3TestCase):
 
     def setUp(self):
-        super(SecurityTokenTestCase, self).setUp()
+        super(AWSSessionTokenTestCase, self).setUp()
 
-        self.mock_emr = self.start(patch('boto.emr.connection.EmrConnection'))
         self.mock_client = self.start(patch('boto3.client'))
         self.mock_resource = self.start(patch('boto3.resource'))
 
     def assert_conns_use_security_token(self, runner, security_token):
-        runner.make_emr_conn()
+        runner.make_emr_client()
 
-        self.assertTrue(self.mock_emr.called)
-        emr_kwargs = self.mock_emr.call_args[1]
-        self.assertIn('security_token', emr_kwargs)
-        self.assertEqual(emr_kwargs['security_token'], security_token)
+        self.assertTrue(self.mock_client.called)
+        emr_kwargs = self.mock_client.call_args[1]
+        self.assertIn('aws_session_token', emr_kwargs)
+        self.assertEqual(emr_kwargs['aws_session_token'], security_token)
 
         self.mock_client.reset_mock()
         runner.make_iam_client()

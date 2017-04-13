@@ -33,7 +33,7 @@ from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_boto3 import MockEmrObject
-from tests.mock_boto3 import to_iso8601
+from tests.mock_boto3.emr import to_iso8601
 
 
 class ClusterTerminationTestCase(MockBoto3TestCase):

@@ -44,6 +44,8 @@ class MockBoto3TestCase(SandboxedTestCase):
     # times, there's probably a problem with simulating progress
     MAX_EMR_CLIENTS = 100
 
+    connect_emr = Boto2TestSkipper()
+
     @classmethod
     def setUpClass(cls):
         # we don't care what's in this file, just want mrjob to stop creating
@@ -96,20 +98,16 @@ class MockBoto3TestCase(SandboxedTestCase):
         add_mock_s3_data(self.mock_s3_fs, data, age, location)
 
     def add_mock_emr_cluster(self, cluster):
-        if cluster.id in self.mock_emr_clusters:
+        if cluster['Id'] in self.mock_emr_clusters:
             raise ValueError('mock cluster %s already exists' % cluster.id)
 
-        for field in ('_bootstrapactions', '_instancegroups', '_steps'):
-            if not hasattr(cluster, field):
-                setattr(cluster, field, [])
+        for field in ('_BootstrapActions', '_InstanceGroups', '_Steps'):
+            cluster.setdefault(field, [])
 
-        if not hasattr(cluster, 'name'):
-            cluster.name = cluster.id[2:]
+        cluster.setdefault('Name', cluster['Id'][2:])
+        cluster.setdefault('NormalizedInstanceHours', 0)
 
-        if not hasattr(cluster, 'normalizedinstancehours'):
-            cluster.normalizedinstancehours = '0'
-
-        self.mock_emr_clusters[cluster.id] = cluster
+        self.mock_emr_clusters[cluster['Id']] = cluster
 
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # TODO: Refactor this abomination of a test harness

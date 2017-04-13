@@ -24,186 +24,189 @@ from mrjob.tools.emr.report_long_jobs import main
 from tests.mock_boto3 import MockEmrObject
 from tests.mock_boto3 import MockBoto3TestCase
 
+
+# TODO: port these to boto3. Just replaced "MockEmrObject" with "dict"
+# so that the module could import
 CLUSTERS = [
-    MockEmrObject(
-        id='j-STARTING',
+    dict(
+        Id='j-STARTING',
         name='mr_grieving',
-        status=MockEmrObject(
+        status=dict(
             state='STARTING',
-            timeline=MockEmrObject(
+            timeline=dict(
                 creationdatetime='2010-06-06T00:05:00Z',
             ),
         ),
         _steps=[],
     ),
-    MockEmrObject(
-        id='j-BOOTSTRAPPING',
+    dict(
+        Id='j-BOOTSTRAPPING',
         name='mr_grieving',
-        status=MockEmrObject(
+        status=dict(
             state='BOOTSTRAPPING',
-            timeline=MockEmrObject(
+            timeline=dict(
                 creationdatetime='2010-06-06T00:05:00Z',
             ),
         ),
         _steps=[],
     ),
-    MockEmrObject(
-        id='j-RUNNING1STEP',
+    dict(
+        Id='j-RUNNING1STEP',
         name='mr_grieving',
-        status=MockEmrObject(
+        status=dict(
             state='RUNNING',
-            timeline=MockEmrObject(
+            timeline=dict(
                 creationdatetime='2010-06-06T00:00:00Z',
                 readydatetime='2010-06-06T00:15:00Z',
             ),
         ),
         _steps=[
-            MockEmrObject(
+            dict(
                 name='mr_denial: Step 1 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='RUNNING',
-                    timeline=MockEmrObject(
+                    timeline=dict(
                         startdatetime='2010-06-06T00:20:00Z',
                     ),
                 ),
             ),
         ],
     ),
-    MockEmrObject(
-        id='j-RUNNING2STEPS',
+    dict(
+        Id='j-RUNNING2STEPS',
         name='mr_grieving',
-        status=MockEmrObject(
+        status=dict(
             state='RUNNING',
-            timeline=MockEmrObject(
+            timeline=dict(
                 creationdatetime='2010-06-06T00:00:00Z',
                 readydatetime='2010-06-06T00:15:00Z',
             ),
         ),
         _steps=[
-            MockEmrObject(
+            dict(
                 name='mr_denial: Step 1 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='COMPLETED',
-                    timeline=MockEmrObject(
+                    timeline=dict(
                         enddatetime='2010-06-06T00:25:00Z',
                         startdatetime='2010-06-06T00:20:00Z',
                     ),
                 ),
             ),
-            MockEmrObject(
+            dict(
                 name='mr_anger: Step 2 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='RUNNING',
-                    timeline=MockEmrObject(
+                    timeline=dict(
                         startdatetime='2010-06-06T00:30:00Z',
                     ),
                 ),
             ),
         ]
     ),
-    MockEmrObject(
-        id='j-RUNNINGANDPENDING',
+    dict(
+        Id='j-RUNNINGANDPENDING',
         name='mr_grieving',
-        status=MockEmrObject(
+        status=dict(
             state='RUNNING',
-            timeline=MockEmrObject(
+            timeline=dict(
                 creationdatetime='2010-06-06T00:00:00Z',
                 readydatetime='2010-06-06T00:15:00Z',
             ),
         ),
         _steps=[
-            MockEmrObject(
+            dict(
                 name='mr_denial: Step 1 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='COMPLETED',
-                    timeline=MockEmrObject(
+                    timeline=dict(
                         enddatetime='2010-06-06T00:25:00Z',
                         startdatetime='2010-06-06T00:20:00Z',
                     ),
                 ),
             ),
-            MockEmrObject(
+            dict(
                 name='mr_anger: Step 2 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='RUNNING',
-                    timeline=MockEmrObject(
+                    timeline=dict(
                         startdatetime='2010-06-06T00:30:00Z',
                     ),
                 ),
             ),
-            MockEmrObject(
+            dict(
                 name='mr_bargaining: Step 3 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='PENDING',
                 ),
             ),
         ]
     ),
-    MockEmrObject(
-        id='j-PENDING1STEP',
+    dict(
+        Id='j-PENDING1STEP',
         name='mr_grieving',
-        status=MockEmrObject(
+        status=dict(
             state='RUNNING',
-            timeline=MockEmrObject(
+            timeline=dict(
                 creationdatetime='2010-06-06T00:00:00Z',
                 readydatetime='2010-06-06T00:15:00Z',
             ),
         ),
         _steps=[
-            MockEmrObject(
+            dict(
                 name='mr_bargaining: Step 3 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='PENDING',
                 ),
             ),
         ]
     ),
-    MockEmrObject(
-        id='j-PENDING2STEPS',
+    dict(
+        Id='j-PENDING2STEPS',
         name='mr_grieving',
-        status=MockEmrObject(
+        status=dict(
             state='RUNNING',
-            timeline=MockEmrObject(
+            timeline=dict(
                 creationdatetime='2010-06-06T00:00:00Z',
                 readydatetime='2010-06-06T00:15:00Z',
             ),
         ),
         _steps=[
-            MockEmrObject(
+            dict(
                 name='mr_bargaining: Step 3 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='COMPLETED',
-                    timeline=MockEmrObject(
+                    timeline=dict(
                         enddatetime='2010-06-06T00:35:00Z',
                         startdatetime='2010-06-06T00:20:00Z',
                     ),
                 ),
             ),
-            MockEmrObject(
+            dict(
                 name='mr_depression: Step 4 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='PENDING',
                 ),
             ),
         ]
     ),
-    MockEmrObject(
-        id='j-COMPLETED',
+    dict(
+        Id='j-COMPLETED',
         name='mr_grieving',
-        status=MockEmrObject(
+        status=dict(
             state='COMPLETED',
-            timeline=MockEmrObject(
+            timeline=dict(
                 creationdatetime='2010-06-06T00:00:00Z',
                 readydatetime='2010-06-06T00:15:00Z',
             ),
         ),
         state='COMPLETED',
         _steps=[
-            MockEmrObject(
+            dict(
                 name='mr_acceptance: Step 5 of 5',
-                status=MockEmrObject(
+                status=dict(
                     state='COMPLETED',
-                    timeline=MockEmrObject(
+                    timeline=dict(
                         enddatetime='2010-06-06T00:40:00Z',
                         startdatetime='2010-06-06T00:20:00Z',
                     ),
@@ -213,13 +216,13 @@ CLUSTERS = [
     ),
 ]
 
-CLUSTERS_BY_ID = dict((cluster.id, cluster) for cluster in CLUSTERS)
+CLUSTERS_BY_ID = dict((cluster['Id'], cluster) for cluster in CLUSTERS)
 
 CLUSTER_SUMMARIES_BY_ID = dict(
-    (cluster.id, MockEmrObject(
-        id=cluster.id,
-        name=cluster.name,
-        status=cluster.status))
+    (cluster['Id'], dict(
+        Id=cluster['Id'],
+        name=cluster['name'],
+        status=cluster['status']))
     for cluster in CLUSTERS)
 
 

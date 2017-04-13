@@ -30,6 +30,7 @@ import boto3
 
 import mrjob
 import mrjob.emr
+from mrjob.aws import _boto3_now
 from mrjob.compat import version_gte
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
@@ -53,11 +54,12 @@ from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 
 import tests.mock_boto3
+import tests.mock_boto3.s3
 from tests.mock_boto3 import MockBoto3TestCase
-from tests.mock_boto3.emr import DEFAULT_MAX_STEPS_RETURNED
 from tests.mock_boto3.emr import Boto2TestSkipper
-from tests.mock_boto3.emr import MockEmrObject
+from tests.mock_boto3.emr import MockEMRClient
 from tests.mock_boto3.emr import MockEmrConnection
+from tests.mock_boto3.emr import MockEmrObject
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
@@ -1701,10 +1703,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         cluster_id = runner.make_persistent_cluster()
         mock_cluster = self.mock_emr_clusters[cluster_id]
 
-        mock_cluster.status.state = 'WAITING'
-        start = datetime.now() - timedelta(minutes=minutes_ago)
-        mock_cluster.status.timeline.creationdatetime = (
-            start.strftime(boto.utils.ISO8601))
+        mock_cluster['Status']['State'] = 'WAITING'
+        mock_cluster['Status']['Timeline']['CreationDateTime'] = (
+            _boto3_now() - timedelta(minutes=minutes_ago))
         return runner, cluster_id
 
     def get_cluster(self, job_args, job_class=MRTwoStepJob):
@@ -2622,7 +2623,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         cluster_id = EMRJobRunner(**kwargs).make_persistent_cluster()
 
         mock_cluster = self.mock_emr_clusters[cluster_id]
-        mock_cluster.status.state = 'WAITING'
+        mock_cluster['Status']['State'] = 'WAITING'
 
         return cluster_id
 
@@ -3923,8 +3924,8 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
         self.add_mock_s3_data({self.TEST_BUCKET: {}})
 
         self.upload_file = self.start(patch(
-            'tests.mock_boto3.MockS3Object.upload_file',
-            side_effect=tests.mock_boto3.MockS3Object.upload_file,
+            'tests.mock_boto3.s3.MockS3Object.upload_file',
+            side_effect=tests.mock_boto3.s3.MockS3Object.upload_file,
             autospec=True))
 
     def upload_data(self, runner, data):
@@ -5187,12 +5188,12 @@ class JobStepsTestCase(MockBoto3TestCase):
         job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id]).sandbox()
 
         with job.make_runner() as runner:
-            add_other_steps(n=DEFAULT_MAX_STEPS_RETURNED)
+            add_other_steps(n=MockEMRClient.DEFAULT_MAX_ITEMS)
             runner._launch()
             add_other_steps(n=3)
 
             # this test won't work if pages of steps are really small
-            assert(DEFAULT_MAX_STEPS_RETURNED >= 5)
+            self.assertGreaterEqual(MockEMRClient.DEFAULT_MAX_ITEMS, 5)
 
             job_steps = runner._job_steps(max_steps=2)
 

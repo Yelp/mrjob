@@ -28,6 +28,7 @@ from mrjob.py2 import string_types
 from ..py2 import unittest
 from .s3 import add_mock_s3_data
 from .util import MockObject
+from .util import MockPaginator
 
 
 class Boto2TestSkipper(object):
@@ -98,6 +99,16 @@ DUMMY_APPLICATION_VERSION = '0.0.0'
 class MockEMRClient(object):
     """Mock out boto3 EMR clients. This actually handles a small
     state machine that simulates EMR clusters."""
+
+    DEFAULT_MAX_ITEMS = 50
+
+    OPERATION_NAME_TO_RESULT_KEY = dict(
+        list_bootstrap_actions='BootstrapActions',
+        list_clusters='Clusters',
+        list_instance_groups='InstanceGroups',
+        list_instances='Instances',
+        list_steps='Steps',
+    )
 
     _enforce_strict_ssl = Boto2TestSkipper()
 
@@ -181,6 +192,13 @@ class MockEMRClient(object):
         self.meta = MockObject(
             endpoint_url=endpoint_url,
             region_name=region_name)
+
+    # TODO: merge with code from MockIAMClient
+    def get_paginator(self, operation_name):
+        return MockPaginator(
+            getattr(self, operation_name),
+            self.OPERATION_NAME_TO_RESULT_KEY[operation_name],
+            self.DEFAULT_MAX_ITEMS)
 
     def run_job_flow(self, **kwargs):
         # going to pop params from kwargs as we process then, and raise
@@ -355,6 +373,10 @@ class MockEMRClient(object):
         if 'Tags' in kwargs:
             self._add_tags('RunJobFlow', kwargs.pop('Tags'), cluster)
 
+        # save AdditionalInfo
+        if 'AdditionalInfo' in kwargs:
+            cluster['_AdditionalInfo'] = kwargs.pop('AdditionalInfo')
+
         # catch extra params
         if kwargs:
             raise NotImplementedError(
@@ -422,13 +444,13 @@ class MockEMRClient(object):
         if 'Ec2SubnetId' in Instances:
             _check_param_type(Instances['Ec2SubnetId'], string_types)
             cluster['Ec2InstanceAttributes']['Ec2SubnetId'] = (
-                Instances['Ec2SubnetId'])
+                Instances.pop('Ec2SubnetId'))
 
         # KeepJobFlowAliveWhenNoSteps
         if 'KeepJobFlowAliveWhenNoSteps' in Instances:
             _check_param_type(Instances['KeepJobFlowAliveWhenNoSteps'], bool)
             cluster['AutoTerminate'] = (
-                not Instances['KeepJobFlowAliveWhenNoSteps'])
+                not Instances.pop('KeepJobFlowAliveWhenNoSteps'))
 
         # Placement (availability zone)
         if 'Placement' in Instances:
@@ -776,7 +798,7 @@ class MockEMRClient(object):
                 status=step_status,
             ))
 
-    def add_tags(self, resource_id, tags):
+    def add_tags(self, **kwargs):
         """Simulate successful creation of new metadata tags for the specified
         resource id.
         """
@@ -815,7 +837,7 @@ class MockEMRClient(object):
 
         return cluster
 
-    def describe_step(self, cluster_id, step_id):
+    def describe_step(self, **kwargs):
         self._enforce_strict_ssl()
 
         # simulate progress, to support _wait_for_steps_to_complete()
@@ -836,7 +858,7 @@ class MockEMRClient(object):
             400, 'Bad Request', body=err_xml(
                 "Step id '%s' is not valid." % step_id))
 
-    def list_bootstrap_actions(self, cluster_id, marker=None):
+    def list_bootstrap_actions(self, **kwargs):
         self._enforce_strict_ssl()
 
         if marker is not None:
@@ -847,8 +869,7 @@ class MockEMRClient(object):
 
         return MockEmrObject(actions=cluster._bootstrapactions)
 
-    def list_clusters(self, created_after=None, created_before=None,
-                      cluster_states=None, marker=None):
+    def list_clusters(self, **kwargs):
         self._enforce_strict_ssl()
 
         # summaries of cluster state, to return
@@ -894,8 +915,7 @@ class MockEMRClient(object):
 
         return MockEmrObject(clusters=cluster_summaries, marker=cluster_marker)
 
-    def list_instances(self, cluster_id, instance_group_id=None,
-                       instance_group_types=None, marker=None):
+    def list_instances(self, **kwargs):
         """stripped-down simulation of list_instances() to support
         SSH tunneling; only includes state.status and the privateipaddress
         field.
@@ -935,7 +955,7 @@ class MockEMRClient(object):
 
         return MockEmrObject(instances=instances)
 
-    def list_instance_groups(self, cluster_id, marker=None):
+    def list_instance_groups(self, **kwargs):
         self._enforce_strict_ssl()
 
         # TODO: not sure what order API returns instance groups in,
@@ -950,7 +970,7 @@ class MockEMRClient(object):
 
         return MockEmrObject(instancegroups=cluster._instancegroups)
 
-    def list_steps(self, cluster_id, step_states=None, marker=None):
+    def list_steps(self, **kwargs):
         self._enforce_strict_ssl()
 
         # make sure that we only call list_steps() when we've patched
@@ -999,6 +1019,9 @@ class MockEMRClient(object):
                 # pretty sure this is what INTERRUPTED is for
                 step.status.state = 'INTERRUPTED'
 
+    def terminate_job_flows(self, **kwargs):
+        self._enforce_strict_ssl()
+
     def _get_step_output_uri(self, step_args):
         """Figure out the output dir for a step by parsing step.args
         and looking for an -output argument."""
@@ -1019,6 +1042,8 @@ class MockEMRClient(object):
         :type now: py:class:`datetime.datetime`
         :param now: alternate time to use as the current time (should be UTC)
         """
+        _enforce_strict_ssl()
+
         # TODO: this doesn't actually update steps to CANCELLED when
         # cluster is shut down
         if now is None:

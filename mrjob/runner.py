@@ -836,14 +836,11 @@ class MRJobRunner(object):
         when running a Hadoop streaming job."""
         args = []
 
-        # set up uploading from HDFS/cloud storage to the working dir
-        args.extend(self._upload_args())
-
         # get command for each part of the job
         mapper, combiner, reducer = (
             self._hadoop_streaming_commands(step_num))
 
-        # set up uploading from HDFS to the working dir
+        # set up uploading from HDFS/cloud storage to the working dir
         args.extend(self._upload_args())
 
         # if no reducer, shut off reducer tasks. This has to come before

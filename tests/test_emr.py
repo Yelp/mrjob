@@ -3858,7 +3858,7 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
             )
 
 
-class BuildMasterNodeSetupStep(MockBoto3TestCase):
+class BuildMasterNodeSetupStepTestCase(MockBoto3TestCase):
 
     def test_build_master_node_setup_step(self):
         runner = EMRJobRunner(libjars=['cookie.jar'])
@@ -3871,10 +3871,12 @@ class BuildMasterNodeSetupStep(MockBoto3TestCase):
         with patch('boto.emr.JarStep', dict):
             step = runner._build_master_node_setup_step()
 
-        self.assertTrue(step['name'].endswith(': Master node setup'))
-        self.assertEqual(step['jar'], runner._script_runner_jar_uri())
-        self.assertEqual(step['step_args'], [master_node_setup_uri])
-        self.assertEqual(step['action_on_failure'],
+        self.assertTrue(step['Name'].endswith(': Master node setup'))
+        self.assertEqual(step['HadoopJarStep']['Jar'],
+                         runner._script_runner_jar_uri())
+        self.assertEqual(step['HadoopJarStep']['Args'],
+                         [master_node_setup_uri])
+        self.assertEqual(step['ActionOnFailure'],
                          runner._action_on_failure())
 
 

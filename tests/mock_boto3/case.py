@@ -24,12 +24,12 @@ import boto3
 from mrjob.emr import _EMR_LOG_DIR
 from mrjob.emr import EMRJobRunner
 
-from ..mockssh import create_mock_ssh_script
-from ..mockssh import mock_ssh_dir
-from ..mr_two_step_job import MRTwoStepJob
-from ..py2 import MagicMock
-from ..py2 import patch
-from ..sandbox import SandboxedTestCase
+from tests.mockssh import create_mock_ssh_script
+from tests.mockssh import mock_ssh_dir
+from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import MagicMock
+from tests.py2 import patch
+from tests.sandbox import SandboxedTestCase
 
 from .emr import MockEMRClient
 from .emr import Boto2TestSkipper

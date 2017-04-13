@@ -25,7 +25,8 @@ from mrjob.parse import parse_s3_uri
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
 
-from ..py2 import unittest
+from tests.py2 import unittest
+
 from .s3 import add_mock_s3_data
 from .util import MockObject
 from .util import MockPaginator

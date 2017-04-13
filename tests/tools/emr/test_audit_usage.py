@@ -19,6 +19,8 @@ from datetime import date
 from datetime import datetime
 from datetime import timedelta
 
+import boto3
+
 from mrjob.tools.emr.audit_usage import _cluster_to_full_summary
 from mrjob.tools.emr.audit_usage import _percent
 from mrjob.tools.emr.audit_usage import _subdivide_interval_by_date
@@ -50,9 +52,15 @@ class AuditUsageTestCase(ToolTestCase):
         self.assertFalse(self.describe_cluster_sleep.called)
 
     def test_with_one_cluster(self):
-        emr_conn = boto.emr.connection.EmrConnection()
-        emr_conn.run_jobflow('no name', job_flow_role='fake-instance-profile',
-                             service_role='fake-service-role')
+        emr_client = boto3.client('emr')
+        emr_client.run_job_flow(
+            Name='no name',
+            Instances=dict(
+                MasterInstanceType='m1.medium',
+                InstanceCount=1),
+            JobFlowRole='fake-instance-profile',
+            ServiceRole='fake-service-role',
+            ReleaseLabel='emr-5.0.0')
 
         self.monkey_patch_stdout()
         main(['-q', '--no-conf'])

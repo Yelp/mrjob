@@ -251,28 +251,28 @@ class MockEMRClient(object):
             'j-MOCKCLUSTER%d' % len (self.mock_emr_clusters))
 
         # Name (required)
-        _check_param_type(kwargs.get('Name'), string_types)
+        _validate_param(kwargs, 'Name', string_types)
         cluster['Name'] = kwargs.pop('Name')
 
         # LogUri
         if 'LogUri' in kwargs:
-            _check_param_type(kwargs['LogUri'], string_types)
+            _validate_param(kwargs, 'LogUri', string_types)
             cluster['LogUri'] = kwargs.pop('LogUri')
 
         # JobFlowRole and ServiceRole (required)
-        _check_param_type(kwargs.get('JobFlowRole'), string_types)
+        _validate_param(kwargs, 'JobFlowRole', string_types)
         cluster['Ec2InstanceAttributes']['IamInstanceProfile'] = kwargs.pop(
             'JobFlowRole')
 
         if 'ServiceRole' not in kwargs:  # required by API, not boto3
             raise _error('ServiceRole is required for creating cluster.')
-        _check_param_type(kwargs['ServiceRole'], string_types)
+        _validate_param(kwargs, 'ServiceRole', string_types)
         cluster['ServiceRole'] = kwargs.pop('ServiceRole')
 
         # AmiVersion and ReleaseLabel
         for version_param in ('AmiVersion', 'ReleaseLabel'):
             if version_param in kwargs:
-                _check_param_type(kwargs[version_param], string_types)
+                _validate_param(kwargs, version_param, string_types)
 
         if 'AmiVersion' in kwargs:
             if 'ReleaseLabel' in kwargs:
@@ -351,7 +351,7 @@ class MockEMRClient(object):
 
         # VisibleToAllUsers
         if 'VisibleToAllUsers' in kwargs:
-            _check_param_type(kwargs['VisibleToAllUsers'], bool)
+            _validate_param(kwargs, 'VisibleToAllUsers', bool)
             cluster['VisibleToAllUsers'] = kwargs.pop('VisibleToAllUsers')
 
         # pass BootstrapActions off to helper
@@ -360,8 +360,7 @@ class MockEMRClient(object):
                 'RunJobFlow', kwargs.pop('BootstrapActions'), cluster)
 
         # pass Instances (required) off to helper
-        if 'Instances' not in kwargs:
-            raise ParamValidationError
+        _validate_param(kwargs, 'Instances')
         self._add_instances('RunJobFlow', kwargs.pop('Instances'), cluster,
                             now=now)
 
@@ -395,24 +394,24 @@ class MockEMRClient(object):
 
         (there isn't any other way to add bootstrap actions)
         """
-        _check_param_type(BootstrapActions, (list, tuple))
+        _validate_param_type(BootstrapActions, (list, tuple))
 
         operation_name  # currently unused, quiet pyflakes
 
         new_actions = []  # don't update _BootstrapActions if there's an error
 
         for ba in BootstrapActions:
-            _check_param_type(ba, dict)
-            _check_param_type(ba.get('Name'), string_types)
-            _check_param_type(ba.get('ScriptBootstrapAction'), dict)
-            _check_param_type(ba['ScriptBootstrapAction'].get('Path'),
-                              string_types)
+            _validate_param_type(ba, dict)
+            _validate_param(ba, 'Name', string_types)
+            _validate_param(ba, 'ScriptBootstrapAction', dict)
+            _validate_param(ba['ScriptBootstrapAction'], 'Path', string_types)
 
             args = []
             if 'Args' in ba['ScriptBootstrapAction']:
-                _check_param_type(ba['ScriptBootstrapAction']['Args'], (list, tuple))
+                _validate_param(
+                    ba['ScriptBootstrapAction'], 'Args', (list, tuple))
                 for arg in ba['ScriptBootstrapAction']['Args']:
-                    _check_param_type(arg, string_types)
+                    _validate_param_type(arg, string_types)
                     args.append(arg)
 
             new_actions.append(dict(
@@ -427,7 +426,7 @@ class MockEMRClient(object):
         if now is None:
             now = _boto3_now()
 
-        _check_param_type(Instances, dict)
+        _validate_param_type(Instances, dict)
 
         Instances = dict(Instances)  # going to pop params from Instances
 
@@ -436,32 +435,29 @@ class MockEMRClient(object):
 
         # Ec2KeyName
         if 'Ec2KeyName' in Instances:
-            _check_param_type(Instances['Ec2KeyName'], string_types)
+            _validate_param(Instances, 'Ec2KeyName', string_types)
             cluster['Ec2InstanceAttributes']['Ec2KeyName'] = Instances.pop(
                 'Ec2KeyName')
 
         # Ec2SubnetId
         if 'Ec2SubnetId' in Instances:
-            _check_param_type(Instances['Ec2SubnetId'], string_types)
+            _validate_param(Instances, 'Ec2SubnetId', string_types)
             cluster['Ec2InstanceAttributes']['Ec2SubnetId'] = (
                 Instances.pop('Ec2SubnetId'))
 
         # KeepJobFlowAliveWhenNoSteps
         if 'KeepJobFlowAliveWhenNoSteps' in Instances:
-            _check_param_type(Instances['KeepJobFlowAliveWhenNoSteps'], bool)
+            _validate_param(Instances, 'KeepJobFlowAliveWhenNoSteps', bool)
             cluster['AutoTerminate'] = (
                 not Instances.pop('KeepJobFlowAliveWhenNoSteps'))
 
         # Placement (availability zone)
         if 'Placement' in Instances:
+            _validate_param(Instances, 'Placement', dict)
             Placement = Instances.pop('Placement')
-            if not isinstance(Placement, dict):
-                raise ParamValidationError
 
             # mock_boto3 doesn't support the 'AvailabilityZones' param
-            if not isinstance(Placement.get('AvailabilityZone'), string_types):
-                raise ParamValidationError
-
+            _validate_param(Placement, 'AvailabilityZone', string_types)
             cluster['Ec2AvailabilityZone'] = Placement['AvailabilityZone']
 
         if 'InstanceGroups' in Instances:
@@ -481,11 +477,10 @@ class MockEMRClient(object):
             instance_groups = []
 
             instance_count = Instances.pop('InstanceCount', 0)
-            _check_param_type(instance_count, integer_types)
+            _validate_param_type(instance_count, integer_types)
 
             # note: boto3 actually lets 'null' fall through to the API here
-            _check_param_type(
-                Instances.get('MasterInstanceType'), string_types)
+            _validate_param(Instances, 'MasterInstanceType', string_types)
             instance_groups.append(dict(
                 InstanceRole='MASTER',
                 InstanceType=Instances.pop('MasterInstanceType'),
@@ -493,7 +488,7 @@ class MockEMRClient(object):
 
             if 'SlaveInstanceType' in Instances:
                 SlaveInstanceType = Instances.pop('SlaveInstanceType')
-                _check_param_type(SlaveInstanceType, string_types)
+                _validate_param_type(SlaveInstanceType, string_types)
 
                 # don't create a group with no instances!
                 if instance_count > 1:
@@ -516,7 +511,7 @@ class MockEMRClient(object):
         """Add instance groups from *InstanceGroups* to the mock
         cluster *cluster*.
         """
-        _check_param_type(InstanceGroups, (list, tuple))
+        _validate_param_type(InstanceGroups, (list, tuple))
 
         def _error(message):
             return _ValidationException(operation_name, message)
@@ -534,7 +529,7 @@ class MockEMRClient(object):
         roles = set()  # roles already handled
 
         for i, InstanceGroup in enumerate(InstanceGroups):
-            _check_param_type(InstanceGroup, dict)
+            _validate_param_type(InstanceGroup, dict)
             InstanceGroup = dict(InstanceGroup)
 
             # our new mock instance group
@@ -555,7 +550,7 @@ class MockEMRClient(object):
             )
 
             # InstanceRole (required)
-            _check_param_type(InstanceGroup.get('InstanceRole'), string_types)
+            _validate_param(InstanceGroup, 'InstanceRole', string_types)
             role = InstanceGroup.pop('InstanceRole')
 
             # bad role type
@@ -577,7 +572,7 @@ class MockEMRClient(object):
             ig['InstanceGroupType'] = role
 
             # InstanceType (required)
-            _check_param_type(InstanceGroup.get('InstanceType'), string_types)
+            _validate_param(InstanceGroup, 'InstanceType', string_types)
 
             # 3.x AMIs (but not 4.x, etc.) reject m1.small explicitly
             if (InstanceGroup.get('InstanceType') == 'm1.small' and
@@ -589,8 +584,7 @@ class MockEMRClient(object):
             ig['InstanceType'] = InstanceGroup.pop('InstanceType')
 
             # InstanceCount (required)
-            _check_param_type(InstanceGroup.get('InstanceCount'),
-                              integer_types)
+            _validate_param(InstanceGroup, 'InstanceCount', integer_types)
             InstanceCount = InstanceGroup.pop('InstanceCount')
             if InstanceCount < 1:
                 raise _error(
@@ -603,12 +597,12 @@ class MockEMRClient(object):
 
             # Name
             if 'Name' in InstanceGroup:
-                _check_param_type(InstanceGroup['Name'], string_types)
+                _validate_param(InstanceGroup, 'Name', string_types)
                 ig['Name'] = InstanceGroup.pop('Name')
 
             # Market (default set above)
             if 'Market' in InstanceGroup:
-                _check_param_type(InstanceGroup['Market'], string_types)
+                _validate_param(InstanceGroup, 'Market', string_types)
                 if InstanceGroup['Market'] not in ('ON_DEMAND', 'SPOT'):
                     raise _error(
                     "1 validation error detected: value '%s' at"
@@ -620,7 +614,7 @@ class MockEMRClient(object):
             # BidPrice
             if 'BidPrice' in InstanceGroup:
                 # not float, surprisingly
-                _check_param_type(InstanceGroup['BidPrice'], string_types)
+                _validate_param(InstanceGroup, 'BidPrice', string_types)
 
                 if ig['Market'] != 'SPOT':
                     raise _error('Attempted to set bid price for on demand'
@@ -665,8 +659,7 @@ class MockEMRClient(object):
         if now is None:
             now = _boto3_now()
 
-        if not isinstance(Steps, (list, tuple)):
-            raise ParamValidationError
+        _validate_param_type(Steps, (list, tuple))
 
         new_steps = []
 
@@ -691,25 +684,25 @@ class MockEMRClient(object):
             )
 
             # Name (required)
-            _check_param_type(Step.get('Name'), string_types)
+            _validate_param(Step, 'Name', string_types)
             new_step['Name'] = Step.pop('Name')
 
             # HadoopJarStep (required)
-            _check_param_type(Step.get('HadoopJarStep'), dict)
+            _validate_param(Step, 'HadoopJarStep', dict)
             HadoopJarStep = dict(Step.pop('HadoopJarStep'))
 
-            _check_param_type(HadoopJarStep.get('Jar'), string_types)
+            _validate_param(HadoopJarStep, 'Jar', string_types)
             new_step['Config']['Jar'] = HadoopJarStep.pop('Jar')
 
             if 'Args' in HadoopJarStep:
                 Args = HadoopJarStep.pop('Args')
-                _check_param_type(Args, (list, tuple))
+                _validate_param_type(Args, (list, tuple))
                 for arg in Args:
-                    _check_param_type(arg, string_types)
+                    _validate_param_type(arg, string_types)
                 new_step['Config']['Args'].extend(Args)
 
             if 'MainClass' in HadoopJarStep:
-                _check_param_type(HadoopJarStep['MainClass'], string_types)
+                _validate_param(HadoopJarStep, 'MainClass', string_types)
                 new_step['Config']['MainClass'] = HadoopJarStep.pop(
                     'MainClass')
 
@@ -730,15 +723,14 @@ class MockEMRClient(object):
         return [new_step['Id'] for new_step in new_steps]
 
     def _add_tags(self, operation_name, Tags, cluster):
-        if not isinstance(Tags, (list, tuple)):
-            raise ParamValidationError
+        _validate_param_type(Tags, (list, tuple))
 
         new_tags = {}
 
         for Tag in Tags:
-            _check_param_type(Tag, dict)
+            _validate_param_type(Tag, dict)
             if set(Tag) > set('Key', 'Value'):
-                raise ParamValidationError
+                raise ParamValidationError(report='Unknown parameter in Tags')
 
             Key = Tag.get('Key')
             if not Key or not 1 <= len(Key) <= 128:
@@ -996,7 +988,7 @@ class MockEMRClient(object):
         return MockEmrObject(steps=steps_listed, marker=index)
 
     def terminate_job_flows(self, JobFlowIds):
-        _check_param_type(JobFlowIds, (list, tuple))
+        _validate_param_type(JobFlowIds, (list, tuple))
 
         if not JobFlowIds:
             raise _ValidationException(
@@ -1227,9 +1219,21 @@ def _normalized_configurations(configurations):
 
 # errors
 
-def _check_param_type(value, type_or_types):
-    """quick way to raise a boto3 ParamValidationError. We don't bother
-    constructing the text of the ParamValidationError."""
+def _validate_param(params, name, type_or_types=None):
+    """Check that the param *name* is found in *params*, and if
+    *type_or_types* is set, validate that it has the proper type.
+    """
+    if name not in params:
+        raise ParamValidationError(
+            report='Missing required parameter in input: "%s"' % name)
+
+    if type_or_types:
+        _validate_param_type(params[name], type_or_types)
+
+
+def _validate_param_type(value, type_or_types):
+    """Raise ParamValidationError if *value* isn't an instance of
+    *type_or_types*."""
     if not isinstance(value, type_or_types):
         raise ParamValidationError(
             report=('%r is not an instance of %r' % (value, type_or_types)))

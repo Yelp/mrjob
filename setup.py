@@ -35,6 +35,10 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
+    # special case for Python 2.6
+    if sys.version_info < (2, 7):
+        setuptools_kwargs['test_suite'] = 'unittest2.collector'
+
     # mrjob doesn't actually support Python 3.2, but it tries to support
     # PyPy3, which is currently Python 3.2 with some key 3.3 features
     if (hasattr(sys, 'pypy_version_info') and
@@ -42,6 +46,9 @@ try:
         # httplib2 is a dependency of google-api-python-client, used
         # to run tests
         setuptools_kwargs['install_requires'].append('httplib2>=0.8,<1')
+    elif sys.version_info < (2, 7):
+        setuptools_kwargs['install_requires'].append(
+            'google-api-python-client==1.5.0')
     else:
         setuptools_kwargs['install_requires'].append(
             'google-api-python-client>=1.5.0')

@@ -1705,9 +1705,11 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         cluster_id = runner.make_persistent_cluster()
         mock_cluster = self.mock_emr_clusters[cluster_id]
 
+        # poor man's version of simulating cluster progress
         mock_cluster['Status']['State'] = 'WAITING'
         mock_cluster['Status']['Timeline']['CreationDateTime'] = (
             _boto3_now() - timedelta(minutes=minutes_ago))
+        mock_cluster['MasterPublicDnsName'] = 'mockmaster'
         return runner, cluster_id
 
     def get_cluster(self, job_args, job_class=MRTwoStepJob):
@@ -2626,6 +2628,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
 
         mock_cluster = self.mock_emr_clusters[cluster_id]
         mock_cluster['Status']['State'] = 'WAITING'
+        mock_cluster['MasterPublicDnsName'] = 'mockmaster'
 
         return cluster_id
 

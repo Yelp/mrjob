@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Mock boto3 EMR support."""
+from copy import deepcopy
+
 from botocore.exceptions import ClientError
 from botocore.exceptions import ParamValidationError
 
@@ -756,13 +758,20 @@ class MockEMRClient(object):
         cluster['Tags'] = [
             dict(Key=k, Value=v) for k, v in sorted(tags_dict.items())]
 
-    def _get_mock_cluster(self, cluster_id):
-        if not cluster_id in self.mock_emr_clusters:
-            raise boto.exception.S3ResponseError(404, 'Not Found')
+    def _get_mock_cluster(self, operation_name, cluster_id):
+        """Get the mock cluster with the given ID, or raise
+        an InvalidRequestException.
+
+        Note that TerminateJobFlows raises a different error on
+        invalid clusters.
+        """
+        if cluster_id not in self.mock_emr_clusters:
+            raise _InvalidRequestException(
+                operation_name, 'Cluster id %r is not valid.' % ResourceId)
 
         return self.mock_emr_clusters[cluster_id]
 
-    def add_jobflow_steps(self, jobflow_id, steps, now=None):
+    def add_job_flow_steps(self, **kwargs):
         self._enforce_strict_ssl()
 
         if now is None:
@@ -798,28 +807,24 @@ class MockEMRClient(object):
         _validate_param_type(ResourceId, string_types)
         _validate_param_type(Tags, (list, tuple))
 
-        if ResourceId not in self.mock_emr_clusters:
-            raise _InvalidRequestException(
-                'AddTags', 'Cluster id %r is not valid.' % ResourceId)
+        cluster = self._get_mock_cluster('AddTags', ResourceId)
 
-        cluster = self.mock_emr_clusters[ResourceId]
         if cluster['Status']['State'].startswith('TERMINATED'):
             raise _InvalidRequestException(
                 'AddTags', 'Tags cannot be modified on terminated clusters.')
 
         self._add_tags('AddTags', Tags, cluster)
 
-    def describe_cluster(self, **kwargs):
-        self._enforce_strict_ssl()
+    def describe_cluster(self, ClusterId):
+        _validate_param_type(ClusterId, string_types)
+        cluster = self._get_mock_cluster('DescribeCluster', ClusterId)
 
-        cluster = self._get_mock_cluster(cluster_id)
-
-        if cluster.status.state == 'TERMINATING':
+        if cluster['Status']['State'] == 'TERMINATING':
             # simulate progress, to support
             # _wait_for_logs_on_s3()
-            self.simulate_progress(cluster_id)
+            self.simulate_progress(ClusterId)
 
-        return cluster
+        return dict(Cluster=deepcopy(cluster))
 
     def describe_step(self, **kwargs):
         self._enforce_strict_ssl()
@@ -987,7 +992,7 @@ class MockEMRClient(object):
                 'TerminateJobFlows', 'The JobFlowId list cannot be empty')
 
         to_terminate = []
-        cluster_ids_seen = ()
+        cluster_ids_seen = set()
 
         for cluster_id in JobFlowIds:
             if cluster_id not in self.mock_emr_clusters:
@@ -1016,7 +1021,7 @@ class MockEMRClient(object):
                 Message='Terminated by user request',
             )
 
-            for step in cluster._steps:
+            for step in cluster['_Steps']:
                 if step['Status']['State'] == 'PENDING':
                     step['Status']['State'] = 'CANCELLED'
                 elif step['Status']['State'] == 'RUNNING':

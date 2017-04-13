@@ -18,7 +18,6 @@ import sys
 from mrjob.tools.emr.create_cluster import main as create_cluster_main
 from mrjob.tools.emr.create_cluster import _runner_kwargs
 
-from tests.mock_boto3.emr import MockEmrObject
 from tests.tools.emr import ToolTestCase
 
 
@@ -101,11 +100,11 @@ class ClusterInspectionTestCase(ToolTestCase):
         )
         self.monkey_patch_stdout()
         create_cluster_main()
-        self.assertEqual(list(self.mock_emr_clusters.keys()),
+        self.assertEqual(sorted(self.mock_emr_clusters),
                          ['j-MOCKCLUSTER0'])
 
         mock_cluster = self.mock_emr_clusters['j-MOCKCLUSTER0']
-        self.assertEqual(mock_cluster.tags, [
-            MockEmrObject(key='tag_one', value='foo'),
-            MockEmrObject(key='tag_two', value='bar'),
+        self.assertEqual(mock_cluster['Tags'], [
+            dict(Key='tag_one', Value='foo'),
+            dict(Key='tag_two', Value='bar'),
         ])

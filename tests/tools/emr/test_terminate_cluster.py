@@ -14,7 +14,6 @@
 # limitations under the License.
 """Test the cluster termination tool"""
 from mrjob.emr import EMRJobRunner
-from mrjob.patched_boto import _patched_describe_cluster
 from mrjob.tools.emr.terminate_cluster import main as terminate_main
 from mrjob.tools.emr.terminate_cluster import _make_option_parser
 

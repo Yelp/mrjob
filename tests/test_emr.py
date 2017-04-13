@@ -4446,7 +4446,7 @@ class WaitForLogsOnS3TestCase(MockBoto3TestCase):
 
     def test_terminating(self):
         self.cluster['Status']['State'] = 'TERMINATING'
-        self.cluster['DelayProgressSimulation'] = True
+        self.cluster['_DelayProgressSimulation'] = 1
 
         self.runner._wait_for_logs_on_s3()
 

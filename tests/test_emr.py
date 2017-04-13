@@ -3092,27 +3092,27 @@ class CleanupClusterTestCase(MockBoto3TestCase):
     def test_kill_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
-            with patch.object(EMRJobRunner, 'make_emr_conn') as m:
+            with patch.object(EMRJobRunner, 'make_emr_client') as m:
                 r._cleanup_cluster()
-                self.assertTrue(m().terminate_jobflow.called)
+                self.assertTrue(m().terminate_job_flows.called)
 
     def test_kill_cluster_if_successful(self):
         # If they are setting up the cleanup to kill the cluster, mrjob should
         # kill the cluster independent of job success.
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
-            with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
+            with patch.object(EMRJobRunner, 'make_emr_client') as m:
                 r._ran_job = True
                 r._cleanup_cluster()
-                self.assertTrue(m().terminate_jobflow.called)
+                self.assertTrue(m().terminate_job_flows.called)
 
     def test_kill_persistent_cluster(self):
         with no_handlers_for_logger('mrjob.emr'):
             r = self._quick_runner()
-            with patch.object(mrjob.emr.EMRJobRunner, 'make_emr_conn') as m:
+            with patch.object(EMRJobRunner, 'make_emr_client') as m:
                 r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
                 r._cleanup_cluster()
-                self.assertTrue(m().terminate_jobflow.called)
+                self.assertTrue(m().terminate_job_flows.called)
 
 
 class JobWaitTestCase(MockBoto3TestCase):

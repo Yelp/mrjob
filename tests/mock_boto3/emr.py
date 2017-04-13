@@ -243,7 +243,7 @@ class MockEMRClient(object):
         )
 
         def _error(message):
-            return _validation_error('RunJobFlow', message)
+            return _ValidationException('RunJobFlow', message)
 
         # Id
         cluster['Id'] = (
@@ -395,7 +395,7 @@ class MockEMRClient(object):
 
         (there isn't any other way to add bootstrap actions)
         """
-        _check_param_type(BootstrapActions, list)
+        _check_param_type(BootstrapActions, (list, tuple))
 
         operation_name  # currently unused, quiet pyflakes
 
@@ -410,7 +410,7 @@ class MockEMRClient(object):
 
             args = []
             if 'Args' in ba['ScriptBootstrapAction']:
-                _check_param_type(ba['ScriptBootstrapAction']['Args'], list)
+                _check_param_type(ba['ScriptBootstrapAction']['Args'], (list, tuple))
                 for arg in ba['ScriptBootstrapAction']['Args']:
                     _check_param_type(arg, string_types)
                     args.append(arg)
@@ -432,7 +432,7 @@ class MockEMRClient(object):
         Instances = dict(Instances)  # going to pop params from Instances
 
         def _error(message):
-            return _validation_error(operation_name, message)
+            return _ValidationException(operation_name, message)
 
         # Ec2KeyName
         if 'Ec2KeyName' in Instances:
@@ -516,10 +516,10 @@ class MockEMRClient(object):
         """Add instance groups from *InstanceGroups* to the mock
         cluster *cluster*.
         """
-        _check_param_type(InstanceGroups, list)
+        _check_param_type(InstanceGroups, (list, tuple))
 
         def _error(message):
-            return _validation_error(operation_name, message)
+            return _ValidationException(operation_name, message)
 
         if now is None:
             now = _boto3_now()
@@ -665,7 +665,7 @@ class MockEMRClient(object):
         if now is None:
             now = _boto3_now()
 
-        if not isinstance(Steps, list):
+        if not isinstance(Steps, (list, tuple)):
             raise ParamValidationError
 
         new_steps = []
@@ -703,7 +703,7 @@ class MockEMRClient(object):
 
             if 'Args' in HadoopJarStep:
                 Args = HadoopJarStep.pop('Args')
-                _check_param_type(Args, list)
+                _check_param_type(Args, (list, tuple))
                 for arg in Args:
                     _check_param_type(arg, string_types)
                 new_step['Config']['Args'].extend(Args)
@@ -730,7 +730,7 @@ class MockEMRClient(object):
         return [new_step['Id'] for new_step in new_steps]
 
     def _add_tags(self, operation_name, Tags, cluster):
-        if not isinstance(Tags, list):
+        if not isinstance(Tags, (list, tuple)):
             raise ParamValidationError
 
         new_tags = {}
@@ -742,7 +742,7 @@ class MockEMRClient(object):
 
             Key = Tag.get('Key')
             if not Key or not 1 <= len(Key) <= 128:
-                raise _invalid_request_error(
+                raise _InvalidRequestException(
                     operation_name,
                     "Invalid tag key: '%s'. Tag keys must be between 1 and 128"
                     " characters in length." %
@@ -750,7 +750,7 @@ class MockEMRClient(object):
 
             Value = Tag.get('Value') or ''
             if not 0 <= len(Value) <= 256:
-                raise _invalid_request_error(
+                raise _InvalidRequestException(
                     operation_name,
                     "Invalid tag value: '%s'. Tag values must be between 1 and"
                     " 128 characters in length." % Value)
@@ -995,32 +995,49 @@ class MockEMRClient(object):
 
         return MockEmrObject(steps=steps_listed, marker=index)
 
-    def terminate_jobflow(self, jobflow_id):
-        self._enforce_strict_ssl()
+    def terminate_job_flows(self, JobFlowIds):
+        _check_param_type(JobFlowIds, (list, tuple))
 
-        cluster = self._get_mock_cluster(jobflow_id)
+        if not JobFlowIds:
+            raise _ValidationException(
+                'TerminateJobFlows', 'The JobFlowId list cannot be empty')
 
-        # already terminated
-        if cluster.status.state in (
-                'TERMINATED', 'TERMINATED_WITH_ERRORS'):
-            return
+        to_terminate = []
+        cluster_ids_seen = ()
 
-        # mark cluster as shutting down
-        cluster.status.state = 'TERMINATING'
-        cluster.status.statechangereason = MockEmrObject(
-            code='USER_REQUEST',
-            message='Terminated by user request',
-        )
+        for cluster_id in JobFlowIds:
+            if cluster_id not in self.mock_emr_clusters:
+                raise _ValidationException(
+                    'TerminateJobFlows', 'Specified job flow ID not valid')
 
-        for step in cluster._steps:
-            if step.status.state == 'PENDING':
-                step.status.state = 'CANCELLED'
-            elif step.status.state == 'RUNNING':
-                # pretty sure this is what INTERRUPTED is for
-                step.status.state = 'INTERRUPTED'
+            # the API doesn't allow duplicate IDs
+            if cluster_id in cluster_ids_seen:
+                raise _ValidationException(
+                    'TerminateJobFlows',
+                    'Specified job flow ID does not exist')
+            cluster_ids_seen.add(cluster_id)
 
-    def terminate_job_flows(self, **kwargs):
-        self._enforce_strict_ssl()
+        to_terminate.append(self.mock_emr_clusters[cluster_id])
+
+        for cluster in to_terminate:
+            # already terminated
+            if cluster['Status']['State'] in (
+                    'TERMINATED', 'TERMINATED_WITH_ERRORS'):
+                continue
+
+            # mark cluster as shutting down
+            cluster['Status']['State'] = 'TERMINATING'
+            cluster['Status']['StateChangeReason'] = dict(
+                Code='USER_REQUEST',
+                Message='Terminated by user request',
+            )
+
+            for step in cluster._steps:
+                if step['Status']['State'] == 'PENDING':
+                    step['Status']['State'] = 'CANCELLED'
+                elif step['Status']['State'] == 'RUNNING':
+                    # pretty sure this is what INTERRUPTED is for
+                    step['Status']['State'] = 'INTERRUPTED'
 
     def _get_step_output_uri(self, step_args):
         """Figure out the output dir for a step by parsing step.args
@@ -1218,7 +1235,7 @@ def _check_param_type(value, type_or_types):
             report=('%r is not an instance of %r' % (value, type_or_types)))
 
 
-def _invalid_request_error(operation_name, message):
+def _InvalidRequestException(operation_name, message):
     # boto3 reports this as a botocore.exceptions.InvalidRequestException,
     # but that's not something you can actually import
     return AttributeError(
@@ -1226,7 +1243,7 @@ def _invalid_request_error(operation_name, message):
         ' %s operation: %s' % (operation_name, message))
 
 
-def _validation_error(operation_name, message):
+def _ValidationException(operation_name, message):
     return ClientError(
         dict(
             Error=dict(

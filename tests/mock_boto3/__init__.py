@@ -15,10 +15,5 @@
 
 This is by no means a complete mock of boto3, just what we need for tests.
 """
-from ..py2 import unittest
-
 from .case import MockBoto3TestCase
 MockBoto3TestCase  # shh, pyflakes
-
-# temporary shim
-from .emr import MockEmrObject

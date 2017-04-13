@@ -19,8 +19,8 @@ from datetime import timedelta
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 
-from tests.mock_boto3 import MockEmrObject
-from tests.mock_boto3 import to_iso8601
+from tests.mock_boto3.emr import MockEmrObject
+from tests.mock_boto3.emr import to_iso8601
 from tests.py2 import TestCase
 
 

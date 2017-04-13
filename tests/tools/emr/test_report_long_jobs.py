@@ -21,7 +21,7 @@ from mrjob.py2 import StringIO
 from mrjob.tools.emr.report_long_jobs import _find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
 
-from tests.mock_boto3 import MockEmrObject
+from tests.mock_boto3.emr import MockEmrObject
 from tests.mock_boto3 import MockBoto3TestCase
 
 

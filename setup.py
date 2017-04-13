@@ -31,9 +31,13 @@ try:
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],
-        'test_suite': 'tests.suite.load_tests',
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
+
+    if sys.version_info < (2, 7):
+        setuptools_kwargs['test_suite'] = 'tests.suite.load_tests'
+    else:
+        setuptools_kwargs['test_suite'] = 'tests'
 
     # mrjob doesn't actually support Python 3.2, but it tries to support
     # PyPy3, which is currently Python 3.2 with some key 3.3 features

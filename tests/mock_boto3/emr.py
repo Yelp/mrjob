@@ -36,7 +36,11 @@ from .util import MockPaginator
 
 class Boto2TestSkipper(object):
     def __call__(self, *args, **kwargs):
-        raise unittest.SkipTest('old boto 2 test')
+        from os import environ
+        if environ.get('NO_SKIP'):
+            raise Exception('old boto 2 test')
+        else:
+            raise unittest.SkipTest('old boto 2 test')
 
     def __getattr__(self, name):
         self()
@@ -1175,7 +1179,7 @@ class MockEMRClient(object):
             if (cluster_id, step_num) in self.mock_emr_failures:
                 step['Status']['State'] = 'FAILED'
 
-                if step.actiononfailure in (
+                if step['ActionOnFailure'] in (
                         'TERMINATE_CLUSTER', 'TERMINATE_JOB_FLOW'):
 
                     cluster['Status']['State'] = 'TERMINATING'

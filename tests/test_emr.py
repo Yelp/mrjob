@@ -208,7 +208,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
             cluster = runner._describe_cluster()
 
-            name_match = _JOB_KEY_RE.match(cluster.name)
+            name_match = _JOB_KEY_RE.match(cluster['Name'])
             self.assertEqual(name_match.group(1), 'mr_hadoop_format_job')
             self.assertEqual(name_match.group(2), getpass.getuser())
 
@@ -782,7 +782,7 @@ class EnableDebuggingTestCase(MockBoto3TestCase):
             emr_conn = runner.make_emr_conn()
             steps = _list_all_steps(emr_conn, runner.get_cluster_id())
 
-            self.assertEqual(steps[0].name, 'Setup Hadoop Debugging')
+            self.assertEqual(steps[0]['Name'], 'Setup Hadoop Debugging')
 
 
 class RegionTestCase(MockBoto3TestCase):
@@ -1419,7 +1419,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         def assertScriptDownloads(path, name=None):
             uri = runner._upload_mgr.uri(path)
-            name = runner._bootstrap_dir_mgr.name('file', path, name=name)
+            name = runner._bootstrap_dir_mgr['Name']('file', path, name=name)
 
             if image_version and not version_gte(image_version, '4'):
                 self.assertIn(
@@ -1447,7 +1447,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
                       lines)
         self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
         # bootstrap_mrjob
-        mrjob_zip_name = runner._bootstrap_dir_mgr.name(
+        mrjob_zip_name = runner._bootstrap_dir_mgr['Name'](
             'file', runner._mrjob_zip_path)
         self.assertIn("  __mrjob_PYTHON_LIB=$(" + expected_python_bin +
                       " -c 'from distutils.sysconfig import get_python_lib;"
@@ -1529,17 +1529,17 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertEqual(
             actions[0].args[0].value,
             '-m,mapred.tasktracker.map.tasks.maximum=1')
-        self.assertEqual(actions[0].name, 'action 0')
+        self.assertEqual(actions[0]['Name'], 'action 0')
 
         self.assertEqual(actions[1].scriptpath, 's3://foo/bar')
         self.assertEqual(actions[1].args, [])
-        self.assertEqual(actions[1].name, 'action 1')
+        self.assertEqual(actions[1]['Name'], 'action 1')
 
         # check for master bootstrap script
         self.assertTrue(actions[2].scriptpath.startswith('s3://mrjob-'))
         self.assertTrue(actions[2].scriptpath.endswith('b.py'))
         self.assertEqual(actions[2].args, [])
-        self.assertEqual(actions[2].name, 'master')
+        self.assertEqual(actions[2]['Name'], 'master')
 
         # make sure master bootstrap script is on S3
         self.assertTrue(runner.fs.exists(actions[2].scriptpath))
@@ -1579,7 +1579,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         self.assertTrue(actions[0].scriptpath.startswith('s3://mrjob-'))
         self.assertTrue(actions[0].scriptpath.endswith('/apt-install.sh'))
-        self.assertEqual(actions[0].name, 'action 0')
+        self.assertEqual(actions[0]['Name'], 'action 0')
         self.assertEqual(actions[0].args[0].value, 'python-scipy')
         self.assertEqual(actions[0].args[1].value, 'mysql-server')
 
@@ -1587,7 +1587,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertTrue(actions[1].scriptpath.startswith('s3://mrjob-'))
         self.assertTrue(actions[1].scriptpath.endswith('b.py'))
         self.assertEqual(actions[1].args, [])
-        self.assertEqual(actions[1].name, 'master')
+        self.assertEqual(actions[1]['Name'], 'master')
 
         # make sure master bootstrap script is on S3
         self.assertTrue(runner.fs.exists(actions[1].scriptpath))
@@ -2924,7 +2924,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
         actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
         action = actions[-1]
 
-        self.assertEqual(action.name, 'idle timeout')
+        self.assertEqual(action['Name'], 'idle timeout')
         self.assertEqual(
             action.scriptpath,
             runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
@@ -2935,7 +2935,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
         cluster_id = runner.get_cluster_id()
 
         actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
-        action_names = [a.name for a in actions]
+        action_names = [a['Name'] for a in actions]
 
         self.assertNotIn('idle timeout', action_names)
         # idle timeout script should not even be uploaded
@@ -4165,10 +4165,11 @@ class BootstrapSparkTestCase(MockBoto3TestCase):
     def ran_spark_bootstrap_action(
             self, cluster, uri=_3_X_SPARK_BOOTSTRAP_ACTION):
 
-        return any(ba.scriptpath == uri for ba in cluster._bootstrapactions)
+        return any(ba['ScriptPath'] == uri
+                   for ba in cluster['_BootstrapActions'])
 
     def installed_spark_application(self, cluster, name='Spark'):
-        return any(a.name == name for a in cluster.applications)
+        return any(a['Name'] == name for a in cluster['Applications'])
 
     def test_default_ami(self):
         cluster = self.get_cluster()
@@ -5149,8 +5150,8 @@ class JobStepsTestCase(MockBoto3TestCase):
             self.assertEqual(len(job_steps), 2)
 
             # ensure that steps appear in correct order (see #1316)
-            self.assertIn('Step 1', job_steps[0].name)
-            self.assertIn('Step 2', job_steps[1].name)
+            self.assertIn('Step 1', job_steps[0]['Name'])
+            self.assertIn('Step 2', job_steps[1]['Name'])
 
             self.assertEqual(MockEmrConnection.list_steps.call_count, 1)
 
@@ -5177,12 +5178,12 @@ class JobStepsTestCase(MockBoto3TestCase):
             self.assertEqual(len(job_steps), 2)
 
             # ensure that steps appear in correct order (see #1316)
-            self.assertIn('Step 1', job_steps[0].name)
-            self.assertIn('Step 2', job_steps[1].name)
+            self.assertIn('Step 1', job_steps[0]['Name'])
+            self.assertIn('Step 2', job_steps[1]['Name'])
 
             # ensure that steps are for correct job
-            self.assertTrue(job_steps[0].name.startswith(runner._job_key))
-            self.assertTrue(job_steps[1].name.startswith(runner._job_key))
+            self.assertTrue(job_steps[0]['Name'].startswith(runner._job_key))
+            self.assertTrue(job_steps[1]['Name'].startswith(runner._job_key))
 
             # this should have only taken one call to list_steps(),
             # thanks to pagination

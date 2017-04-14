@@ -26,9 +26,6 @@ from mrjob.tools.emr.report_long_jobs import main
 
 from tests.mock_boto3 import MockBoto3TestCase
 
-
-# TODO: port these to boto3. Just replaced "MockEmrObject" with "dict"
-# so that the module could import
 CLUSTERS = [
     dict(
         Id='j-STARTING',

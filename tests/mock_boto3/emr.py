@@ -479,7 +479,8 @@ class MockEMRClient(object):
 
             # mock_boto3 doesn't support the 'AvailabilityZones' param
             _validate_param(Placement, 'AvailabilityZone', string_types)
-            cluster['Ec2AvailabilityZone'] = Placement['AvailabilityZone']
+            cluster['Ec2InstanceAttributes']['Ec2AvailabilityZone'] = (
+                Placement['AvailabilityZone'])
 
         if 'InstanceGroups' in Instances:
             if any(x in Instances for x in ('MasterInstanceType',

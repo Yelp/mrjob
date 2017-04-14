@@ -459,19 +459,19 @@ class SubnetTestCase(MockBoto3TestCase):
     def test_defaults(self):
         cluster = self.run_and_get_cluster()
         self.assertEqual(
-            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            getattr(cluster['Ec2InstanceAttributes'], 'ec2subnetid', None),
             None)
 
     def test_subnet_option(self):
         cluster = self.run_and_get_cluster('--subnet', 'subnet-ffffffff')
         self.assertEqual(
-            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            getattr(cluster['Ec2InstanceAttributes'], 'ec2subnetid', None),
             'subnet-ffffffff')
 
     def test_empty_string_means_no_subnet(self):
         cluster = self.run_and_get_cluster('--subnet', '')
         self.assertEqual(
-            getattr(cluster.ec2instanceattributes, 'ec2subnetid', None),
+            getattr(cluster['Ec2InstanceAttributes'], 'ec2subnetid', None),
             None)
 
 
@@ -489,7 +489,7 @@ class IAMTestCase(MockBoto3TestCase):
 
         # check instance_profile
         instance_profile_name = (
-            cluster.ec2instanceattributes.iaminstanceprofile)
+            cluster['Ec2InstanceAttributes'].iaminstanceprofile)
         self.assertIsNotNone(instance_profile_name)
         self.assertTrue(instance_profile_name.startswith('mrjob-'))
         self.assertIn(instance_profile_name, self.mock_iam_instance_profiles)
@@ -510,7 +510,7 @@ class IAMTestCase(MockBoto3TestCase):
 
         # run again, and see if we reuse the roles
         cluster2 = self.run_and_get_cluster()
-        self.assertEqual(cluster2.ec2instanceattributes.iaminstanceprofile,
+        self.assertEqual(cluster2['Ec2InstanceAttributes'].iaminstanceprofile,
                          instance_profile_name)
         self.assertEqual(cluster2.servicerole, service_role_name)
 
@@ -519,7 +519,7 @@ class IAMTestCase(MockBoto3TestCase):
             '--iam-instance-profile', 'EMR_EC2_DefaultRole')
         self.assertTrue(boto3.client.called)
 
-        self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
+        self.assertEqual(cluster['Ec2InstanceAttributes'].iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
 
     def test_iam_service_role_option(self):
@@ -539,7 +539,7 @@ class IAMTestCase(MockBoto3TestCase):
         self.assertFalse(any(args == ('iam',)
                              for args, kwargs in boto3.client.call_args_list))
 
-        self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
+        self.assertEqual(cluster['Ec2InstanceAttributes'].iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
         self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
@@ -561,7 +561,7 @@ class IAMTestCase(MockBoto3TestCase):
         self.assertTrue(any(args == ('iam',)
                             for args, kwargs in boto3.client.call_args_list))
 
-        self.assertEqual(cluster.ec2instanceattributes.iaminstanceprofile,
+        self.assertEqual(cluster['Ec2InstanceAttributes'].iaminstanceprofile,
                          'EMR_EC2_DefaultRole')
         self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
 
@@ -763,8 +763,9 @@ class AvailabilityZoneTestCase(MockBoto3TestCase):
             runner.run()
 
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster.ec2instanceattributes.ec2availabilityzone,
-                             'PUPPYLAND')
+            self.assertEqual(
+                cluster['Ec2InstanceAttributes'].get('Ec2AvailabilityZone'),
+                'PUPPYLAND')
 
 
 class EnableDebuggingTestCase(MockBoto3TestCase):

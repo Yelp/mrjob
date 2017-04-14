@@ -149,9 +149,9 @@ def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
             'Steps', emr_client, 'list_steps', ClusterId=cs['Id']))))
 
         running_steps = [
-            step for step in steps if step.status.state == 'RUNNING']
+            step for step in steps if step['Status']['State'] == 'RUNNING']
         pending_steps = [
-            step for step in steps if step.status.state == 'PENDING']
+            step for step in steps if step['Status']['State'] == 'PENDING']
 
         if running_steps:
             # should be only one, but if not, we should know about it
@@ -176,7 +176,7 @@ def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
             start = cs['Status']['Timeline']['ReadyDateTime']
             for step in steps:
                 if step['Status']['State'] == 'COMPLETED':
-                    start = cs['Status']['Timeline']['EndDateTime']
+                    start = step['Status']['Timeline']['EndDateTime']
 
             time_pending = now - start
 

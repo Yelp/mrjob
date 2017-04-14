@@ -190,7 +190,7 @@ class MockBoto3TestCase(SandboxedTestCase):
             try:
                 next(self.emr_client_counter)
             except StopIteration:
-                raise AssertionError(
+                raise Exception(
                     'Too many connections to mock EMR, may be stalled')
 
             kwargs['mock_s3_fs'] = self.mock_s3_fs

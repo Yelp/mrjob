@@ -720,7 +720,7 @@ class MockEMRClient(object):
                     Jar={},
                     Properties={},
                 ),
-                Id='s-MOCKSTEP%d' % (len(cluster['_Steps']) + 1),
+                Id='s-MOCKSTEP%d' % (len(cluster['_Steps']) + i),
                 Name='',
                 Status=dict(
                     State='PENDING',
@@ -1187,6 +1187,10 @@ class MockEMRClient(object):
                         'STEP_FAILURE')
                     cluster['Status']['StateChangeReason']['Message'] = (
                         'Shut down as step failed')
+
+                    for step in cluster['_Steps']:
+                        if step['Status']['State'] in ('PENDING', 'RUNNING'):
+                            step['Status']['State'] = 'CANCELLED'
 
                 return
 

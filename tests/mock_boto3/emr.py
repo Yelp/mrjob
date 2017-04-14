@@ -35,6 +35,7 @@ from .util import MockObject
 from .util import MockPaginator
 
 
+# utilities for skipping unported tests
 class Boto2TestSkipper(object):
     def __call__(self, *args, **kwargs):
         from os import environ
@@ -127,8 +128,6 @@ class MockEMRClient(object):
         list_instances='Instances',
         list_steps='Steps',
     )
-
-    _enforce_strict_ssl = Boto2TestSkipper()
 
     def __init__(self,
                  aws_access_key_id=None,
@@ -922,45 +921,57 @@ class MockEMRClient(object):
 
         return dict(Clusters=cluster_summaries)
 
-    def list_instances(self, **kwargs):
+    def list_instances(self, ClusterId, InstanceGroupId=None,
+                       InstanceGroupTypes=None, InstanceStates=None):
         """stripped-down simulation of list_instances() to support
         SSH tunneling; only includes state.status and the privateipaddress
         field.
         """
-        self._enforce_strict_ssl()
-
-        if instance_group_id is not None:
+        if InstanceGroupId:
             raise NotImplementedError(
-                'instance_group_id not simulated for ListInstances')
+                "mock boto3 doesn't support instance IDs")
 
-        if marker is not None:
-            raise NotImplementedError(
-                'marker not simulated for ListInstances')
+        if InstanceGroupTypes:
+            _validate_param_type(InstanceGroupTypes, (list, tuple))
+            for igt in InstanceGroupTypes:
+                _validate_param_enum(igt, ['MASTER', 'CORE', 'TASK'])
 
-        cluster = self._get_mock_cluster(cluster_id)
+        if InstanceStates:
+            _validate_param_type(InstanceStates, (list, tuple))
+            for ist in InstanceStates:
+                _validate_param_enum(
+                    ist,
+                    ['AWAITING_FULFILLMENT', 'PROVISIONING', 'BOOTSTRAPPING',
+                     'RUNNING', 'TERMINATED'])
 
-        instances = []
+        cluster = self._get_mock_cluster('ListInstances', ClusterId)
 
-        for i, ig in enumerate(cluster._instancegroups):
-            if instance_group_types and (
-                    ig.instancegrouptype not in instance_group_types):
+        instances = []  # to return
+
+        for i, ig in enumerate(cluster['_InstanceGroups']):
+            if InstanceGroupTypes and (
+                    ig['InstanceGroupType'] not in InstanceGroupTypes):
                 continue
 
-            for j in range(int(ig.requestedinstancecount)):
-                instance = MockEmrObject()
+            state = ig['Status']['State']
 
-                state = ig.status.state
+            if InstanceStates and state not in InstanceStates:
+                continue
 
-                instance.status = MockEmrObject(state=state)
+            for j in range(ig['RequestedInstanceCount']):
+                # we construct mock instances from scratch
+                instance = dict(
+                    Status=dict(State=state),
+                )
 
                 if state not in ('PROVISIONING', 'AWAITING_FULLFILLMENT'):
                     # this is just an easy way to assign a unique IP
-                    instance.privateipaddress = '172.172.%d.%d' % (
+                    instance['PrivateIpAddress'] = '172.172.%d.%d' % (
                         i + 1, j + 1)
 
                 instances.append(instance)
 
-        return MockEmrObject(instances=instances)
+        return dict(Instances=instances)
 
     def list_instance_groups(self, ClusterId):
         cluster = self._get_mock_cluster('ListInstanceGroups', ClusterId)

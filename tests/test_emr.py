@@ -458,21 +458,18 @@ class SubnetTestCase(MockBoto3TestCase):
 
     def test_defaults(self):
         cluster = self.run_and_get_cluster()
-        self.assertEqual(
-            getattr(cluster['Ec2InstanceAttributes'], 'ec2subnetid', None),
-            None)
+        self.assertEqual(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
+                         None)
 
     def test_subnet_option(self):
         cluster = self.run_and_get_cluster('--subnet', 'subnet-ffffffff')
-        self.assertEqual(
-            getattr(cluster['Ec2InstanceAttributes'], 'ec2subnetid', None),
-            'subnet-ffffffff')
+        self.assertEqual(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
+                         'subnet-ffffffff')
 
     def test_empty_string_means_no_subnet(self):
         cluster = self.run_and_get_cluster('--subnet', '')
-        self.assertEqual(
-            getattr(cluster['Ec2InstanceAttributes'], 'ec2subnetid', None),
-            None)
+        self.assertEqual(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
+                         None)
 
 
 class IAMTestCase(MockBoto3TestCase):

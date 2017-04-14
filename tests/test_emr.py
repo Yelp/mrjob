@@ -1419,7 +1419,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         def assertScriptDownloads(path, name=None):
             uri = runner._upload_mgr.uri(path)
-            name = runner._bootstrap_dir_mgr['Name']('file', path, name=name)
+            name = runner._bootstrap_dir_mgr.name('file', path, name=name)
 
             if image_version and not version_gte(image_version, '4'):
                 self.assertIn(
@@ -1447,7 +1447,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
                       lines)
         self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
         # bootstrap_mrjob
-        mrjob_zip_name = runner._bootstrap_dir_mgr['Name'](
+        mrjob_zip_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_zip_path)
         self.assertIn("  __mrjob_PYTHON_LIB=$(" + expected_python_bin +
                       " -c 'from distutils.sysconfig import get_python_lib;"
@@ -2637,7 +2637,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         return cluster_id
 
     def num_steps(self, cluster_id):
-        return len(self.mock_emr_clusters[cluster_id]._steps)
+        return len(self.mock_emr_clusters[cluster_id]['_Steps'])
 
     def test_join_healthy_cluster(self):
         cluster_id = self.make_pooled_cluster()
@@ -2834,7 +2834,7 @@ class PoolingDisablingTestCase(MockBoto3TestCase):
             runner.run()
 
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster.autoterminate, 'true')
+            self.assertEqual(cluster['AutoTerminate'], 'true')
 
 
 class S3LockTestCase(MockBoto3TestCase):

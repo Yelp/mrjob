@@ -55,6 +55,7 @@ from mrjob.util import cmd_line
 from mrjob.util import log_to_stream
 
 import tests.mock_boto3
+import tests.mock_boto3.emr
 import tests.mock_boto3.s3
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_boto3.emr import Boto2TestSkipper
@@ -2187,16 +2188,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 
         # fill the cluster
-        self.mock_emr_clusters[cluster_id]._steps = 999 * [
-            MockEmrObject(
-                actiononfailure='CANCEL_AND_WAIT',
-                config=MockEmrObject(args=[]),
-                id='s-FAKE',
-                name='dummy',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='definitely not none')))
+        self.mock_emr_clusters[cluster_id]['_Steps'] = 999 * [
+            dict(
+                ActionOnFailure='CANCEL_AND_WAIT',
+                Config=dict(Args=[]),
+                Id='s-FAKE',
+                Name='dummy',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime='definitely not none')))
         ]
 
         # a two-step job shouldn't fit
@@ -2208,16 +2209,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 
         # fill the cluster
-        self.mock_emr_clusters[cluster_id]._steps = 999 * [
-            MockEmrObject(
-                actiononfailure='CANCEL_AND_WAIT',
-                config=MockEmrObject(args=[]),
-                id='s-FAKE',
-                name='dummy',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='definitely not none')))
+        self.mock_emr_clusters[cluster_id]['_Steps'] = 999 * [
+            dict(
+                ActionOnFailure='CANCEL_AND_WAIT',
+                Config=dict(Args=[]),
+                Id='s-FAKE',
+                Name='dummy',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime='definitely not none')))
         ]
 
         # a one-step job should fit
@@ -2230,16 +2231,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             image_version='2.4.7')
 
         # fill the cluster
-        self.mock_emr_clusters[cluster_id]._steps = 255 * [
-            MockEmrObject(
-                actiononfailure='CANCEL_AND_WAIT',
-                config=MockEmrObject(args=[]),
-                id='s-FAKE',
-                name='dummy',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='definitely not none')))
+        self.mock_emr_clusters[cluster_id]['_Steps'] = 255 * [
+            dict(
+                ActionOnFailure='CANCEL_AND_WAIT',
+                Config=dict(Args=[]),
+                Id='s-FAKE',
+                Name='dummy',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime='definitely not none')))
         ]
 
         # a two-step job shouldn't fit
@@ -2253,16 +2254,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             image_version='2.4.7')
 
         # fill the cluster
-        self.mock_emr_clusters[cluster_id]._steps = 255 * [
-            MockEmrObject(
-                actiononfailure='CANCEL_AND_WAIT',
-                config=MockEmrObject(args=[]),
-                id='s-FAKE',
-                name='dummy',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='definitely not none')))
+        self.mock_emr_clusters[cluster_id]['_Steps'] = 255 * [
+            dict(
+                ActionOnFailure='CANCEL_AND_WAIT',
+                Config=dict(Args=[]),
+                Id='s-FAKE',
+                Name='dummy',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime='definitely not none')))
         ]
 
         # a one-step job should fit
@@ -2274,16 +2275,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 
         # fill the cluster
-        self.mock_emr_clusters[cluster_id]._steps = 999 * [
-            MockEmrObject(
-                actiononfailure='CANCEL_AND_WAIT',
-                config=MockEmrObject(args=[]),
-                id='s-FAKE',
-                name='dummy',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='definitely not none')))
+        self.mock_emr_clusters[cluster_id]['_Steps'] = 999 * [
+            dict(
+                ActionOnFailure='CANCEL_AND_WAIT',
+                Config=dict(Args=[]),
+                Id='s-FAKE',
+                Name='dummy',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime='definitely not none')))
         ]
 
         # --libjar makes this a two-step job, which won't fit
@@ -2296,16 +2297,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 
         # fill the cluster
-        self.mock_emr_clusters[cluster_id]._steps = 998 * [
-            MockEmrObject(
-                actiononfailure='CANCEL_AND_WAIT',
-                config=MockEmrObject(args=[]),
-                id='s-FAKE',
-                name='dummy',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='definitely not none')))
+        self.mock_emr_clusters[cluster_id]['_Steps'] = 998 * [
+            dict(
+                ActionOnFailure='CANCEL_AND_WAIT',
+                Config=dict(Args=[]),
+                Id='s-FAKE',
+                Name='dummy',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime='definitely not none')))
         ]
 
         # now there's space for two steps
@@ -2319,13 +2320,13 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
         cluster = self.mock_emr_clusters[cluster_id]
 
-        cluster._steps = [
-            MockEmrObject(
-                actiononfailure='CANCEL_AND_WAIT',
-                config=MockEmrObject(args=[]),
-                name='dummy',
-                status=MockEmrObject(state='PENDING'))]
-        cluster.delay_progress_simulation = 100  # keep step PENDING
+        cluster['_Steps'] = [
+            dict(
+                ActionOnFailure='CANCEL_AND_WAIT',
+                Config=dict(Args=[]),
+                Name='dummy',
+                Status=dict(State='PENDING'))]
+        cluster['_DelayProgressSimulation'] = 100  # keep step PENDING
 
         self.assertDoesNotJoin(cluster_id,
                                ['-r', 'emr', '--pool-clusters'])
@@ -2333,19 +2334,22 @@ class PoolMatchingTestCase(MockBoto3TestCase):
     def test_do_join_idle_with_cancelled_steps(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 
-        self.mock_emr_clusters[cluster_id].steps = [
-            MockEmrObject(
-                state='FAILED',
-                name='step 1 of 2',
-                actiononfailure='CANCEL_AND_WAIT',
-                enddatetime='sometime in the past',
-                args=[]),
-            # step 2 never ran, so its enddatetime is not set
-            MockEmrObject(
-                state='CANCELLED',
-                name='step 2 of 2',
-                actiononfailure='CANCEL_AND_WAIT',
-                args=[])
+        self.mock_emr_clusters[cluster_id]['_Steps'] = [
+            dict(
+                Id='s-MOCK1',
+                Name='step 1 of 2',
+                Status=dict(
+                    State='FAILED',
+                    Timeline=dict(
+                        EndDateTime=_boto3_now() - timedelta(100),
+                    ),
+                ),
+            ),
+            dict(
+                Id='s-MOCK2',
+                Name='step 2 of 2',
+                Status=dict(State='CANCELLED'),
+            ),
         ]
 
         self.assertJoins(cluster_id,
@@ -3274,7 +3278,7 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
             stdin=BytesIO(),
             **kwargs)
 
-        runner._steps = [step]
+        runner['_Steps'] = [step]
 
         runner._add_job_files_for_upload()
         runner._add_master_node_setup_files_for_upload()
@@ -5160,8 +5164,8 @@ class JobStepsTestCase(MockBoto3TestCase):
 
         def add_other_steps(n):
             for _ in range(n):
-                self.mock_emr_clusters[cluster_id]._steps.append(
-                    MockEmrObject(id='s-NONE', name=''))
+                self.mock_emr_clusters[cluster_id]['_Steps'].append(
+                    dict(Id='s-NONE', name=''))
 
         job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id]).sandbox()
 
@@ -5357,20 +5361,26 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         runner = self.make_runner()
 
         self.start(patch(
-            'mrjob.emr._patched_describe_step',
-            return_value=MockEmrObject(
-                status=MockEmrObject(
-                    state='CANCELLED',
+            'tests.mock_boto3.emr.MockEMRClient.describe_step',
+            return_value=dict(
+                Step=dict(
+                    Status=dict(
+                        State='CANCELLED',
+                        StateChangeReason={},
+                    ),
                 ),
             ),
         ))
 
         self.start(patch(
-            'mrjob.emr._patched_describe_cluster',
-            return_value=MockEmrObject(
-                id='j-CLUSTERID',
-                status=MockEmrObject(
-                    state='TERMINATING',
+            'tests.mock_boto3.emr.MockEMRClient.describe_cluster',
+            return_value=dict(
+                Cluster=dict(
+                    Id='j-CLUSTERID',
+                    Status=dict(
+                        State='TERMINATING',
+                        StateChangeReason={},
+                    ),
                 ),
             ),
         ))

@@ -48,7 +48,6 @@ class Boto2TestSkipper(object):
         self()
 
 MockEmrObject = Boto2TestSkipper()
-to_iso8601 = Boto2TestSkipper()
 
 
 # what partial versions and "latest" map to, as of 2015-07-15

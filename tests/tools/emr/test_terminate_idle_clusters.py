@@ -19,6 +19,7 @@ import sys
 from datetime import datetime
 from datetime import timedelta
 
+from mrjob.aws import _boto3_now
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
@@ -33,7 +34,6 @@ from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_boto3.emr import MockEmrObject
-from tests.mock_boto3.emr import to_iso8601
 
 
 class ClusterTerminationTestCase(MockBoto3TestCase):
@@ -48,7 +48,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.create_fake_clusters()
 
     def create_fake_clusters(self):
-        self.now = datetime.utcnow().replace(microsecond=0)
+        self.now = _boto3_now().replace(microsecond=0)
         self.add_mock_s3_data({'my_bucket': {}})
 
         # create a timestamp the given number of *hours*, *minutes*, etc.
@@ -56,7 +56,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         def ago(**kwargs):
             if any(v is None for v in kwargs.values()):
                 return None
-            return to_iso8601(self.now - timedelta(**kwargs))
+            return self.now - timedelta(**kwargs)
 
         # Build a step object easily
         # also make it respond to .args()

@@ -687,8 +687,7 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
 
     def test_ami_version_1_0_no_longer_supported(self):
         with self.make_runner('--image-version', '1.0') as runner:
-            self.assertRaises(boto.exception.EmrResponseError,
-                              runner._launch)
+            self.assertRaises(ClientError, runner._launch)
 
     def test_ami_version_2_0(self):
         with self.make_runner('--image-version', '2.0') as runner:
@@ -725,10 +724,9 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
             self.assertEqual(runner.get_hadoop_version(), '2.6.0')
 
             cluster = runner._describe_cluster()
-            self.assertEqual(getattr(cluster, 'releaselabel', ''),
-                             'emr-4.0.0')
-            self.assertEqual(getattr(cluster, 'requestedamiversion', ''), '')
-            self.assertEqual(getattr(cluster, 'runningamiversion', ''), '')
+            self.assertEqual(cluster.get('ReleaseLabel'), 'emr-4.0.0')
+            self.assertEqual(cluster.get('RequestedAmiVersion'), None)
+            self.assertEqual(cluster.get('RunningAmiVersion'), None)
 
     def test_ami_version_4_0_0_via_image_version_option(self):
         # mrjob should also be smart enough to handle this
@@ -738,10 +736,9 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
             self.assertEqual(runner.get_hadoop_version(), '2.6.0')
 
             cluster = runner._describe_cluster()
-            self.assertEqual(getattr(cluster, 'releaselabel', ''),
-                             'emr-4.0.0')
-            self.assertEqual(getattr(cluster, 'requestedamiversion', ''), '')
-            self.assertEqual(getattr(cluster, 'runningamiversion', ''), '')
+            self.assertEqual(cluster.get('ReleaseLabel'), 'emr-4.0.0')
+            self.assertEqual(cluster.get('RequestedAmiVersion'), None)
+            self.assertEqual(cluster.get('RunningAmiVersion'), None)
 
     def test_hadoop_version_option_does_nothing(self):
         with logger_disabled('mrjob.emr'):
@@ -5624,7 +5621,7 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
             user=user)
 
     def test_basic(self):
-        # test things that don't depend on AMI
+        # test things that don't depend on AMIs
         ssh_args = self.get_ssh_args()
         params = self.parse_ssh_args(ssh_args)
 

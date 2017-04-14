@@ -22,7 +22,6 @@ import os.path
 import posixpath
 import sys
 import time
-from datetime import datetime
 from datetime import timedelta
 from io import BytesIO
 
@@ -59,7 +58,6 @@ import tests.mock_boto3.s3
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_boto3.emr import Boto2TestSkipper
 from tests.mock_boto3.emr import MockEMRClient
-from tests.mock_boto3.emr import MockEmrConnection
 from tests.mock_boto3.emr import MockEmrObject
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
@@ -86,6 +84,7 @@ from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_local import _bash_wrap
 
 # detect and skip boto 2 tests
+MockEmrConnection = Boto2TestSkipper()
 _decode_configurations_from_api = Boto2TestSkipper()
 _list_all_steps = Boto2TestSkipper()
 _yield_all_bootstrap_actions = Boto2TestSkipper()
@@ -5282,8 +5281,8 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
 
         self.assertEqual(EMRJobRunner._wait_for_step_to_complete.call_count, 1)
 
-        mock_cluster = runner._describe_cluster()
-        mock_steps = mock_cluster._steps
+        mock_cluster = self.mock_emr_clusters[runner._cluster_id]
+        mock_steps = mock_cluster['_Steps']
 
         self.assertEqual(len(mock_steps), 2)
         self.assertEqual(mock_steps[0]['Status']['State'], 'RUNNING')
@@ -5295,8 +5294,9 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
 
         runner = self.make_runner()
-        mock_cluster = runner._describe_cluster()
+        mock_cluster = self.mock_emr_clusters[runner._cluster_id]
         mock_cluster['Status']['State'] = 'RUNNING'
+        mock_cluster['MasterPublicDnsName'] = 'mockmaster'
 
         # run until SSH tunnel is set up
         self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
@@ -5310,8 +5310,9 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         EMRJobRunner._set_up_ssh_tunnel.side_effect = self.StopTest
 
         runner = self.make_runner()
-        mock_cluster = runner._describe_cluster()
+        mock_cluster = self.mock_emr_clusters[runner._cluster_id]
         mock_cluster['Status']['State'] = 'WAITING'
+        mock_cluster['MasterPublicDnsName'] = 'mockmaster'
 
         # run until SSH tunnel is set up
         self.assertRaises(self.StopTest, runner._wait_for_steps_to_complete)
@@ -5344,7 +5345,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
 
         # cluster should be running, step should still be pending
         self.assertEqual(mock_cluster['Status']['State'], 'RUNNING')
-        self.assertIn(runner._job_key, mock_steps[2].name)
+        self.assertIn(runner._job_key, mock_steps[2]['Name'])
         self.assertEqual(mock_steps[2]['Status']['State'], 'PENDING')
 
     def test_terminated_cluster(self):

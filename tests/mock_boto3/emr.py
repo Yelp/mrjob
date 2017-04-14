@@ -13,6 +13,7 @@
 # limitations under the License.
 """Mock boto3 EMR support."""
 from copy import deepcopy
+from datetime import datetime
 
 from botocore.exceptions import ClientError
 from botocore.exceptions import ParamValidationError
@@ -878,51 +879,48 @@ class MockEMRClient(object):
 
         return dict(BootstrapActions=deepcopy(cluster['_BootstrapActions']))
 
-    def list_clusters(self, **kwargs):
-        self._enforce_strict_ssl()
+    def list_clusters(self, CreatedAfter=None, CreatedBefore=None,
+                      ClusterStates=None):
+        if CreatedAfter:
+            _validate_param_type(CreatedAfter, datetime)
+
+        if CreatedBefore:
+            _validate_param_type(CreatedBefore, datetime)
+
+        if ClusterStates:
+            _validate_param_type(ClusterStates, (list, tuple))
+            for cs in ClusterStates:
+                _validate_param_enum(
+                    cs,
+                    ['STARTING', 'BOOTSTRAPPING', 'RUNNING', 'WAITING',
+                     'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'])
 
         # summaries of cluster state, to return
         cluster_summaries = []
 
-        # add markers to clusters
-        marked_clusters = [
-            ((cluster.status.timeline.creationdatetime, cluster.id), cluster)
-            for cluster in self.mock_emr_clusters.values()]
-        marked_clusters.sort(reverse=True)
+        def created(cluster):
+            return cluster['Status']['Timeline']['CreationDateTime']
 
-        # *marker* is just the marker for the last cluster we returned
+        # put clusters in chronological order
+        clusters = sorted(self.mock_emr_clusters.values(), key=created)
 
-        for cluster_marker, cluster in marked_clusters:
-            if marker is not None and cluster_marker <= marker:
+        # list_clusters starts with newest cluster
+        for cluster in reversed(clusters):
+            if CreatedAfter and created(cluster) < CreatedAfter:
                 continue
 
-            # stop if we hit pagination limit
-            if len(cluster_summaries) >= self.max_clusters_returned:
-                break
-
-            created = cluster.status.timeline.creationdatetime
-
-            if created_after is not None and created < created_after:
+            if CreatedBefore and created(cluster) > CreatedBefore:
                 continue
 
-            if created_before is not None and created > created_before:
+            if (ClusterStates and
+                    cluster['Status']['State'] not in ClusterStates):
                 continue
 
-            state = cluster.status.state
+            cluster_summaries.append(deepcopy(dict(
+                (k, cluster[k])
+                for k in ['Id', 'Name', 'Status', 'NormalizedInstanceHours'])))
 
-            if not (cluster_states is None or state in cluster_states):
-                continue
-
-            cluster_summaries.append(MockEmrObject(
-                id=cluster.id,
-                name=cluster.name,
-                normalizedinstancehours=cluster.normalizedinstancehours,
-                status=cluster.status))
-        else:
-            # we went through all clusters, no need to call again
-            cluster_marker = None
-
-        return MockEmrObject(clusters=cluster_summaries, marker=cluster_marker)
+        return dict(Clusters=cluster_summaries)
 
     def list_instances(self, **kwargs):
         """stripped-down simulation of list_instances() to support
@@ -1094,7 +1092,7 @@ class MockEMRClient(object):
             cluster['Status']['State'] = 'BOOTSTRAPPING'
 
             # master now has a hostname
-            cluster['MasterPublicDnsName'] = 'mockmaster'
+            cluster['MasterPublicDnsName'] = 'master.%s.mock' % cluster['Id']
 
             # instances are now provisioned
             for ig in cluster['_InstanceGroups']:

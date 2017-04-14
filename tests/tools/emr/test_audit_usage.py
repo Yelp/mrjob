@@ -20,6 +20,8 @@ from datetime import datetime
 from datetime import timedelta
 
 import boto3
+from dateutil.parser import parse
+from dateutil.tz import tzutc
 
 from mrjob.tools.emr.audit_usage import _cluster_to_full_summary
 from mrjob.tools.emr.audit_usage import _percent
@@ -27,10 +29,14 @@ from mrjob.tools.emr.audit_usage import _subdivide_interval_by_date
 from mrjob.tools.emr.audit_usage import _subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
 
-from tests.mock_boto3.emr import MockEmrObject
 from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.tools.emr import ToolTestCase
+
+# this test used to use naive datetimes
+def utc(*args):
+    return datetime(*args, tzinfo=tzutc())
+
 
 
 class AuditUsageTestCase(ToolTestCase):
@@ -75,16 +81,18 @@ class ClusterToFullSummaryTestCase(TestCase):
     maxDiff = None  # show whole diff when tests fail
 
     def test_basic_cluster_with_no_steps(self):
-        cluster = MockEmrObject(
-            id='j-ISFORJAGUAR',
-            name='mr_exciting.woo.20100605.235850.000000',
-            normalizedinstancehours='10',
-            status=MockEmrObject(
-                state='TERMINATED',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-06T00:00:00Z',
-                    enddatetime='2010-06-06T00:30:00Z',
-                    readydatetime='2010-06-06T00:15:00Z',
+        cluster = dict(
+            BootstrapActions=[],
+            Id='j-ISFORJAGUAR',
+            Name='mr_exciting.woo.20100605.235850.000000',
+            NormalizedInstanceHours=10,
+            Steps=[],
+            Status=dict(
+                State='TERMINATED',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                    EndDateTime=parse('2010-06-06T00:30:00Z'),
+                    ReadyDateTime=parse('2010-06-06T00:15:00Z'),
                 ),
             ),
         )
@@ -92,8 +100,8 @@ class ClusterToFullSummaryTestCase(TestCase):
         summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 6, 0, 0),
-            'end': datetime(2010, 6, 6, 0, 30),
+            'created': utc(2010, 6, 6, 0, 0),
+            'end': utc(2010, 6, 6, 0, 30),
             'id': u'j-ISFORJAGUAR',
             'label': u'mr_exciting',
             'name': u'mr_exciting.woo.20100605.235850.000000',
@@ -105,47 +113,49 @@ class ClusterToFullSummaryTestCase(TestCase):
             'owner': u'woo',
             'pool': None,
             'ran': timedelta(minutes=30),
-            'ready': datetime(2010, 6, 6, 0, 15),
+            'ready': utc(2010, 6, 6, 0, 15),
             'state': u'TERMINATED',
             'usage': [{
                 'date_to_nih_bbnu': {date(2010, 6, 6): 7.5},
                 'date_to_nih_billed': {date(2010, 6, 6): 10.0},
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
-                'end': datetime(2010, 6, 6, 0, 15),
-                'end_billing': datetime(2010, 6, 6, 1, 0),
+                'end': utc(2010, 6, 6, 0, 15),
+                'end_billing': utc(2010, 6, 6, 1, 0),
                 'label': u'mr_exciting',
-                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 7.5},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 10.0},
-                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_bbnu': {utc(2010, 6, 6, 0): 7.5},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 0): 10.0},
+                'hour_to_nih_used': {utc(2010, 6, 6, 0): 2.5},
                 'nih_bbnu': 7.5,
                 'nih_billed': 10.0,
                 'nih_used': 2.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 0, 0),
+                'start': utc(2010, 6, 6, 0, 0),
                 'step_num': None,
             }],
         })
 
     def test_still_running_cluster_with_no_steps(self):
 
-        cluster = MockEmrObject(
-            id='j-ISFORJUICE',
-            name='mr_exciting.woo.20100605.235850.000000',
-            normalizedinstancehours='10',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-06T00:00:00Z',
-                    readydatetime='2010-06-06T00:15:00Z',
+        cluster = dict(
+            BootstrapActions=[],
+            Id='j-ISFORJUICE',
+            Name='mr_exciting.woo.20100605.235850.000000',
+            NormalizedInstanceHours=10,
+            Steps=[],
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                    ReadyDateTime=parse('2010-06-06T00:15:00Z'),
                 ),
             ),
         )
 
         summary = _cluster_to_full_summary(
-            cluster, now=datetime(2010, 6, 6, 0, 30))
+            cluster, now=utc(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 6, 0, 0),
+            'created': utc(2010, 6, 6, 0, 0),
             'end': None,
             'id': u'j-ISFORJUICE',
             'label': u'mr_exciting',
@@ -158,45 +168,47 @@ class ClusterToFullSummaryTestCase(TestCase):
             'owner': u'woo',
             'pool': None,
             'ran': timedelta(minutes=30),
-            'ready': datetime(2010, 6, 6, 0, 15),
+            'ready': utc(2010, 6, 6, 0, 15),
             'state': u'WAITING',
             'usage': [{
                 'date_to_nih_bbnu': {date(2010, 6, 6): 2.5},
                 'date_to_nih_billed': {date(2010, 6, 6): 5.0},
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
-                'end': datetime(2010, 6, 6, 0, 15),
-                'end_billing': datetime(2010, 6, 6, 0, 30),
-                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 2.5},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 5.0},
-                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
+                'end': utc(2010, 6, 6, 0, 15),
+                'end_billing': utc(2010, 6, 6, 0, 30),
+                'hour_to_nih_bbnu': {utc(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_used': {utc(2010, 6, 6, 0): 2.5},
                 'label': u'mr_exciting',
                 'nih_bbnu': 2.5,
                 'nih_billed': 5.0,
                 'nih_used': 2.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 0, 0),
+                'start': utc(2010, 6, 6, 0, 0),
                 'step_num': None,
             }],
         })
 
     def test_still_bootstrapping_cluster_with_no_steps(self):
-        cluster = MockEmrObject(
-            id='j-ISFORJOKE',
-            name='mr_exciting.woo.20100605.235850.000000',
-            normalizedinstancehours='10',
-            status=MockEmrObject(
-                state='BOOTSTRAPPING',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-06T00:00:00Z',
+        cluster = dict(
+            BootstrapActions=[],
+            Id='j-ISFORJOKE',
+            Name='mr_exciting.woo.20100605.235850.000000',
+            NormalizedInstanceHours=10,
+            Status=dict(
+                State='BOOTSTRAPPING',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-06T00:00:00Z'),
                 ),
             ),
+            Steps=[],
         )
 
         summary = _cluster_to_full_summary(
-            cluster, now=datetime(2010, 6, 6, 0, 30))
+            cluster, now=utc(2010, 6, 6, 0, 30))
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 6, 0, 0),
+            'created': utc(2010, 6, 6, 0, 0),
             'end': None,
             'id': u'j-ISFORJOKE',
             'label': u'mr_exciting',
@@ -215,41 +227,43 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 5.0},
                 'date_to_nih_used': {date(2010, 6, 6): 5.0},
-                'end': datetime(2010, 6, 6, 0, 30),
-                'end_billing': datetime(2010, 6, 6, 0, 30),
+                'end': utc(2010, 6, 6, 0, 30),
+                'end_billing': utc(2010, 6, 6, 0, 30),
                 'hour_to_nih_bbnu': {},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 5.0},
-                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_used': {utc(2010, 6, 6, 0): 5.0},
                 'label': u'mr_exciting',
                 'nih_bbnu': 0.0,
                 'nih_billed': 5.0,
                 'nih_used': 5.0,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 0, 0),
+                'start': utc(2010, 6, 6, 0, 0),
                 'step_num': None,
             }],
         })
 
     def test_cluster_that_was_terminated_before_ready(self):
-        cluster = MockEmrObject(
-            id='j-ISFORJOURNEY',
-            name='mr_exciting.woo.20100605.235850.000000',
-            normalizedinstancehours='1',
-            status=MockEmrObject(
-                state='TERMINATED',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-06T00:00:00Z',
-                    enddatetime='2010-06-06T00:30:00Z',
+        cluster = dict(
+            BootstrapActions=[],
+            Id='j-ISFORJOURNEY',
+            Name='mr_exciting.woo.20100605.235850.000000',
+            NormalizedInstanceHours=1,
+            Steps=[],
+            Status=dict(
+                State='TERMINATED',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                    EndDateTime=parse('2010-06-06T00:30:00Z'),
                 ),
             ),
         )
 
         summary = _cluster_to_full_summary(
-            cluster, now=datetime(2010, 6, 6, 1))
+            cluster, now=utc(2010, 6, 6, 1))
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 6, 0, 0),
-            'end': datetime(2010, 6, 6, 0, 30),
+            'created': utc(2010, 6, 6, 0, 0),
+            'end': utc(2010, 6, 6, 0, 30),
             'id': u'j-ISFORJOURNEY',
             'label': u'mr_exciting',
             'name': u'mr_exciting.woo.20100605.235850.000000',
@@ -267,24 +281,25 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'date_to_nih_bbnu': {date(2010, 6, 6): 0.5},
                 'date_to_nih_billed': {date(2010, 6, 6): 1.0},
                 'date_to_nih_used': {date(2010, 6, 6): 0.5},
-                'end': datetime(2010, 6, 6, 0, 30),
-                'end_billing': datetime(2010, 6, 6, 1, 0),
-                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0, 0): 0.5},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 0, 0): 1.0},
-                'hour_to_nih_used': {datetime(2010, 6, 6, 0, 0): 0.5},
+                'end': utc(2010, 6, 6, 0, 30),
+                'end_billing': utc(2010, 6, 6, 1, 0),
+                'hour_to_nih_bbnu': {utc(2010, 6, 6, 0, 0): 0.5},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 0, 0): 1.0},
+                'hour_to_nih_used': {utc(2010, 6, 6, 0, 0): 0.5},
                 'label': u'mr_exciting',
                 'nih_bbnu': 0.5,
                 'nih_billed': 1.0,
                 'nih_used': 0.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 0, 0),
+                'start': utc(2010, 6, 6, 0, 0),
                 'step_num': None,
             }],
         })
 
+    # TODO: make this pass first
     def test_cluster_with_no_fields(self):
         # this shouldn't happen in practice; just a robustness check
-        cluster = MockEmrObject()
+        cluster = dict()
 
         summary = _cluster_to_full_summary(cluster)
 
@@ -308,25 +323,27 @@ class ClusterToFullSummaryTestCase(TestCase):
         })
 
     def test_cluster_with_no_steps_split_over_midnight(self):
-        cluster = MockEmrObject(
-            id='j-ISFORJOY',
-            name='mr_exciting.woo.20100605.232950.000000',
-            normalizedinstancehours='20',
-            status=MockEmrObject(
-                state='TERMINATED',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-05T23:30:00Z',
-                    enddatetime='2010-06-06T01:15:00Z',  # 2 hours billed
-                    readydatetime='2010-06-05T23:45:00Z',  # 15 minutes "used"
+        cluster = dict(
+            BootstrapActions=[],
+            Id='j-ISFORJOY',
+            Name='mr_exciting.woo.20100605.232950.000000',
+            NormalizedInstanceHours=20,
+            Status=dict(
+                State='TERMINATED',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-05T23:30:00Z'),
+                    EndDateTime=parse('2010-06-06T01:15:00Z'),  # 2 hours billed
+                    ReadyDateTime=parse('2010-06-05T23:45:00Z'),  # 15 minutes "used"
                 ),
             ),
+            Steps=[],
         )
 
         summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 30),
-            'end': datetime(2010, 6, 6, 1, 15),
+            'created': utc(2010, 6, 5, 23, 30),
+            'end': utc(2010, 6, 6, 1, 15),
             'id': u'j-ISFORJOY',
             'label': u'mr_exciting',
             'name': u'mr_exciting.woo.20100605.232950.000000',
@@ -338,7 +355,7 @@ class ClusterToFullSummaryTestCase(TestCase):
             'owner': u'woo',
             'pool': None,
             'ran': timedelta(hours=1, minutes=45),
-            'ready': datetime(2010, 6, 5, 23, 45),
+            'ready': utc(2010, 6, 5, 23, 45),
             'state': u'TERMINATED',
             'usage': [{
                 'date_to_nih_bbnu': {date(2010, 6, 5): 2.5,
@@ -346,43 +363,44 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'date_to_nih_billed': {date(2010, 6, 5): 5.0,
                                        date(2010, 6, 6): 15.0},
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},
-                'end': datetime(2010, 6, 5, 23, 45),
-                'end_billing': datetime(2010, 6, 6, 1, 30),
-                'hour_to_nih_bbnu': {datetime(2010, 6, 5, 23): 2.5,
-                                     datetime(2010, 6, 6, 0): 10.0,
-                                     datetime(2010, 6, 6, 1): 5.0},
-                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 5.0,
-                                       datetime(2010, 6, 6, 0): 10.0,
-                                       datetime(2010, 6, 6, 1): 5.0},
-                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
+                'end': utc(2010, 6, 5, 23, 45),
+                'end_billing': utc(2010, 6, 6, 1, 30),
+                'hour_to_nih_bbnu': {utc(2010, 6, 5, 23): 2.5,
+                                     utc(2010, 6, 6, 0): 10.0,
+                                     utc(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_billed': {utc(2010, 6, 5, 23): 5.0,
+                                       utc(2010, 6, 6, 0): 10.0,
+                                       utc(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_used': {utc(2010, 6, 5, 23): 2.5},
                 'label': u'mr_exciting',
                 'nih_bbnu': 17.5,
                 'nih_billed': 20.0,
                 'nih_used': 2.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 5, 23, 30),
+                'start': utc(2010, 6, 5, 23, 30),
                 'step_num': None,
             }],
         })
 
     def test_cluster_with_one_still_running_step(self):
-        cluster = MockEmrObject(
-            id='j-ISFORJUNGLE',
-            name='mr_exciting.woo.20100606.035855.000000',
-            normalizedinstancehours='20',
-            status=MockEmrObject(
-                state='RUNNING',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-06T04:00:00Z',
-                    readydatetime='2010-06-06T04:15:00Z',
+        cluster = dict(
+            BootstrapActions=[],
+            Id='j-ISFORJUNGLE',
+            Name='mr_exciting.woo.20100606.035855.000000',
+            NormalizedInstanceHours=20,
+            Status=dict(
+                State='RUNNING',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-06T04:00:00Z'),
+                    ReadyDateTime=parse('2010-06-06T04:15:00Z'),
                 ),
             ),
-            steps=[
-                MockEmrObject(
-                    name='mr_exciting.woo.20100606.035855.000000: Step 1 of 3',
-                    status=MockEmrObject(
-                        timeline=MockEmrObject(
-                            startdatetime='2010-06-06T04:15:00Z',
+            Steps=[
+                dict(
+                    Name='mr_exciting.woo.20100606.035855.000000: Step 1 of 3',
+                    Status=dict(
+                        Timeline=dict(
+                            StartDateTime=parse('2010-06-06T04:15:00Z'),
                         ),
                     ),
                 ),
@@ -390,10 +408,10 @@ class ClusterToFullSummaryTestCase(TestCase):
         )
 
         summary = _cluster_to_full_summary(
-            cluster, now=datetime(2010, 6, 6, 5, 30))
+            cluster, now=utc(2010, 6, 6, 5, 30))
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 6, 4, 0),
+            'created': utc(2010, 6, 6, 4, 0),
             'end': None,
             'id': u'j-ISFORJUNGLE',
             'label': u'mr_exciting',
@@ -406,67 +424,67 @@ class ClusterToFullSummaryTestCase(TestCase):
             'owner': u'woo',
             'pool': None,
             'ran': timedelta(hours=1, minutes=30),
-            'ready': datetime(2010, 6, 6, 4, 15),
+            'ready': utc(2010, 6, 6, 4, 15),
             'state': u'RUNNING',
             'usage': [{
                 # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
-                'end': datetime(2010, 6, 6, 4, 15),
-                'end_billing': datetime(2010, 6, 6, 4, 15),
-                'hour_to_nih_used': {datetime(2010, 6, 6, 4): 2.5},
+                'end': utc(2010, 6, 6, 4, 15),
+                'end_billing': utc(2010, 6, 6, 4, 15),
+                'hour_to_nih_used': {utc(2010, 6, 6, 4): 2.5},
                 'hour_to_nih_bbnu': {},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 4): 2.5},
                 'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 4, 0),
+                'start': utc(2010, 6, 6, 4, 0),
                 'step_num': None,
             }, {
                 # mr_exciting, step 1
                 'date_to_nih_used': {date(2010, 6, 6): 12.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 12.5},
-                'end': datetime(2010, 6, 6, 5, 30),
-                'end_billing': datetime(2010, 6, 6, 5, 30),
-                'hour_to_nih_used': {datetime(2010, 6, 6, 4): 7.5,
-                                     datetime(2010, 6, 6, 5): 5.0},
+                'end': utc(2010, 6, 6, 5, 30),
+                'end_billing': utc(2010, 6, 6, 5, 30),
+                'hour_to_nih_used': {utc(2010, 6, 6, 4): 7.5,
+                                     utc(2010, 6, 6, 5): 5.0},
                 'hour_to_nih_bbnu': {},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 7.5,
-                                       datetime(2010, 6, 6, 5): 5.0},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 4): 7.5,
+                                       utc(2010, 6, 6, 5): 5.0},
                 'label': u'mr_exciting',
                 'nih_used': 12.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 12.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 4, 15),
+                'start': utc(2010, 6, 6, 4, 15),
                 'step_num': 1,
             }],
         })
 
     def test_cluster_with_one_cancelled_step(self):
-        cluster = MockEmrObject(
-            id='j-ISFORJACUZZI',
-            name='mr_exciting.woo.20100606.035855.000000',
-            normalizedinstancehours='20',
-            status=MockEmrObject(
-                state='RUNNING',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-06T04:00:00Z',
-                    enddatetime='2010-06-06T05:30:00Z',
-                    readydatetime='2010-06-06T04:15:00Z',
+        cluster = dict(
+            Id='j-ISFORJACUZZI',
+            Name='mr_exciting.woo.20100606.035855.000000',
+            NormalizedInstanceHours=20,
+            Status=dict(
+                State='RUNNING',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-06T04:00:00Z'),
+                    EndDateTime=parse('2010-06-06T05:30:00Z'),
+                    ReadyDateTime=parse('2010-06-06T04:15:00Z'),
                 ),
             ),
             # step doesn't have end time even though cluster does
-            steps=[
-                MockEmrObject(
-                    name='mr_exciting.woo.20100606.035855.000000: Step 1 of 3',
-                    status=MockEmrObject(
-                        timeline=MockEmrObject(
-                            startdatetime='2010-06-06T04:15:00Z',
+            Steps=[
+                dict(
+                    Name='mr_exciting.woo.20100606.035855.000000: Step 1 of 3',
+                    Status=dict(
+                        Timeline=dict(
+                            StartDateTime=parse('2010-06-06T04:15:00Z'),
                         ),
                     ),
                 ),
@@ -476,8 +494,8 @@ class ClusterToFullSummaryTestCase(TestCase):
         summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 6, 4, 0),
-            'end': datetime(2010, 6, 6, 5, 30),
+            'created': utc(2010, 6, 6, 4, 0),
+            'end': utc(2010, 6, 6, 5, 30),
             'id': u'j-ISFORJACUZZI',
             'label': u'mr_exciting',
             'name': u'mr_exciting.woo.20100606.035855.000000',
@@ -489,85 +507,85 @@ class ClusterToFullSummaryTestCase(TestCase):
             'owner': u'woo',
             'pool': None,
             'ran': timedelta(hours=1, minutes=30),
-            'ready': datetime(2010, 6, 6, 4, 15),
+            'ready': utc(2010, 6, 6, 4, 15),
             'state': u'RUNNING',
             'usage': [{
                 # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
-                'end': datetime(2010, 6, 6, 4, 15),
-                'end_billing': datetime(2010, 6, 6, 4, 15),
-                'hour_to_nih_used': {datetime(2010, 6, 6, 4): 2.5},
+                'end': utc(2010, 6, 6, 4, 15),
+                'end_billing': utc(2010, 6, 6, 4, 15),
+                'hour_to_nih_used': {utc(2010, 6, 6, 4): 2.5},
                 'hour_to_nih_bbnu': {},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 4): 2.5},
                 'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 4, 0),
+                'start': utc(2010, 6, 6, 4, 0),
                 'step_num': None,
             }, {
                 # mr_exciting, step 1 (cancelled)
                 'date_to_nih_used': {},
                 'date_to_nih_bbnu': {date(2010, 6, 6): 17.5},
                 'date_to_nih_billed': {date(2010, 6, 6): 17.5},
-                'end': datetime(2010, 6, 6, 4, 15),
-                'end_billing': datetime(2010, 6, 6, 6, 0),
+                'end': utc(2010, 6, 6, 4, 15),
+                'end_billing': utc(2010, 6, 6, 6, 0),
                 'hour_to_nih_used': {},
-                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 4): 7.5,
-                                     datetime(2010, 6, 6, 5): 10.0},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 4): 7.5,
-                                       datetime(2010, 6, 6, 5): 10.0},
+                'hour_to_nih_bbnu': {utc(2010, 6, 6, 4): 7.5,
+                                     utc(2010, 6, 6, 5): 10.0},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 4): 7.5,
+                                       utc(2010, 6, 6, 5): 10.0},
                 'label': u'mr_exciting',
                 'nih_used': 0.0,
                 'nih_bbnu': 17.5,
                 'nih_billed': 17.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 4, 15),
+                'start': utc(2010, 6, 6, 4, 15),
                 'step_num': 1,
             }],
         })
 
     def test_multi_step_cluster(self):
-        cluster = MockEmrObject(
-            id='j-ISFORJOB',
-            name='mr_exciting.woo.20100605.232850.000000',
-            normalizedinstancehours='20',
-            status=MockEmrObject(
-                state='TERMINATED',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-05T23:30:00Z',
-                    enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
-                    readydatetime='2010-06-05T23:45:00Z',
+        cluster = dict(
+            Id='j-ISFORJOB',
+            Name='mr_exciting.woo.20100605.232850.000000',
+            NormalizedInstanceHours=20,
+            Status=dict(
+                State='TERMINATED',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-05T23:30:00Z'),
+                    EndDateTime=parse('2010-06-06T01:15:00Z'),  # 2 hours are billed
+                    ReadyDateTime=parse('2010-06-05T23:45:00Z'),
                 ),
             ),
-            steps=[
-                MockEmrObject(
-                    name='mr_exciting.woo.20100605.232850.000000: Step 1 of 3',
-                    status=MockEmrObject(
-                        timeline=MockEmrObject(
-                            startdatetime='2010-06-05T23:45:00Z',
-                            enddatetime='2010-06-06T00:15:00Z',
+            Steps=[
+                dict(
+                    Name='mr_exciting.woo.20100605.232850.000000: Step 1 of 3',
+                    Status=dict(
+                        Timeline=dict(
+                            StartDateTime=parse('2010-06-05T23:45:00Z'),
+                            EndDateTime=parse('2010-06-06T00:15:00Z'),
                         ),
                     ),
                 ),
-                MockEmrObject(
-                    name='mr_exciting.woo.20100605.232850.000000: Step 2 of 3',
-                    status=MockEmrObject(
-                        timeline=MockEmrObject(
-                            startdatetime='2010-06-06T00:30:00Z',
-                            enddatetime='2010-06-06T00:45:00Z',
+                dict(
+                    Name='mr_exciting.woo.20100605.232850.000000: Step 2 of 3',
+                    Status=dict(
+                        Timeline=dict(
+                            StartDateTime=parse('2010-06-06T00:30:00Z'),
+                            EndDateTime=parse('2010-06-06T00:45:00Z'),
                         ),
                     ),
                 ),
-                MockEmrObject(
-                    name='mr_exciting.woo.20100605.232850.000000: Step 3 of 3',
-                    status=MockEmrObject(
-                        timeline=MockEmrObject(
-                            startdatetime='2010-06-06T00:45:00Z',
-                            enddatetime='2010-06-06T01:00:00Z',
+                dict(
+                    Name='mr_exciting.woo.20100605.232850.000000: Step 3 of 3',
+                    Status=dict(
+                        Timeline=dict(
+                            StartDateTime=parse('2010-06-06T00:45:00Z'),
+                            EndDateTime=parse('2010-06-06T01:00:00Z'),
                         ),
                     ),
                 ),
@@ -577,8 +595,8 @@ class ClusterToFullSummaryTestCase(TestCase):
         summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 30),
-            'end': datetime(2010, 6, 6, 1, 15),
+            'created': utc(2010, 6, 5, 23, 30),
+            'end': utc(2010, 6, 6, 1, 15),
             'id': u'j-ISFORJOB',
             'label': u'mr_exciting',
             'name': u'mr_exciting.woo.20100605.232850.000000',
@@ -590,24 +608,24 @@ class ClusterToFullSummaryTestCase(TestCase):
             'owner': u'woo',
             'pool': None,
             'ran': timedelta(hours=1, minutes=45),
-            'ready': datetime(2010, 6, 5, 23, 45),
+            'ready': utc(2010, 6, 5, 23, 45),
             'state': u'TERMINATED',
             'usage': [{
                 # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 5): 2.5},
-                'end': datetime(2010, 6, 5, 23, 45),
-                'end_billing': datetime(2010, 6, 5, 23, 45),
+                'end': utc(2010, 6, 5, 23, 45),
+                'end_billing': utc(2010, 6, 5, 23, 45),
                 'hour_to_nih_bbnu': {},
-                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5},
-                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 5, 23): 2.5},
+                'hour_to_nih_used': {utc(2010, 6, 5, 23): 2.5},
                 'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 5, 23, 30),
+                'start': utc(2010, 6, 5, 23, 30),
                 'step_num': None,
             }, {
                 # step 1 (and idle time after)
@@ -616,106 +634,103 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'date_to_nih_bbnu': {date(2010, 6, 6): 2.5},
                 'date_to_nih_billed': {date(2010, 6, 5): 2.5,
                                        date(2010, 6, 6): 5.0},
-                'end': datetime(2010, 6, 6, 0, 15),
-                'end_billing': datetime(2010, 6, 6, 0, 30),
-                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 2.5},
-                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5,
-                                       datetime(2010, 6, 6, 0): 5.0},
-                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5,
-                                     datetime(2010, 6, 6, 0): 2.5},
+                'end': utc(2010, 6, 6, 0, 15),
+                'end_billing': utc(2010, 6, 6, 0, 30),
+                'hour_to_nih_bbnu': {utc(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 5, 23): 2.5,
+                                       utc(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_used': {utc(2010, 6, 5, 23): 2.5,
+                                     utc(2010, 6, 6, 0): 2.5},
                 'label': u'mr_exciting',
                 'nih_used': 5.0,
                 'nih_bbnu': 2.5,
                 'nih_billed': 7.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 5, 23, 45),
+                'start': utc(2010, 6, 5, 23, 45),
                 'step_num': 1,
             }, {
                 # step 2
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
-                'end': datetime(2010, 6, 6, 0, 45),
-                'end_billing': datetime(2010, 6, 6, 0, 45),
+                'end': utc(2010, 6, 6, 0, 45),
+                'end_billing': utc(2010, 6, 6, 0, 45),
                 'hour_to_nih_bbnu': {},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5},
-                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_used': {utc(2010, 6, 6, 0): 2.5},
                 'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 0, 30),
+                'start': utc(2010, 6, 6, 0, 30),
                 'step_num': 2,
             }, {
                 # step 3 (and idle time after)
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {date(2010, 6, 6): 5.0},
                 'date_to_nih_billed': {date(2010, 6, 6): 7.5},
-                'end': datetime(2010, 6, 6, 1, 0),
-                'end_billing': datetime(2010, 6, 6, 1, 30),
-                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 1): 5.0},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5,
-                                       datetime(2010, 6, 6, 1): 5.0},
-                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
+                'end': utc(2010, 6, 6, 1, 0),
+                'end_billing': utc(2010, 6, 6, 1, 30),
+                'hour_to_nih_bbnu': {utc(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 0): 2.5,
+                                       utc(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_used': {utc(2010, 6, 6, 0): 2.5},
                 'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 5.0,
                 'nih_billed': 7.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 6, 0, 45),
+                'start': utc(2010, 6, 6, 0, 45),
                 'step_num': 3,
             }],
         })
 
     def test_pooled_cluster(self):
         # same as test case above with different job keys
-        cluster = MockEmrObject(
-            bootstrapactions=[
-                MockEmrObject(args=[]),
-                MockEmrObject(args=[
-                    MockEmrObject(
-                        value='pool-0123456789abcdef0123456789abcdef'),
-                    MockEmrObject(value='reflecting'),
-                ]),
+        cluster = dict(
+            BootstrapActions=[
+                dict(Args=[]),
+                dict(Args=['pool-0123456789abcdef0123456789abcdef',
+                           'reflecting']),
             ],
-            id='j-ISFORJOB',
-            name='mr_exciting.woo.20100605.232850.000000',
-            normalizedinstancehours='20',
-            state='TERMINATED',
-            status=MockEmrObject(
-                state='TERMINATED',
-                timeline=MockEmrObject(
-                    creationdatetime='2010-06-05T23:30:00Z',
-                    enddatetime='2010-06-06T01:15:00Z',  # 2 hours are billed
-                    readydatetime='2010-06-05T23:45:00Z',
+            Id='j-ISFORJOB',
+            Name='mr_exciting.woo.20100605.232850.000000',
+            NormalizedInstanceHours=20,
+            State='TERMINATED',
+            Status=dict(
+                State='TERMINATED',
+                Timeline=dict(
+                    CreationDateTime=parse('2010-06-05T23:30:00Z'),
+                    EndDateTime=parse('2010-06-06T01:15:00Z'),  # 2 hrs billed
+                    ReadyDateTime=parse('2010-06-05T23:45:00Z'),
                 ),
             ),
-            steps=[
-                MockEmrObject(
-                    name='mr_exciting.woo.20100605.232950.000000: Step 1 of 1',
-                    status=MockEmrObject(
-                        timeline=MockEmrObject(
-                            startdatetime='2010-06-05T23:45:00Z',
-                            enddatetime='2010-06-06T00:15:00Z',
+            Steps=[
+                dict(
+                    Name='mr_exciting.woo.20100605.232950.000000: Step 1 of 1',
+                    Status=dict(
+                        Timeline=dict(
+                            StartDateTime=parse('2010-06-05T23:45:00Z'),
+                            EndDateTime=parse('2010-06-06T00:15:00Z'),
                         ),
                     ),
                 ),
-                MockEmrObject(
-                    name='mr_whatever.meh.20100606.002000.000000: Step 1 of 2',
-                    status=MockEmrObject(
-                        timeline=MockEmrObject(
-                            startdatetime='2010-06-06T00:30:00Z',
-                            enddatetime='2010-06-06T00:45:00Z',
+                dict(
+                    Name='mr_whatever.meh.20100606.002000.000000: Step 1 of 2',
+                    Status=dict(
+                        Timeline=dict(
+                            StartDateTime=parse('2010-06-06T00:30:00Z'),
+                            EndDateTime=parse('2010-06-06T00:45:00Z'),
                         ),
                     ),
                 ),
-                MockEmrObject(
-                    name='mr_whatever.meh.20100606.002000.000000: Step 2 of 2',
-                    status=MockEmrObject(
-                        timeline=MockEmrObject(
-                            startdatetime='2010-06-06T00:45:00Z',
-                            enddatetime='2010-06-06T01:00:00Z',
+                dict(
+                    Name='mr_whatever.meh.20100606.002000.000000: Step 2 of 2',
+                    Status=dict(
+                        Timeline=dict(
+                            StartDateTime=parse('2010-06-06T00:45:00Z'),
+                            EndDateTime=parse('2010-06-06T01:00:00Z'),
                         ),
                     ),
                 ),
@@ -725,8 +740,8 @@ class ClusterToFullSummaryTestCase(TestCase):
         summary = _cluster_to_full_summary(cluster)
 
         self.assertEqual(summary, {
-            'created': datetime(2010, 6, 5, 23, 30),
-            'end': datetime(2010, 6, 6, 1, 15),
+            'created': utc(2010, 6, 5, 23, 30),
+            'end': utc(2010, 6, 6, 1, 15),
             'id': u'j-ISFORJOB',
             'label': u'mr_exciting',
             'name': u'mr_exciting.woo.20100605.232850.000000',
@@ -738,24 +753,24 @@ class ClusterToFullSummaryTestCase(TestCase):
             'owner': u'woo',
             'pool': u'reflecting',
             'ran': timedelta(hours=1, minutes=45),
-            'ready': datetime(2010, 6, 5, 23, 45),
+            'ready': utc(2010, 6, 5, 23, 45),
             'state': 'TERMINATED',
             'usage': [{
                 # bootstrapping
                 'date_to_nih_used': {date(2010, 6, 5): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 5): 2.5},
-                'end': datetime(2010, 6, 5, 23, 45),
-                'end_billing': datetime(2010, 6, 5, 23, 45),
+                'end': utc(2010, 6, 5, 23, 45),
+                'end_billing': utc(2010, 6, 5, 23, 45),
                 'hour_to_nih_bbnu': {},
-                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5},
-                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 5, 23): 2.5},
+                'hour_to_nih_used': {utc(2010, 6, 5, 23): 2.5},
                 'label': u'mr_exciting',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 5, 23, 30),
+                'start': utc(2010, 6, 5, 23, 30),
                 'step_num': None,
             }, {
                 # mr_exciting, step 1 (and idle time after)
@@ -764,54 +779,54 @@ class ClusterToFullSummaryTestCase(TestCase):
                 'date_to_nih_bbnu': {date(2010, 6, 6): 2.5},
                 'date_to_nih_billed': {date(2010, 6, 5): 2.5,
                                        date(2010, 6, 6): 5.0},
-                'end': datetime(2010, 6, 6, 0, 15),
-                'end_billing': datetime(2010, 6, 6, 0, 30),
-                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 0): 2.5},
-                'hour_to_nih_billed': {datetime(2010, 6, 5, 23): 2.5,
-                                       datetime(2010, 6, 6, 0): 5.0},
-                'hour_to_nih_used': {datetime(2010, 6, 5, 23): 2.5,
-                                     datetime(2010, 6, 6, 0): 2.5},
+                'end': utc(2010, 6, 6, 0, 15),
+                'end_billing': utc(2010, 6, 6, 0, 30),
+                'hour_to_nih_bbnu': {utc(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 5, 23): 2.5,
+                                       utc(2010, 6, 6, 0): 5.0},
+                'hour_to_nih_used': {utc(2010, 6, 5, 23): 2.5,
+                                     utc(2010, 6, 6, 0): 2.5},
                 'label': u'mr_exciting',
                 'nih_used': 5.0,
                 'nih_bbnu': 2.5,
                 'nih_billed': 7.5,
                 'owner': u'woo',
-                'start': datetime(2010, 6, 5, 23, 45),
+                'start': utc(2010, 6, 5, 23, 45),
                 'step_num': 1,
             }, {
                 # mr whatever, step 1
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {},
                 'date_to_nih_billed': {date(2010, 6, 6): 2.5},
-                'end': datetime(2010, 6, 6, 0, 45),
-                'end_billing': datetime(2010, 6, 6, 0, 45),
+                'end': utc(2010, 6, 6, 0, 45),
+                'end_billing': utc(2010, 6, 6, 0, 45),
                 'hour_to_nih_bbnu': {},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5},
-                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 0): 2.5},
+                'hour_to_nih_used': {utc(2010, 6, 6, 0): 2.5},
                 'label': u'mr_whatever',
                 'nih_used': 2.5,
                 'nih_bbnu': 0.0,
                 'nih_billed': 2.5,
                 'owner': u'meh',
-                'start': datetime(2010, 6, 6, 0, 30),
+                'start': utc(2010, 6, 6, 0, 30),
                 'step_num': 1,
             }, {
                 # mr whatever, step 2 (and idle time after)
                 'date_to_nih_used': {date(2010, 6, 6): 2.5},
                 'date_to_nih_bbnu': {date(2010, 6, 6): 5.0},
                 'date_to_nih_billed': {date(2010, 6, 6): 7.5},
-                'end': datetime(2010, 6, 6, 1, 0),
-                'end_billing': datetime(2010, 6, 6, 1, 30),
-                'hour_to_nih_bbnu': {datetime(2010, 6, 6, 1): 5.0},
-                'hour_to_nih_billed': {datetime(2010, 6, 6, 0): 2.5,
-                                       datetime(2010, 6, 6, 1): 5.0},
-                'hour_to_nih_used': {datetime(2010, 6, 6, 0): 2.5},
+                'end': utc(2010, 6, 6, 1, 0),
+                'end_billing': utc(2010, 6, 6, 1, 30),
+                'hour_to_nih_bbnu': {utc(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_billed': {utc(2010, 6, 6, 0): 2.5,
+                                       utc(2010, 6, 6, 1): 5.0},
+                'hour_to_nih_used': {utc(2010, 6, 6, 0): 2.5},
                 'label': u'mr_whatever',
                 'nih_used': 2.5,
                 'nih_bbnu': 5.0,
                 'nih_billed': 7.5,
                 'owner': u'meh',
-                'start': datetime(2010, 6, 6, 0, 45),
+                'start': utc(2010, 6, 6, 0, 45),
                 'step_num': 2,
             }],
         })
@@ -822,8 +837,8 @@ class SubdivideIntervalByDateTestCase(TestCase):
     def test_zero_interval(self):
         self.assertEqual(
             _subdivide_interval_by_date(
-                datetime(2010, 6, 6, 4, 26),
-                datetime(2010, 6, 6, 4, 26),
+                utc(2010, 6, 6, 4, 26),
+                utc(2010, 6, 6, 4, 26),
             ),
             {}
         )
@@ -831,8 +846,8 @@ class SubdivideIntervalByDateTestCase(TestCase):
     def test_same_day(self):
         self.assertEqual(
             _subdivide_interval_by_date(
-                datetime(2010, 6, 6, 4, 0),
-                datetime(2010, 6, 6, 6, 0),
+                utc(2010, 6, 6, 4, 0),
+                utc(2010, 6, 6, 6, 0),
             ),
             {date(2010, 6, 6): 7200.0}
         )
@@ -840,8 +855,8 @@ class SubdivideIntervalByDateTestCase(TestCase):
     def test_start_at_midnight(self):
         self.assertEqual(
             _subdivide_interval_by_date(
-                datetime(2010, 6, 6, 0, 0),
-                datetime(2010, 6, 6, 5, 0),
+                utc(2010, 6, 6, 0, 0),
+                utc(2010, 6, 6, 5, 0),
             ),
             {date(2010, 6, 6): 18000.0}
         )
@@ -849,8 +864,8 @@ class SubdivideIntervalByDateTestCase(TestCase):
     def test_end_at_midnight(self):
         self.assertEqual(
             _subdivide_interval_by_date(
-                datetime(2010, 6, 5, 23, 0),
-                datetime(2010, 6, 6, 0, 0),
+                utc(2010, 6, 5, 23, 0),
+                utc(2010, 6, 6, 0, 0),
             ),
             {date(2010, 6, 5): 3600.0}
         )
@@ -858,8 +873,8 @@ class SubdivideIntervalByDateTestCase(TestCase):
     def test_split_over_midnight(self):
         self.assertEqual(
             _subdivide_interval_by_date(
-                datetime(2010, 6, 5, 23, 0),
-                datetime(2010, 6, 6, 5, 0),
+                utc(2010, 6, 5, 23, 0),
+                utc(2010, 6, 6, 5, 0),
             ),
             {date(2010, 6, 5): 3600.0,
              date(2010, 6, 6): 18000.0}
@@ -868,8 +883,8 @@ class SubdivideIntervalByDateTestCase(TestCase):
     def test_full_days(self):
         self.assertEqual(
             _subdivide_interval_by_date(
-                datetime(2010, 6, 5, 23, 0),
-                datetime(2010, 6, 10, 5, 0),
+                utc(2010, 6, 5, 23, 0),
+                utc(2010, 6, 10, 5, 0),
             ),
             {date(2010, 6, 5): 3600.0,
              date(2010, 6, 6): 86400.0,
@@ -885,8 +900,8 @@ class SubdivideIntervalByHourTestCase(TestCase):
     def test_zero_interval(self):
         self.assertEqual(
             _subdivide_interval_by_hour(
-                datetime(2010, 6, 6, 4, 26),
-                datetime(2010, 6, 6, 4, 26),
+                utc(2010, 6, 6, 4, 26),
+                utc(2010, 6, 6, 4, 26),
             ),
             {}
         )
@@ -894,50 +909,50 @@ class SubdivideIntervalByHourTestCase(TestCase):
     def test_same_hour(self):
         self.assertEqual(
             _subdivide_interval_by_hour(
-                datetime(2010, 6, 6, 4, 24),
-                datetime(2010, 6, 6, 4, 26),
+                utc(2010, 6, 6, 4, 24),
+                utc(2010, 6, 6, 4, 26),
             ),
-            {datetime(2010, 6, 6, 4): 120.0}
+            {utc(2010, 6, 6, 4): 120.0}
         )
 
     def test_start_at_midnight(self):
         self.assertEqual(
             _subdivide_interval_by_hour(
-                datetime(2010, 6, 6, 0, 0),
-                datetime(2010, 6, 6, 0, 3),
+                utc(2010, 6, 6, 0, 0),
+                utc(2010, 6, 6, 0, 3),
             ),
-            {datetime(2010, 6, 6, 0): 180.0}
+            {utc(2010, 6, 6, 0): 180.0}
         )
 
     def test_end_at_midnight(self):
         self.assertEqual(
             _subdivide_interval_by_hour(
-                datetime(2010, 6, 5, 23, 55),
-                datetime(2010, 6, 6, 0, 0),
+                utc(2010, 6, 5, 23, 55),
+                utc(2010, 6, 6, 0, 0),
             ),
-            {datetime(2010, 6, 5, 23): 300.0}
+            {utc(2010, 6, 5, 23): 300.0}
         )
 
     def test_split_over_midnight(self):
         self.assertEqual(
             _subdivide_interval_by_hour(
-                datetime(2010, 6, 5, 23, 55),
-                datetime(2010, 6, 6, 0, 3),
+                utc(2010, 6, 5, 23, 55),
+                utc(2010, 6, 6, 0, 3),
             ),
-            {datetime(2010, 6, 5, 23): 300.0,
-             datetime(2010, 6, 6, 0): 180.0}
+            {utc(2010, 6, 5, 23): 300.0,
+             utc(2010, 6, 6, 0): 180.0}
         )
 
     def test_full_hours(self):
         self.assertEqual(
             _subdivide_interval_by_hour(
-                datetime(2010, 6, 5, 23, 40),
-                datetime(2010, 6, 6, 2, 10),
+                utc(2010, 6, 5, 23, 40),
+                utc(2010, 6, 6, 2, 10),
             ),
-            {datetime(2010, 6, 5, 23): 1200.0,
-             datetime(2010, 6, 6, 0): 3600.0,
-             datetime(2010, 6, 6, 1): 3600.0,
-             datetime(2010, 6, 6, 2): 600.0}
+            {utc(2010, 6, 5, 23): 1200.0,
+             utc(2010, 6, 6, 0): 3600.0,
+             utc(2010, 6, 6, 1): 3600.0,
+             utc(2010, 6, 6, 2): 600.0}
         )
 
 

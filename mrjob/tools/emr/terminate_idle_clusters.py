@@ -246,8 +246,8 @@ def _maybe_terminate_clusters(dry_run=False,
 
 def _is_cluster_done(cluster):
     """Return True if the given cluster is done running."""
-    return (cluster['Status']['State'] == 'TERMINATING' or
-            cluster['Status']['Timeline'].get('EndDateTime'))
+    return bool(cluster['Status']['State'] == 'TERMINATING' or
+                cluster['Status']['Timeline'].get('EndDateTime'))
 
 
 def _is_cluster_starting(cluster_summary):

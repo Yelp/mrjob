@@ -44,8 +44,6 @@ class MockBoto3TestCase(SandboxedTestCase):
     # times, there's probably a problem with simulating progress
     MAX_EMR_CLIENTS = 100
 
-    connect_emr = Boto2TestSkipper()
-
     @classmethod
     def setUpClass(cls):
         # we don't care what's in this file, just want mrjob to stop creating

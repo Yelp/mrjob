@@ -2772,7 +2772,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.assertEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(cluster_id), 2)
 
-            self.connect_emr().terminate_jobflow(cluster_id)
+            self.client('emr').terminate_job_flows(JobFlowIds=[cluster_id])
 
             self.assertRaises(StepFailedException, runner._finish_run)
 
@@ -5578,7 +5578,7 @@ class MasterPrivateIPTestCase(MockBoto3TestCase):
 
             self.assertIsNone(runner._master_private_ip())
 
-            self.connect_emr().simulate_progress(runner.get_cluster_id())
+            self.client('emr').simulate_progress(runner.get_cluster_id())
             self.assertIsNotNone(runner._master_private_ip())
 
 
@@ -5611,7 +5611,7 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
 
             cluster = self.mock_emr_clusters[cluster_id]
             while cluster['Status']['State'] in ('STARTING', 'BOOTSTRAPPING'):
-                self.connect_emr().simulate_progress(cluster_id)
+                self.client('emr').simulate_progress(cluster_id)
 
             runner._set_up_ssh_tunnel()
 

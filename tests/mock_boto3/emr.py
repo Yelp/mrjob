@@ -243,7 +243,7 @@ class MockEMRClient(object):
                 EmrManagedSlaveSecurityGroup='sg-mockslave',
                 IamInstanceProfile='',
             ),
-            Id='',
+            Id='j-MOCKCLUSTER%d' % len(self.mock_emr_clusters),
             Name='',
             NormalizedInstanceHours=0,
             ScaleDownBehavior='TERMINATE_AT_TASK_COMPLETION',
@@ -260,11 +260,6 @@ class MockEMRClient(object):
 
         def _error(message):
             return _ValidationException('RunJobFlow', message)
-
-        # Id
-        cluster['Id'] = (
-            kwargs.pop('_Id', None) or
-            'j-MOCKCLUSTER%d' % len (self.mock_emr_clusters))
 
         # Name (required)
         _validate_param(kwargs, 'Name', string_types)

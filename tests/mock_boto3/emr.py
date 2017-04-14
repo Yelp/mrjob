@@ -41,14 +41,8 @@ class Boto2TestSkipper(object):
     def __getattr__(self, name):
         self()
 
-MockEmrConnection = Boto2TestSkipper()
 MockEmrObject = Boto2TestSkipper()
-err_xml = Boto2TestSkipper()
 to_iso8601 = Boto2TestSkipper()
-_decode_configurations_from_api = Boto2TestSkipper()
-_list_all_steps = Boto2TestSkipper()
-_yield_all_instance_groups = Boto2TestSkipper()
-_yield_all_clusters = Boto2TestSkipper()
 
 
 # what partial versions and "latest" map to, as of 2015-07-15
@@ -725,6 +719,7 @@ class MockEMRClient(object):
                 Name='',
                 Status=dict(
                     State='PENDING',
+                    StateChangeReason={},
                     Timeline=dict(CreationDateTime=now),
                 ),
             )
@@ -870,7 +865,7 @@ class MockEMRClient(object):
         # simulate progress, to support _wait_for_steps_to_complete()
         self.simulate_progress(ClusterId)
 
-        steps = self._list_steps(ClusterId, StepIds=[StepId])
+        steps = self._list_steps('DescribeStep', ClusterId, StepIds=[StepId])
         return dict(Step=steps[0])
 
     def list_bootstrap_actions(self, **kwargs):
@@ -1075,8 +1070,8 @@ class MockEMRClient(object):
         and looking for an -output argument."""
         # parse in reverse order, in case there are multiple -output args
         for i, arg in reversed(list(enumerate(step_args[:-1]))):
-            if arg.value == '-output':
-                return step_args[i + 1].value
+            if arg == '-output':
+                return step_args[i + 1]
         else:
             return None
 
@@ -1090,110 +1085,112 @@ class MockEMRClient(object):
         :type now: py:class:`datetime.datetime`
         :param now: alternate time to use as the current time (should be UTC)
         """
-        self._enforce_strict_ssl()
-
         # TODO: this doesn't actually update steps to CANCELLED when
         # cluster is shut down
         if now is None:
             now = _boto3_now()
 
-        cluster = self._get_mock_cluster(cluster_id)
+        cluster = self.mock_emr_clusters[cluster_id]
 
         # allow clusters to get stuck
-        if getattr(cluster, 'delay_progress_simulation', 0) > 0:
-            cluster.delay_progress_simulation -= 1
+        if cluster.get('_DelayProgressSimulation', 0) > 0:
+            cluster['_DelayProgressSimulation'] -= 1
             return
 
-        # this code is pretty loose about updating statechangereason
+        # this code is pretty loose about updating StateChangeReason
         # (for the cluster, instance groups, and steps). Add this as needed.
 
         # if job is STARTING, move it along to BOOTSTRAPPING
-        if cluster.status.state == 'STARTING':
-            cluster.status.state = 'BOOTSTRAPPING'
+        if cluster['Status']['State'] == 'STARTING':
+            cluster['Status']['State'] = 'BOOTSTRAPPING'
+
+            # master now has a hostname
+            cluster['MasterPublicDnsName'] = 'mockmaster'
+
             # instances are now provisioned
-            for ig in cluster._instancegroups:
-                ig.runninginstancecount = ig.requestedinstancecount,
-                ig.status.state = 'BOOTSTRAPPING'
+            for ig in cluster['_InstanceGroups']:
+                ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
+                ig['Status']['State'] = 'BOOTSTRAPPING'
 
             return
 
         # if job is TERMINATING, move along to terminated
-        if cluster.status.state == 'TERMINATING':
-            code = getattr(getattr(cluster.status, 'statechangereason', None),
-                           'code', None)
-
+        if cluster['Status']['State'] == 'TERMINATING':
+            code = cluster['Status']['StateChangeReason'].get('Code')
             if code and code.endswith('_FAILURE'):
-                cluster.status.state = 'TERMINATED_WITH_ERRORS'
+                cluster['Status']['State'] = 'TERMINATED_WITH_ERRORS'
             else:
-                cluster.status.state = 'TERMINATED'
+                cluster['Status']['State'] = 'TERMINATED'
 
             return
 
         # if job is done, nothing to do
-        if cluster.status.state in ('TERMINATED', 'TERMINATED_WITH_ERRORS'):
+        if cluster['Status']['State'] in ('TERMINATED',
+                                          'TERMINATED_WITH_ERRORS'):
             return
 
         # if job is BOOTSTRAPPING, move it along to RUNNING and continue
-        if cluster.status.state == 'BOOTSTRAPPING':
-            cluster.status.state = 'RUNNING'
-            for ig in cluster._instancegroups:
-                ig.status.state = 'RUNNING'
+        if cluster['Status']['State'] == 'BOOTSTRAPPING':
+            cluster['Status']['State'] = 'RUNNING'
+            for ig in cluster['_InstanceGroups']:
+                ig['Status']['State'] = 'RUNNING'
 
         # at this point, should be RUNNING or WAITING
-        assert cluster.status.state in ('RUNNING', 'WAITING')
+        assert cluster['Status']['State'] in ('RUNNING', 'WAITING')
 
         # simulate self-termination
         if cluster_id in self.mock_emr_self_termination:
-            cluster.status.state = 'TERMINATING'
-            cluster.status.statechangereason = MockEmrObject(
-                code='INSTANCE_FAILURE',
-                message='The master node was terminated. ',  # sic
+            cluster['Status']['State'] = 'TERMINATING'
+            cluster['Status']['StateChangeReason'] = dict(
+                Code='INSTANCE_FAILURE',
+                Message='The master node was terminated. ',  # sic
             )
 
-            for step in cluster._steps:
-                if step.status.state in ('PENDING', 'RUNNING'):
-                    step.status.state = 'CANCELLED'  # not INTERRUPTED
+            for step in cluster['_Steps']:
+                if step['Status']['State'] in ('PENDING', 'RUNNING'):
+                    step['Status']['State'] = 'CANCELLED'  # not INTERRUPTED
 
             return
 
         # try to find the next step, and advance it
 
-        for step_num, step in enumerate(cluster._steps):
+        for step_num, step in enumerate(cluster['_Steps']):
             # skip steps that are already done
-            if step.status.state in (
+            if step['Status']['State'] in (
                     'COMPLETED', 'FAILED', 'CANCELLED', 'INTERRUPTED'):
                 continue
 
             # found currently running step! handle it, then exit
 
             # start PENDING step
-            if step.status.state == 'PENDING':
-                step.status.state = 'RUNNING'
-                step.status.timeline.startdatetime = to_iso8601(now)
+            if step['Status']['State'] == 'PENDING':
+                step['Status']['State'] = 'RUNNING'
+                step['Status']['Timeline']['StartDateTime'] = now
                 return
 
-            assert step.status.state == 'RUNNING'
+            assert step['Status']['State'] == 'RUNNING'
 
             # check if we're supposed to have an error
             if (cluster_id, step_num) in self.mock_emr_failures:
-                step.status.state = 'FAILED'
+                step['Status']['State'] = 'FAILED'
 
                 if step.actiononfailure in (
                         'TERMINATE_CLUSTER', 'TERMINATE_JOB_FLOW'):
 
-                    cluster.status.state = 'TERMINATING'
-                    cluster.status.statechangereason.code = 'STEP_FAILURE'
-                    cluster.status.statechangereason.message = (
+                    cluster['Status']['State'] = 'TERMINATING'
+                    cluster['Status']['StateChangeReason']['Code'] = (
+                        'STEP_FAILURE')
+                    cluster['Status']['StateChangeReason']['Message'] = (
                         'Shut down as step failed')
 
                 return
 
             # complete step
-            step.status.state = 'COMPLETED'
-            step.status.timeline.enddatetime = to_iso8601(now)
+            step['Status']['State'] = 'COMPLETED'
+            step['Status']['Timeline']['EndDateTime'] = now
 
             # create fake output if we're supposed to write to S3
-            output_uri = self._get_step_output_uri(step.config.args)
+            output_uri = self._get_step_output_uri(step['Config']['Args'])
             if output_uri and is_s3_uri(output_uri):
                 mock_output = self.mock_emr_output.get(
                     (cluster_id, step_num)) or [b'']
@@ -1212,19 +1209,20 @@ class MockEMRClient(object):
 
             # done!
             # if this is the last step, continue to autotermination code, below
-            if step_num < len(cluster._steps) - 1:
+            if step_num < len(cluster['_Steps']) - 1:
                 return
 
         # no pending steps. should we wait, or shut down?
-        if cluster.autoterminate == 'true':
-            cluster.status.state = 'TERMINATING'
-            cluster.status.statechangereason.code = 'ALL_STEPS_COMPLETED'
-            cluster.status.statechangereason.message = (
+        if cluster['AutoTerminate']:
+            cluster['Status']['State'] = 'TERMINATING'
+            cluster['Status']['StateChangeReason']['Code'] = (
+                'ALL_STEPS_COMPLETED')
+            cluster['Status']['StateChangeReason']['Message'] = (
                 'Steps Completed')
         else:
             # just wait
-            cluster.status.state = 'WAITING'
-            cluster.status.statechangereason = MockEmrObject()
+            cluster['Status']['State'] = 'WAITING'
+            cluster['Status']['StateChangeReason'] = {}
 
         return
 

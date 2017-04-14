@@ -486,7 +486,7 @@ class IAMTestCase(MockBoto3TestCase):
 
         # check instance_profile
         instance_profile_name = (
-            cluster['Ec2InstanceAttributes'].iaminstanceprofile)
+            cluster['Ec2InstanceAttributes']['IamInstanceProfile'])
         self.assertIsNotNone(instance_profile_name)
         self.assertTrue(instance_profile_name.startswith('mrjob-'))
         self.assertIn(instance_profile_name, self.mock_iam_instance_profiles)
@@ -495,7 +495,7 @@ class IAMTestCase(MockBoto3TestCase):
                       self.mock_iam_role_attached_policies)
 
         # check service_role
-        service_role_name = cluster.servicerole
+        service_role_name = cluster['ServiceRole']
         self.assertIsNotNone(service_role_name)
         self.assertTrue(service_role_name.startswith('mrjob-'))
         self.assertIn(service_role_name, self.mock_iam_roles)
@@ -507,24 +507,26 @@ class IAMTestCase(MockBoto3TestCase):
 
         # run again, and see if we reuse the roles
         cluster2 = self.run_and_get_cluster()
-        self.assertEqual(cluster2['Ec2InstanceAttributes'].iaminstanceprofile,
-                         instance_profile_name)
-        self.assertEqual(cluster2.servicerole, service_role_name)
+        self.assertEqual(
+            cluster2['Ec2InstanceAttributes']['IamInstanceProfile'],
+            instance_profile_name)
+        self.assertEqual(cluster2['ServiceRole'], service_role_name)
 
     def test_iam_instance_profile_option(self):
         cluster = self.run_and_get_cluster(
             '--iam-instance-profile', 'EMR_EC2_DefaultRole')
         self.assertTrue(boto3.client.called)
 
-        self.assertEqual(cluster['Ec2InstanceAttributes'].iaminstanceprofile,
-                         'EMR_EC2_DefaultRole')
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['IamInstanceProfile'],
+            'EMR_EC2_DefaultRole')
 
     def test_iam_service_role_option(self):
         cluster = self.run_and_get_cluster(
             '--iam-service-role', 'EMR_DefaultRole')
         self.assertTrue(boto3.client.called)
 
-        self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
+        self.assertEqual(cluster['ServiceRole'], 'EMR_DefaultRole')
 
     def test_both_iam_options(self):
         cluster = self.run_and_get_cluster(
@@ -536,16 +538,21 @@ class IAMTestCase(MockBoto3TestCase):
         self.assertFalse(any(args == ('iam',)
                              for args, kwargs in boto3.client.call_args_list))
 
-        self.assertEqual(cluster['Ec2InstanceAttributes'].iaminstanceprofile,
-                         'EMR_EC2_DefaultRole')
-        self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['IamInstanceProfile'],
+            'EMR_EC2_DefaultRole')
+        self.assertEqual(cluster['ServiceRole'], 'EMR_DefaultRole')
 
     def test_no_iam_access(self):
         boto3_client = boto3.client
 
         def forbidding_boto3_client(service_name, **kwargs):
             if service_name == 'iam':
-                raise boto.exception.BotoServerError(403, 'Forbidden')
+                raise ClientError(
+                    dict(
+                        Error=dict(),
+                        ResponseMetadata=dict(HTTPStatusCode=403)
+                    ), 'WhateverApiCall')
             else:
                 # pass through other services
                 return boto3_client(service_name, **kwargs)
@@ -558,9 +565,10 @@ class IAMTestCase(MockBoto3TestCase):
         self.assertTrue(any(args == ('iam',)
                             for args, kwargs in boto3.client.call_args_list))
 
-        self.assertEqual(cluster['Ec2InstanceAttributes'].iaminstanceprofile,
-                         'EMR_EC2_DefaultRole')
-        self.assertEqual(cluster.servicerole, 'EMR_DefaultRole')
+        self.assertEqual(
+            cluster['Ec2InstanceAttributes']['IamInstanceProfile'],
+            'EMR_EC2_DefaultRole')
+        self.assertEqual(cluster['ServiceRole'], 'EMR_DefaultRole')
 
 
 @unittest.skip('reworking emr_api_params for boto3, see #1574')

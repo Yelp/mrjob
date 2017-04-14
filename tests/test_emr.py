@@ -2834,7 +2834,7 @@ class PoolingDisablingTestCase(MockBoto3TestCase):
             runner.run()
 
             cluster = runner._describe_cluster()
-            self.assertEqual(cluster['AutoTerminate'], 'true')
+            self.assertEqual(cluster['AutoTerminate'], True)
 
 
 class S3LockTestCase(MockBoto3TestCase):

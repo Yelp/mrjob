@@ -873,16 +873,10 @@ class MockEMRClient(object):
         steps = self._list_steps('DescribeStep', ClusterId, StepIds=[StepId])
         return dict(Step=steps[0])
 
-    def list_bootstrap_actions(self, **kwargs):
-        self._enforce_strict_ssl()
+    def list_bootstrap_actions(self, ClusterId):
+        cluster = self._get_mock_cluster('ListBootstrapActions', ClusterId)
 
-        if marker is not None:
-            raise NotImplementedError(
-                'marker not simulated for ListBootstrapActions')
-
-        cluster = self._get_mock_cluster(cluster_id)
-
-        return MockEmrObject(actions=cluster._bootstrapactions)
+        return dict(BootstrapActions=deepcopy(cluster['_BootstrapActions']))
 
     def list_clusters(self, **kwargs):
         self._enforce_strict_ssl()
@@ -970,20 +964,10 @@ class MockEMRClient(object):
 
         return MockEmrObject(instances=instances)
 
-    def list_instance_groups(self, **kwargs):
-        self._enforce_strict_ssl()
+    def list_instance_groups(self, ClusterId):
+        cluster = self._get_mock_cluster('ListInstanceGroups', ClusterId)
 
-        # TODO: not sure what order API returns instance groups in,
-        # but doesn't matter for us, as our code treats them like
-        # a dictionary. See #1316.
-
-        if marker is not None:
-            raise NotImplementedError(
-                'marker not simulated for ListInstanceGroups')
-
-        cluster = self._get_mock_cluster(cluster_id)
-
-        return MockEmrObject(instancegroups=cluster._instancegroups)
+        return dict(InstanceGroups=deepcopy(cluster['_InstanceGroups']))
 
     def list_steps(self, ClusterId, StepIds=None, StepStates=None):
         return dict(Steps=self._list_steps(

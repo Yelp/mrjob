@@ -27,6 +27,7 @@ from io import BytesIO
 
 import boto3
 from botocore.exceptions import ClientError
+from botocore.exceptions import ParamValidationError
 
 import mrjob
 import mrjob.emr
@@ -426,21 +427,21 @@ class VisibleToAllUsersTestCase(MockBoto3TestCase):
 
     def test_defaults(self):
         cluster = self.run_and_get_cluster()
-        self.assertEqual(cluster.visibletoallusers, 'true')
+        self.assertEqual(cluster['VisibleToAllUsers'], True)
 
     def test_no_visible(self):
         cluster = self.run_and_get_cluster('--no-visible-to-all-users')
-        self.assertEqual(cluster.visibletoallusers, 'false')
+        self.assertEqual(cluster['VisibleToAllUsers'], False)
 
     def test_force_to_bool(self):
         # make sure mock_boto3 doesn't always convert to bool
-        self.assertRaises(boto.exception.EmrResponseError,
+        self.assertRaises(ParamValidationError,
                           self.run_and_get_cluster,
                           '--emr-api-param', 'VisibleToAllUsers=1')
 
     def test_visible(self):
         cluster = self.run_and_get_cluster('--visible-to-all-users')
-        self.assertTrue(cluster.visibletoallusers, 'true')
+        self.assertEqual(cluster['VisibleToAllUsers'], True)
 
         VISIBLE_MRJOB_CONF = {'runners': {'emr': {
             'check_cluster_every': 0.00,
@@ -450,7 +451,7 @@ class VisibleToAllUsersTestCase(MockBoto3TestCase):
 
         with mrjob_conf_patcher(VISIBLE_MRJOB_CONF):
             visible_cluster = self.run_and_get_cluster()
-            self.assertEqual(visible_cluster.visibletoallusers, 'true')
+            self.assertEqual(visible_cluster['VisibleToAllUsers'], True)
 
 
 class SubnetTestCase(MockBoto3TestCase):

@@ -60,7 +60,6 @@ import tests.mock_boto3.s3
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mock_boto3.emr import Boto2TestSkipper
 from tests.mock_boto3.emr import MockEMRClient
-from tests.mock_boto3.emr import MockEmrObject
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob

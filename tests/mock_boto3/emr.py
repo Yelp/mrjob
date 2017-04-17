@@ -47,8 +47,6 @@ class Boto2TestSkipper(object):
     def __getattr__(self, name):
         self()
 
-MockEmrObject = Boto2TestSkipper()
-
 
 # what partial versions and "latest" map to, as of 2015-07-15
 AMI_VERSION_ALIASES = {

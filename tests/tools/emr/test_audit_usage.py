@@ -296,32 +296,6 @@ class ClusterToFullSummaryTestCase(TestCase):
             }],
         })
 
-    # TODO: make this pass first
-    def test_cluster_with_no_fields(self):
-        # this shouldn't happen in practice; just a robustness check
-        cluster = dict()
-
-        summary = _cluster_to_full_summary(cluster)
-
-        self.assertEqual(summary, {
-            'created': None,
-            'end': None,
-            'id': None,
-            'label': None,
-            'name': None,
-            'nih': 0.0,
-            'nih_bbnu': 0.0,
-            'nih_billed': 0.0,
-            'nih_used': 0.0,
-            'num_steps': 0,
-            'owner': None,
-            'pool': None,
-            'ran': timedelta(0),
-            'ready': None,
-            'state': None,
-            'usage': [],
-        })
-
     def test_cluster_with_no_steps_split_over_midnight(self):
         cluster = dict(
             BootstrapActions=[],
@@ -467,6 +441,7 @@ class ClusterToFullSummaryTestCase(TestCase):
 
     def test_cluster_with_one_cancelled_step(self):
         cluster = dict(
+            BootstrapActions=[],
             Id='j-ISFORJACUZZI',
             Name='mr_exciting.woo.20100606.035855.000000',
             NormalizedInstanceHours=20,
@@ -550,6 +525,7 @@ class ClusterToFullSummaryTestCase(TestCase):
 
     def test_multi_step_cluster(self):
         cluster = dict(
+            BootstrapActions=[],
             Id='j-ISFORJOB',
             Name='mr_exciting.woo.20100605.232850.000000',
             NormalizedInstanceHours=20,

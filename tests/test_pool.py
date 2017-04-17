@@ -190,7 +190,3 @@ class TestPoolHashAndName(TestCase):
         ]
 
         self.assertEqual(_pool_hash_and_name(actions), (None, None))
-
-    def test_empty_bootstrap_action(self):
-        # this doesn't happen in practice; just a test of robustness
-        self.assertEqual(_pool_hash_and_name([{}]), (None, None))

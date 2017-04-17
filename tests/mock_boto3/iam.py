@@ -19,7 +19,7 @@ from botocore.exceptions import ClientError
 from mrjob.aws import _boto3_now
 from mrjob.conf import combine_values
 
-from .util import MockObject
+from .util import MockClientMeta
 from .util import MockPaginator
 
 
@@ -69,7 +69,7 @@ class MockIAMClient(object):
         endpoint_url = endpoint_url or 'https://iam.amazonaws.com'
         region_name = region_name or 'aws-global'
 
-        self.meta = MockObject(
+        self.meta = MockClientMeta(
             endpoint_url=endpoint_url,
             region_name=region_name)
 

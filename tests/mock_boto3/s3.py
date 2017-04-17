@@ -21,6 +21,7 @@ from boto3.exceptions import S3UploadFailedError
 from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import _boto3_now
 
+from .util import MockClientMeta
 from .util import MockObject
 
 
@@ -52,7 +53,7 @@ class MockS3Client(object):
             else:
                 endpoint_url = 'https://s3-%s.amazonaws.com' % region_name
 
-        self.meta = MockObject(
+        self.meta = MockClientMeta(
             endpoint_url=endpoint_url,
             region_name=region_name)
 
@@ -112,7 +113,7 @@ class MockS3Resource(object):
 
         self.mock_s3_fs = mock_s3_fs
 
-        self.meta = MockObject(
+        self.meta = MockClientMeta(
             client=MockS3Client(
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
@@ -145,7 +146,7 @@ class MockS3Bucket(object):
         """Create a mock bucket with the given name and client
         """
         self.name = name
-        self.meta = MockObject(client=client)
+        self.meta = MockClientMeta(client=client)
 
         self.objects = MockObject(
             all=self._objects_all,
@@ -184,7 +185,7 @@ class MockS3Object(object):
         self.bucket_name = bucket_name
         self.key = key
 
-        self.meta = MockObject(client=client)
+        self.meta = MockClientMeta(client=client)
 
     def delete(self):
         mock_keys = self._mock_bucket_keys('DeleteObject')

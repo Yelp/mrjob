@@ -31,7 +31,7 @@ from mrjob.py2 import string_types
 from tests.py2 import unittest
 
 from .s3 import add_mock_s3_data
-from .util import MockObject
+from .util import MockClientMeta
 from .util import MockPaginator
 
 
@@ -203,7 +203,7 @@ class MockEMRClient(object):
                 endpoint_url = (
                     'https://%s.elasticmapreduce.amazonaws.com' % region_name)
 
-        self.meta = MockObject(
+        self.meta = MockClientMeta(
             endpoint_url=endpoint_url,
             region_name=region_name)
 

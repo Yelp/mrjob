@@ -15,6 +15,15 @@
 from mrjob.conf import combine_dicts
 
 
+class MockClientMeta(object):
+    """Mock out the *meta* field for various boto3 objects."""
+
+    def __init__(self, client=None, endpoint_url=None, region_name=None):
+        self.client = client
+        self.endpoint_url = endpoint_url
+        self.region_name = region_name
+
+
 # TODO: move this to top level of tests? Or rework as MockClientMeta?
 class MockObject(object):
     """A generic object that you can set any attribute on."""

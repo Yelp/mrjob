@@ -250,7 +250,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
         emr_conn = runner.make_emr_conn()
         cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            emr_conn.simulate_progress(cluster_id)
+            self.simulate_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'TERMINATED')
@@ -281,7 +281,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
                 emr_conn = runner.make_emr_conn()
                 cluster_id = runner.get_cluster_id()
                 for _ in range(10):
-                    emr_conn.simulate_progress(cluster_id)
+                    self.simulate_emr_progress(cluster_id)
 
                 cluster = runner._describe_cluster()
                 self.assertEqual(cluster['Status']['State'],
@@ -290,7 +290,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
             # job should get terminated on cleanup
             cluster_id = runner.get_cluster_id()
             for _ in range(10):
-                emr_conn.simulate_progress(cluster_id)
+                self.simulate_emr_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'TERMINATED_WITH_ERRORS')
@@ -408,7 +408,7 @@ class ExistingClusterTestCase(MockBoto3TestCase):
             emr_conn = runner.make_emr_conn()
             cluster_id = runner.get_cluster_id()
             for _ in range(10):
-                emr_conn.simulate_progress(cluster_id)
+                self.simulate_emr_progress(cluster_id)
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
@@ -417,7 +417,7 @@ class ExistingClusterTestCase(MockBoto3TestCase):
         emr_conn = runner.make_emr_conn()
         cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            emr_conn.simulate_progress(cluster_id)
+            self.simulate_emr_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'WAITING')
@@ -1770,7 +1770,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             self.assertEqual(jf_hash, runner._pool_hash())
             self.assertEqual(jf_name, runner._opts['pool_name'])
 
-            emr_conn.simulate_progress(runner.get_cluster_id())
+            self.simulate_emr_progress(runner.get_cluster_id())
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
 
@@ -2482,7 +2482,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             emr_conn = runner.make_emr_conn()
             cluster_id = runner.get_cluster_id()
             for _ in range(10):
-                emr_conn.simulate_progress(cluster_id)
+                self.simulate_emr_progress(cluster_id)
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
@@ -2491,7 +2491,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         emr_conn = runner.make_emr_conn()
         cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            emr_conn.simulate_progress(cluster_id)
+            self.simulate_emr_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'WAITING')
@@ -2518,7 +2518,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
             emr_conn = runner.make_emr_conn()
             for _ in range(10):
-                emr_conn.simulate_progress(cluster_id)
+                self.simulate_emr_progress(cluster_id)
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
@@ -2527,7 +2527,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         emr_conn = runner.make_emr_conn()
         cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            emr_conn.simulate_progress(cluster_id)
+            self.simulate_emr_progress(cluster_id)
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'WAITING')
@@ -5577,7 +5577,7 @@ class MasterPrivateIPTestCase(MockBoto3TestCase):
 
             self.assertIsNone(runner._master_private_ip())
 
-            self.client('emr').simulate_progress(runner.get_cluster_id())
+            self.simulate_emr_progress(runner.get_cluster_id())
             self.assertIsNotNone(runner._master_private_ip())
 
 
@@ -5610,7 +5610,7 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
 
             cluster = self.mock_emr_clusters[cluster_id]
             while cluster['Status']['State'] in ('STARTING', 'BOOTSTRAPPING'):
-                self.client('emr').simulate_progress(cluster_id)
+                self.simulate_emr_progress(cluster_id)
 
             runner._set_up_ssh_tunnel()
 

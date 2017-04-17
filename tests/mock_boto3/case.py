@@ -107,6 +107,9 @@ class MockBoto3TestCase(SandboxedTestCase):
 
         self.mock_emr_clusters[cluster['Id']] = cluster
 
+    def simulate_emr_progress(self, cluster_id):
+        self.client('emr')._simulate_progress(cluster_id)
+
     def prepare_runner_for_ssh(self, runner, num_slaves=0):
         # TODO: Refactor this abomination of a test harness
 

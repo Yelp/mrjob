@@ -227,8 +227,6 @@ class MockEMRClient(object):
         #
         # TODO: at some point when we implement instance fleets,
         # _InstanceGroups will become optional
-        #
-        # TODO: update simulate_progress() to add MasterPublicDnsName
         cluster = dict(
             _BootstrapActions=[],
             _InstanceGroups=[],
@@ -851,7 +849,7 @@ class MockEMRClient(object):
         if cluster['Status']['State'] == 'TERMINATING':
             # simulate progress, to support
             # _wait_for_logs_on_s3()
-            self.simulate_progress(ClusterId)
+            self._simulate_progress(ClusterId)
 
         # hide _ fields, don't let user mess with mock cluster
         cluster = deepcopy(_strip_hidden(cluster))
@@ -860,7 +858,7 @@ class MockEMRClient(object):
 
     def describe_step(self, ClusterId, StepId):
         # simulate progress, to support _wait_for_steps_to_complete()
-        self.simulate_progress(ClusterId)
+        self._simulate_progress(ClusterId)
 
         steps = self._list_steps('DescribeStep', ClusterId, StepIds=[StepId])
         return dict(Step=steps[0])
@@ -1065,7 +1063,7 @@ class MockEMRClient(object):
         else:
             return None
 
-    def simulate_progress(self, cluster_id, now=None):
+    def _simulate_progress(self, cluster_id, now=None):
         """Simulate progress on the given cluster. This is automatically
         run when we call :py:meth:`describe_step`, and, when the cluster is
         ``TERMINATING``, :py:meth:`describe_cluster`.

@@ -32,8 +32,7 @@ class TerminateToolTestCase(ToolTestCase):
 
         terminate_main()
 
-        emr_client = EMRJobRunner(conf_paths=[]).make_emr_client()
-        emr_client.simulate_progress(cluster_id)
+        self.simulate_emr_progress(cluster_id)
 
-        cluster = emr_client.describe_cluster(ClusterId=cluster_id)['Cluster']
+        cluster = self.mock_emr_clusters[cluster_id]
         self.assertEqual(cluster['Status']['State'], 'TERMINATED')

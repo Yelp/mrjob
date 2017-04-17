@@ -666,9 +666,9 @@ class ClusterToFullSummaryTestCase(TestCase):
         # same as test case above with different job keys
         cluster = dict(
             BootstrapActions=[
-                dict(Args=[]),
+                dict(Args=[], Name='empty'),
                 dict(Args=['pool-0123456789abcdef0123456789abcdef',
-                           'reflecting']),
+                           'reflecting'], Name='master'),
             ],
             Id='j-ISFORJOB',
             Name='mr_exciting.woo.20100605.232850.000000',

@@ -32,6 +32,7 @@ from botocore.exceptions import ParamValidationError
 import mrjob
 import mrjob.emr
 from mrjob.aws import _boto3_now
+from mrjob.aws import _boto3_paginate
 from mrjob.compat import version_gte
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
@@ -896,9 +897,10 @@ class EC2InstanceGroupTestCase(MockBoto3TestCase):
         runner = EMRJobRunner(**opts)
         cluster_id = runner.make_persistent_cluster()
 
-        emr_conn = runner.make_emr_conn()
-        instance_groups = list(
-            _yield_all_instance_groups(emr_conn, cluster_id))
+        emr_client = runner.make_emr_client()
+        instance_groups = _boto3_paginate(
+            'InstanceGroups', emr_client, 'list_instance_groups',
+            ClusterId=cluster_id)
 
         # convert actual instance groups to dicts. (This gets around any
         # assumptions about the order the API returns instance groups in;
@@ -906,23 +908,23 @@ class EC2InstanceGroupTestCase(MockBoto3TestCase):
         role_to_actual = {}
         for ig in instance_groups:
             info = dict(
-                (field, getattr(ig, field, None))
-                for field in ('bidprice', 'instancetype',
-                              'market', 'requestedinstancecount'))
+                (field, ig.get(field))
+                for field in ('BidPrice', 'InstanceType',
+                              'Market', 'RequestedInstanceCount'))
 
-            role_to_actual[ig.instancegrouptype] = info
+            role_to_actual[ig['InstanceGroupType']] = info
 
         # convert expected to dicts
         role_to_expected = {}
         for role, (num, instance_type, bid_price) in expected.items():
-            info = dict(
-                bidprice=(bid_price if bid_price else None),
-                instancetype=instance_type,
-                market=(u'SPOT' if bid_price else u'ON_DEMAND'),
-                requestedinstancecount=str(num),
+            expected = dict(
+                BidPrice=(bid_price if bid_price else None),
+                InstanceType=instance_type,
+                Market=(u'SPOT' if bid_price else u'ON_DEMAND'),
+                RequestedInstanceCount=num,
             )
 
-            role_to_expected[role.upper()] = info
+            role_to_expected[role.upper()] = expected
 
         self.assertEqual(role_to_actual, role_to_expected)
 
@@ -1169,7 +1171,7 @@ class EC2InstanceGroupTestCase(MockBoto3TestCase):
 
     def test_pass_invalid_bid_prices_through_to_emr(self):
         self.assertRaises(
-            boto.exception.EmrResponseError,
+            ClientError,
             self._test_instance_groups,
             {'master_instance_bid_price': 'all the gold in California'})
 

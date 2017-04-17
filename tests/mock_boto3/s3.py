@@ -22,7 +22,6 @@ from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import _boto3_now
 
 from .util import MockClientMeta
-from .util import MockObject
 
 
 class MockS3Client(object):
@@ -124,19 +123,23 @@ class MockS3Resource(object):
             )
         )
 
-        self.buckets = MockObject(
-            all=self._buckets_all,
-        )
+        self.buckets = MockS3Buckets(_client=self.meta.client)
 
     def Bucket(self, name):
         # boto3's Bucket() doesn't care if the bucket exists
         return MockS3Bucket(self.meta.client, name)
 
-    def _buckets_all(self):
+
+class MockS3Buckets(object):
+    """The *buckets* field of a :py:class:`MockS3Resource`"""
+    def __init__(self, _client):
+        self._client = _client
+
+    def all(self):
         # technically, this only lists buckets we own, but our mock fs
         # doesn't simulate buckets owned by others
-        for bucket_name in sorted(self.meta.client.mock_s3_fs):
-            yield self.Bucket(bucket_name)
+        for bucket_name in sorted(self._client.mock_s3_fs):
+            yield MockS3Bucket(self._client, bucket_name)
 
 
 class MockS3Bucket(object):
@@ -148,34 +151,38 @@ class MockS3Bucket(object):
         self.name = name
         self.meta = MockClientMeta(client=client)
 
-        self.objects = MockObject(
-            all=self._objects_all,
-            filter=self._objects_filter)
+        self.objects = MockS3Objects(self)
 
     def Object(self, key):
         return MockS3Object(self.meta.client, self.name, key)
 
-    def _objects_all(self):
-        return self._objects_filter()
-
-    def _objects_filter(self, Prefix=None):
-        self._check_bucket_exists('ListObjects')
-
-        # there are several other keyword arguments that we don't support
-        mock_s3_fs = self.meta.client.mock_s3_fs
-
-        for key in sorted(mock_s3_fs[self.name]['keys']):
-            if Prefix and not key.startswith(Prefix):
-                continue
-
-            key = self.Object(key)
-            # emulate ObjectSummary by pre-filling size, e_tag, etc.
-            key.get()
-            yield key
-
     def _check_bucket_exists(self, operation_name):
         if self.name not in self.meta.client.mock_s3_fs:
             raise _no_such_bucket_error(self.name, operation_name)
+
+
+class MockS3Objects(object):
+    """The *objects* field of a :py:class:`MockS3Bucket`"""
+    def __init__(self, _bucket):
+        self._bucket = _bucket
+
+    def all(self):
+        return self.filter()
+
+    def filter(self, Prefix=None):
+        self._bucket._check_bucket_exists('ListObjects')
+
+        # there are several other keyword arguments that we don't support
+        mock_s3_fs = self._bucket.meta.client.mock_s3_fs
+
+        for key in sorted(mock_s3_fs[self._bucket.name]['keys']):
+            if Prefix and not key.startswith(Prefix):
+                continue
+
+            key = self._bucket.Object(key)
+            # emulate ObjectSummary by pre-filling size, e_tag, etc.
+            key.get()
+            yield key
 
 
 class MockS3Object(object):

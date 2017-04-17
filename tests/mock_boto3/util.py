@@ -24,47 +24,6 @@ class MockClientMeta(object):
         self.region_name = region_name
 
 
-# TODO: move this to top level of tests? Or rework as MockClientMeta?
-class MockObject(object):
-    """A generic object that you can set any attribute on."""
-
-    def __init__(self, **kwargs):
-        """Intialize with the given attributes, ignoring fields set to None."""
-        for key, value in kwargs.items():
-            if value is not None:
-                setattr(self, key, value)
-
-    def __setattr__(self, key, value):
-        if isinstance(value, bytes):
-            value = value.decode('utf_8')
-
-        self.__dict__[key] = value
-
-    def __eq__(self, other):
-        if not isinstance(other, self.__class__):
-            return False
-
-        if len(self.__dict__) != len(other.__dict__):
-            return False
-
-        for k, v in self.__dict__.items():
-            if not k in other.__dict__:
-                return False
-            else:
-                if v != other.__dict__[k]:
-                    return False
-
-        return True
-
-    # useful for hand-debugging tests
-    def __repr__(self):
-        return('%s.%s(%s)' % (
-            self.__class__.__module__,
-            self.__class__.__name__,
-            ', '.join('%s=%r' % (k, v)
-                      for k, v in sorted(self.__dict__.items()))))
-
-
 class MockPaginator(object):
     """Mock botocore paginators.
 

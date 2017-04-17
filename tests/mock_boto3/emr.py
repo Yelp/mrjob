@@ -112,6 +112,9 @@ DEFAULT_MAX_STEPS_RETURNED = 50
 DUMMY_APPLICATION_VERSION = '0.0.0'
 
 
+# TODO: raise InvalidRequest: Missing required header for this
+# request: x-amz-content-sha256 when region name is clearly invalid
+
 class MockEMRClient(object):
     """Mock out boto3 EMR clients. This actually handles a small
     state machine that simulates EMR clusters."""
@@ -193,12 +196,12 @@ class MockEMRClient(object):
 
         region_name = region_name or _DEFAULT_AWS_REGION
         if not endpoint_url:
-            # not entirely sure why boto3 1.4.4 uses a different format for
-            # us-east-1, but there it is. according to AWS docs, the canonical
-            # host name is elasticmapreduce.<region>.amazonaws.com.
-            if endpoint_url == _DEFAULT_AWS_REGION:
+            if region_name == _DEFAULT_AWS_REGION:
+                # not entirely sure why boto3 1.4.4 uses a different format for
+                # us-east-1, but there it is. according to AWS docs, the
+                # host name is elasticmapreduce.<region>.amazonaws.com.
                 endpoint_url = (
-                    'https://elasticmapreduce.us-east-1.amazonaws.com')
+                    'https://elasticmapreduce.%s.amazonaws.com' % region_name)
             else:
                 endpoint_url = (
                     'https://%s.elasticmapreduce.amazonaws.com' % region_name)

@@ -1231,89 +1231,58 @@ def make_input_uri_line(input_uri):
             " Opening '%s' for reading\n" % input_uri).encode('utf_8')
 
 
-class TestEMREndpoints(MockBoto3TestCase):
+class EMREndpointTestCase(MockBoto3TestCase):
+
+    # back when we used boto 2, mrjob used to figure out endpoints itself
+    # Now we leave that to boto, so this is more a benchmark that makes sure
+    # mock_boto3 matches boto3 1.4.4
 
     def test_default_region(self):
         runner = EMRJobRunner(conf_paths=[])
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.us-west-2.amazonaws.com')
         self.assertEqual(runner._opts['region'], 'us-west-2')
+        self.assertEqual(runner.make_emr_client().meta.endpoint_url,
+                         'https://us-west-2.elasticmapreduce.amazonaws.com')
 
     def test_none_region(self):
         # blank region should be treated the same as no region
         runner = EMRJobRunner(conf_paths=[], region=None)
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.us-west-2.amazonaws.com')
         self.assertEqual(runner._opts['region'], 'us-west-2')
+        self.assertEqual(runner.make_emr_client().meta.endpoint_url,
+                         'https://us-west-2.elasticmapreduce.amazonaws.com')
 
     def test_blank_region(self):
         # blank region should be treated the same as no region
         runner = EMRJobRunner(conf_paths=[], region='')
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.us-west-2.amazonaws.com')
         self.assertEqual(runner._opts['region'], 'us-west-2')
-
-    def test_eu(self):
-        runner = EMRJobRunner(conf_paths=[], region='EU')
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.eu-west-1.amazonaws.com')
-
-    def test_eu_case_insensitive(self):
-        runner = EMRJobRunner(conf_paths=[], region='eu')
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.eu-west-1.amazonaws.com')
+        self.assertEqual(runner.make_emr_client().meta.endpoint_url,
+                         'https://us-west-2.elasticmapreduce.amazonaws.com')
 
     def test_us_east_1(self):
         runner = EMRJobRunner(conf_paths=[], region='us-east-1')
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.us-east-1.amazonaws.com')
+        self.assertEqual(runner._opts['region'], 'us-east-1')
+        # boto3 has a special case for us-east-1 for whatever reason
+        self.assertEqual(runner.make_emr_client().meta.endpoint_url,
+                         'https://elasticmapreduce.us-east-1.amazonaws.com')
 
     def test_us_west_1(self):
         runner = EMRJobRunner(conf_paths=[], region='us-west-1')
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.us-west-1.amazonaws.com')
-
-    def test_us_west_1_case_insensitive(self):
-        runner = EMRJobRunner(conf_paths=[], region='US-West-1')
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.us-west-1.amazonaws.com')
+        self.assertEqual(runner._opts['region'], 'us-west-1')
+        self.assertEqual(runner.make_emr_client().meta.endpoint_url,
+                         'https://us-west-1.elasticmapreduce.amazonaws.com')
 
     def test_ap_southeast_1(self):
         runner = EMRJobRunner(conf_paths=[], region='ap-southeast-1')
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.ap-southeast-1.amazonaws.com')
+        self.assertEqual(runner._opts['region'], 'ap-southeast-1')
+        self.assertEqual(
+            runner.make_emr_client().meta.endpoint_url,
+            'https://ap-southeast-1.elasticmapreduce.amazonaws.com')
 
-    def test_previously_unknown_region(self):
-        runner = EMRJobRunner(conf_paths=[], region='lolcatnia-1')
-        self.assertEqual(runner.make_emr_conn().host,
-                         'elasticmapreduce.lolcatnia-1.amazonaws.com')
-
-    def test_explicit_endpoints(self):
-        runner = EMRJobRunner(conf_paths=[], region='EU',
-                              s3_endpoint='s3-proxy', emr_endpoint='emr-proxy')
-        self.assertEqual(runner.make_emr_conn().host, 'emr-proxy')
-
-    def test_ssl_fallback_host(self):
-        runner = EMRJobRunner(conf_paths=[], region='us-west-1')
-
-        with patch.object(MockEmrConnection, 'STRICT_SSL', True):
-            emr_conn = runner.make_emr_conn()
-            self.assertEqual(emr_conn.host,
-                             'elasticmapreduce.us-west-1.amazonaws.com')
-            # this should still work
-            self.assertEqual(list(_yield_all_clusters(emr_conn)), [])
-            # but it's only because we've switched to the alternate hostname
-            self.assertEqual(emr_conn.host,
-                             'us-west-1.elasticmapreduce.amazonaws.com')
-
-        # without SSL issues, we should stay on the same endpoint
-        emr_conn = runner.make_emr_conn()
-        self.assertEqual(emr_conn.host,
-                         'elasticmapreduce.us-west-1.amazonaws.com')
-
-        self.assertEqual(list(_yield_all_clusters(emr_conn)), [])
-        self.assertEqual(emr_conn.host,
-                         'elasticmapreduce.us-west-1.amazonaws.com')
+    def test_explicit_endpoint(self):
+        runner = EMRJobRunner(conf_paths=[], region='eu-west-2',
+                              emr_endpoint='emr-proxy')
+        self.assertEqual(runner._opts['region'], 'eu-west-2')
+        self.assertEqual(runner.make_emr_client().meta.endpoint_url,
+                         'https://emr-proxy')
 
 
 class TestSSHLs(MockBoto3TestCase):

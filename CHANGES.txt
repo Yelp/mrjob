@@ -16,6 +16,7 @@ v0.6.0, 2017-04-?? -- ???
      * s3_endpoint_for_region()
      * s3_location_constraint_for_region()
    * 'EU' alias for region 'us-west-1' no longer works
+   * region names are case-sensitive; we no longer convert to lowercase
  * removed deprecated INPUT, OUTPUT attributes from JarStep
  * removed deprecated filesystem methods:
    * path_exists()

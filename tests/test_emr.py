@@ -778,8 +778,10 @@ class EnableDebuggingTestCase(MockBoto3TestCase):
         with self.make_runner('--enable-emr-debugging') as runner:
             runner.run()
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            emr_client = runner.make_emr_client()
+            steps = list(reversed(list(_boto3_paginate(
+                'Steps', emr_client, 'list_steps',
+                ClusterId=runner.get_cluster_id()))))
 
             self.assertEqual(steps[0]['Name'], 'Setup Hadoop Debugging')
 
@@ -4962,7 +4964,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertRaises(boto.exception.EmrResponseError, runner._launch)
+            self.assertRaises(ClientError, runner._launch)
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(

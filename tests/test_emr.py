@@ -88,7 +88,6 @@ from tests.test_local import _bash_wrap
 # detect and skip boto 2 tests
 MockEmrConnection = Boto2TestSkipper()
 _decode_configurations_from_api = Boto2TestSkipper()
-_yield_all_bootstrap_actions = Boto2TestSkipper()
 _yield_all_clusters = Boto2TestSkipper()
 _yield_all_instance_groups = Boto2TestSkipper()
 boto = Boto2TestSkipper()
@@ -145,8 +144,15 @@ HADOOP_ENV_EMR_CONFIGURATION_VARIANT = dict(
 )
 
 
+def _list_all_bootstrap_actions(runner):
+    """Get bootstrap action for the runner's cluster as a list."""
+    return list(_boto3_paginate(
+        'BootstrapActions', runner.make_emr_client(), 'list_bootstrap_actions',
+        ClusterId=runner.get_cluster_id()))
+
+
 def _list_all_steps(runner):
-    """Get the list of steps for the given cluster, in chronological order."""
+    """Get steps for the runner's cluster as a list (in forward order)"""
     return list(reversed(list(_boto3_paginate(
         'Steps', runner.make_emr_client(), 'list_steps',
         ClusterId=runner.get_cluster_id()))))
@@ -1496,31 +1502,30 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         cluster_id = runner.make_persistent_cluster()
 
-        emr_conn = runner.make_emr_conn()
-        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        actions = _list_all_bootstrap_actions(runner)
 
         self.assertEqual(len(actions), 3)
 
         self.assertEqual(
-            actions[0].scriptpath,
+            actions[0]['ScriptPath'],
             's3://elasticmapreduce/bootstrap-actions/configure-hadoop')
         self.assertEqual(
-            actions[0].args[0].value,
+            actions[0]['Args'][0],
             '-m,mapred.tasktracker.map.tasks.maximum=1')
         self.assertEqual(actions[0]['Name'], 'action 0')
 
-        self.assertEqual(actions[1].scriptpath, 's3://foo/bar')
-        self.assertEqual(actions[1].args, [])
+        self.assertEqual(actions[1]['ScriptPath'], 's3://foo/bar')
+        self.assertEqual(actions[1]['Args'], [])
         self.assertEqual(actions[1]['Name'], 'action 1')
 
         # check for master bootstrap script
-        self.assertTrue(actions[2].scriptpath.startswith('s3://mrjob-'))
-        self.assertTrue(actions[2].scriptpath.endswith('b.py'))
-        self.assertEqual(actions[2].args, [])
+        self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
+        self.assertTrue(actions[2]['ScriptPath'].endswith('b.py'))
+        self.assertEqual(actions[2]['Args'], [])
         self.assertEqual(actions[2]['Name'], 'master')
 
         # make sure master bootstrap script is on S3
-        self.assertTrue(runner.fs.exists(actions[2].scriptpath))
+        self.assertTrue(runner.fs.exists(actions[2]['ScriptPath']))
 
     def test_bootstrap_mrjob_uses_python_bin(self):
         # use all the bootstrap options
@@ -1550,25 +1555,24 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         cluster_id = runner.make_persistent_cluster()
 
-        emr_conn = runner.make_emr_conn()
-        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        actions = _list_all_bootstrap_actions(runner)
 
         self.assertEqual(len(actions), 2)
 
-        self.assertTrue(actions[0].scriptpath.startswith('s3://mrjob-'))
-        self.assertTrue(actions[0].scriptpath.endswith('/apt-install.sh'))
+        self.assertTrue(actions[0]['ScriptPath'].startswith('s3://mrjob-'))
+        self.assertTrue(actions[0]['ScriptPath'].endswith('/apt-install.sh'))
         self.assertEqual(actions[0]['Name'], 'action 0')
-        self.assertEqual(actions[0].args[0].value, 'python-scipy')
-        self.assertEqual(actions[0].args[1].value, 'mysql-server')
+        self.assertEqual(actions[0]['Args'][0], 'python-scipy')
+        self.assertEqual(actions[0]['Args'][1], 'mysql-server')
 
         # check for master bootstrap script
-        self.assertTrue(actions[1].scriptpath.startswith('s3://mrjob-'))
-        self.assertTrue(actions[1].scriptpath.endswith('b.py'))
-        self.assertEqual(actions[1].args, [])
+        self.assertTrue(actions[1]['ScriptPath'].startswith('s3://mrjob-'))
+        self.assertTrue(actions[1]['ScriptPath'].endswith('b.py'))
+        self.assertEqual(actions[1]['Args'], [])
         self.assertEqual(actions[1]['Name'], 'master')
 
         # make sure master bootstrap script is on S3
-        self.assertTrue(runner.fs.exists(actions[1].scriptpath))
+        self.assertTrue(runner.fs.exists(actions[1]['ScriptPath']))
 
 
 class MasterNodeSetupScriptTestCase(MockBoto3TestCase):
@@ -1740,10 +1744,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             runner.run()
 
             # Make sure that the runner made a pooling-enabled cluster
-            emr_client = runner.make_emr_client()
-            bootstrap_actions = list(_boto3_paginate(
-                'BootstrapActions', emr_client, 'list_bootstrap_actions',
-                ClusterId=runner.get_cluster_id()))
+            bootstrap_actions = _list_all_bootstrap_actions(runner)
 
             jf_hash, jf_name = _pool_hash_and_name(bootstrap_actions)
             self.assertEqual(jf_hash, runner._pool_hash())
@@ -2893,23 +2894,17 @@ class S3LockTestCase(MockBoto3TestCase):
 class MaxHoursIdleTestCase(MockBoto3TestCase):
 
     def assertRanIdleTimeoutScriptWith(self, runner, args):
-        emr_conn = runner.make_emr_conn()
-        cluster_id = runner.get_cluster_id()
-
-        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        actions = _list_all_bootstrap_actions(runner)
         action = actions[-1]
 
         self.assertEqual(action['Name'], 'idle timeout')
         self.assertEqual(
-            action.scriptpath,
+            action['ScriptPath'],
             runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
-        self.assertEqual([arg.value for arg in action.args], args)
+        self.assertEqual(action['Args'], args)
 
     def assertDidNotUseIdleTimeoutScript(self, runner):
-        emr_conn = runner.make_emr_conn()
-        cluster_id = runner.get_cluster_id()
-
-        actions = list(_yield_all_bootstrap_actions(emr_conn, cluster_id))
+        actions = _list_all_bootstrap_actions(runner)
         action_names = [a['Name'] for a in actions]
 
         self.assertNotIn('idle timeout', action_names)
@@ -3508,7 +3503,7 @@ class JarStepTestCase(MockBoto3TestCase):
             steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
-            self.assertEqual(steps[0]['Config'].jar, jar_uri)
+            self.assertEqual(steps[0]['Config']['Jar'], jar_uri)
 
     def test_with_libjar(self):
         fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
@@ -3539,8 +3534,8 @@ class JarStepTestCase(MockBoto3TestCase):
             self.assertEqual(len(steps), 2)  # adds master node setup
 
             jar_step = steps[1]
-            self.assertEqual(jar_step['Config'].jar, jar_uri)
-            step_args = [a.value for a in jar_step['Config'].args]
+            self.assertEqual(jar_step['Config']['Jar'], jar_uri)
+            step_args = jar_step['Config']['Args']
 
             working_dir = runner._master_node_setup_working_dir()
 
@@ -3560,7 +3555,7 @@ class JarStepTestCase(MockBoto3TestCase):
             steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
-            self.assertEqual(steps[0]['Config'].jar, JAR_URI)
+            self.assertEqual(steps[0]['Config']['Jar'], JAR_URI)
 
     def test_jar_inside_emr(self):
         job = MRJustAJar(['-r', 'emr', '--jar',
@@ -3573,7 +3568,7 @@ class JarStepTestCase(MockBoto3TestCase):
             steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
-            self.assertEqual(steps[0]['Config'].jar,
+            self.assertEqual(steps[0]['Config']['Jar'],
                              '/home/hadoop/hadoop-examples.jar')
 
     def test_input_output_interpolation(self):
@@ -3597,10 +3592,10 @@ class JarStepTestCase(MockBoto3TestCase):
             jar_step, streaming_step = steps
 
             # on EMR, the jar gets uploaded
-            self.assertEqual(jar_step['Config'].jar,
+            self.assertEqual(jar_step['Config']['Jar'],
                              runner._upload_mgr.uri(fake_jar))
 
-            jar_args = [a.value for a in jar_step['Config'].args]
+            jar_args = jar_step['Config']['Args']
             self.assertEqual(len(jar_args), 3)
             self.assertEqual(jar_args[0], 'stuff')
 
@@ -3612,7 +3607,7 @@ class JarStepTestCase(MockBoto3TestCase):
             # check output of jar is input of next step
             jar_output_arg = jar_args[2]
 
-            streaming_args = [a.value for a in streaming_step['Config'].args]
+            streaming_args = streaming_step['Config']['Args']
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
@@ -3772,7 +3767,7 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
-                steps[0]['Config'].jar, runner._script_runner_jar_uri())
+                steps[0]['Config']['Jar'], runner._script_runner_jar_uri())
             self.assertEqual(
                 steps[0]['Config']['Args'][0],
                 _3_X_SPARK_SUBMIT)
@@ -3790,7 +3785,7 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
-                steps[0]['Config'].jar, _4_X_COMMAND_RUNNER_JAR)
+                steps[0]['Config']['Jar'], _4_X_COMMAND_RUNNER_JAR)
             self.assertEqual(
                 steps[0]['Config']['Args'][0], 'spark-submit')
 

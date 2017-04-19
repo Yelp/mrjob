@@ -35,19 +35,6 @@ from .util import MockClientMeta
 from .util import MockPaginator
 
 
-# utilities for skipping unported tests
-class Boto2TestSkipper(object):
-    def __call__(self, *args, **kwargs):
-        from os import environ
-        if environ.get('NO_SKIP'):
-            raise Exception('old boto 2 test')
-        else:
-            raise unittest.SkipTest('old boto 2 test')
-
-    def __getattr__(self, name):
-        self()
-
-
 # what partial versions and "latest" map to, as of 2015-07-15
 AMI_VERSION_ALIASES = {
     None: '1.0.0',  # API does this for old accounts

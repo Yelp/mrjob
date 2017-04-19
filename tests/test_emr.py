@@ -59,7 +59,6 @@ import tests.mock_boto3
 import tests.mock_boto3.emr
 import tests.mock_boto3.s3
 from tests.mock_boto3 import MockBoto3TestCase
-from tests.mock_boto3.emr import Boto2TestSkipper
 from tests.mock_boto3.emr import MockEMRClient
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
@@ -84,9 +83,6 @@ from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
 from tests.test_local import _bash_wrap
-
-# detect and skip boto 2 tests
-MockEmrConnection = Boto2TestSkipper()
 
 # used to match command lines
 if PY2:
@@ -3124,7 +3120,6 @@ class JobWaitTestCase(MockBoto3TestCase):
                 cluster_id = self.future_mock_cluster_ids.pop(0)
                 self.mock_cluster_ids.append(cluster_id)
 
-        self.start(patch.object(EMRJobRunner, 'make_emr_conn'))
         self.start(patch.object(EMRJobRunner, '_usable_clusters',
                                 side_effect=side_effect_usable_clusters))
         self.start(patch.object(EMRJobRunner, '_lock_uri',

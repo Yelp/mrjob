@@ -87,10 +87,6 @@ from tests.test_local import _bash_wrap
 
 # detect and skip boto 2 tests
 MockEmrConnection = Boto2TestSkipper()
-_yield_all_clusters = Boto2TestSkipper()
-_yield_all_instance_groups = Boto2TestSkipper()
-boto = Boto2TestSkipper()
-
 
 # used to match command lines
 if PY2:
@@ -1246,7 +1242,7 @@ def make_input_uri_line(input_uri):
 class EMREndpointTestCase(MockBoto3TestCase):
 
     # back when we used boto 2, mrjob used to figure out endpoints itself
-    # Now we leave that to boto, so this is more a benchmark that makes sure
+    # Now we leave that to boto3, so this is more a benchmark that makes sure
     # mock_boto3 matches boto3 1.4.4
 
     def test_default_region(self):

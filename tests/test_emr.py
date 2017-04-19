@@ -351,13 +351,19 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 class ExistingClusterTestCase(MockBoto3TestCase):
 
     def test_attach_to_existing_cluster(self):
-        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        # set log_uri to None, so that when we describe the cluster, it
-        # won't have the loguri attribute, to test Issue #112
-        cluster_id = emr_conn.run_jobflow(
-            name='Development Cluster', log_uri=None,
-            keep_alive=True, job_flow_role='fake-instance-profile',
-            service_role='fake-service-role')
+        emr_client = EMRJobRunner(conf_paths=[]).make_emr_client()
+        # create cluster without LogUri, to test Issue #112
+        cluster_id = emr_client.run_job_flow(
+            Instances=dict(
+                InstanceCount=1,
+                KeepJobFlowAliveWhenNoSteps=True,
+                MasterInstanceType='m1.medium',
+            ),
+            JobFlowRole='fake-instance-profile',
+            Name='Development Cluster',
+            ReleaseLabel='emr-5.0.0',
+            ServiceRole='fake-service-role',
+        )['JobFlowId']
 
         stdin = BytesIO(b'foo\nbar\n')
         self.mock_emr_output = {(cluster_id, 1): [
@@ -383,13 +389,19 @@ class ExistingClusterTestCase(MockBoto3TestCase):
                          [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_take_down_cluster_on_failure(self):
-        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        # set log_uri to None, so that when we describe the cluster, it
-        # won't have the loguri attribute, to test Issue #112
-        cluster_id = emr_conn.run_jobflow(
-            name='Development Cluster', log_uri=None,
-            keep_alive=True, job_flow_role='fake-instance-profile',
-            service_role='fake-service-role')
+        emr_client = EMRJobRunner(conf_paths=[]).make_emr_client()
+        # create cluster without LogUri, to test Issue #112
+        cluster_id = emr_client.run_job_flow(
+            Instances=dict(
+                InstanceCount=1,
+                KeepJobFlowAliveWhenNoSteps=True,
+                MasterInstanceType='m1.medium',
+            ),
+            JobFlowRole='fake-instance-profile',
+            Name='Development Cluster',
+            ReleaseLabel='emr-5.0.0',
+            ServiceRole='fake-service-role',
+        )['JobFlowId']
 
         mr_job = MRTwoStepJob(['-r', 'emr', '-v',
                                '--cluster-id', cluster_id])
@@ -404,19 +416,15 @@ class ExistingClusterTestCase(MockBoto3TestCase):
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(StepFailedException, runner.run)
 
-            emr_conn = runner.make_emr_conn()
-            cluster_id = runner.get_cluster_id()
             for _ in range(10):
-                self.simulate_emr_progress(cluster_id)
+                self.simulate_emr_progress(runner.get_cluster_id())
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
 
         # job shouldn't get terminated by cleanup
-        emr_conn = runner.make_emr_conn()
-        cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            self.simulate_emr_progress(cluster_id)
+            self.simulate_emr_progress(runner.get_cluster_id())
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'WAITING')

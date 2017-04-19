@@ -3201,7 +3201,6 @@ class PoolWaitMinutesOptionTestCase(MockBoto3TestCase):
         self.assertEqual(runner._opts['pool_wait_minutes'], 12)
 
 
-@unittest.skip('rework to test _build_step()')
 class BuildStreamingStepTestCase(MockBoto3TestCase):
 
     def setUp(self):
@@ -3225,30 +3224,43 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
 
         self.start(patch(
             'mrjob.emr.EMRJobRunner._get_streaming_jar_and_step_arg_prefix',
-            return_value=('streaming.jar', [])))
+            return_value=('mockstreaming.jar', [])))
 
-    def _get_streaming_step_args(self, step, **kwargs):
+    def _runner_with_steps(self, steps, **kwargs):
+        if isinstance(steps, dict):
+            raise TypeError
+
         runner = EMRJobRunner(
             mr_job_script='my_job.py',
             conf_paths=[],
             stdin=BytesIO(),
             **kwargs)
 
-        runner['_Steps'] = [step]
+        runner._steps = steps
 
         runner._add_job_files_for_upload()
         runner._add_master_node_setup_files_for_upload()
 
-        return runner._build_step(0)
+        return runner
 
     def test_basic_mapper(self):
-        ss = self._get_streaming_step(
-            dict(type='streaming', mapper=dict(type='script')))
+        runner = self._runner_with_steps(
+            [dict(type='streaming', mapper=dict(type='script'))])
 
-        self.assertEqual(ss['mapper'],
-                         PYTHON_BIN + ' my_job.py --step-num=0 --mapper')
-        self.assertEqual(ss['combiner'], None)
-        self.assertEqual(ss['reducer'], None)
+        step = runner._build_step(0)
+
+        self.assertEqual(
+            step['HadoopJarStep']['Jar'], 'mockstreaming.jar')
+        self.assertEqual(
+            step['HadoopJarStep']['Args'], [
+                '-files',
+                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '-D',
+                'mapreduce.job.reduces=0',
+                '-input', 'input', '-output', 'output',
+                '-mapper',
+                '%s my_job.py --step-num=0 --mapper' % PYTHON_BIN,
+            ])
 
     def test_basic_reducer(self):
         ss = self._get_streaming_step(

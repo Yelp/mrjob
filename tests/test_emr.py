@@ -3571,6 +3571,9 @@ class JarStepTestCase(MockBoto3TestCase):
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0]['Config']['Jar'], JAR_URI)
 
+            # for comparison with test_main_class()
+            self.assertNotIn('MainClass', steps[0]['Config'])
+
     def test_jar_inside_emr(self):
         job = MRJustAJar(['-r', 'emr', '--jar',
                           'file:///home/hadoop/hadoop-examples.jar'])
@@ -3625,6 +3628,24 @@ class JarStepTestCase(MockBoto3TestCase):
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
+
+    def test_main_class(self):
+        # don't forget to make sure main_class is respected. tests #1572
+        self.add_mock_s3_data({'dubliners': {'whiskeyinthe.jar': b''}})
+        JAR_URI = 's3://dubliners/whiskeyinthe.jar'
+
+        job = MRJustAJar(['-r', 'emr', '--jar', JAR_URI,
+                          '--main-class', 'ThingAnalyzer'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            steps = _list_all_steps(runner)
+
+            self.assertEqual(len(steps), 1)
+            self.assertEqual(steps[0]['Config']['Jar'], JAR_URI)
+            self.assertEqual(steps[0]['Config']['MainClass'], 'ThingAnalyzer')
 
 
 class SparkStepTestCase(MockBoto3TestCase):

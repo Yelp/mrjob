@@ -24,9 +24,11 @@ class MRJustAJar(MRJob):
         super(MRJustAJar, self).configure_options()
 
         self.add_passthrough_option('--jar')
+        self.add_passthrough_option('--main-class', default=None)
 
     def steps(self):
-        return [JarStep(jar=self.options.jar)]
+        return [JarStep(jar=self.options.jar,
+                        main_class=self.options.main_class)]
 
 
 if __name__ == '__main__':

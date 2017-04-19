@@ -3249,33 +3249,36 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
 
         step = runner._build_step(0)
 
-        self.assertEqual(
-            step['HadoopJarStep']['Jar'], 'mockstreaming.jar')
+        self.assertEqual(step['HadoopJarStep']['Jar'], 'mockstreaming.jar')
+
         self.assertEqual(
             step['HadoopJarStep']['Args'], [
                 '-files',
                 '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
-                '-D',
-                'mapreduce.job.reduces=0',
+                '-D', 'mapreduce.job.reduces=0',
                 '-input', 'input', '-output', 'output',
                 '-mapper',
                 '%s my_job.py --step-num=0 --mapper' % PYTHON_BIN,
             ])
 
     def test_basic_reducer(self):
-        ss = self._get_streaming_step(
-            dict(type='streaming', reducer=dict(type='script')))
+        runner = self._runner_with_steps(
+            [dict(type='streaming', reducer=dict(type='script'))])
 
-        self.assertEqual(ss['mapper'], 'cat')
-        self.assertEqual(ss['combiner'], None)
-        self.assertEqual(ss['reducer'],
-                         PYTHON_BIN + ' my_job.py --step-num=0 --reducer')
+        step = runner._build_step(0)
 
-        self.assertEqual(ss['jar'], 'streaming.jar')
-        self.assertEqual(ss['step_args'][:1], ['-files'])  # no prefix
+        self.assertEqual(
+            step['HadoopJarStep']['Args'], [
+                '-files',
+                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '-input', 'input', '-output', 'output',
+                '-mapper', 'cat',
+                '-reducer',
+                '%s my_job.py --step-num=0 --reducer' % PYTHON_BIN,
+            ])
 
     def test_pre_filters(self):
-        ss = self._get_streaming_step(
+        runner = self._runner_with_steps([
             dict(type='streaming',
                  mapper=dict(
                      type='script',
@@ -3285,66 +3288,72 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
                      pre_filter='grep nothing'),
                  reducer=dict(
                      type='script',
-                     pre_filter='grep something')))
+                     pre_filter='grep something'))])
 
-        self.assertEqual(ss['mapper'],
-                         "/bin/sh -ex -c 'grep anything | " +
-                         PYTHON_BIN +
-                         " my_job.py --step-num=0 --mapper'")
-        self.assertEqual(ss['combiner'],
-                         "/bin/sh -ex -c 'grep nothing | " +
-                         PYTHON_BIN +
-                         " my_job.py --step-num=0 --combiner'")
-        self.assertEqual(ss['reducer'],
-                         "/bin/sh -ex -c 'grep something | " +
-                         PYTHON_BIN +
-                         " my_job.py --step-num=0 --reducer'")
+        step = runner._build_step(0)
+
+        self.assertEqual(
+            step['HadoopJarStep']['Args'], [
+                '-files',
+                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '-input', 'input', '-output', 'output',
+                '-mapper',
+                "/bin/sh -ex -c 'grep anything | %s"
+                " my_job.py --step-num=0 --mapper'" % PYTHON_BIN,
+                '-combiner',
+                "/bin/sh -ex -c 'grep nothing | %s"
+                " my_job.py --step-num=0 --combiner'" % PYTHON_BIN,
+                '-reducer',
+                "/bin/sh -ex -c 'grep something | %s"
+                " my_job.py --step-num=0 --reducer'" % PYTHON_BIN,
+            ])
 
     def test_pre_filter_escaping(self):
-        ss = self._get_streaming_step(
-            dict(type='streaming',
-                 mapper=dict(
-                     type='script',
-                     pre_filter=_bash_wrap("grep 'anything'"))))
+        runner = self._runner_with_steps(
+            [dict(type='streaming',
+                  mapper=dict(
+                      type='script',
+                      pre_filter=_bash_wrap("grep 'anything'")))])
+
+        step = runner._build_step(0)
 
         self.assertEqual(
-            ss['mapper'],
-            "/bin/sh -ex -c 'bash -c '\\''grep"
-            " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | " +
-            PYTHON_BIN +
-            " my_job.py --step-num=0 --mapper'")
-        self.assertEqual(
-            ss['combiner'], None)
-        self.assertEqual(
-            ss['reducer'], None)
-
-    def test_default_streaming_jar_and_step_arg_prefix(self):
-        ss = self._get_streaming_step(
-            dict(type='streaming', mapper=dict(type='script')))
-
-        self.assertEqual(ss['jar'], 'streaming.jar')
-
-        # step_args should be -files script_uri#script_name
-        self.assertEqual(len(ss['step_args']), 2)
-        self.assertEqual(ss['step_args'][0], '-files')
-        self.assertTrue(ss['step_args'][1].endswith('#my_job.py'))
+            step['HadoopJarStep']['Args'], [
+                '-files',
+                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '-D', 'mapreduce.job.reduces=0',
+                '-input', 'input', '-output', 'output',
+                '-mapper',
+                "/bin/sh -ex -c 'bash -c '\\''grep"
+                " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | %s"
+                " my_job.py --step-num=0 --mapper'" % PYTHON_BIN,
+            ])
 
     def test_custom_streaming_jar_and_step_arg_prefix(self):
-        # test integration with custom jar options. See
+        # this tests integration with custom jar options. See
         # StreamingJarAndStepArgPrefixTestCase below.
+        #
+        # compare to test_basic_mapper()
         EMRJobRunner._get_streaming_jar_and_step_arg_prefix.return_value = (
             ('launch.jar', ['streaming', '-v']))
 
-        ss = self._get_streaming_step(
-            dict(type='streaming', mapper=dict(type='script')))
+        runner = self._runner_with_steps(
+            [dict(type='streaming', mapper=dict(type='script'))])
 
-        self.assertEqual(ss['jar'], 'launch.jar')
+        step = runner._build_step(0)
 
-        # step_args should be -files script_uri#script_name
-        self.assertEqual(len(ss['step_args']), 4)
-        self.assertEqual(ss['step_args'][:2], ['streaming', '-v'])
-        self.assertEqual(ss['step_args'][2], '-files')
-        self.assertTrue(ss['step_args'][3].endswith('#my_job.py'))
+        self.assertEqual(step['HadoopJarStep']['Jar'], 'launch.jar')
+
+        self.assertEqual(
+            step['HadoopJarStep']['Args'], [
+                'streaming', '-v',
+                '-files',
+                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '-D', 'mapreduce.job.reduces=0',
+                '-input', 'input', '-output', 'output',
+                '-mapper',
+                '%s my_job.py --step-num=0 --mapper' % PYTHON_BIN,
+            ])
 
     def test_hadoop_args_for_step(self):
         self.start(patch(
@@ -3352,19 +3361,22 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
             return_value=['-libjars', '/home/hadoop/dora.jar',
                           '-D', 'foo=bar']))
 
-        ss = self._get_streaming_step(
-            dict(type='streaming', mapper=dict(type='script')))
+        runner = self._runner_with_steps(
+            [dict(type='streaming', mapper=dict(type='script'))])
 
-        self.assertEqual(ss['jar'], 'streaming.jar')
+        step = runner._build_step(0)
 
-        # step_args should be -files script_uri#script_name
-        self.assertEqual(len(ss['step_args']), 6)
-        self.assertEqual(ss['step_args'][0], '-files')
-        self.assertTrue(ss['step_args'][1].endswith('#my_job.py'))
         self.assertEqual(
-            ss['step_args'][2:],
-            ['-libjars', '/home/hadoop/dora.jar',
-             '-D', 'foo=bar'])
+            step['HadoopJarStep']['Args'], [
+                '-files',
+                '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
+                '-D', 'mapreduce.job.reduces=0',
+                '-libjars', '/home/hadoop/dora.jar',
+                '-D', 'foo=bar',
+                '-input', 'input', '-output', 'output',
+                '-mapper',
+                '%s my_job.py --step-num=0 --mapper' % PYTHON_BIN,
+            ])
 
 
 class LibjarPathsTestCase(MockBoto3TestCase):

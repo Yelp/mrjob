@@ -80,8 +80,10 @@ class PatcherTestCase(TestCase):
 
         mock_turtle = self.start(patch('foo.bar.turtle'))
         """
+        mock = patcher.start()
+        # don't addCleanup() if patcher fails
         self.addCleanup(patcher.stop)
-        return patcher.start()
+        return mock
 
 
 class EmptyMrjobConfTestCase(PatcherTestCase):

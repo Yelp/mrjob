@@ -22,7 +22,6 @@ import time
 from io import BytesIO
 from optparse import Option
 from optparse import OptionError
-from optparse import OptionGroup
 from optparse import OptionParser
 
 from mrjob.conf import combine_dicts
@@ -167,7 +166,7 @@ class MRJobLauncher(object):
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
         if self.options.runner == 'emr':
-            # avoid requiring dependencies (such as boto) for other runners
+            # avoid requiring dependencies (such as boto3) for other runners
             from mrjob.emr import EMRJobRunner
             return EMRJobRunner(**self.emr_job_runner_kwargs())
 
@@ -198,8 +197,8 @@ class MRJobLauncher(object):
                              ``INFO``)
         :param bool stream: Stream to log to (default is ``sys.stderr``)
 
-        This will also set up a null log handler for boto, so we don't get
-        warnings if boto tries to log about throttling and whatnot.
+        This will also set up a null log handler for boto3, so we don't get
+        warnings if boto3 tries to log about throttling and whatnot.
         """
         if quiet:
             log_to_null(name='mrjob')
@@ -208,7 +207,7 @@ class MRJobLauncher(object):
             log_to_stream(name='mrjob', debug=verbose, stream=stream)
             log_to_stream(name='__main__', debug=verbose, stream=stream)
 
-        log_to_null(name='boto')
+        log_to_null(name='boto3')
 
     def run_job(self):
         """Run the all steps of the job, logging errors (and debugging output

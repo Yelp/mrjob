@@ -18,14 +18,12 @@ from datetime import timedelta
 import tempfile
 import shutil
 
-from dateutil.tz import tzutc
-
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.s3_tmpwatch import _s3_cleanup
-from tests.mockboto import MockBotoTestCase
+from tests.mock_boto3 import MockBoto3TestCase
 
 
-class S3TmpWatchTestCase(MockBotoTestCase):
+class S3TmpWatchTestCase(MockBoto3TestCase):
 
     def setUp(self):
         super(S3TmpWatchTestCase, self).setUp()

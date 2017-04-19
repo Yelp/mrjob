@@ -26,7 +26,6 @@ try:
 except ImportError:
     pty = None
 
-from mrjob.compat import translate_jobconf
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
@@ -525,48 +524,8 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         if not hadoop_streaming_jar:
             raise Exception('no Hadoop streaming jar')
 
-        mapper, combiner, reducer = (
-            self._hadoop_streaming_commands(step_num))
-
-        args = self.get_hadoop_bin() + ['jar', hadoop_streaming_jar]
-
-        # set up uploading from HDFS to the working dir
-        args.extend(self._upload_args())
-
-        # if no reducer, shut off reducer tasks. This has to come before
-        # extra hadoop args, which could contain jar-specific args
-        # (e.g. -outputformat). See #1331.
-        #
-        # might want to just integrate this into _hadoop_args_for_step?
-        if not reducer:
-            args.extend(['-D', ('%s=0' % translate_jobconf(
-                'mapreduce.job.reduces', self.get_hadoop_version()))])
-
-        # Add extra hadoop args first as hadoop args could be a hadoop
-        # specific argument which must come before job
-        # specific args.
-        args.extend(self._hadoop_args_for_step(step_num))
-
-        # set up input
-        for input_uri in self._step_input_uris(step_num):
-            args.extend(['-input', input_uri])
-
-        # set up output
-        args.append('-output')
-        args.append(self._step_output_uri(step_num))
-
-        args.append('-mapper')
-        args.append(mapper)
-
-        if combiner:
-            args.append('-combiner')
-            args.append(combiner)
-
-        if reducer:
-            args.append('-reducer')
-            args.append(reducer)
-
-        return args
+        return (self.get_hadoop_bin() + ['jar', hadoop_streaming_jar] +
+                self._hadoop_streaming_jar_args(step_num))
 
     def _args_for_jar_step(self, step_num):
         step = self._get_step(step_num)

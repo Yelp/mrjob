@@ -16,7 +16,7 @@ import json
 
 from mrjob.iam import _MRJOB_SERVICE_ROLE
 
-from tests.mockboto import MockIAMClient
+from tests.mock_boto3.iam import MockIAMClient
 from tests.py2 import TestCase
 
 

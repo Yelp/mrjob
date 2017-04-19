@@ -17,15 +17,6 @@ import os
 from tempfile import mkdtemp
 from shutil import rmtree
 
-try:
-    import boto
-    import boto.emr
-    import boto.emr.connection
-    import boto.exception
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    boto = None
-
 import mrjob.conf
 import mrjob.hadoop
 from mrjob.conf import ClearedValue

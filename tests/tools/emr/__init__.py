@@ -18,10 +18,10 @@ from mrjob.emr import EMRJobRunner
 
 from tests.py2 import mock_stdout_or_stderr
 from tests.py2 import patch
-from tests.mockboto import MockBotoTestCase
+from tests.mock_boto3 import MockBoto3TestCase
 
 
-class ToolTestCase(MockBotoTestCase):
+class ToolTestCase(MockBoto3TestCase):
 
     def monkey_patch_argv(self, *args):
         p = patch('sys.argv', [sys.argv[0]] + list(args))

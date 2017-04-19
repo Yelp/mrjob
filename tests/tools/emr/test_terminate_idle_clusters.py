@@ -19,6 +19,7 @@ import sys
 from datetime import datetime
 from datetime import timedelta
 
+from mrjob.aws import _boto3_now
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
@@ -31,12 +32,10 @@ from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_starting
 from mrjob.tools.emr.terminate_idle_clusters import _cluster_has_pending_steps
 from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 
-from tests.mockboto import MockBotoTestCase
-from tests.mockboto import MockEmrObject
-from tests.mockboto import to_iso8601
+from tests.mock_boto3 import MockBoto3TestCase
 
 
-class ClusterTerminationTestCase(MockBotoTestCase):
+class ClusterTerminationTestCase(MockBoto3TestCase):
 
     maxDiff = None
 
@@ -48,138 +47,140 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         self.create_fake_clusters()
 
     def create_fake_clusters(self):
-        self.now = datetime.utcnow().replace(microsecond=0)
+        self.now = _boto3_now().replace(microsecond=0)
         self.add_mock_s3_data({'my_bucket': {}})
 
         # create a timestamp the given number of *hours*, *minutes*, etc.
-        # in the past. If any *kwargs* are None, return None.
+        # in the past
         def ago(**kwargs):
-            if any(v is None for v in kwargs.values()):
-                return None
-            return to_iso8601(self.now - timedelta(**kwargs))
+            return self.now - timedelta(**kwargs)
 
         # Build a step object easily
         # also make it respond to .args()
         def step(jar='/home/hadoop/contrib/streaming/hadoop-streaming.jar',
                  args=self._DEFAULT_STEP_ARGS,
                  state='COMPLETED',
-                 create_hours_ago=None,
-                 start_hours_ago=None,
-                 end_hours_ago=None,
+                 created=None,
+                 started=None,
+                 ended=None,
                  name='Streaming Step',
                  action_on_failure='TERMINATE_CLUSTER',
                  **kwargs):
 
-            return MockEmrObject(
-                config=MockEmrObject(
-                    actiononfailure=action_on_failure,
-                    args=[MockEmrObject(value=a) for a in args],
-                    jar=jar,
+            timeline = dict()
+            if created:
+                timeline['CreationDateTime'] = created
+            if started:
+                timeline['StartDateTime'] = started
+            if ended:
+                timeline['EndDateTime'] = ended
+
+            return dict(
+                Config=dict(
+                    ActionOnFailure=action_on_failure,
+                    Args=args,
+                    Jar=jar,
                 ),
-                status=MockEmrObject(
-                    state=state,
-                    timeline=MockEmrObject(
-                        creationdatetime=ago(hours=create_hours_ago),
-                        enddatetime=ago(hours=end_hours_ago),
-                        startdatetime=ago(hours=start_hours_ago),
-                    ),
+                Status=dict(
+                    State=state,
+                    Timeline=timeline,
                 )
             )
 
         # empty job
         self.add_mock_emr_cluster(
-            MockEmrObject(
-                id='j-EMPTY',
-                status=MockEmrObject(
-                    state='STARTING',
-                    timeline=MockEmrObject(
-                        creationdatetime=ago(hours=10)
+            dict(
+                Id='j-EMPTY',
+                Status=dict(
+                    State='STARTING',
+                    Timeline=dict(
+                        CreationDateTime=ago(hours=10)
                     ),
                 ),
             )
         )
 
         # job that's bootstrapping
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-BOOTSTRAPPING',
-            status=MockEmrObject(
-                state='BOOTSTRAPPING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=10),
+        self.add_mock_emr_cluster(dict(
+            Id='j-BOOTSTRAPPING',
+            Status=dict(
+                State='BOOTSTRAPPING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=10),
                 ),
             ),
-            _steps=[step(create_hours_ago=10, state='PENDING')],
+            _Steps=[step(created=ago(hours=10), state='PENDING')],
         ))
 
         # currently running job
         self.add_mock_emr_cluster(
-            MockEmrObject(
-                id='j-CURRENTLY_RUNNING',
-                status=MockEmrObject(
-                    state='RUNNING',
-                    timeline=MockEmrObject(
-                        creationdatetime=ago(hours=4, minutes=15),
-                        readydatetime=ago(hours=4, minutes=10)
+            dict(
+                Id='j-CURRENTLY_RUNNING',
+                Status=dict(
+                    State='RUNNING',
+                    Timeline=dict(
+                        CreationDateTime=ago(hours=4, minutes=15),
+                        ReadyDateTime=ago(hours=4, minutes=10)
                     )
                 ),
-                _steps=[step(start_hours_ago=4, state='RUNNING')]
+                _Steps=[step(started=ago(hours=4), state='RUNNING')]
             )
         )
 
         # finished cluster
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-DONE',
-            status=MockEmrObject(
-                state='TERMINATED',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=10),
-                    readydatetime=ago(hours=8),
-                    enddatetime=ago(hours=5),
+        self.add_mock_emr_cluster(dict(
+            Id='j-DONE',
+            Status=dict(
+                State='TERMINATED',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=10),
+                    ReadyDateTime=ago(hours=8),
+                    EndDateTime=ago(hours=5),
                 ),
             ),
-            _steps=[step(start_hours_ago=8, end_hours_ago=6)],
+            _Steps=[step(started=ago(hours=8), ended=ago(hours=6))],
         ))
 
         # idle cluster
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-DONE_AND_IDLE',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=6),
-                    readydatetime=ago(hours=5, minutes=5),
+        self.add_mock_emr_cluster(dict(
+            Id='j-DONE_AND_IDLE',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=5),
                 ),
             ),
-            _steps=[step(start_hours_ago=4, end_hours_ago=2)],
+            _Steps=[step(started=ago(hours=4), ended=ago(hours=2))],
         ))
 
         # idle cluster with 4.x step format. should still be
         # recognizable as a streaming step
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-DONE_AND_IDLE_4_X',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=6),
-                    readydatetime=ago(hours=5, minutes=5),
+        self.add_mock_emr_cluster(dict(
+            Id='j-DONE_AND_IDLE_4_X',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=5),
                 ),
             ),
-            _steps=[step(start_hours_ago=4, end_hours_ago=2,
+            _Steps=[step(started=ago(hours=4), ended=ago(hours=2),
                          jar='command-runner.jar',
                          args=['hadoop-streaming'] + self._DEFAULT_STEP_ARGS)],
         ))
 
         # idle cluster with an active lock
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-IDLE_AND_LOCKED',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=6),
-                    readydatetime=ago(hours=5, minutes=5),
+        self.add_mock_emr_cluster(dict(
+            Id='j-IDLE_AND_LOCKED',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=5),
                 ),
             ),
-            _steps=[step(start_hours_ago=4, end_hours_ago=2)],
+            _Steps=[step(started=ago(hours=4), ended=ago(hours=2))],
         ))
         self.add_mock_s3_data({
             'my_bucket': {
@@ -188,16 +189,16 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         })
 
         # idle cluster with an expired lock
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-IDLE_AND_EXPIRED',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=6),
-                    readydatetime=ago(hours=5, minutes=5),
+        self.add_mock_emr_cluster(dict(
+            Id='j-IDLE_AND_EXPIRED',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=5),
                 ),
             ),
-            _steps=[step(start_hours_ago=4, end_hours_ago=2)],
+            _Steps=[step(started=ago(hours=4), ended=ago(hours=2))],
         ))
         self.add_mock_s3_data({
             'my_bucket': {
@@ -206,123 +207,123 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         }, age=timedelta(minutes=5))
 
         # idle cluster with an expired lock
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-IDLE_BUT_INCOMPLETE_STEPS',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=6),
-                    readydatetime=ago(hours=5, minutes=5),
+        self.add_mock_emr_cluster(dict(
+            Id='j-IDLE_BUT_INCOMPLETE_STEPS',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=5),
                 ),
             ),
-            _steps=[step(start_hours_ago=4, end_hours_ago=None)],
+            _Steps=[step(started=ago(hours=4), end_hours_ago=None)],
         ))
 
         # custom hadoop streaming jar
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-CUSTOM_DONE_AND_IDLE',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=6),
-                    readydatetime=ago(hours=5, minutes=5),
+        self.add_mock_emr_cluster(dict(
+            Id='j-CUSTOM_DONE_AND_IDLE',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=5),
                 ),
             ),
-            _steps=[step(
-                start_hours_ago=4,
-                end_hours_ago=4,
+            _Steps=[step(
+                started=ago(hours=4),
+                ended=ago(hours=4),
                 jar=('s3://my_bucket/tmp/somejob/files/'
                      'oddjob-0.0.3-SNAPSHOT-standalone.jar'),
                 args=[],
             )],
         ))
 
-        mock_emr_conn = self.connect_emr()
-
         # hadoop debugging without any other steps
-        mock_emr_conn.run_jobflow(_id='j-DEBUG_ONLY',
-                                  name='DEBUG_ONLY',
-                                  enable_debugging=True,
-                                  now=self.now - timedelta(hours=3),
-                                  job_flow_role='fake-instance-profile',
-                                  service_role='fake-service-role')
-
-        j_debug_only = self.mock_emr_clusters['j-DEBUG_ONLY']
-        j_debug_only.status.state = 'WAITING'
-        j_debug_only.status.timeline.readydatetime = ago(hours=2, minutes=55)
-        j_debug_only._steps[0].status.state = 'COMPLETED'
-        j_debug_only._steps[0].status.timeline.enddatetime = ago(hours=2)
-
-        # hadoop debugging + actual job
-        mock_emr_conn.run_jobflow(_id='j-HADOOP_DEBUGGING',
-                                  name='HADOOP_DEBUGGING',
-                                  enable_debugging=True,
-                                  now=self.now - timedelta(hours=6),
-                                  job_flow_role='fake-instance-profile',
-                                  service_role='fake-service-role')
-
-        j_hadoop_debugging = self.mock_emr_clusters['j-HADOOP_DEBUGGING']
-        j_hadoop_debugging._steps.append(step())
-        j_hadoop_debugging.status.state = 'WAITING'
-        j_hadoop_debugging.status.timeline.readydatetime = ago(
-            hours=4, minutes=55)
-
-        # Need to reset times manually because mockboto resets them
-        j_hadoop_debugging._steps[0].status.state = 'COMPLETED'
-        j_hadoop_debugging._steps[0].status.timeline.enddatetime = ago(hours=5)
-        j_hadoop_debugging._steps[1].status.timeline.startdatetime = ago(
-            hours=4)
-        j_hadoop_debugging._steps[1].status.timeline.enddatetime = ago(hours=2)
-
-        # should skip cancelled steps
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-IDLE_AND_FAILED',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=6),
-                    readydatetime=ago(hours=5, minutes=5),
+        self.add_mock_emr_cluster(dict(
+            Id='j-DEBUG_ONLY',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=3),
+                    ReadyDateTime=ago(hours=2, minutes=55),
                 ),
             ),
-            _steps=[
-                step(start_hours_ago=4, end_hours_ago=3, state='FAILED'),
-                step(
-                    state='CANCELLED',
-                )
+            _Steps=[
+                step(jar='command-runner.jar',
+                     name='Setup Hadoop Debugging',
+                     args=['state-pusher-script'],
+                     started=ago(hours=3),
+                     ended=ago(hours=2))
+            ],
+        ))
+
+        # hadoop debugging + actual job
+        self.add_mock_emr_cluster(dict(
+            Id='j-HADOOP_DEBUGGING',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=55),
+                ),
+            ),
+            _Steps=[
+                step(jar='command-runner.jar',
+                     name='Setup Hadoop Debugging',
+                     args=['state-pusher-script'],
+                     started=ago(hours=5),
+                     ended=ago(hours=4)),
+                step(started=ago(hours=4), ended=ago(hours=2)),
+            ],
+        ))
+
+        # should skip cancelled steps
+        self.add_mock_emr_cluster(dict(
+            Id='j-IDLE_AND_FAILED',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _Steps=[
+                step(started=ago(hours=4), ended=ago(hours=3), state='FAILED'),
+                step(state='CANCELLED'),
             ],
         ))
 
         # pooled cluster reaching end of full hour
-        self.add_mock_emr_cluster(MockEmrObject(
-            _bootstrapactions=[
-                MockEmrObject(args=[], name='action 0'),
-                MockEmrObject(args=[
-                    MockEmrObject(
-                        value='pool-0123456789abcdef0123456789abcdef'),
-                    MockEmrObject(value='reflecting'),
-                ], name='master'),
+        self.add_mock_emr_cluster(dict(
+            _BootstrapActions=[
+                dict(Args=[], Name='action 0'),
+                dict(
+                    Args=['pool-0123456789abcdef0123456789abcdef',
+                          'reflecting'],
+                    Name='master',
+                ),
             ],
-            id='j-POOLED',
-            status=MockEmrObject(
-                state='WAITING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(minutes=55),
-                    readydatetime=ago(minutes=50),
+            Id='j-POOLED',
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(minutes=55),
+                    ReadyDateTime=ago(minutes=50),
                 ),
             ),
         ))
 
         # cluster that has had pending jobs but hasn't run them
-        self.add_mock_emr_cluster(MockEmrObject(
-            id='j-PENDING_BUT_IDLE',
-            status=MockEmrObject(
-                state='RUNNING',
-                timeline=MockEmrObject(
-                    creationdatetime=ago(hours=3),
-                    readydatetime=ago(hours=2, minutes=50),
+        self.add_mock_emr_cluster(dict(
+            Id='j-PENDING_BUT_IDLE',
+            Status=dict(
+                State='RUNNING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=3),
+                    ReadyDateTime=ago(hours=2, minutes=50),
                 ),
             ),
-            _steps=[step(create_hours_ago=3, state='PENDING')],
+            _Steps=[step(created=ago(hours=3), state='PENDING')],
         ))
 
     def ids_of_terminated_clusters(self):
@@ -330,7 +331,7 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             str(cluster_id)
             for cluster_id, cluster in self.mock_emr_clusters.items()
             if cluster_id != 'j-DONE' and
-            cluster.status.state in (
+            cluster['Status']['State'] in (
                 'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'))
 
     def maybe_terminate_quietly(self, stdout=None, **kwargs):
@@ -355,12 +356,12 @@ class ClusterTerminationTestCase(MockBotoTestCase):
     def time_mock_cluster_idle(self, mock_cluster):
         if (_is_cluster_starting(mock_cluster) or
                 _is_cluster_bootstrapping(mock_cluster) or
-                _is_cluster_running(mock_cluster._steps) or
+                _is_cluster_running(mock_cluster['_Steps']) or
                 _is_cluster_done(mock_cluster)):
             return timedelta(0)
         else:
             return self.now - _time_last_active(
-                mock_cluster, mock_cluster._steps)
+                mock_cluster, mock_cluster['_Steps'])
 
     def assert_mock_cluster_is(
             self, mock_cluster,
@@ -383,19 +384,20 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         self.assertEqual(from_end_of_hour,
                          _est_time_to_hour(mock_cluster, self.now))
         self.assertEqual(has_pending_steps,
-                         _cluster_has_pending_steps(mock_cluster._steps))
+                         _cluster_has_pending_steps(mock_cluster['_Steps']))
         self.assertEqual(idle_for,
                          self.time_mock_cluster_idle(mock_cluster))
         self.assertEqual((pool_hash, pool_name),
-                         _pool_hash_and_name(mock_cluster._bootstrapactions))
+                         _pool_hash_and_name(mock_cluster['_BootstrapActions'])
+        )
         self.assertEqual(running,
-                         _is_cluster_running(mock_cluster._steps))
+                         _is_cluster_running(mock_cluster['_Steps']))
 
     def _lock_contents(self, mock_cluster, steps_ahead=0):
         fs = S3Filesystem()
 
         contents = b''.join(fs.cat('s3://my_bucket/locks/%s/%d' % (
-            mock_cluster.id, len(mock_cluster._steps) + steps_ahead)))
+            mock_cluster['Id'], len(mock_cluster['_Steps']) + steps_ahead)))
 
         return contents or None
 

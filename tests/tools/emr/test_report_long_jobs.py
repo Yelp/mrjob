@@ -17,195 +17,197 @@ import sys
 from datetime import datetime
 from datetime import timedelta
 
+from dateutil.parser import parse
+from dateutil.tz import tzutc
+
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.report_long_jobs import _find_long_running_jobs
 from mrjob.tools.emr.report_long_jobs import main
 
-from tests.mockboto import MockEmrObject
-from tests.mockboto import MockBotoTestCase
+from tests.mock_boto3 import MockBoto3TestCase
 
 CLUSTERS = [
-    MockEmrObject(
-        id='j-STARTING',
-        name='mr_grieving',
-        status=MockEmrObject(
-            state='STARTING',
-            timeline=MockEmrObject(
-                creationdatetime='2010-06-06T00:05:00Z',
+    dict(
+        Id='j-STARTING',
+        Name='mr_grieving',
+        Status=dict(
+            State='STARTING',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:05:00Z'),
             ),
         ),
         _steps=[],
     ),
-    MockEmrObject(
-        id='j-BOOTSTRAPPING',
-        name='mr_grieving',
-        status=MockEmrObject(
-            state='BOOTSTRAPPING',
-            timeline=MockEmrObject(
-                creationdatetime='2010-06-06T00:05:00Z',
+    dict(
+        Id='j-BOOTSTRAPPING',
+        Name='mr_grieving',
+        Status=dict(
+            State='BOOTSTRAPPING',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:05:00Z'),
             ),
         ),
         _steps=[],
     ),
-    MockEmrObject(
-        id='j-RUNNING1STEP',
-        name='mr_grieving',
-        status=MockEmrObject(
-            state='RUNNING',
-            timeline=MockEmrObject(
-                creationdatetime='2010-06-06T00:00:00Z',
-                readydatetime='2010-06-06T00:15:00Z',
+    dict(
+        Id='j-RUNNING1STEP',
+        Name='mr_grieving',
+        Status=dict(
+            State='RUNNING',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
-        _steps=[
-            MockEmrObject(
-                name='mr_denial: Step 1 of 5',
-                status=MockEmrObject(
-                    state='RUNNING',
-                    timeline=MockEmrObject(
-                        startdatetime='2010-06-06T00:20:00Z',
+        _Steps=[
+            dict(
+                Name='mr_denial: Step 1 of 5',
+                Status=dict(
+                    State='RUNNING',
+                    Timeline=dict(
+                        StartDateTime=parse('2010-06-06T00:20:00Z'),
                     ),
                 ),
             ),
         ],
     ),
-    MockEmrObject(
-        id='j-RUNNING2STEPS',
-        name='mr_grieving',
-        status=MockEmrObject(
-            state='RUNNING',
-            timeline=MockEmrObject(
-                creationdatetime='2010-06-06T00:00:00Z',
-                readydatetime='2010-06-06T00:15:00Z',
+    dict(
+        Id='j-RUNNING2STEPS',
+        Name='mr_grieving',
+        Status=dict(
+            State='RUNNING',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
-        _steps=[
-            MockEmrObject(
-                name='mr_denial: Step 1 of 5',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='2010-06-06T00:25:00Z',
-                        startdatetime='2010-06-06T00:20:00Z',
+        _Steps=[
+            dict(
+                Name='mr_denial: Step 1 of 5',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime=parse('2010-06-06T00:25:00Z'),
+                        StartDateTime=parse('2010-06-06T00:20:00Z'),
                     ),
                 ),
             ),
-            MockEmrObject(
-                name='mr_anger: Step 2 of 5',
-                status=MockEmrObject(
-                    state='RUNNING',
-                    timeline=MockEmrObject(
-                        startdatetime='2010-06-06T00:30:00Z',
+            dict(
+                Name='mr_anger: Step 2 of 5',
+                Status=dict(
+                    State='RUNNING',
+                    Timeline=dict(
+                        StartDateTime=parse('2010-06-06T00:30:00Z'),
                     ),
                 ),
             ),
         ]
     ),
-    MockEmrObject(
-        id='j-RUNNINGANDPENDING',
-        name='mr_grieving',
-        status=MockEmrObject(
-            state='RUNNING',
-            timeline=MockEmrObject(
-                creationdatetime='2010-06-06T00:00:00Z',
-                readydatetime='2010-06-06T00:15:00Z',
+    dict(
+        Id='j-RUNNINGANDPENDING',
+        Name='mr_grieving',
+        Status=dict(
+            State='RUNNING',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
-        _steps=[
-            MockEmrObject(
-                name='mr_denial: Step 1 of 5',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='2010-06-06T00:25:00Z',
-                        startdatetime='2010-06-06T00:20:00Z',
+        _Steps=[
+            dict(
+                Name='mr_denial: Step 1 of 5',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime=parse('2010-06-06T00:25:00Z'),
+                        StartDateTime=parse('2010-06-06T00:20:00Z'),
                     ),
                 ),
             ),
-            MockEmrObject(
-                name='mr_anger: Step 2 of 5',
-                status=MockEmrObject(
-                    state='RUNNING',
-                    timeline=MockEmrObject(
-                        startdatetime='2010-06-06T00:30:00Z',
+            dict(
+                Name='mr_anger: Step 2 of 5',
+                Status=dict(
+                    State='RUNNING',
+                    Timeline=dict(
+                        StartDateTime=parse('2010-06-06T00:30:00Z'),
                     ),
                 ),
             ),
-            MockEmrObject(
-                name='mr_bargaining: Step 3 of 5',
-                status=MockEmrObject(
-                    state='PENDING',
+            dict(
+                Name='mr_bargaining: Step 3 of 5',
+                Status=dict(
+                    State='PENDING',
                 ),
             ),
         ]
     ),
-    MockEmrObject(
-        id='j-PENDING1STEP',
-        name='mr_grieving',
-        status=MockEmrObject(
-            state='RUNNING',
-            timeline=MockEmrObject(
-                creationdatetime='2010-06-06T00:00:00Z',
-                readydatetime='2010-06-06T00:15:00Z',
+    dict(
+        Id='j-PENDING1STEP',
+        Name='mr_grieving',
+        Status=dict(
+            State='RUNNING',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
-        _steps=[
-            MockEmrObject(
-                name='mr_bargaining: Step 3 of 5',
-                status=MockEmrObject(
-                    state='PENDING',
+        _Steps=[
+            dict(
+                Name='mr_bargaining: Step 3 of 5',
+                Status=dict(
+                    State='PENDING',
                 ),
             ),
         ]
     ),
-    MockEmrObject(
-        id='j-PENDING2STEPS',
-        name='mr_grieving',
-        status=MockEmrObject(
-            state='RUNNING',
-            timeline=MockEmrObject(
-                creationdatetime='2010-06-06T00:00:00Z',
-                readydatetime='2010-06-06T00:15:00Z',
+    dict(
+        Id='j-PENDING2STEPS',
+        Name='mr_grieving',
+        Status=dict(
+            State='RUNNING',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
-        _steps=[
-            MockEmrObject(
-                name='mr_bargaining: Step 3 of 5',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='2010-06-06T00:35:00Z',
-                        startdatetime='2010-06-06T00:20:00Z',
+        _Steps=[
+            dict(
+                Name='mr_bargaining: Step 3 of 5',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime=parse('2010-06-06T00:35:00Z'),
+                        StartDateTime=parse('2010-06-06T00:20:00Z'),
                     ),
                 ),
             ),
-            MockEmrObject(
-                name='mr_depression: Step 4 of 5',
-                status=MockEmrObject(
-                    state='PENDING',
+            dict(
+                Name='mr_depression: Step 4 of 5',
+                Status=dict(
+                    State='PENDING',
                 ),
             ),
         ]
     ),
-    MockEmrObject(
-        id='j-COMPLETED',
-        name='mr_grieving',
-        status=MockEmrObject(
-            state='COMPLETED',
-            timeline=MockEmrObject(
-                creationdatetime='2010-06-06T00:00:00Z',
-                readydatetime='2010-06-06T00:15:00Z',
+    dict(
+        Id='j-COMPLETED',
+        Name='mr_grieving',
+        Status=dict(
+            State='COMPLETED',
+            Timeline=dict(
+                CreationDateTime=parse('2010-06-06T00:00:00Z'),
+                ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
-        state='COMPLETED',
-        _steps=[
-            MockEmrObject(
-                name='mr_acceptance: Step 5 of 5',
-                status=MockEmrObject(
-                    state='COMPLETED',
-                    timeline=MockEmrObject(
-                        enddatetime='2010-06-06T00:40:00Z',
-                        startdatetime='2010-06-06T00:20:00Z',
+        State='COMPLETED',
+        _Steps=[
+            dict(
+                Name='mr_acceptance: Step 5 of 5',
+                Status=dict(
+                    State='COMPLETED',
+                    Timeline=dict(
+                        EndDateTime=parse('2010-06-06T00:40:00Z'),
+                        StartDateTime=parse('2010-06-06T00:20:00Z'),
                     ),
                 ),
             ),
@@ -213,17 +215,17 @@ CLUSTERS = [
     ),
 ]
 
-CLUSTERS_BY_ID = dict((cluster.id, cluster) for cluster in CLUSTERS)
+CLUSTERS_BY_ID = dict((cluster['Id'], cluster) for cluster in CLUSTERS)
 
 CLUSTER_SUMMARIES_BY_ID = dict(
-    (cluster.id, MockEmrObject(
-        id=cluster.id,
-        name=cluster.name,
-        status=cluster.status))
+    (cluster['Id'], dict(
+        Id=cluster['Id'],
+        Name=cluster['Name'],
+        Status=cluster['Status']))
     for cluster in CLUSTERS)
 
 
-class ReportLongJobsTestCase(MockBotoTestCase):
+class ReportLongJobsTestCase(MockBoto3TestCase):
 
     def setUp(self):
         super(ReportLongJobsTestCase, self).setUp()
@@ -243,17 +245,24 @@ class ReportLongJobsTestCase(MockBotoTestCase):
         for cluster in CLUSTERS:
             self.add_mock_emr_cluster(cluster)
 
-        emr_conn = self.connect_emr()
-        emr_conn.run_jobflow('no name',
-                             job_flow_role='fake-instance-profile',
-                             service_role='fake-service-role')
+        emr_client = self.client('emr')
+        emr_client.run_job_flow(
+            Name='no name',
+            Instances=dict(
+                MasterInstanceType='m1.medium',
+                InstanceCount=1,
+            ),
+            JobFlowRole='fake-instance-profile',
+            ReleaseLabel='emr-4.0.0',
+            ServiceRole='fake-service-role',
+        )
         main(['-q', '--no-conf'])
 
         lines = [line for line in StringIO(self.stdout.getvalue())]
         self.assertEqual(len(lines), len(CLUSTERS_BY_ID) - 1)
 
 
-class FindLongRunningJobsTestCase(MockBotoTestCase):
+class FindLongRunningJobsTestCase(MockBoto3TestCase):
 
     maxDiff = None  # show whole diff when tests fail
 
@@ -264,10 +273,10 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             self.add_mock_emr_cluster(cluster)
 
     def _find_long_running_jobs(self, cluster_summaries, min_time, now):
-        emr_conn = self.connect_emr()
+        emr_client = self.client('emr')
 
         return _find_long_running_jobs(
-            emr_conn,
+            emr_client,
             cluster_summaries,
             min_time=min_time,
             now=now)
@@ -277,7 +286,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-STARTING']],
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [{'cluster_id': u'j-STARTING',
               'name': u'mr_grieving',
@@ -289,7 +298,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-BOOTSTRAPPING']],
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [{'cluster_id': u'j-BOOTSTRAPPING',
               'name': u'mr_grieving',
@@ -301,7 +310,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNING1STEP']],
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [{'cluster_id': u'j-RUNNING1STEP',
               'name': u'mr_denial: Step 1 of 5',
@@ -313,7 +322,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNING1STEP']],
                 min_time=timedelta(days=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [])
 
@@ -322,7 +331,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNING2STEPS']],
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [{'cluster_id': u'j-RUNNING2STEPS',
               'name': u'mr_anger: Step 2 of 5',
@@ -334,7 +343,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNING2STEPS']],
                 min_time=timedelta(days=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [])
 
@@ -343,7 +352,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNINGANDPENDING']],
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [{'cluster_id': u'j-RUNNINGANDPENDING',
               'name': u'mr_anger: Step 2 of 5',
@@ -355,7 +364,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-RUNNINGANDPENDING']],
                 min_time=timedelta(days=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [])
 
@@ -364,7 +373,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-PENDING1STEP']],
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [{'cluster_id': u'j-PENDING1STEP',
               'name': u'mr_bargaining: Step 3 of 5',
@@ -376,7 +385,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-PENDING1STEP']],
                 min_time=timedelta(days=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [])
 
@@ -385,7 +394,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-PENDING2STEPS']],
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [{'cluster_id': u'j-PENDING2STEPS',
               'name': u'mr_depression: Step 4 of 5',
@@ -397,7 +406,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-PENDING2STEPS']],
                 min_time=timedelta(days=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [])
 
@@ -406,7 +415,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 [CLUSTER_SUMMARIES_BY_ID['j-COMPLETED']],
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             []
         )
@@ -416,7 +425,7 @@ class FindLongRunningJobsTestCase(MockBotoTestCase):
             list(self._find_long_running_jobs(
                 CLUSTERS,
                 min_time=timedelta(hours=1),
-                now=datetime(2010, 6, 6, 4)
+                now=datetime(2010, 6, 6, 4, tzinfo=tzutc())
             )),
             [{'cluster_id': u'j-STARTING',
               'name': u'mr_grieving',

@@ -1,5 +1,5 @@
 # Copyright 2009-2010 Yelp
-# Copyright 2015-2016 Yelp
+# Copyright 2015-2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -54,17 +54,15 @@ from datetime import timedelta
 from time import sleep
 from optparse import OptionParser
 
+from mrjob.aws import _boto3_now
+from mrjob.aws import _boto3_paginate
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import _list_all_steps
-from mrjob.emr import _yield_all_clusters
-from mrjob.emr import _yield_all_bootstrap_actions
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
-from mrjob.parse import iso8601_to_datetime
-from mrjob.patched_boto import _patched_describe_cluster
+from mrjob.pool import _pool_hash_and_name
 from mrjob.util import strip_microseconds
 
 # match an mrjob job key (used to uniquely identify the job)
@@ -90,7 +88,7 @@ def main(args=None):
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
-    now = datetime.utcnow()
+    now = _boto3_now()
 
     log.info('getting cluster history...')
     clusters = list(_yield_clusters(
@@ -255,7 +253,7 @@ def _cluster_to_full_summary(cluster, now=None):
     """Convert a cluster to a full summary for use in creating a report,
     including billing/usage information.
 
-    :param cluster: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:mod:`boto3` cluster data structure
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
@@ -288,10 +286,9 @@ def _cluster_to_full_summary(cluster, now=None):
 
 
 def _cluster_to_basic_summary(cluster, now=None):
-    """Extract fields such as creation time, owner, etc. from the cluster,
-    so we can safely reference them without using :py:func:`getattr`.
+    """Extract fields such as creation time, owner, etc. from the cluster.
 
-    :param cluster: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:mod:`boto3` cluster data structure
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
 
@@ -320,36 +317,30 @@ def _cluster_to_basic_summary(cluster, now=None):
     * *state*: The cluster's state as a string (e.g. ``'RUNNING'``)
     """
     if now is None:
-        now = datetime.utcnow()
+        now = _boto3_now()
 
     bcs = {}  # basic cluster summary to fill in
 
-    bcs['id'] = getattr(cluster, 'id', None)
-    bcs['name'] = getattr(cluster, 'name', None)
+    bcs['id'] = cluster['Id']
+    bcs['name'] = cluster['Name']
 
-    status = getattr(cluster, 'status', None)
-    timeline = getattr(status, 'timeline', None)
+    Status = cluster['Status']
+    Timeline = Status.get('Timeline', {})
 
-    bcs['created'] = _to_datetime(getattr(
-        timeline, 'creationdatetime', None))
-    bcs['ready'] = _to_datetime(getattr(timeline, 'readydatetime', None))
-    bcs['end'] = _to_datetime(getattr(timeline, 'enddatetime', None))
+    bcs['created'] = Timeline.get('CreationDateTime')
+    bcs['ready'] = Timeline.get('ReadyDateTime')
+    bcs['end'] = Timeline.get('EndDateTime')
 
     if bcs['created']:
         bcs['ran'] = (bcs['end'] or now) - bcs['created']
     else:
         bcs['ran'] = timedelta(0)
 
-    bcs['state'] = getattr(status, 'state', None)
+    bcs['state'] = Status.get('State')
 
-    bcs['num_steps'] = len(getattr(cluster, 'steps', ()))
+    bcs['num_steps'] = len(cluster['Steps'])
 
-    bcs['pool'] = None
-    bootstrap_actions = getattr(cluster, 'bootstrapactions', None)
-    if bootstrap_actions:
-        args = [arg.value for arg in bootstrap_actions[-1].args]
-        if len(args) == 2 and args[0].startswith('pool-'):
-            bcs['pool'] = args[1]
+    _, bcs['pool'] = _pool_hash_and_name(cluster['BootstrapActions'])
 
     m = _JOB_KEY_RE.match(bcs['name'] or '')
     if m:
@@ -357,7 +348,7 @@ def _cluster_to_basic_summary(cluster, now=None):
     else:
         bcs['label'], bcs['owner'] = None, None
 
-    bcs['nih'] = float(getattr(cluster, 'normalizedinstancehours', '0'))
+    bcs['nih'] = cluster.get('NormalizedInstanceHours', 0)
 
     return bcs
 
@@ -365,7 +356,7 @@ def _cluster_to_basic_summary(cluster, now=None):
 def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
     """Break billing/usage information for a cluster down by job.
 
-    :param cluster: a :py:class:`boto.emr.EmrObject`
+    :param cluster: a :py:mod:`boto3` cluster data structure
     :param basic_summary: a basic summary of the cluster, returned by
                           :py:func:`_cluster_to_basic_summary`. If this
                           is ``None``, we'll call
@@ -404,7 +395,7 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
     bcs = basic_summary or _cluster_to_basic_summary(cluster)
 
     if now is None:
-        now = datetime.utcnow()
+        now = _boto3_now()
 
     if not bcs['created']:
         return []
@@ -436,17 +427,17 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
         'step_num': None,
     })
 
-    for step in getattr(cluster, 'steps', ()):
-        step_status = getattr(step, 'status', None)
-        step_timeline = getattr(step_status, 'timeline', None)
+    for step in cluster['Steps']:
+        Status = step['Status']
+        Timeline = Status.get('Timeline', {})
 
         # we've reached the last step that's actually run
-        if not hasattr(step_timeline, 'startdatetime'):
+        if not Timeline.get('StartDateTime'):
             break
 
-        step_start = _to_datetime(step_timeline.startdatetime)
+        step_start = Timeline['StartDateTime']
 
-        step_end = _to_datetime(getattr(step_timeline, 'enddatetime', None))
+        step_end = Timeline.get('EndDateTime')
         if step_end is None:
             # step started running and was cancelled. credit it for 0 usage
             if bcs['end']:
@@ -455,7 +446,7 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
             else:
                 step_end = now
 
-        m = _STEP_NAME_RE.match(getattr(step, 'name', ''))
+        m = _STEP_NAME_RE.match(step['Name'])
         if m:
             step_label = m.group(1)
             step_owner = m.group(2)
@@ -542,11 +533,11 @@ def _subdivide_interval_by_date(start, end):
         date_to_secs = {}
 
         date_to_secs[start.date()] = _to_secs(
-            datetime(start.year, start.month, start.day) + timedelta(days=1) -
-            start)
+            datetime(start.year, start.month, start.day, tzinfo=start.tzinfo) +
+            timedelta(days=1) - start)
 
         date_to_secs[end.date()] = _to_secs(
-            end - datetime(end.year, end.month, end.day))
+            end - datetime(end.year, end.month, end.day, tzinfo=end.tzinfo))
 
         # fill in dates in the middle
         cur_date = start.date() + timedelta(days=1)
@@ -605,27 +596,37 @@ def _yield_clusters(max_days_ago=None, now=None, **runner_kwargs):
                           :py:class:`~mrjob.emr.EMRJobRunner`
     """
     if now is None:
-        now = datetime.utcnow()
+        now = _boto3_now()
 
-    emr_conn = EMRJobRunner(**runner_kwargs).make_emr_conn()
+    emr_client = EMRJobRunner(**runner_kwargs).make_emr_client()
 
     # if --max-days-ago is set, only look at recent jobs
     created_after = None
     if max_days_ago is not None:
         created_after = now - timedelta(days=max_days_ago)
 
-    # use _DELAY to sleep 1 second before each API call (see #1091). Could
+    # use _DELAY to sleep 1 second after each API call (see #1091). Could
     # implement some sort of connection wrapper for this if it becomes more
     # generally useful.
-    for cluster_summary in _yield_all_clusters(
-            emr_conn, created_after=created_after, _delay=_DELAY):
-        cluster_id = cluster_summary.id
+    list_clusters_kwargs = dict(_delay=_DELAY)
+    if created_after is not None:
+        list_clusters_kwargs['CreatedAfter'] = created_after
 
+    for cluster_summary in _boto3_paginate(
+            'Clusters', emr_client, 'list_clusters', **list_clusters_kwargs):
+
+        cluster_id = cluster_summary['Id']
+
+        cluster = emr_client.describe_cluster(ClusterId=cluster_id)['Cluster']
         sleep(_DELAY)
-        cluster = _patched_describe_cluster(emr_conn, cluster_id)
-        cluster.steps = _list_all_steps(emr_conn, cluster_id, _delay=_DELAY)
-        cluster.bootstrapactions = list(
-            _yield_all_bootstrap_actions(emr_conn, cluster_id, _delay=_DELAY))
+
+        cluster['Steps'] = list(reversed(list(_boto3_paginate(
+            'Steps', emr_client, 'list_steps',
+            ClusterId=cluster_id, _delay=_DELAY))))
+
+        cluster['BootstrapActions'] = list(_boto3_paginate(
+            'BootstrapActions', emr_client, 'list_bootstrap_actions',
+            ClusterId=cluster_id, _delay=_DELAY))
 
         yield cluster
 
@@ -638,7 +639,7 @@ def _print_report(stats, now=None):
                 Defaults to the current time.
     """
     if now is None:
-        now = datetime.utcnow()
+        now = _boto3_now()
 
     s = stats
 
@@ -816,15 +817,6 @@ def _to_secs(delta):
     return (delta.days * 86400.0 +
             delta.seconds +
             delta.microseconds / 1000000.0)
-
-
-def _to_datetime(iso8601_time):
-    """Convert a ISO8601-formatted datetime (from :py:mod:`boto`) to
-    a :py:class:`datetime.datetime`."""
-    if iso8601_time is None:
-        return None
-
-    return iso8601_to_datetime(iso8601_time)
 
 
 def _percent(x, total, default=0.0):

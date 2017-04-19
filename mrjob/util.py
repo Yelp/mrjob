@@ -19,7 +19,6 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 import contextlib
 import glob
-import itertools
 import logging
 import os
 import pipes
@@ -28,7 +27,6 @@ import shlex
 import shutil
 import sys
 import tarfile
-from copy import deepcopy
 from datetime import timedelta
 from distutils.spawn import find_executable
 from logging import getLogger
@@ -174,7 +172,8 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
                     is omitted, we ``open(path)``.
     :param yields_lines: Does iterating over *fileobj* yield lines (like
                          file objects are supposed to)? If not, set this to
-                         ``False`` (useful for :py:class:`boto.s3.Key`)
+                         ``False`` (useful for objects that correspond
+                         to objects on cluster filesystems)
     :param cleanup: Optional callback to call with no arguments when EOF is
                     reached or an exception is thrown.
     """

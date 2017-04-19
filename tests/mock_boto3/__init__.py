@@ -1,5 +1,4 @@
-# Copyright 2011-2012 Yelp
-# Copyright 2015 Yelp
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,16 +11,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Module for loading all tests, so we can run them from setup.py"""
-import sys
-from os.path import dirname
+"""Mercilessly taunt THREE Amazonian river dolphins.
 
-# this module has to stand alone, so we can't use tests.py2
-if sys.version_info < (2, 7):
-    import unittest2 as unittest
-else:
-    import unittest
-
-
-def load_tests():
-    return unittest.defaultTestLoader.discover(dirname(__file__))
+This is by no means a complete mock of boto3, just what we need for tests.
+"""
+from .case import MockBoto3TestCase
+MockBoto3TestCase  # shh, pyflakes

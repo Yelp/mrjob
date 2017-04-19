@@ -28,8 +28,6 @@ import shutil
 import sys
 import tarfile
 import tempfile
-from inspect import isfunction
-from inspect import ismethod
 from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
@@ -832,6 +830,53 @@ class MRJobRunner(object):
                 return 'cat'
             else:
                 return None
+
+    def _hadoop_streaming_jar_args(self, step_num):
+        """The arguments that come after ``hadoop jar <streaming jar path>``
+        when running a Hadoop streaming job."""
+        args = []
+
+        # get command for each part of the job
+        mapper, combiner, reducer = (
+            self._hadoop_streaming_commands(step_num))
+
+        # set up uploading from HDFS/cloud storage to the working dir
+        args.extend(self._upload_args())
+
+        # if no reducer, shut off reducer tasks. This has to come before
+        # extra hadoop args, which could contain jar-specific args
+        # (e.g. -outputformat). See #1331.
+        #
+        # might want to just integrate this into _hadoop_args_for_step?
+        if not reducer:
+            args.extend(['-D', ('%s=0' % translate_jobconf(
+                'mapreduce.job.reduces', self.get_hadoop_version()))])
+
+        # Add extra hadoop args first as hadoop args could be a hadoop
+        # specific argument which must come before job
+        # specific args.
+        args.extend(self._hadoop_args_for_step(step_num))
+
+        # set up input
+        for input_uri in self._step_input_uris(step_num):
+            args.extend(['-input', input_uri])
+
+        # set up output
+        args.append('-output')
+        args.append(self._step_output_uri(step_num))
+
+        args.append('-mapper')
+        args.append(mapper)
+
+        if combiner:
+            args.append('-combiner')
+            args.append(combiner)
+
+        if reducer:
+            args.append('-reducer')
+            args.append(reducer)
+
+        return args
 
     def _hadoop_streaming_commands(self, step_num):
         return (

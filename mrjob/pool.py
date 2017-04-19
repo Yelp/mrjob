@@ -16,11 +16,10 @@
 # limitations under the License.
 """Utilities related to cluster pooling. This code used to be in mrjob.emr.
 """
-from datetime import datetime
 from datetime import timedelta
 from logging import getLogger
 
-from mrjob.parse import iso8601_to_datetime
+from mrjob.aws import _boto3_now
 
 log = getLogger(__name__)
 
@@ -37,30 +36,27 @@ def _est_time_to_hour(cluster_summary, now=None):
     one hour, not zero.
     """
     if now is None:
-        now = datetime.utcnow()
+        now = _boto3_now()
 
-    timeline = getattr(
-        getattr(cluster_summary, 'status', None), 'timeline', None)
+    timeline = cluster_summary.get('Status', {}).get('Timeline', {})
 
-    creationdatetime = getattr(timeline, 'creationdatetime', None)
+    creationdatetime = timeline.get('CreationDateTime')
 
-    if creationdatetime:
-        start = iso8601_to_datetime(creationdatetime)
-    else:
+    if not creationdatetime:
         # do something reasonable if creationdatetime isn't set
         return timedelta(minutes=60)
 
-    run_time = now - start
+    run_time = now - creationdatetime
     return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
 
 
 def _pool_hash_and_name(bootstrap_actions):
     """Return the hash and pool name for the given cluster, or
     ``(None, None)`` if it isn't pooled."""
-    for bootstrap_action in bootstrap_actions:
-        if bootstrap_action.name == 'master':
-            args = [arg.value for arg in bootstrap_action.args]
+    for ba in bootstrap_actions:
+        if ba['Name'] == 'master':
+            args = ba['Args']
             if len(args) == 2 and args[0].startswith('pool-'):
                 return args[0][5:], args[1]
 
-    return (None, None)
+    return None, None

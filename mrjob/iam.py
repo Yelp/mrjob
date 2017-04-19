@@ -26,7 +26,7 @@ idential to the ones it needs before attempting to create them.
 import json
 from logging import getLogger
 
-from mrjob.py2 import unquote
+from mrjob.aws import _boto3_paginate
 from mrjob.util import random_identifier
 
 # Working IAM roles and policies for EMR; these should be identical
@@ -92,11 +92,10 @@ def get_or_create_mrjob_service_role(client):
 
     # look for matching role. Must have same policy document
     # and attached role policy
-    for role_page in client.get_paginator('list_roles').paginate():
-        for role in role_page['Roles']:
-            if _role_matches(client, role, _MRJOB_SERVICE_ROLE,
-                             _EMR_SERVICE_ROLE_POLICY_ARN):
-                return role['RoleName']
+    for role in _boto3_paginate('Roles', client, 'list_roles'):
+        if _role_matches(client, role, _MRJOB_SERVICE_ROLE,
+                         _EMR_SERVICE_ROLE_POLICY_ARN):
+            return role['RoleName']
 
     # no matches, create it ourselves
     role_name = _create_mrjob_role_with_attached_policy(
@@ -112,15 +111,14 @@ def get_or_create_mrjob_instance_profile(client):
     create one."""
     # look for matching instance profile. Must point to a role with
     # the right policy document and attached role policy
-    profile_paginator = client.get_paginator('list_instance_profiles')
-    for profile_page in profile_paginator.paginate():
-        for profile in profile_page['InstanceProfiles']:
-            roles = profile['Roles']
-            if len(roles) != 1:
-                continue
-            if _role_matches(client, roles[0], _MRJOB_INSTANCE_PROFILE_ROLE,
-                             _EMR_INSTANCE_PROFILE_POLICY_ARN):
-                return profile['InstanceProfileName']
+    for profile in _boto3_paginate(
+            'InstanceProfiles', client, 'list_instance_profiles'):
+        roles = profile['Roles']
+        if len(roles) != 1:
+            continue
+        if _role_matches(client, roles[0], _MRJOB_INSTANCE_PROFILE_ROLE,
+                         _EMR_INSTANCE_PROFILE_POLICY_ARN):
+            return profile['InstanceProfileName']
 
     # create a new role, and wrap it in an instance profile
     # with the same name

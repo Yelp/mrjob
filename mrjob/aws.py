@@ -14,8 +14,18 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """General information about Amazon Web Services, such as region-to-endpoint
-mappings.
+mappings, plus a couple of utilities for working with boto3.
 """
+import time
+from datetime import datetime
+
+# dateutil is a boto3 dependency
+try:
+    from dateutil.tz import tzutc
+    tzutc
+except ImportError:
+    tzutc = None
+
 
 ### EC2 Instances ###
 
@@ -149,86 +159,43 @@ EC2_INSTANCE_TYPE_TO_MEMORY = {
 
 ### Regions ###
 
-# Based on http://docs.aws.amazon.com/general/latest/gr/rande.html
-
-# See Issue #658 for why we don't just let boto handle this.
-
-
-# where to connect to EMR. The docs say
-# elasticmapreduce.<region>.amazonaws.com, but the SSL certificates,
-# they tell a different story. See Issue #621.
-
-# where the AWS docs say to connect to EMR
-_EMR_REGION_ENDPOINT = 'elasticmapreduce.%(region)s.amazonaws.com'
-# the host that currently works with EMR's SSL certificate
-_EMR_REGION_SSL_HOST = '%(region)s.elasticmapreduce.amazonaws.com'
-# the regionless endpoint doesn't have SSL issues
-_EMR_REGIONLESS_ENDPOINT = 'elasticmapreduce.amazonaws.com'
-
-# where to connect to S3
-_S3_REGION_ENDPOINT = 's3-%(region)s.amazonaws.com'
-_S3_REGIONLESS_ENDPOINT = 's3.amazonaws.com'
-
 # us-east-1 doesn't have its own endpoint or need bucket location constraints
 _S3_REGION_WITH_NO_LOCATION_CONSTRAINT = 'us-east-1'
-
-
-# "EU" is an alias for the eu-west-1 region
-_ALIAS_TO_REGION = {
-    'eu': 'eu-west-1',
-}
 
 # The region to assume if none is specified
 _DEFAULT_AWS_REGION = 'us-east-1'
 
 
-def _fix_region(region):
-    """Convert "EU" to "eu-west-1", None to '', and convert to lowercase."""
-    region = (region or '').lower()
-    return _ALIAS_TO_REGION.get(region) or region
-
-
-def emr_endpoint_for_region(region):
-    """Get the host for Elastic MapReduce in the given AWS region."""
-    region = _fix_region(region)
-
-    if not region:
-        return _EMR_REGIONLESS_ENDPOINT
-    else:
-        return _EMR_REGION_ENDPOINT % {'region': region}
-
-
-def emr_ssl_host_for_region(region):
-    """Get the host for Elastic MapReduce that matches their SSL cert
-    for the given region. (See Issue #621.)"""
-    region = _fix_region(region)
-
-    if not region:
-        return _EMR_REGIONLESS_ENDPOINT
-    else:
-        return _EMR_REGION_SSL_HOST % {'region': region}
-
-
-def s3_endpoint_for_region(region):
-    """Get the host for S3 in the given AWS region.
-
-    This will accept ``''`` for region as well, so it's fine to
-    use location constraint in place of region.
+def _boto3_now():
+    """Get a ``datetime`` that's compatible with :py:mod:`boto3`.
+    These are always UTC time, with time zone ``dateutil.tz.tzutc()``.
     """
-    region = _fix_region(region)
+    if tzutc is None:
+        raise ImportError(
+            'You must install dateutil to get boto3-compatible datetimes')
 
-    if not region or region == _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
-        return _S3_REGIONLESS_ENDPOINT
-    else:
-        return _S3_REGION_ENDPOINT % {'region': region}
+    return datetime.now(tzutc())
 
 
-def s3_location_constraint_for_region(region):
-    """Get the location constraint an S3 bucket needs so that other AWS
-    services can connect to it in the given region."""
-    region = _fix_region(region)
+def _boto3_paginate(what, boto3_client, api_call, **api_params):
+    """Yield results from a paginatable API client call.
 
-    if not region or region == _S3_REGION_WITH_NO_LOCATION_CONSTRAINT:
-        return ''
-    else:
-        return region
+    *what* is the name of the field the holds the list of items
+    in each page (e.g. ``'InstanceGroups'``).
+
+    This doesn't do anything magical; it just saves the trouble of creating
+    variable names for your paginator and its pages.
+
+    You can add the keyword ``_delay`` to *api_params* to sleep that many
+    seconds after each API call
+    """
+    # added the _delay kwarg for the audit-emr-usage tool; see #1091
+    _delay = api_params.pop('_delay', None)
+
+    paginator = boto3_client.get_paginator(api_call)
+    for page in paginator.paginate(**api_params):
+        if _delay:
+            time.sleep(_delay)
+
+        for item in page[what]:
+            yield item

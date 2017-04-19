@@ -33,23 +33,6 @@ from subprocess import Popen
 from subprocess import PIPE
 
 try:
-    import boto
-    import boto.ec2
-    import boto.emr
-    import boto.emr.connection
-    import boto.emr.instance_group
-    import boto.emr.emrobject
-    import boto.exception
-    import boto.https_connection
-    import boto.regioninfo
-    import boto.utils
-    boto  # quiet "redefinition of unused ..." warning from pyflakes
-except ImportError:
-    # don't require boto; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    boto = None
-
-try:
     import botocore.client
     botocore  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
@@ -60,7 +43,7 @@ try:
     import boto3.s3.transfer
     boto3  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
-    # don't require boto; MRJobs don't actually need it when running
+    # don't require boto3; MRJobs don't actually need it when running
     # inside hadoop streaming
     boto3 = None
 
@@ -70,17 +53,14 @@ import mrjob.step
 from mrjob.aws import _DEFAULT_AWS_REGION
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
-from mrjob.aws import emr_endpoint_for_region
-from mrjob.aws import emr_ssl_host_for_region
+from mrjob.aws import _boto3_now
+from mrjob.aws import _boto3_paginate
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import _EMR_BACKOFF
-from mrjob.fs.s3 import _EMR_BACKOFF_MULTIPLIER
-from mrjob.fs.s3 import _EMR_MAX_TRIES
 from mrjob.fs.s3 import _client_error_status
 from mrjob.fs.s3 import _endpoint_url
 from mrjob.fs.s3 import _get_bucket_region
@@ -106,20 +86,14 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
-from mrjob.parse import iso8601_to_timestamp
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.patched_boto import _patched_describe_cluster
-from mrjob.patched_boto import _patched_describe_step
-from mrjob.patched_boto import _patched_list_steps
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
-from mrjob.retry import RetryGoRound
-from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import BootstrapWorkingDirManager
@@ -130,6 +104,7 @@ from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
+from mrjob.util import strip_microseconds
 from mrjob.util import random_identifier
 
 
@@ -269,109 +244,6 @@ _CLUSTER_SELF_TERMINATED_RE = re.compile(
     '^.*The master node was terminated.*$', re.I)
 
 
-def _repeat(api_call, *args, **kwargs):
-    """Make the same API call repeatedly until we've seen every page
-    of the response (sets *marker* automatically).
-
-    Yields one or more responses.
-    """
-    # the _delay kwarg sleeps that many seconds before each API call
-    # (including the first). This was added for audit-emr-usage; should
-    # re-visit if we need to use more generally. See #1091
-
-    marker = None
-
-    _delay = kwargs.pop('_delay', None)
-
-    while True:
-        if _delay:
-            time.sleep(_delay)
-
-        resp = api_call(*args, marker=marker, **kwargs)
-        yield resp
-
-        # go to next page, if any
-        marker = getattr(resp, 'marker', None)
-        if not marker:
-            return
-
-
-def _yield_all_clusters(emr_conn, *args, **kwargs):
-    """Make successive API calls, yielding cluster summaries."""
-    for resp in _repeat(emr_conn.list_clusters, *args, **kwargs):
-        for cluster in getattr(resp, 'clusters', []):
-            yield cluster
-
-
-def _yield_all_bootstrap_actions(emr_conn, cluster_id, *args, **kwargs):
-    for resp in _repeat(emr_conn.list_bootstrap_actions,
-                        cluster_id, *args, **kwargs):
-        for action in getattr(resp, 'actions', []):
-            yield action
-
-
-def _yield_all_instances(emr_conn, cluster_id, *args, **kwargs):
-    """Get information about all instances for the given cluster."""
-    for resp in _repeat(emr_conn.list_instances,
-                        cluster_id, *args, **kwargs):
-        for instance in getattr(resp, 'instances', []):
-            yield instance
-
-
-def _yield_all_instance_groups(emr_conn, cluster_id, *args, **kwargs):
-    """Get all instance groups for the given cluster.
-
-    Not sure what order the API returns instance groups in (see #1316);
-    please treat it as undefined (make a dictionary, etc.)
-    """
-    for resp in _repeat(emr_conn.list_instance_groups,
-                        cluster_id, *args, **kwargs):
-        for group in getattr(resp, 'instancegroups', []):
-            yield group
-
-
-def _yield_all_steps(emr_conn, cluster_id, *args, **kwargs):
-    """Get all steps for the cluster, making successive API calls
-    if necessary.
-
-    Calls :py:func:`~mrjob.patched_boto._patched_list_steps`, to work around
-    `boto's StartDateTime bug <https://github.com/boto/boto/issues/3268>`__.
-
-    Note that this returns steps in *reverse* order, because that's what
-    the ``ListSteps`` API call does (see #1316). If you want to see all steps
-    in chronological order, use :py:func:`_list_all_steps`.
-    """
-    for resp in _repeat(_patched_list_steps, emr_conn, cluster_id,
-                        *args, **kwargs):
-        for step in getattr(resp, 'steps', []):
-            yield step
-
-
-def _list_all_steps(emr_conn, cluster_id, *args, **kwargs):
-    """Return all steps for the cluster as a list, in chronological order
-    (the reverse of :py:func:`_yield_all_steps`).
-    """
-    return list(reversed(list(
-        _yield_all_steps(emr_conn, cluster_id, *args, **kwargs))))
-
-
-def _step_ids_for_job(steps, job_key):
-    """Given a list of steps for a cluster, return a list of the (EMR) step
-    IDs for the job with the given key, in the same order.
-
-    Note that :py:func:`_yield_all_steps` returns steps in reverse order;
-    you probably want to use the value returned by
-    :pyfunc:`_list_all_steps` for *steps*.
-    """
-    step_ids = []
-
-    for step in steps:
-        if step.name.startswith(job_key):
-            step_ids.append(step.id)
-
-    return step_ids
-
-
 def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):
     """Generate the URI to lock the cluster ``cluster_id``"""
     return cloud_tmp_dir + 'locks/' + cluster_id + '/' + str(step_num)
@@ -398,8 +270,7 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
             return False
         else:
             # dateutil is a boto3 dependency
-            from dateutil.tz import tzutc
-            age = datetime.now(tzutc()) - key_data['LastModified']
+            age = _boto3_now() - key_data['LastModified']
             if age <= timedelta(minutes=mins_to_expiration):
                 return False
 
@@ -415,36 +286,9 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
 
 
 def _get_reason(cluster_or_step):
-    """Extract statechangereason.message from a boto Cluster or Step.
-
-    Default to ``''``."""
-    return getattr(
-        getattr(cluster_or_step.status, 'statechangereason', ''),
-        'message', '').rstrip()
-
-
-# only exists for deprecated boto library support, going away in v0.7.0
-def _wrap_aws_conn(raw_conn):
-    """Wrap a given boto Connection object so that it can retry when
-    throttled."""
-    def retry_if(ex):
-        """Retry if we get a server error indicating throttling. Also
-        handle spurious 505s that are thought to be part of a load
-        balancer issue inside AWS."""
-        return ((isinstance(ex, boto.exception.BotoServerError) and
-                 ('Throttling' in ex.body or
-                  'RequestExpired' in ex.body or
-                  ex.status == 505)) or
-                (isinstance(ex, socket.error) and
-                 ex.args in ((104, 'Connection reset by peer'),
-                             (110, 'Connection timed out'))))
-
-    return RetryWrapper(raw_conn,
-                        retry_if=retry_if,
-                        backoff=_EMR_BACKOFF,
-                        multiplier=_EMR_BACKOFF_MULTIPLIER,
-                        max_tries=_EMR_MAX_TRIES)
-
+    """Get state change reason message."""
+    # StateChangeReason is {} before the first state change
+    return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
 class EMRRunnerOptionStore(RunnerOptionStore):
@@ -600,8 +444,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         from mrjob.emr import EMRJobRunner
 
-        emr_conn = EMRJobRunner().make_emr_conn()
-        clusters = emr_conn.list_clusters()
+        emr_client = EMRJobRunner().make_emr_client()
+        clusters = emr_client.list_clusters()
         ...
     """
     alias = 'emr'
@@ -618,7 +462,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
 
         *aws_access_key_id* and *aws_secret_access_key* are required if you
-        haven't set them up already for boto (e.g. by setting the environment
+        haven't set them up already for boto3 (e.g. by setting the environment
         variables :envvar:`AWS_ACCESS_KEY_ID` and
         :envvar:`AWS_SECRET_ACCESS_KEY`)
 
@@ -814,7 +658,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Get the URI of the log directory for this job's cluster."""
         if not self._s3_log_dir_uri:
             cluster = self._describe_cluster()
-            log_uri = getattr(cluster, 'loguri', '')
+            log_uri = cluster.get('LogUri')
             if log_uri:
                 self._s3_log_dir_uri = '%s%s/' % (
                     log_uri.replace('s3n://', 's3://'), self._cluster_id)
@@ -946,7 +790,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if self.fs.exists(self._output_dir):
                 raise IOError(
                     'Output path %s already exists!' % (self._output_dir,))
-        except boto.exception.S3ResponseError:
+        except botocore.exceptions.ClientError:
             pass
 
     def _add_bootstrap_files_for_upload(self, persistent=False):
@@ -1254,7 +1098,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 and not self._opts['pool_clusters']:
             log.info('Terminating cluster: %s' % self._cluster_id)
             try:
-                self.make_emr_conn().terminate_jobflow(self._cluster_id)
+                self.make_emr_client().terminate_job_flows(
+                    JobFlowIds=[self._cluster_id]
+                )
             except Exception as e:
                 log.exception(e)
 
@@ -1287,12 +1133,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # If we don't have a cluster, then we can't terminate it.
             return
 
-        emr_conn = self.make_emr_conn()
+        emr_client = self.make_emr_client()
         try:
             log.info("Attempting to terminate cluster")
-            emr_conn.terminate_jobflow(self._cluster_id)
+            emr_client.terminate_job_flows(
+                JobFlowIds=[self._cluster_id]
+            )
         except Exception as e:
-            # Something happened with boto and the user should know.
+            # Something happened with boto3 and the user should know.
             log.exception(e)
             return
         log.info('Cluster %s successfully terminated' % self._cluster_id)
@@ -1309,17 +1157,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             cluster = self._describe_cluster()
 
         log.info('Waiting for cluster (%s) to terminate...' %
-                 cluster.id)
+                 cluster['Id'])
 
-        if (cluster.status.state == 'WAITING' and
-                cluster.autoterminate != 'true'):
+        if (cluster['Status']['State'] == 'WAITING' and
+                cluster['AutoTerminate']):
             raise Exception('Operation requires cluster to terminate, but'
                             ' it may never do so.')
 
         while True:
-            log.info('  %s' % cluster.status.state)
+            log.info('  %s' % cluster['Status']['State'])
 
-            if cluster.status.state in (
+            if cluster['Status']['State'] in (
                     'TERMINATED', 'TERMINATED_WITH_ERRORS'):
                 return
 
@@ -1391,43 +1239,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return self._opts[role + '_instance_bid_price']
 
-    def _create_instance_group(
-            self, role, instance_type, num_instances, bid_price):
-        """Helper method for creating instance groups. For use when
-        creating a cluster using a list of InstanceGroups
-
-            - Role is either 'master', 'core', or 'task'.
-            - instance_type is an EC2 instance type
-            - count is an int
-            - bid_price is a number, a string, or None. If None,
-              this instance group will be use the ON-DEMAND market
-              instead of the SPOT market.
-        """
-        if role not in _INSTANCE_ROLES:
-            raise ValueError
-
-        if not instance_type:
-            raise ValueError
-
-        if not num_instances:
-            raise ValueError
-
-        if bid_price:
-            market = 'SPOT'
-            bid_price = str(bid_price)  # must be a string
-        else:
-            market = 'ON_DEMAND'
-            bid_price = None
-
-        return boto.emr.instance_group.InstanceGroup(
-            num_instances=num_instances,
-            role=role.upper(),
-            type=instance_type,
-            market=market,
-            name=role,  # just name the groups "core", "master", and "task"
-            bidprice=bid_price)
-
-    def _create_cluster(self, persistent=False, steps=None):
+    def _create_cluster(self, persistent=False):
         """Create an empty cluster on EMR, and return the ID of that
         job.
 
@@ -1441,14 +1253,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         self._wait_for_s3_eventual_consistency()
 
         log.debug('Creating Elastic MapReduce cluster')
-        args = self._cluster_args(persistent, steps)
+        emr_client = self.make_emr_client()
 
-        emr_conn = self.make_emr_conn()
-        log.debug('Calling run_jobflow(%r, %r, %s)' % (
-            self._job_key, self._opts['cloud_log_dir'],
-            ', '.join('%s=%r' % (k, v) for k, v in args.items())))
-        cluster_id = emr_conn.run_jobflow(
-            self._job_key, self._opts['cloud_log_dir'], **args)
+        kwargs = self._cluster_kwargs(persistent)
+        log.debug('Calling run_job_flow(%s)' % (
+            ', '.join('%s=%r' % (k, v)
+                      for k, v in sorted(kwargs.items()))))
+        cluster_id = emr_client.run_job_flow(**kwargs)['JobFlowId']
 
          # keep track of when we started our job
         self._emr_job_start = time.time()
@@ -1456,58 +1267,78 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.debug('Cluster created with ID: %s' % cluster_id)
 
         # set EMR tags for the cluster, if any
-        tags = self._opts['tags']
-        if tags:
-            log.info('Setting EMR tags: %s' % ', '.join(
-                '%s=%s' % (tag, value or '') for tag, value in tags.items()))
-            emr_conn.add_tags(cluster_id, tags)
+        self._add_tags(self._opts['tags'], cluster_id)
 
         return cluster_id
 
+    def _add_tags(self, tags, cluster_id):
+        """Add tags in the dict *tags* to cluster *cluster_id*. Do nothing
+        if *tags* is empty or ``None``"""
+        if not tags:
+            return
+
+        tags_items = sorted(tags.items())
+        log.info('Add EMR tags to cluster %s: %s' % (
+            cluster_id,
+            ', '.join('%s=%s' % (tag, value) for tag, value in tags_items)))
+
+        self.make_emr_client().add_tags(
+            ResourceId=cluster_id,
+            Tags=[dict(Key=k, Value=v) for k, v in tags_items])
+
     # TODO: could break this into sub-methods for clarity
-    def _cluster_args(self, persistent=False, steps=None):
-        """Build kwargs for emr_conn.run_jobflow()"""
-        args = {}
-        api_params = {}
+    def _cluster_kwargs(self, persistent=False):
+        """Build kwargs for emr_client.run_job_flow()"""
+        kwargs = {}
+
+        kwargs['Name'] = self._job_key
+
+        kwargs['LogUri'] = self._opts['cloud_log_dir']
 
         if self._opts['release_label']:
-            api_params['ReleaseLabel'] = self._opts['release_label']
+            kwargs['ReleaseLabel'] = self._opts['release_label']
         else:
-            args['ami_version'] = self._opts['image_version']
+            kwargs['AmiVersion'] = self._opts['image_version']
+
+        # capitalizing Instances because it's just an API parameter
+        kwargs['Instances'] = Instances = {}
 
         if self._opts['zone']:
-            args['availability_zone'] = self._opts['zone']
+            Instances['Placement'] = dict(AvailabilityZone=self._opts['zone'])
+
         # The old, simple API, available if we're not using task instances
         # or bid prices
         if not (self._num_instances('task') or
                 any(self._instance_bid_price(role)
                     for role in _INSTANCE_ROLES)):
-            args['num_instances'] = self._num_instances('core') + 1
-            args['master_instance_type'] = self._instance_type('master')
-            args['slave_instance_type'] = self._instance_type('core')
+            Instances['InstanceCount'] = self._num_instances('core') + 1
+            Instances['MasterInstanceType'] = self._instance_type('master')
+            Instances['SlaveInstanceType'] = self._instance_type('core')
         else:
-            # Create a list of InstanceGroups
-            args['instance_groups'] = []
+            Instances['InstanceGroups'] = []
 
+            # Create a list of InstanceGroups
             for role in _INSTANCE_ROLES:
                 num_instances = self._num_instances(role)
 
                 if num_instances:
-                    args['instance_groups'].append(
-                        self._create_instance_group(
+                    Instances['InstanceGroups'].append(
+                        _build_instance_group(
                             role=role,
                             instance_type=self._instance_type(role),
                             num_instances=self._num_instances(role),
                             bid_price=self._instance_bid_price(role)))
 
         # bootstrap actions
-        bootstrap_action_args = []
+        kwargs['BootstrapActions'] = BootstrapActions = []
 
         for i, bootstrap_action in enumerate(self._bootstrap_actions()):
             uri = self._upload_mgr.uri(bootstrap_action['path'])
-            bootstrap_action_args.append(
-                boto.emr.BootstrapAction(
-                    'action %d' % i, uri, bootstrap_action['args']))
+            BootstrapActions.append(dict(
+                Name=('action %d' % i),
+                ScriptBootstrapAction=dict(
+                    Path=uri,
+                    Args=bootstrap_action['args'])))
 
         if self._master_bootstrap_script_path:
             master_bootstrap_script_args = []
@@ -1516,74 +1347,72 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     'pool-' + self._pool_hash(),
                     self._opts['pool_name'],
                 ]
-            bootstrap_action_args.append(
-                boto.emr.BootstrapAction(
-                    'master',
-                    self._upload_mgr.uri(self._master_bootstrap_script_path),
-                    master_bootstrap_script_args))
+            uri = self._upload_mgr.uri(self._master_bootstrap_script_path)
+
+            BootstrapActions.append(dict(
+                Name='master',
+                ScriptBootstrapAction=dict(
+                    Path=uri,
+                    Args=master_bootstrap_script_args)))
 
         if persistent or self._opts['pool_clusters']:
-            args['keep_alive'] = True
+            Instances['KeepJobFlowAliveWhenNoSteps'] = True
 
             # only use idle termination script on persistent clusters
             # add it last, so that we don't count bootstrapping as idle time
             if self._opts['max_hours_idle']:
-                s3_uri = self._upload_mgr.uri(
+                uri = self._upload_mgr.uri(
                     _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
                 # script takes args in (integer) seconds
-                ba_args = [int(self._opts['max_hours_idle'] * 3600),
-                           int(self._opts['mins_to_end_of_hour'] * 60)]
-                bootstrap_action_args.append(
-                    boto.emr.BootstrapAction('idle timeout', s3_uri, ba_args))
-
-        if bootstrap_action_args:
-            args['bootstrap_actions'] = bootstrap_action_args
+                ba_args = [str(int(self._opts['max_hours_idle'] * 3600)),
+                           str(int(self._opts['mins_to_end_of_hour'] * 60))]
+                BootstrapActions.append(dict(
+                    Name='idle timeout',
+                    ScriptBootstrapAction=dict(
+                        Path=uri,
+                        Args=ba_args)))
 
         if self._opts['ec2_key_pair']:
-            args['ec2_keyname'] = self._opts['ec2_key_pair']
+            Instances['Ec2KeyName'] = self._opts['ec2_key_pair']
+
+        kwargs['Steps'] = Steps = []
 
         if self._opts['enable_emr_debugging']:
-            args['enable_debugging'] = True
+            # other steps are added separately
+            Steps.append(self._build_debugging_step())
 
         if self._opts['additional_emr_info']:
-            args['additional_info'] = self._opts['additional_emr_info']
+            kwargs['AdditionalInfo'] = self._opts['additional_emr_info']
 
-        # boto's connect_emr() has keyword args for these, but they override
-        # emr_api_params, which is not what we want.
-        api_params['VisibleToAllUsers'] = str(bool(
-            self._opts['visible_to_all_users'])).lower()
+        kwargs['VisibleToAllUsers'] = bool(
+            self._opts['visible_to_all_users'])
 
-        api_params['JobFlowRole'] = self._instance_profile()
-        api_params['ServiceRole'] = self._service_role()
+        kwargs['JobFlowRole'] = self._instance_profile()
+        kwargs['ServiceRole'] = self._service_role()
 
         applications = self._applications()
         if applications:
-            api_params['Applications'] = [
+            kwargs['Applications'] = [
                 dict(Name=a) for a in sorted(applications)]
 
         if self._opts['emr_configurations']:
-            # Properties will be automatically converted to KeyValue objects
-            api_params['Configurations'] = self._opts['emr_configurations']
+            kwargs['Configurations'] = self._opts['emr_configurations']
 
         if self._opts['subnet']:
-            api_params['Instances.Ec2SubnetId'] = self._opts['subnet']
+            Instances['Ec2SubnetId'] = self._opts['subnet']
 
         if self._opts['emr_api_params']:
-            api_params.update(self._opts['emr_api_params'])
+            kwargs.update(self._opts['emr_api_params'])
 
-        args['api_params'] = _encode_emr_api_params(api_params)
-
-        if steps:
-            args['steps'] = steps
-
-        return args
+        return kwargs
 
     def _instance_profile(self):
         try:
             return (self._opts['iam_instance_profile'] or
-                    get_or_create_mrjob_instance_profile(self.make_iam_client()))
-        except boto.exception.BotoServerError as ex:
-            if ex.status != 403:
+                    get_or_create_mrjob_instance_profile(
+                        self.make_iam_client()))
+        except botocore.exceptions.ClientError as ex:
+            if _client_error_status(ex) != 403:
                 raise
             log.warning(
                 "Can't access IAM API, trying default instance profile: %s" %
@@ -1594,8 +1423,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         try:
             return (self._opts['iam_service_role'] or
                     get_or_create_mrjob_service_role(self.make_iam_client()))
-        except boto.exception.BotoServerError as ex:
-            if ex.status != 403:
+        except botocore.exceptions.ClientError as ex:
+            if _client_error_status(ex) != 403:
                 raise
             log.warning(
                 "Can't access IAM API, trying default service role: %s" %
@@ -1613,8 +1442,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             return 'TERMINATE_CLUSTER'
 
     def _build_steps(self):
-        """Return a list of boto Step objects corresponding to the
-        steps we want to run."""
+        """Return a step data structures to pass to ``boto3``"""
         # quick, add the other steps before the job spins up and
         # then shuts itself down! (in practice that won't happen
         # for several minutes)
@@ -1632,67 +1460,51 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         step = self._get_step(step_num)
 
         if step['type'] == 'streaming':
-            return self._build_streaming_step(step_num)
+            method = self._streaming_step_hadoop_jar_step
         elif step['type'] == 'jar':
-            return self._build_jar_step(step_num)
+            method = self._jar_step_hadoop_jar_step
         elif _is_spark_step_type(step['type']):
-            return self._build_spark_step(step_num)
+            method = self._spark_step_hadoop_jar_step
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
-    def _build_streaming_step(self, step_num):
-        jar, step_arg_prefix = self._get_streaming_jar_and_step_arg_prefix()
+        hadoop_jar_step = method(step_num)
 
-        streaming_step_kwargs = dict(
-            action_on_failure=self._action_on_failure(),
-            input=self._step_input_uris(step_num),
-            jar=jar,
-            name='%s: Step %d of %d' % (
-                self._job_key, step_num + 1, self._num_steps()),
-            output=self._step_output_uri(step_num),
+        return dict(
+            ActionOnFailure=self._action_on_failure(),
+            HadoopJarStep=hadoop_jar_step,
+            Name=self._step_name(step_num),
         )
 
-        step_args = []
-        step_args.extend(step_arg_prefix)  # add 'hadoop-streaming' for 4.x
-        step_args.extend(self._upload_args())
-        step_args.extend(self._hadoop_args_for_step(step_num))
+    def _streaming_step_hadoop_jar_step(self, step_num):
+        jar, step_arg_prefix = self._get_streaming_jar_and_step_arg_prefix()
 
-        streaming_step_kwargs['step_args'] = step_args
+        args = (step_arg_prefix +
+                self._hadoop_streaming_jar_args(step_num))
 
-        mapper, combiner, reducer = (
-            self._hadoop_streaming_commands(step_num))
+        return dict(Jar=jar, Args=args)
 
-        streaming_step_kwargs['mapper'] = mapper
-        streaming_step_kwargs['combiner'] = combiner
-        streaming_step_kwargs['reducer'] = reducer
-
-        return boto.emr.StreamingStep(**streaming_step_kwargs)
-
-    def _build_jar_step(self, step_num):
+    def _jar_step_hadoop_jar_step(self, step_num):
         step = self._get_step(step_num)
 
         jar = self._upload_uri_or_remote_path(step['jar'])
-        step_args = self._interpolate_input_and_output(step['args'], step_num)
 
-        # -libjars, -D comes before jar-specific args
-        step_args = self._hadoop_generic_args_for_step(step_num) + step_args
+        args = (
+            # -libjars, -D comes before jar-specific args
+            self._hadoop_generic_args_for_step(step_num) +
+            self._interpolate_input_and_output(step['args'], step_num))
 
-        return boto.emr.JarStep(
-            name=self._step_name(step_num),
-            jar=jar,
-            main_class=step['main_class'],
-            step_args=step_args,
-            action_on_failure=self._action_on_failure())
+        hadoop_jar_step = dict(Jar=jar, Args=args)
 
-    def _build_spark_step(self, step_num):
-        """Returns a boto.emr.JarStep suitable for running all Spark
-        step types (``spark``, ``spark_jar``, and ``spark_script``).
-        """
-        return boto.emr.JarStep(
-            name=self._step_name(step_num),
-            jar=self._spark_jar(),
-            step_args=self._args_for_spark_step(step_num),
-            action_on_failure=self._action_on_failure())
+        if step.get('main_class'):
+            hadoop_jar_step['MainClass'] = step['main_class']
+
+        return hadoop_jar_step
+
+    def _spark_step_hadoop_jar_step(self, step_num):
+        return dict(
+            Jar=self._spark_jar(),
+            Args=self._args_for_spark_step(step_num))
 
     def _interpolate_spark_script_path(self, path):
         return self._upload_uri_or_remote_path(path)
@@ -1741,9 +1553,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         jar = self._script_runner_jar_uri()
         step_args = [self._upload_mgr.uri(self._master_node_setup_script_path)]
 
-        return boto.emr.JarStep(
-            name=name, jar=jar, step_args=step_args,
-            action_on_failure=self._action_on_failure())
+        return dict(
+            Name=name,
+            ActionOnFailure=self._action_on_failure(),
+            HadoopJarStep=dict(
+                Jar=jar,
+                Args=step_args,
+            )
+        )
 
     def _libjar_paths(self):
         results = []
@@ -1789,7 +1606,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         its ID.
         """
         self._create_s3_tmp_bucket_if_needed()
-        emr_conn = self.make_emr_conn()
+        emr_client = self.make_emr_client()
 
         # try to find a cluster from the pool. basically auto-fill
         # 'cluster_id' if possible and then follow normal behavior.
@@ -1819,42 +1636,40 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # define our steps
         steps = self._build_steps()
-        log.debug('Calling add_jobflow_steps(%r, %r)' % (
-            self._cluster_id, steps))
-        emr_conn.add_jobflow_steps(self._cluster_id, steps)
+        steps_kwargs = dict(JobFlowId=self._cluster_id, Steps=steps)
+        log.debug('Calling add_job_flow_steps(%s)' % ','.join(
+            ('%s=%r' % (k, v)) for k, v in steps_kwargs.items()))
+        emr_client.add_job_flow_steps(**steps_kwargs)
 
         # keep track of when we launched our job
         self._emr_job_start = time.time()
 
         # set EMR tags for the job, if any
-        tags = self._opts['tags']
-        if tags:
-            log.info('Setting EMR tags: %s' %
-                     ', '.join('%s=%s' % (tag, value)
-                               for tag, value in tags.items()))
-            emr_conn.add_tags(self._cluster_id, tags)
+        self._add_tags(self._opts['tags'], self._cluster_id)
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
-    def _job_steps(self, max_steps=None):
-        """Get the steps we submitted for this job in chronological order,
-        ignoring steps from other jobs.
+    def _job_step_ids(self, max_steps=None):
+        """Get the IDs of the steps we submitted for this job
+         in chronological order, ignoring steps from other jobs.
 
         Generally, you want to set *max_steps*, so we can make as few API
         calls as possible.
         """
-        # the API yields steps in reversed order. Once we've found the expected
-        # number of steps, stop.
-        #
-        # This implicitly excludes the master node setup script, which
-        # is what we want for now.
-        return list(reversed(list(islice(
-            (step for step in
-             _yield_all_steps(self.make_emr_conn(), self.get_cluster_id())
-             if step.name.startswith(self._job_key)),
-            max_steps))))
+        # yield all steps whose name matches our job key
+        def yield_step_ids():
+            emr_client = self.make_emr_client()
+            for step in _boto3_paginate('Steps', emr_client, 'list_steps',
+                                  ClusterId=self._cluster_id):
+                if step['Name'].startswith(self._job_key):
+                    yield step['Id']
+
+        # list_steps() returns steps in reverse chronological order.
+        # put them in forward chronological order, only keeping the
+        # last *max_steps* steps.
+        return list(reversed(list(islice(yield_step_ids(), max_steps))))
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
@@ -1867,9 +1682,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             max_steps = num_steps
 
-        job_steps = self._job_steps(max_steps=max_steps)
+        step_ids = self._job_step_ids(max_steps=max_steps)
 
-        if len(job_steps) < max_steps:
+        if len(step_ids) < max_steps:
             raise AssertionError("Can't find our steps in the cluster!")
 
         # clear out log interpretations if they were filled somehow
@@ -1879,7 +1694,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # open SSH tunnel if cluster is already ready
         # (this happens with pooling). See #1115
         cluster = self._describe_cluster()
-        if cluster.status.state in ('RUNNING', 'WAITING'):
+        if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
             self._set_up_ssh_tunnel()
 
         # treat master node setup as step -1
@@ -1888,17 +1703,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             start = 0
 
-        for step_num, step in enumerate(job_steps, start=start):
+        for step_num, step_id in enumerate(step_ids, start=start):
             # this will raise an exception if a step fails
             if step_num == -1:
                 log.info(
                     'Waiting for master node setup step (%s) to complete...' %
-                    step.id)
+                    step_id)
             else:
                 log.info('Waiting for step %d of %d (%s) to complete...' % (
-                    step_num + 1, num_steps, step.id))
+                    step_num + 1, num_steps, step_id))
 
-            self._wait_for_step_to_complete(step.id, step_num, num_steps)
+            self._wait_for_step_to_complete(step_id, step_num, num_steps)
 
     def _wait_for_step_to_complete(
             self, step_id, step_num=None, num_steps=None):
@@ -1926,7 +1741,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         else:
             self._log_interpretations.append(log_interpretation)
 
-        emr_conn = self.make_emr_conn()
+        emr_client = self.make_emr_client()
 
         while True:
             # don't antagonize EMR's throttling
@@ -1934,30 +1749,30 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                       self._opts['check_cluster_every'])
             time.sleep(self._opts['check_cluster_every'])
 
-            step = _patched_describe_step(emr_conn, self._cluster_id, step_id)
+            step = emr_client.describe_step(
+                ClusterId=self._cluster_id, StepId=step_id)['Step']
 
-            if step.status.state == 'PENDING':
+            if step['Status']['State'] == 'PENDING':
                 cluster = self._describe_cluster()
 
-                reason = _get_reason(cluster)
+                reason =_get_reason(cluster)
                 reason_desc = (': %s' % reason) if reason else ''
 
                 # we can open the ssh tunnel if cluster is ready (see #1115)
-                if cluster.status.state in ('RUNNING', 'WAITING'):
+                if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
                     self._set_up_ssh_tunnel()
 
                 log.info('  PENDING (cluster is %s%s)' % (
-                    cluster.status.state, reason_desc))
+                    cluster['Status']['State'], reason_desc))
                 continue
 
-            if step.status.state == 'RUNNING':
+            elif step['Status']['State'] == 'RUNNING':
                 time_running_desc = ''
 
-                startdatetime = getattr(
-                    getattr(step.status, 'timeline', ''), 'startdatetime', '')
-                if startdatetime:
-                    start = iso8601_to_timestamp(startdatetime)
-                    time_running_desc = ' for %.1fs' % (time.time() - start)
+                start = step['Status']['Timeline'].get('StartDateTime')
+                if start:
+                    time_running_desc = ' for %s' % strip_microseconds(
+                        _boto3_now() - start)
 
                 # now is the time to tunnel, if we haven't already
                 self._set_up_ssh_tunnel()
@@ -1971,7 +1786,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 continue
 
             # we're done, will return at the end of this
-            if step.status.state == 'COMPLETED':
+            elif step['Status']['State'] == 'COMPLETED':
                 log.info('  COMPLETED')
                 # will fetch counters, below, and then return
             else:
@@ -1981,7 +1796,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 reason_desc = (' (%s)' % reason) if reason else ''
 
                 log.info('  %s%s' % (
-                    step.status.state, reason_desc))
+                    step['Status']['State'], reason_desc))
 
                 # print cluster status; this might give more context
                 # why step didn't succeed
@@ -1989,12 +1804,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 reason = _get_reason(cluster)
                 reason_desc = (': %s' % reason) if reason else ''
                 log.info('Cluster %s %s %s%s' % (
-                    cluster.id,
-                    'was' if 'ED' in cluster.status.state else 'is',
-                    cluster.status.state,
+                    cluster['Id'],
+                    'was' if 'ED' in cluster['Status']['State'] else 'is',
+                    cluster['Status']['State'],
                     reason_desc))
 
-                if cluster.status.state in (
+                if cluster['Status']['State'] in (
                         'TERMINATING', 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
                     # was it caused by a pooled cluster self-terminating?
                     # (if so, raise _PooledClusterSelfTerminatedException)
@@ -2014,7 +1829,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters. (Except for master node setup
             # and Spark, which has no counters.)
-            if step.status.state != 'CANCELLED':
+            if step['Status']['State'] != 'CANCELLED':
                 if step_num >= 0 and not _is_spark_step_type(step_type):
                     counters = self._pick_counters(
                         log_interpretation, step_type)
@@ -2023,10 +1838,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     else:
                         log.warning('No counters found')
 
-            if step.status.state == 'COMPLETED':
+            if step['Status']['State'] == 'COMPLETED':
                 return
 
-            if step.status.state == 'FAILED':
+            if step['Status']['State'] == 'FAILED':
                 error = self._pick_error(log_interpretation, step_type)
                 if error:
                     log.error('Probable cause of failure:\n\n%s\n\n' %
@@ -2137,7 +1952,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # not other bootstrap actions)
 
         # our step should be CANCELLED (not failed)
-        if step.status.state != 'CANCELLED':
+        if step['Status']['State'] != 'CANCELLED':
             return
 
         # we *could* check if the step had a chance to start by checking if
@@ -2371,14 +2186,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         (This currently returns IP addresses rather than full hostnames
         because they're shorter.)
         """
-        return [
-            instance.privateipaddress for instance in
-            _yield_all_instances(
-                self.make_emr_conn(),
-                self._cluster_id,
-                instance_group_types=['CORE', 'TASK'])
-            if instance.status.state == 'RUNNING'
-        ]
+        emr_client = self.make_emr_client()
+
+        instances = _boto3_paginate(
+            'Instances', emr_client, 'list_instances',
+            ClusterId=self._cluster_id,
+            InstanceGroupTypes=['CORE', 'TASK'],
+            InstanceStates=['RUNNING'])
+
+        hosts = []
+
+        for instance in instances:
+            hosts.append(instance['PrivateIpAddress'])
+
+        return hosts
 
     def _wait_for_logs_on_s3(self):
         """If the cluster is already terminating, wait for it to terminate,
@@ -2388,11 +2209,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """
         cluster = self._describe_cluster()
 
-        if cluster.status.state in (
+        if cluster['Status']['State'] in (
                 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
             return  # already terminated
 
-        if cluster.status.state != 'TERMINATING':
+        if cluster['Status']['State'] != 'TERMINATING':
             # going to need to wait for logs to get archived to S3
 
             # "step_num" is just a unique ID for the step; using -1
@@ -2759,6 +2580,26 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             's3://%s.elasticmapreduce/libs/script-runner/script-runner.jar' %
             self._opts['region'])
 
+    def _build_debugging_step(self):
+        if self._opts['release_label']:
+            jar = _4_X_COMMAND_RUNNER_JAR
+            args = ['state-pusher-script']
+        else:
+            jar = self._script_runner_jar_uri()
+            args = (
+                's3://%s.elasticmapreduce/libs/state-pusher/0.1/fetch' %
+                self._opts['region'])
+
+        return dict(
+            Name='Setup Hadoop Debugging',
+            HadoopJarStep=dict(Jar=jar, Args=args),
+        )
+
+    def _debug_script_uri(self):
+        return (
+            's3://%s.elasticmapreduce/libs/state-pusher/0.1/fetch' %
+            self._opts['region'])
+
     ### EMR JOB MANAGEMENT UTILS ###
 
     def make_persistent_cluster(self):
@@ -2783,8 +2624,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         """Get the ID of the cluster our job is running on, or ``None``."""
         return self._cluster_id
 
-    def _usable_clusters(self, emr_conn=None, exclude=None, num_steps=1):
-        """Get clusters that this runner can join.
+    def _usable_clusters(self, exclude=None, num_steps=1):
+        """Get clusters that this runner can join, returning a list of
+        ``(cluster_id, num_steps)`` (number of steps is used for locking).
 
         We basically expect to only join available clusters with the exact
         same setup as our own, that is:
@@ -2811,7 +2653,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         :return: tuple of (:py:class:`botoemr.emrobject.Cluster`,
                            num_steps_in_cluster)
         """
-        emr_conn = emr_conn or self.make_emr_conn()
+        emr_client = self.make_emr_client()
         exclude = exclude or set()
 
         req_hash = self._pool_hash()
@@ -2844,30 +2686,29 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         key_cluster_steps_list = []
 
         def add_if_match(cluster):
-            log.debug('  Considering joining cluster %s...' % cluster.id)
+            log.debug('  Considering joining cluster %s...' % cluster['Id'])
 
             # skip if user specified a key pair and it doesn't match
             if (self._opts['ec2_key_pair'] and
-                self._opts['ec2_key_pair'] !=
-                getattr(getattr(cluster,
-                                'ec2instanceattributes', None),
-                        'ec2keyname', None)):
+                    self._opts['ec2_key_pair'] !=
+                    cluster['Ec2InstanceAttributes'].get('Ec2KeyName')):
                 log.debug('    ec2 key pair mismatch')
                 return
 
             # this may be a retry due to locked clusters
-            if cluster.id in exclude:
+            if cluster['Id'] in exclude:
                 log.debug('    excluded')
                 return
 
             # only take persistent clusters
-            if cluster.autoterminate != 'false':
+            if cluster['AutoTerminate']:
                 log.debug('    not persistent')
                 return
 
             # match pool name, and (bootstrap) hash
-            bootstrap_actions = list(_yield_all_bootstrap_actions(
-                emr_conn, cluster.id))
+            bootstrap_actions = list(_boto3_paginate(
+                'BootstrapActions',
+                emr_client, 'list_bootstrap_actions', ClusterId=cluster['Id']))
             pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
 
             if req_hash != pool_hash:
@@ -2881,7 +2722,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             if self._opts['release_label']:
                 # just check for exact match. EMR doesn't have a concept
                 # of partial release labels like it does for AMI versions.
-                release_label = getattr(cluster, 'releaselabel', '')
+                release_label = cluster.get('ReleaseLabel')
 
                 if release_label != self._opts['release_label']:
                     log.debug('    release label mismatch')
@@ -2891,7 +2732,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 max_steps = _4_X_MAX_STEPS
             else:
                 # match actual AMI version
-                image_version = getattr(cluster, 'runningamiversion', '')
+                image_version = cluster.get('RunningAmiVersion', '')
                 # Support partial matches, e.g. let a request for
                 # '2.4' pass if the version is '2.4.2'. The version
                 # extracted from the existing cluster should always
@@ -2907,30 +2748,29 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             applications = self._applications()
             if applications:
                 # use case-insensitive mapping (see #1417)
-                cluster_applications = set(
-                    a.name.lower() for a in cluster.applications)
+                expected_applications = set(a.lower() for a in applications)
 
-                expected_applications = set(
-                    a.lower() for a in applications)
+                cluster_applications = set(
+                    a['Name'].lower() for a in cluster.get('Applications', []))
 
                 if not expected_applications <= cluster_applications:
                     log.debug('    missing applications: %s' % ', '.join(
                         sorted(expected_applications - cluster_applications)))
                     return
 
-            emr_configurations = _decode_configurations_from_api(
-                getattr(cluster, 'configurations', []))
+            emr_configurations = cluster.get('Configurations', [])
             if self._opts['emr_configurations'] != emr_configurations:
                 log.debug('    emr configurations mismatch')
                 return
 
-            subnet = getattr(
-                cluster.ec2instanceattributes, 'ec2subnetid', None)
+            subnet = cluster['Ec2InstanceAttributes'].get('Ec2SubnetId')
             if subnet != (self._opts['subnet'] or None):
                 log.debug('    subnet mismatch')
                 return
 
-            steps = _list_all_steps(emr_conn, cluster.id)
+            steps = list(_boto3_paginate(
+                'Steps',
+                emr_client, 'list_steps', ClusterId=cluster['Id']))
 
             # don't add more steps than EMR will allow/display through the API
             if len(steps) + num_steps > max_steps:
@@ -2940,14 +2780,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             # in rare cases, cluster can be WAITING *and* have incomplete
             # steps. We could just check for PENDING steps, but we're
             # trying to be defensive about EMR adding a new step state.
-            #
-            # TODO: checking for PENDING steps seems pretty safe
+            # Not entirely sure what to make of CANCEL_PENDING
             for step in steps:
-                if ((getattr(step.status, 'timeline', None) is None or
-                     getattr(step.status.timeline, 'enddatetime', None)
-                     is None) and
-                    getattr(step.status, 'state', None) not in
-                        ('CANCELLED', 'INTERRUPTED')):
+                if (step['Status']['State'] not in ('CANCELLED', 'INTERRUPTED')
+                        and not step['Status'].get('Timeline', {}).get(
+                            'EndDateTime')):
                     log.debug('    unfinished steps')
                     return
 
@@ -2959,10 +2796,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
-            for ig in _yield_all_instance_groups(emr_conn, cluster.id):
-                # if you edit this code, please don't rely on any particular
-                # ordering of instance groups (see #1316)
-                role = ig.instancegrouptype.lower()
+            for ig in _boto3_paginate(
+                    'InstanceGroups', emr_client, 'list_instance_groups',
+                    ClusterId=cluster['Id']):
+                role = ig['InstanceGroupType'].lower()
 
                 # unknown, new kind of role; bail out!
                 if role not in ('core', 'master', 'task'):
@@ -2970,9 +2807,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     return
 
                 req_instance_type = role_to_req_instance_type[role]
-                if ig.instancetype != req_instance_type:
+                if ig['InstanceType'] != req_instance_type:
                     # if too little memory, bail out
-                    mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype, 0.0)
+                    mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(
+                        ig['InstanceType'], 0.0)
                     req_mem = role_to_req_mem.get(role, 0.0)
                     if mem < req_mem:
                         log.debug('    too little memory')
@@ -2980,7 +2818,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
                 # if bid price is too low, don't count compute units
                 req_bid_price = role_to_req_bid_price[role]
-                bid_price = getattr(ig, 'bidprice', None)
+                bid_price = ig.get('BidPrice')
 
                 # if the instance is on-demand (no bid price) or bid prices
                 # are the same, we're okay
@@ -3001,16 +2839,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 # we started our own cluster from scratch. (This can happen if
                 # the previous job finished while some task instances were
                 # still being provisioned.)
-                cu = (int(ig.requestedinstancecount) *
+                cu = (ig['RequestedInstanceCount'] *
                       EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(
-                          ig.instancetype, 0.0))
+                          ig['InstanceType'], 0.0))
                 role_to_cu.setdefault(role, 0.0)
                 role_to_cu[role] += cu
 
                 # track number of instances of the same type
-                if ig.instancetype == req_instance_type:
+                if ig['InstanceType'] == req_instance_type:
                     role_to_matched_instances[role] += (
-                        int(ig.requestedinstancecount))
+                        int(ig['RequestedInstanceCount']))
 
             # check if there are enough compute units
             for role, req_cu in role_to_req_cu.items():
@@ -3029,11 +2867,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         _est_time_to_hour(cluster))
 
             log.debug('    OK')
-            key_cluster_steps_list.append((sort_key, cluster.id, len(steps)))
+            key_cluster_steps_list.append(
+                (sort_key, cluster['Id'], len(steps)))
 
-        for cluster_summary in _yield_all_clusters(
-                emr_conn, cluster_states=['WAITING']):
-            cluster = _patched_describe_cluster(emr_conn, cluster_summary.id)
+        for cluster_summary in _boto3_paginate(
+                'Clusters', emr_client, 'list_clusters',
+                ClusterStates=['WAITING']):
+
+            cluster = emr_client.describe_cluster(
+                ClusterId=cluster_summary['Id'])['Cluster']
+
             add_if_match(cluster)
 
         return [(cluster_id, cluster_num_steps) for
@@ -3046,7 +2889,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         Return ``None`` if no suitable clusters exist.
         """
         exclude = set()
-        emr_conn = self.make_emr_conn()
         max_wait_time = self._opts['pool_wait_minutes']
         now = datetime.now()
         end_time = now + timedelta(minutes=max_wait_time)
@@ -3055,7 +2897,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         log.info('Attempting to find an available cluster...')
         while now <= end_time:
             cluster_info_list = self._usable_clusters(
-                emr_conn=emr_conn,
                 exclude=exclude,
                 num_steps=num_steps)
             log.debug(
@@ -3135,53 +2976,31 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     ### EMR-specific Stuff ###
 
-    def make_emr_conn(self):
-        """Create a connection to EMR.
+    def make_emr_client(self):
+        """Create a :py:mod:`boto3` EMR client.
 
-        :return: a :py:class:`boto.emr.connection.EmrConnection`,
-                 wrapped in a :py:class:`mrjob.retry.RetryWrapper`
+        :return: a :py:class:`botocore.client.EMR` wrapped in a
+                :py:class:`mrjob.retry.RetryWrapper`
         """
         # ...which is then wrapped in bacon! Mmmmm!
+        if boto3 is None:
+            raise ImportError('You must install boto3 to connect to EMR')
 
-        # give a non-cryptic error message if boto isn't installed
-        if boto is None:
-            raise ImportError('You must install boto to connect to EMR')
+        raw_emr_client = boto3.client(
+            'emr',
+            aws_access_key_id=self._opts['aws_access_key_id'],
+            aws_secret_access_key=self._opts['aws_secret_access_key'],
+            aws_session_token=self._opts['aws_security_token'],
+            endpoint_url=_endpoint_url(self._opts['emr_endpoint']),
+            region_name=self._opts['region'],
+        )
 
-        def emr_conn_for_endpoint(endpoint):
-            conn = boto.emr.connection.EmrConnection(
-                aws_access_key_id=self._opts['aws_access_key_id'],
-                aws_secret_access_key=self._opts['aws_secret_access_key'],
-                region=boto.regioninfo.RegionInfo(
-                    name=self._opts['region'], endpoint=endpoint,
-                    connection_cls=boto.emr.connection.EmrConnection),
-                security_token=self._opts['aws_security_token'])
-
-            return conn
-
-        endpoint = (self._opts['emr_endpoint'] or
-                    emr_endpoint_for_region(self._opts['region']))
-
-        log.debug('creating EMR connection (to %s)' % endpoint)
-        conn = emr_conn_for_endpoint(endpoint)
-
-        # Issue #621: if we're using a region-specific endpoint,
-        # try both the canonical version of the hostname and the one
-        # that matches the SSL cert
-        if not self._opts['emr_endpoint']:
-
-            ssl_host = emr_ssl_host_for_region(self._opts['region'])
-            fallback_conn = emr_conn_for_endpoint(ssl_host)
-
-            conn = RetryGoRound(
-                [conn, fallback_conn],
-                lambda ex: isinstance(
-                    ex, boto.https_connection.InvalidCertificateException))
-
-        return _wrap_aws_conn(conn)
+        return _wrap_aws_client(raw_emr_client)
 
     def _describe_cluster(self):
-        emr_conn = self.make_emr_conn()
-        return _patched_describe_cluster(emr_conn, self._cluster_id)
+        emr_client = self.make_emr_client()
+        return emr_client.describe_cluster(
+            ClusterId=self._cluster_id)['Cluster']
 
     def get_hadoop_version(self):
         return self._get_app_versions().get('hadoop')
@@ -3236,17 +3055,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # AMI version might be in RunningAMIVersion (2.x, 3.x)
         # or ReleaseLabel (4.x)
-        cache['image_version'] = getattr(cluster, 'runningamiversion', None)
+        cache['image_version'] = cluster.get('RunningAmiVersion')
         if not cache['image_version']:
-            release_label = getattr(cluster, 'releaselabel', None)
+            release_label = cluster.get('ReleaseLabel')
             if release_label:
                 cache['image_version'] = release_label.lstrip('emr-')
 
         cache['app_versions'] = dict(
-            (a.name.lower(), a.version) for a in cluster.applications)
+            (a['Name'].lower(), a['Version'])
+            for a in cluster['Applications'])
 
-        if cluster.status.state in ('RUNNING', 'WAITING'):
-            cache['master_public_dns'] = cluster.masterpublicdnsname
+        if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
+            cache['master_public_dns'] = cluster['MasterPublicDnsName']
 
     def _store_master_instance_info(self):
         """List master instance for our cluster, and cache
@@ -3256,10 +3076,11 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         cache = self._cluster_to_cache[self._cluster_id]
 
-        emr_conn = self.make_emr_conn()
+        emr_client = self.make_emr_client()
 
-        instances = emr_conn.list_instances(
-            self._cluster_id, instance_group_types=['MASTER']).instances
+        instances = emr_client.list_instances(
+            ClusterId=self._cluster_id,
+            InstanceGroupTypes=['MASTER'])['Instances']
 
         if not instances:
             return
@@ -3267,8 +3088,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         master = instances[0]
 
         # can also get private DNS and public IP/DNS, but we don't use this
-        if hasattr(master, 'privateipaddress'):
-            cache['master_private_ip'] = master.privateipaddress
+        master_private_ip = master.get('PrivateIpAddress')
+        if master_private_ip:  # may not have been assigned yet
+            cache['master_private_ip'] = master_private_ip
 
     def make_iam_client(self):
         """Create a :py:mod:`boto3` IAM client.
@@ -3359,54 +3181,24 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                         '  (try --image-version %s or later)' % (
                             image_version, _MIN_SPARK_PY3_AMI_VERSION))
 
-        # make sure there's enough memory to run Spark
-        instance_groups = list(_yield_all_instance_groups(
-            self.make_emr_conn(), self.get_cluster_id()))
+        emr_client = self.make_emr_client()
 
-        for ig in instance_groups:
+        # make sure instance groups have enough memory to run Spark
+        igs = list(_boto3_paginate(
+            'InstanceGroups', emr_client, 'list_instance_groups',
+            ClusterId=self.get_cluster_id()))
+
+        for ig in igs:
             # master doesn't matter if it's not running tasks
-            if ig.instancegrouptype.lower() == 'master' and (
-                    len(instance_groups) > 1):
+            if ig['InstanceGroupType'] == 'MASTER' and len(igs) > 1:
                 continue
 
-            mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig.instancetype)
+            mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig['InstanceType'])
             if mem and mem < _MIN_SPARK_INSTANCE_MEMORY:
                 return ('  instance type %s is too small for Spark;'
-                        ' your job may stall forever' % ig.instancetype)
+                        ' your job may stall forever' % ig['InstanceType'])
 
         return None
-
-
-def _encode_emr_api_params(x):
-    """Recursively unpack parameters to the EMR API."""
-    # recursively unpack values, and flatten into main dict
-    if isinstance(x, dict):
-        result = {}
-
-        for key, value in x.items():
-            # special case for Properties dicts, which have to be
-            # represented as KeyValue objects
-            if key == 'Properties' and isinstance(value, dict):
-                value = [{'Key': k, 'Value': v}
-                         for k, v in sorted(value.items())]
-
-            unpacked_value = _encode_emr_api_params(value)
-            if isinstance(unpacked_value, dict):
-                for subkey, subvalue in unpacked_value.items():
-                    result['%s.%s' % (key, subkey)] = subvalue
-            else:
-                result[key] = unpacked_value
-
-        return result
-
-    # treat lists like dicts mapping "member.N" (1-indexed) to value
-    if isinstance(x, (list, tuple)):
-        return _encode_emr_api_params(dict(
-            ('member.%d' % (i + 1), item)
-            for i, item in enumerate(x)))
-
-    # base case, not a dict or list
-    return x
 
 
 def _fix_configuration_opt(c):
@@ -3417,9 +3209,8 @@ def _fix_configuration_opt(c):
     Raise exception on more serious problems (extra fields, wrong data
     type, etc).
 
-    This allows us to use :py:func:`_decode_configurations_from_api`
-    to match configurations against the API, *and* catches bad configurations
-    before they result in cryptic API errors.
+    This allows us to match configurations against the API, *and* catches bad
+    configurations before they result in cryptic API errors.
     """
     if not isinstance(c, dict):
         raise TypeError('configurations must be dicts, not %r' % (c,))
@@ -3463,26 +3254,36 @@ def _fix_configuration_opt(c):
     return c
 
 
-def _decode_configurations_from_api(configurations):
-    """Recursively convert configurations object from describe_cluster()
-    back into simple data structure."""
-    results = []
+def _build_instance_group(role, instance_type, num_instances, bid_price):
+    """Helper method for creating instance groups. For use when
+    creating a cluster using a list of InstanceGroups
 
-    for c in configurations:
-        result = {}
+        - Role is either 'master', 'core', or 'task'.
+        - instance_type is an EC2 instance type
+        - count is an int
+        - bid_price is a number, a string, or None. If None,
+          this instance group will be use the ON-DEMAND market
+          instead of the SPOT market.
+    """
+    if role not in _INSTANCE_ROLES:
+        raise ValueError
 
-        if hasattr(c, 'classification'):
-            result['Classification'] = c.classification
+    if not instance_type:
+        raise ValueError
 
-        # don't decode empty configurations (which API shouldn't return)
-        if getattr(c, 'configurations', None):
-            result['Configurations'] = _decode_configurations_from_api(
-                c.configurations)
+    if not num_instances:
+        raise ValueError
 
-        # Properties should always be set (API should do this anyway)
-        result['Properties'] = dict(
-            (kv.key, kv.value) for kv in getattr(c, 'properties', []))
+    ig = dict(
+        InstanceCount=num_instances,
+        InstanceRole=role.upper(),
+        InstanceType=instance_type,
+        Market='ON_DEMAND',
+        Name=role,  # just name the groups "core", "master", and "task"
+    )
 
-        results.append(result)
+    if bid_price:
+        ig['Market'] = 'SPOT'
+        ig['BidPrice'] = str(bid_price)  # must be a string
 
-    return results
+    return ig

@@ -62,22 +62,19 @@ Options::
 """
 from __future__ import print_function
 
-from datetime import datetime
 from datetime import timedelta
 import logging
 from optparse import OptionParser
 
+from mrjob.aws import _boto3_now
+from mrjob.aws import _boto3_paginate
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
-from mrjob.emr import _list_all_steps
-from mrjob.emr import _yield_all_bootstrap_actions
-from mrjob.emr import _yield_all_clusters
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
-from mrjob.parse import iso8601_to_datetime
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.util import strip_microseconds
@@ -103,7 +100,7 @@ def main(cl_args=None):
         max_hours_idle=options.max_hours_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,
         unpooled_only=options.unpooled_only,
-        now=datetime.utcnow(),
+        now=_boto3_now(),
         pool_name=options.pool_name,
         pooled_only=options.pooled_only,
         max_mins_locked=options.max_mins_locked,
@@ -134,14 +131,14 @@ def _maybe_terminate_clusters(dry_run=False,
                               quiet=False,
                               **kwargs):
     if now is None:
-        now = datetime.utcnow()
+        now = _boto3_now()
 
     # old default behavior
     if max_hours_idle is None and mins_to_end_of_hour is None:
         max_hours_idle = _DEFAULT_MAX_HOURS_IDLE
 
     runner = EMRJobRunner(**kwargs)
-    emr_conn = runner.make_emr_conn()
+    emr_client = runner.make_emr_client()
 
     num_starting = 0
     num_bootstrapping = 0
@@ -152,8 +149,10 @@ def _maybe_terminate_clusters(dry_run=False,
 
     # We don't filter by cluster state because we want this to work even
     # if Amazon adds another kind of idle state.
-    for cluster_summary in _yield_all_clusters(emr_conn):
-        cluster_id = cluster_summary.id
+    for cluster_summary in _boto3_paginate(
+            'Clusters', emr_client, 'list_clusters'):
+
+        cluster_id = cluster_summary['Id']
 
         # check if cluster is done
         if _is_cluster_done(cluster_summary):
@@ -171,7 +170,9 @@ def _maybe_terminate_clusters(dry_run=False,
             continue
 
         # need steps to learn more about cluster
-        steps = _list_all_steps(emr_conn, cluster_id)
+        steps = list(reversed(list(_boto3_paginate(
+            'Steps', emr_client, 'list_steps',
+            ClusterId=cluster_id))))
 
         if any(_is_step_running(step) for step in steps):
             num_running += 1
@@ -182,8 +183,10 @@ def _maybe_terminate_clusters(dry_run=False,
         time_to_end_of_hour = _est_time_to_hour(cluster_summary, now=now)
         is_pending = _cluster_has_pending_steps(steps)
 
-        bootstrap_actions = list(_yield_all_bootstrap_actions(
-            emr_conn, cluster_id))
+        bootstrap_actions = list(_boto3_paginate(
+            'BootstrapActions', emr_client, 'list_bootstrap_actions',
+            ClusterId=cluster_id))
+
         _, pool = _pool_hash_and_name(bootstrap_actions)
 
         if is_pending:
@@ -198,7 +201,7 @@ def _maybe_terminate_clusters(dry_run=False,
              strip_microseconds(time_idle),
              strip_microseconds(time_to_end_of_hour),
              ('unpooled' if pool is None else 'in %s pool' % pool),
-             cluster_summary.name))
+             cluster_summary['Name']))
 
         # filter out clusters that don't meet our criteria
         if (max_hours_idle is not None and
@@ -225,7 +228,7 @@ def _maybe_terminate_clusters(dry_run=False,
         _terminate_and_notify(
             runner=runner,
             cluster_id=cluster_id,
-            cluster_name=cluster_summary.name,
+            cluster_name=cluster_summary['Name'],
             num_steps=len(steps),
             is_pending=is_pending,
             time_idle=time_idle,
@@ -243,18 +246,18 @@ def _maybe_terminate_clusters(dry_run=False,
 
 def _is_cluster_done(cluster):
     """Return True if the given cluster is done running."""
-    return (cluster.status.state == 'TERMINATING' or
-            hasattr(cluster.status.timeline, 'enddatetime'))
+    return bool(cluster['Status']['State'] == 'TERMINATING' or
+                cluster['Status']['Timeline'].get('EndDateTime'))
 
 
 def _is_cluster_starting(cluster_summary):
-    return cluster_summary.status.state == 'STARTING'
+    return cluster_summary['Status']['State'] == 'STARTING'
 
 
 def _is_cluster_bootstrapping(cluster_summary):
     """Return ``True`` if *cluster_summary* is currently bootstrapping."""
-    return (cluster_summary.status.state != 'STARTING' and
-            not hasattr(cluster_summary.status.timeline, 'readydatetime'))
+    return (cluster_summary['Status']['State'] != 'STARTING' and
+            not cluster_summary['Status']['Timeline'].get('ReadyDateTime'))
 
 
 def _is_cluster_running(steps):
@@ -263,15 +266,15 @@ def _is_cluster_running(steps):
 
 def _is_step_running(step):
     """Return true if the given step is currently running."""
-    return (getattr(step.status, 'state', None) not in
+    return (step['Status']['State'] not in
             ('CANCELLED', 'INTERRUPTED') and
-            hasattr(step.status.timeline, 'startdatetime') and
-            not hasattr(step.status.timeline, 'enddatetime'))
+            step['Status']['Timeline'].get('StartDateTime') and
+            not step['Status']['Timeline'].get('EndDateTime'))
 
 
 def _cluster_has_pending_steps(steps):
     """Does *cluster* have any steps in the ``PENDING`` state?"""
-    return any(step.status.state == 'PENDING' for step in steps)
+    return any(step['Status']['State'] == 'PENDING' for step in steps)
 
 
 def _time_last_active(cluster_summary, steps):
@@ -279,32 +282,29 @@ def _time_last_active(cluster_summary, steps):
 
     Things we look at:
 
-    * ``cluster.creationdatetime`` (always set)
-    * ``cluster.readydatetime`` (i.e. when bootstrapping finished)
-    * ``step.creationdatetime`` for any step
-    * ``step.startdatetime`` for any step
-    * ``step.enddatetime`` for any step
+    * cluster's ``CreationDateTime`` (always set)
+    * cluster's ``ReadyDateTime`` (i.e. when bootstrapping finished)
+    * step's ``CreationDateTime`` for any step
+    * step's ``StartDateTime`` for any step
+    * step's ``EndDateTime`` for any step
 
     This is not really meant to be run on clusters which are currently
     running, or done.
     """
     timestamps = []
 
-    for key in 'creationdatetime', 'readydatetime':
-        value = getattr(cluster_summary.status.timeline, key, None)
+    for key in 'CreationDateTime', 'ReadyDateTime':
+        value = cluster_summary['Status']['Timeline'].get(key)
         if value:
             timestamps.append(value)
 
     for step in steps:
-        for key in 'creationdatetime', 'startdatetime', 'enddatetime':
-            value = getattr(step.status.timeline, key, None)
+        for key in 'CreationDateTime', 'StartDateTime', 'EndDateTime':
+            value = step['Status']['Timeline'].get(key)
             if value:
                 timestamps.append(value)
 
-    # for ISO8601 timestamps, alpha order == chronological order
-    last_timestamp = max(timestamps)
-
-    return iso8601_to_datetime(last_timestamp)
+    return max(timestamps)
 
 
 def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
@@ -331,7 +331,8 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
             mins_to_expiration=max_mins_locked,
         )
         if status:
-            runner.make_emr_conn().terminate_jobflow(cluster_id)
+            runner.make_emr_client().terminate_job_flows(
+                JobFlowIds=[cluster_id])
             did_terminate = True
         elif not quiet:
             log.info('%s was locked between getting cluster info and'

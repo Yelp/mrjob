@@ -1,4 +1,5 @@
 v0.6.0, 2017-04-?? -- ???
+ * enable_emr_debugging works with 4.x AMIs and later
  * use boto3 instead of boto
    * removed make_*_conn() from EMRJobRunner (use make_*_client())
    * removed s3_key_to_uri() functions
@@ -9,6 +10,13 @@ v0.6.0, 2017-04-?? -- ???
      * removed get_s3_keys()
      * create_bucket()'s second arg is now named region, not location
    * mrjob.fs.s3.wrap_aws_conn() removed
+   * removed utility functions from mrjob.aws:
+     * emr_endpoint_for_region()
+     * emr_ssl_host_for_region()
+     * s3_endpoint_for_region()
+     * s3_location_constraint_for_region()
+   * 'EU' alias for region 'us-west-1' no longer works
+   * region names are case-sensitive; we no longer convert to lowercase
  * removed deprecated INPUT, OUTPUT attributes from JarStep
  * removed deprecated filesystem methods:
    * path_exists()
@@ -26,6 +34,8 @@ v0.6.0, 2017-04-?? -- ???
  * removed deprecated functions:
    * mrjob.parse:
      * is_windows_path()
+     * iso8601_to_timestamp()
+     * iso8601_to_datetime()
      * parse_key_value_list()
      * parse_port_range_list()
    * mrjob.util:
@@ -37,6 +47,7 @@ v0.6.0, 2017-04-?? -- ???
      * populate_option_groups_with_options()
      * scrape_options_and_index_by_dest()
      * scrape_options_into_new_groups()
+ * removed mrjob.retry.RetryGoRound
  * removed deprecated options:
    * bootstrap_cmds
    * bootstrap_files

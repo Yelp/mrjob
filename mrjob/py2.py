@@ -140,19 +140,13 @@ xrange  # quiet, pyflakes
 # in most cases you should use ``mrjob.parse.urlparse()``
 if PY2:
     from urlparse import ParseResult
-    from urllib import quote
-    from urllib import unquote
     from urllib2 import urlopen
     from urlparse import urlparse
 else:
     from urllib.parse import ParseResult
-    from urllib.parse import quote
-    from urllib.parse import unquote
     from urllib.request import urlopen
     from urllib.parse import urlparse
 ParseResult
-quote
-unquote
 urlopen
 urlparse
 

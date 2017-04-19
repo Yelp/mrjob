@@ -5078,20 +5078,20 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
                               HADOOP_ENV_EMR_CONFIGURATION])
 
 
-class JobStepsTestCase(MockBoto3TestCase):
+class JobStepIdsTestCase(MockBoto3TestCase):
 
     def setUp(self):
-        super(JobStepsTestCase, self).setUp()
-        self.start(patch.object(MockEmrConnection, 'list_steps',
-                                side_effect=MockEmrConnection.list_steps,
+        super(JobStepIdsTestCase, self).setUp()
+        self.start(patch.object(MockEMRClient, 'list_steps',
+                                side_effect=MockEMRClient.list_steps,
                                 autospec=True))
 
     def test_empty(self):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
 
-        self.assertEqual(runner._job_steps(max_steps=0), [])
-        self.assertEqual(MockEmrConnection.list_steps.call_count, 0)
+        self.assertEqual(runner._job_step_ids(max_steps=0), [])
+        self.assertEqual(MockEMRClient.list_steps.call_count, 0)
 
     def test_own_cluster(self):
         job = MRTwoStepJob(['-r', 'emr']).sandbox()
@@ -5099,56 +5099,47 @@ class JobStepsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner._launch()
 
-            job_steps = runner._job_steps(max_steps=2)
-
-            self.assertEqual(len(job_steps), 2)
+            steps = _list_all_steps(runner)
 
             # ensure that steps appear in correct order (see #1316)
-            self.assertIn('Step 1', job_steps[0]['Name'])
-            self.assertIn('Step 2', job_steps[1]['Name'])
+            self.assertIn('Step 1', steps[0]['Name'])
+            self.assertIn('Step 2', steps[1]['Name'])
 
-            self.assertEqual(MockEmrConnection.list_steps.call_count, 1)
+            job_step_ids = runner._job_step_ids(max_steps=2)
+            self.assertEqual(job_step_ids,
+                             [steps[0]['Id'], steps[1]['Id']])
 
     def test_shared_cluster(self):
         cluster_id = EMRJobRunner().make_persistent_cluster()
 
-        def add_other_steps(n):
-            for _ in range(n):
-                self.mock_emr_clusters[cluster_id]['_Steps'].append(
-                    dict(Id='s-NONE', name=''))
+        def add_other_steps(runner, n):
+            emr_client = runner.make_emr_client()
+            emr_client.add_job_flow_steps(
+                JobFlowId=runner.get_cluster_id(),
+                Steps=[dict(Name='dummy step',
+                            HadoopJarStep=(dict(Jar='dummy.jar')))] * n,
+            )
 
         job = MRTwoStepJob(['-r', 'emr', '--cluster-id', cluster_id]).sandbox()
 
         with job.make_runner() as runner:
-            add_other_steps(n=MockEMRClient.DEFAULT_MAX_ITEMS)
+            add_other_steps(runner, 50)
             runner._launch()
-            add_other_steps(n=3)
+            add_other_steps(runner, 3)
 
-            # this test won't work if pages of steps are really small
-            self.assertGreaterEqual(MockEMRClient.DEFAULT_MAX_ITEMS, 5)
+            steps = _list_all_steps(runner)
 
-            job_steps = runner._job_steps(max_steps=2)
+            # make sure these are our steps, and they are in the right order
+            # (see #1316)
+            self.assertIn(runner._job_key, steps[50]['Name'])
+            self.assertIn('Step 1', steps[50]['Name'])
+            self.assertIn(runner._job_key, steps[51]['Name'])
+            self.assertIn('Step 2', steps[51]['Name'])
 
-            self.assertEqual(len(job_steps), 2)
+            job_step_ids = runner._job_step_ids(max_steps=2)
 
-            # ensure that steps appear in correct order (see #1316)
-            self.assertIn('Step 1', job_steps[0]['Name'])
-            self.assertIn('Step 2', job_steps[1]['Name'])
-
-            # ensure that steps are for correct job
-            self.assertTrue(job_steps[0]['Name'].startswith(runner._job_key))
-            self.assertTrue(job_steps[1]['Name'].startswith(runner._job_key))
-
-            # this should have only taken one call to list_steps(),
-            # thanks to pagination
-            self.assertEqual(MockEmrConnection.list_steps.call_count, 1)
-
-            # would take two calls to list all the steps
-            MockEmrConnection.list_steps.reset_mock()
-
-            job_steps = runner._job_steps()
-            self.assertEqual(len(job_steps), 2)
-            self.assertEqual(MockEmrConnection.list_steps.call_count, 2)
+            self.assertEqual(job_step_ids,
+                             [steps[50]['Id'], steps[51]['Id']])
 
 
 class WaitForStepsToCompleteTestCase(MockBoto3TestCase):

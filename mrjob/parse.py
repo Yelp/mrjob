@@ -15,11 +15,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Utilities for parsing errors, counters, and status messages."""
-import calendar
 import logging
 import re
-import time
-from datetime import datetime
 from functools import wraps
 from io import BytesIO
 

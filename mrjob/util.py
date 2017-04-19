@@ -19,7 +19,6 @@
 # since MRJobs need to run in Amazon's generic EMR environment
 import contextlib
 import glob
-import itertools
 import logging
 import os
 import pipes
@@ -28,7 +27,6 @@ import shlex
 import shutil
 import sys
 import tarfile
-from copy import deepcopy
 from datetime import timedelta
 from distutils.spawn import find_executable
 from logging import getLogger

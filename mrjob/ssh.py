@@ -13,12 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Shortcuts for SSH operations"""
-
-# don't add imports here that aren't part of the standard Python library,
-# since MRJobs need to run in Amazon's generic EMR environment
-
 import logging
-import os
 from subprocess import Popen
 from subprocess import PIPE
 

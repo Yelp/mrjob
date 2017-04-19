@@ -61,9 +61,6 @@ from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.fs.s3 import _EMR_BACKOFF
-from mrjob.fs.s3 import _EMR_BACKOFF_MULTIPLIER
-from mrjob.fs.s3 import _EMR_MAX_TRIES
 from mrjob.fs.s3 import _client_error_status
 from mrjob.fs.s3 import _endpoint_url
 from mrjob.fs.s3 import _get_bucket_region
@@ -97,7 +94,6 @@ from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
-from mrjob.retry import RetryWrapper
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import BootstrapWorkingDirManager

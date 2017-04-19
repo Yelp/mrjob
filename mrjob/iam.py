@@ -27,7 +27,6 @@ import json
 from logging import getLogger
 
 from mrjob.aws import _boto3_paginate
-from mrjob.py2 import unquote
 from mrjob.util import random_identifier
 
 # Working IAM roles and policies for EMR; these should be identical

@@ -22,7 +22,6 @@ import time
 from io import BytesIO
 from optparse import Option
 from optparse import OptionError
-from optparse import OptionGroup
 from optparse import OptionParser
 
 from mrjob.conf import combine_dicts

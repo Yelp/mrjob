@@ -215,11 +215,13 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            emr_client = runner.make_emr_client()
+            steps = list(reversed(list(_boto3_paginate(
+                'Steps', emr_client, 'list_steps',
+                ClusterId=runner.get_cluster_id()))))
 
-            step_0_args = [a.value for a in steps[0]['Config'].args]
-            step_1_args = [a.value for a in steps[1]['Config'].args]
+            step_0_args = steps[0]['Config']['Args']
+            step_1_args = steps[1]['Config']['Args']
 
             self.assertIn('-inputformat', step_0_args)
             self.assertNotIn('-outputformat', step_0_args)
@@ -248,10 +250,8 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
         self.assertFalse(any(runner.fs.ls(runner.get_output_dir())))
 
         # job should get terminated
-        emr_conn = runner.make_emr_conn()
-        cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            self.simulate_progress(cluster_id)
+            self.simulate_emr_progress(runner.get_cluster_id())
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'TERMINATED')
@@ -259,7 +259,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
         # did we wait for steps in correct order? (regression test for #1316)
         step_ids = [
             c[0][0] for c in runner._wait_for_step_to_complete.call_args_list]
-        self.assertEqual(step_ids, [step.id for step in steps])
+        self.assertEqual(step_ids, [step['Id'] for step in steps])
 
     def test_failed_job(self):
         mr_job = MRTwoStepJob(['-r', 'emr', '-v'])
@@ -279,10 +279,8 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
                 self.assertIn('\n  FAILED\n',
                               stderr.getvalue())
 
-                emr_conn = runner.make_emr_conn()
-                cluster_id = runner.get_cluster_id()
                 for _ in range(10):
-                    self.simulate_emr_progress(cluster_id)
+                    self.simulate_emr_progress(runner.get_cluster_id())
 
                 cluster = runner._describe_cluster()
                 self.assertEqual(cluster['Status']['State'],

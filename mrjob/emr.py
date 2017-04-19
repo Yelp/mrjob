@@ -1464,31 +1464,31 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         step = self._get_step(step_num)
 
         if step['type'] == 'streaming':
-            method = self._streaming_step_jar_and_args
+            method = self._streaming_step_hadoop_jar_step
         elif step['type'] == 'jar':
-            method = self._jar_step_jar_and_args
+            method = self._jar_step_hadoop_jar_step
         elif _is_spark_step_type(step['type']):
-            method = self._spark_step_jar_and_args
+            method = self._spark_step_hadoop_jar_step
         else:
             raise AssertionError('Bad step type: %r' % (step['type'],))
 
-        jar, args = method(step_num)
+        hadoop_jar_step = method(step_num)
 
         return dict(
             ActionOnFailure=self._action_on_failure(),
-            HadoopJarStep=dict(Jar=jar, Args=args),
+            HadoopJarStep=hadoop_jar_step,
             Name=self._step_name(step_num),
         )
 
-    def _streaming_step_jar_and_args(self, step_num):
+    def _streaming_step_hadoop_jar_step(self, step_num):
         jar, step_arg_prefix = self._get_streaming_jar_and_step_arg_prefix()
 
         args = (step_arg_prefix +
                 self._hadoop_streaming_jar_args(step_num))
 
-        return jar, args
+        return dict(Jar=jar, Args=args)
 
-    def _jar_step_jar_and_args(self, step_num):
+    def _jar_step_hadoop_jar_step(self, step_num):
         step = self._get_step(step_num)
 
         jar = self._upload_uri_or_remote_path(step['jar'])
@@ -1498,10 +1498,17 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._hadoop_generic_args_for_step(step_num) +
             self._interpolate_input_and_output(step['args'], step_num))
 
-        return jar, args
+        hadoop_jar_step = dict(Jar=jar, Args=args)
 
-    def _spark_step_jar_and_args(self, step_num):
-        return self._spark_jar(), self._args_for_spark_step(step_num)
+        if step.get('main_class'):
+            hadoop_jar_step['MainClass'] = step['main_class']
+
+        return hadoop_jar_step
+
+    def _spark_step_hadoop_jar_step(self, step_num):
+        return dict(
+            Jar=self._spark_jar(),
+            Args=self._args_for_spark_step(step_num))
 
     def _interpolate_spark_script_path(self, path):
         return self._upload_uri_or_remote_path(path)

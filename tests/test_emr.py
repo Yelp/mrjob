@@ -1718,8 +1718,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
         # terminate the cluster created by this assert, to avoid
         # very confusing behavior (see Issue #331)
-        emr_conn = EMRJobRunner(conf_paths=[]).make_emr_conn()
-        emr_conn.terminate_jobflow(actual_cluster_id)
+        emr_client = EMRJobRunner(conf_paths=[]).make_emr_client()
+        emr_client.terminate_job_flows(JobFlowIds=[actual_cluster_id])
 
     def make_simple_runner(self, pool_name):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
@@ -1741,9 +1741,10 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             runner.run()
 
             # Make sure that the runner made a pooling-enabled cluster
-            emr_conn = runner.make_emr_conn()
-            bootstrap_actions = list(_yield_all_bootstrap_actions(
-                emr_conn, runner.get_cluster_id()))
+            emr_client = runner.make_emr_client()
+            bootstrap_actions = list(_boto3_paginate(
+                'BootstrapActions', emr_client, 'list_bootstrap_actions',
+                ClusterId=runner.get_cluster_id()))
 
             jf_hash, jf_name = _pool_hash_and_name(bootstrap_actions)
             self.assertEqual(jf_hash, runner._pool_hash())
@@ -2458,19 +2459,15 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             with logger_disabled('mrjob.emr'):
                 self.assertRaises(StepFailedException, runner.run)
 
-            emr_conn = runner.make_emr_conn()
-            cluster_id = runner.get_cluster_id()
             for _ in range(10):
-                self.simulate_emr_progress(cluster_id)
+                self.simulate_emr_progress(runner.get_cluster_id())
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
 
         # job shouldn't get terminated by cleanup
-        emr_conn = runner.make_emr_conn()
-        cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            self.simulate_emr_progress(cluster_id)
+            self.simulate_emr_progress(runner.get_cluster_id())
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'WAITING')
@@ -2495,18 +2492,15 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
             self.assertEqual(runner.get_cluster_id(), cluster_id)
 
-            emr_conn = runner.make_emr_conn()
             for _ in range(10):
-                self.simulate_emr_progress(cluster_id)
+                self.simulate_emr_progress(runner.get_cluster_id())
 
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
 
         # job shouldn't get terminated by cleanup
-        emr_conn = runner.make_emr_conn()
-        cluster_id = runner.get_cluster_id()
         for _ in range(10):
-            self.simulate_emr_progress(cluster_id)
+            self.simulate_emr_progress(runner.get_cluster_id())
 
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'WAITING')

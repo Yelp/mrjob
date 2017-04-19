@@ -88,7 +88,6 @@ from tests.test_local import _bash_wrap
 # detect and skip boto 2 tests
 MockEmrConnection = Boto2TestSkipper()
 _decode_configurations_from_api = Boto2TestSkipper()
-_list_all_steps = Boto2TestSkipper()
 _yield_all_bootstrap_actions = Boto2TestSkipper()
 _yield_all_clusters = Boto2TestSkipper()
 _yield_all_instance_groups = Boto2TestSkipper()
@@ -144,6 +143,13 @@ HADOOP_ENV_EMR_CONFIGURATION_VARIANT = dict(
         ),
     ],
 )
+
+
+def _list_all_steps(runner):
+    """Get the list of steps for the given cluster, in chronological order."""
+    return list(reversed(list(_boto3_paginate(
+        'Steps', runner.make_emr_client(), 'list_steps',
+        ClusterId=runner.get_cluster_id()))))
 
 
 class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
@@ -215,10 +221,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            emr_client = runner.make_emr_client()
-            steps = list(reversed(list(_boto3_paginate(
-                'Steps', emr_client, 'list_steps',
-                ClusterId=runner.get_cluster_id()))))
+            steps = _list_all_steps(runner)
 
             step_0_args = steps[0]['Config']['Args']
             step_1_args = steps[1]['Config']['Args']
@@ -786,11 +789,7 @@ class EnableDebuggingTestCase(MockBoto3TestCase):
         with self.make_runner('--enable-emr-debugging') as runner:
             runner.run()
 
-            emr_client = runner.make_emr_client()
-            steps = list(reversed(list(_boto3_paginate(
-                'Steps', emr_client, 'list_steps',
-                ClusterId=runner.get_cluster_id()))))
-
+            steps = _list_all_steps(runner)
             self.assertEqual(steps[0]['Name'], 'Setup Hadoop Debugging')
 
 
@@ -3506,8 +3505,7 @@ class JarStepTestCase(MockBoto3TestCase):
             jar_uri = runner._upload_mgr.uri(fake_jar)
             self.assertTrue(runner.fs.ls(jar_uri))
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0]['Config'].jar, jar_uri)
@@ -3536,8 +3534,7 @@ class JarStepTestCase(MockBoto3TestCase):
             libjar_uri = runner._upload_mgr.uri(fake_libjar)
             self.assertTrue(runner.fs.ls(libjar_uri))
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 2)  # adds master node setup
 
@@ -3560,8 +3557,7 @@ class JarStepTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0]['Config'].jar, JAR_URI)
@@ -3574,8 +3570,7 @@ class JarStepTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(steps[0]['Config'].jar,
@@ -3596,8 +3591,7 @@ class JarStepTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 2)
             jar_step, streaming_step = steps
@@ -3634,11 +3628,6 @@ class SparkStepTestCase(MockBoto3TestCase):
             'mrjob.runner.MRJobRunner._spark_submit_args',
             return_value=['<spark submit args>']))
 
-    def _list_all_steps(self, runner):
-        return list(reversed(list(_boto3_paginate(
-                'Steps', runner.make_emr_client(), 'list_steps',
-                ClusterId=runner.get_cluster_id()))))
-
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
 
     def test_3_x_ami(self):
@@ -3647,7 +3636,7 @@ class SparkStepTestCase(MockBoto3TestCase):
 
         with job.make_runner() as runner:
             runner.run()
-            steps = self._list_all_steps(runner)
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
@@ -3661,7 +3650,7 @@ class SparkStepTestCase(MockBoto3TestCase):
 
         with job.make_runner() as runner:
             runner.run()
-            steps = self._list_all_steps(runner)
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
@@ -3685,10 +3674,7 @@ class SparkStepTestCase(MockBoto3TestCase):
             input1_uri = runner._upload_mgr.uri(input1)
             input2_uri = runner._upload_mgr.uri(input2)
 
-            emr_client = runner.make_emr_client()
-            steps = list(reversed(list(_boto3_paginate(
-                'Steps', emr_client, 'list_steps',
-                ClusterId=runner.get_cluster_id()))))
+            steps = _list_all_steps(runner)
 
             step_args = steps[0]['Config']['Args']
             # the first arg is spark-submit and varies by AMI

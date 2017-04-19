@@ -87,7 +87,6 @@ from tests.test_local import _bash_wrap
 
 # detect and skip boto 2 tests
 MockEmrConnection = Boto2TestSkipper()
-_decode_configurations_from_api = Boto2TestSkipper()
 _yield_all_clusters = Boto2TestSkipper()
 _yield_all_instance_groups = Boto2TestSkipper()
 boto = Boto2TestSkipper()

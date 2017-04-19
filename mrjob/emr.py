@@ -3206,9 +3206,8 @@ def _fix_configuration_opt(c):
     Raise exception on more serious problems (extra fields, wrong data
     type, etc).
 
-    This allows us to use :py:func:`_decode_configurations_from_api`
-    to match configurations against the API, *and* catches bad configurations
-    before they result in cryptic API errors.
+    This allows us to match configurations against the API, *and* catches bad
+    configurations before they result in cryptic API errors.
     """
     if not isinstance(c, dict):
         raise TypeError('configurations must be dicts, not %r' % (c,))
@@ -3250,31 +3249,6 @@ def _fix_configuration_opt(c):
             del c['Configurations']
 
     return c
-
-
-def _decode_configurations_from_api(configurations):
-    """Recursively convert configurations object from describe_cluster()
-    back into simple data structure."""
-    results = []
-
-    for c in configurations:
-        result = {}
-
-        if hasattr(c, 'classification'):
-            result['Classification'] = c.classification
-
-        # don't decode empty configurations (which API shouldn't return)
-        if getattr(c, 'configurations', None):
-            result['Configurations'] = _decode_configurations_from_api(
-                c.configurations)
-
-        # Properties should always be set (API should do this anyway)
-        result['Properties'] = dict(
-            (kv.key, kv.value) for kv in getattr(c, 'properties', []))
-
-        results.append(result)
-
-    return results
 
 
 def _build_instance_group(role, instance_type, num_instances, bid_price):

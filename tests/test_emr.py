@@ -3704,11 +3704,10 @@ class SparkJarStepTestCase(MockBoto3TestCase):
             jar_uri = runner._upload_mgr.uri(self.fake_jar)
             self.assertTrue(runner.fs.ls(jar_uri))
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
-            step_args = [a.value for a in steps[0]['Config'].args]
+            step_args = steps[0]['Config']['Args']
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],
@@ -3739,11 +3738,10 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
             script_uri = runner._upload_mgr.uri(self.fake_script)
             self.assertTrue(runner.fs.ls(script_uri))
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
-            step_args = [a.value for a in steps[0]['Config'].args]
+            step_args = steps[0]['Config']['Args']
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],
@@ -3757,8 +3755,7 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
@@ -3775,8 +3772,7 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
             self.assertEqual(len(steps), 1)
             self.assertEqual(
@@ -3804,10 +3800,9 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
             input1_uri = runner._upload_mgr.uri(input1)
             input2_uri = runner._upload_mgr.uri(input2)
 
-            emr_conn = runner.make_emr_conn()
-            steps = _list_all_steps(emr_conn, runner.get_cluster_id())
+            steps = _list_all_steps(runner)
 
-            step_args = [a.value for a in steps[0]['Config'].args]
+            step_args = steps[0]['Config']['Args']
             # the first arg is spark-submit and varies by AMI
             self.assertEqual(
                 step_args[1:],

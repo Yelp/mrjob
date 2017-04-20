@@ -107,10 +107,20 @@ def fully_qualify_hdfs_path(path):
     """If path isn't an ``hdfs://`` URL, turn it into one."""
     if is_uri(path):
         return path
+    # patch for mrjob on hdinsight waiting for hdfs bugfix
+    # https://community.hortonworks.com/questions/64494/hdinsight-use-hdfs-filesystem-over-wasb.html#answer-64500
+    # jradaelli 20161102
     elif path.startswith('/'):
-        return 'hdfs://' + path
+        try:
+            return 'wasb://' + path
+        except: 
+            return 'hdfs://' + path
     else:
-        return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
+         try:
+            return 'wasb:///user/%s/%s' % (getpass.getuser(), path)
+         except:
+            return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
+    # finish patch 
 
 
 class HadoopRunnerOptionStore(RunnerOptionStore):

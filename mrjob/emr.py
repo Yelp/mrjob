@@ -2575,7 +2575,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # TODO: shouldn't it be b.sh now?
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
-        path = os.path.join(self._get_local_tmp_dir(), 'b.py')
+        path = os.path.join(self._get_local_tmp_dir(), 'b.sh')
         log.debug('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content(

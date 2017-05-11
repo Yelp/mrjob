@@ -2297,9 +2297,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 "'from distutils.sysconfig import get_python_lib;"
                 " print(get_python_lib())')" %
                 cmd_line(self._python_bin())])
+
+            # remove anything that might be in the way (see #1567)
+            mrjob_bootstrap.append(['sudo rm -rf $__mrjob_PYTHON_LIB/mrjob'])
+
             # copy mrjob.zip over
             mrjob_bootstrap.append(
                 ['sudo unzip ', path_dict, ' -d $__mrjob_PYTHON_LIB'])
+
             # re-compile pyc files now, since mappers/reducers can't
             # write to this directory. Don't fail if there is extra
             # un-compileable crud in the tarball (this would matter if
@@ -2311,7 +2316,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         # TODO: shouldn't it be b.sh now?
         # we call the script b.py because there's a character limit on
         # bootstrap script names (or there was at one time, anyway)
-        path = os.path.join(self._get_local_tmp_dir(), 'b.py')
+        path = os.path.join(self._get_local_tmp_dir(), 'b.sh')
         log.debug('writing master bootstrap script to %s' % path)
 
         contents = self._master_bootstrap_script_content(

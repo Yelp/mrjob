@@ -377,8 +377,10 @@ See :py:mod:`mrjob.protocol` for the full list of protocols built-in to mrjob.
     an alias for one of two different protocols depending on your Python
     version.
 
-.. [#json] |JSONProtocol| is an alias for one of two different implementations;
-    we try to use the (much faster) :py:mod:`ujson` library if it is available.
+.. [#json] |JSONProtocol| is an alias for one of four different
+    implementations; we try to use the (much faster) :py:mod:`ujson` library
+    if it is available, and if not, :py:mod:`rapidjson` or :py:mod:`simplejson`
+    before falling back to the built-in :py:mod:`json` implementation.
 
 Data flow walkthrough by example
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

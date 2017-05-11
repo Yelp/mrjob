@@ -34,17 +34,18 @@ JSON
 ----
 .. py:class:: JSONProtocol
 
-    Encode ``(key, value)`` as two JSONs separated by a tab.
+   Encode ``(key, value)`` as two JSONs separated by a tab.
 
-    **This is the default protocol used by jobs to write output and communicate
-    between steps.**
+   **This is the default protocol used by jobs to write output and communicate
+   between steps.**
 
-    This is an alias for :py:class:`UltraJSONProtocol` if :py:mod:`ujson`
-    is installed, :py:class:`SimpleJSONProtocol` if :py:mod:`simplejson`
-    is installed and :py:mod:`ujson` is not and
-    :py:class:`StandardJSONProtocol` if neither is installed.
+   This is an alias for the first one of :py:class:`UltraJSONProtocol`,
+   :py:class:`RapidJSONProtocol`, :py:class:`SimpleJSONProtocol`,
+   or :py:class:`StandardJSONProtocol` for which the underlying library is
+   available.
 
 .. autoclass:: UltraJSONProtocol
+.. autoclass:: RapidJSONProtocol
 .. autoclass:: SimpleJSONProtocol
 .. autoclass:: StandardJSONProtocol
 
@@ -53,12 +54,13 @@ JSON
    Encode ``value`` as a JSON and discard ``key`` (``key`` is read in as
    ``None``).
 
-    This is an alias for :py:class:`UltraJSONValueProtocol` if :py:mod:`ujson`
-    is installed, :py:class:`SimpleJSONValueProtocol` if :py:mod:`simplejson`
-    is installed and :py:mod:`ujson` is not and
-    :py:class:`StandardJSONValueProtocol` if neither is installed.
+   This is an alias for the first one of :py:class:`UltraJSONValueProtocol`,
+   :py:class:`RapidJSONValueProtocol`, :py:class:`SimpleJSONValueProtocol`,
+   or :py:class:`StandardJSONValueProtocol` for which the underlying library is
+   available.
 
 .. autoclass:: UltraJSONValueProtocol
+.. autoclass:: RapidJSONValueProtocol
 .. autoclass:: SimpleJSONValueProtocol
 .. autoclass:: StandardJSONValueProtocol
 

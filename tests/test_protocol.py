@@ -20,6 +20,8 @@ from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
 from mrjob.protocol import PickleValueProtocol
+from mrjob.protocol import RapidJSONProtocol
+from mrjob.protocol import RapidJSONValueProtocol
 from mrjob.protocol import RawProtocol
 from mrjob.protocol import RawValueProtocol
 from mrjob.protocol import ReprProtocol
@@ -32,12 +34,14 @@ from mrjob.protocol import TextProtocol
 from mrjob.protocol import TextValueProtocol
 from mrjob.protocol import UltraJSONProtocol
 from mrjob.protocol import UltraJSONValueProtocol
+from mrjob.protocol import rapidjson
 from mrjob.protocol import simplejson
 from mrjob.protocol import ujson
 from mrjob.py2 import PY2
 
 from tests.py2 import TestCase
 from tests.py2 import skipIf
+from tests.py2 import unittest
 
 
 class Point(object):
@@ -115,6 +119,9 @@ class JSONProtocolAliasesTestCase(TestCase):
         if ujson:
             self.assertEqual(JSONProtocol, UltraJSONProtocol)
             self.assertEqual(JSONValueProtocol, UltraJSONValueProtocol)
+        elif rapidjson and not PY2:
+            self.assertEqual(JSONProtocol, RapidJSONProtocol)
+            self.assertEqual(JSONValueProtocol, RapidJSONValueProtocol)
         elif simplejson:
             self.assertEqual(JSONProtocol, SimpleJSONProtocol)
             self.assertEqual(JSONValueProtocol, SimpleJSONValueProtocol)
@@ -141,7 +148,9 @@ class StandardJSONProtocolTestCase(ProtocolTestCase):
         ENCODED = b'["a", 1]\t{"foo": "bar"}'
 
         self.assertEqual((KEY, VALUE), self.PROTOCOL.read(ENCODED))
-        self.assertEqual(self.PROTOCOL.write(KEY, VALUE), ENCODED)
+        # ujson and rapidjson don't use spaces
+        self.assertEqual(self.PROTOCOL.write(KEY, VALUE).replace(b' ', b''),
+                         ENCODED.replace(b' ', b''))
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
@@ -178,18 +187,30 @@ class SimpleJSONProtocolTestCase(StandardJSONProtocolTestCase):
     PROTOCOL = SimpleJSONProtocol()
 
 
+@skipIf(rapidjson is None, 'rapidjson module not installed')
+class RapidJSONProtocolTestCase(StandardJSONProtocolTestCase):
+
+    PROTOCOL = RapidJSONProtocol()
+
+    @unittest.skip('rapidjson only allows strings as keys')
+    def test_numerical_keys_become_strs(self):
+        pass
+
+    def test_bad_keys_and_values(self):
+        # dictionaries have to have strings as keys
+        self.assertCantEncode(self.PROTOCOL, {(1, 2): 3}, None)
+
+        # sets don't exist in JSON
+        self.assertCantEncode(self.PROTOCOL, set([1]), set())
+
+        # Point class has no representation in JSON
+        self.assertCantEncode(self.PROTOCOL, Point(2, 3), Point(1, 4))
+
+
 @skipIf(ujson is None, 'ujson module not installed')
 class UltraJSONProtocolTestCase(StandardJSONProtocolTestCase):
 
     PROTOCOL = UltraJSONProtocol()
-
-    def test_uses_json_format(self):
-        KEY = ['a', 1]
-        VALUE = {'foo': 'bar'}
-        ENCODED = b'["a",1]\t{"foo":"bar"}'  # no whitespace for ujson
-
-        self.assertEqual((KEY, VALUE), self.PROTOCOL.read(ENCODED))
-        self.assertEqual(self.PROTOCOL.write(KEY, VALUE), ENCODED)
 
     def test_bad_keys_and_values(self):
         # seems like the only thing ujson won't encode is non-UTF-8 bytes
@@ -213,7 +234,8 @@ class StandardJSONValueProtocolTestCase(ProtocolTestCase):
         ENCODED = b'{"foo": "bar"}'
 
         self.assertEqual((None, VALUE), self.PROTOCOL.read(ENCODED))
-        self.assertEqual(self.PROTOCOL.write(None, VALUE), ENCODED)
+        self.assertEqual(self.PROTOCOL.write(None, VALUE).replace(b' ', b''),
+                         ENCODED.replace(b' ', b''))
 
     def test_tuples_become_lists(self):
         # JSON should convert tuples into lists
@@ -248,6 +270,26 @@ class StandardJSONValueProtocolTestCase(ProtocolTestCase):
 class SimpleJSONValueProtocolTestCase(StandardJSONValueProtocolTestCase):
 
     PROTOCOL = SimpleJSONValueProtocol()
+
+
+@skipIf(rapidjson is None, 'rapidjson module not installed')
+class RapidJSONValueProtocolTestCase(StandardJSONValueProtocolTestCase):
+
+    PROTOCOL = RapidJSONValueProtocol()
+
+    @unittest.skip('rapidjson only allows strings as keys')
+    def test_numerical_keys_become_strs(self):
+        pass
+
+    def test_bad_keys_and_values(self):
+        # dictionaries have to have strings as keys
+        self.assertCantEncode(self.PROTOCOL, None, {(1, 2): 3})
+
+        # sets don't exist in JSON
+        self.assertCantEncode(self.PROTOCOL, None, set())
+
+        # Point class has no representation in JSON
+        self.assertCantEncode(self.PROTOCOL, None, Point(1, 4))
 
 
 @skipIf(ujson is None, 'ujson module not installed')

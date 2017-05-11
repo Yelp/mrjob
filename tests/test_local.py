@@ -25,6 +25,7 @@ from io import BytesIO
 
 import mrjob
 from mrjob.local import LocalMRJobRunner
+from mrjob.step import StepFailedException
 from mrjob.util import bash_wrap
 from mrjob.util import cmd_line
 from mrjob.util import read_file
@@ -496,11 +497,12 @@ class LocalBootstrapMrjobTestCase(TestCase):
                 try:
                     with no_handlers_for_logger():
                         runner.run()
-                except Exception as e:
-                    # if mrjob is not installed, script won't be able to run
-                    self.assertIn('ImportError', str(e))
+                except StepFailedException:
+                    # this is what happens when mrjob isn't installed elsewhere
                     return
 
+                # however, if mrjob is installed, we need to verify that
+                # we're using the installed version and not a bootstrapped copy
                 output = list(runner.stream_output())
 
                 self.assertEqual(len(output), 1)

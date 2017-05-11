@@ -1613,7 +1613,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         # check for master bootstrap script
         self.assertTrue(actions[2].scriptpath.startswith('s3://mrjob-'))
-        self.assertTrue(actions[2].scriptpath.endswith('b.py'))
+        self.assertTrue(actions[2].scriptpath.endswith('b.sh'))
         self.assertEqual(actions[2].args, [])
         self.assertEqual(actions[2].name, 'master')
 
@@ -1661,7 +1661,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
         # check for master bootstrap script
         self.assertTrue(actions[1].scriptpath.startswith('s3://mrjob-'))
-        self.assertTrue(actions[1].scriptpath.endswith('b.py'))
+        self.assertTrue(actions[1].scriptpath.endswith('b.sh'))
         self.assertEqual(actions[1].args, [])
         self.assertEqual(actions[1].name, 'master')
 

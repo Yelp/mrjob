@@ -32,6 +32,7 @@ try:
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests.suite.load_tests',
+        'tests_require': ['simplejson'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
@@ -46,9 +47,12 @@ try:
         setuptools_kwargs['install_requires'].append(
             'google-api-python-client>=1.5.0')
 
+    if sys.version_info >= (3, 0):
+        setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
+
     # mock is included in Python 3.3 as unittest.mock
     if sys.version_info < (3, 3):
-        setuptools_kwargs['tests_require'] = ['mock']
+        setuptools_kwargs['tests_require'].append('mock')
 
         # unittest2 is a backport of unittest from Python 2.7
         if sys.version_info < (2, 7):

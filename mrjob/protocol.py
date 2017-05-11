@@ -42,6 +42,12 @@ from mrjob.util import safeeval
 
 
 try:
+    import rapidjson
+    rapidjson
+except ImportError:
+    rapidjson = None
+
+try:
     import simplejson
     simplejson  # quiet "redefinition of unused ..." warning from pyflakes
 except ImportError:
@@ -150,6 +156,31 @@ class StandardJSONValueProtocol(object):
             return json.dumps(value).encode('utf_8')
 
 
+class RapidJSONProtocol(_KeyCachingProtocol):
+    """Implements :py:class:`JSONProtocol` using the :py:mod:`rapidjson`
+    library."""
+    # rapidjson only exists in Python 3, so no special cases for Python 3
+
+    def _loads(self, value):
+        return rapidjson.loads(value)
+
+    def _dumps(self, value):
+        return rapidjson.dumps(value).encode('utf_8')
+
+
+class RapidJSONValueProtocol(object):
+    """Implements :py:class:`JSONValueProtocol` using the :py:mod:`rapidjson`
+    library.
+    """
+    # rapidjson only exists in Python 3, so no special cases for Python 3
+
+    def read(self, line):
+        return (None, rapidjson.loads(line))
+
+    def write(self, key, value):
+        return rapidjson.dumps(value).encode('utf_8')
+
+
 class SimpleJSONProtocol(_KeyCachingProtocol):
     """Implements :py:class:`JSONProtocol` using the :py:mod:`simplejson`
     library."""
@@ -233,10 +264,16 @@ class UltraJSONValueProtocol(object):
 if ujson:
     JSONProtocol = UltraJSONProtocol
     JSONValueProtocol = UltraJSONValueProtocol
-# if no ujson, try simplejson
+# otherwise, try rapidjson. This library is supposed to be Python 3+
+# only, so don't try to use it on Python 2
+elif rapidjson and not PY2:
+    JSONProtocol = RapidJSONProtocol
+    JSONValueProtocol = RapidJSONValueProtocol
+# otherwise, try simplejson
 elif simplejson:
     JSONProtocol = SimpleJSONProtocol
     JSONValueProtocol = SimpleJSONValueProtocol
+# fall back to the built-in JSON module
 else:
     JSONProtocol = StandardJSONProtocol
     JSONValueProtocol = StandardJSONValueProtocol

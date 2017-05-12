@@ -36,7 +36,7 @@ about setting these options.
     :envvar:`AWS_SECRET_ACCESS_KEY` instead.
 
 .. mrjob-opt::
-    :config: aws_security_token
+    :config: aws_session_token
     :type: :ref:`string <data-type-string>`
     :set: emr
     :default: ``None``
@@ -47,6 +47,10 @@ about setting these options.
     There isn't a command-line switch for this option because credentials are
     supposed to be secret! Use the environment variable
     :envvar:`AWS_SECURITY_TOKEN` instead.
+
+    .. versionchanged:: 0.5.10
+
+       this used to be called *aws_security_token*.
 
 .. mrjob-opt::
     :config: ec2_key_pair

@@ -417,7 +417,7 @@ class JobRunnerKwargsTestCase(TestCase):
     CONF_ONLY_OPTIONS = set([
         'aws_access_key_id',
         'aws_secret_access_key',
-        'aws_security_token',
+        'aws_session_token',
         'local_tmp_dir',
     ])
 

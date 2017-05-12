@@ -411,7 +411,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         if not opt_value:
             return opt_value
 
-        if opt_key in ('aws_secret_access_key', 'aws_security_token'):
+        if opt_key in ('aws_secret_access_key', 'aws_session_token'):
             # don't expose any part of secret credentials
             return '...'
         elif opt_key == 'aws_access_key_id':
@@ -711,7 +711,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             s3_fs = S3Filesystem(
                 aws_access_key_id=self._opts['aws_access_key_id'],
                 aws_secret_access_key=self._opts['aws_secret_access_key'],
-                aws_session_token=self._opts['aws_security_token'],
+                aws_session_token=self._opts['aws_session_token'],
                 s3_endpoint=self._opts['s3_endpoint'],
                 s3_region=self._opts['region'])
 
@@ -2995,7 +2995,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             'emr',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
-            aws_session_token=self._opts['aws_security_token'],
+            aws_session_token=self._opts['aws_session_token'],
             endpoint_url=_endpoint_url(self._opts['emr_endpoint']),
             region_name=self._opts['region'],
         )
@@ -3122,7 +3122,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             'iam',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
-            aws_session_token=self._opts['aws_security_token'],
+            aws_session_token=self._opts['aws_session_token'],
             endpoint_url=endpoint_url,
             region_name=region_name,
         )

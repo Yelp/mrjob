@@ -3989,13 +3989,13 @@ class AWSSessionTokenTestCase(MockBoto3TestCase):
         self.mock_client = self.start(patch('boto3.client'))
         self.mock_resource = self.start(patch('boto3.resource'))
 
-    def assert_conns_use_security_token(self, runner, security_token):
+    def assert_conns_use_session_token(self, runner, session_token):
         runner.make_emr_client()
 
         self.assertTrue(self.mock_client.called)
         emr_kwargs = self.mock_client.call_args[1]
         self.assertIn('aws_session_token', emr_kwargs)
-        self.assertEqual(emr_kwargs['aws_session_token'], security_token)
+        self.assertEqual(emr_kwargs['aws_session_token'], session_token)
 
         self.mock_client.reset_mock()
         runner.make_iam_client()
@@ -4004,7 +4004,7 @@ class AWSSessionTokenTestCase(MockBoto3TestCase):
         iam_args, iam_kwargs = self.mock_client.call_args
         self.assertEqual(iam_args, ('iam',))
         self.assertIn('aws_session_token', iam_kwargs)
-        self.assertEqual(iam_kwargs['aws_session_token'], security_token)
+        self.assertEqual(iam_kwargs['aws_session_token'], session_token)
 
         self.mock_client.reset_mock()
         runner.fs.make_s3_client()
@@ -4013,7 +4013,7 @@ class AWSSessionTokenTestCase(MockBoto3TestCase):
         s3_client_args, s3_client_kwargs = self.mock_client.call_args
         self.assertEqual(s3_client_args, ('s3',))
         self.assertIn('aws_session_token', s3_client_kwargs)
-        self.assertEqual(s3_client_kwargs['aws_session_token'], security_token)
+        self.assertEqual(s3_client_kwargs['aws_session_token'], session_token)
 
         runner.fs.make_s3_resource()
         self.assertTrue(self.mock_client.called)
@@ -4021,17 +4021,17 @@ class AWSSessionTokenTestCase(MockBoto3TestCase):
         self.assertEqual(s3_resource_args, ('s3',))
         self.assertIn('aws_session_token', s3_resource_kwargs)
         self.assertEqual(s3_resource_kwargs['aws_session_token'],
-                         security_token)
+                         session_token)
 
-    def test_connections_without_security_token(self):
+    def test_connections_without_session_token(self):
         runner = EMRJobRunner()
 
-        self.assert_conns_use_security_token(runner, None)
+        self.assert_conns_use_session_token(runner, None)
 
-    def test_connections_with_security_token(self):
-        runner = EMRJobRunner(aws_security_token='meow')
+    def test_connections_with_session_token(self):
+        runner = EMRJobRunner(aws_session_token='meow')
 
-        self.assert_conns_use_security_token(runner, 'meow')
+        self.assert_conns_use_session_token(runner, 'meow')
 
 
 class BootstrapPythonTestCase(MockBoto3TestCase):

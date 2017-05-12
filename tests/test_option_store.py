@@ -471,12 +471,12 @@ class OptionStoreDebugPrintoutTestCase(ConfigFilesTestCase):
         self.assertNotIn('PASSWORD', printout)
         self.assertIn("'...'", printout)
 
-    def test_aws_security_token(self):
+    def test_aws_session_token(self):
         printout = self.get_debug_printout(
             EMRRunnerOptionStore, 'emr', dict(
-                aws_security_token='TOKEN'))
+                aws_session_token='TOKEN'))
 
-        self.assertIn("'aws_security_token'", printout)
+        self.assertIn("'aws_session_token'", printout)
         self.assertNotIn('TOKEN', printout)
         self.assertIn("'...'", printout)
 
@@ -487,4 +487,4 @@ class OptionStoreDebugPrintoutTestCase(ConfigFilesTestCase):
         self.assertNotIn("'...'", printout)
         self.assertIn("'aws_access_key_id'", printout)
         self.assertIn("'aws_secret_access_key'", printout)
-        self.assertIn("'aws_security_token'", printout)
+        self.assertIn("'aws_session_token'", printout)

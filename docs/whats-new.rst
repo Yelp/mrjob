@@ -321,7 +321,7 @@ security vulnerability. (This doesn't happen for AWS credentials set through
 environment variables.)
 
 Starting in this version, the values of :mrjob-opt:`aws_secret_access_key`
-and :mrjob-opt:`aws_security_token` are shown as ``'...'`` if they are set,
+and `aws_security_token` are shown as ``'...'`` if they are set,
 and all but the last four characters of :mrjob-opt:`aws_access_key_id` are
 blanked out as well (e.g. ``'...YNDR'``).
 
@@ -661,7 +661,7 @@ first, but now it terminates idle job flows as soon as it identifies them.
 :py:mod:`~mrjob.emr.tools.job_flow_pool` have *not* been ported to the
 new API and will be removed in v0.5.0.
 
-Added an :mrjob-opt:`aws_security_token` option to allow you to run
+Added an `aws_security_token` option to allow you to run
 mrjob on EMR using temporary AWS credentials.
 
 Added an `emr_tags` (see :mrjob-opt:`tags`) option to allow you to tag EMR job

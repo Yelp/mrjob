@@ -46,7 +46,7 @@ about setting these options.
 
     There isn't a command-line switch for this option because credentials are
     supposed to be secret! Use the environment variable
-    :envvar:`AWS_SECURITY_TOKEN` instead.
+    :envvar:`AWS_SESSION_TOKEN` instead.
 
     .. versionchanged:: 0.5.10
 

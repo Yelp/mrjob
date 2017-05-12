@@ -63,6 +63,7 @@ v0.6.0, 2017-04-?? -- ???
    * ami_version
    * aws_availability_zone
    * aws_region
+   * aws_security_token
    * base_tmp_dir
    * check_emr_status_every
    * ec2_core_instance_bid_price

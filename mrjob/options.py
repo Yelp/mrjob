@@ -274,7 +274,6 @@ _RUNNER_OPTS = dict(
     ),
     aws_session_token=dict(
         cloud_role='connect',
-        deprecated_aliases=['aws_security_token'],
         runners=['emr'],
     ),
     bootstrap=dict(

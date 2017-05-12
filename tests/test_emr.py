@@ -4120,22 +4120,22 @@ class SessionTokenTestCase(MockBotoTestCase):
 
         self.assertTrue(self.mock_emr.called)
         emr_kwargs = self.mock_emr.call_args[1]
-        self.assertIn('session_token', emr_kwargs)
-        self.assertEqual(emr_kwargs['session_token'], session_token)
+        self.assertIn('security_token', emr_kwargs)
+        self.assertEqual(emr_kwargs['security_token'], session_token)
 
         runner.make_iam_conn()
 
         self.assertTrue(self.mock_iam.called)
         iam_kwargs = self.mock_iam.call_args[1]
-        self.assertIn('session_token', iam_kwargs)
-        self.assertEqual(iam_kwargs['session_token'], session_token)
+        self.assertIn('security_token', iam_kwargs)
+        self.assertEqual(iam_kwargs['security_token'], session_token)
 
         runner.fs.make_s3_conn()
 
         self.assertTrue(self.mock_s3.called)
         s3_kwargs = self.mock_s3.call_args[1]
-        self.assertIn('session_token', s3_kwargs)
-        self.assertEqual(s3_kwargs['session_token'], session_token)
+        self.assertIn('security_token', s3_kwargs)
+        self.assertEqual(s3_kwargs['security_token'], session_token)
 
     def test_connections_without_session_token(self):
         runner = EMRJobRunner()

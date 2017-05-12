@@ -4,6 +4,28 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.10:
+
+0.5.10
+------
+
+Fixed an issue where bootstrapping mrjob on Dataproc or EMR could stall if
+mrjob was already installed.
+
+The `aws_security_token` option has been renamed to
+:mrjob-opt:`aws_session_token`. If you want to set it via environment
+variable, you still have to use :envvar:`$AWS_SECURITY_TOKEN` because that's
+what boto uses.
+
+Added protocol support for :py:mod:`rapidjson`; see
+:py:class:`~mrjob.protocol.RapidJSONProtocol` and
+:py:class:`~mrjob.protocol.RapidJSONValueProtocol`. If available,
+:py:mod:`rapidjson` will be used as the default JSON implementation if
+:py:mod:`ujson` is not installed.
+
+The master bootstrap script on EMR and Dataproc now has the correct
+file extension (``.sh``, not ``.py``).
+
 .. _v0.5.9:
 
 0.5.9

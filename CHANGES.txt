@@ -5,6 +5,7 @@ v0.5.10, 2017-05-12 -- loose ends
    * aws_security_token option renamed to aws_session_token (#1536)
  * EMR and Dataproc runners:
    * bootstrapping mrjob no longer stalls if mrjob already installed (#1567)
+   * master bootstrap script has correct extension: .sh, not .py (#1504)
 
 v0.5.9, 2017-03-20 -- Docker hooks
  * fixes which affect Docker:

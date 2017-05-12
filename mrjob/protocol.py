@@ -158,7 +158,10 @@ class StandardJSONValueProtocol(object):
 
 class RapidJSONProtocol(_KeyCachingProtocol):
     """Implements :py:class:`JSONProtocol` using the :py:mod:`rapidjson`
-    library."""
+    library.
+
+    .. versionadded:: 0.5.10
+    """
     # rapidjson only exists in Python 3, so no special cases for Python 3
 
     def _loads(self, value):
@@ -171,6 +174,8 @@ class RapidJSONProtocol(_KeyCachingProtocol):
 class RapidJSONValueProtocol(object):
     """Implements :py:class:`JSONValueProtocol` using the :py:mod:`rapidjson`
     library.
+
+    .. versionadded:: 0.5.10
     """
     # rapidjson only exists in Python 3, so no special cases for Python 3
 

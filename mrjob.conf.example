@@ -17,7 +17,7 @@ runners:
     aws_access_key_id: AKIAAAAAAAAAAAAAAAAAAAAAAAAAAAA
     aws_secret_access_key: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
     # instead of keys, you can use a temporary security token
-    #aws_security_token: AREALLYLONGHASH
+    #aws_session_token: AREALLYLONGHASH
     # $BT is the path to our source tree. This lets us add modules to
     # install on EMR by simply dumping them in this dir.
     bootstrap_python_packages:

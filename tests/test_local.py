@@ -22,6 +22,8 @@ import stat
 import sys
 import tempfile
 from io import BytesIO
+from unittest import TestCase
+from unittest import skipIf
 
 import mrjob
 from mrjob.local import LocalMRJobRunner
@@ -37,10 +39,8 @@ from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_verbose_job import MRVerboseJob
 from tests.mr_word_count import MRWordCount
-from tests.py2 import TestCase
 from tests.py2 import call
 from tests.py2 import patch
-from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase

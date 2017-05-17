@@ -12,6 +12,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import TestCase
+
 from mrjob.logs.task import _interpret_task_logs
 from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_spark_task_logs
@@ -22,8 +24,6 @@ from mrjob.logs.task import _parse_task_syslog
 
 from tests.py2 import call
 from tests.py2 import Mock
-from tests.py2 import unittest
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.sandbox import PatcherTestCase
 
@@ -587,10 +587,6 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
             self.mock_fs, self.mock_path_matches(),
             log_callback=self.mock_log_callback,
             **kwargs)
-
-    # need to port over remaining tests
-    def interpret_task_logs(self, **kwargs):
-        raise unittest.SkipTest()
 
     def test_empty(self):
         self.assertEqual(self.interpret_spark_task_logs(), {})

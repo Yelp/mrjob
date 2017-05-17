@@ -22,6 +22,7 @@ import os.path
 import posixpath
 import sys
 import time
+import unittest
 from datetime import timedelta
 from io import BytesIO
 
@@ -76,7 +77,6 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import call
 from tests.py2 import patch
-from tests.py2 import unittest
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase

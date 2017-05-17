@@ -18,6 +18,7 @@ import sys
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
+from unittest import TestCase
 
 import boto3
 from dateutil.parser import parse
@@ -29,7 +30,6 @@ from mrjob.tools.emr.audit_usage import _subdivide_interval_by_date
 from mrjob.tools.emr.audit_usage import _subdivide_interval_by_hour
 from mrjob.tools.emr.audit_usage import main
 
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.tools.emr import ToolTestCase
 

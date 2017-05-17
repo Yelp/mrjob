@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import json
+from unittest import TestCase
 
 from mrjob.iam import _MRJOB_SERVICE_ROLE
 
 from tests.mock_boto3.iam import MockIAMClient
-from tests.py2 import TestCase
 
 
 # IAM stuff is mostly tested by test_emr.py, but we don't test what happens if

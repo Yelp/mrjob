@@ -20,11 +20,11 @@ import stat
 from contextlib import contextmanager
 from tempfile import mkdtemp
 from shutil import rmtree
+from unittest import TestCase
 
 import mrjob
 from mrjob import runner
 
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import add_null_handler_to_root_logger
 

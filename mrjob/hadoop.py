@@ -42,7 +42,7 @@ from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_uri
-from mrjob.py2 import to_string
+from mrjob.py2 import to_unicode
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.setup import UploadDirManager
@@ -447,7 +447,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
                 # there shouldn't be much output to STDOUT
                 for line in step_proc.stdout:
-                    _log_line_from_hadoop(to_string(line).strip('\r\n'))
+                    _log_line_from_hadoop(to_unicode(line).strip('\r\n'))
 
                 step_proc.stdout.close()
                 step_proc.stderr.close()

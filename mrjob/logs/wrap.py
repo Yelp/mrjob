@@ -15,7 +15,7 @@
 """Utilities for ls()ing and cat()ing logs without raising exceptions."""
 from logging import getLogger
 
-from mrjob.py2 import to_string
+from mrjob.py2 import to_unicode
 
 from .ids import _sort_by_recency
 
@@ -29,7 +29,7 @@ def _cat_log(fs, path):
         if not fs.exists(path):
             return
         for line in fs.cat(path):
-            yield to_string(line)
+            yield to_unicode(line)
     except (IOError, OSError) as e:
         log.warning("couldn't cat() %s: %r" % (path, e))
 

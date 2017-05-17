@@ -23,7 +23,7 @@ from subprocess import CalledProcessError
 
 from mrjob.compat import uses_yarn
 from mrjob.fs.base import Filesystem
-from mrjob.py2 import to_string
+from mrjob.py2 import to_unicode
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line
@@ -119,7 +119,7 @@ class HadoopFilesystem(Filesystem):
                 first_line = stdout.split(b'\n')[0]
                 m = _HADOOP_VERSION_RE.match(first_line)
                 if m:
-                    self._hadoop_version = to_string(m.group('version'))
+                    self._hadoop_version = to_unicode(m.group('version'))
                     log.info("Using Hadoop version %s" % self._hadoop_version)
                 else:
                     raise Exception('Unable to determine Hadoop version.')
@@ -152,7 +152,7 @@ class HadoopFilesystem(Filesystem):
         log_func = log.debug if proc.returncode == 0 else log.error
         if not return_stdout:
             for line in BytesIO(stdout):
-                log_func('STDOUT: ' + to_string(line.rstrip(b'\r\n')))
+                log_func('STDOUT: ' + to_unicode(line.rstrip(b'\r\n')))
 
         # check if STDERR is okay
         stderr_is_ok = False
@@ -164,7 +164,7 @@ class HadoopFilesystem(Filesystem):
 
         if not stderr_is_ok:
             for line in BytesIO(stderr):
-                log_func('STDERR: ' + to_string(line.rstrip(b'\r\n')))
+                log_func('STDERR: ' + to_unicode(line.rstrip(b'\r\n')))
 
         ok_returncodes = ok_returncodes or [0]
 
@@ -242,7 +242,7 @@ class HadoopFilesystem(Filesystem):
             if not path_index:
                 raise IOError("Could not locate path in string %r" % line)
 
-            path = to_string(line.split(b' ', path_index)[-1])
+            path = to_unicode(line.split(b' ', path_index)[-1])
             # handle fully qualified URIs from newer versions of Hadoop ls
             # (see Pull Request #577)
             if is_uri(path):
@@ -260,7 +260,7 @@ class HadoopFilesystem(Filesystem):
         def cleanup():
             # this does someties happen; see #1396
             for line in cat_proc.stderr:
-                log.error('STDERR: ' + to_string(line.rstrip(b'\r\n')))
+                log.error('STDERR: ' + to_unicode(line.rstrip(b'\r\n')))
 
             cat_proc.stdout.close()
             cat_proc.stderr.close()

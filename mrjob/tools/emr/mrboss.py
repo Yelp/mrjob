@@ -56,7 +56,7 @@ from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
-from mrjob.py2 import to_string
+from mrjob.py2 import to_unicode
 from mrjob.ssh import _ssh_copy_key
 from mrjob.ssh import _ssh_run_with_recursion
 from mrjob.util import random_identifier
@@ -140,7 +140,7 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
         if print_stderr:
             print('---')
             print('Command completed on %s.' % addr)
-            print(to_string(stderr), end=' ')
+            print(to_unicode(stderr), end=' ')
 
         if '!' in addr:
             base_dir = os.path.join(output_dir, 'slave ' + addr.split('!')[1])

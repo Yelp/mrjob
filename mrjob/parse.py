@@ -21,7 +21,7 @@ from functools import wraps
 from io import BytesIO
 
 from mrjob.py2 import ParseResult
-from mrjob.py2 import to_string
+from mrjob.py2 import to_unicode
 from mrjob.py2 import urlparse as urlparse_buggy
 
 log = logging.getLogger(__name__)
@@ -151,8 +151,8 @@ def parse_mr_job_stderr(stderr, counters=None):
             group, counter, amount_str = m.groups()
 
             # don't leave these as bytes on Python 3
-            group = to_string(group)
-            counter = to_string(counter)
+            group = to_unicode(group)
+            counter = to_unicode(counter)
 
             counters.setdefault(group, {})
             counters[group].setdefault(counter, 0)
@@ -162,10 +162,10 @@ def parse_mr_job_stderr(stderr, counters=None):
         m = _STATUS_RE.match(line.rstrip(b'\r\n'))
         if m:
             # don't leave as bytes on Python 3
-            statuses.append(to_string(m.group(1)))
+            statuses.append(to_unicode(m.group(1)))
             continue
 
-        other.append(to_string(line))
+        other.append(to_unicode(line))
 
     return {'counters': counters, 'statuses': statuses, 'other': other}
 
@@ -192,7 +192,7 @@ def _find_python_traceback(lines):
 
     for line in lines:
         # don't return bytes in Python 3
-        line = to_string(line)
+        line = to_unicode(line)
 
         if in_traceback:
             tb_lines.append(line)

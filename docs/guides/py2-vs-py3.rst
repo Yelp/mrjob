@@ -20,7 +20,7 @@ The following things are bytes in any version of Python (which means you need to
 
 The :py:attr:`~mrjob.job.MRJob.stdin`, :py:attr:`~mrjob.job.MRJob.stdout`, and :py:attr:`~mrjob.job.MRJob.stderr` attributes of :py:class:`~mrjob.job.MRJob`\ s are always bytestreams (so, for example, ``self.stderr`` defaults to ``sys.stderr.buffer`` in Python 3).
 
-Everything else (including file paths, URIs, arguments to commands, and logging messages) are strings; that is, ``str`` on Python 3, and either ``str`` or ``unicode`` on Python 2. Like with :py:class:`~mrjob.protocol.RawValueProtocol`, most of the time it'll just work even if you don't think about it.
+Everything else (including file paths, URIs, arguments to commands, and logging messages) are strings; that is, ``str``\s on Python 3, and either ``unicode``\s or ASCII ``str``\s on Python 2. Like with :py:class:`~mrjob.protocol.RawValueProtocol`, most of the time it'll just work even if you don't think about it.
 
 python_bin
 ----------

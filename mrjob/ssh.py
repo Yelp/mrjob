@@ -17,7 +17,7 @@ import logging
 from subprocess import Popen
 from subprocess import PIPE
 
-from mrjob.py2 import to_string
+from mrjob.py2 import to_unicode
 from mrjob.util import cmd_line
 
 log = logging.getLogger(__name__)
@@ -154,7 +154,7 @@ def _ssh_ls(ssh_bin, address, ec2_key_pair_file, path,
     if sudo:
         cmd_args = ['sudo'] + cmd_args
 
-    out = to_string(_check_output(*_ssh_run_with_recursion(
+    out = to_unicode(_check_output(*_ssh_run_with_recursion(
         ssh_bin, address, ec2_key_pair_file, keyfile, cmd_args)))
     if 'No such file or directory' in out:
         raise IOError("No such file or directory: %s" % path)

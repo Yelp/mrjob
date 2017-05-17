@@ -19,7 +19,7 @@ import errno
 import re
 from logging import getLogger
 
-from mrjob.py2 import to_string
+from mrjob.py2 import to_unicode
 from .ids import _add_implied_job_id
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
@@ -203,7 +203,7 @@ def _interpret_hadoop_jar_command_stderr(stderr, record_callback=None):
     def yield_lines():
         try:
             for line in stderr:
-                yield to_string(line)
+                yield to_unicode(line)
         except IOError as e:
             # this is just the PTY's way of saying goodbye
             if e.errno == errno.EIO:

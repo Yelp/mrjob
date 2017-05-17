@@ -23,8 +23,8 @@ that all non-byte strings be unicode. But that doesn't really make sense for
 Python 2, where str (bytes) and unicode can be used interchangeably.
 
 So really our string datatypes fall into two categories, bytes, and
-"strings", which is either ``str`` (i.e., bytes) or ``unicode`` in Python 2,
-and ``str`` (i.e. unicode) in Python 3.
+"strings", which means either ``unicode``\s or ASCII ``str``\s in
+Python 2, and ``str``\s (i.e. unicode) in Python 3.
 
 These things should always be bytes:
 
@@ -73,7 +73,7 @@ We don't provide a ``unicode`` type:
 - Python 3.3+ has ``u''`` literals; please use sparingly
 
 If you need to convert bytes of unknown encoding to a string (e.g. to
-``print()`` or log them), use ``to_string()`` from this module.
+``print()`` or log them), use ``to_unicode()`` from this module.
 
 Iterables
 ---------
@@ -151,21 +151,21 @@ urlopen
 urlparse
 
 
-def to_string(s):
-    """Convert ``bytes`` to ``str``, leaving ``unicode`` unchanged.
-
-    (This means on Python 2, ``to_string()`` does nothing.)
+def to_unicode(s):
+    """Convert ``bytes`` to unicode.
 
     Use this if you need to ``print()`` or log bytes of an unknown encoding,
     or to parse strings out of bytes of unknown encoding (e.g. a log file).
+
+    This hopes that your bytes are UTF-8 decodable, but if not, falls back
+    to latin-1, which always works.
     """
-    if not isinstance(s, string_types + (bytes,)):
-        raise TypeError
-
-    if PY2 or isinstance(s, str):
+    if isinstance(s, bytes):
+        try:
+            return s.decode('utf_8')
+        except UnicodeDecodeError:
+            return s.decode('latin_1')
+    elif isinstance(s, string_types):  # e.g. is unicode
         return s
-
-    try:
-        return s.decode('utf_8')
-    except UnicodeDecodeError:
-        return s.decode('latin_1')
+    else:
+        raise TypeError

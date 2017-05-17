@@ -14,6 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob.py2 import to_string
+from mrjob.py2 import to_unicode
 
 from tests.py2 import TestCase
 
@@ -37,3 +38,24 @@ class ToStringTestCase(TestCase):
 
     def test_non_ascii_unicode(self):
         self.assertEqual(to_string(u'café'), u'café')
+
+
+class ToUnicodeTestCase(TestCase):
+
+    def test_None(self):
+        self.assertRaises(TypeError, to_unicode, None)
+
+    def test_ascii_bytes(self):
+        self.assertEqual(to_unicode(b'foo'), u'foo')
+
+    def test_utf_8_bytes(self):
+        self.assertEqual(to_unicode(b'caf\xc3\xa9'), u'café')
+
+    def test_latin_1_bytes(self):
+        self.assertEqual(to_unicode(b'caf\xe9'), u'caf\xe9')
+
+    def test_ascii_unicode(self):
+        self.assertEqual(to_unicode(u'foo'), u'foo')
+
+    def test_non_ascii_unicode(self):
+        self.assertEqual(to_unicode(u'café'), u'café')

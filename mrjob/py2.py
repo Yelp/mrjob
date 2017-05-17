@@ -169,3 +169,23 @@ def to_string(s):
         return s.decode('utf_8')
     except UnicodeDecodeError:
         return s.decode('latin_1')
+
+
+def to_unicode(s):
+    """Convert ``bytes`` to unicode.
+
+    Use this if you need to ``print()`` or log bytes of an unknown encoding,
+    or to parse strings out of bytes of unknown encoding (e.g. a log file).
+
+    This hopes that your bytes are UTF-8 decodable, but if not, falls back
+    to latin-1, which always works.
+    """
+    if isinstance(s, bytes):
+        try:
+            return s.decode('utf_8')
+        except UnicodeDecodeError:
+            return s.decode('latin_1')
+    elif isinstance(s, string_types):  # e.g. is unicode
+        return s
+    else:
+        raise TypeError

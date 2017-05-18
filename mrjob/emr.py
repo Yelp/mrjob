@@ -568,32 +568,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _default_python_bin(self, local=False):
         """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,
-        except we explicitly pick a minor version of Python 2
-        (``python2.6`` or ``python2.7``).
-
-        On 3.x and later, we just try to match the current minor
-        version of Python. On the 2.x AMIs, we try to use ``python2.7``
-        on 2.4.3 and later (because it comes with a working :command:`pip`),
-        and ``python2.6`` otherwise (because Python 2.7 isn't installed).
+        except when running Python 2, we explicitly pick :command:`python2.7`
+        on AMIs prior to 4.3.0 where's it's not the default.
         """
         if local or not PY2:
             return super(EMRJobRunner, self)._default_python_bin(local=local)
 
-        if self._image_version_gte('3'):
-            # on 3.x and 4.x AMIs, both versions of Python work, so just
-            # match whatever version we're using locally
-            if sys.version_info >= (2, 7):
-                return ['python2.7']
-            else:
-                return ['python2.6']
-        elif self._image_version_gte('2.4.3'):
-            # on 2.4.3+, use python2.7 because the default python
-            # doesn't have a working pip
-            return ['python2.7']
+        if self._image_version_gte('4.3.0'):
+            return ['python']
         else:
-            # prior to 2.4.3, Python 2.6 is the only version installed.
-            # Use "python2.6" and not "python" for consistency
-            return ['python2.6']
+            return ['python2.7']
 
     def _image_version_gte(self, version):
         """Check if the requested image version is greater than

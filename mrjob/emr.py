@@ -169,10 +169,6 @@ _DEFAULT_EMR_REGION = 'us-west-2'
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_IMAGE_VERSION = '4.8.2'
 
-# EMR translates the dead/deprecated "latest" AMI version to 2.4.2
-# (2.4.2 isn't actually the latest version by a long shot)
-_IMAGE_VERSION_LATEST = '2.4.2'
-
 # first AMI version that we can't run bash -e on (see #1548)
 _BAD_BASH_IMAGE_VERSION = '5.2.0'
 
@@ -306,7 +302,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
         self._fix_emr_configurations_opt()
         self._fix_instance_opts()
-        self._fix_image_version_latest()
         self._fix_release_label_opt()
 
     def default_options(self):
@@ -389,13 +384,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                         self[opt_name] = None
                 except ValueError:
                     pass  # maybe EMR will accept non-floats?
-
-    def _fix_image_version_latest(self):
-        """Translate the dead/deprecated *image_version* value ``latest``
-        to ``2.4.2`` up-front, so our code doesn't have to deal with
-        non-numeric AMI versions."""
-        if self['image_version'] == 'latest':
-            self['image_version'] = _IMAGE_VERSION_LATEST
 
     def _fix_release_label_opt(self):
         """If *release_label* is not set and *image_version* is set to version

@@ -706,15 +706,6 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
             self.assertEqual(runner.get_image_version(), '2.0.6')
             self.assertEqual(runner.get_hadoop_version(), '0.20.205')
 
-    def test_latest_ami_version(self):
-        # "latest" is no longer actually the latest version
-        with self.make_runner('--image-version', 'latest') as runner:
-            # we should translate "latest" ourselves (see #1269)
-            self.assertEqual(runner._opts['image_version'], '2.4.2')
-            runner.run()
-            self.assertEqual(runner.get_image_version(), '2.4.2')
-            self.assertEqual(runner.get_hadoop_version(), '1.0.3')
-
     def test_ami_version_3_0(self):
         with self.make_runner('--image-version', '3.0') as runner:
             runner.run()

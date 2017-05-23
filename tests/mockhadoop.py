@@ -196,7 +196,7 @@ def real_path_to_hdfs_uri(real_path, environ):
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
 
-    # janky version of os.path.relpath(), for Python 2.6
+    # for some reason, relpath() doesn't work here
     hdfs_uri = real_path[len(hdfs_root):]
     if not hdfs_uri.startswith('/'):
         hdfs_uri = '/' + hdfs_uri

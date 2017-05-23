@@ -21,6 +21,7 @@ import contextlib
 import glob
 import logging
 import os
+import os.path
 import pipes
 import random
 import shlex
@@ -485,8 +486,8 @@ def zip_dir(dir, out_path, filter=None, prefix=''):
         for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
             for filename in filenames:
                 path = os.path.join(dirpath, filename)
-                # janky version of os.path.relpath() (Python 2.6):
-                rel_path = path[len(os.path.join(dir, '')):]
+                rel_path = os.path.relpath(path, dir)
+
                 if filter(rel_path):
                     # copy over real files, not symlinks
                     real_path = os.path.realpath(path)

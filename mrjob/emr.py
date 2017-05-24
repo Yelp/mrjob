@@ -326,6 +326,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
             'num_task_instances': 0,
+            'pool_clusters': True,
             'pool_name': 'default',
             'pool_wait_minutes': 0,
             'cloud_fs_sync_secs': 5.0,

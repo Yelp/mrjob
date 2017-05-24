@@ -230,6 +230,11 @@ _INSTANCE_ROLES = ('master', 'core', 'task')
 # use to disable multipart uploading
 _HUGE_PART_THRESHOLD = 2 ** 256
 
+# don't make mins_to_end_of_hour less than this, or it'll break
+# idle termination
+_MIN_MINS_TO_END_OF_HOUR = 1
+
+
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
     pass
@@ -312,6 +317,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
+            'max_hours_idle': 1,
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
             'num_task_instances': 0,

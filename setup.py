@@ -1,4 +1,5 @@
 # Copyright 2009-2015 Yelp and Contributors
+# Copyright 2016-2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,10 +37,6 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # special case for Python 2.6
-    if sys.version_info < (2, 7):
-        setuptools_kwargs['test_suite'] = 'unittest2.collector'
-
     # mrjob doesn't actually support Python 3.2, but it tries to support
     # PyPy3, which is currently Python 3.2 with some key 3.3 features
     if (hasattr(sys, 'pypy_version_info') and
@@ -61,10 +58,6 @@ try:
     if sys.version_info < (3, 3):
         setuptools_kwargs['tests_require'].append('mock')
 
-        # unittest2 is a backport of unittest from Python 2.7
-        if sys.version_info < (2, 7):
-            setuptools_kwargs['tests_require'].append('unittest2')
-
 except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}
@@ -80,7 +73,6 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.3',

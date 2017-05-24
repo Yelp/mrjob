@@ -11,13 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Compatilibity layer for test code. Handles the following issues:
+"""Compatilibity layer for test code, mostly to deal with the fact
+that mock is a library in Python 2 but built into Python 3.
 
-Need to use unittest2 rather than unittest in Python 2.6 only.
-
-mock is built in to Python 3.
-
-Don't import directly from unittest/mock; use this module instead.
+Also provides utility code for mocking ``sys.stdout`` and ``sys.stderr``.
 """
 import codecs
 import sys
@@ -25,15 +22,6 @@ from io import BytesIO
 
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
-
-# unittest2 is a backport of unittest in Python 2.7
-if sys.version_info < (2, 7):
-    import unittest2 as unittest
-else:
-    import unittest
-
-TestCase = unittest.TestCase
-TestCase  # quiet pyflakes
 
 # mock is built into unittest in Python 3.3+
 if sys.version_info < (3, 3):
@@ -52,9 +40,6 @@ call
 
 patch = mock.patch
 patch
-
-skipIf = unittest.skipIf
-skipIf
 
 
 def mock_stdout_or_stderr():

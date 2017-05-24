@@ -75,29 +75,17 @@ def parse_s3_uri(uri):
 
 @wraps(urlparse_buggy)
 def urlparse(urlstring, scheme='', allow_fragments=True, *args, **kwargs):
-    """A wrapper for :py:func:`urlparse.urlparse` with the following
-    differences:
-
-    * Handles buckets in S3 URIs correctly. (:py:func:`~urlparse.urlparse`
-      does this correctly sometime after 2.6.1; this is just a patch for older
-      Python versions.)
-    * Splits the fragment correctly in all URIs, not just Web-related ones.
-      This behavior was fixed in the Python 2.7.4 standard library but we have
-      to back-port it for previous versions.
+    """A wrapper for :py:func:`urlparse.urlparse` that splits the fragment
+    correctly in all URIs, not just Web-related ones.
+    This behavior was fixed in the Python 2.7.4 standard library but we have
+    to back-port it for previous versions.
     """
-    # we're probably going to mess with at least one of these values and
-    # re-pack the whole thing before we return it.
-    # NB: urlparse_buggy()'s second argument changes names from
-    # 'default_scheme' to 'scheme' in Python 2.6, so urlparse_buggy() should
-    # be called with positional arguments.
     (scheme, netloc, path, params, query, fragment) = (
         urlparse_buggy(urlstring, scheme, allow_fragments, *args, **kwargs))
-    if netloc == '' and path.startswith('//'):
-        m = _NETLOC_RE.match(path)
-        netloc = m.group(1)
-        path = m.group(2)
+
     if allow_fragments and '#' in path and not fragment:
         path, fragment = path.split('#', 1)
+
     return ParseResult(scheme, netloc, path, params, query, fragment)
 
 

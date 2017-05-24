@@ -12,6 +12,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import TestCase
 
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _match_history_log_path
@@ -22,7 +23,6 @@ from mrjob.logs.history import _parse_yarn_history_log
 
 from tests.sandbox import PatcherTestCase
 from tests.py2 import Mock
-from tests.py2 import TestCase
 from tests.py2 import patch
 
 

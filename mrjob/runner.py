@@ -1114,15 +1114,13 @@ class MRJobRunner(object):
         if not os.path.isdir(os.path.dirname(tar_gz_path)):
             os.makedirs(os.path.dirname(tar_gz_path))
 
-        log.info('Archiving %s -> %s' % (dir_path, tar_gz_path))
-
-        tar_gz = tarfile.open(tar_gz_path, mode='w:gz')
-
         # for remote files
         tmp_download_path = os.path.join(
             self._get_local_tmp_dir(), 'tmp-download')
 
-        try:
+        log.info('Archiving %s -> %s' % (dir_path, tar_gz_path))
+
+        with tarfile.open(tar_gz_path, mode='w:gz') as tar_gz:
             for path in self.fs.ls(dir_path):
                 # fs.ls() only lists files
                 if path == dir_path:
@@ -1148,8 +1146,6 @@ class MRJobRunner(object):
 
                 log.debug('  adding %s to %s' % (path, tar_gz_path))
                 tar_gz.add(local_path, path_in_tar_gz, recursive=False)
-        finally:
-            tar_gz.close()
 
         self._dir_archives_created.add(tar_gz_path)
 

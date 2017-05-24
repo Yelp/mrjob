@@ -19,6 +19,7 @@ import sys
 from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
+from unittest import TestCase
 
 from mrjob.parse import _find_python_traceback
 from mrjob.parse import _parse_port_range_list
@@ -29,9 +30,6 @@ from mrjob.parse import is_uri
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
-
-from tests.py2 import TestCase
-
 
 
 class FindPythonTracebackTestCase(TestCase):

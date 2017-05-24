@@ -21,6 +21,7 @@ import contextlib
 import glob
 import logging
 import os
+import os.path
 import pipes
 import random
 import shlex
@@ -415,10 +416,10 @@ def unarchive(archive_path, dest):
     within zip files can be deflated or stored.
     """
     if tarfile.is_tarfile(archive_path):
-        with contextlib.closing(tarfile.open(archive_path, 'r')) as archive:
+        with tarfile.open(archive_path, 'r') as archive:
             archive.extractall(dest)
     elif is_zipfile(archive_path):
-        with contextlib.closing(ZipFile(archive_path, 'r')) as archive:
+        with ZipFile(archive_path, 'r') as archive:
             for name in archive.namelist():
                 # the zip spec specifies that front slashes are always
                 # used as directory separators
@@ -475,20 +476,20 @@ def zip_dir(dir, out_path, filter=None, prefix=''):
     if not filter:
         filter = lambda path: True
 
-    try:
-        zip_file = ZipFile(out_path, mode='w', compression=ZIP_DEFLATED)
-    except RuntimeError:  # zlib not available
-        zip_file = ZipFile(out_path, mode='w', compression=ZIP_STORED)
+    def create_zip_file():
+        try:
+            return ZipFile(out_path, mode='w', compression=ZIP_DEFLATED)
+        except RuntimeError:  # zlib not available
+            return ZipFile(out_path, mode='w', compression=ZIP_STORED)
 
-    for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
-        for filename in filenames:
-            path = os.path.join(dirpath, filename)
-            # janky version of os.path.relpath() (Python 2.6):
-            rel_path = path[len(os.path.join(dir, '')):]
-            if filter(rel_path):
-                # copy over real files, not symlinks
-                real_path = os.path.realpath(path)
-                path_in_zip_file = os.path.join(prefix, rel_path)
-                zip_file.write(real_path, arcname=path_in_zip_file)
+    with create_zip_file() as zip_file:
+        for dirpath, dirnames, filenames in os.walk(dir, followlinks=True):
+            for filename in filenames:
+                path = os.path.join(dirpath, filename)
+                rel_path = os.path.relpath(path, dir)
 
-    zip_file.close()
+                if filter(rel_path):
+                    # copy over real files, not symlinks
+                    real_path = os.path.realpath(path)
+                    path_in_zip_file = os.path.join(prefix, rel_path)
+                    zip_file.write(real_path, arcname=path_in_zip_file)

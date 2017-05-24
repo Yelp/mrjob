@@ -22,6 +22,7 @@ import os.path
 import posixpath
 import sys
 import time
+import unittest
 from datetime import timedelta
 from io import BytesIO
 
@@ -76,7 +77,6 @@ from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
 from tests.py2 import call
 from tests.py2 import patch
-from tests.py2 import unittest
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
@@ -86,10 +86,8 @@ from tests.test_local import _bash_wrap
 
 # used to match command lines
 if PY2:
-    if sys.version_info < (2, 7):
-        PYTHON_BIN = 'python2.6'
-    else:
-        PYTHON_BIN = 'python2.7'
+    PYTHON_BIN = 'python'
+    # prior to AMI 4.3.0, we use python2.7
 else:
     PYTHON_BIN = 'python3'
 
@@ -707,15 +705,6 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
             runner.run()
             self.assertEqual(runner.get_image_version(), '2.0.6')
             self.assertEqual(runner.get_hadoop_version(), '0.20.205')
-
-    def test_latest_ami_version(self):
-        # "latest" is no longer actually the latest version
-        with self.make_runner('--image-version', 'latest') as runner:
-            # we should translate "latest" ourselves (see #1269)
-            self.assertEqual(runner._opts['image_version'], '2.4.2')
-            runner.run()
-            self.assertEqual(runner.get_image_version(), '2.4.2')
-            self.assertEqual(runner.get_hadoop_version(), '1.0.3')
 
     def test_ami_version_3_0(self):
         with self.make_runner('--image-version', '3.0') as runner:
@@ -1355,11 +1344,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertEqual(lines[0], '#!/usr/bin/env bash -e')
 
     def _test_create_master_bootstrap_script(
-            self, image_version=None, expected_python_bin=PYTHON_BIN,
-            expect_pip_binary=None):
-
-        if expect_pip_binary is None:
-            expect_pip_binary = (PYTHON_BIN == 'python2.6')
+            self, image_version=None, expected_python_bin=PYTHON_BIN):
 
         # create a fake src tarball
         foo_py_path = os.path.join(self.tmp_dir, 'foo.py')
@@ -1438,19 +1423,13 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
     def test_create_master_bootstrap_script_on_3_11_0_ami(self):
         self._test_create_master_bootstrap_script(
+            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
             image_version='3.11.0')
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
         self._test_create_master_bootstrap_script(
             image_version='2.4.11',
-            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
-            expect_pip_binary=False)
-
-    def test_create_master_bootstrap_script_on_2_4_2_ami(self):
-        self._test_create_master_bootstrap_script(
-            image_version='2.4.2',
-            expected_python_bin=('python2.6' if PY2 else PYTHON_BIN),
-            expect_pip_binary=PY2)
+            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN))
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
@@ -3216,11 +3195,11 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
 
         self.start(patch(
             'mrjob.emr.EMRJobRunner.get_image_version',
-            return_value='3.7.0'))
+            return_value='4.8.2'))
 
         self.start(patch(
             'mrjob.emr.EMRJobRunner.get_hadoop_version',
-            return_value='2.4.0'))
+            return_value='2.7.3'))
 
         self.start(patch(
             'mrjob.emr.EMRJobRunner._get_streaming_jar_and_step_arg_prefix',
@@ -3417,20 +3396,15 @@ class DefaultPythonBinTestCase(MockBoto3TestCase):
 
     def test_4_x_release_label(self):
         runner = EMRJobRunner(release_label='emr-4.0.0')
-        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+        self.assertEqual(runner._default_python_bin(),
+                         ['python2.7'] if PY2 else [PYTHON_BIN])
 
     def test_3_11_0_ami(self):
         runner = EMRJobRunner(image_version='3.11.0')
-        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+        self.assertEqual(runner._default_python_bin(),
+                         ['python2.7'] if PY2 else [PYTHON_BIN])
 
     def test_2_4_3_ami(self):
-        runner = EMRJobRunner(image_version='2.4.3')
-        if PY2:
-            self.assertEqual(runner._default_python_bin(), ['python2.7'])
-        else:
-            self.assertEqual(runner._default_python_bin(), ['python3'])
-
-    def test_2_4_2_ami(self):
         runner = EMRJobRunner(image_version='2.4.3')
         if PY2:
             self.assertEqual(runner._default_python_bin(), ['python2.7'])

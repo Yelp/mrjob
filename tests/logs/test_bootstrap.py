@@ -11,9 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import TestCase
+
 from tests.sandbox import PatcherTestCase
 from tests.py2 import Mock
-from tests.py2 import TestCase
 from tests.py2 import patch
 
 from mrjob.logs.bootstrap import _check_for_nonzero_return_code

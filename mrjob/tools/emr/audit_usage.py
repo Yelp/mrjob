@@ -403,7 +403,7 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
     # Figure out billing rate per second for the job, given that
     # normalizedinstancehours is how much we're charged up until
     # the next full hour.
-    full_hours = math.ceil(_to_secs(bcs['ran']) / 60.0 / 60.0)
+    full_hours = math.ceil(timedelta.total_seconds(bcs['ran']) / 60.0 / 60.0)
     nih_per_sec = bcs['nih'] / (full_hours * 3600.0)
 
     # Don't actually count a step as billed for the full hour until
@@ -473,7 +473,7 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
 
         interval['nih_used'] = (
             nih_per_sec *
-            _to_secs(interval['end'] - interval['start']))
+            timedelta.total_seconds(interval['end'] - interval['start']))
 
         interval['date_to_nih_used'] = dict(
             (d, nih_per_sec * secs)
@@ -488,8 +488,8 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
                                            interval['end']).items())
 
         interval['nih_billed'] = (
-            nih_per_sec *
-            _to_secs(interval['end_billing'] - interval['start']))
+            nih_per_sec * timedelta.total_seconds(
+                interval['end_billing'] - interval['start']))
 
         interval['date_to_nih_billed'] = dict(
             (d, nih_per_sec * secs)
@@ -528,21 +528,21 @@ def _subdivide_interval_by_date(start, end):
     *start* and *end* are :py:class:`datetime.datetime` objects.
     """
     if start.date() == end.date():
-        date_to_secs = {start.date(): _to_secs(end - start)}
+        date_to_secs = {start.date(): timedelta.total_seconds(end - start)}
     else:
         date_to_secs = {}
 
-        date_to_secs[start.date()] = _to_secs(
+        date_to_secs[start.date()] = timedelta.total_seconds(
             datetime(start.year, start.month, start.day, tzinfo=start.tzinfo) +
             timedelta(days=1) - start)
 
-        date_to_secs[end.date()] = _to_secs(
+        date_to_secs[end.date()] = timedelta.total_seconds(
             end - datetime(end.year, end.month, end.day, tzinfo=end.tzinfo))
 
         # fill in dates in the middle
         cur_date = start.date() + timedelta(days=1)
         while cur_date < end.date():
-            date_to_secs[cur_date] = _to_secs(timedelta(days=1))
+            date_to_secs[cur_date] = timedelta.total_seconds(timedelta(days=1))
             cur_date += timedelta(days=1)
 
     # remove zeros
@@ -563,19 +563,19 @@ def _subdivide_interval_by_hour(start, end):
     end_hour = end.replace(minute=0, second=0, microsecond=0)
 
     if start_hour == end_hour:
-        hour_to_secs = {start_hour: _to_secs(end - start)}
+        hour_to_secs = {start_hour: timedelta.total_seconds(end - start)}
     else:
         hour_to_secs = {}
 
-        hour_to_secs[start_hour] = _to_secs(
+        hour_to_secs[start_hour] = timedelta.total_seconds(
             start_hour + timedelta(hours=1) - start)
 
-        hour_to_secs[end_hour] = _to_secs(end - end_hour)
+        hour_to_secs[end_hour] = timedelta.total_seconds(end - end_hour)
 
         # fill in dates in the middle
         cur_hour = start_hour + timedelta(hours=1)
         while cur_hour < end_hour:
-            hour_to_secs[cur_hour] = _to_secs(timedelta(hours=1))
+            hour_to_secs[cur_hour] = timedelta.total_seconds(timedelta(hours=1))
             cur_hour += timedelta(hours=1)
 
     # remove zeros
@@ -806,17 +806,6 @@ def _print_report(stats, now=None):
             cs['id'], cs['state'], cs['created'], cs['num_steps'],
             strip_microseconds(cs['ran']), cs['nih_used'], cs['nih_bbnu'],
             (cs['owner'] or ''), (cs['label'] or ('not started by mrjob'))))
-
-
-def _to_secs(delta):
-    """Convert a :py:class:`datetime.timedelta` to a number of seconds.
-
-    (This is basically a backport of
-    :py:meth:`datetime.timedelta.total_seconds`.)
-    """
-    return (delta.days * 86400.0 +
-            delta.seconds +
-            delta.microseconds / 1000000.0)
 
 
 def _percent(x, total, default=0.0):

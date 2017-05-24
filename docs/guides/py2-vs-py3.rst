@@ -25,7 +25,7 @@ Everything else (including file paths, URIs, arguments to commands, and logging 
 python_bin
 ----------
 
-:mrjob-opt:`python_bin` defaults to :command:`python` in Python 2, and :command:`python3` in Python 3 (except in Python 2 on EMR, where it's one of :command:`python2.6` or :command:`python2.7`; see :mrjob-opt:`python_bin` for details).
+:mrjob-opt:`python_bin` defaults to :command:`python3` in Python 3, and :command:`python` in Python 2 (except on EMR AMIs prior to 4.3.0, where we use :command:`python2.7`)
 
 Your Hadoop cluster
 -------------------

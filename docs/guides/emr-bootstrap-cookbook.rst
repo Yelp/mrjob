@@ -33,11 +33,11 @@ version of Python.
 Figure out which version of Python you'll be running on EMR (see
 :mrjob-opt:`python_bin` for defaults).
 
- * If it's Python 2.6, use :command:`pip`
- * If it's Python 2.7, use :command:`pip-2.7`
+ * If it's Python 2, use :command:`pip2.7` (just plain :command:`pip` also
+   works on AMI 4.3.0 and later)
  * If it's Python 3, use :command:`pip-3.4`
 
-For example, to install :py:mod:`ujson` on Python 2.7:
+For example, to install :py:mod:`ujson` on Python 2:
 
 .. code-block:: yaml
 
@@ -67,16 +67,10 @@ Or a tarball:
         bootstrap:
         - sudo pip-2.7 install /local/path/of/tarball.tar.gz#
 
-.. note::
-
-  If for some reason you must run on AMI version 2.4.2 or earlier (protip:
-  don't do that), see :ref:`below <installing-pip-on-2.x-amis>` for how to get
-  :command:`pip` working.
-
 .. warning::
 
-   If you're trying to run jobs on AMI version 3.0.0 (protip: don't do that
-   either) :command:`pip` appears not to work due to out-of-date SSL
+   If you're trying to run jobs on AMI version 3.0.0 (protip: don't do that)
+   :command:`pip` appears not to work due to out-of-date SSL
    certificate information.
 
 
@@ -124,34 +118,12 @@ by EMR:
 2.x AMIs
 --------
 
-The 2.x AMIs are based on a version of Debian that is so old it has been
-"archived," which makes their package installer, :command:`apt-get`, no
-longer work out-of-the-box.
+Probably not worth the trouble. The 2.x AMIs are based on a version of Debian
+that is so old it has been "archived," which makes their package installer,
+:command:`apt-get`, no longer work out-of-the-box. Moreover, Python system
+packages work for Python 2.6, not 2.7.
 
-.. _installing-pip-on-2.x-amis:
-
-If you *must* use the 2.x AMIs, you can get :command:`apt-get` working
-again by fixing ``/etc/apt/sources.list`` and running
-:command:`apt-get update`. For example, to install :command:`pip` for Python
-2.6:
-
-.. code-block:: yaml
-
-    runners:
-      emr:
-        bootstrap:
-        - sudo echo "deb http://archive.debian.org/debian/ squeeze main contrib non-free" > /etc/apt/sources.list
-        - sudo apt-get update
-        - sudo apt-get install -y python-pip
-
-.. note::
-
-   :command:`pip-2.7` is already installed by default on AMI version 2.4.3 and
-   later.
-
-See the `full list of Squeeze packages
-<https://packages.debian.org/squeeze/>`__ for all the (very old versions of)
-software you can install.
+Instead, just use :command:`pip-2.7` to install Python libraries.
 
 .. _installing-python-from-source:
 

@@ -14,9 +14,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test compatibility switching between different Hadoop versions"""
-
 import os
 from distutils.version import LooseVersion
+from unittest import TestCase
 
 from mrjob.compat import jobconf_from_dict
 from mrjob.compat import jobconf_from_env
@@ -26,7 +26,6 @@ from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.compat import uses_yarn
 
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.sandbox import PatcherTestCase
 

@@ -11,7 +11,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Minimal utilities to make Python work for 2.6+ and 3.3+
+"""Minimal utilities to make Python work for 2.7 and 3.3+
 
 Strategies for making `mrjob` work across Python versions:
 

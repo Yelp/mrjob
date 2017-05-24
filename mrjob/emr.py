@@ -169,10 +169,6 @@ _DEFAULT_EMR_REGION = 'us-west-2'
 # default AMI to use on EMR. This will be updated with each version
 _DEFAULT_IMAGE_VERSION = '4.8.2'
 
-# EMR translates the dead/deprecated "latest" AMI version to 2.4.2
-# (2.4.2 isn't actually the latest version by a long shot)
-_IMAGE_VERSION_LATEST = '2.4.2'
-
 # first AMI version that we can't run bash -e on (see #1548)
 _BAD_BASH_IMAGE_VERSION = '5.2.0'
 
@@ -306,7 +302,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
 
         self._fix_emr_configurations_opt()
         self._fix_instance_opts()
-        self._fix_image_version_latest()
         self._fix_release_label_opt()
 
     def default_options(self):
@@ -389,13 +384,6 @@ class EMRRunnerOptionStore(RunnerOptionStore):
                         self[opt_name] = None
                 except ValueError:
                     pass  # maybe EMR will accept non-floats?
-
-    def _fix_image_version_latest(self):
-        """Translate the dead/deprecated *image_version* value ``latest``
-        to ``2.4.2`` up-front, so our code doesn't have to deal with
-        non-numeric AMI versions."""
-        if self['image_version'] == 'latest':
-            self['image_version'] = _IMAGE_VERSION_LATEST
 
     def _fix_release_label_opt(self):
         """If *release_label* is not set and *image_version* is set to version
@@ -568,32 +556,16 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     def _default_python_bin(self, local=False):
         """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,
-        except we explicitly pick a minor version of Python 2
-        (``python2.6`` or ``python2.7``).
-
-        On 3.x and later, we just try to match the current minor
-        version of Python. On the 2.x AMIs, we try to use ``python2.7``
-        on 2.4.3 and later (because it comes with a working :command:`pip`),
-        and ``python2.6`` otherwise (because Python 2.7 isn't installed).
+        except when running Python 2, we explicitly pick :command:`python2.7`
+        on AMIs prior to 4.3.0 where's it's not the default.
         """
         if local or not PY2:
             return super(EMRJobRunner, self)._default_python_bin(local=local)
 
-        if self._image_version_gte('3'):
-            # on 3.x and 4.x AMIs, both versions of Python work, so just
-            # match whatever version we're using locally
-            if sys.version_info >= (2, 7):
-                return ['python2.7']
-            else:
-                return ['python2.6']
-        elif self._image_version_gte('2.4.3'):
-            # on 2.4.3+, use python2.7 because the default python
-            # doesn't have a working pip
-            return ['python2.7']
+        if self._image_version_gte('4.3.0'):
+            return ['python']
         else:
-            # prior to 2.4.3, Python 2.6 is the only version installed.
-            # Use "python2.6" and not "python" for consistency
-            return ['python2.6']
+            return ['python2.7']
 
     def _image_version_gte(self, version):
         """Check if the requested image version is greater than

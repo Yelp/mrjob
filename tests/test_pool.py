@@ -15,14 +15,13 @@
 # limitations under the License.
 from datetime import datetime
 from datetime import timedelta
+from unittest import TestCase
 
 from dateutil.tz import tzutc
 
 from mrjob.aws import _boto3_now
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
-
-from tests.py2 import TestCase
 
 
 class EstTimeToEndOfHourTestCase(TestCase):

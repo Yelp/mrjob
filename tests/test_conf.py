@@ -17,6 +17,8 @@
 """Test configuration parsing and option combining"""
 import os
 import os.path
+from unittest import TestCase
+from unittest import skipIf
 
 import mrjob.conf
 from mrjob.conf import ClearedValue
@@ -38,13 +40,11 @@ from mrjob.conf import expand_path
 from mrjob.conf import find_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_conf
 from mrjob.conf import load_opts_from_mrjob_confs
+
+from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
-
-from tests.py2 import TestCase
-from tests.py2 import patch
-from tests.py2 import skipIf
 
 
 def load_mrjob_conf(conf_path=None):

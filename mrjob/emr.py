@@ -305,6 +305,11 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         if not self['region']:
             self['region'] = _DEFAULT_EMR_REGION
 
+        # don't allow mins_to_end_of_hour to be small
+        if not self['mins_to_end_of_hour'] >= _MIN_MINS_TO_END_OF_HOUR:
+            raise ValueError('mins_to_end_of_hour must be at least %.1f' %
+                             _MIN_MINS_TO_END_OF_HOUR)
+
         self._fix_emr_configurations_opt()
         self._fix_instance_opts()
         self._fix_release_label_opt()

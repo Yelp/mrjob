@@ -149,11 +149,16 @@ def _list_all_steps(runner):
 
 class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
-    MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_cluster_every': 0.00,
-        'cloud_fs_sync_secs': 0.00,
-        'additional_emr_info': {'key': 'value'}
-    }}}
+    MRJOB_CONF_CONTENTS = dict(
+        runners=dict(
+            emr=dict(
+                additional_emr_info=dict(key='value'),
+                check_cluster_every=0.00,
+                cloud_fs_sync_secs=0.00,
+                pool_clusters=False,  # so we can test cleanup
+            ),
+        ),
+    )
 
     def test_end_to_end(self):
         # read from STDIN, a local file, and a remote file
@@ -2888,17 +2893,17 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertDidNotUseIdleTimeoutScript(runner)
+            self.assertRanIdleTimeoutScriptWith(runner, ['3600', '300'])
 
-    def test_non_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1'])
+    def test_non_pooled_cluster(self):
+        mr_job = MRWordCount(['-r', 'emr', '--no-pool-clusters'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
             self.assertDidNotUseIdleTimeoutScript(runner)
 
-    def test_persistent_cluster(self):
+    def test_custom_max_hours_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '0.01'])
         mr_job.sandbox()
 
@@ -2915,13 +2920,19 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
             runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
 
-    def test_mins_to_end_of_hour_does_nothing_without_max_hours_idle(self):
+    def test_mins_to_end_of_hour_does_without_max_hours_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertDidNotUseIdleTimeoutScript(runner)
+            self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
+
+    def test_too_small_mins_to_end_of_hour(self):
+        mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '0.1'])
+        mr_job.sandbox()
+
+        self.assertRaises(ValueError, mr_job.make_runner)
 
     def test_use_integers(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1.000001',
@@ -2931,15 +2942,6 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
-
-    def pooled_clusters(self):
-        mr_job = MRWordCount(['-r', 'emr', '--pool-clusters',
-                              '--max-hours-idle', '0.5'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '300'])
 
     def test_bootstrap_script_is_actually_installed(self):
         self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))

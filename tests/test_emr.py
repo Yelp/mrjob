@@ -1438,7 +1438,8 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
-                              bootstrap_python=False)
+                              bootstrap_python=False,
+                              pool_clusters=False)
 
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
@@ -1479,7 +1480,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         actions = _list_all_bootstrap_actions(runner)
 
-        self.assertEqual(len(actions), 3)
+        self.assertEqual(len(actions), 4)
 
         self.assertEqual(
             actions[0]['ScriptPath'],
@@ -1496,8 +1497,16 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check for master bootstrap script
         self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[2]['ScriptPath'].endswith('b.sh'))
-        self.assertEqual(actions[2]['Args'], [])
+        self.assertTrue(actions[2]['Args'][0].startswith('pool-'))
+        self.assertTrue(actions[2]['Args'][1].startswith('default'))
         self.assertEqual(actions[2]['Name'], 'master')
+
+        # check for idle timeout script
+        self.assertTrue(actions[3]['ScriptPath'].startswith('s3://mrjob-'))
+        self.assertTrue(actions[3]['ScriptPath'].endswith(
+            'terminate_idle_cluster.sh'))
+        self.assertEqual(actions[3]['Args'], ['3600', '300'])
+        self.assertEqual(actions[3]['Name'], 'idle timeout')
 
         # make sure master bootstrap script is on S3
         self.assertTrue(runner.fs.exists(actions[2]['ScriptPath']))
@@ -1526,13 +1535,14 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_actions=bootstrap_actions,
-                              cloud_fs_sync_secs=0.00)
+                              cloud_fs_sync_secs=0.00,
+                              pool_clusters=False)
 
         cluster_id = runner.make_persistent_cluster()
 
         actions = _list_all_bootstrap_actions(runner)
 
-        self.assertEqual(len(actions), 2)
+        self.assertEqual(len(actions), 3)
 
         self.assertTrue(actions[0]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[0]['ScriptPath'].endswith('/apt-install.sh'))
@@ -1546,8 +1556,16 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertEqual(actions[1]['Args'], [])
         self.assertEqual(actions[1]['Name'], 'master')
 
-        # make sure master bootstrap script is on S3
+        # check for idle timeout script
+        self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
+        self.assertTrue(actions[2]['ScriptPath'].endswith(
+            'terminate_idle_cluster.sh'))
+        self.assertEqual(actions[2]['Args'], ['3600', '300'])
+        self.assertEqual(actions[2]['Name'], 'idle timeout')
+
+        # make sure scripts are on S3
         self.assertTrue(runner.fs.exists(actions[1]['ScriptPath']))
+        self.assertTrue(runner.fs.exists(actions[2]['ScriptPath']))
 
 
 class MasterNodeSetupScriptTestCase(MockBoto3TestCase):
@@ -3858,17 +3876,17 @@ class ActionOnFailureTestCase(MockBoto3TestCase):
     def test_default(self):
         runner = EMRJobRunner()
         self.assertEqual(runner._action_on_failure(),
-                         'TERMINATE_CLUSTER')
+                         'CANCEL_AND_WAIT')
 
     def test_default_with_cluster_id(self):
         runner = EMRJobRunner(cluster_id='j-CLUSTER')
         self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 
-    def test_default_with_pooling(self):
-        runner = EMRJobRunner(pool_clusters=True)
+    def test_default_without_pooling(self):
+        runner = EMRJobRunner(pool_clusters=False)
         self.assertEqual(runner._action_on_failure(),
-                         'CANCEL_AND_WAIT')
+                         'TERMINATE_CLUSTER')
 
     def test_option(self):
         runner = EMRJobRunner(emr_action_on_failure='CONTINUE')

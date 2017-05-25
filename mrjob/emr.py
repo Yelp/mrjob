@@ -322,7 +322,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
-            'max_hours_idle': 1.0,
+            'max_hours_idle': 0.5,
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
             'num_task_instances': 0,

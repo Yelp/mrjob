@@ -1623,9 +1623,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # keep track of when we launched our job
         self._emr_job_start = time.time()
 
-        # set EMR tags for the job, if any
-        self._add_tags(self._opts['tags'], self._cluster_id)
-
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()

@@ -13,6 +13,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from mrjob.runner import MRJobRunner
+from mrjob.runner import RunnerOptionStore
+
+
+class HadoopInTheCloudOptionStore(RunnerOptionStore):
+    pass
+
 
 
 class HadoopInTheCloudJobRunner(MRJobRunner):
@@ -20,3 +26,8 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
 
     # so far, every service provides the ability to run bootstrap scripts
     BOOTSTRAP_MRJOB_IN_SETUP = False
+
+    # init: mentions
+    # _cluster_id
+    # _bootstrap
+    # _master_bootstrap_script_path

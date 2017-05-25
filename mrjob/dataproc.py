@@ -41,6 +41,7 @@ except ImportError:
     import configparser
 
 import mrjob
+from mrjob.cloud import HadoopInTheCloudJobRunner
 from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
@@ -268,10 +269,6 @@ class DataprocJobRunner(MRJobRunner):
         ...
     """
     alias = 'dataproc'
-
-    # Don't need to bootstrap mrjob in the setup wrapper; that's what
-    # the bootstrap script is for!
-    BOOTSTRAP_MRJOB_IN_SETUP = False
 
     OPTION_STORE_CLASS = DataprocRunnerOptionStore
 

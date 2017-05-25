@@ -55,6 +55,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
+from mrjob.cloud import HadoopInTheCloudJobRunner
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
@@ -425,7 +426,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             return opt_value
 
 
-class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
+class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
     Invoked when you run your job with ``-r emr``.
 
@@ -449,10 +450,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         ...
     """
     alias = 'emr'
-
-    # Don't need to bootstrap mrjob in the setup wrapper; that's what
-    # the bootstrap script is for!
-    BOOTSTRAP_MRJOB_IN_SETUP = False
 
     OPTION_STORE_CLASS = EMRRunnerOptionStore
 

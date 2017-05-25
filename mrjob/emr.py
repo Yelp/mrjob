@@ -230,6 +230,11 @@ _INSTANCE_ROLES = ('master', 'core', 'task')
 # use to disable multipart uploading
 _HUGE_PART_THRESHOLD = 2 ** 256
 
+# don't make mins_to_end_of_hour less than this, or it'll break
+# idle termination
+_MIN_MINS_TO_END_OF_HOUR = 1
+
+
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
     pass
@@ -300,6 +305,11 @@ class EMRRunnerOptionStore(RunnerOptionStore):
         if not self['region']:
             self['region'] = _DEFAULT_EMR_REGION
 
+        # don't allow mins_to_end_of_hour to be small
+        if not self['mins_to_end_of_hour'] >= _MIN_MINS_TO_END_OF_HOUR:
+            raise ValueError('mins_to_end_of_hour must be at least %.1f' %
+                             _MIN_MINS_TO_END_OF_HOUR)
+
         self._fix_emr_configurations_opt()
         self._fix_instance_opts()
         self._fix_release_label_opt()
@@ -312,9 +322,11 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
+            'max_hours_idle': 0.5,
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
             'num_task_instances': 0,
+            'pool_clusters': True,
             'pool_name': 'default',
             'pool_wait_minutes': 0,
             'cloud_fs_sync_secs': 5.0,
@@ -795,8 +807,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             self._upload_mgr.add(bootstrap_action['path'])
 
         # Add max-hours-idle script if we need it
-        if (self._opts['max_hours_idle'] and
-                (persistent or self._opts['pool_clusters'])):
+        if persistent or self._opts['pool_clusters']:
             self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_master_node_setup_files_for_upload(self):
@@ -1330,19 +1341,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         if persistent or self._opts['pool_clusters']:
             Instances['KeepJobFlowAliveWhenNoSteps'] = True
 
-            # only use idle termination script on persistent clusters
+            # use idle termination script on persistent clusters
             # add it last, so that we don't count bootstrapping as idle time
-            if self._opts['max_hours_idle']:
-                uri = self._upload_mgr.uri(
-                    _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
-                # script takes args in (integer) seconds
-                ba_args = [str(int(self._opts['max_hours_idle'] * 3600)),
-                           str(int(self._opts['mins_to_end_of_hour'] * 60))]
-                BootstrapActions.append(dict(
-                    Name='idle timeout',
-                    ScriptBootstrapAction=dict(
-                        Path=uri,
-                        Args=ba_args)))
+            uri = self._upload_mgr.uri(
+                _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+            # script takes args in (integer) seconds
+            ba_args = [str(int(self._opts['max_hours_idle'] * 3600)),
+                       str(int(self._opts['mins_to_end_of_hour'] * 60))]
+            BootstrapActions.append(dict(
+                Name='idle timeout',
+                ScriptBootstrapAction=dict(
+                    Path=uri,
+                    Args=ba_args)))
 
         if self._opts['ec2_key_pair']:
             Instances['Ec2KeyName'] = self._opts['ec2_key_pair']

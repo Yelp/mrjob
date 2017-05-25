@@ -149,11 +149,16 @@ def _list_all_steps(runner):
 
 class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
-    MRJOB_CONF_CONTENTS = {'runners': {'emr': {
-        'check_cluster_every': 0.00,
-        'cloud_fs_sync_secs': 0.00,
-        'additional_emr_info': {'key': 'value'}
-    }}}
+    MRJOB_CONF_CONTENTS = dict(
+        runners=dict(
+            emr=dict(
+                additional_emr_info=dict(key='value'),
+                check_cluster_every=0.00,
+                cloud_fs_sync_secs=0.00,
+                pool_clusters=False,  # so we can test cleanup
+            ),
+        ),
+    )
 
     def test_end_to_end(self):
         # read from STDIN, a local file, and a remote file
@@ -1433,7 +1438,8 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
     def test_no_bootstrap_script_if_not_needed(self):
         runner = EMRJobRunner(conf_paths=[], bootstrap_mrjob=False,
-                              bootstrap_python=False)
+                              bootstrap_python=False,
+                              pool_clusters=False)
 
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
@@ -1474,7 +1480,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         actions = _list_all_bootstrap_actions(runner)
 
-        self.assertEqual(len(actions), 3)
+        self.assertEqual(len(actions), 4)
 
         self.assertEqual(
             actions[0]['ScriptPath'],
@@ -1491,8 +1497,16 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check for master bootstrap script
         self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[2]['ScriptPath'].endswith('b.sh'))
-        self.assertEqual(actions[2]['Args'], [])
+        self.assertTrue(actions[2]['Args'][0].startswith('pool-'))
+        self.assertTrue(actions[2]['Args'][1].startswith('default'))
         self.assertEqual(actions[2]['Name'], 'master')
+
+        # check for idle timeout script
+        self.assertTrue(actions[3]['ScriptPath'].startswith('s3://mrjob-'))
+        self.assertTrue(actions[3]['ScriptPath'].endswith(
+            'terminate_idle_cluster.sh'))
+        self.assertEqual(actions[3]['Args'], ['1800', '300'])
+        self.assertEqual(actions[3]['Name'], 'idle timeout')
 
         # make sure master bootstrap script is on S3
         self.assertTrue(runner.fs.exists(actions[2]['ScriptPath']))
@@ -1521,13 +1535,14 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
 
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_actions=bootstrap_actions,
-                              cloud_fs_sync_secs=0.00)
+                              cloud_fs_sync_secs=0.00,
+                              pool_clusters=False)
 
         cluster_id = runner.make_persistent_cluster()
 
         actions = _list_all_bootstrap_actions(runner)
 
-        self.assertEqual(len(actions), 2)
+        self.assertEqual(len(actions), 3)
 
         self.assertTrue(actions[0]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[0]['ScriptPath'].endswith('/apt-install.sh'))
@@ -1541,8 +1556,16 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertEqual(actions[1]['Args'], [])
         self.assertEqual(actions[1]['Name'], 'master')
 
-        # make sure master bootstrap script is on S3
+        # check for idle timeout script
+        self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
+        self.assertTrue(actions[2]['ScriptPath'].endswith(
+            'terminate_idle_cluster.sh'))
+        self.assertEqual(actions[2]['Args'], ['1800', '300'])
+        self.assertEqual(actions[2]['Name'], 'idle timeout')
+
+        # make sure scripts are on S3
         self.assertTrue(runner.fs.exists(actions[1]['ScriptPath']))
+        self.assertTrue(runner.fs.exists(actions[2]['ScriptPath']))
 
 
 class MasterNodeSetupScriptTestCase(MockBoto3TestCase):
@@ -2888,17 +2911,17 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertDidNotUseIdleTimeoutScript(runner)
+            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '300'])
 
-    def test_non_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1'])
+    def test_non_pooled_cluster(self):
+        mr_job = MRWordCount(['-r', 'emr', '--no-pool-clusters'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
             self.assertDidNotUseIdleTimeoutScript(runner)
 
-    def test_persistent_cluster(self):
+    def test_custom_max_hours_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '0.01'])
         mr_job.sandbox()
 
@@ -2915,13 +2938,19 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
             runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
 
-    def test_mins_to_end_of_hour_does_nothing_without_max_hours_idle(self):
+    def test_mins_to_end_of_hour_does_without_max_hours_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertDidNotUseIdleTimeoutScript(runner)
+            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '600'])
+
+    def test_too_small_mins_to_end_of_hour(self):
+        mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '0.1'])
+        mr_job.sandbox()
+
+        self.assertRaises(ValueError, mr_job.make_runner)
 
     def test_use_integers(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1.000001',
@@ -2931,15 +2960,6 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
-
-    def pooled_clusters(self):
-        mr_job = MRWordCount(['-r', 'emr', '--pool-clusters',
-                              '--max-hours-idle', '0.5'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '300'])
 
     def test_bootstrap_script_is_actually_installed(self):
         self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
@@ -3856,17 +3876,17 @@ class ActionOnFailureTestCase(MockBoto3TestCase):
     def test_default(self):
         runner = EMRJobRunner()
         self.assertEqual(runner._action_on_failure(),
-                         'TERMINATE_CLUSTER')
+                         'CANCEL_AND_WAIT')
 
     def test_default_with_cluster_id(self):
         runner = EMRJobRunner(cluster_id='j-CLUSTER')
         self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 
-    def test_default_with_pooling(self):
-        runner = EMRJobRunner(pool_clusters=True)
+    def test_default_without_pooling(self):
+        runner = EMRJobRunner(pool_clusters=False)
         self.assertEqual(runner._action_on_failure(),
-                         'CANCEL_AND_WAIT')
+                         'TERMINATE_CLUSTER')
 
     def test_option(self):
         runner = EMRJobRunner(emr_action_on_failure='CONTINUE')

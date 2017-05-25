@@ -276,11 +276,17 @@ Cluster creation and configuration
     :switch: --max-hours-idle
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``None``
+    :default: 0.5
 
-    If we create a persistent cluster, have it automatically terminate itself
-    after it's been idle this many hours AND we're within
-    :mrjob-opt:`mins_to_end_of_hour` of an EC2 billing hour.
+    Automatically terminate persistent/pooled clusters that have been idle at
+    least this many hours, if we're within :mrjob-opt:`mins_to_end_of_hour` of
+    an EC2 billing hour.
+
+    .. versionchanged:: 0.6.0
+
+       All clusters launched by mrjob now auto-terminate when idle. In previous
+       versions, you needed to set this option explicitly, or use
+       :ref:`terminate-idle-clusters`.
 
 .. mrjob-opt::
     :config: mins_to_end_of_hour
@@ -384,13 +390,10 @@ Cluster creation and configuration
     Otherwise, the cluster will only be visible to the IAM user that created
     it.
 
-    .. warning::
+    .. deprecated:: 0.6.0
 
-        You should almost certainly not set this to ``False`` if you are
-        :ref:`pooling-clusters` with other users; other users will
-        not be able to reuse your clusters, and
-        :command:`mrjob terminate-idle-clusters` won't be
-        able to shut them down when they become idle.
+       Hiding clusters from other users on the same account is not very useful.
+       If you don't want to share pooled clusters, try :mrjob-opt:`pool_name`.
 
 .. mrjob-opt::
     :config: zone
@@ -735,7 +738,7 @@ Choosing/creating a cluster to join
     :switch: --pool-clusters
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``False``
+    :default: ``True``
 
     Try to run the job on a ``WAITING`` pooled cluster with the same
     bootstrap configuration. Prefer the one with the most compute units. Use
@@ -743,10 +746,12 @@ Choosing/creating a cluster to join
     another job. If no suitable cluster is `WAITING`, create a new pooled
     cluster.
 
-    .. warning:: Do not run this without either setting
-        :mrjob-opt:`max_hours_idle` (recommended) or putting
-        :command:`mrjob terminate-idle-clusters` in your crontab;
-        clusters left idle can quickly become expensive!
+    .. versionchanged:: 0.6.0
+
+       This used to be turned off by default. If you want to enable this
+       option in older versions of mrjob, make sure to set
+       :mrjob-opt:`max_hours_idle` too, or your clusters will run
+       (costing you money) forever.
 
     .. versionchanged:: 0.5.4
 

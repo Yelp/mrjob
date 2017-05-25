@@ -1097,6 +1097,7 @@ _RUNNER_OPTS = dict(
     ),
     visible_to_all_users=dict(
         cloud_role='launch',
+        deprecated=True,
         runners=['emr'],
         switches=[
             (['--visible-to-all-users'], dict(

@@ -144,7 +144,7 @@ Cluster pooling
 ^^^^^^^^^^^^^^^
 
 mrjob can now add up to 1,000 steps on
-:ref:`pooled clusters <pooling-clusters>` on EMR (except on very old AMIs).
+:ref:`pooled clusters <cluster-pooling>` on EMR (except on very old AMIs).
 mrjob now prints debug messages explaining why your job matched
 a particular pooled cluster when running in verbose mode (the ``-v`` option).
 Fixed a bug that caused pooling to fail when there was no need for a master
@@ -227,7 +227,7 @@ Functionally equivalent to :ref:`v0.5.4`, except that it restores
 the deprecated *ami_version* option as an alias for :mrjob-opt:`image_version`,
 making it easier to upgrade from earlier versions of mrjob.
 
-Also slightly improves :ref:`EMR cluster pooling <pooling-clusters>` with
+Also slightly improves :ref:`cluster-pooling` on EMR with
 updated information on memory and CPU power of various EC2 instance types, and
 by treating application names (e.g. "Spark") as case-insensitive.
 
@@ -246,7 +246,7 @@ Pooling and idle cluster self-termination
    of mrjob, use version :ref:`v0.5.5` or later.
 
 This release resolves a long-standing EMR API race condition that made it
-difficult to use :ref:`cluster pooling <pooling-clusters>` and idle cluster
+difficult to use :ref:`cluster-pooling` and idle cluster
 self-termination (see :mrjob-opt:`max_hours_idle`) together. Now if your
 pooled job unknowingly runs on a cluster that was in the process of shutting
 down, it will detect that and re-launch the job on a different cluster.
@@ -622,7 +622,7 @@ Other changes
  - :py:data:`~mrjob.runner.JOB` :mrjob-opt:`cleanup` on EMR is temporarily disabled
  - mrjob now follows symlinks when :py:meth:`~mrjob.fs.local.LocalFileSystem.ls`\ ing the local filesystem (beware recursive symlinks!)
  - The :mrjob-opt:`interpreter` option disables :mrjob-opt:`bootstrap_mrjob` by default (:mrjob-opt:`interpreter` is meant for non-Python jobs)
- - :ref:`cluster pooling <pooling-clusters>` now respects :mrjob-opt:`ec2_key_pair`
+ - :ref:`cluster-pooling` now respects :mrjob-opt:`ec2_key_pair`
  - cluster self-termination (see :mrjob-opt:`max_hours_idle`) now respects non-streaming jobs
  - :py:class:`~mrjob.fs.local.LocalFilesystem` now rejects URIs rather than interpreting them as local paths
  - ``local`` and ``inline`` runners no longer have a default :mrjob-opt:`hadoop_version`, instead handling :mrjob-opt:`jobconf` in a version-agnostic way
@@ -823,7 +823,7 @@ that will terminate themselves after being idle for a certain amount of time,
 in a way that optimizes EMR/EC2's full-hour billing model.
 
 For development (not production), we now recommend always using
-:ref:`job flow pooling <pooling-clusters>`, with :mrjob-opt:`max_hours_idle`
+:ref:`job flow pooling <cluster-pooling>`, with :mrjob-opt:`max_hours_idle`
 enabled. Update your :ref:`mrjob.conf <mrjob.conf>` like this:
 
 .. code-block:: yaml
@@ -967,7 +967,7 @@ Features
     multiple automated jobs, save time and money while debugging, and generally
     make your life simpler.
 
-    More info: :ref:`pooling-clusters`
+    More info: :ref:`cluster-pooling`
 
 **SSH Log Fetching**
 

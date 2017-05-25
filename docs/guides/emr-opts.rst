@@ -393,7 +393,7 @@ Cluster creation and configuration
     .. deprecated:: 0.6.0
 
        Hiding clusters from other users on the same account is not very useful.
-       If you don't want to share pooled clusters, try :mrjob:`pool_name`.
+       If you don't want to share pooled clusters, try :mrjob-opt:`pool_name`.
 
 .. mrjob-opt::
     :config: zone

@@ -2386,7 +2386,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             out.append(line + '\n')
 
         # shebang, etc.
-        self._write_start_of_sh_script(writeln)
+        for line in self._start_of_sh_script():
+            writeln(line)
+        writeln()
 
         # run commands in a block so we can redirect stdout to stderr
         # (e.g. to catch errors from compileall). See #370

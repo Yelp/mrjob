@@ -101,43 +101,42 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap)
         for line in contents:
-            log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
+            log.debug('BOOTSTRAP: ' + line)
 
-        with open(path, 'w') as f:
+        with open(path, 'wb') as f:
             for line in contents:
-                f.write(line)
+                f.write(line.encode('utf-8') + b'\n')
 
         self._master_bootstrap_script_path = path
 
     def _master_bootstrap_script_content(self, bootstrap):
         """Return a list containing the lines of the master bootstrap script.
+        (without trailing newlines)
         """
         out = []
 
-        def writeln(line=''):
-            out.append(line + '\n')
-
         # shebang, precommands
-        self._write_start_of_sh_script(writeln)
+        out.extend(self._start_of_sh_script())
+        out.append('')
 
         # store $PWD
-        writeln('# store $PWD')
-        writeln('__mrjob_PWD=$PWD')
-        writeln()
+        out.append('# store $PWD')
+        out.append('__mrjob_PWD=$PWD')
+        out.append('')
 
         # special case for PWD being in /, which happens on Dataproc
         # (really we should cd to tmp or something)
-        writeln('if [ $__mrjob_PWD = "/" ]; then')
-        writeln('  __mrjob_PWD=""')
-        writeln('fi')
-        writeln()
+        out.append('if [ $__mrjob_PWD = "/" ]; then')
+        out.append('  __mrjob_PWD=""')
+        out.append('fi')
+        out.append('')
 
         # run commands in a block so we can redirect stdout to stderr
         # (e.g. to catch errors from compileall). See #370
-        writeln('{')
+        out.append('{')
 
         # download files
-        writeln('  # download files and mark them executable')
+        out.append('  # download files and mark them executable')
 
         cp_to_local = self._cp_to_local_cmd()
 
@@ -145,14 +144,14 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            writeln('  %s %s $__mrjob_PWD/%s' %
+            out.append('  %s %s $__mrjob_PWD/%s' %
                     (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # make everything executable, like Hadoop Distributed Cache
-            writeln('  chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
-        writeln()
+            out.append('  chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
+        out.append('')
 
         # run bootstrap commands
-        writeln('  # bootstrap commands')
+        out.append('  # bootstrap commands')
         for cmd in bootstrap:
             # reconstruct the command line, substituting $__mrjob_PWD/<name>
             # for path dicts
@@ -165,22 +164,24 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
                 else:
                     # it's raw script
                     line += token
-            writeln(line)
+            out.append(line)
 
-        writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
+        out.append('} 1>&2')  # stdout -> stderr for ease of error log parsing
 
         return out
 
-    def _write_start_of_sh_script(self, writeln):
-        """Write shebang and pre-commands."""
+    def _start_of_sh_script(self):
+        """Return a list of lines (without trailing newlines) containing the
+        shell script shebang and pre-commands."""
+        out = []
+
         # shebang
         sh_bin = self._sh_bin()
         if not sh_bin[0].startswith('/'):
             sh_bin = ['/usr/bin/env'] + sh_bin
-        writeln('#!' + cmd_line(sh_bin))
+        out.append('#!' + cmd_line(sh_bin))
 
         # hook for 'set -e', etc. (see #1549)
-        for cmd in self._sh_pre_commands():
-            writeln(cmd)
+        out.extend(self._sh_pre_commands())
 
-        writeln()
+        return out

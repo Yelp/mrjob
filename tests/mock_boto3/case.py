@@ -41,7 +41,7 @@ class MockBoto3TestCase(SandboxedTestCase):
 
     # if a test needs to create an EMR client more than this many
     # times, there's probably a problem with simulating progress
-    MAX_EMR_CLIENTS = 100
+    MAX_EMR_CLIENTS = 120
 
     @classmethod
     def setUpClass(cls):

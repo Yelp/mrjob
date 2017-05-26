@@ -1497,8 +1497,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check for master bootstrap script
         self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[2]['ScriptPath'].endswith('b.sh'))
-        self.assertTrue(actions[2]['Args'][0].startswith('pool-'))
-        self.assertTrue(actions[2]['Args'][1].startswith('default'))
+        self.assertEqual(actions[2]['Args'], [])
         self.assertEqual(actions[2]['Name'], 'master')
 
         # check for idle timeout script
@@ -1737,13 +1736,14 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             runner.run()
 
             # Make sure that the runner made a pooling-enabled cluster
-            bootstrap_actions = _list_all_bootstrap_actions(runner)
+            cluster = runner._describe_cluster()
+            jf_hash, jf_name = _pool_hash_and_name(cluster)
 
-            jf_hash, jf_name = _pool_hash_and_name(bootstrap_actions)
             self.assertEqual(jf_hash, runner._pool_hash())
             self.assertEqual(jf_name, runner._opts['pool_name'])
 
             self.simulate_emr_progress(runner.get_cluster_id())
+
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
 
@@ -4286,7 +4286,8 @@ class EMRTagsTestCase(MockBoto3TestCase):
 
     def test_tags_get_created(self):
         cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
-                                           '--tag', 'tag_two=bar')
+                                           '--tag', 'tag_two=bar',
+                                           '--no-pool-clusters')
 
         # tags should be in alphabetical order by key
         self.assertEqual(cluster['Tags'], [
@@ -4296,7 +4297,8 @@ class EMRTagsTestCase(MockBoto3TestCase):
 
     def test_blank_tag_value(self):
         cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
-                                           '--tag', 'tag_two=')
+                                           '--tag', 'tag_two=',
+                                           '--no-pool-clusters')
 
         # tags should be in alphabetical order by key
         self.assertEqual(cluster['Tags'], [
@@ -4305,7 +4307,8 @@ class EMRTagsTestCase(MockBoto3TestCase):
         ])
 
     def test_tag_values_can_be_none(self):
-        runner = EMRJobRunner(conf_paths=[], tags={'tag_one': None})
+        runner = EMRJobRunner(conf_paths=[], tags={'tag_one': None},
+                              pool_clusters=False)
         cluster_id = runner.make_persistent_cluster()
 
         mock_cluster = self.mock_emr_clusters[cluster_id]
@@ -4315,7 +4318,8 @@ class EMRTagsTestCase(MockBoto3TestCase):
 
     def test_persistent_cluster(self):
         args = ['--tag', 'tag_one=foo',
-                '--tag', 'tag_two=bar']
+                '--tag', 'tag_two=bar',
+                '--no-pool-clusters']
 
         with self.make_runner(*args) as runner:
             cluster_id = runner.make_persistent_cluster()

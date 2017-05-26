@@ -91,6 +91,7 @@ from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
+from mrjob.pool import _pool_tags
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
@@ -1249,6 +1250,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # set EMR tags for the cluster, if any
         self._add_tags(self._opts['tags'], cluster_id)
 
+        # add pooling tags
+        if self._opts['pool_clusters']:
+            self._add_tags(
+                _pool_tags(self._pool_hash(), self._opts['pool_name']),
+                cluster_id,
+            )
+
         return cluster_id
 
     def _add_tags(self, tags, cluster_id):
@@ -1321,19 +1329,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     Args=bootstrap_action['args'])))
 
         if self._master_bootstrap_script_path:
-            master_bootstrap_script_args = []
-            if self._opts['pool_clusters']:
-                master_bootstrap_script_args = [
-                    'pool-' + self._pool_hash(),
-                    self._opts['pool_name'],
-                ]
             uri = self._upload_mgr.uri(self._master_bootstrap_script_path)
 
             BootstrapActions.append(dict(
                 Name='master',
                 ScriptBootstrapAction=dict(
                     Path=uri,
-                    Args=master_bootstrap_script_args)))
+                    Args=[])))
 
         if persistent or self._opts['pool_clusters']:
             Instances['KeepJobFlowAliveWhenNoSteps'] = True
@@ -2687,10 +2689,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 return
 
             # match pool name, and (bootstrap) hash
-            bootstrap_actions = list(_boto3_paginate(
-                'BootstrapActions',
-                emr_client, 'list_bootstrap_actions', ClusterId=cluster['Id']))
-            pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
+            pool_hash, pool_name = _pool_hash_and_name(cluster)
 
             if req_hash != pool_hash:
                 log.debug('    pool hash mismatch')

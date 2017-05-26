@@ -252,7 +252,7 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         })
 
 
-class DataprocJobRunner(MRJobRunner):
+class DataprocJobRunner(HadoopInTheCloudJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Google Cloud Dataproc.
     Invoked when you run your job with ``-r dataproc``.
 

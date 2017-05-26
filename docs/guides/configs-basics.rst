@@ -6,6 +6,7 @@ Config file format and location
 We look for :file:`mrjob.conf` in these locations:
 
 - The location specified by :envvar:`MRJOB_CONF`
+- :file:`./mrjob.conf`
 - :file:`~/.mrjob.conf`
 - :file:`/etc/mrjob.conf`
 

@@ -90,6 +90,11 @@ class MRJobBasicConfTestCase(MRJobConfTestCase):
         open(dot_mrjob_path, 'w').close()
         self.assertEqual(find_mrjob_conf(), dot_mrjob_path)
 
+    def test_mrjob_in_current_dir(self):
+        dot_mrjob_path = os.path.join('.', 'mrjob.conf')
+        open(dot_mrjob_path, 'w').close()
+        self.assertEqual(find_mrjob_conf(), dot_mrjob_path)
+
     def test_mrjob_conf_in_home_dir(self):
         # ~/mrjob.conf is not a place we look (should be ~/.mrjob)
         os.environ['HOME'] = self.tmp_dir

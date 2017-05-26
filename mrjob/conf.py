@@ -138,6 +138,7 @@ def find_mrjob_conf():
     """Look for :file:`mrjob.conf`, and return its path. Places we look:
 
     - The location specified by :envvar:`MRJOB_CONF`
+    - :file:`./mrjob.conf`
     - :file:`~/.mrjob.conf`
     - :file:`/etc/mrjob.conf`
 
@@ -146,6 +147,8 @@ def find_mrjob_conf():
     def candidates():
         if 'MRJOB_CONF' in os.environ:
             yield expand_path(os.environ['MRJOB_CONF'])
+
+        yield expand_path(os.path.join('.', 'mrjob.conf'))
 
         # $HOME isn't necessarily set on Windows, but ~ works
         # use os.path.join() so we don't end up mixing \ and /

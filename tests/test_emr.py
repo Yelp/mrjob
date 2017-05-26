@@ -46,6 +46,7 @@ from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
+from mrjob.pool import _extract_tags
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
@@ -145,6 +146,13 @@ def _list_all_steps(runner):
     return list(reversed(list(_boto3_paginate(
         'Steps', runner.make_emr_client(), 'list_steps',
         ClusterId=runner.get_cluster_id()))))
+
+
+def _extract_non_mrjob_tags(cluster):
+    """get tags from a cluster as a dict, excluding tags starting with
+    ``__mrjob_``"""
+    return {k: v for k, v in _extract_tags(cluster).items()
+            if not k.startswith('__mrjob_')}
 
 
 class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
@@ -4254,11 +4262,30 @@ class ShouldBootstrapSparkTestCase(MockBoto3TestCase):
 
 class EMRTagsTestCase(MockBoto3TestCase):
 
+    def test_default_tags(self):
+        cluster = self.run_and_get_cluster()
+
+        tags = _extract_tags(cluster)
+
+        self.assertEqual(tags['__mrjob_pool_name'], 'default')
+        self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
+        self.assertIn('__mrjob_pool_hash', tags)
+
+    def test_no_pooling(self):
+        cluster = self.run_and_get_cluster('--no-pool-clusters')
+
+        tags = _extract_tags(cluster)
+
+        self.assertNotIn('__mrjob_pool_hash', tags)
+        self.assertNotIn('__mrjob_pool_name', tags)
+        self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
+
     def test_tags_option_dict(self):
         job = MRWordCount([
             '-r', 'emr',
             '--tag', 'tag_one=foo',
             '--tag', 'tag_two=bar'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['tags'],
@@ -4276,6 +4303,7 @@ class EMRTagsTestCase(MockBoto3TestCase):
         }}}
 
         job = MRWordCount(['-r', 'emr', '--tag', 'tag_two=qwerty'])
+        job.sandbox()
 
         with mrjob_conf_patcher(TAGS_MRJOB_CONF):
             with job.make_runner() as runner:
@@ -4286,49 +4314,41 @@ class EMRTagsTestCase(MockBoto3TestCase):
 
     def test_tags_get_created(self):
         cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
-                                           '--tag', 'tag_two=bar',
-                                           '--no-pool-clusters')
+                                           '--tag', 'tag_two=bar')
 
-        # tags should be in alphabetical order by key
-        self.assertEqual(cluster['Tags'], [
-            dict(Key='tag_one', Value='foo'),
-            dict(Key='tag_two', Value='bar'),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(cluster),
+            dict(tag_one='foo', tag_two='bar'))
 
     def test_blank_tag_value(self):
         cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
-                                           '--tag', 'tag_two=',
-                                           '--no-pool-clusters')
+                                           '--tag', 'tag_two=')
 
-        # tags should be in alphabetical order by key
-        self.assertEqual(cluster['Tags'], [
-            dict(Key='tag_one', Value='foo'),
-            dict(Key='tag_two', Value=''),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(cluster),
+            dict(tag_one='foo', tag_two=''))
 
     def test_tag_values_can_be_none(self):
         runner = EMRJobRunner(conf_paths=[], tags={'tag_one': None},
                               pool_clusters=False)
         cluster_id = runner.make_persistent_cluster()
+        cluster = self.mock_emr_clusters[cluster_id]
 
-        mock_cluster = self.mock_emr_clusters[cluster_id]
-        self.assertEqual(mock_cluster['Tags'], [
-            dict(Key='tag_one', Value=''),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(cluster),
+            dict(tag_one=''))
 
     def test_persistent_cluster(self):
         args = ['--tag', 'tag_one=foo',
-                '--tag', 'tag_two=bar',
-                '--no-pool-clusters']
+                '--tag', 'tag_two=bar']
 
         with self.make_runner(*args) as runner:
             cluster_id = runner.make_persistent_cluster()
+            cluster = self.mock_emr_clusters[cluster_id]
 
-        mock_cluster = self.mock_emr_clusters[cluster_id]
-        self.assertEqual(mock_cluster['Tags'], [
-            dict(Key='tag_one', Value='foo'),
-            dict(Key='tag_two', Value='bar'),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(cluster),
+            dict(tag_one='foo', tag_two='bar'))
 
 
 # this isn't actually enough to support GovCloud; see:

@@ -25,6 +25,7 @@ from mrjob.compat import version_gte
 from mrjob.conf import combine_values
 from mrjob.parse import is_s3_uri
 from mrjob.parse import parse_s3_uri
+from mrjob.pool import _extract_tags
 from mrjob.py2 import integer_types
 from mrjob.py2 import string_types
 
@@ -784,7 +785,7 @@ class MockEMRClient(object):
 
             new_tags[Key] = Value
 
-        tags_dict = dict((t['Key'], t['Value']) for t in cluster['Tags'])
+        tags_dict = _extract_tags(cluster)
         tags_dict.update(new_tags)
 
         cluster['Tags'] = [

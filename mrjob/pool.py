@@ -55,11 +55,15 @@ def _pool_tags(hash, name):
     return dict(__mrjob_pool_hash=hash, __mrjob_pool_name=name)
 
 
+def _extract_tags(cluster):
+    """Pull the tags from a cluster, as a dict."""
+    return {t['Key']: t['Value'] for t in cluster.get('Tags') or []}
+
+
 def _pool_hash_and_name(cluster):
     """Return the hash and pool name for the given cluster, or
     ``(None, None)`` if it isn't pooled."""
-    tags = {t['Key']: t['Value'] for t in cluster.get('Tags') or []}
-
+    tags = _extract_tags(cluster)
     return tags.get('__mrjob_pool_hash'), tags.get('__mrjob_pool_name')
 
 

@@ -18,6 +18,7 @@ import sys
 from mrjob.tools.emr.create_cluster import main as create_cluster_main
 from mrjob.tools.emr.create_cluster import _runner_kwargs
 
+from tests.test_emr import _extract_non_mrjob_tags
 from tests.tools.emr import ToolTestCase
 
 
@@ -105,11 +106,6 @@ class ClusterInspectionTestCase(ToolTestCase):
 
         mock_cluster = self.mock_emr_clusters['j-MOCKCLUSTER0']
 
-        # strip tags for pooling, etc.
-        non_mrjob_tags = [t for t in mock_cluster['Tags']
-                          if not t['Key'].startswith('__mrjob_')]
-
-        self.assertEqual(non_mrjob_tags, [
-            dict(Key='tag_one', Value='foo'),
-            dict(Key='tag_two', Value='bar'),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(mock_cluster),
+            dict(tag_one='foo', tag_two='bar'))

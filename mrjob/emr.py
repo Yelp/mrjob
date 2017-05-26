@@ -1247,15 +1247,18 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         log.debug('Cluster created with ID: %s' % cluster_id)
 
-        # set EMR tags for the cluster, if any
-        self._add_tags(self._opts['tags'], cluster_id)
+        # set EMR tags for the cluster
+        tags = dict(self._opts['tags'])
+
+        # patch in version
+        tags['__mrjob_version'] = mrjob.__version__
 
         # add pooling tags
         if self._opts['pool_clusters']:
-            self._add_tags(
-                _pool_tags(self._pool_hash(), self._opts['pool_name']),
-                cluster_id,
-            )
+            tags['__mrjob_pool_hash'] = self._pool_hash()
+            tags['__mrjob_pool_name'] = self._opts['pool_name']
+
+        self._add_tags(tags, cluster_id)
 
         return cluster_id
 

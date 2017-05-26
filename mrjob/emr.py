@@ -2331,79 +2331,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
 
-    # helper for _master_*_script_content() methods
-    def _write_start_of_sh_script(self, writeln):
-        # shebang
-        sh_bin = self._sh_bin()
-        if not sh_bin[0].startswith('/'):
-            sh_bin = ['/usr/bin/env'] + sh_bin
-        writeln('#!' + cmd_line(sh_bin))
-
-        # hook for 'set -e', etc. (see #1549)
-        for cmd in self._sh_pre_commands():
-            writeln(cmd)
-
-        writeln()
-
-    def _master_bootstrap_script_content(self, bootstrap):
-        """Create the contents of the master bootstrap script.
-        """
-        out = []
-
-        def writeln(line=''):
-            out.append(line + '\n')
-
-        # shebang, etc.
-        self._write_start_of_sh_script(writeln)
-
-        # store $PWD
-        writeln('# store $PWD')
-        writeln('__mrjob_PWD=$PWD')
-        writeln()
-
-        # run commands in a block so we can redirect stdout to stderr
-        # (e.g. to catch errors from compileall). See #370
-        writeln('{')
-
-        # download files
-        writeln('  # download files and mark them executable')
-
+    def _cp_to_local_cmd(self):
+        """Command to copy files from the cloud to the local directory."""
         if self._opts['release_label']:
             # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
-            cp_to_local = 'aws s3 cp'
+            return 'aws s3 cp'
         else:
             # on the 2.x and 3.x AMIs, use hadoop
-            cp_to_local = 'hadoop fs -copyToLocal'
-
-        # TODO: why bother with $__mrjob_PWD here, since we're already in it?
-        for name, path in sorted(
-                self._bootstrap_dir_mgr.name_to_path('file').items()):
-            uri = self._upload_mgr.uri(path)
-            writeln('  %s %s $__mrjob_PWD/%s' %
-                    (cp_to_local, pipes.quote(uri), pipes.quote(name)))
-            # make everything executable, like Hadoop Distributed Cache
-            writeln('  chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
-        writeln()
-
-        # run bootstrap commands
-        writeln('  # bootstrap commands')
-        for cmd in bootstrap:
-            # reconstruct the command line, substituting $__mrjob_PWD/<name>
-            # for path dicts
-            line = '  '
-            for token in cmd:
-                if isinstance(token, dict):
-                    # it's a path dictionary
-                    line += '$__mrjob_PWD/'
-                    line += pipes.quote(self._bootstrap_dir_mgr.name(**token))
-                else:
-                    # it's raw script
-                    line += token
-            writeln(line)
-
-        writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
-
-        return out
+            return 'hadoop fs -copyToLocal'
 
     ### master node setup script ###
 

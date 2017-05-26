@@ -2252,15 +2252,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return
 
         # don't bother if we're not starting a cluster
-        if self._opts['cluster_id']:
+        if self._cluster_id:
             return
 
         # Also don't bother if we're not bootstrapping
-        # (unless we're pooling, in which case we need the bootstrap
-        # script to attach the pool hash too; see #1503).
-        if not (self._bootstrap or
-                self._bootstrap_mrjob() or
-                self._opts['pool_clusters']):
+        if not (self._bootstrap or self._bootstrap_mrjob()):
             return
 
         # create mrjob.zip if we need it, and add commands to install it

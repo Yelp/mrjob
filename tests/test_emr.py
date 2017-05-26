@@ -1462,16 +1462,15 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
 
-    def test_pooling_requires_bootstrap_script(self):
-        # using pooling currently requires us to create a bootstrap script;
-        # see #1503
+    def test_pooling_does_not_require_bootstrap_script(self):
+        # now we use tags for this (see #1086)
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
                               bootstrap_python=False,
                               pool_clusters=True)
 
         runner._add_bootstrap_files_for_upload()
-        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertIsNone(runner._master_bootstrap_script_path)
 
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [

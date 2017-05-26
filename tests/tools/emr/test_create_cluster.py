@@ -104,7 +104,12 @@ class ClusterInspectionTestCase(ToolTestCase):
                          ['j-MOCKCLUSTER0'])
 
         mock_cluster = self.mock_emr_clusters['j-MOCKCLUSTER0']
-        self.assertEqual(mock_cluster['Tags'], [
+
+        # strip tags for pooling, etc.
+        non_mrjob_tags = [t for t in mock_cluster['Tags']
+                          if not t['Key'].startswith('__mrjob_')]
+
+        self.assertEqual(non_mrjob_tags, [
             dict(Key='tag_one', Value='foo'),
             dict(Key='tag_two', Value='bar'),
         ])

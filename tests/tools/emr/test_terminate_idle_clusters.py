@@ -311,6 +311,12 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
                     ReadyDateTime=ago(minutes=50),
                 ),
             ),
+            Tags=[
+                dict(Key='__mrjob_pool_name',
+                     Value='reflecting'),
+                dict(Key='__mrjob_pool_hash',
+                     Value='0123456789abcdef0123456789abcdef'),
+            ],
         ))
 
         # cluster that has had pending jobs but hasn't run them
@@ -388,7 +394,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.assertEqual(idle_for,
                          self.time_mock_cluster_idle(mock_cluster))
         self.assertEqual((pool_hash, pool_name),
-                         _pool_hash_and_name(mock_cluster['_BootstrapActions'])
+                         _pool_hash_and_name(mock_cluster)
         )
         self.assertEqual(running,
                          _is_cluster_running(mock_cluster['_Steps']))

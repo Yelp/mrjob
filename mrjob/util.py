@@ -208,7 +208,7 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
                 cleanup()
 
 
-def read_input(path, stdin=None):
+def read_text_input(path, stdin=None):
     """Stream input the way Hadoop would.
 
     - Resolve globs (``foo_*.gz``).
@@ -234,7 +234,7 @@ def read_input(path, stdin=None):
         raise IOError(2, 'No such file or directory: %r' % path)
     elif len(paths) > 1:
         for path in paths:
-            for line in read_input(path, stdin=stdin):
+            for line in read_text_input(path, stdin=stdin):
                 yield line
         return
     else:
@@ -244,8 +244,8 @@ def read_input(path, stdin=None):
     if os.path.isdir(path):
         for dirname, _, filenames in os.walk(path, followlinks=True):
             for filename in filenames:
-                for line in read_input(os.path.join(dirname, filename),
-                                       stdin=stdin):
+                for line in read_text_input(os.path.join(dirname, filename),
+                                            stdin=stdin):
                     yield line
         return
 

@@ -16,6 +16,7 @@ for more information."""
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
+from __future__ import print_function
 import inspect
 import itertools
 import json
@@ -23,6 +24,7 @@ import logging
 import os.path
 import sys
 from optparse import OptionGroup
+import struct
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
@@ -39,7 +41,9 @@ from mrjob.step import MRStep
 from mrjob.step import SparkStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import expand_path
-from mrjob.util import read_input
+from mrjob.util import read_text_input
+
+from msgpack import Packer, Unpacker, UnpackValueError
 
 
 log = logging.getLogger(__name__)
@@ -657,7 +661,7 @@ class MRJob(MRJobLauncher):
 
     ### Other useful utilities ###
 
-    def _read_input(self):
+    def _read_text_input(self):
         """Read from stdin, or one more files, or directories.
         Yield one line at time.
 
@@ -668,8 +672,21 @@ class MRJob(MRJobLauncher):
         """
         paths = self.args or ['-']
         for path in paths:
-            for line in read_input(path, stdin=self.stdin):
+            for line in read_text_input(path, stdin=self.stdin):
                 yield line
+
+    def _read_input(self):
+        it = iter(self.unpacker)
+        while True:
+            try:
+                key = next(it)
+                value = next(it)
+                yield key, value
+            except StopIteration:
+                raise
+            except UnpackValueError, err:
+                print(err, file=self.stderr)
+                pass
 
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing
@@ -688,18 +705,20 @@ class MRJob(MRJobLauncher):
         :param step_type: ``'mapper'``, ``'reducer'``, or ``'combiner'`` from
                           :py:mod:`mrjob.step`
         """
-        read, write = self.pick_protocols(step_num, step_type)
+        # We disable protocols selection, because non of default protocols is compatible with our changes
+        # read, write = self.pick_protocols(step_num, step_type)
+        self.unpacker = Unpacker(self.stdin, encoding="utf-8")
+        self.packer = Packer(use_bin_type=True)
 
-        def read_lines():
-            for line in self._read_input():
-                key, value = read(line.rstrip(b'\r\n'))
-                yield key, value
+        def write_(key, value):
+            key_enc = self.packer.pack(key, use_bin_type=True)
+            val_enc = self.packer.pack(value, use_bin_type=True)
+            self.stdout.write(struct.pack(">i", len(key_enc)))
+            self.stdout.write(key_enc)
+            self.stdout.write(struct.pack(">i", len(val_enc)))
+            self.stdout.write(val_enc)
 
-        def write_line(key, value):
-            self.stdout.write(write(key, value))
-            self.stdout.write(b'\n')
-
-        return read_lines, write_line
+        return self._read_input, write_
 
     def _step_key(self, step_num, step_type):
         return '%d-%s' % (step_num, step_type)

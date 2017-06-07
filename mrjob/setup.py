@@ -472,7 +472,7 @@ class WorkingDirManager(object):
 
     def _check_type(self, type):
         if type not in self._SUPPORTED_TYPES:
-            raise ValueError('bad path type %r, must be one of %s' % (
+            raise ValueError('bad path type %r, must be one of: %s' % (
                 type, ', '.join(sorted(self._SUPPORTED_TYPES))))
 
 
@@ -482,4 +482,4 @@ class BootstrapWorkingDirManager(WorkingDirManager):
 
     Also used for master node setup script.
     """
-    _SUPPORTED_TYPES = ('file',)
+    _SUPPORTED_TYPES = ('file', 'archive')

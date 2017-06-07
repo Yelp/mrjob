@@ -18,8 +18,18 @@ import pipes
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
 from mrjob.util import cmd_line
+from mrjob.util import file_ext
 
 log = logging.getLogger(__name__)
+
+
+# map archive file extensions to the command used to unarchive them
+_EXT_TO_UNARCHIVE_CMD = {
+    '.zip': 'unzip -o %(file)s -d %(dir)s',
+    '.tar': 'mkdir %(dir)s; tar xf %(file)s -C %(dir)s',
+    '.tar.gz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
+    '.tgz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
+}
 
 
 class HadoopInTheCloudOptionStore(RunnerOptionStore):
@@ -42,7 +52,9 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
 
     def _cp_to_local_cmd(self):
         """Command to copy files from the cloud to the local directory
-        (usually via Hadoop). Redefine this as needed"""
+        (usually via Hadoop). Redefine this as needed; for example, on EMR,
+        we sometimes have to use ``aws s3 cp`` because ``hadoop`` isn't
+        installed at bootstrap time."""
         return 'hadoop fs -copyToLocal'
 
     def _create_master_bootstrap_script_if_needed(self):
@@ -149,6 +161,36 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
             # make everything executable, like Hadoop Distributed Cache
             out.append('  chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
         out.append('')
+
+        # download and unarchive archives
+        archive_names_and_paths = sorted(
+            self._bootstrap_dir_mgr.name_to_path('archive').items())
+        if archive_names_and_paths:
+            # make tmp dir if needed
+            out.append('__mrjob_TMP=$(mktemp -d)')
+            out.append('')
+
+            for name, path in archive_names_and_paths:
+                uri = self._upload_mgr.uri(path)
+                ext = file_ext(path)
+
+                # copy file to tmp dir
+                quoted_archive_path = (
+                    '$__mrjob_TMP/' + pipes.quote(name + ext))
+
+                out.append('  %s %s %s' % (
+                    cp_to_local, pipes.quote(uri), quoted_archive_path))
+
+                # unarchive file
+                if ext not in _EXT_TO_UNARCHIVE_CMD:
+                    raise KeyError('unknown archive file extension: %s' % path)
+                unarchive_cmd = _EXT_TO_UNARCHIVE_CMD[ext]
+
+                out.append('  ' + unarchive_cmd % dict(
+                    file=quoted_archive_path,
+                    dir='$__mrjob_PWD/' + pipes.quote(name)))
+
+                out.append('')
 
         # run bootstrap commands
         out.append('  # bootstrap commands')

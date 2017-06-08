@@ -216,6 +216,12 @@ _DEPRECATED_NON_RUNNER_OPTS = set([
 
 ### runner opts ###
 
+# map from runner to abstract parent runners, if any
+_RUNNER_TO_PARENTS = {
+    'dataproc': {'cloud'},
+    'emr': {'cloud'},
+}
+
 # map from runner option name to dict with the following keys (all optional):
 # cloud_role:
 #   'connect' if needed when interacting with cloud services at all

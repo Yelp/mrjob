@@ -42,6 +42,9 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
     # so far, every service provides the ability to run bootstrap scripts
     BOOTSTRAP_MRJOB_IN_SETUP = False
 
+    def __init__(self, **kwargs):
+        super(HadoopInTheCloudJobRunner, self).__init__(**kwargs)
+
     # init: mentions
     # _cluster_id
     # _bootstrap

@@ -23,7 +23,6 @@ import random
 import re
 import signal
 import socket
-import sys
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -56,6 +55,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
 from mrjob.cloud import HadoopInTheCloudJobRunner
+from mrjob.cloud import HadoopInTheCloudOptionStore
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
@@ -91,16 +91,12 @@ from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
-from mrjob.pool import _pool_tags
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
-from mrjob.runner import MRJobRunner
-from mrjob.runner import RunnerOptionStore
 from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_setup_cmd
 from mrjob.ssh import _ssh_run
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
@@ -294,7 +290,7 @@ def _get_reason(cluster_or_step):
     return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
-class EMRRunnerOptionStore(RunnerOptionStore):
+class EMRRunnerOptionStore(HadoopInTheCloudOptionStore):
 
     ALLOWED_KEYS = _allowed_keys('emr')
     COMBINERS = _combiners('emr')
@@ -495,23 +491,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         s3_files_dir = self._cloud_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
 
-        # manage working dir for bootstrap script
-        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
-
-        self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
-
-        for cmd in self._bootstrap:
-            for maybe_path_dict in cmd:
-                if isinstance(maybe_path_dict, dict):
-                    self._bootstrap_dir_mgr.add(**maybe_path_dict)
-
         if not (isinstance(self._opts['additional_emr_info'], string_types) or
                 self._opts['additional_emr_info'] is None):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
-
-        # we'll create the script later
-        self._master_bootstrap_script_path = None
 
         # master node setup script (handled later by
         # _add_master_node_setup_files_for_upload())
@@ -521,9 +504,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # where our own logs ended up (we'll find this out once we run the job)
         self._s3_log_dir_uri = None
 
-        # the ID assigned by EMR to this job (might be None)
-        self._cluster_id = self._opts['cluster_id']
-        # did we create this cluster?
+        # did we create the cluster we're running on?
         self._created_cluster = False
 
         # when did our particular task start?
@@ -2243,6 +2224,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _bootstrap_python(self):
         """Return a (possibly empty) list of parsed commands (in the same
         format as returned by parse_setup_cmd())'"""
+
         if PY2:
             # Python 2 and pip are basically already installed everywhere
             # (Okay, there's no pip on AMIs prior to 2.4.3, but there's no
@@ -2324,12 +2306,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             results.append(dict(path=args[0], args=args[1:]))
 
         return results
-
-    def _parse_bootstrap(self):
-        """Parse the *bootstrap* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`.
-        """
-        return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
 
     def _cp_to_local_cmd(self):
         """Command to copy files from the cloud to the local directory."""

@@ -17,7 +17,6 @@ import io
 import logging
 import os
 import os.path
-import pipes
 import time
 import re
 import subprocess
@@ -42,6 +41,7 @@ except ImportError:
 
 import mrjob
 from mrjob.cloud import HadoopInTheCloudJobRunner
+from mrjob.cloud import HadoopInTheCloudOptionStore
 from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
@@ -55,13 +55,8 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_uri
 from mrjob.py2 import PY2
-from mrjob.runner import MRJobRunner
-from mrjob.runner import RunnerOptionStore
-from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_setup_cmd
 from mrjob.step import StepFailedException
-from mrjob.util import cmd_line
 from mrjob.util import random_identifier
 
 log = logging.getLogger(__name__)
@@ -200,7 +195,7 @@ class DataprocException(Exception):
     pass
 
 
-class DataprocRunnerOptionStore(RunnerOptionStore):
+class DataprocRunnerOptionStore(HadoopInTheCloudOptionStore):
     ALLOWED_KEYS = _allowed_keys('dataproc')
     COMBINERS = _combiners('dataproc')
     DEPRECATED_ALIASES = _deprecated_aliases('dataproc')
@@ -316,23 +311,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             self._output_dir = self._job_tmpdir + 'output/'
         # END - setup directories
 
-        # manage working dir for bootstrap script
-        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
-
         # manage local files that we want to upload to GCS. We'll add them
         # to this manager just before we need them.
         fs_files_dir = self._job_tmpdir + 'files/'
         self._upload_mgr = UploadDirManager(fs_files_dir)
-
-        self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
-
-        for cmd in self._bootstrap:
-            for maybe_path_dict in cmd:
-                if isinstance(maybe_path_dict, dict):
-                    self._bootstrap_dir_mgr.add(**maybe_path_dict)
-
-        # we'll create the script later
-        self._master_bootstrap_script_path = None
 
         # when did our particular task start?
         self._dataproc_job_start = None
@@ -838,12 +820,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             return [
                 ['sudo apt-get install -y python3 python3-pip python3-dev'],
             ]
-
-    def _parse_bootstrap(self):
-        """Parse the *bootstrap* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`.
-        """
-        return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
 
     def get_cluster_id(self):
         return self._cluster_id

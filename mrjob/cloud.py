@@ -15,8 +15,13 @@
 import logging
 import os
 import pipes
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
+from mrjob.setup import BootstrapWorkingDirManager
+from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
 
@@ -33,25 +38,57 @@ _EXT_TO_UNARCHIVE_CMD = {
 
 
 class HadoopInTheCloudOptionStore(RunnerOptionStore):
-    pass
+
+    ALLOWED_KEYS = _allowed_keys('_cloud')
+    COMBINERS = _combiners('_cloud')
+    DEPRECATED_ALIASES = _deprecated_aliases('_cloud')
+
+
+
 
 
 class HadoopInTheCloudJobRunner(MRJobRunner):
     """Abstract base class for all Hadoop-in-the-cloud services."""
 
+    alias = '_cloud'
+
+    OPTION_STORE_CLASS = HadoopInTheCloudOptionStore
+
     # so far, every service provides the ability to run bootstrap scripts
     BOOTSTRAP_MRJOB_IN_SETUP = False
+
 
     def __init__(self, **kwargs):
         super(HadoopInTheCloudJobRunner, self).__init__(**kwargs)
 
-    # init: mentions
-    # _cluster_id
-    # _bootstrap
-    # _bootstrap_dir_mgr
-    # _master_bootstrap_script_path
+        # if *cluster_id* is not set, ``self._cluster_id`` will be
+        # set when we create or join a cluster
+        self._cluster_id = self._opts['cluster_id']
+
+        # bootstrapping
+        self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
+
+        # add files to manager
+        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
+
+        for cmd in self._bootstrap:
+            for maybe_path_dict in cmd:
+                if isinstance(maybe_path_dict, dict):
+                    self._bootstrap_dir_mgr.add(**maybe_path_dict)
+
+        # we'll create this script later, as needed
+        self._master_bootstrap_script_path = None
 
     ### Bootstrapping ###
+
+    def _bootstrap_python(self):
+        """Redefine this to return a (possibly empty) list of parsed commands
+        (in the same format as returned by parse_setup_cmd())' to make sure a
+        compatible version of Python is installed
+
+        If the *bootstrap_python* option is false, should always return ``[]``.
+        """
+        return []
 
     def _cp_to_local_cmd(self):
         """Command to copy files from the cloud to the local directory
@@ -59,6 +96,12 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
         we sometimes have to use ``aws s3 cp`` because ``hadoop`` isn't
         installed at bootstrap time."""
         return 'hadoop fs -copyToLocal'
+
+    def _parse_bootstrap(self):
+        """Parse the *bootstrap* option with
+        :py:func:`mrjob.setup.parse_setup_cmd()`.
+        """
+        return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
 
     def _create_master_bootstrap_script_if_needed(self):
         """Helper for :py:meth:`_add_bootstrap_files_for_upload`.

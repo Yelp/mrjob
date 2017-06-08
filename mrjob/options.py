@@ -218,8 +218,8 @@ _DEPRECATED_NON_RUNNER_OPTS = set([
 
 # map from runner to ancestors, if any
 _RUNNER_TO_ANCESTORS = {
-    'dataproc': {'cloud'},
-    'emr': {'cloud'},
+    'dataproc': {'_cloud'},
+    'emr': {'_cloud'},
 }
 
 # map from runner option name to dict with the following keys (all optional):
@@ -285,7 +285,7 @@ _RUNNER_OPTS = dict(
     bootstrap=dict(
         cloud_role='launch',
         combiner=combine_lists,
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--bootstrap'], dict(
                 action='append',
@@ -332,7 +332,7 @@ _RUNNER_OPTS = dict(
     ),
     bootstrap_python=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--bootstrap-python'], dict(
                 action='store_true',
@@ -374,7 +374,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     check_cluster_every=dict(
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--check-cluster-every'], dict(
                 help=('How often (in seconds) to check status of your'
@@ -404,7 +404,7 @@ _RUNNER_OPTS = dict(
     ),
     cloud_fs_sync_secs=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--cloud-fs-sync-secs'], dict(
                 help=('How long to wait for remote FS to reach eventual'
@@ -428,7 +428,7 @@ _RUNNER_OPTS = dict(
     cloud_tmp_dir=dict(
         cloud_role='launch',
         combiner=combine_paths,
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--cloud-tmp-dir'], dict(
                 help='URI on remote FS to use as our temp directory.',
@@ -448,7 +448,7 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cluster_id=dict(
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--cluster-id'], dict(
                 help='ID of an existing cluster to run our job on',
@@ -483,7 +483,7 @@ _RUNNER_OPTS = dict(
     ),
     core_instance_type=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--core-instance-type'], dict(
                 help='Type of GCE/EC2 core instance(s) to launch',
@@ -673,7 +673,7 @@ _RUNNER_OPTS = dict(
     ),
     image_version=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--image-version'], dict(
                 help='EMR/Dataproc machine image to launch clusters with',
@@ -682,7 +682,7 @@ _RUNNER_OPTS = dict(
     ),
     instance_type=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--instance-type'], dict(
                 help=('Type of GCE/EC2 instance(s) to launch \n'
@@ -749,7 +749,7 @@ _RUNNER_OPTS = dict(
     ),
     master_instance_type=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--master-instance-type'], dict(
                 help='Type of GCE/EC2 master instance to launch',
@@ -758,7 +758,7 @@ _RUNNER_OPTS = dict(
     ),
     max_hours_idle=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--max-hours-idle'], dict(
                 help=("If we create a cluster, have it automatically"
@@ -782,7 +782,7 @@ _RUNNER_OPTS = dict(
     ),
     num_core_instances=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--num-core-instances'], dict(
                 help='Total number of core instances to launch',
@@ -792,7 +792,7 @@ _RUNNER_OPTS = dict(
     ),
     num_task_instances=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--num-task-instances'], dict(
                 help='Total number of task instances to launch',
@@ -867,7 +867,7 @@ _RUNNER_OPTS = dict(
     ),
     region=dict(
         cloud_role='connect',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--region'], dict(
                 help='GCE/AWS region to run Dataproc/EMR jobs in.',
@@ -1052,7 +1052,7 @@ _RUNNER_OPTS = dict(
     ),
     task_instance_type=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--task-instance-type'], dict(
                 help='Type of GCE/EC2 task instance(s) to launch',
@@ -1120,7 +1120,7 @@ _RUNNER_OPTS = dict(
     ),
     zone=dict(
         cloud_role='launch',
-        runners={'cloud'},
+        runners={'_cloud'},
         switches=[
             (['--zone'], dict(
                 help=('GCE zone/AWS availability zone to run Dataproc/EMR jobs'

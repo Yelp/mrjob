@@ -1405,7 +1405,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
                     lines)
 
             self.assertIn(
-                '  chmod a+x $__mrjob_PWD/%s' % (name,),
+                '  chmod u+rx $__mrjob_PWD/%s' % (name,),
                 lines)
 
         # check files get downloaded
@@ -1610,7 +1610,7 @@ class MasterNodeSetupScriptTestCase(MockBoto3TestCase):
         self.assertTrue(contents.startswith(b'#!/bin/sh -ex\n'))
         self.assertIn(b'aws s3 cp ', contents)
         self.assertNotIn(b'hadoop fs -copyToLocal ', contents)
-        self.assertIn(b'chmod a+x ', contents)
+        self.assertIn(b'chmod u+rx ', contents)
         self.assertIn(b'cookie.jar', contents)
         self.assertIn(b's3://pooh/honey.jar', contents)
         self.assertNotIn(b'dora.jar', contents)

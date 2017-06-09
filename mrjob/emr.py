@@ -2389,8 +2389,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             uri = self._upload_mgr.uri(path)
             writeln('  %s %s %s' % (
                 cp_to_local, pipes.quote(uri), pipes.quote(name)))
-            # make everything executable, like Hadoop Distributed Cache
-            writeln('  chmod a+x %s' % pipes.quote(name))
+            # imitate Hadoop Distributed Cache
+            writeln('  chmod u+rx %s' % pipes.quote(name))
 
         # at some point we will probably run commands as well (see #1336)
 

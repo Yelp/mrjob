@@ -15,6 +15,8 @@
 import logging
 import os
 import pipes
+from os.path import basename
+
 from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
@@ -44,9 +46,6 @@ class HadoopInTheCloudOptionStore(RunnerOptionStore):
     DEPRECATED_ALIASES = _deprecated_aliases('_cloud')
 
 
-
-
-
 class HadoopInTheCloudJobRunner(MRJobRunner):
     """Abstract base class for all Hadoop-in-the-cloud services."""
 
@@ -72,9 +71,14 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
         self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
 
         for cmd in self._bootstrap:
-            for maybe_path_dict in cmd:
-                if isinstance(maybe_path_dict, dict):
-                    self._bootstrap_dir_mgr.add(**maybe_path_dict)
+            for token in cmd:
+                if isinstance(token, dict):
+                    # convert dir archive tokens to archives
+                    if token['type'] == 'dir':
+                        token['path'] = self._dir_archive_path(token['path'])
+                        token['type'] = 'archive'
+
+                    self._bootstrap_dir_mgr.add(**token)
 
         # we'll create this script later, as needed
         self._master_bootstrap_script_path = None
@@ -213,16 +217,16 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
             self._bootstrap_dir_mgr.name_to_path('archive').items())
         if archive_names_and_paths:
             # make tmp dir if needed
-            out.append('__mrjob_TMP=$(mktemp -d)')
+            out.append('  # download and unpack archives')
+            out.append('  __mrjob_TMP=$(mktemp -d)')
             out.append('')
 
             for name, path in archive_names_and_paths:
                 uri = self._upload_mgr.uri(path)
-                ext = file_ext(path)
+                ext = file_ext(basename(path))
 
                 # copy file to tmp dir
-                quoted_archive_path = (
-                    '$__mrjob_TMP/' + pipes.quote(name + ext))
+                quoted_archive_path = '$__mrjob_TMP/%s' % pipes.quote(name)
 
                 out.append('  %s %s %s' % (
                     cp_to_local, pipes.quote(uri), quoted_archive_path))

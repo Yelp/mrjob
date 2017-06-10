@@ -1132,7 +1132,7 @@ _RUNNER_OPTS = dict(
 
 
 def _for_runner(config, runner_alias):
-    if not config.get('runners'):
+    if not (runner_alias and config.get('runners')):
         return True
 
     runner_aliases = (
@@ -1187,9 +1187,7 @@ def _pick_runner_opts(runner_alias=None, cloud_role=None):
     """
     return set(
         opt_name for opt_name, conf in _RUNNER_OPTS.items()
-        if ((runner_alias is None or
-             conf.get('runners') is None or
-             runner_alias in conf['runners']) and
+        if (_for_runner(conf, runner_alias) and
             (cloud_role is None or
              cloud_role == conf.get('cloud_role')))
     )

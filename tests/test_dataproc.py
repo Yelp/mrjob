@@ -721,10 +721,10 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
             name = runner._bootstrap_dir_mgr.name('file', path, name=name)
 
             self.assertIn(
-                'hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
+                '  hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
                 lines)
             self.assertIn(
-                'chmod a+x $__mrjob_PWD/%s' % (name,),
+                '  chmod u+rx $__mrjob_PWD/%s' % (name,),
                 lines)
 
         # check files get downloaded
@@ -735,34 +735,34 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
         # check scripts get run
 
         # bootstrap
-        self.assertIn(PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
-        self.assertIn('$__mrjob_PWD/ohnoes.sh', lines)
+        self.assertIn('  ' + PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
+        self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
 
-        self.assertIn('echo "Hi!"', lines)
-        self.assertIn('true', lines)
-        self.assertIn('ls', lines)
+        self.assertIn('  echo "Hi!"', lines)
+        self.assertIn('  true', lines)
+        self.assertIn('  ls', lines)
 
-        self.assertIn('speedups.sh', lines)
-        self.assertIn('/tmp/s.sh', lines)
+        self.assertIn('  speedups.sh', lines)
+        self.assertIn('  /tmp/s.sh', lines)
 
         # bootstrap_mrjob
         mrjob_zip_name = runner._bootstrap_dir_mgr.name(
             'file', runner._mrjob_zip_path)
-        self.assertIn("__mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
+        self.assertIn("  __mrjob_PYTHON_LIB=$(" + PYTHON_BIN + " -c 'from"
                       " distutils.sysconfig import get_python_lib;"
                       " print(get_python_lib())')", lines)
-        self.assertIn('sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
+        self.assertIn('  sudo unzip $__mrjob_PWD/' + mrjob_zip_name +
                       ' -d $__mrjob_PYTHON_LIB', lines)
-        self.assertIn('sudo ' + PYTHON_BIN + ' -m compileall -q -f'
+        self.assertIn('  sudo ' + PYTHON_BIN + ' -m compileall -q -f'
                       ' $__mrjob_PYTHON_LIB/mrjob && true', lines)
         # bootstrap_python
         if PY2:
             self.assertIn(
-                'sudo apt-get install -y python-pip python-dev',
+                '  sudo apt-get install -y python-pip python-dev',
                 lines)
         else:
             self.assertIn(
-                'sudo apt-get install -y python3 python3-pip python3-dev',
+                '  sudo apt-get install -y python3 python3-pip python3-dev',
                 lines)
 
     def test_no_bootstrap_script_if_not_needed(self):

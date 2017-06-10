@@ -23,7 +23,6 @@ import random
 import re
 import signal
 import socket
-import sys
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -55,6 +54,8 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS
 from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
+from mrjob.cloud import HadoopInTheCloudJobRunner
+from mrjob.cloud import HadoopInTheCloudOptionStore
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
@@ -94,11 +95,8 @@ from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
-from mrjob.runner import MRJobRunner
-from mrjob.runner import RunnerOptionStore
-from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_setup_cmd
+from mrjob.setup import WorkingDirManager
 from mrjob.ssh import _ssh_run
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
@@ -292,7 +290,7 @@ def _get_reason(cluster_or_step):
     return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
-class EMRRunnerOptionStore(RunnerOptionStore):
+class EMRRunnerOptionStore(HadoopInTheCloudOptionStore):
 
     ALLOWED_KEYS = _allowed_keys('emr')
     COMBINERS = _combiners('emr')
@@ -425,7 +423,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             return opt_value
 
 
-class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
+class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
     Invoked when you run your job with ``-r emr``.
 
@@ -449,10 +447,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         ...
     """
     alias = 'emr'
-
-    # Don't need to bootstrap mrjob in the setup wrapper; that's what
-    # the bootstrap script is for!
-    BOOTSTRAP_MRJOB_IN_SETUP = False
 
     OPTION_STORE_CLASS = EMRRunnerOptionStore
 
@@ -497,35 +491,20 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         s3_files_dir = self._cloud_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
 
-        # manage working dir for bootstrap script
-        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
-
-        self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
-
-        for cmd in self._bootstrap:
-            for maybe_path_dict in cmd:
-                if isinstance(maybe_path_dict, dict):
-                    self._bootstrap_dir_mgr.add(**maybe_path_dict)
-
         if not (isinstance(self._opts['additional_emr_info'], string_types) or
                 self._opts['additional_emr_info'] is None):
             self._opts['additional_emr_info'] = json.dumps(
                 self._opts['additional_emr_info'])
 
-        # we'll create the script later
-        self._master_bootstrap_script_path = None
-
         # master node setup script (handled later by
         # _add_master_node_setup_files_for_upload())
-        self._master_node_setup_mgr = BootstrapWorkingDirManager()
+        self._master_node_setup_mgr = WorkingDirManager()
         self._master_node_setup_script_path = None
 
         # where our own logs ended up (we'll find this out once we run the job)
         self._s3_log_dir_uri = None
 
-        # the ID assigned by EMR to this job (might be None)
-        self._cluster_id = self._opts['cluster_id']
-        # did we create this cluster?
+        # did we create the cluster we're running on?
         self._created_cluster = False
 
         # when did our particular task start?
@@ -1249,8 +1228,18 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         log.debug('Cluster created with ID: %s' % cluster_id)
 
-        # set EMR tags for the cluster, if any
-        self._add_tags(self._opts['tags'], cluster_id)
+        # set EMR tags for the cluster
+        tags = dict(self._opts['tags'])
+
+        # patch in version
+        tags['__mrjob_version'] = mrjob.__version__
+
+        # add pooling tags
+        if self._opts['pool_clusters']:
+            tags['__mrjob_pool_hash'] = self._pool_hash()
+            tags['__mrjob_pool_name'] = self._opts['pool_name']
+
+        self._add_tags(tags, cluster_id)
 
         return cluster_id
 
@@ -1324,19 +1313,13 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                     Args=bootstrap_action['args'])))
 
         if self._master_bootstrap_script_path:
-            master_bootstrap_script_args = []
-            if self._opts['pool_clusters']:
-                master_bootstrap_script_args = [
-                    'pool-' + self._pool_hash(),
-                    self._opts['pool_name'],
-                ]
             uri = self._upload_mgr.uri(self._master_bootstrap_script_path)
 
             BootstrapActions.append(dict(
                 Name='master',
                 ScriptBootstrapAction=dict(
                     Path=uri,
-                    Args=master_bootstrap_script_args)))
+                    Args=[])))
 
         if persistent or self._opts['pool_clusters']:
             Instances['KeepJobFlowAliveWhenNoSteps'] = True
@@ -1625,9 +1608,6 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         # keep track of when we launched our job
         self._emr_job_start = time.time()
-
-        # set EMR tags for the job, if any
-        self._add_tags(self._opts['tags'], self._cluster_id)
 
         # SSH FS uses sudo if we're on AMI 4.3.0+ (see #1244)
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
@@ -2241,81 +2221,10 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
     ### Bootstrapping ###
 
-    def _create_master_bootstrap_script_if_needed(self):
-        """Helper for :py:meth:`_add_bootstrap_files_for_upload`.
-
-        Create the master bootstrap script and write it into our local
-        temp directory. Set self._master_bootstrap_script_path.
-
-        This will do nothing if there are no bootstrap scripts or commands,
-        or if it has already been called."""
-        if self._master_bootstrap_script_path:
-            return
-
-        # don't bother if we're not starting a cluster
-        if self._opts['cluster_id']:
-            return
-
-        # Also don't bother if we're not bootstrapping
-        # (unless we're pooling, in which case we need the bootstrap
-        # script to attach the pool hash too; see #1503).
-        if not (self._bootstrap or
-                self._bootstrap_mrjob() or
-                self._opts['pool_clusters']):
-            return
-
-        # create mrjob.zip if we need it, and add commands to install it
-        mrjob_bootstrap = []
-        if self._bootstrap_mrjob():
-            # _add_bootstrap_files_for_upload() should have done this
-            assert self._mrjob_zip_path
-            path_dict = {
-                'type': 'file', 'name': None, 'path': self._mrjob_zip_path}
-            self._bootstrap_dir_mgr.add(**path_dict)
-
-            # find out where python keeps its libraries
-            mrjob_bootstrap.append([
-                "__mrjob_PYTHON_LIB=$(%s -c "
-                "'from distutils.sysconfig import get_python_lib;"
-                " print(get_python_lib())')" %
-                cmd_line(self._python_bin())])
-
-            # remove anything that might be in the way (see #1567)
-            mrjob_bootstrap.append(['sudo rm -rf $__mrjob_PYTHON_LIB/mrjob'])
-
-            # copy mrjob.zip over
-            mrjob_bootstrap.append(
-                ['sudo unzip ', path_dict, ' -d $__mrjob_PYTHON_LIB'])
-
-            # re-compile pyc files now, since mappers/reducers can't
-            # write to this directory. Don't fail if there is extra
-            # un-compileable crud in the tarball (this would matter if
-            # sh_bin were 'sh -e')
-            mrjob_bootstrap.append(
-                ['sudo %s -m compileall -q -f $__mrjob_PYTHON_LIB/mrjob'
-                 ' && true' % cmd_line(self._python_bin())])
-
-        # TODO: shouldn't it be b.sh now?
-        # we call the script b.py because there's a character limit on
-        # bootstrap script names (or there was at one time, anyway)
-        path = os.path.join(self._get_local_tmp_dir(), 'b.sh')
-        log.debug('writing master bootstrap script to %s' % path)
-
-        contents = self._master_bootstrap_script_content(
-            self._bootstrap + mrjob_bootstrap)
-        for line in contents:
-            log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
-
-        # TODO: Windows line endings?
-        with open(path, 'w') as f:
-            for line in contents:
-                f.write(line)
-
-        self._master_bootstrap_script_path = path
-
     def _bootstrap_python(self):
         """Return a (possibly empty) list of parsed commands (in the same
         format as returned by parse_setup_cmd())'"""
+
         if PY2:
             # Python 2 and pip are basically already installed everywhere
             # (Okay, there's no pip on AMIs prior to 2.4.3, but there's no
@@ -2398,85 +2307,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
         return results
 
-    def _parse_bootstrap(self):
-        """Parse the *bootstrap* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`.
-        """
-        return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
-
-    # helper for _master_*_script_content() methods
-    def _write_start_of_sh_script(self, writeln):
-        # shebang
-        sh_bin = self._sh_bin()
-        if not sh_bin[0].startswith('/'):
-            sh_bin = ['/usr/bin/env'] + sh_bin
-        writeln('#!' + cmd_line(sh_bin))
-
-        # hook for 'set -e', etc. (see #1549)
-        for cmd in self._sh_pre_commands():
-            writeln(cmd)
-
-        writeln()
-
-    def _master_bootstrap_script_content(self, bootstrap):
-        """Create the contents of the master bootstrap script.
-        """
-        out = []
-
-        def writeln(line=''):
-            out.append(line + '\n')
-
-        # shebang, etc.
-        self._write_start_of_sh_script(writeln)
-
-        # store $PWD
-        writeln('# store $PWD')
-        writeln('__mrjob_PWD=$PWD')
-        writeln()
-
-        # run commands in a block so we can redirect stdout to stderr
-        # (e.g. to catch errors from compileall). See #370
-        writeln('{')
-
-        # download files
-        writeln('  # download files and mark them executable')
-
+    def _cp_to_local_cmd(self):
+        """Command to copy files from the cloud to the local directory."""
         if self._opts['release_label']:
             # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
-            cp_to_local = 'aws s3 cp'
+            return 'aws s3 cp'
         else:
             # on the 2.x and 3.x AMIs, use hadoop
-            cp_to_local = 'hadoop fs -copyToLocal'
-
-        # TODO: why bother with $__mrjob_PWD here, since we're already in it?
-        for name, path in sorted(
-                self._bootstrap_dir_mgr.name_to_path('file').items()):
-            uri = self._upload_mgr.uri(path)
-            writeln('  %s %s $__mrjob_PWD/%s' %
-                    (cp_to_local, pipes.quote(uri), pipes.quote(name)))
-            # make everything executable, like Hadoop Distributed Cache
-            writeln('  chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
-        writeln()
-
-        # run bootstrap commands
-        writeln('  # bootstrap commands')
-        for cmd in bootstrap:
-            # reconstruct the command line, substituting $__mrjob_PWD/<name>
-            # for path dicts
-            line = '  '
-            for token in cmd:
-                if isinstance(token, dict):
-                    # it's a path dictionary
-                    line += '$__mrjob_PWD/'
-                    line += pipes.quote(self._bootstrap_dir_mgr.name(**token))
-                else:
-                    # it's raw script
-                    line += token
-            writeln(line)
-
-        writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
-
-        return out
+            return 'hadoop fs -copyToLocal'
 
     ### master node setup script ###
 
@@ -2524,7 +2362,9 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             out.append(line + '\n')
 
         # shebang, etc.
-        self._write_start_of_sh_script(writeln)
+        for line in self._start_of_sh_script():
+            writeln(line)
+        writeln()
 
         # run commands in a block so we can redirect stdout to stderr
         # (e.g. to catch errors from compileall). See #370
@@ -2549,8 +2389,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             uri = self._upload_mgr.uri(path)
             writeln('  %s %s %s' % (
                 cp_to_local, pipes.quote(uri), pipes.quote(name)))
-            # make everything executable, like Hadoop Distributed Cache
-            writeln('  chmod a+x %s' % pipes.quote(name))
+            # imitate Hadoop Distributed Cache
+            writeln('  chmod u+rx %s' % pipes.quote(name))
 
         # at some point we will probably run commands as well (see #1336)
 
@@ -2693,10 +2533,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                 return
 
             # match pool name, and (bootstrap) hash
-            bootstrap_actions = list(_boto3_paginate(
-                'BootstrapActions',
-                emr_client, 'list_bootstrap_actions', ClusterId=cluster['Id']))
-            pool_hash, pool_name = _pool_hash_and_name(bootstrap_actions)
+            pool_hash, pool_name = _pool_hash_and_name(cluster)
 
             if req_hash != pool_hash:
                 log.debug('    pool hash mismatch')

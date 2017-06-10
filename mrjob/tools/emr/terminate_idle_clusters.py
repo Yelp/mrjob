@@ -183,11 +183,10 @@ def _maybe_terminate_clusters(dry_run=False,
         time_to_end_of_hour = _est_time_to_hour(cluster_summary, now=now)
         is_pending = _cluster_has_pending_steps(steps)
 
-        bootstrap_actions = list(_boto3_paginate(
-            'BootstrapActions', emr_client, 'list_bootstrap_actions',
-            ClusterId=cluster_id))
+        # need to get actual cluster to see tags
+        cluster = emr_client.describe_cluster(ClusterId=cluster_id)['Cluster']
 
-        _, pool = _pool_hash_and_name(bootstrap_actions)
+        _, pool = _pool_hash_and_name(cluster)
 
         if is_pending:
             num_pending += 1

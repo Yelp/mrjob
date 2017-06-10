@@ -663,13 +663,25 @@ class ClusterToFullSummaryTestCase(TestCase):
         })
 
     def test_pooled_cluster(self):
-        # same as test case above with different job keys
-        cluster = dict(
-            BootstrapActions=[
+        self._test_new_or_legacy_pooled_cluster(Tags=[
+            dict(Key='__mrjob_pool_hash',
+                 Value='0123456789abcdef0123456789abcdef'),
+            dict(Key='__mrjob_pool_name',
+                 Value='reflecting'),
+        ])
+
+    def test_legacy_pooled_cluster(self):
+        # audit clusters from previous versions of mrjob
+        self._test_new_or_legacy_pooled_cluster(BootstrapActions=[
                 dict(Args=[], Name='empty'),
                 dict(Args=['pool-0123456789abcdef0123456789abcdef',
                            'reflecting'], Name='master'),
             ],
+        )
+
+    def _test_new_or_legacy_pooled_cluster(self, **kwargs):
+        # same as test case above with different job keys
+        cluster = dict(
             Id='j-ISFORJOB',
             Name='mr_exciting.woo.20100605.232850.000000',
             NormalizedInstanceHours=20,
@@ -711,6 +723,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                     ),
                 ),
             ],
+            **kwargs
         )
 
         summary = _cluster_to_full_summary(cluster)

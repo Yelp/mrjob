@@ -1,3 +1,4 @@
+
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 Lyft
 # Copyright 2015-2016 Yelp
@@ -21,6 +22,7 @@ from dateutil.tz import tzutc
 
 from mrjob.aws import _boto3_now
 from mrjob.pool import _est_time_to_hour
+from mrjob.pool import _legacy_pool_hash_and_name
 from mrjob.pool import _pool_hash_and_name
 
 
@@ -105,9 +107,40 @@ class EstTimeToEndOfHourTestCase(TestCase):
 class TestPoolHashAndName(TestCase):
 
     def test_empty(self):
+        cluster = {}
+
+        self.assertEqual(_pool_hash_and_name({}), (None, None))
+
+    def test_pooled_cluster(self):
+        cluster = dict(Tags=[
+            dict(Key='__mrjob_pool_hash',
+                 Value='0123456789abcdef0123456789abcdef'),
+            dict(Key='__mrjob_pool_name',
+                 Value='reflecting'),
+        ])
+
+        self.assertEqual(_pool_hash_and_name(cluster),
+                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
+
+    def test_pooled_cluster_with_other_tags(self):
+        cluster = dict(Tags=[
+            dict(Key='__mrjob_pool_hash',
+                 Value='0123456789abcdef0123456789abcdef'),
+            dict(Key='__mrjob_pool_name',
+                 Value='reflecting'),
+            dict(Key='price', Value='$9.99'),
+        ])
+
+        self.assertEqual(_pool_hash_and_name(cluster),
+                         ('0123456789abcdef0123456789abcdef', 'reflecting'))
+
+
+class TestLegacyPoolHashAndName(TestCase):
+
+    def test_empty(self):
         actions = []
 
-        self.assertEqual(_pool_hash_and_name(actions), (None, None))
+        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))
 
     def test_pooled_cluster(self):
         actions = [
@@ -117,7 +150,7 @@ class TestPoolHashAndName(TestCase):
             ),
         ]
 
-        self.assertEqual(_pool_hash_and_name(actions),
+        self.assertEqual(_legacy_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
     def test_pooled_cluster_with_other_bootstrap_actions(self):
@@ -130,7 +163,7 @@ class TestPoolHashAndName(TestCase):
             ),
         ]
 
-        self.assertEqual(_pool_hash_and_name(actions),
+        self.assertEqual(_legacy_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
     def test_pooled_cluster_with_max_hours_idle(self):
@@ -147,7 +180,7 @@ class TestPoolHashAndName(TestCase):
             ),
         ]
 
-        self.assertEqual(_pool_hash_and_name(actions),
+        self.assertEqual(_legacy_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
     def test_first_arg_doesnt_start_with_pool(self):
@@ -158,7 +191,7 @@ class TestPoolHashAndName(TestCase):
             ),
         ]
 
-        self.assertEqual(_pool_hash_and_name(actions), (None, None))
+        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))
 
     def test_too_many_args(self):
         actions = [
@@ -168,7 +201,7 @@ class TestPoolHashAndName(TestCase):
             ),
         ]
 
-        self.assertEqual(_pool_hash_and_name(actions), (None, None))
+        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))
 
     def test_too_few_args(self):
         actions = [
@@ -178,7 +211,7 @@ class TestPoolHashAndName(TestCase):
             ),
         ]
 
-        self.assertEqual(_pool_hash_and_name(actions), (None, None))
+        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))
 
     def test_bootstrap_action_isnt_named_master(self):
         actions = [
@@ -188,4 +221,4 @@ class TestPoolHashAndName(TestCase):
             ),
         ]
 
-        self.assertEqual(_pool_hash_and_name(actions), (None, None))
+        self.assertEqual(_legacy_pool_hash_and_name(actions), (None, None))

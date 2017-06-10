@@ -50,9 +50,25 @@ def _est_time_to_hour(cluster_summary, now=None):
     return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
 
 
-def _pool_hash_and_name(bootstrap_actions):
+def _pool_tags(hash, name):
+    """Return a dict with "hidden" tags to add to the given cluster."""
+    return dict(__mrjob_pool_hash=hash, __mrjob_pool_name=name)
+
+
+def _extract_tags(cluster):
+    """Pull the tags from a cluster, as a dict."""
+    return {t['Key']: t['Value'] for t in cluster.get('Tags') or []}
+
+
+def _pool_hash_and_name(cluster):
     """Return the hash and pool name for the given cluster, or
     ``(None, None)`` if it isn't pooled."""
+    tags = _extract_tags(cluster)
+    return tags.get('__mrjob_pool_hash'), tags.get('__mrjob_pool_name')
+
+
+def _legacy_pool_hash_and_name(bootstrap_actions):
+    """Get pool hash and name from a pre-v0.6.0 job."""
     for ba in bootstrap_actions:
         if ba['Name'] == 'master':
             args = ba['Args']

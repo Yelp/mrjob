@@ -62,6 +62,7 @@ from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _pick_runner_opts
+from mrjob.pool import _legacy_pool_hash_and_name
 from mrjob.pool import _pool_hash_and_name
 from mrjob.util import strip_microseconds
 
@@ -340,7 +341,10 @@ def _cluster_to_basic_summary(cluster, now=None):
 
     bcs['num_steps'] = len(cluster['Steps'])
 
-    _, bcs['pool'] = _pool_hash_and_name(cluster['BootstrapActions'])
+    _, bcs['pool'] = _pool_hash_and_name(cluster)
+    if not bcs['pool']:
+        _, bcs['pool'] = _legacy_pool_hash_and_name(
+            cluster['BootstrapActions'])
 
     m = _JOB_KEY_RE.match(bcs['name'] or '')
     if m:

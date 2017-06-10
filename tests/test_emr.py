@@ -25,6 +25,7 @@ import time
 import unittest
 from datetime import timedelta
 from io import BytesIO
+from shutil import make_archive
 
 import boto3
 from botocore.exceptions import ClientError
@@ -46,6 +47,7 @@ from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
+from mrjob.pool import _extract_tags
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
@@ -145,6 +147,13 @@ def _list_all_steps(runner):
     return list(reversed(list(_boto3_paginate(
         'Steps', runner.make_emr_client(), 'list_steps',
         ClusterId=runner.get_cluster_id()))))
+
+
+def _extract_non_mrjob_tags(cluster):
+    """get tags from a cluster as a dict, excluding tags starting with
+    ``__mrjob_``"""
+    return {k: v for k, v in _extract_tags(cluster).items()
+            if not k.startswith('__mrjob_')}
 
 
 class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
@@ -1356,7 +1365,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         with open(foo_py_path, 'w'):
             pass
 
-        # use all the bootstrap options
+        # test bootstrap with a file, bootstrap_mrjob
         runner = EMRJobRunner(conf_paths=[],
                               image_version=image_version,
                               bootstrap=[
@@ -1397,7 +1406,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
                     lines)
 
             self.assertIn(
-                '  chmod a+x $__mrjob_PWD/%s' % (name,),
+                '  chmod u+rx $__mrjob_PWD/%s' % (name,),
                 lines)
 
         # check files get downloaded
@@ -1454,16 +1463,15 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         runner._add_bootstrap_files_for_upload()
         self.assertIsNone(runner._master_bootstrap_script_path)
 
-    def test_pooling_requires_bootstrap_script(self):
-        # using pooling currently requires us to create a bootstrap script;
-        # see #1503
+    def test_pooling_does_not_require_bootstrap_script(self):
+        # now we use tags for this (see #1086)
         runner = EMRJobRunner(conf_paths=[],
                               bootstrap_mrjob=False,
                               bootstrap_python=False,
                               pool_clusters=True)
 
         runner._add_bootstrap_files_for_upload()
-        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertIsNone(runner._master_bootstrap_script_path)
 
     def test_bootstrap_actions_get_added(self):
         bootstrap_actions = [
@@ -1497,8 +1505,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check for master bootstrap script
         self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[2]['ScriptPath'].endswith('b.sh'))
-        self.assertTrue(actions[2]['Args'][0].startswith('pool-'))
-        self.assertTrue(actions[2]['Args'][1].startswith('default'))
+        self.assertEqual(actions[2]['Args'], [])
         self.assertEqual(actions[2]['Name'], 'master')
 
         # check for idle timeout script
@@ -1567,6 +1574,77 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertTrue(runner.fs.exists(actions[1]['ScriptPath']))
         self.assertTrue(runner.fs.exists(actions[2]['ScriptPath']))
 
+    def test_bootstrap_archive(self):
+        foo_dir = self.makedirs('foo')
+        foo_tar_gz = make_archive(
+            os.path.join(self.tmp_dir, 'foo'), 'gztar', foo_dir)
+
+        runner = EMRJobRunner(conf_paths=[],
+                              bootstrap=['cd ' + foo_tar_gz + '#/'])
+
+        runner._add_bootstrap_files_for_upload()
+
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
+
+        with open(runner._master_bootstrap_script_path) as f:
+            lines = [line.rstrip() for line in f]
+
+        self.assertIn('  __mrjob_TMP=$(mktemp -d)', lines)
+
+        self.assertIn(('  aws s3 cp %s $__mrjob_TMP/foo.tar.gz' %
+                       runner._upload_mgr.uri(foo_tar_gz)),
+                      lines)
+
+        self.assertIn(
+            '  mkdir $__mrjob_PWD/foo.tar.gz;'
+            ' tar xfz $__mrjob_TMP/foo.tar.gz -C $__mrjob_PWD/foo.tar.gz',
+            lines)
+
+        self.assertIn(
+            '  chmod u+rx -R $__mrjob_PWD/foo.tar.gz',
+            lines)
+
+        self.assertIn(
+            '  cd $__mrjob_PWD/foo.tar.gz/',
+            lines)
+
+    def test_bootstrap_dir(self):
+        foo_dir = self.makedirs('foo')
+
+        runner = EMRJobRunner(conf_paths=[],
+                              bootstrap=['cd ' + foo_dir + '/#'])
+
+        runner._add_bootstrap_files_for_upload()
+
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
+
+        self.assertIn(foo_dir, runner._dir_to_archive_path)
+
+        with open(runner._master_bootstrap_script_path) as f:
+            lines = [line.rstrip() for line in f]
+
+        self.assertIn('  __mrjob_TMP=$(mktemp -d)', lines)
+
+        self.assertIn(('  aws s3 cp %s $__mrjob_TMP/foo.tar.gz' %
+                       runner._upload_mgr.uri(
+                           runner._dir_archive_path(foo_dir))),
+                      lines)
+
+        self.assertIn(
+            '  mkdir $__mrjob_PWD/foo.tar.gz;'
+            ' tar xfz $__mrjob_TMP/foo.tar.gz -C $__mrjob_PWD/foo.tar.gz',
+            lines)
+
+        self.assertIn(
+            '  chmod u+rx -R $__mrjob_PWD/foo.tar.gz',
+            lines)
+
+        self.assertIn(
+            '  cd $__mrjob_PWD/foo.tar.gz/',
+            lines)
+
 
 class MasterNodeSetupScriptTestCase(MockBoto3TestCase):
 
@@ -1604,7 +1682,7 @@ class MasterNodeSetupScriptTestCase(MockBoto3TestCase):
         self.assertTrue(contents.startswith(b'#!/bin/sh -ex\n'))
         self.assertIn(b'aws s3 cp ', contents)
         self.assertNotIn(b'hadoop fs -copyToLocal ', contents)
-        self.assertIn(b'chmod a+x ', contents)
+        self.assertIn(b'chmod u+rx ', contents)
         self.assertIn(b'cookie.jar', contents)
         self.assertIn(b's3://pooh/honey.jar', contents)
         self.assertNotIn(b'dora.jar', contents)
@@ -1737,13 +1815,14 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             runner.run()
 
             # Make sure that the runner made a pooling-enabled cluster
-            bootstrap_actions = _list_all_bootstrap_actions(runner)
+            cluster = runner._describe_cluster()
+            jf_hash, jf_name = _pool_hash_and_name(cluster)
 
-            jf_hash, jf_name = _pool_hash_and_name(bootstrap_actions)
             self.assertEqual(jf_hash, runner._pool_hash())
             self.assertEqual(jf_name, runner._opts['pool_name'])
 
             self.simulate_emr_progress(runner.get_cluster_id())
+
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['Status']['State'], 'WAITING')
 
@@ -4254,11 +4333,30 @@ class ShouldBootstrapSparkTestCase(MockBoto3TestCase):
 
 class EMRTagsTestCase(MockBoto3TestCase):
 
+    def test_default_tags(self):
+        cluster = self.run_and_get_cluster()
+
+        tags = _extract_tags(cluster)
+
+        self.assertEqual(tags['__mrjob_pool_name'], 'default')
+        self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
+        self.assertIn('__mrjob_pool_hash', tags)
+
+    def test_no_pooling(self):
+        cluster = self.run_and_get_cluster('--no-pool-clusters')
+
+        tags = _extract_tags(cluster)
+
+        self.assertNotIn('__mrjob_pool_hash', tags)
+        self.assertNotIn('__mrjob_pool_name', tags)
+        self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
+
     def test_tags_option_dict(self):
         job = MRWordCount([
             '-r', 'emr',
             '--tag', 'tag_one=foo',
             '--tag', 'tag_two=bar'])
+        job.sandbox()
 
         with job.make_runner() as runner:
             self.assertEqual(runner._opts['tags'],
@@ -4276,6 +4374,7 @@ class EMRTagsTestCase(MockBoto3TestCase):
         }}}
 
         job = MRWordCount(['-r', 'emr', '--tag', 'tag_two=qwerty'])
+        job.sandbox()
 
         with mrjob_conf_patcher(TAGS_MRJOB_CONF):
             with job.make_runner() as runner:
@@ -4288,30 +4387,27 @@ class EMRTagsTestCase(MockBoto3TestCase):
         cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
                                            '--tag', 'tag_two=bar')
 
-        # tags should be in alphabetical order by key
-        self.assertEqual(cluster['Tags'], [
-            dict(Key='tag_one', Value='foo'),
-            dict(Key='tag_two', Value='bar'),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(cluster),
+            dict(tag_one='foo', tag_two='bar'))
 
     def test_blank_tag_value(self):
         cluster = self.run_and_get_cluster('--tag', 'tag_one=foo',
                                            '--tag', 'tag_two=')
 
-        # tags should be in alphabetical order by key
-        self.assertEqual(cluster['Tags'], [
-            dict(Key='tag_one', Value='foo'),
-            dict(Key='tag_two', Value=''),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(cluster),
+            dict(tag_one='foo', tag_two=''))
 
     def test_tag_values_can_be_none(self):
-        runner = EMRJobRunner(conf_paths=[], tags={'tag_one': None})
+        runner = EMRJobRunner(conf_paths=[], tags={'tag_one': None},
+                              pool_clusters=False)
         cluster_id = runner.make_persistent_cluster()
+        cluster = self.mock_emr_clusters[cluster_id]
 
-        mock_cluster = self.mock_emr_clusters[cluster_id]
-        self.assertEqual(mock_cluster['Tags'], [
-            dict(Key='tag_one', Value=''),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(cluster),
+            dict(tag_one=''))
 
     def test_persistent_cluster(self):
         args = ['--tag', 'tag_one=foo',
@@ -4319,12 +4415,11 @@ class EMRTagsTestCase(MockBoto3TestCase):
 
         with self.make_runner(*args) as runner:
             cluster_id = runner.make_persistent_cluster()
+            cluster = self.mock_emr_clusters[cluster_id]
 
-        mock_cluster = self.mock_emr_clusters[cluster_id]
-        self.assertEqual(mock_cluster['Tags'], [
-            dict(Key='tag_one', Value='foo'),
-            dict(Key='tag_two', Value='bar'),
-        ])
+        self.assertEqual(
+            _extract_non_mrjob_tags(cluster),
+            dict(tag_one='foo', tag_two='bar'))
 
 
 # this isn't actually enough to support GovCloud; see:

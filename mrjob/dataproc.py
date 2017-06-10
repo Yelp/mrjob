@@ -17,7 +17,6 @@ import io
 import logging
 import os
 import os.path
-import pipes
 import time
 import re
 import subprocess
@@ -41,6 +40,8 @@ except ImportError:
     import configparser
 
 import mrjob
+from mrjob.cloud import HadoopInTheCloudJobRunner
+from mrjob.cloud import HadoopInTheCloudOptionStore
 from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
@@ -54,13 +55,8 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_uri
 from mrjob.py2 import PY2
-from mrjob.runner import MRJobRunner
-from mrjob.runner import RunnerOptionStore
-from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
-from mrjob.setup import parse_setup_cmd
 from mrjob.step import StepFailedException
-from mrjob.util import cmd_line
 from mrjob.util import random_identifier
 
 log = logging.getLogger(__name__)
@@ -199,7 +195,7 @@ class DataprocException(Exception):
     pass
 
 
-class DataprocRunnerOptionStore(RunnerOptionStore):
+class DataprocRunnerOptionStore(HadoopInTheCloudOptionStore):
     ALLOWED_KEYS = _allowed_keys('dataproc')
     COMBINERS = _combiners('dataproc')
     DEPRECATED_ALIASES = _deprecated_aliases('dataproc')
@@ -251,7 +247,7 @@ class DataprocRunnerOptionStore(RunnerOptionStore):
         })
 
 
-class DataprocJobRunner(MRJobRunner):
+class DataprocJobRunner(HadoopInTheCloudJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` on Google Cloud Dataproc.
     Invoked when you run your job with ``-r dataproc``.
 
@@ -268,10 +264,6 @@ class DataprocJobRunner(MRJobRunner):
         ...
     """
     alias = 'dataproc'
-
-    # Don't need to bootstrap mrjob in the setup wrapper; that's what
-    # the bootstrap script is for!
-    BOOTSTRAP_MRJOB_IN_SETUP = False
 
     OPTION_STORE_CLASS = DataprocRunnerOptionStore
 
@@ -319,23 +311,10 @@ class DataprocJobRunner(MRJobRunner):
             self._output_dir = self._job_tmpdir + 'output/'
         # END - setup directories
 
-        # manage working dir for bootstrap script
-        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
-
         # manage local files that we want to upload to GCS. We'll add them
         # to this manager just before we need them.
         fs_files_dir = self._job_tmpdir + 'files/'
         self._upload_mgr = UploadDirManager(fs_files_dir)
-
-        self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
-
-        for cmd in self._bootstrap:
-            for maybe_path_dict in cmd:
-                if isinstance(maybe_path_dict, dict):
-                    self._bootstrap_dir_mgr.add(**maybe_path_dict)
-
-        # we'll create the script later
-        self._master_bootstrap_script_path = None
 
         # when did our particular task start?
         self._dataproc_job_start = None
@@ -826,72 +805,6 @@ class DataprocJobRunner(MRJobRunner):
 
     ### Bootstrapping ###
 
-    # TODO: merge code shared with emr.py
-
-    def _create_master_bootstrap_script_if_needed(self):
-        """Helper for :py:meth:`_add_bootstrap_files_for_upload`.
-
-        Create the master bootstrap script and write it into our local
-        temp directory. Set self._master_bootstrap_script_path.
-
-        This will do nothing if there are no bootstrap scripts or commands,
-        or if it has already been called."""
-        if self._master_bootstrap_script_path:
-            return
-
-        # don't bother if we're not starting a cluster
-        if self._cluster_id:
-            return
-
-        # Also don't bother if we're not bootstrapping
-        if not (self._bootstrap or self._bootstrap_mrjob()):
-            return
-
-        # create mrjob.zip if we need it, and add commands to install it
-        mrjob_bootstrap = []
-        if self._bootstrap_mrjob():
-            assert self._mrjob_zip_path
-            path_dict = {
-                'type': 'file', 'name': None, 'path': self._mrjob_zip_path}
-            self._bootstrap_dir_mgr.add(**path_dict)
-
-            # find out where python keeps its libraries
-            mrjob_bootstrap.append([
-                "__mrjob_PYTHON_LIB=$(%s -c "
-                "'from distutils.sysconfig import get_python_lib;"
-                " print(get_python_lib())')" %
-                cmd_line(self._python_bin())])
-
-            # remove anything that might be in the way (see #1567)
-            mrjob_bootstrap.append(['sudo rm -rf $__mrjob_PYTHON_LIB/mrjob'])
-
-            # unzip mrjob.zip
-            mrjob_bootstrap.append(
-                ['sudo unzip ', path_dict, ' -d $__mrjob_PYTHON_LIB'])
-
-            # re-compile pyc files now, since mappers/reducers can't
-            # write to this directory. Don't fail if there is extra
-            # un-compileable crud in the tarball (this would matter if
-            # sh_bin were 'sh -e')
-            mrjob_bootstrap.append(
-                ['sudo %s -m compileall -q'
-                 ' -f $__mrjob_PYTHON_LIB/mrjob && true' %
-                 cmd_line(self._python_bin())])
-
-        path = os.path.join(self._get_local_tmp_dir(), 'b.sh')
-        log.info('writing master bootstrap script to %s' % path)
-
-        contents = self._master_bootstrap_script_content(
-            self._bootstrap + mrjob_bootstrap)
-        for line in contents:
-            log.debug('BOOTSTRAP: ' + line.rstrip('\r\n'))
-
-        with open(path, 'w') as f:
-            for line in contents:
-                f.write(line)
-
-        self._master_bootstrap_script_path = path
-
     def _bootstrap_python(self):
         """Return a (possibly empty) list of parsed commands (in the same
         format as returned by parse_setup_cmd())'"""
@@ -907,81 +820,6 @@ class DataprocJobRunner(MRJobRunner):
             return [
                 ['sudo apt-get install -y python3 python3-pip python3-dev'],
             ]
-
-    def _parse_bootstrap(self):
-        """Parse the *bootstrap* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`.
-        """
-        return [parse_setup_cmd(cmd) for cmd in self._opts['bootstrap']]
-
-    def _master_bootstrap_script_content(self, bootstrap):
-        """Create the contents of the master bootstrap script.
-        """
-        out = []
-
-        def writeln(line=''):
-            out.append(line + '\n')
-
-        # shebang
-        sh_bin = self._sh_bin()
-        if not sh_bin[0].startswith('/'):
-            sh_bin = ['/usr/bin/env'] + sh_bin
-        writeln('#!' + cmd_line(sh_bin))
-
-        # unused hook for 'set -e', etc. (see #1549)
-        for cmd in self._sh_pre_commands():
-            writeln(cmd)
-        writeln()
-
-        # store $PWD
-        writeln('# store $PWD')
-        writeln('__mrjob_PWD=$PWD')
-
-        # FYI - mtai @ davidmarin - begin section, mtai had to add this
-        # otherwise initialization didn't work
-        # // kept blowing up in all subsequent invocations of $__mrjob_PWD/
-        writeln('if [ $__mrjob_PWD = "/" ]; then')
-        writeln('  __mrjob_PWD=""')
-        writeln('fi')
-        # FYI - mtai @ davidmarin - end section
-
-        writeln()
-
-        # download files
-        writeln('# download files and mark them executable')
-
-        cp_to_local = 'hadoop fs -copyToLocal'
-
-        for name, path in sorted(
-                self._bootstrap_dir_mgr.name_to_path('file').items()):
-            uri = self._upload_mgr.uri(path)
-
-            output_string = '%s %s $__mrjob_PWD/%s' % (
-                cp_to_local, pipes.quote(uri), pipes.quote(name))
-
-            writeln(output_string)
-            # make everything executable, like Hadoop Distributed Cache
-            writeln('chmod a+x $__mrjob_PWD/%s' % pipes.quote(name))
-        writeln()
-
-        # run bootstrap commands
-        writeln('# bootstrap commands')
-        for cmd in bootstrap:
-            # reconstruct the command line, substituting $__mrjob_PWD/<name>
-            # for path dicts
-            line = ''
-            for token in cmd:
-                if isinstance(token, dict):
-                    # it's a path dictionary
-                    line += '$__mrjob_PWD/'
-                    line += pipes.quote(self._bootstrap_dir_mgr.name(**token))
-                else:
-                    # it's raw script
-                    line += token
-            writeln(line)
-        writeln()
-
-        return out
 
     def get_cluster_id(self):
         return self._cluster_id

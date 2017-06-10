@@ -25,6 +25,7 @@ import time
 import unittest
 from datetime import timedelta
 from io import BytesIO
+from shutil import make_archive
 
 import boto3
 from botocore.exceptions import ClientError
@@ -1364,7 +1365,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         with open(foo_py_path, 'w'):
             pass
 
-        # use all the bootstrap options
+        # test bootstrap with a file, bootstrap_mrjob
         runner = EMRJobRunner(conf_paths=[],
                               image_version=image_version,
                               bootstrap=[
@@ -1572,6 +1573,77 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # make sure scripts are on S3
         self.assertTrue(runner.fs.exists(actions[1]['ScriptPath']))
         self.assertTrue(runner.fs.exists(actions[2]['ScriptPath']))
+
+    def test_bootstrap_archive(self):
+        foo_dir = self.makedirs('foo')
+        foo_tar_gz = make_archive(
+            os.path.join(self.tmp_dir, 'foo'), 'gztar', foo_dir)
+
+        runner = EMRJobRunner(conf_paths=[],
+                              bootstrap=['cd ' + foo_tar_gz + '#/'])
+
+        runner._add_bootstrap_files_for_upload()
+
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
+
+        with open(runner._master_bootstrap_script_path) as f:
+            lines = [line.rstrip() for line in f]
+
+        self.assertIn('  __mrjob_TMP=$(mktemp -d)', lines)
+
+        self.assertIn(('  aws s3 cp %s $__mrjob_TMP/foo.tar.gz' %
+                       runner._upload_mgr.uri(foo_tar_gz)),
+                      lines)
+
+        self.assertIn(
+            '  mkdir $__mrjob_PWD/foo.tar.gz;'
+            ' tar xfz $__mrjob_TMP/foo.tar.gz -C $__mrjob_PWD/foo.tar.gz',
+            lines)
+
+        self.assertIn(
+            '  chmod u+rx -R $__mrjob_PWD/foo.tar.gz',
+            lines)
+
+        self.assertIn(
+            '  cd $__mrjob_PWD/foo.tar.gz/',
+            lines)
+
+    def test_bootstrap_dir(self):
+        foo_dir = self.makedirs('foo')
+
+        runner = EMRJobRunner(conf_paths=[],
+                              bootstrap=['cd ' + foo_dir + '/#'])
+
+        runner._add_bootstrap_files_for_upload()
+
+        self.assertIsNotNone(runner._master_bootstrap_script_path)
+        self.assertTrue(os.path.exists(runner._master_bootstrap_script_path))
+
+        self.assertIn(foo_dir, runner._dir_to_archive_path)
+
+        with open(runner._master_bootstrap_script_path) as f:
+            lines = [line.rstrip() for line in f]
+
+        self.assertIn('  __mrjob_TMP=$(mktemp -d)', lines)
+
+        self.assertIn(('  aws s3 cp %s $__mrjob_TMP/foo.tar.gz' %
+                       runner._upload_mgr.uri(
+                           runner._dir_archive_path(foo_dir))),
+                      lines)
+
+        self.assertIn(
+            '  mkdir $__mrjob_PWD/foo.tar.gz;'
+            ' tar xfz $__mrjob_TMP/foo.tar.gz -C $__mrjob_PWD/foo.tar.gz',
+            lines)
+
+        self.assertIn(
+            '  chmod u+rx -R $__mrjob_PWD/foo.tar.gz',
+            lines)
+
+        self.assertIn(
+            '  cd $__mrjob_PWD/foo.tar.gz/',
+            lines)
 
 
 class MasterNodeSetupScriptTestCase(MockBoto3TestCase):

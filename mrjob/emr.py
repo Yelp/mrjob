@@ -95,8 +95,8 @@ from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
-from mrjob.setup import BootstrapWorkingDirManager
 from mrjob.setup import UploadDirManager
+from mrjob.setup import WorkingDirManager
 from mrjob.ssh import _ssh_run
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
@@ -498,7 +498,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # master node setup script (handled later by
         # _add_master_node_setup_files_for_upload())
-        self._master_node_setup_mgr = BootstrapWorkingDirManager()
+        self._master_node_setup_mgr = WorkingDirManager()
         self._master_node_setup_script_path = None
 
         # where our own logs ended up (we'll find this out once we run the job)

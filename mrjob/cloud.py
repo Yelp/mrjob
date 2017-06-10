@@ -22,7 +22,7 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.runner import MRJobRunner
 from mrjob.runner import RunnerOptionStore
-from mrjob.setup import BootstrapWorkingDirManager
+from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
@@ -68,7 +68,7 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
         self._bootstrap = self._bootstrap_python() + self._parse_bootstrap()
 
         # add files to manager
-        self._bootstrap_dir_mgr = BootstrapWorkingDirManager()
+        self._bootstrap_dir_mgr = WorkingDirManager()
 
         for cmd in self._bootstrap:
             for token in cmd:

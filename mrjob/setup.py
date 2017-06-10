@@ -474,12 +474,3 @@ class WorkingDirManager(object):
         if type not in self._SUPPORTED_TYPES:
             raise ValueError('bad path type %r, must be one of: %s' % (
                 type, ', '.join(sorted(self._SUPPORTED_TYPES))))
-
-
-class BootstrapWorkingDirManager(WorkingDirManager):
-    """Manage the working dir for the master bootstrap script. Identical
-    to :py:class:`WorkingDirManager` except that it doesn't support archives.
-
-    Also used for master node setup script.
-    """
-    _SUPPORTED_TYPES = ('file', 'archive')

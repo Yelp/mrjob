@@ -724,7 +724,7 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
                 '  hadoop fs -copyToLocal %s $__mrjob_PWD/%s' % (uri, name),
                 lines)
             self.assertIn(
-                '  chmod a+x $__mrjob_PWD/%s' % (name,),
+                '  chmod u+rx $__mrjob_PWD/%s' % (name,),
                 lines)
 
         # check files get downloaded

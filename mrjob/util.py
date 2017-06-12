@@ -352,12 +352,16 @@ def to_lines(chunks):
         return _to_lines(chunks)
 
 
-# TODO: treat b'' as EOF
 def _to_lines(chunks):
     """Take in data as a sequence of bytes, and yield it, one line at a time.
 
     Only breaks lines on ``\\n`` (not ``\\r``), and does not add
     a trailing newline.
+
+    Exception: if we encounter an empty bytestring ``b''``, immediately yield
+    what we have so far rather than joining it to the next chunk. This allows
+    us to handle bytes from multiple files without joining the end of one
+    file to the beginning of the next one.
 
     Optimizes for:
 
@@ -368,6 +372,14 @@ def _to_lines(chunks):
     leftovers = []
 
     for chunk in chunks:
+        # special case for b'' standing for EOF
+        if chunk == b'':
+            if leftovers:
+                yield b''.join(leftovers)
+                leftovers = []
+
+            continue
+
         start = 0
 
         while start < len(chunk):

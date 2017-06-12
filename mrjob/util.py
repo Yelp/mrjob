@@ -352,6 +352,7 @@ def to_lines(chunks):
         return _to_lines(chunks)
 
 
+# TODO: treat b'' as EOF
 def _to_lines(chunks):
     """Take in data as a sequence of bytes, and yield it, one line at a time.
 

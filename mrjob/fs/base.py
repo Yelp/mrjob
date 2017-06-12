@@ -43,7 +43,12 @@ class Filesystem(object):
         False
 
     def cat(self, path_glob):
-        """cat all files matching **path_glob**, decompressing if necessary"""
+        """cat all files matching **path_glob**, decompressing if necessary
+
+        This yields bytes, which don't necessarily correspond to lines
+        (see #1544). If multiple files are catted, yields ``b''`` between
+        each file.
+        """
         for filename in self.ls(path_glob):
             for line in self._cat_file(filename):
                 yield line
@@ -66,6 +71,8 @@ class Filesystem(object):
         raise NotImplementedError
 
     def _cat_file(self, path):
+        """Yield the contents of the file at *path* as a series of ``bytes``,
+        not necessarily respecting line boundaries."""
         raise NotImplementedError
 
     def exists(self, path_glob):

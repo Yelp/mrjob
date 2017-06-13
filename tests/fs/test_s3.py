@@ -34,7 +34,8 @@ class CatTestCase(MockBoto3TestCase):
             {'walrus': {'data/foo': b'foo\nfoo\n'}})
 
         self.assertEqual(
-
+            b''.join(self.fs._cat_file('s3://walrus/data/foo')),
+            b'foo\nfoo\n')
 
     def test_cat_bz2(self):
         self.add_mock_s3_data(

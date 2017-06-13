@@ -40,6 +40,7 @@ from mrjob.step import SparkStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import expand_path
 from mrjob.util import read_input
+from mrjob.util import to_lines
 
 
 log = logging.getLogger(__name__)
@@ -917,6 +918,15 @@ class MRJob(MRJobLauncher):
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
     OUTPUT_PROTOCOL = JSONProtocol
 
+    def parse_output(self, chunks):
+        """Parse the final output of this MRJob (as a stream of byte chunks)
+        into a stream of ``(key, value)``.
+        """
+        read = self.output_protocol().read
+
+        for line in to_lines(chunks):
+            yield read(line)
+
     def parse_output_line(self, line):
         """
         Parse a line from the final output of this MRJob into
@@ -925,6 +935,10 @@ class MRJob(MRJobLauncher):
             runner.run()
             for line in runner.stream_output():
                 key, value = mr_job.parse_output_line(line)
+
+        .. deprecated:: 0.6.0
+
+           Use :py:meth:`parse_output` instead.
         """
         return self.output_protocol().read(line)
 

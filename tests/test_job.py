@@ -122,6 +122,17 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
         self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
 
 
+class ParseOutputTestCase(TestCase):
+
+    def test_json(self):
+        job = MRJob()
+
+        data = iter([b'1\t2', b'\n{"3": ', '4}\t"fi', b've"\n'])
+        self.assertEqual(
+            list(job.parse_output(data)),
+            [(1, 2), ({'3': 4}, 'five')])
+
+
 class NoTzsetTestCase(TestCase):
 
     def setUp(self):

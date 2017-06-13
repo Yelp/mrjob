@@ -57,6 +57,7 @@ from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
+from mrjob.util import to_lines
 from mrjob.util import zip_dir
 
 
@@ -462,11 +463,10 @@ class MRJobRunner(object):
 
                 path = base
 
-        # TODO - mtai @ davidmarin - why aren't we using self.fs.cat ?
         for filename in self.fs.ls(output_dir):
             subpath = filename[len(output_dir):]
             if not any(name.startswith('_') for name in split_path(subpath)):
-                for line in self.fs._cat_file(filename):
+                for line in to_lines(self.fs._cat_file(filename)):
                     yield line
 
     def _cleanup_mode(self, mode=None):

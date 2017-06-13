@@ -49,7 +49,10 @@ class Filesystem(object):
         (see #1544). If multiple files are catted, yields ``b''`` between
         each file.
         """
-        for filename in self.ls(path_glob):
+        for i, filename in enumerate(self.ls(path_glob)):
+            if i > 0:
+                yield b''  # mark end of previous file
+
             for line in self._cat_file(filename):
                 yield line
 

@@ -16,9 +16,27 @@ from unittest import TestCase
 
 from mrjob.fs.base import Filesystem
 
+from tests.py2 import Mock
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
+
+
+class CatTestCase(SandboxedTestCase):
+
+    def test_multiple_files(self):
+        fs = Filesystem()
+
+        fs.ls = Mock(return_value=['path1', 'path2', 'path3'])
+        fs._cat_file = Mock(return_value=[b'chunk1\n', b'chunk2'])
+
+        chunks = list(fs.cat('whatever'))
+
+        self.assertEqual(
+            chunks,
+            [b'chunk1\n', b'chunk2', b'',
+             b'chunk1\n', b'chunk2', b'',
+             b'chunk1\n', b'chunk2'])
 
 
 class JoinTestCase(SandboxedTestCase):

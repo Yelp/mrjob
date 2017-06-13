@@ -23,32 +23,50 @@ from tests.mock_boto3 import MockBoto3TestCase
 from tests.py2 import patch
 
 
-class S3FSTestCase(MockBoto3TestCase):
+class CatTestCase(MockBoto3TestCase):
 
     def setUp(self):
-        super(S3FSTestCase, self).setUp()
+        super(CatTestCase, self).setUp()
         self.fs = S3Filesystem()
 
     def test_cat_uncompressed(self):
         self.add_mock_s3_data(
             {'walrus': {'data/foo': b'foo\nfoo\n'}})
 
-        self.assertEqual(list(self.fs._cat_file('s3://walrus/data/foo')),
-                         [b'foo\n', b'foo\n'])
+        self.assertEqual(
+            b''.join(self.fs._cat_file('s3://walrus/data/foo')),
+            b'foo\nfoo\n')
 
     def test_cat_bz2(self):
         self.add_mock_s3_data(
             {'walrus': {'data/foo.bz2': bz2.compress(b'foo\n' * 1000)}})
 
-        self.assertEqual(list(self.fs._cat_file('s3://walrus/data/foo.bz2')),
-                         [b'foo\n'] * 1000)
+        self.assertEqual(
+            b''.join(self.fs._cat_file('s3://walrus/data/foo.bz2')),
+            b'foo\n' * 1000)
 
     def test_cat_gz(self):
         self.add_mock_s3_data(
             {'walrus': {'data/foo.gz': gzip_compress(b'foo\n' * 10000)}})
 
-        self.assertEqual(list(self.fs._cat_file('s3://walrus/data/foo.gz')),
-                         [b'foo\n'] * 10000)
+        self.assertEqual(
+            b''.join(self.fs._cat_file('s3://walrus/data/foo.gz')),
+            b'foo\n' * 10000)
+
+    def test_chunks_file(self):
+        self.add_mock_s3_data(
+            {'walrus': {'data/foo': b'foo\n' * 1000}})
+
+        self.assertGreater(
+            len(list(self.fs._cat_file('s3://walrus/data/foo'))),
+            1)
+
+
+class S3FSTestCase(MockBoto3TestCase):
+
+    def setUp(self):
+        super(S3FSTestCase, self).setUp()
+        self.fs = S3Filesystem()
 
     def test_ls_key(self):
         self.add_mock_s3_data(

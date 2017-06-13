@@ -16,6 +16,8 @@ import fnmatch
 import logging
 import mimetypes
 
+from mrjob.cat import decompress
+from mrjob.cat import to_chunks
 from mrjob.fs.base import Filesystem
 from mrjob.parse import urlparse
 from mrjob.runner import GLOB_RE
@@ -178,10 +180,8 @@ class GCSFilesystem(Filesystem):
 
             tmp_fileobj.seek(0)
 
-            line_gen = read_file(
-                gcs_uri, fileobj=tmp_fileobj, yields_lines=False)
-            for current_line in line_gen:
-                yield current_line
+            for chunk in decompress(tmp_fileobj, gcs_uri):
+                yield chunk
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on GCS because there are

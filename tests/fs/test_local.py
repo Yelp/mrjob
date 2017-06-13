@@ -21,6 +21,44 @@ from mrjob.fs.local import LocalFilesystem
 
 from tests.sandbox import SandboxedTestCase
 
+class CatTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(CatTestCase, self).setUp()
+        self.fs = LocalFilesystem()
+
+    def test_cat_uncompressed(self):
+        path = self.makefile('f', b'bar\nfoo\n')
+
+        self.assertEqual(
+            b''.join(self.fs._cat_file(path)),
+            b'bar\nfoo\n')
+
+    def test_yields_lines(self):
+        # since it's just opening the fileobj directly
+        path = self.makefile('f', b'bar\nfoo\n')
+
+        self.assertEqual(list(self.fs._cat_file(path)),
+                         [b'bar\n', b'foo\n'])
+
+    def test_cat_gz(self):
+        input_gz_path = join(self.tmp_dir, 'input.gz')
+        with gzip.GzipFile(input_gz_path, 'wb') as input_gz:
+            input_gz.write(b'foo\nbar\n')
+
+        self.assertEqual(
+            b''.join(self.fs._cat_file(input_gz_path)),
+            b'foo\nbar\n')
+
+    def test_cat_bz2(self):
+        input_bz2_path = join(self.tmp_dir, 'input.bz2')
+
+        with bz2.BZ2File(input_bz2_path, 'wb') as input_bz2:
+            input_bz2.write(b'bar\nbar\nfoo\n')
+
+        self.assertEqual(
+            b''.join(self.fs._cat_file(input_bz2_path)),
+            b'bar\nbar\nfoo\n')
 
 class LocalFSTestCase(SandboxedTestCase):
 
@@ -63,28 +101,6 @@ class LocalFSTestCase(SandboxedTestCase):
         self.makefile(join('d', 'f2'), 'contents')
         self.assertEqual(sorted(list(self.fs.ls(self.tmp_dir))),
                          sorted(self.abs_paths('f', 'd/f2')))
-
-    def test_cat_uncompressed(self):
-        path = self.makefile('f', b'bar\nfoo\n')
-        self.assertEqual(list(self.fs._cat_file(path)), [b'bar\n', b'foo\n'])
-
-    def test_cat_gz(self):
-        input_gz_path = join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'wb')
-        input_gz.write(b'foo\nbar\n')
-        input_gz.close()
-
-        self.assertEqual(list(self.fs._cat_file(input_gz_path)),
-                         [b'foo\n', b'bar\n'])
-
-    def test_cat_bz2(self):
-        input_bz2_path = join(self.tmp_dir, 'input.bz2')
-        input_bz2 = bz2.BZ2File(input_bz2_path, 'wb')
-        input_bz2.write(b'bar\nbar\nfoo\n')
-        input_bz2.close()
-
-        self.assertEqual(list(self.fs._cat_file(input_bz2_path)),
-                         [b'bar\n', b'bar\n', b'foo\n'])
 
     def test_mkdir(self):
         path = join(self.tmp_dir, 'dir')

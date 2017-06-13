@@ -39,10 +39,10 @@ from tests.mockgoogleapiclient import MockGoogleAPITestCase
 from tests.sandbox import PatcherTestCase
 
 
-class GCSFSTestCase(MockGoogleAPITestCase):
+class CatTestCase(MockGoogleAPITestCase):
 
     def setUp(self):
-        super(GCSFSTestCase, self).setUp()
+        super(CatTestCase, self).setUp()
         self.fs = GCSFilesystem()
 
     def test_cat_uncompressed(self):
@@ -50,24 +50,44 @@ class GCSFSTestCase(MockGoogleAPITestCase):
             'gs://walrus/data/foo': b'foo\nfoo\n'
         })
 
-        self.assertEqual(list(self.fs._cat_file('gs://walrus/data/foo')),
-                         [b'foo\n', b'foo\n'])
+        self.assertEqual(
+            b''.join(self.fs._cat_file('gs://walrus/data/foo')),
+            b'foo\nfoo\n')
 
     def test_cat_bz2(self):
         self.put_gcs_multi({
             'gs://walrus/data/foo.bz2': bz2.compress(b'foo\n' * 1000)
         })
 
-        self.assertEqual(list(self.fs._cat_file('gs://walrus/data/foo.bz2')),
-                         [b'foo\n'] * 1000)
+        self.assertEqual(
+            b''.join(self.fs._cat_file('gs://walrus/data/foo.bz2')),
+            b'foo\n' * 1000)
 
     def test_cat_gz(self):
         self.put_gcs_multi({
             'gs://walrus/data/foo.gz': gzip_compress(b'foo\n' * 10000)
         })
 
-        self.assertEqual(list(self.fs._cat_file('gs://walrus/data/foo.gz')),
-                         [b'foo\n'] * 10000)
+        self.assertEqual(
+            b''.join(self.fs._cat_file('gs://walrus/data/foo.gz')),
+            b'foo\n' * 10000)
+
+    def test_chunks_file(self):
+        self.put_gcs_multi({
+            'gs://walrus/data/foo': b'foo\nfoo\n' * 1000
+        })
+
+        self.assertGreater(
+            len(list(self.fs._cat_file('gs://walrus/data/foo'))),
+            1)
+
+
+
+class GCSFSTestCase(MockGoogleAPITestCase):
+
+    def setUp(self):
+        super(GCSFSTestCase, self).setUp()
+        self.fs = GCSFilesystem()
 
     def test_ls_key(self):
         self.put_gcs_multi({

@@ -21,6 +21,7 @@ from subprocess import Popen
 from subprocess import PIPE
 from subprocess import CalledProcessError
 
+from mrjob.cat import decompress
 from mrjob.compat import uses_yarn
 from mrjob.fs.base import Filesystem
 from mrjob.py2 import to_unicode
@@ -257,20 +258,20 @@ class HadoopFilesystem(Filesystem):
 
         cat_proc = Popen(cat_args, stdout=PIPE, stderr=PIPE)
 
-        def cleanup():
-            # this does someties happen; see #1396
-            for line in cat_proc.stderr:
-                log.error('STDERR: ' + to_unicode(line.rstrip(b'\r\n')))
+        for chunk in decompress(cat_proc.stdout, filename):
+            yield chunk
 
-            cat_proc.stdout.close()
-            cat_proc.stderr.close()
+        # this does someties happen; see #1396
+        for line in cat_proc.stderr:
+            log.error('STDERR: ' + to_unicode(line.rstrip(b'\r\n')))
 
-            returncode = cat_proc.wait()
+        cat_proc.stdout.close()
+        cat_proc.stderr.close()
 
-            if returncode != 0:
-                raise IOError("Could not stream %s" % filename)
+        returncode = cat_proc.wait()
 
-        return read_file(filename, cat_proc.stdout, cleanup=cleanup)
+        if returncode != 0:
+            raise IOError("Could not stream %s" % filename)
 
     def mkdir(self, path):
         version = self.get_hadoop_version()

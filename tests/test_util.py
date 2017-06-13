@@ -56,41 +56,43 @@ class ToLinesTestCase(TestCase):
 
     def test_buffered_lines(self):
         self.assertEqual(
-            list(to_lines(chunk for chunk in
-                          [b'The quick\nbrown fox\nju',
-                           b'mped over\nthe lazy\ndog',
-                           b's.\n'])),
-            [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
-             b'dogs.\n'])
-
-    def test_empty_chunks(self):
-        self.assertEqual(
-            list(to_lines(chunk for chunk in
-                          [b'',
-                           b'The quick\nbrown fox\nju',
-                           b'', b'', b'',
-                           b'mped over\nthe lazy\ndog',
-                           b'',
-                           b's.\n',
-                           b''])),
+            list(to_lines(iter([
+                b'The quick\nbrown fox\nju',
+                b'mped over\nthe lazy\ndog',
+                b's.\n',
+            ]))),
             [b'The quick\n', b'brown fox\n', b'jumped over\n', b'the lazy\n',
              b'dogs.\n'])
 
     def test_no_trailing_newline(self):
         self.assertEqual(
-            list(to_lines(chunk for chunk in
-                          [b'Alouette,\ngentille',
-                           b' Alouette.'])),
+            list(to_lines(iter([
+                b'Alouette,\ngentille',
+                b' Alouette.',
+            ]))),
             [b'Alouette,\n', b'gentille Alouette.'])
+
+    def test_eof_without_trailing_newline(self):
+        self.assertEqual(
+            list(to_lines(iter([
+                b'Alouette,\ngentille',
+                b' Alouette.',
+                b'',  # treated as EOF
+                b'Allouette,\nje te p',
+                b'lumerais.',
+            ]))),
+            [b'Alouette,\n', b'gentille Alouette.',
+             b'Allouette,\n', b'je te plumerais.'])
 
     def test_long_lines(self):
         super_long_line = b'a' * 10000 + b'\n' + b'b' * 1000 + b'\nlast\n'
         self.assertEqual(
             list(to_lines(
-                chunk for chunk in
-                (super_long_line[0 + i:1024 + i]
-                 for i in range(0, len(super_long_line), 1024)))),
+                super_long_line[0 + i:1024 + i]
+                for i in range(0, len(super_long_line), 1024)
+            )),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
+
 
 
 class CmdLineTestCase(TestCase):

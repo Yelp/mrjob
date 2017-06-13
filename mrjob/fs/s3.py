@@ -31,6 +31,7 @@ except ImportError:
     boto3 = None
 
 from mrjob.aws import _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
+from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_uri
 from mrjob.parse import is_s3_uri
@@ -38,7 +39,6 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.retry import RetryWrapper
 from mrjob.runner import GLOB_RE
-from mrjob.util import read_file
 
 
 log = logging.getLogger(__name__)
@@ -210,7 +210,7 @@ class S3Filesystem(Filesystem):
         s3_key = self._get_s3_key(filename)
         body = s3_key.get()['Body']
 
-        return read_file(filename, fileobj=body, yields_lines=False)
+        return decompress(body, filename)
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on S3 because there are

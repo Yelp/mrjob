@@ -45,11 +45,7 @@ def bunzip2_stream(fileobj, bufsize=1024):
 
     d = bz2.BZ2Decompressor()
 
-    while True:
-        chunk = fileobj.read(bufsize)
-        if not chunk:
-            return
-
+    for chunk in to_chunks(fileobj):
         part = d.decompress(chunk)
         if part:
             yield part
@@ -73,10 +69,7 @@ def gunzip_stream(fileobj, bufsize=1024):
     # actually defined in zlib, so we define it here.
     READ_GZIP_DATA = 16
     d = zlib.decompressobj(READ_GZIP_DATA | zlib.MAX_WBITS)
-    while True:
-        chunk = fileobj.read(bufsize)
-        if not chunk:
-            return
+    for chunk in to_chunks(fileobj, bufsize):
         data = d.decompress(chunk)
         if data:
             yield data
@@ -99,11 +92,13 @@ def decompress(fileobj, path, bufsize=1024):
         return fileobj
     else:
         # not a real fileobj (e.g. boto3 StreamingBody)
-        return _yield_chunks(fileobj, bufsize=bufsize)
+        return to_chunks(fileobj, bufsize=bufsize)
 
 
-# TODO: name this to_chunks()
-def _yield_chunks(readable, bufsize=1024):
+def to_chunks(readable, bufsize=1024):
+    """Convert *readable*, which is any object supporting ``read()``
+    (e.g. fileobjs) to a stream of non-empty ``bytes``.
+    """
     while True:
         chunk = readable.read(bufsize)
         if chunk:

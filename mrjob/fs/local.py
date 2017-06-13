@@ -16,9 +16,10 @@ import logging
 import os
 import shutil
 
+from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
 from mrjob.parse import is_uri
-from mrjob.util import read_file
+
 
 log = logging.getLogger(__name__)
 
@@ -43,7 +44,9 @@ class LocalFilesystem(Filesystem):
                 yield path
 
     def _cat_file(self, filename):
-        return read_file(filename)
+        with open(filename, 'rb') as f:
+            for chunk in decompress(f, filename):
+                yield chunk
 
     def mkdir(self, path):
         if not os.path.isdir(path):

@@ -64,6 +64,33 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         return self.makefile(
             os.path.join(get_mock_hdfs_root(self.env), name), contents)
 
+    def test_cat_uncompressed(self):
+        self.make_mock_file('data/foo', 'foo\nfoo\n')
+
+        remote_path = self.fs.join('hdfs:///data', 'foo')
+
+        self.assertEqual(
+            b''.join(self.fs._cat_file(remote_path)),
+            b'foo\nfoo\n')
+
+    def test_cat_bz2(self):
+        self.make_mock_file('data/foo.bz2', bz2.compress(b'foo\n' * 1000))
+
+        remote_path = self.fs.join('hdfs:///data', 'foo.bz2')
+
+        self.assertEqual(
+            b''.join(self.fs._cat_file(remote_path)),
+            b'foo\n' * 1000)
+
+    def test_cat_gz(self):
+        self.make_mock_file('data/foo.gz', gzip_compress(b'foo\n' * 10000))
+
+        remote_path = self.fs.join('hdfs:///data', 'foo.gz')
+
+        self.assertEqual(
+            b''.join(self.fs._cat_file(remote_path)),
+            b'foo\n' * 10000)
+
     def test_ls_empty(self):
         self.assertEqual(list(self.fs.ls('hdfs:///')), [])
 
@@ -99,30 +126,6 @@ class HadoopFSTestCase(MockSubprocessTestCase):
         self.make_mock_file('foo  bar')
         self.assertEqual(sorted(self.fs.ls('hdfs:///')),
                          ['hdfs:///foo  bar'])
-
-    def test_cat_uncompressed(self):
-        self.make_mock_file('data/foo', 'foo\nfoo\n')
-
-        remote_path = self.fs.join('hdfs:///data', 'foo')
-
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n', b'foo\n'])
-
-    def test_cat_bz2(self):
-        self.make_mock_file('data/foo.bz2', bz2.compress(b'foo\n' * 1000))
-
-        remote_path = self.fs.join('hdfs:///data', 'foo.bz2')
-
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n'] * 1000)
-
-    def test_cat_gz(self):
-        self.make_mock_file('data/foo.gz', gzip_compress(b'foo\n' * 10000))
-
-        remote_path = self.fs.join('hdfs:///data', 'foo.gz')
-
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n'] * 10000)
 
     def test_du(self):
         self.make_mock_file('data1', 'abcd')

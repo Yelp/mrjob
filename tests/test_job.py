@@ -124,13 +124,46 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
 
 class ParseOutputTestCase(TestCase):
 
-    def test_json(self):
+    def test_default_protocol(self):
         job = MRJob()
 
         data = iter([b'1\t2', b'\n{"3": ', '4}\t"fi', b've"\n'])
         self.assertEqual(
             list(job.parse_output(data)),
             [(1, 2), ({'3': 4}, 'five')])
+
+    def test_raw_value_protocol(self):
+        job = MRJob()
+        job.OUTPUT_PROTOCOL = RawValueProtocol
+
+        data = iter([b'one\nt', b'wo\nthree\n', b'four\nfive\n'])
+        self.assertEqual(
+            list(job.parse_output(data)),
+            [(None, b'one\n'),
+             (None, b'two\n'),
+             (None, b'three\n'),
+             (None, b'four\n'),
+             (None, b'five\n')])
+
+
+class ParseOutputLine(TestCase):
+
+    def test_default_protocol(self):
+        job = MRJob()
+
+        self.assertEqual(
+            job.parse_output_line(b'1\t2\n'),
+            (1, 2))
+
+    def test_raw_value_protocol(self):
+        job = MRJob()
+        job.OUTPUT_PROTOCOL = RawValueProtocol
+
+        self.assertEqual(
+            job.parse_output_line(b'one two\n'),
+            (None, b'one two\n'))
+
+
 
 
 class NoTzsetTestCase(TestCase):

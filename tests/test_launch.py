@@ -94,7 +94,7 @@ class RunJobTestCase(TestCase):
         launcher.sandbox()
 
         launcher.mock_runner = Mock()
-        launcher.mock_runner.stream_output.return_value = [b'a line\n']
+        launcher.mock_runner.cat_output.return_value = [b'a line\n']
 
         launcher.make_runner = MagicMock()  # include __enter__
         launcher.make_runner.return_value.__enter__.return_value = (
@@ -345,8 +345,7 @@ class TestPassThroughRunner(TestCase):
         with job.make_runner() as runner:
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = job.parse_output_line(line)
+            for _, value in job.parse_output(runner.cat_output()):
                 return value
 
     def test_no_pass_through(self):

@@ -932,11 +932,7 @@ class MRJob(MRJobLauncher):
     def parse_output_line(self, line):
         """
         Parse a line from the final output of this MRJob into
-        ``(key, value)``. Used extensively in tests like this::
-
-            runner.run()
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
+        ``(key, value)``.
 
         .. deprecated:: 0.6.0
 

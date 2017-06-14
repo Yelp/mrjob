@@ -235,8 +235,8 @@ class MRJobLauncher(object):
                 sys.exit(1)
 
             if not self.options.no_output:
-                for line in runner.stream_output():
-                    self.stdout.write(line)
+                for chunk in runner.cat_output():
+                    self.stdout.write(chunk)
                 self.stdout.flush()
 
     ### Command-line arguments ###

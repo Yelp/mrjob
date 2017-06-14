@@ -21,5 +21,4 @@ def run_job(job, raw_input=b''):
 
     with job.make_runner() as runner:
         runner.run()
-        return dict(job.parse_output_line(line)
-                    for line in runner.stream_output())
+        return dict(job.parse_output(runner.cat_output()))

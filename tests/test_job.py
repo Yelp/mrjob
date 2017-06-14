@@ -146,7 +146,12 @@ class ParseOutputTestCase(TestCase):
              (None, b'five\n')])
 
 
-class ParseOutputLine(TestCase):
+class ParseOutputLine(SandboxedTestCase):
+
+    def setUp(self):
+        super(ParseOutputLine, self).setUp()
+
+        self.log = self.start(patch('mrjob.job.log'))
 
     def test_default_protocol(self):
         job = MRJob()
@@ -163,7 +168,15 @@ class ParseOutputLine(TestCase):
             job.parse_output_line(b'one two\n'),
             (None, b'one two\n'))
 
+    def test_deprecation_warning(self):
+        job = MRJob()
 
+        job.parse_output_line(b'1\t2\n')
+        self.assertEqual(self.log.warning.call_count, 1)
+
+        # only warn once
+        job.parse_output_line(b'3\t4\n')
+        self.assertEqual(self.log.warning.call_count, 1)
 
 
 class NoTzsetTestCase(TestCase):

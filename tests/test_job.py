@@ -114,12 +114,11 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
         results = []
         with mr_job.make_runner() as runner:
             runner.run()
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append(value)
+            results.extend(mr_job.parse_output(runner.cat_output()))
+
         # these numbers should match if mapper_init, reducer_init, and
         # combiner_init were called as expected
-        self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
+        self.assertEqual(results[0][1], num_inputs * 10 * 10 * 2)
 
 
 class ParseOutputTestCase(TestCase):
@@ -396,7 +395,7 @@ class ProtocolErrorsTestCase(EmptyMrjobConfTestCase):
             r.run()
 
             # good data should still get through
-            self.assertEqual(b''.join(r.stream_output()), b'"foo"\t["bar"]\n')
+            self.assertEqual(b''.join(r.cat_output()), b'"foo"\t["bar"]\n')
 
             # exception type varies between JSON implementations,
             # so just make sure there were three exceptions of some sort
@@ -420,7 +419,7 @@ class ProtocolErrorsTestCase(EmptyMrjobConfTestCase):
             r.run()
 
             # good data should still get through
-            self.assertEqual(b''.join(r.stream_output()),
+            self.assertEqual(b''.join(r.cat_output()),
                              b'null\t["bar", "foo"]\n')
 
             counters = r.counters()[0]
@@ -921,8 +920,7 @@ class FileOptionsTestCase(SandboxedTestCase):
 
                 runner.run()
                 output = set()
-                for line in runner.stream_output():
-                    _, value = mr_job.parse_output_line(line)
+                for _, value in mr_job.parse_output(runner.cat_output()):
                     output.add(value)
 
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))

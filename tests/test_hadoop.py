@@ -645,9 +645,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
             # make sure cleanup hasn't happened yet

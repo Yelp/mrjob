@@ -213,9 +213,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
             # make sure cleanup hasn't happened yet
@@ -324,7 +322,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
             # this is set and unset before we can get at it unless we do this
             log_bucket, _ = parse_s3_uri(runner._s3_log_dir())
 
-            list(runner.stream_output())
+            list(runner.cat_output())
 
         bucket = runner.fs.get_bucket(tmp_bucket)
         self.assertEqual(len(list(bucket.objects.all())), tmp_len)
@@ -393,9 +391,7 @@ class ExistingClusterTestCase(MockBoto3TestCase):
             # attaching to another cluster
             self.assertIsNone(runner._master_bootstrap_script_path)
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
         self.assertEqual(sorted(results),
                          [(1, 'bar'), (1, 'foo'), (2, None)])
@@ -1741,9 +1737,7 @@ class EMRNoMapperTestCase(MockBoto3TestCase):
         with mr_job.make_runner() as runner:
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
         self.assertEqual(sorted(results),
                          [(1, ['blue', 'one', 'red', 'two']),

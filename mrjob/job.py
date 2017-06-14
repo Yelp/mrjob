@@ -87,6 +87,8 @@ class MRJob(MRJobLauncher):
         """
         super(MRJob, self).__init__(self.mr_job_script(), args)
 
+        self._warned_about_parse_output_line = False
+
     @classmethod
     def _usage(cls):
         return "usage: %prog [options] [input files]"
@@ -940,6 +942,11 @@ class MRJob(MRJobLauncher):
 
            Use :py:meth:`parse_output` instead.
         """
+        if not self._warned_about_parse_output_line:
+            log.warning('parse_output_line() is deprecated and will be removed'
+                        ' in v0.7.0; use parse_output() instead.')
+            self._warned_about_parse_output_line = True
+
         return self.output_protocol().read(line)
 
     ### Hadoop Input/Output Formats ###

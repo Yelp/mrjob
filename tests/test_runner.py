@@ -286,15 +286,16 @@ class TestCatOutput(SandboxedTestCase):
                          [b'A', b'B', b'C'])
 
     def test_deprecated_stream_output(self):
-        self.makefile('part-00000', contents=b'one\ntwo')
-        self.makefile('part-00001', contents=b'three\nfour')
+        self.makefile('part-00000', contents=b'1\n2')
+        self.makefile('part-00001', contents=b'3\n4\n')
 
         runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
 
         log = self.start(patch('mrjob.runner.log'))
 
-        self.assertEqual(list(runner.stream_output()),
-                         [b'one\n', b'two', b'three\n', b'four'])
+        # should group output into lines, but not join across files
+        self.assertEqual(sorted(runner.stream_output()),
+                         [b'1\n', b'2', b'3\n', b'4\n'])
 
         # should issue deprecation warning
         self.assertEqual(log.warning.call_count, 1)

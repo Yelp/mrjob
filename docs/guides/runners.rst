@@ -131,23 +131,33 @@ This pattern can also be used to write integration tests (see :doc:`testing`).
 
 ::
 
-    mr_job = MRWordCounter(args=['-r', 'emr'])
-    with mr_job.make_runner() as runner:
+   mr_job = MRWordCounter(args=['-r', 'emr'])
+   with mr_job.make_runner() as runner:
         runner.run()
+        for key, value in mr_job.parse_output(runner.cat_output()):
+            ... # do something with the parsed output
+
+You instantiate the :py:class:`~mrjob.job.MRJob`, use a context manager to
+create the runner, run the job, and cat its output, parsing that output with
+the job's output protocol.
+
+:py:meth:`~mrjob.job.MRJob.parse_output` and :py:meth:`~mrjob.job.MRJob.cat_output` were introduced in version 0.6.0. In previous versions of mrjob, you'd iterate line by line instead, like this:
+
+.. code-block:: python
+
+    ...
         for line in runner.stream_output():
             key, value = mr_job.parse_output_line(line)
             ... # do something with the parsed output
 
-You instantiate the :py:class:`~mrjob.job.MRJob`, use a context manager to
-create the runner, run the job, iterate over the output lines, and use the job
-instance to parse each line with its output protocol.
-
 Further reference:
 
 * :py:meth:`~mrjob.job.MRJob.make_runner`
+* :py:meth:`~mrjob.runner.MRJobRunner.run`
+* :py:meth:`~mrjob.job.MRJob.parse_output`
+* :py:meth:`~mrjob.runner.MRJobRunner.cat_output`
 * :py:meth:`~mrjob.job.MRJob.parse_output_line`
 * :py:meth:`~mrjob.runner.MRJobRunner.stream_output`
-* :py:meth:`~mrjob.runner.MRJobRunner.run`
 
 Limitations
 ^^^^^^^^^^^

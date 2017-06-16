@@ -249,21 +249,7 @@ class CreateMrjobZipTestCase(SandboxedTestCase):
                                    quiet=1))
 
 
-class TestStreamingOutput(TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        # use a leading underscore to test behavior of underscore-ignoring
-        # code that shouldn't ignore the entire output_dir
-        self.tmp_dir = tempfile.mkdtemp(prefix='_streamingtest')
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+class TestCatOutput(SandboxedTestCase):
 
     # Test regression for #269
     def test_cat_output(self):
@@ -299,6 +285,19 @@ class TestStreamingOutput(TestCase):
         self.assertEqual(sorted(to_lines(runner.cat_output())),
                          [b'A', b'B', b'C'])
 
+    def test_deprecated_stream_output(self):
+        self.makefile('part-00000', contents=b'one\ntwo')
+        self.makefile('part-00001', contents=b'three\nfour')
+
+        runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
+
+        log = self.start(patch('mrjob.runner.log'))
+
+        self.assertEqual(list(runner.stream_output()),
+                         [b'one\n', b'two', b'three\n', b'four'])
+
+        # should issue deprecation warning
+        self.assertEqual(log.warning.call_count, 1)
 
 class TestInvokeSort(TestCase):
 

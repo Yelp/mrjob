@@ -488,9 +488,9 @@ class MRJobRunner(object):
 
         .. deprecated:: 0.6.0
         """
-        log.warn('stream_output() is deprecated and will be removed in'
-                 ' v0.7.0. use mrjob.util.to_lines(runner.cat_output())'
-                 ' instead.')
+        log.warning('stream_output() is deprecated and will be removed in'
+                    ' v0.7.0. use mrjob.util.to_lines(runner.cat_output())'
+                    ' instead.')
 
         return to_lines(self.cat_output())
 

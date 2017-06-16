@@ -160,9 +160,9 @@ class ParseOutputLine(SandboxedTestCase):
             job.parse_output_line(b'1\t2\n'),
             (1, 2))
 
-    def test_raw_value_protocol(self):
+    def test_bytes_value_protocol(self):
         job = MRJob()
-        job.OUTPUT_PROTOCOL = RawValueProtocol
+        job.OUTPUT_PROTOCOL = BytesValueProtocol
 
         self.assertEqual(
             job.parse_output_line(b'one two\n'),

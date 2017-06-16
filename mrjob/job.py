@@ -40,6 +40,7 @@ from mrjob.step import SparkStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import expand_path
 from mrjob.util import read_input
+from mrjob.util import to_lines
 
 
 log = logging.getLogger(__name__)
@@ -85,6 +86,8 @@ class MRJob(MRJobLauncher):
         ``python -m mrjob.job --help``
         """
         super(MRJob, self).__init__(self.mr_job_script(), args)
+
+        self._warned_about_parse_output_line = False
 
     @classmethod
     def _usage(cls):
@@ -917,15 +920,29 @@ class MRJob(MRJobLauncher):
     #: See :py:data:`mrjob.protocol` for the full list of protocols.
     OUTPUT_PROTOCOL = JSONProtocol
 
+    def parse_output(self, chunks):
+        """Parse the final output of this MRJob (as a stream of byte chunks)
+        into a stream of ``(key, value)``.
+        """
+        read = self.output_protocol().read
+
+        for line in to_lines(chunks):
+            yield read(line)
+
     def parse_output_line(self, line):
         """
         Parse a line from the final output of this MRJob into
-        ``(key, value)``. Used extensively in tests like this::
+        ``(key, value)``.
 
-            runner.run()
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
+        .. deprecated:: 0.6.0
+
+           Use :py:meth:`parse_output` instead.
         """
+        if not self._warned_about_parse_output_line:
+            log.warning('parse_output_line() is deprecated and will be removed'
+                        ' in v0.7.0; use parse_output() instead.')
+            self._warned_about_parse_output_line = True
+
         return self.output_protocol().read(line)
 
     ### Hadoop Input/Output Formats ###

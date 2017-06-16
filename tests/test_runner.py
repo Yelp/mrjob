@@ -46,6 +46,7 @@ from mrjob.step import INPUT
 from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
+from mrjob.util import to_lines
 
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mr_cmd_job import MRCmdJob
@@ -248,24 +249,10 @@ class CreateMrjobZipTestCase(SandboxedTestCase):
                                    quiet=1))
 
 
-class TestStreamingOutput(TestCase):
-
-    def setUp(self):
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        # use a leading underscore to test behavior of underscore-ignoring
-        # code that shouldn't ignore the entire output_dir
-        self.tmp_dir = tempfile.mkdtemp(prefix='_streamingtest')
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+class TestCatOutput(SandboxedTestCase):
 
     # Test regression for #269
-    def test_stream_output(self):
+    def test_cat_output(self):
         a_dir_path = os.path.join(self.tmp_dir, 'a')
         b_dir_path = os.path.join(self.tmp_dir, 'b')
         l_dir_path = os.path.join(self.tmp_dir, '_logs')
@@ -295,9 +282,23 @@ class TestStreamingOutput(TestCase):
             f.write('I win')
 
         runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
-        self.assertEqual(sorted(runner.stream_output()),
+        self.assertEqual(sorted(to_lines(runner.cat_output())),
                          [b'A', b'B', b'C'])
 
+    def test_deprecated_stream_output(self):
+        self.makefile('part-00000', contents=b'1\n2')
+        self.makefile('part-00001', contents=b'3\n4\n')
+
+        runner = InlineMRJobRunner(conf_paths=[], output_dir=self.tmp_dir)
+
+        log = self.start(patch('mrjob.runner.log'))
+
+        # should group output into lines, but not join across files
+        self.assertEqual(sorted(runner.stream_output()),
+                         [b'1\n', b'2', b'3\n', b'4\n'])
+
+        # should issue deprecation warning
+        self.assertEqual(log.warning.call_count, 1)
 
 class TestInvokeSort(TestCase):
 
@@ -1249,8 +1250,7 @@ class SetupTestCase(SandboxedTestCase):
         with job.make_runner() as r:
             r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
         self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
         self.assertEqual(path_to_size.get('./bar.sh'), self.foo_sh_size)
@@ -1266,8 +1266,7 @@ class SetupTestCase(SandboxedTestCase):
             with no_handlers_for_logger('mrjob.local'):
                 r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
         self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
                          self.foo_py_size)
@@ -1284,8 +1283,7 @@ class SetupTestCase(SandboxedTestCase):
             with no_handlers_for_logger('mrjob.local'):
                 r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
         self.assertEqual(path_to_size.get('./foo/foo.py'),
                          self.foo_py_size)
@@ -1302,8 +1300,7 @@ class SetupTestCase(SandboxedTestCase):
         with job.make_runner() as r:
             r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
         # foo.py should be there, and getsize() should be patched to return
         # double the number of bytes
@@ -1320,8 +1317,7 @@ class SetupTestCase(SandboxedTestCase):
         with job.make_runner() as r:
             r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
         # foo.py should be there, and getsize() should be patched to return
         # double the number of bytes
@@ -1338,8 +1334,7 @@ class SetupTestCase(SandboxedTestCase):
         with job.make_runner() as r:
             r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
         # foo.py should be there, and getsize() should be patched to return
         # double the number of bytes
@@ -1356,8 +1351,7 @@ class SetupTestCase(SandboxedTestCase):
         with job.make_runner() as r:
             r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
         # foo.py should be there, and getsize() should be patched to return
         # double the number of bytes
@@ -1373,8 +1367,7 @@ class SetupTestCase(SandboxedTestCase):
         with job.make_runner() as r:
             r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
         self.assertIn('./bar', path_to_size)
 
@@ -1387,8 +1380,7 @@ class SetupTestCase(SandboxedTestCase):
         with job.make_runner() as r:
             r.run()
 
-            path_to_size = dict(job.parse_output_line(line)
-                                for line in r.stream_output())
+            path_to_size = dict(job.parse_output(r.cat_output()))
 
             self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
             self.assertIn('./foo.sh-made-this', path_to_size)
@@ -1433,8 +1425,7 @@ class SetupTestCase(SandboxedTestCase):
             with job.make_runner() as r:
                 r.run()
 
-                path_to_size = dict(job.parse_output_line(line)
-                                    for line in r.stream_output())
+                path_to_size = dict(job.parse_output(r.cat_output()))
 
                 self.assertEqual(path_to_size.get('./stdin.txt'), 0)
                 # input gets passed through by identity mapper
@@ -1458,7 +1449,7 @@ class SetupTestCase(SandboxedTestCase):
             with job.make_runner() as r:
                 r.run()
 
-                output = b''.join(r.stream_output())
+                output = b''.join(r.cat_output())
 
                 # stray ouput should be in stderr, not the job's output
                 self.assertIn('stray output', stderr.getvalue())

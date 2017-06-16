@@ -68,9 +68,7 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             assert isinstance(runner, InlineMRJobRunner)
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(local_tmp_dir)
@@ -104,9 +102,7 @@ class InlineMRJobRunnerCmdenvTest(EmptyMrjobConfTestCase):
             assert isinstance(runner, InlineMRJobRunner)
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
         self.assertEqual(sorted(results),
                          [('FOO', 'bar'), ('SOMETHING', 'foofoofoo')])
@@ -182,8 +178,8 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
 
             runner.run()
 
-            output = sorted(mr_job.parse_output_line(line)[1]
-                            for line in runner.stream_output())
+            output = sorted(
+                v for k, v in mr_job.parse_output(runner.cat_output()))
 
             self.assertEqual(output, [2, 3, 4])
 
@@ -204,8 +200,8 @@ class MRJobFileOptionsTestCase(SandboxedTestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            output = sorted(mr_job.parse_output_line(line)[1]
-                            for line in runner.stream_output())
+            output = sorted(
+                v for k, v in mr_job.parse_output(runner.cat_output()))
 
             self.assertEqual(output, [2])
 
@@ -221,8 +217,8 @@ class NoMRJobConfTestCase(TestCase):
 
             with mr_job.make_runner() as runner:
                 runner.run()
-                output = sorted(mr_job.parse_output_line(line)[1]
-                                for line in runner.stream_output())
+                output = sorted(
+                    v for k, v in mr_job.parse_output(runner.cat_output()))
                 self.assertEqual(output, [2, 3, 4])
 
 
@@ -252,9 +248,7 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
             self.assertEqual(runner.counters()[0]['count']['combiners'], 3)
 
@@ -298,9 +292,7 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results[key] = value
+            results.update(dict(mr_job.parse_output(runner.cat_output())))
 
         working_dir = results['mapreduce.job.local.dir']
         self.assertEqual(working_dir,
@@ -354,8 +346,7 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
+            for key, value in mr_job.parse_output(runner.cat_output()):
                 results[tuple(key)] = value
 
         # user.defined gets re-defined in the second step
@@ -393,12 +384,10 @@ class InlineMRJobRunnerNoMapperTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             runner.run()
 
-            results = [mr_job.parse_output_line(line)
-                       for line in runner.stream_output()]
-
-            self.assertEqual(sorted(results),
-                             [(1, ['blue', 'one', 'red', 'two']),
-                              (4, ['fish'])])
+            self.assertEqual(
+                sorted(mr_job.parse_output(runner.cat_output())),
+                [(1, ['blue', 'one', 'red', 'two']),
+                 (4, ['fish'])])
 
 
 class InlineMRJobRunnerFSTestCase(SandboxedTestCase):

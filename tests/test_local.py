@@ -30,6 +30,7 @@ from mrjob.local import LocalMRJobRunner
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import read_file
+from mrjob.util import to_lines
 
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
@@ -91,9 +92,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             assert isinstance(runner, LocalMRJobRunner)
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(local_tmp_dir)
@@ -131,9 +130,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             assert isinstance(runner, LocalMRJobRunner)
             runner.run()
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(local_tmp_dir)
@@ -391,7 +388,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
         with mr_job.make_runner() as runner:
             assert isinstance(runner, LocalMRJobRunner)
             runner.run()
-            output = b''.join(runner.stream_output())
+            output = b''.join(runner.cat_output())
 
         # the output should basically be the command we used to
         # run the last step, which in this case is a mapper
@@ -487,7 +484,7 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
                 runner.run()
 
-                output = list(runner.stream_output())
+                output = list(to_lines(runner.cat_output()))
                 self.assertEqual(len(output), 1)
 
                 # script should load mrjob from its working dir
@@ -516,7 +513,7 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
                 # however, if mrjob is installed, we need to verify that
                 # we're using the installed version and not a bootstrapped copy
-                output = list(runner.stream_output())
+                output = list(runner.cat_output())
 
                 self.assertEqual(len(output), 1)
 
@@ -593,7 +590,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
                         'command': 'cat'}}])
 
             r.run()
-            lines = [line.strip() for line in list(r.stream_output())]
+            lines = [line.strip() for line in to_lines(r.cat_output())]
             self.assertEqual(sorted(lines), sorted(data.split()))
 
     def test_uniq_combiner(self):
@@ -617,7 +614,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
             # there are 2 map tasks, each of which has 1 combiner, and all rows
             # are the same, so we should end up with just 2 values
 
-            self.assertEqual(b''.join(r.stream_output()), b'x\nx\n')
+            self.assertEqual(b''.join(r.cat_output()), b'x\nx\n')
 
     def test_cat_reducer(self):
         data = b'x\ny\nz\n'
@@ -637,7 +634,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             r.run()
 
-            lines = list(r.stream_output())
+            lines = list(to_lines(r.cat_output()))
             self.assertEqual(sorted(lines), [b'x$\n', b'y$\n', b'z$\n'])
 
     def test_multiple(self):
@@ -662,7 +659,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             r.run()
 
-            self.assertEqual(list(r.stream_output()), [b'2'])
+            self.assertEqual(list(r.cat_output()), [b'2'])
 
     def test_multiple_2(self):
         data = b'x\ny\nz\n'
@@ -671,7 +668,7 @@ class CommandSubstepTestCase(SandboxedTestCase):
         job.sandbox(stdin=BytesIO(data))
         with job.make_runner() as r:
             r.run()
-            self.assertEqual(sum(int(l) for l in r.stream_output()), 3)
+            self.assertEqual(sum(int(l) for l in to_lines(r.cat_output())), 3)
 
 
 class FilterTestCase(SandboxedTestCase):
@@ -691,7 +688,7 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
 
-            lines = [line.strip() for line in list(r.stream_output())]
+            lines = [line.strip() for line in to_lines(r.cat_output())]
             self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
     def test_combiner_pre_filter(self):
@@ -712,7 +709,7 @@ class FilterTestCase(SandboxedTestCase):
                     }}])
 
             r.run()
-            lines = [line.strip() for line in list(r.stream_output())]
+            lines = [line.strip() for line in to_lines(r.cat_output())]
             self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
     def test_reducer_pre_filter(self):
@@ -733,7 +730,7 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
 
-            lines = [line.strip() for line in list(r.stream_output())]
+            lines = [line.strip() for line in to_lines(r.cat_output())]
             self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
     def test_pre_filter_failure(self):
@@ -754,7 +751,7 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
 
-            lines = [line.strip() for line in list(r.stream_output())]
+            lines = [line.strip() for line in to_lines(r.cat_output())]
             self.assertEqual(sorted(lines), [])
 
     def test_pre_filter_on_compressed_data(self):
@@ -777,7 +774,7 @@ class FilterTestCase(SandboxedTestCase):
 
             r.run()
 
-            lines = [line.strip() for line in list(r.stream_output())]
+            lines = [line.strip() for line in to_lines(r.cat_output())]
             self.assertEqual(sorted(lines), [b'x$', b'y$', b'z$'])
 
 

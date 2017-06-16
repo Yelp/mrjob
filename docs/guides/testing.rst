@@ -251,26 +251,27 @@ To run the job without leaving temp files on your system, use the
 command line arguments and ensures that job cleanup is performed regardless of
 the success or failure of the job.
 
-Run the job with :py:meth:`~mrjob.runner.MRJobRunner.run()`. The output lines
-are available as a generator through
-:py:meth:`~mrjob.runner.MRJobRunner.stream_output()` and can be interpreted
-through the job's output protocol with
-:py:meth:`~mrjob.job.MRJob.parse_output_line()`. You may choose to collect
-these lines in a list and check the contents of the list.
+Run the job with :py:meth:`~mrjob.runner.MRJobRunner.run()`. The job's output
+is available as a generator through
+:py:meth:`~mrjob.runner.MRJobRunner.cat_output()` and can be parsed with
+the job's output protocol using :py:meth:`~mrjob.job.MRJob.parse_output`::
+
+   results = []
+   with mr_job.make_runner() as runner:
+       runner.run()
+       for key, value in mrjob.parse_output(runner.cat_output()):
+           results.append(value)
+
+       # these numbers should match if mapper_init, reducer_init, and
+       # combiner_init were called as expected
+       self.assertEqual(sorted(results)[0], num_inputs * 10 * 10 * 2)
+
 
 .. warning:: Do not let your tests depend on the input lines being processed in
-    a certain order. Both mrjob and Hadoop divide input non-deterministically.
+             a certain order. Both mrjob and Hadoop divide input
+             non-deterministically.
 
-::
+.. note::
 
-            results = []
-            with mr_job.make_runner() as runner:
-                runner.run()
-                for line in runner.stream_output():
-                    # Use the job's specified protocol to read the output
-                    key, value = mr_job.parse_output_line(line)
-                    results.append(value)
-
-            # these numbers should match if mapper_init, reducer_init, and
-            # combiner_init were called as expected
-            self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
+   In mrjob versions prior to 0.6.0, you have to parse output line by line;
+   see :ref:`runners-programmatically` for an example.

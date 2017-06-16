@@ -436,10 +436,15 @@ class MRJobRunner(object):
         self._run()
         self._ran_job = True
 
-    def stream_output(self):
-        """Stream raw lines from the job's output. You can parse these
-        using the read() method of the appropriate HadoopStreamingProtocol
-        class."""
+    def cat_output(self):
+        """Stream the jobs output, as a stream of ``bytes``. If there are
+        multiple output files, there will be an empty bytestring
+        (``b''``) between them.
+
+        .. versionadded:: 0.6.0
+
+           In previous versions, you'd use :py:meth:`stream_output`.
+        """
         output_dir = self.get_output_dir()
         if output_dir is None:
             raise AssertionError('Run the job before streaming output')
@@ -463,11 +468,31 @@ class MRJobRunner(object):
 
                 path = base
 
-        for filename in self.fs.ls(output_dir):
-            subpath = filename[len(output_dir):]
-            if not any(name.startswith('_') for name in split_path(subpath)):
-                for line in to_lines(self.fs._cat_file(filename)):
-                    yield line
+        def ls_output():
+            for filename in self.fs.ls(output_dir):
+                subpath = filename[len(output_dir):]
+                if not (any(name.startswith('_')
+                            for name in split_path(subpath))):
+                    yield filename
+
+        for i, filename in enumerate(ls_output()):
+            if i > 0:
+                yield b''  # EOF of previous file
+
+            for chunk in self.fs._cat_file(filename):
+                yield chunk
+
+    def stream_output(self):
+        """Like :py:meth:`cat_output` except that it groups bytes into
+        lines. Equivalent to ``mrjob.util.to_lines(runner.stream_output())``.
+
+        .. deprecated:: 0.6.0
+        """
+        log.warning('stream_output() is deprecated and will be removed in'
+                    ' v0.7.0. use mrjob.util.to_lines(runner.cat_output())'
+                    ' instead.')
+
+        return to_lines(self.cat_output())
 
     def _cleanup_mode(self, mode=None):
         """Actual cleanup action to take based on various options"""

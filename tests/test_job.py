@@ -28,6 +28,7 @@ from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
+from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
@@ -114,12 +115,68 @@ class MRInitTestCase(EmptyMrjobConfTestCase):
         results = []
         with mr_job.make_runner() as runner:
             runner.run()
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append(value)
+            results.extend(mr_job.parse_output(runner.cat_output()))
+
         # these numbers should match if mapper_init, reducer_init, and
         # combiner_init were called as expected
-        self.assertEqual(results[0], num_inputs * 10 * 10 * 2)
+        self.assertEqual(results[0][1], num_inputs * 10 * 10 * 2)
+
+
+class ParseOutputTestCase(TestCase):
+
+    def test_default_protocol(self):
+        job = MRJob()
+
+        data = iter([b'1\t2', b'\n{"3": ', b'4}\t"fi', b've"\n'])
+        self.assertEqual(
+            list(job.parse_output(data)),
+            [(1, 2), ({'3': 4}, 'five')])
+
+    def test_bytes_value_protocol(self):
+        job = MRJob()
+        job.OUTPUT_PROTOCOL = BytesValueProtocol
+
+        data = iter([b'one\nt', b'wo\nthree\n', b'four\nfive\n'])
+        self.assertEqual(
+            list(job.parse_output(data)),
+            [(None, b'one\n'),
+             (None, b'two\n'),
+             (None, b'three\n'),
+             (None, b'four\n'),
+             (None, b'five\n')])
+
+
+class ParseOutputLine(SandboxedTestCase):
+
+    def setUp(self):
+        super(ParseOutputLine, self).setUp()
+
+        self.log = self.start(patch('mrjob.job.log'))
+
+    def test_default_protocol(self):
+        job = MRJob()
+
+        self.assertEqual(
+            job.parse_output_line(b'1\t2\n'),
+            (1, 2))
+
+    def test_bytes_value_protocol(self):
+        job = MRJob()
+        job.OUTPUT_PROTOCOL = BytesValueProtocol
+
+        self.assertEqual(
+            job.parse_output_line(b'one two\n'),
+            (None, b'one two\n'))
+
+    def test_deprecation_warning(self):
+        job = MRJob()
+
+        job.parse_output_line(b'1\t2\n')
+        self.assertEqual(self.log.warning.call_count, 1)
+
+        # only warn once
+        job.parse_output_line(b'3\t4\n')
+        self.assertEqual(self.log.warning.call_count, 1)
 
 
 class NoTzsetTestCase(TestCase):
@@ -339,7 +396,7 @@ class ProtocolErrorsTestCase(EmptyMrjobConfTestCase):
             r.run()
 
             # good data should still get through
-            self.assertEqual(b''.join(r.stream_output()), b'"foo"\t["bar"]\n')
+            self.assertEqual(b''.join(r.cat_output()), b'"foo"\t["bar"]\n')
 
             # exception type varies between JSON implementations,
             # so just make sure there were three exceptions of some sort
@@ -363,7 +420,7 @@ class ProtocolErrorsTestCase(EmptyMrjobConfTestCase):
             r.run()
 
             # good data should still get through
-            self.assertEqual(b''.join(r.stream_output()),
+            self.assertEqual(b''.join(r.cat_output()),
                              b'null\t["bar", "foo"]\n')
 
             counters = r.counters()[0]
@@ -864,8 +921,7 @@ class FileOptionsTestCase(SandboxedTestCase):
 
                 runner.run()
                 output = set()
-                for line in runner.stream_output():
-                    _, value = mr_job.parse_output_line(line)
+                for _, value in mr_job.parse_output(runner.cat_output()):
                     output.add(value)
 
         self.assertEqual(set(output), set([0, 1, ((2 ** 3) ** 3) ** 3]))

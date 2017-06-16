@@ -124,9 +124,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             # setup fake output
             self.put_job_output_parts(runner, fake_gcs_output)
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
             # make sure cleanup hasn't happened yet
@@ -224,7 +222,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             runner.run()
 
             # this is set and unset before we can get at it unless we do this
-            list(runner.stream_output())
+            list(runner.cat_output())
 
         objects_in_bucket = self._gcs_fs.api_client._cache_objects[tmp_bucket]
         self.assertEqual(len(objects_in_bucket), tmp_len)
@@ -285,9 +283,7 @@ class ExistingClusterTestCase(MockGoogleAPITestCase):
             # attaching to another cluster
             self.assertIsNone(runner._master_bootstrap_script_path)
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
         self.assertEqual(sorted(results),
                          [(1, 'bar'), (1, 'foo'), (2, None)])
@@ -840,9 +836,7 @@ class DataprocNoMapperTestCase(MockGoogleAPITestCase):
                 b'1\t["blue", "one", "red", "two"]\n',
                 b'4\t["fish"]\n'])
 
-            for line in runner.stream_output():
-                key, value = mr_job.parse_output_line(line)
-                results.append((key, value))
+            results.extend(mr_job.parse_output(runner.cat_output()))
 
         self.assertEqual(sorted(results),
                          [(1, ['blue', 'one', 'red', 'two']),

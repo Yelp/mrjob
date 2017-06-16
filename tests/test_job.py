@@ -28,6 +28,7 @@ from mrjob.job import MRJob
 from mrjob.job import UsageError
 from mrjob.job import _im_func
 from mrjob.parse import parse_mr_job_stderr
+from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import JSONValueProtocol
 from mrjob.protocol import PickleProtocol
@@ -126,14 +127,14 @@ class ParseOutputTestCase(TestCase):
     def test_default_protocol(self):
         job = MRJob()
 
-        data = iter([b'1\t2', b'\n{"3": ', '4}\t"fi', b've"\n'])
+        data = iter([b'1\t2', b'\n{"3": ', b'4}\t"fi', b've"\n'])
         self.assertEqual(
             list(job.parse_output(data)),
             [(1, 2), ({'3': 4}, 'five')])
 
-    def test_raw_value_protocol(self):
+    def test_bytes_value_protocol(self):
         job = MRJob()
-        job.OUTPUT_PROTOCOL = RawValueProtocol
+        job.OUTPUT_PROTOCOL = BytesValueProtocol
 
         data = iter([b'one\nt', b'wo\nthree\n', b'four\nfive\n'])
         self.assertEqual(

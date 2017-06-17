@@ -129,7 +129,7 @@ class InlineMRJobRunner(SimMRJobRunner):
             child_args = (
                 ['--reducer'] + [input_path] + common_args)
         elif step_type == 'combiner':
-            child_args = ['--combiner'] + common_args + ['-']
+            child_args = ['--combiner'] + common_args
 
         has_combiner = (step_type == 'mapper' and 'combiner' in step)
 

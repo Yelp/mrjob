@@ -28,7 +28,6 @@ from mrjob.py2 import to_unicode
 from mrjob.parse import is_uri
 from mrjob.parse import urlparse
 from mrjob.util import cmd_line
-from mrjob.util import read_file
 from mrjob.util import unique
 from mrjob.util import which
 

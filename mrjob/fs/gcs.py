@@ -17,11 +17,9 @@ import logging
 import mimetypes
 
 from mrjob.cat import decompress
-from mrjob.cat import to_chunks
 from mrjob.fs.base import Filesystem
 from mrjob.parse import urlparse
 from mrjob.runner import GLOB_RE
-from mrjob.util import read_file
 
 try:
     from oauth2client.client import GoogleCredentials

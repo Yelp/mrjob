@@ -93,7 +93,7 @@ def decompress(readable, path, bufsize=1024):
             raise Exception('bz2 module was not successfully imported'
                             ' (likely not installed).')
 
-         return bunzip2_stream(readable)
+        return bunzip2_stream(readable)
     elif hasattr(readable, '__iter__'):
         return readable
     else:
@@ -114,7 +114,7 @@ def open_input(path):
             raise Exception('bz2 module was not successfully imported'
                             ' (likely not installed).')
 
-        return bzip2.BZ2File(path, 'rb')
+        return bz2.BZ2File(path, 'rb')
     else:
         return open(path, 'rb')
 

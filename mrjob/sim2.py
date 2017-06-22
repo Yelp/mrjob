@@ -15,10 +15,13 @@
 import itertools
 import logging
 import os
+import platform
 import shutil
 import stat
 from multiprocessing import cpu_count
 from os.path import join
+from subprocess import CalledProcessError
+from subprocess import check_call
 
 from mrjob.cat import is_compressed
 from mrjob.cat import open_input
@@ -26,10 +29,15 @@ from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.runner import RunnerOptionStore
+from mrjob.util import cmd_line
 from mrjob.util import unarchive
 
 
 log = logging.getLogger(__name__)
+
+
+
+
 
 
 class Sim2RunnerOptionStore(RunnerOptionStore):
@@ -43,6 +51,9 @@ class Sim2RunnerOptionStore(RunnerOptionStore):
         super(Sim2RunnerOptionStore, self).__init__(**kwargs)
 
         self._counters = []
+
+        # should we fall back to sorting in memory?
+        self._bad_sort_bin = False
 
     # re-implement these in your subclass
 
@@ -287,6 +298,90 @@ class Sim2RunnerOptionStore(RunnerOptionStore):
 
     def _sorted_reducer_input_path(self, step_num):
         return join(self._step_dir_path(step_num), 'reducer', 'sorted-input')
+
+    def _sort_input(self, input_paths, output_path):
+        """Sort lines from one or more input paths into a new file
+        at *output_path*.
+
+        This uses a unix sort binary, windows sort binary, or Python
+        as appropriate.
+        """
+        if not input_paths:
+            raise ValueError('Must specify at least one input path.')
+
+        if not (self._bad_sort_bin or platform.system() == 'Windows'):
+            env = os.environ.copy()
+
+            # ignore locale when sorting
+            env['LC_ALL'] = 'C'
+
+            # Make sure that the tmp dir environment variables are changed if
+            # the default is changed.
+            env['TMP'] = self._opts['local_tmp_dir']
+            env['TMPDIR'] = self._opts['local_tmp_dir']
+
+            err_path = os.path.join(self._get_local_tmp_dir(), 'sort-stderr')
+
+            with open(output_path, 'wb') as output:
+                with open(err_path, 'wb') as err:
+                    args = self._sort_bin() + list(input_paths)
+                    log.debug('> %s' % cmd_line(args))
+                    try:
+                        check_call(args, stdout=output, stderr=err,
+                                   env=self._sort_env())
+                        return
+                    except CalledProcessError:
+                        log.error(
+                            '`%s` failed, falling back to in-memory sort' %
+                            cmd_line(self._sort_bin()))
+                        with open(err_path) as err:
+                            for line in err:
+                                log.error('STDERR: %s' % line.rstrip('\r\n'))
+                    except OSError:
+                        log.error(
+                            'no sort binary, falling back to in-memory sort')
+
+        self._bad_sort_bin = True
+
+        # sort in memory
+        log.debug('sorting in memory: %s' % ', '.join(input_paths))
+        lines = []
+
+        for input_path in input_paths:
+            with open(input_path, 'rb') as input:
+                lines.extend(input)
+
+        if self._sort_values:
+            lines.sort()
+        else:
+            lines.sort(key=lambda line: line.split('\t')[0])
+
+        with open(output_path, 'wb') as output:
+            for line in lines:
+                output.write(line)
+
+    def _sort_bin(self):
+        """The binary to use to sort input.
+
+        (On Windows, we go straight to sorting in memory.)
+        """
+        if self._opts['sort_bin']:
+            return self._opts['sort_bin']
+        elif self._sort_values:
+            return ['sort']
+        else:
+            # only sort on the reducer key (see #660)
+            return ['sort', '-t', '\t', '-k', '1,1', '-s']
+
+
+
+
+
+
+
+
+
+
 
 
 def _chmod_u_rx(path, recursive=False):

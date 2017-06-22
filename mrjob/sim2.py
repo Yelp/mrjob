@@ -20,7 +20,8 @@ import stat
 from multiprocessing import cpu_count
 from os.path import join
 
-
+from mrjob.cat import is_compressed
+from mrjob.cat import open_input
 from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
@@ -148,12 +149,66 @@ class Sim2RunnerOptionStore(RunnerOptionStore):
         return cpu_count()
 
     def _split_mapper_input(self, input_paths, step_num):
-        # goals:
-        #
-        # make enough splits to have 2x as many splits as mappers
-        # leave compressed files alone
-        # yield "splits" referring back to original file
+        """Take one or more input paths (which may be compressed) and split
+        it to create the input files for the map tasks.
+
+        Yields "splits", which are dictionaries with the following keys:
+
+        input: path of input for one mapper
+        file: path of original file
+        start, length: chunk of original file in *input*
+
+        Uncompressed files will not be split (even ``.bz2`` files);
+        uncompressed files will be split as to to attempt to create
+        twice as many input files as there are mappers.
+        """
         input_paths = list(input_paths)
+
+        # determine split size
+        split_size = self._pick_mapper_split_size(input_paths, step_num)
+
+        # yield output fileobjs as needed
+        split_fileobj_gen = self._yield_split_fileobjs('mapper', step_num)
+
+        for path in input_paths:
+            with open_input(path) as src:
+                if is_compressed(path):
+                    # if file is compressed, uncompress it into a single split
+
+                    # Hadoop tracks the compressed file's size
+                    size = os.stat(path)[stat.ST_SIZE]
+
+                    with split_fileobj_gen.next() as dest:
+                        shutil.copyfileobj(src, dest)
+
+                        yield dict(
+                            input=dest.name,
+                            file=path,
+                            start=0,
+                            length=size)
+                else:
+                    # otherwise, split into one or more input files
+                    start = 0
+                    length = 0
+
+                    for lines in _split_records(src, split_size):
+                        with split_fileobj_gen.next() as dest:
+                            for line in lines:
+                                dest.write(line)
+                                length += len(line)
+
+                                yield dict(
+                                    input=dest.name,
+                                    file=path,
+                                    start=start,
+                                    length=length)
+
+                        start += length
+                        length = 0
+
+    def _pick_mapper_split_size(self, input_paths, step_num):
+        if not isinstance(input_paths, list):
+            raise TypeError
 
         target_num_splits = self._num_mappers(step_num) * 2
 
@@ -167,82 +222,39 @@ class Sim2RunnerOptionStore(RunnerOptionStore):
             else:
                 uncompressed_bytes += os.stat(path)[stat.ST_SIZE]
 
-        split_size = uncompressed_bytes // max(
+        return uncompressed_bytes // max(
             target_num_splits - num_compressed, 1)
 
-        task_num_gen = itertools.count()
+    def _split_reducer_input(self, path, step_num):
+        """Split a single, uncompressed file containing sorted input for the
+        reducer into input files for each reducer task.
 
-        def next_split_path(self):
-            task_num = task_num_gen.next()
+        Yield the paths of the reducer input files."""
+        size = os.stat(path)[stat.ST_SIZE]
+        split_size = size // (self._num_reducers(step_num) * 2)
+
+        # yield output fileobjs as needed
+        split_fileobj_gen = self._yield_split_fileobjs('reducer', step_num)
+
+        def reducer_key(line):
+            return line.split(b'\t')[0]
+
+        with open(path, 'rb') as src:
+            for lines in _split_records(src, split_size, reducer_key):
+                with split_fileobj_gen.next() as dest:
+                    shutil.copyfileobj(src, dest)
+                    yield dest.name
+
+    def _yield_split_fileobjs(self, task_type, step_num):
+        """Used to split input for the given mapper/reducer.
+
+        Yields writeable fileobjs for input splits (check their *name*
+        attribute to get the path)
+        """
+        for task_num in itertools.count():
             task_dir = self._task_dir_path('mapper', step_num, task_num)
             self.fs.mkdir(task_dir)
-            return join(task_dir, 'input')
-
-        for path in input_paths:
-            if self._is_compressed_file(path):
-                split_path = next_split_path()
-                size = os.stat(path)[stat.ST_SIZE]
-
-                with self._open_compressed_file(path) as src:
-                    with open(split_path, 'wb') as dest:
-                        shutil.copyfileobj(src, dest)
-
-                yield dict(
-                    path=path,
-                    split_path=split_path,
-                    start=0,
-                    length=size)
-            else:
-                start = 0
-                length = 0
-
-                for line in open(path, 'rb'):
-                    pass
-
-
-
-
-
-
-
-
-
-        # split files
-        results = []
-
-        def next_split_path():
-            mapper_task_dir = self._task_dir_path(
-                'mapper', step_num, len(results))
-            os.mkdir(mapper_task_dir)
-            return os.path.join(mapper_task_dir, 'input')
-
-        for path in input_paths:
-            if self._is_compressed_file(path):
-                pass
-
-
-
-
-
-
-
-    def _is_compressed_file(self, path):
-        return path.endswith('.bz2') or path.endswith('.gz2')
-
-    def _open_compressed_file(self, path):
-        pass # TODO
-
-    def _split_sorted_reducer_input(self, path, step_num):
-        """Split a single file containing sorted reducer input into reducer
-        input files, and return them."""
-        task_num = 0
-
-
-
-
-
-
-
+            return open(join(task_dir, 'input'), 'rb')
 
     # directory structure
 
@@ -283,20 +295,31 @@ def _chmod_u_rx(path, recursive=False):
 
 
 
-def _split_lines(line_gen, split_size, reducer_key=None):
-    pass
+def _split_records(record_gen, split_size, reducer_key=None):
+    """Given a stream of records (bytestrings, usually lines), yield groups of
+    records (as generators such that the total number of bytes in each group
+    only barely exceeds *split_size*, and, if *reducer_key* is set, consecutive
+    records with the same key will be in the same split."""
+    labeled_record_gen = _label_records_for_split(
+        record_gen, split_size, reducer_key)
 
-def _label_lines_for_split(line_gen, split_size, reducer_key=None):
+    for label, labeled_records in itertools.groupby(
+            labeled_record_gen, key=lambda lr: lr[0]):
+        yield (record for _, record in labeled_records)
+
+
+def _label_records_for_split(record_gen, split_size, reducer_key=None):
+    """Helper for _split_records()."""
     split_num = 0
     bytes_in_split = 0
 
     last_key_value = None
 
-    for line in line_gen:
+    for record in record_gen:
         same_key = False
 
         if reducer_key:
-            key_value = reducer_key(line)
+            key_value = reducer_key(record)
             same_key = (key_value == last_key_value)
             last_key_value = key_value
 
@@ -304,5 +327,5 @@ def _label_lines_for_split(line_gen, split_size, reducer_key=None):
             split_num += 1
             bytes_in_split = 0
 
-        yield split_num, line
-        bytes_in_split += len(line)
+        yield split_num, record
+        bytes_in_split += len(record)

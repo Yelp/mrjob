@@ -18,6 +18,7 @@ This module also functions as a :command:`cat` substitute that can handle
 compressed files. It it used by :py:mod:`local <mrjob.local>` mode and can
 function without the rest of the mrjob library.
 """
+import gzip
 import sys
 import zlib
 
@@ -75,24 +76,47 @@ def gunzip_stream(fileobj, bufsize=1024):
             yield data
 
 
-def decompress(fileobj, path, bufsize=1024):
-    """Take a *fileobj* correponding to the given path and returns an iterator
-    that yield chunks of bytes, or, if *path* doesn't correspond to a
-    compressed file type, *fileobj* itself.
+def decompress(readable, path, bufsize=1024):
+    """Take *readable* which support the ``.read()`` method correponding to
+    the given path and returns an iterator that yields chunks of bytes,
+    possibly decompressing based on *path*.
+
+    if *readable* appears to be a fileobj, pass it through as-is.
+
+    Unlike :py:func:`open_input`, this can deal with things that don't support
+    the full fileobj interface (e.g. :py:mod:`boto3`'s ``StreamingBody``).
     """
     if path.endswith('.gz'):
-        return gunzip_stream(fileobj)
+        return gunzip_stream(readable)
     elif path.endswith('.bz2'):
         if bz2 is None:
             raise Exception('bz2 module was not successfully imported'
                             ' (likely not installed).')
-        else:
-            return bunzip2_stream(fileobj)
-    elif hasattr(fileobj, '__iter__'):
-        return fileobj
+
+         return bunzip2_stream(readable)
+    elif hasattr(readable, '__iter__'):
+        return readable
     else:
-        # not a real fileobj (e.g. boto3 StreamingBody)
-        return to_chunks(fileobj, bufsize=bufsize)
+        # not a real readable (e.g. boto3 StreamingBody)
+        return to_chunks(readable, bufsize=bufsize)
+
+def is_compressed(path):
+    return path.endswith('.bz2') or path.endswith('.gz')
+
+
+def open_input(path):
+    """Open the given *path* and return a fileobj or, if it's a compressed
+    file, a fileobj-like object."""
+    if path.endswith('.gz'):
+        return gzip.open(path, 'rb')
+    elif path.endswith('.bz2'):
+        if bz2 is None:
+            raise Exception('bz2 module was not successfully imported'
+                            ' (likely not installed).')
+
+        return bzip2.BZ2File(path, 'rb')
+    else:
+        return open(path, 'rb')
 
 
 def to_chunks(readable, bufsize=1024):

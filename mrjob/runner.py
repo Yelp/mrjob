@@ -1202,11 +1202,11 @@ class MRJobRunner(object):
 
         return [self._stdin_path if p == '-' else p for p in self._input_paths]
 
-    def _intermediate_output_uri(self, step_num):
+    def _intermediate_output_uri(self, step_num, local=False):
         """A URI for intermediate output for the given step number."""
-        # TODO: if we enable this for local runners, use os.path.join()
-        # for them.
-        return posixpath.join(
+        join = os.path.join if local else posixpath.join
+
+        return join(
             self._step_output_dir or self._default_step_output_dir(),
             '%04d' % step_num)
 

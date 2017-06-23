@@ -673,7 +673,7 @@ def translate_jobconf_for_all_versions(variable):
         set([variable] + list(_JOBCONF_MAP.get(variable, {}).values())))
 
 
-def translate_jobconf_dict(jobconf, hadoop_version=None):
+def translate_jobconf_dict(jobconf, hadoop_version=None, warn=True):
     """Translates the configuration property name to match those that
     are accepted in hadoop_version. Prints a warning message if any
     configuration property name does not match the name in the hadoop
@@ -699,7 +699,7 @@ def translate_jobconf_dict(jobconf, hadoop_version=None):
 
             translated_jobconf[variant] = value
 
-            if hadoop_version:
+            if hadoop_version and warn:
                 translation_warnings[variable] = variant
 
     if translation_warnings:

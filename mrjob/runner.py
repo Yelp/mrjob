@@ -809,12 +809,7 @@ class MRJobRunner(object):
             return ['python%d' % sys.version_info[0]]
 
     def _script_args_for_step(self, step_num, mrc):
-        assert self._script_path
-
-        args = self._executable() + [
-            '--step-num=%d' % step_num,
-            '--%s' % mrc,
-        ] + self._mr_job_extra_args()
+        args = self._executable() + self._args_for_task(step_num, mrc)
 
         if self._setup_wrapper_script_path:
             return (self._sh_bin() +
@@ -823,6 +818,12 @@ class MRJobRunner(object):
                     args)
         else:
             return args
+
+    def _args_for_task(self, step_num, mrc):
+        return [
+            '--step-num=%d' % step_num,
+            '--%s' % mrc,
+        ] + self._mr_job_extra_args()
 
     def _substep_cmd_line(self, step_num, mrc):
         step = self._get_step(step_num)

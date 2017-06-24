@@ -314,6 +314,7 @@ _RUNNER_OPTS = dict(
     ),
     bootstrap_mrjob=dict(
         cloud_role='launch',
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--bootstrap-mrjob'], dict(
                 action='store_true',
@@ -857,6 +858,7 @@ _RUNNER_OPTS = dict(
     ),
     python_bin=dict(
         combiner=combine_cmds,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--python-bin'], dict(
                 help=('Alternate python command for Python mappers/reducers.'
@@ -898,6 +900,7 @@ _RUNNER_OPTS = dict(
     ),
     setup=dict(
         combiner=combine_lists,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--setup'], dict(
                 action='append',
@@ -1008,6 +1011,7 @@ _RUNNER_OPTS = dict(
     ),
     steps_python_bin=dict(
         combiner=combine_cmds,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--steps-python-bin'], dict(
                 help=('Name/path of alternate python command to use to'

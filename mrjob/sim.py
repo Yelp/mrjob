@@ -15,68 +15,71 @@
 import itertools
 import logging
 import os
-import platform
 import shutil
 import stat
 from multiprocessing import cpu_count
+from os.path import dirname
 from os.path import join
 from os.path import relpath
-from subprocess import CalledProcessError
-from subprocess import check_call
 
 from mrjob.cat import is_compressed
 from mrjob.cat import open_input
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
-from mrjob.runner import RunnerOptionStore
-from mrjob.util import cmd_line
+from mrjob.compat import translate_jobconf_dict
+from mrjob.conf import combine_local_envs
+from mrjob.runner import MRJobRunner
 from mrjob.util import unarchive
 
 log = logging.getLogger(__name__)
 
 
-class SimRunnerOptionStore(RunnerOptionStore):
-    # these are the same for 'local' and 'inline' runners
-    ALLOWED_KEYS = _allowed_keys('local')
-    COMBINERS = _combiners('local')
-    DEPRECATED_ALIASES = _deprecated_aliases('local')
-
-
 class SimMRJobRunner(MRJobRunner):
 
+    # keyword arguments that we ignore because they require real Hadoop.
+    # We look directly at self._<kwarg_name> because they aren't in
+    # self._opts
+    _IGNORED_HADOOP_ATTRS = [
+        '_hadoop_input_format',
+        '_hadoop_output_format',
+        '_partitioner',
+        '_step_output_dir',
+    ]
+
+    # options that we ignore becaue they require real Hadoop.
+    _IGNORED_HADOOP_OPTS = [
+        'libjars',
+    ]
+
     def __init__(self, **kwargs):
-        super(Sim2RunnerOptionStore, self).__init__(**kwargs)
+        super(SimMRJobRunner, self).__init__(**kwargs)
 
-        self._counters = []
+        # warn about ignored keyword arguments
+        for ignored_attr in self._IGNORED_HADOOP_ATTRS:
+            value = getattr(self, ignored_attr)
+            if value is not None:
+                log.warning(
+                    'ignoring %s keyword arg (requires real Hadoop): %r' %
+                    (ignored_attr[1:], value))
 
-        # should we fall back to sorting in memory?
-        self._bad_sort_bin = False
+        for ignored_opt in self._IGNORED_HADOOP_OPTS:
+            value = self._opts.get(ignored_opt)
+            if value:  # ignore [], the default value of libjars
+                log.warning(
+                    'ignoring %s option (requires real Hadoop): %r' %
+                    (ignored_opt, value))
+
 
     # re-implement these in your subclass
 
-    def _run_multiple(self, num_processes=None):
-        """Run multiple tasks, possibly in parallel. Tasks are tuples of
-        ``(func, args, kwds, callback)``, just like the arguments to
-        :py:meth:`multiprocessing.Pool.apply_async`. No need to return
-        anything.
-        """
-        raise NotImplementedError
-
-    def _launch_task(
-            self, task_type, step_num, input_path, output_path, wd, env):
-        """Run the given mapper/reducer."""
+    def _invoke_task(self, task_type, step_num, input_path, output_path,
+                     stderr_path, wd, env):
+        """Run the given mapper/reducer, given the """
         NotImplementedError
 
-    def _run_task(self, task_type, step_num, task_num, map_split=None):
-        """Run one mapper, reducer, or combiner."""
-        input_path = self._task_input_path(task_type, step_num, task_num)
-        output_path = self._task_output_path(task_type, step_num, task_num)
-        wd = self._setup_working_dir(task_type, step_num, task_num)
-        env = self._env_for_task(task_type, step_num, task_num, map_split)
-
-        self._launch_task(
-            task_type, step_num, input_path, output_path, wd, env)
+    def _run_multiple(self, tasks, num_processes=None):
+        """Run multiple tasks, possibly in parallel. Tasks are tuples of
+        ``(func, args, kwargs)``.
+        """
+        raise NotImplementedError
 
     def _run(self):
         self._warn_ignored_opts()
@@ -103,6 +106,21 @@ class SimMRJobRunner(MRJobRunner):
 
                 self._run_reducers(step_num, num_reducer_tasks)
 
+    def _run_task(self, task_type, step_num, task_num, map_split=None):
+        """Run one mapper, reducer, or combiner.
+
+        This sets up everything the task needs to run, then passes it off to
+        :py:meth:`_invoke_task`.
+        """
+        input_path = self._task_input_path(task_type, step_num, task_num)
+        stderr_path = self._task_stderr_path(task_type, step_num, task_num)
+        output_path = self._task_output_path(task_type, step_num, task_num)
+        wd = self._setup_working_dir(task_type, step_num, task_num)
+        env = self._env_for_task(task_type, step_num, task_num, map_split)
+
+        self._launch_task(
+            task_type, step_num, input_path, output_path, stderr_path, wd, env)
+
     def _run_mappers_and_combiners(self, map_splits, step_num):
         # TODO: possibly catch step failure
         self._run_multiple(
@@ -111,9 +129,16 @@ class SimMRJobRunner(MRJobRunner):
         )
 
     def _run_mapper_and_combiner(self, map_split, step_num, task_num):
-        self._run_task('mapper', step_num, task_num, map_split)
-
         step = self._get_step(step_num)
+
+        if 'mapper' in step:
+            self._run_task('mapper', step_num, task_num, map_split)
+        else:
+            # if no mapper, just pass the data through (see #1141)
+            _symlink_or_copy(
+                self._task_output_path('mapper', step_num, task_num),
+                self._task_input_path('mapper', step_num, task_num))
+
         if 'combiner' in step:
             self._sort_combiner_input(step_num, task_num)
             self._run_task('combiner', step_num, task_num)
@@ -166,7 +191,7 @@ class SimMRJobRunner(MRJobRunner):
         user_jobconf = self._jobconf_for_step(step_num)
 
         simulated_jobconf = self._simulate_jobconf_for_step(
-            step_num, step_type, task_num, map_split)
+            step_num, task_type, task_num, map_split)
 
         def to_env(jobconf):
             return dict((k.replace('.', '_'), str(v))
@@ -186,11 +211,11 @@ class SimMRJobRunner(MRJobRunner):
         # TODO: these are really poor imtations of Hadoop keys. See #1254
         j['mapreduce.job.id'] = self._job_key
         j['mapreduce.task.id'] = 'task_%s_%s_%04d%d' % (
-            self._job_key, step_type.lower(), step_num, task_num)
+            self._job_key, task_type.lower(), step_num, task_num)
         j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%04d%d_0' % (
-            self._job_key, step_type.lower(), step_num, task_num)
+            self._job_key, task_type.lower(), step_num, task_num)
 
-        j['mapreduce.task.ismap'] = (step_type == 'mapper')
+        j['mapreduce.task.ismap'] = (task_type == 'mapper')
 
         # TODO: is this the correct format?
         j['mapreduce.task.partition'] = str(task_num)
@@ -198,7 +223,7 @@ class SimMRJobRunner(MRJobRunner):
         j['mapreduce.task.output.dir'] = self._step_output_dir(step_num)
 
         working_dir = self._task_working_dir(task_type, step_num, task_num)
-        j['mapreduce.job.local.dir'] =
+        j['mapreduce.job.local.dir'] = working_dir
 
         for x in ('archive', 'file'):
             named_paths = sorted(self._working_dir_mgr.name_to_path(x).items())
@@ -353,8 +378,8 @@ class SimMRJobRunner(MRJobRunner):
         for type in ('archive', 'file'):
             for name, path in (
                     self._working_dir_mgr.name_to_path(type).items()):
-            self._symlink_to_file_or_copy(
-                self._path_in_dist_cache_dir(name), join(wd, name))
+                _symlink_or_copy(
+                    self._path_in_dist_cache_dir(name), join(wd, name))
 
     def _last_task_type_in_step(self, step_num):
         step = self._get_step(step_num)
@@ -398,6 +423,10 @@ class SimMRJobRunner(MRJobRunner):
         return join(
             self._task_dir(task_type, step_num, task_num), 'input')
 
+    def _task_stderr_path(self, task_type, step_num, task_num):
+        return join(
+            self._task_dir(task_type, step_num, task_num), 'stderr')
+
     def _task_output_path(self, task_type, step_num, task_num):
         """Where to output data for the given task.
 
@@ -426,45 +455,9 @@ class SimMRJobRunner(MRJobRunner):
         """Sort lines from one or more input paths into a new file
         at *output_path*.
 
-        This uses a unix sort binary, windows sort binary, or Python
-        as appropriate.
+        By default this sorts in memory, but you can override this to
+        use the :command:`sort` binary, etc.
         """
-        if not input_paths:
-            raise ValueError('Must specify at least one input path.')
-
-        if not (self._bad_sort_bin or platform.system() == 'Windows'):
-            env = os.environ.copy()
-
-            # ignore locale when sorting
-            env['LC_ALL'] = 'C'
-
-            # Make sure that the tmp dir environment variables are changed if
-            # the default is changed.
-            env['TMP'] = self._opts['local_tmp_dir']
-            env['TMPDIR'] = self._opts['local_tmp_dir']
-
-            err_path = os.path.join(self._get_local_tmp_dir(), 'sort-stderr')
-
-            with open(output_path, 'wb') as output:
-                with open(err_path, 'wb') as err:
-                    args = self._sort_bin() + list(input_paths)
-                    log.debug('> %s' % cmd_line(args))
-                    try:
-                        check_call(args, stdout=output, stderr=err, env=env)
-                        return
-                    except CalledProcessError:
-                        log.error(
-                            '`%s` failed, falling back to in-memory sort' %
-                            cmd_line(self._sort_bin()))
-                        with open(err_path) as err:
-                            for line in err:
-                                log.error('STDERR: %s' % line.rstrip('\r\n'))
-                    except OSError:
-                        log.error(
-                            'no sort binary, falling back to in-memory sort')
-
-        self._bad_sort_bin = True
-
         # sort in memory
         log.debug('sorting in memory: %s' % ', '.join(input_paths))
         lines = []
@@ -482,27 +475,8 @@ class SimMRJobRunner(MRJobRunner):
             for line in lines:
                 output.write(line)
 
-    def _sort_bin(self):
-        """The binary to use to sort input.
 
-        (On Windows, we go straight to sorting in memory.)
-        """
-        if self._opts['sort_bin']:
-            return self._opts['sort_bin']
-        elif self._sort_values:
-            return ['sort']
-        else:
-            # only sort on the reducer key (see #660)
-            return ['sort', '-t', '\t', '-k', '1,1', '-s']
 
-    def _symlink_to_file_or_copy(self, path, dest):
-        """Symlink from *dest* to *path*, using relative paths if possible.
-
-        If symlinks aren't available, copy path to dest instead.
-        """
-        if hasattr(os, 'symlink'):
-            log.debug('creating symlink %s <- %s' % (path, dest))
-            os.symlink(relpath(path, dirname(dest)),
 
 
 
@@ -518,6 +492,20 @@ class SimMRJobRunner(MRJobRunner):
 def _chmod_u_rx(path, recursive=False):
     # TODO: implement this
     pass
+
+
+def _symlink_or_copy(path, dest):
+    """Symlink from *dest* to *path*, using relative paths if possible.
+
+    If symlinks aren't available, copy path to dest instead.
+    """
+    if hasattr(os, 'symlink'):
+        log.debug('creating symlink %s <- %s' % (path, dest))
+        os.symlink(relpath(path, dirname(dest)), dest)
+    else:
+        # TODO: use shutil.copy2() or shutil.copytree()
+        raise NotImplementedError
+
 
 
 

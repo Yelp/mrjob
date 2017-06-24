@@ -70,8 +70,8 @@ class SimMRJobRunner(MRJobRunner):
 
     # re-implement these in your subclass
 
-    def _invoke_task(self, task_type, step_num, input_path, output_path,
-                     stderr_path, wd, env):
+    def _invoke_task(
+            self, task_type, step_num, stdin, stdout, stderr, wd, env):
         """Run the given mapper/reducer, given the """
         NotImplementedError
 
@@ -118,8 +118,12 @@ class SimMRJobRunner(MRJobRunner):
         wd = self._setup_working_dir(task_type, step_num, task_num)
         env = self._env_for_task(task_type, step_num, task_num, map_split)
 
-        self._launch_task(
-            task_type, step_num, input_path, output_path, stderr_path, wd, env)
+        with open(input_path, 'rb') as stdin, \
+                open(output_path, 'wb') as stdout, \
+                open(stderr_path, 'wb') as stderr:
+
+            self._launch_task(
+                task_type, step_num, stdin, stdout, stderr, wd, env)
 
     def _run_mappers_and_combiners(self, map_splits, step_num):
         # TODO: possibly catch step failure

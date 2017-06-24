@@ -24,6 +24,7 @@ from subprocess import CalledProcessError
 from subprocess import check_call
 
 from mrjob.sim import SimMRJobRunner
+from mrjob.step import StepFailedException
 from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
@@ -74,14 +75,18 @@ class LocalMRJobRunner(SimMRJobRunner):
         # should we fall back to sorting in memory?
         self._bad_sort_bin = False
 
-    def _invoke_task(self, task_type, step_num, input_path, output_path,
-                     stderr_path, wd, env):
+    def _invoke_task(
+            self, task_type, step_num, stdin, stdout, stderr, wd, env):
 
         args = self._substep_cmd_line(step_num, task_type)
 
-
-
-        raise NotImplementedError
+        try:
+            check_call(args, stdin=stdin, stdout=stdout, stderr=stderr,
+                       cwd=wd, env=env)
+        except CalledProcessError as ex:
+            raise StepFailedException(
+                reason=str(ex), step_num=step_num,
+                num_steps=len(self._get_steps()))
 
     def _run_multiple(self, tasks, num_processes=None):
         """Use multiprocessing to run in parallel."""

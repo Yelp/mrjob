@@ -41,7 +41,6 @@ class SimMRJobRunner(MRJobRunner):
         '_hadoop_input_format',
         '_hadoop_output_format',
         '_partitioner',
-        '_step_output_dir',
     ]
 
     # options that we ignore becaue they require real Hadoop.
@@ -53,12 +52,16 @@ class SimMRJobRunner(MRJobRunner):
         super(SimMRJobRunner, self).__init__(**kwargs)
 
         # warn about ignored keyword arguments
+        # TODO: no need to look at attrs, just look at kwargs
+
         for ignored_attr in self._IGNORED_HADOOP_ATTRS:
             value = getattr(self, ignored_attr)
             if value is not None:
                 log.warning(
                     'ignoring %s keyword arg (requires real Hadoop): %r' %
                     (ignored_attr[1:], value))
+
+        # TODO: libjars should just not be an option for local runners
 
         for ignored_opt in self._IGNORED_HADOOP_OPTS:
             value = self._opts.get(ignored_opt)
@@ -82,7 +85,6 @@ class SimMRJobRunner(MRJobRunner):
         raise NotImplementedError
 
     def _run(self):
-        self._warn_ignored_opts()
         self._check_input_exists()
         self._create_setup_wrapper_script(local=True)
 
@@ -94,9 +96,10 @@ class SimMRJobRunner(MRJobRunner):
                 step_num + 1, self._num_steps()))
 
             self._create_dist_cache_dir(step_num)
-            os.mkdir(self._step_output_dir())
+            self.fs.mkdir(self._output_dir_for_step(step_num))
 
-            map_splits = self._split_mapper_input(last_output_paths, step_num)
+            map_splits = self._split_mapper_input(
+                self._input_paths_for_step(step_num), step_num)
 
             self._run_mappers_and_combiners(map_splits, step_num)
 
@@ -161,7 +164,7 @@ class SimMRJobRunner(MRJobRunner):
         """Copy working directory files into a shared directory,
         simulating the way Hadoop's Distributed Cache works on nodes."""
         cache_dir = self._dist_cache_dir(step_num)
-        os.mkdir(cache_dir)
+        self.fs.mkdir(cache_dir)
 
         for name, path in self._working_dir_mgr.name_to_path('file').items():
 
@@ -224,7 +227,7 @@ class SimMRJobRunner(MRJobRunner):
         # TODO: is this the correct format?
         j['mapreduce.task.partition'] = str(task_num)
 
-        j['mapreduce.task.output.dir'] = self._step_output_dir(step_num)
+        j['mapreduce.task.output.dir'] = self._output_dir_for_step(step_num)
 
         working_dir = self._task_working_dir(task_type, step_num, task_num)
         j['mapreduce.job.local.dir'] = working_dir
@@ -374,7 +377,7 @@ class SimMRJobRunner(MRJobRunner):
         for task_num in itertools.count():
             path = self._task_input_path(task_type, step_num, task_num)
             self.fs.mkdir(dirname(path))
-            yield open(path, 'rb')
+            yield open(path, 'wb')
 
     def _setup_working_dir(self, task_type, step_num, task_num):
         wd = self._task_working_dir(task_type, step_num, task_num)
@@ -383,7 +386,8 @@ class SimMRJobRunner(MRJobRunner):
             for name, path in (
                     self._working_dir_mgr.name_to_path(type).items()):
                 _symlink_or_copy(
-                    self._path_in_dist_cache_dir(name), join(wd, name))
+                    self._path_in_dist_cache_dir(name, step_num),
+                    join(wd, name))
 
     def _last_task_type_in_step(self, step_num):
         step = self._get_step(step_num)
@@ -410,10 +414,19 @@ class SimMRJobRunner(MRJobRunner):
     # step/<step_num>/
 
     def _step_dir(self, step_num):
-        return join(self.tmp_dir, 'step', '%3d' % step_num)
+        return join(self._get_local_tmp_dir(), 'step', '%03d' % step_num)
 
-    def _step_output_dir(self, step_num):
+    def _input_paths_for_step(self, step_num):
+        if step_num == 0:
+            return self._input_paths
+        else:
+            return self.fs.ls(
+                join(self._output_dir_for_step(step_num - 1), 'part-*'))
+
+    def _output_dir_for_step(self, step_num):
         if step_num == self._num_steps() - 1:
+            if not self._output_dir:
+                self._output_dir = join(self._get_local_tmp_dir(), 'output')
             return self._output_dir
         else:
             return self._intermediate_output_uri(step_num, local=True)
@@ -421,7 +434,7 @@ class SimMRJobRunner(MRJobRunner):
     # step/<step_num>/<task_type>/<task_num>/
 
     def _task_dir(self, task_type, step_num, task_num):
-        return join(self._step_dir(step_num), task_type, '%5d' % task_num)
+        return join(self._step_dir(step_num), task_type, '%05d' % task_num)
 
     def _task_input_path(self, task_type, step_num, task_num):
         return join(
@@ -440,7 +453,7 @@ class SimMRJobRunner(MRJobRunner):
         """
         if task_type == self._last_task_type_in_step(step_num):
             return join(
-                self._step_output_dir(step_num), 'part-%5d' % task_num)
+                self._output_dir_for_step(step_num), 'part-%05d' % task_num)
         else:
             return join(
                 self._task_dir(task_type, step_num, task_num), 'output')
@@ -505,7 +518,7 @@ def _symlink_or_copy(path, dest):
     """
     if hasattr(os, 'symlink'):
         log.debug('creating symlink %s <- %s' % (path, dest))
-        os.symlink(relpath(path, dirname(dest)), dest)
+        os.symlink(dest, relpath(path, dirname(dest)))
     else:
         # TODO: use shutil.copy2() or shutil.copytree()
         raise NotImplementedError

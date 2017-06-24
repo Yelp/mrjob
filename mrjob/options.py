@@ -900,7 +900,6 @@ _RUNNER_OPTS = dict(
     ),
     setup=dict(
         combiner=combine_lists,
-        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--setup'], dict(
                 action='append',

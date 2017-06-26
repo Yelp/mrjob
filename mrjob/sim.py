@@ -80,7 +80,8 @@ class SimMRJobRunner(MRJobRunner):
 
     def _run_multiple(self, tasks, num_processes=None):
         """Run multiple tasks, possibly in parallel. Tasks are tuples of
-        ``(func, args, kwargs)``.
+        ``(func, args, kwargs)``. *func* must be pickleable; if you want to run
+        instance methods, use :py:func:`_apply_method` to wrap them.
         """
         raise NotImplementedError
 
@@ -131,7 +132,9 @@ class SimMRJobRunner(MRJobRunner):
     def _run_mappers_and_combiners(self, step_num, map_splits):
         # TODO: possibly catch step failure
         self._run_multiple(
-            (self._run_mapper_and_combiner, (step_num, task_num, map_split))
+            (_apply_method,
+             (self, '_run_mapper_and_combiner', step_num, task_num, map_split),
+             {})
             for task_num, map_split in enumerate(map_splits)
         )
 
@@ -152,7 +155,9 @@ class SimMRJobRunner(MRJobRunner):
 
     def _run_reducers(self, step_num, num_reducer_tasks):
         self._run_multiple(
-            (self._run_task, ('reducer', step_num, task_num))
+            (_apply_method,
+             (self, '_run_task', 'reducer', step_num, task_num),
+             {})
             for task_num in range(num_reducer_tasks)
         )
 
@@ -588,3 +593,8 @@ def _label_records_for_split(record_gen, split_size, reducer_key=None):
 
         yield split_num, record
         bytes_in_split += len(record)
+
+
+def _apply_method(self, method_name, *args, **kwargs):
+    """Shim to turn method calls into pickleable function calls."""
+    getattr(self, method_name)(*args, **kwargs)

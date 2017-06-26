@@ -36,9 +36,9 @@ log = logging.getLogger(__name__)
 
 
 class LocalRunnerOptionStore(RunnerOptionStore):
-    ALLOWED_KEYS = _allowed_keys('inline')
-    COMBINERS = _combiners('inline')
-    DEPRECATED_ALIASES = _deprecated_aliases('inline')
+    ALLOWED_KEYS = _allowed_keys('local')
+    COMBINERS = _combiners('local')
+    DEPRECATED_ALIASES = _deprecated_aliases('local')
 
 
 class LocalMRJobRunner(SimMRJobRunner):
@@ -53,6 +53,8 @@ class LocalMRJobRunner(SimMRJobRunner):
 
     """
     alias = 'local'
+
+    OPTION_STORE_CLASS = LocalRunnerOptionStore
 
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
@@ -91,6 +93,10 @@ class LocalMRJobRunner(SimMRJobRunner):
     def _run_multiple(self, tasks, num_processes=None):
         """Use multiprocessing to run in parallel."""
         pool = Pool(processes=num_processes)
+
+
+
+
 
         results = [pool.apply_async(*task) for task in tasks]
         for result in results:

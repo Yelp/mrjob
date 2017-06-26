@@ -105,8 +105,7 @@ class SimMRJobRunner(MRJobRunner):
 
             if 'reducer' in step:
                 self._sort_reducer_input(step_num, len(map_splits))
-                num_reducer_tasks = self._split_reducer_input(
-                    step_num, len(map_splits))
+                num_reducer_tasks = self._split_reducer_input(step_num)
 
                 self._run_reducers(step_num, num_reducer_tasks)
 
@@ -150,6 +149,12 @@ class SimMRJobRunner(MRJobRunner):
         if 'combiner' in step:
             self._sort_combiner_input(step_num, task_num)
             self._run_task('combiner', step_num, task_num)
+
+    def _run_reducers(self, step_num, num_reducer_tasks):
+        self._run_multiple(
+            (self._run_task, ('reducer', step_num, task_num))
+            for task_num in range(num_reducer_tasks)
+        )
 
     def _check_input_exists(self):
         if not self._opts['check_input_paths']:
@@ -345,11 +350,15 @@ class SimMRJobRunner(MRJobRunner):
         return uncompressed_bytes // max(
             target_num_splits - num_compressed, 1)
 
-    def _split_reducer_input(self, path, step_num):
+    def _split_reducer_input(self, step_num):
         """Split a single, uncompressed file containing sorted input for the
         reducer into input files for each reducer task.
 
         Yield the paths of the reducer input files."""
+        path = self._sorted_reducer_input_path(step_num)
+
+        log.debug('splitting reducer input: %s' % path)
+
         size = os.stat(path)[stat.ST_SIZE]
         split_size = size // (self._num_reducers(step_num) * 2)
 
@@ -362,9 +371,10 @@ class SimMRJobRunner(MRJobRunner):
         num_reducer_tasks = 0
 
         with open(path, 'rb') as src:
-            for lines in _split_records(src, split_size, reducer_key):
+            for records in _split_records(src, split_size, reducer_key):
                 with split_fileobj_gen.next() as dest:
-                    shutil.copyfileobj(src, dest)
+                    for record in records:
+                        dest.write(record)
                     num_reducer_tasks += 1
 
         return num_reducer_tasks
@@ -480,7 +490,8 @@ class SimMRJobRunner(MRJobRunner):
         use the :command:`sort` binary, etc.
         """
         # sort in memory
-        log.debug('sorting in memory: %s' % ', '.join(input_paths))
+        log.debug('sorting in memory: %s -> %s' %
+                  (', '.join(input_paths), output_path))
         lines = []
 
         for input_path in input_paths:

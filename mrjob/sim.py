@@ -101,9 +101,10 @@ class SimMRJobRunner(MRJobRunner):
             map_splits = self._split_mapper_input(
                 self._input_paths_for_step(step_num), step_num)
 
-            self._run_mappers_and_combiners(map_splits, step_num)
+            self._run_mappers_and_combiners(step_num, map_splits)
 
             if 'reducer' in step:
+                self._sort_reducer_input(step_num, len(map_splits))
                 num_reducer_tasks = self._split_reducer_input(
                     step_num, len(map_splits))
 
@@ -125,17 +126,17 @@ class SimMRJobRunner(MRJobRunner):
                 open(output_path, 'wb') as stdout, \
                 open(stderr_path, 'wb') as stderr:
 
-            self._launch_task(
+            self._invoke_task(
                 task_type, step_num, stdin, stdout, stderr, wd, env)
 
-    def _run_mappers_and_combiners(self, map_splits, step_num):
+    def _run_mappers_and_combiners(self, step_num, map_splits):
         # TODO: possibly catch step failure
         self._run_multiple(
-            (self._run_mapper_and_combiner, (map_split, step_num, task_num))
+            (self._run_mapper_and_combiner, (step_num, task_num, map_split))
             for task_num, map_split in enumerate(map_splits)
         )
 
-    def _run_mapper_and_combiner(self, map_split, step_num, task_num):
+    def _run_mapper_and_combiner(self, step_num, task_num, map_split):
         step = self._get_step(step_num)
 
         if 'mapper' in step:
@@ -198,7 +199,7 @@ class SimMRJobRunner(MRJobRunner):
         user_jobconf = self._jobconf_for_step(step_num)
 
         simulated_jobconf = self._simulate_jobconf_for_step(
-            step_num, task_type, task_num, map_split)
+            task_type, step_num, task_num, map_split)
 
         def to_env(jobconf):
             return dict((k.replace('.', '_'), str(v))
@@ -249,7 +250,7 @@ class SimMRJobRunner(MRJobRunner):
             # mapreduce.map.input.file
             # mapreduce.map.input.start
             # mapreduce.map.input.length
-            for key, value in map_split:
+            for key, value in map_split.items():
                 j['mapreduce.map.input.' + key] = str(value)
 
         # translate to correct Hadoop version
@@ -381,6 +382,7 @@ class SimMRJobRunner(MRJobRunner):
 
     def _setup_working_dir(self, task_type, step_num, task_num):
         wd = self._task_working_dir(task_type, step_num, task_num)
+        self.fs.mkdir(wd)
 
         for type in ('archive', 'file'):
             for name, path in (
@@ -388,6 +390,8 @@ class SimMRJobRunner(MRJobRunner):
                 _symlink_or_copy(
                     self._path_in_dist_cache_dir(name, step_num),
                     join(wd, name))
+
+        return wd
 
     def _last_task_type_in_step(self, step_num):
         step = self._get_step(step_num)
@@ -492,6 +496,19 @@ class SimMRJobRunner(MRJobRunner):
             for line in lines:
                 output.write(line)
 
+    def _sort_reducer_input(self, step_num, num_map_tasks):
+        step = self._get_step(step_num)
+
+        output_path = self._sorted_reducer_input_path(step_num)
+        self.fs.mkdir(dirname(output_path))
+
+        prev_task_type = 'combiner' if step.get('combiner') else 'mapper'
+        input_paths = [
+            self._task_output_path(prev_task_type, step_num, task_num)
+            for task_num in range(num_map_tasks)
+        ]
+
+        self._sort_input(input_paths, output_path)
 
 
 
@@ -518,7 +535,7 @@ def _symlink_or_copy(path, dest):
     """
     if hasattr(os, 'symlink'):
         log.debug('creating symlink %s <- %s' % (path, dest))
-        os.symlink(dest, relpath(path, dirname(dest)))
+        os.symlink(relpath(path, dirname(dest)), dest)
     else:
         # TODO: use shutil.copy2() or shutil.copytree()
         raise NotImplementedError

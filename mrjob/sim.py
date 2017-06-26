@@ -116,6 +116,8 @@ class SimMRJobRunner(MRJobRunner):
         This sets up everything the task needs to run, then passes it off to
         :py:meth:`_invoke_task`.
         """
+        log.debug('running step %d, %s %d' % (step_num, task_type, task_num))
+
         input_path = self._task_input_path(task_type, step_num, task_num)
         stderr_path = self._task_stderr_path(task_type, step_num, task_num)
         output_path = self._task_output_path(task_type, step_num, task_num)

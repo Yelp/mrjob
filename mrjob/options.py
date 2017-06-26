@@ -920,6 +920,16 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    sort_bin=dict(
+        combiner=combine_cmds,
+        runners={'local'},
+        switches=[
+            (['--sort-bin'], dict(
+                help=('Alternate shell command for the external sort binary.'
+                     'You may include arguments, e.g. --sort-bin "sort -r"')
+            )),
+        ],
+    ),
     spark_args=dict(
         combiner=combine_lists,
         switches=[

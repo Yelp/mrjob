@@ -1481,7 +1481,7 @@ class InterpreterTestCase(TestCase):
                          [sys.executable])
 
     def test_python_bin(self):
-        runner = MRJobRunner(python_bin=['python', '-v'])
+        runner = LocalMRJobRunner(python_bin=['python', '-v'])
         self.assertEqual(runner._python_bin(), ['python', '-v'])
         self.assertEqual(runner._interpreter(), ['python', '-v'])
         self.assertEqual(runner._interpreter(steps=True), [sys.executable])

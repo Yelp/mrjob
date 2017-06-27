@@ -782,17 +782,18 @@ class MRJobRunner(object):
          * invoking ``cat.py`` in local mode
          * the Python binary for Spark (``$PYSPARK_PYTHON``)
         """
-        return self._opts['python_bin'] or self._default_python_bin()
+        # python_bin isn't an option for inline runners
+        return self._opts.get('python_bin') or self._default_python_bin()
 
     def _steps_python_bin(self):
         """Python binary used to invoke job with ``--steps``"""
-        return (self._opts['steps_python_bin'] or
+        return (self._opts.get('steps_python_bin') or
                 self._default_python_bin(local=True))
 
     def _task_python_bin(self):
         """Python binary used to invoke job with ``--mapper``,
         ``--reducer``, ``--spark``, etc."""
-        return (self._opts['task_python_bin'] or
+        return (self._opts.get('task_python_bin') or
                 self._python_bin())
 
     def _default_python_bin(self, local=False):

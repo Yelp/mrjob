@@ -697,6 +697,7 @@ _RUNNER_OPTS = dict(
     ),
     interpreter=dict(
         combiner=combine_cmds,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--interpreter'], dict(
                 help='Non-python command to run your script, e.g. "ruby".',
@@ -724,6 +725,7 @@ _RUNNER_OPTS = dict(
     ),
     libjars=dict(
         combiner=combine_path_lists,
+        runners={'_cloud', 'hadoop'},
         switches=[
             (['--libjar'], dict(
                 action='append',
@@ -900,6 +902,7 @@ _RUNNER_OPTS = dict(
     ),
     setup=dict(
         combiner=combine_lists,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--setup'], dict(
                 action='append',
@@ -913,6 +916,7 @@ _RUNNER_OPTS = dict(
     ),
     sh_bin=dict(
         combiner=combine_cmds,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--sh-bin'], dict(
                 help=('Alternate shell command for setup scripts. You may'
@@ -951,6 +955,7 @@ _RUNNER_OPTS = dict(
     ),
     spark_submit_bin=dict(
         combiner=combine_cmds,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--spark-submit-bin'], dict(
                 help='spark-submit binary. You may include arguments.'
@@ -1011,6 +1016,7 @@ _RUNNER_OPTS = dict(
     ),
     steps_interpreter=dict(
         combiner=combine_cmds,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--steps-interpreter'], dict(
                 help=("Non-Python command to use to query the job about its"
@@ -1074,6 +1080,7 @@ _RUNNER_OPTS = dict(
     ),
     task_python_bin=dict(
         combiner=combine_cmds,
+        runners={'_cloud', 'local', 'hadoop'},  # not inline
         switches=[
             (['--task-python-bin'], dict(
                 help=('Name/path of alternate python command to use to'

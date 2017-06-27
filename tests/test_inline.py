@@ -28,7 +28,6 @@ from mrjob.fs.base import Filesystem
 from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
-from mrjob.sim import _error_on_bad_paths
 from mrjob.step import MRStep
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_test_cmdenv import MRTestCmdenv

@@ -28,7 +28,8 @@ from mrjob.emr import EMRRunnerOptionStore
 from mrjob.hadoop import HadoopRunnerOptionStore
 from mrjob.py2 import StringIO
 from mrjob.runner import RunnerOptionStore
-from mrjob.sim import SimRunnerOptionStore
+from mrjob.inline import InlineRunnerOptionStore
+from mrjob.local import LocalRunnerOptionStore
 from mrjob.util import log_to_stream
 
 from tests.quiet import logger_disabled
@@ -414,8 +415,11 @@ class OptionStoreSanityCheckTestCase(TestCase):
     def test_hadoop_runner_option_store_is_sane(self):
         self.assert_option_store_is_sane(HadoopRunnerOptionStore)
 
-    def test_sim_runner_option_store_is_sane(self):
-        self.assert_option_store_is_sane(SimRunnerOptionStore)
+    def test_inline_runner_option_store_is_sane(self):
+        self.assert_option_store_is_sane(InlineRunnerOptionStore)
+
+    def test_local_runner_option_store_is_sane(self):
+        self.assert_option_store_is_sane(LocalRunnerOptionStore)
 
 
 class OptionStoreDebugPrintoutTestCase(ConfigFilesTestCase):

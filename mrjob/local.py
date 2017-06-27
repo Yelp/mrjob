@@ -80,16 +80,15 @@ class LocalMRJobRunner(SimMRJobRunner):
     def _invoke_task(
             self, task_type, step_num, stdin, stdout, stderr, wd, env):
 
-        # TODO get args, not a string
-        cmd = self._substep_cmd_line(step_num, task_type)
+        args = self._substep_args(step_num, task_type)
 
         #for key, value in sorted(env.items()):
         #    log.debug('> export %s=%s' % (key, value))
-        log.debug('> %s' % cmd)
+        log.debug('> %s' % cmd_line(args))
 
         try:
-            check_call(cmd, stdin=stdin, stdout=stdout, stderr=stderr,
-                       cwd=wd, env=env, shell=True)  # TODO: don't use shell
+            check_call(args, stdin=stdin, stdout=stdout, stderr=stderr,
+                       cwd=wd, env=env)
         except CalledProcessError as ex:
             raise StepFailedException(
                 reason=str(ex), step_num=step_num,

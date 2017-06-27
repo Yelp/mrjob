@@ -57,6 +57,7 @@ from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
+from mrjob.util import shlex_split
 from mrjob.util import to_lines
 from mrjob.util import zip_dir
 
@@ -825,32 +826,47 @@ class MRJobRunner(object):
             '--%s' % mrc,
         ] + self._mr_job_extra_args()
 
-    def _substep_cmd_line(self, step_num, mrc):
+
+    def _substep_args(self, step_num, mrc):
         step = self._get_step(step_num)
 
         if step[mrc]['type'] == 'command':
+            cmd = step['mrc']['command']
+
             # never wrap custom hadoop streaming commands in bash
-            return step[mrc]['command']
+            if isinstance(cmd, string_types):
+                return shlex_split(cmd)
+            else:
+                return cmd
 
         elif step[mrc]['type'] == 'script':
-            cmd_str = cmd_line(self._script_args_for_step(step_num, mrc))
+            script_args = self._script_args_for_step(step_num, mrc)
 
-            # filter input and pipe for great speed, if user asks
-            # but we have to wrap the command in sh -c
             if 'pre_filter' in step[mrc]:
                 return self._sh_wrap(
-                    '%s | %s' % (step[mrc]['pre_filter'], cmd_str))
+                    '%s | %s' % (step[mrc]['pre_filter'],
+                                 cmd_line(script_args)))
             else:
-                return cmd_str
+                return script_args
         else:
             raise ValueError("Invalid %s step %d: %r" % (
                 mrc, step_num, step[mrc]))
+
+    def _sh_wrap(self, cmd_str):
+        """Helper for _substep_args()
+
+        Wrap command in sh -c '...' to allow for pipes, etc.
+        Use *sh_bin* option."""
+        # prepend set -e etc.
+        cmd_str = '; '.join(self._sh_pre_commands() + [cmd_str])
+
+        return self._sh_bin() + ['-c', "'%s'" % cmd_str.replace("'", "'\\''")]
 
     def _render_substep(self, step_num, mrc):
         step = self._get_step(step_num)
 
         if mrc in step:
-            return self._substep_cmd_line(step_num, mrc)
+            return cmd_line(self._substep_args(step_num, mrc))
         else:
             if mrc == 'mapper':
                 return 'cat'
@@ -910,16 +926,6 @@ class MRJobRunner(object):
             self._render_substep(step_num, 'combiner'),
             self._render_substep(step_num, 'reducer'),
         )
-
-    def _sh_wrap(self, cmd_str):
-        """Wrap command in sh -c '...' to allow for pipes, etc.
-        Use *sh_bin* option."""
-        # prepend set -e etc.
-        cmd_str = '; '.join(self._sh_pre_commands() + [cmd_str])
-
-        return "%s -c '%s'" % (
-            cmd_line(self._sh_bin()),
-            cmd_str.replace("'", "'\\''"))
 
     def _mr_job_extra_args(self, local=False):
         """Return arguments to add to every invocation of MRJob.

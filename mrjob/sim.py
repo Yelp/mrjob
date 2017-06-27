@@ -89,8 +89,6 @@ class SimMRJobRunner(MRJobRunner):
         self._check_input_exists()
         self._create_setup_wrapper_script(local=True)
 
-        last_output_paths = self._input_paths
-
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
             log.info('Running step %d of %d...' % (
@@ -439,7 +437,7 @@ class SimMRJobRunner(MRJobRunner):
 
     def _input_paths_for_step(self, step_num):
         if step_num == 0:
-            return self._input_paths
+            return self._get_input_paths()
         else:
             return self.fs.ls(
                 join(self._output_dir_for_step(step_num - 1), 'part-*'))

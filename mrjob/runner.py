@@ -831,7 +831,7 @@ class MRJobRunner(object):
         step = self._get_step(step_num)
 
         if step[mrc]['type'] == 'command':
-            cmd = step['mrc']['command']
+            cmd = step[mrc]['command']
 
             # never wrap custom hadoop streaming commands in bash
             if isinstance(cmd, string_types):

@@ -723,7 +723,6 @@ _RUNNER_OPTS = dict(
     ),
     libjars=dict(
         combiner=combine_path_lists,
-        runners={'_cloud', 'hadoop'},
         switches=[
             (['--libjar'], dict(
                 action='append',

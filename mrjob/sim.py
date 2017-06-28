@@ -306,7 +306,7 @@ class SimMRJobRunner(MRJobRunner):
                     # Hadoop tracks the compressed file's size
                     size = os.stat(path)[stat.ST_SIZE]
 
-                    with split_fileobj_gen.next() as dest:
+                    with next(split_fileobj_gen) as dest:
                         shutil.copyfileobj(src, dest)
 
                     results.append(dict(
@@ -320,7 +320,7 @@ class SimMRJobRunner(MRJobRunner):
                     length = 0
 
                     for lines in _split_records(src, split_size):
-                        with split_fileobj_gen.next() as dest:
+                        with next(split_fileobj_gen) as dest:
                             for line in lines:
                                 dest.write(line)
                                 length += len(line)
@@ -377,7 +377,7 @@ class SimMRJobRunner(MRJobRunner):
 
         with open(path, 'rb') as src:
             for records in _split_records(src, split_size, reducer_key):
-                with split_fileobj_gen.next() as dest:
+                with next(split_fileobj_gen) as dest:
                     for record in records:
                         dest.write(record)
                     num_reducer_tasks += 1

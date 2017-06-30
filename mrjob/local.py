@@ -98,9 +98,22 @@ class LocalMRJobRunner(SimMRJobRunner):
         """Use multiprocessing to run in parallel."""
         pool = Pool(processes=num_processes)
 
-        results = [pool.apply_async(*task) for task in tasks]
-        for result in results:
-            result.get()
+        try:
+            results = [pool.apply_async(*task) for task in tasks]
+            for result in results:
+                result.get()
+
+        # make sure that the pool (and its file descriptors, etc.)
+        # don't stay open. This doesn't matter much for individual jobs,
+        # but it makes our automated tasks run out of file descriptors.
+
+            pool.close()
+        except:
+            # if there's an error in one task, terminate all others
+            pool.terminate()
+            raise
+        finally:
+            pool.join()
 
     def _sort_input(self, input_paths, output_path):
         """Try sorting with the :command:`sort` binary before falling
@@ -130,8 +143,8 @@ class LocalMRJobRunner(SimMRJobRunner):
                         log.error(
                             '`%s` failed, falling back to in-memory sort' %
                             cmd_line(self._sort_bin()))
-                        with open(err_path) as err:
-                            for line in err:
+                        with open(err_path) as read_err:
+                            for line in read_err:
                                 log.error('STDERR: %s' % line.rstrip('\r\n'))
                     except OSError:
                         log.error(

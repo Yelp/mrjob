@@ -450,6 +450,9 @@ class SimMRJobRunner(MRJobRunner):
         else:
             return self._intermediate_output_uri(step_num, local=True)
 
+    def _default_step_output_dir(self):
+        return join(self._get_local_tmp_dir(), 'step-output')
+
     # step/<step_num>/<task_type>/<task_num>/
 
     def _task_dir(self, task_type, step_num, task_num):

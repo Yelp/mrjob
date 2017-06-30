@@ -437,7 +437,8 @@ class SimMRJobRunner(MRJobRunner):
 
     def _input_paths_for_step(self, step_num):
         if step_num == 0:
-            return self._get_input_paths()
+            return [path for input_path_glob in self._get_input_paths()
+                    for path in self.fs.ls(input_path_glob)]
         else:
             return self.fs.ls(
                 join(self._output_dir_for_step(step_num - 1), 'part-*'))
@@ -514,6 +515,13 @@ class SimMRJobRunner(MRJobRunner):
         with open(output_path, 'wb') as output:
             for line in lines:
                 output.write(line)
+
+    def _sort_combiner_input(self, step_num, task_num):
+        input_path = self._task_output_path('mapper', step_num, task_num)
+        output_path = self._task_input_path('combiner', step_num, task_num)
+        self.fs.mkdir(dirname(output_path))
+
+        self._sort_input([input_path], output_path)
 
     def _sort_reducer_input(self, step_num, num_map_tasks):
         step = self._get_step(step_num)

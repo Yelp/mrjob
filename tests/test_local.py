@@ -97,13 +97,18 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
             local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(local_tmp_dir)
-            self.assertGreater(runner.counters()[0]['count']['combiners'], 3)
+
+            self.assertGreater(runner.counters()[0]['count']['combiners'], 0)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+
+
+# TODO: these belong in tests of the sim runner
+class TestsToPort:
 
     def test_end_to_end_multiple_tasks(self):
         # read from STDIN, a regular file, and a .gz

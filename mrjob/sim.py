@@ -26,6 +26,7 @@ from mrjob.cat import is_compressed
 from mrjob.cat import open_input
 from mrjob.compat import translate_jobconf_dict
 from mrjob.conf import combine_local_envs
+from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
 from mrjob.util import unarchive
 
@@ -50,6 +51,8 @@ class SimMRJobRunner(MRJobRunner):
 
     def __init__(self, **kwargs):
         super(SimMRJobRunner, self).__init__(**kwargs)
+
+        self._counters = []
 
         # warn about ignored keyword arguments
         # TODO: no need to look at attrs, just look at kwargs
@@ -94,6 +97,8 @@ class SimMRJobRunner(MRJobRunner):
             log.info('Running step %d of %d...' % (
                 step_num + 1, self._num_steps()))
 
+            self._counters.append({})
+
             self._create_dist_cache_dir(step_num)
             self.fs.mkdir(self._output_dir_for_step(step_num))
 
@@ -131,12 +136,29 @@ class SimMRJobRunner(MRJobRunner):
 
     def _run_mappers_and_combiners(self, step_num, map_splits):
         # TODO: possibly catch step failure
-        self._run_multiple(
-            (_apply_method,
-             (self, '_run_mapper_and_combiner', step_num, task_num, map_split),
-             {})
-            for task_num, map_split in enumerate(map_splits)
-        )
+        try:
+            self._run_multiple(
+                (_apply_method,
+                 (self, '_run_mapper_and_combiner',
+                  step_num, task_num, map_split),
+                 {})
+                 for task_num, map_split in enumerate(map_splits)
+            )
+        finally:
+            self._parse_task_counters('mapper', step_num)
+            self._parse_task_counters('combiner', step_num)
+
+    def _parse_task_counters(self, task_type, step_num):
+        """Parse all stderr files from the given task (if any)."""
+        stderr_paths = self.fs.ls(self._task_stderr_paths_glob(
+            task_type, step_num))
+
+        for stderr_path in stderr_paths:
+            with open(stderr_path, 'rb') as stderr:
+                parse_mr_job_stderr(stderr, counters=self._counters[step_num])
+
+    def counters(self):
+        return self._counters
 
     def _run_mapper_and_combiner(self, step_num, task_num, map_split):
         step = self._get_step(step_num)
@@ -154,12 +176,15 @@ class SimMRJobRunner(MRJobRunner):
             self._run_task('combiner', step_num, task_num)
 
     def _run_reducers(self, step_num, num_reducer_tasks):
-        self._run_multiple(
-            (_apply_method,
-             (self, '_run_task', 'reducer', step_num, task_num),
-             {})
-            for task_num in range(num_reducer_tasks)
-        )
+        try:
+            self._run_multiple(
+                (_apply_method,
+                 (self, '_run_task', 'reducer', step_num, task_num),
+                 {})
+                 for task_num in range(num_reducer_tasks)
+            )
+        finally:
+            self._parse_task_counters('reducer', step_num)
 
     def _check_input_exists(self):
         if not self._opts['check_input_paths']:
@@ -466,6 +491,10 @@ class SimMRJobRunner(MRJobRunner):
     def _task_stderr_path(self, task_type, step_num, task_num):
         return join(
             self._task_dir(task_type, step_num, task_num), 'stderr')
+
+    def _task_stderr_paths_glob(self, task_type, step_num):
+        return join(
+            self._step_dir(step_num), task_type, '*', 'stderr')
 
     def _task_output_path(self, task_type, step_num, task_num):
         """Where to output data for the given task.

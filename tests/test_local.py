@@ -77,10 +77,11 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             input_file.write('bar\nqux\n')
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz_glob = os.path.join(self.tmp_dir, '*.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'wb')
         input_gz.write(b'foo\n')
         input_gz.close()
+
+        input_gz_glob = os.path.join(self.tmp_dir, '*.gz')
 
         mr_job = MRTwoStepJob(['-r', 'local', '-', input_path, input_gz_glob])
         mr_job.sandbox(stdin=stdin)
@@ -96,7 +97,7 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
             local_tmp_dir = runner._get_local_tmp_dir()
             assert os.path.exists(local_tmp_dir)
-            self.assertEqual(runner.counters()[0]['count']['combiners'], 8)
+            self.assertGreater(runner.counters()[0]['count']['combiners'], 3)
 
         # make sure cleanup happens
         assert not os.path.exists(local_tmp_dir)

@@ -35,6 +35,16 @@ from mrjob.util import cmd_line
 log = logging.getLogger(__name__)
 
 
+class _TaskFailedException(Exception):
+    """Exception for tasks launched by multiprocessing to throw, so we can
+    easily identify it."""
+    def __init__(self, task_type, step_num, task_num, reason):
+        self.task_type = task_type
+        self.step_num = step_num
+        self.task_num = task_num
+        self.reason = reason
+
+
 class LocalRunnerOptionStore(RunnerOptionStore):
     ALLOWED_KEYS = _allowed_keys('local')
     COMBINERS = _combiners('local')
@@ -89,10 +99,9 @@ class LocalMRJobRunner(SimMRJobRunner):
         try:
             check_call(args, stdin=stdin, stdout=stdout, stderr=stderr,
                        cwd=wd, env=env)
-        except CalledProcessError as ex:
-            raise StepFailedException(
-                reason=str(ex), step_num=step_num,
-                num_steps=len(self._get_steps()))
+        except Exception as ex:
+            raise _TaskFailedException(
+                task_type, step_num, task_num, reason=ex)
 
     def _run_multiple(self, tasks, num_processes=None):
         """Use multiprocessing to run in parallel."""

@@ -72,8 +72,8 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         self._mrjob_cls = mrjob_cls
 
-    def _invoke_task(
-            self, task_type, step_num, stdin, stdout, stderr, wd, env):
+    def _invoke_task(self, task_type, step_num, task_num,
+                     stdin, stdout, stderr, wd, env):
         """Just run tasks in the same process."""
 
         with save_current_environment(), save_cwd():

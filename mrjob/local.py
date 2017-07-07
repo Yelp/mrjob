@@ -28,31 +28,10 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.runner import RunnerOptionStore
 from mrjob.sim import SimMRJobRunner
-from mrjob.step import StepFailedException
+from mrjob.sim import TaskFailedException
 from mrjob.util import cmd_line
 
 log = logging.getLogger(__name__)
-
-
-class TaskFailedException(StepFailedException):
-    """Extension of :py:class:`~mrjob.step.StepFailedException` that blames
-    one particular task."""
-    _FIELDS = StepFailedException._FIELDS + ('task_type', 'input_path')
-
-    def __init__(
-            self, reason=None, step_num=None, num_steps=None, step_desc=None,
-            task_type=None, input_path=None):
-        super(TaskFailedException, self).__init__(
-            reason=reason, step_num=step_num,
-            num_steps=num_steps, step_desc=step_desc)
-
-        self.task_type = task_type
-        self.input_path = input_path
-
-    def __str__(self):
-        return (super(TaskFailedException, self).__str__() +
-            '\nwhile running %s on %s' % (
-                self.task_type, self.input_path))
 
 
 class LocalRunnerOptionStore(RunnerOptionStore):
@@ -139,7 +118,7 @@ class LocalMRJobRunner(SimMRJobRunner):
         finally:
             pool.join()
 
-
+    # TODO: remove this once _run_multiple() above is fixed
     def _run_multiple(self, tasks, num_processes=None):
         """Just run the tasks inline, one at a time.
         """

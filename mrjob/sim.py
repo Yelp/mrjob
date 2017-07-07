@@ -102,21 +102,23 @@ class SimMRJobRunner(MRJobRunner):
 
             self._counters.append({})
 
-            self._create_dist_cache_dir(step_num)
-            self.fs.mkdir(self._output_dir_for_step(step_num))
+            try:
+                self._create_dist_cache_dir(step_num)
+                self.fs.mkdir(self._output_dir_for_step(step_num))
 
-            map_splits = self._split_mapper_input(
-                self._input_paths_for_step(step_num), step_num)
+                map_splits = self._split_mapper_input(
+                    self._input_paths_for_step(step_num), step_num)
 
-            self._run_mappers_and_combiners(step_num, map_splits)
+                self._run_mappers_and_combiners(step_num, map_splits)
 
-            if 'reducer' in step:
-                self._sort_reducer_input(step_num, len(map_splits))
-                num_reducer_tasks = self._split_reducer_input(step_num)
+                if 'reducer' in step:
+                    self._sort_reducer_input(step_num, len(map_splits))
+                    num_reducer_tasks = self._split_reducer_input(step_num)
 
-                self._run_reducers(step_num, num_reducer_tasks)
-
-            self._print_counters(step_num)
+                    self._run_reducers(step_num, num_reducer_tasks)
+            finally:
+                # print counters for failed steps too
+                self._print_counters(step_num)
 
     def _run_task(self, task_type, step_num, task_num, map_split=None):
         """Run one mapper, reducer, or combiner.

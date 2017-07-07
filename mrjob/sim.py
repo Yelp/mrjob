@@ -111,6 +111,10 @@ class SimMRJobRunner(MRJobRunner):
         """
         raise NotImplementedError
 
+    def _log_cause_of_error(self, ex):
+        """Log why the job failed."""
+        pass
+
     def _run(self):
         self._check_input_exists()
         self._create_setup_wrapper_script(local=True)
@@ -136,9 +140,14 @@ class SimMRJobRunner(MRJobRunner):
                     num_reducer_tasks = self._split_reducer_input(step_num)
 
                     self._run_reducers(step_num, num_reducer_tasks)
-            finally:
-                # print counters for failed steps too
+
                 self._print_counters(step_num)
+
+            except Exception as ex:
+                self._print_counters(step_num)
+                self._log_cause_of_error(ex)
+
+                raise
 
     def _run_task(self, task_type, step_num, task_num, map_split=None):
         """Run one mapper, reducer, or combiner.
@@ -597,8 +606,6 @@ class SimMRJobRunner(MRJobRunner):
         counters = self.counters()[step_num]
         if counters:
             log.info(_format_counters(counters))
-
-
 
 
 

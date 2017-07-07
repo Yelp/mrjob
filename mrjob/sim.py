@@ -52,8 +52,7 @@ class TaskFailedException(StepFailedException):
 
     def __str__(self):
         return (super(TaskFailedException, self).__str__() +
-            '\nwhile running %s on %s' % (
-                self.task_type, self.input_path))
+            ' while reading from:\n  %s' % self.input_path)
 
 
 class SimMRJobRunner(MRJobRunner):

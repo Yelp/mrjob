@@ -90,7 +90,7 @@ class LocalMRJobRunner(SimMRJobRunner):
                        cwd=wd, env=env)
         except Exception as ex:
             raise TaskFailedException(
-                reason=ex,
+                reason=str(ex),
                 step_num=step_num,
                 num_steps=self._num_steps(),
                 task_type=task_type,
@@ -117,13 +117,6 @@ class LocalMRJobRunner(SimMRJobRunner):
             raise
         finally:
             pool.join()
-
-    # TODO: remove this once _run_multiple() above is fixed
-    def _run_multiple(self, tasks, num_processes=None):
-        """Just run the tasks inline, one at a time.
-        """
-        for func, args, kwargs in tasks:
-            func(*args, **kwargs)
 
     def _sort_input(self, input_paths, output_path):
         """Try sorting with the :command:`sort` binary before falling

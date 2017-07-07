@@ -23,26 +23,36 @@ from multiprocessing import Pool
 from subprocess import CalledProcessError
 from subprocess import check_call
 
-from mrjob.sim import SimMRJobRunner
-from mrjob.step import StepFailedException
 from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.runner import RunnerOptionStore
+from mrjob.sim import SimMRJobRunner
+from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
-
 
 log = logging.getLogger(__name__)
 
 
-class _TaskFailedException(Exception):
-    """Exception for tasks launched by multiprocessing to throw, so we can
-    easily identify it."""
-    def __init__(self, task_type, step_num, task_num, reason):
+class TaskFailedException(StepFailedException):
+    """Extension of :py:class:`~mrjob.step.StepFailedException` that blames
+    one particular task."""
+    _FIELDS = StepFailedException._FIELDS + ('task_type', 'input_path')
+
+    def __init__(
+            self, reason=None, step_num=None, num_steps=None, step_desc=None,
+            task_type=None, input_path=None):
+        super(TaskFailedException, self).__init__(
+            reason=reason, step_num=step_num,
+            num_steps=num_steps, step_desc=step_desc)
+
         self.task_type = task_type
-        self.step_num = step_num
-        self.task_num = task_num
-        self.reason = reason
+        self.input_path = input_path
+
+    def __str__(self):
+        return (super(TaskFailedException, self).__str__() +
+            '\nwhile running %s on %s' % (
+                self.task_type, self.input_path))
 
 
 class LocalRunnerOptionStore(RunnerOptionStore):
@@ -100,8 +110,13 @@ class LocalMRJobRunner(SimMRJobRunner):
             check_call(args, stdin=stdin, stdout=stdout, stderr=stderr,
                        cwd=wd, env=env)
         except Exception as ex:
-            raise _TaskFailedException(
-                task_type, step_num, task_num, reason=ex)
+            raise TaskFailedException(
+                reason=ex,
+                step_num=step_num,
+                num_steps=self._num_steps(),
+                task_type=task_type,
+                input_path=getattr(stdin, 'name', 'STDIN')
+            )
 
     def _run_multiple(self, tasks, num_processes=None):
         """Use multiprocessing to run in parallel."""
@@ -123,6 +138,13 @@ class LocalMRJobRunner(SimMRJobRunner):
             raise
         finally:
             pool.join()
+
+
+    def _run_multiple(self, tasks, num_processes=None):
+        """Just run the tasks inline, one at a time.
+        """
+        for func, args, kwargs in tasks:
+            func(*args, **kwargs)
 
     def _sort_input(self, input_paths, output_path):
         """Try sorting with the :command:`sort` binary before falling

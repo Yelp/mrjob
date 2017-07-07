@@ -26,8 +26,10 @@ from mrjob.cat import is_compressed
 from mrjob.cat import open_input
 from mrjob.compat import translate_jobconf_dict
 from mrjob.conf import combine_local_envs
+from mrjob.logs.counters import _format_counters
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
+from mrjob.step import StepFailedException
 from mrjob.util import unarchive
 
 log = logging.getLogger(__name__)
@@ -76,9 +78,10 @@ class SimMRJobRunner(MRJobRunner):
 
     # re-implement these in your subclass
 
-    def _invoke_task(self, task_type, step_num, task_num,
-                     stdin, stdout, stderr, wd, env):
-        """Run the given mapper/reducer, given the """
+    def _invoke_task(
+            self, task_type, step_num, stdin, stdout, stderr, wd, env):
+        """Run the given mapper/reducer, with the job's file handles
+        working dir, and environment already set up."""
         NotImplementedError
 
     def _run_multiple(self, tasks, num_processes=None):
@@ -113,6 +116,8 @@ class SimMRJobRunner(MRJobRunner):
 
                 self._run_reducers(step_num, num_reducer_tasks)
 
+            self._print_counters(step_num)
+
     def _run_task(self, task_type, step_num, task_num, map_split=None):
         """Run one mapper, reducer, or combiner.
 
@@ -132,7 +137,7 @@ class SimMRJobRunner(MRJobRunner):
                 open(stderr_path, 'wb') as stderr:
 
             self._invoke_task(
-                task_type, step_num, task_num, stdin, stdout, stderr, wd, env)
+                task_type, step_num, stdin, stdout, stderr, wd, env)
 
     def _run_mappers_and_combiners(self, step_num, map_splits):
         # TODO: possibly catch step failure
@@ -565,6 +570,12 @@ class SimMRJobRunner(MRJobRunner):
         ]
 
         self._sort_input(input_paths, output_path)
+
+    def _print_counters(self, step_num):
+        counters = self.counters()[step_num]
+        if counters:
+            log.info(_format_counters(counters))
+
 
 
 

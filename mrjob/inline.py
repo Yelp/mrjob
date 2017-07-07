@@ -72,6 +72,9 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         self._mrjob_cls = mrjob_cls
 
+        # used to explain exceptions
+        self._error_while_reading_from = None
+
     def _invoke_task(
             self, task_type, step_num, stdin, stdout, stderr, wd, env):
         """Just run tasks in the same process."""
@@ -80,11 +83,17 @@ class InlineMRJobRunner(SimMRJobRunner):
             os.environ.update(env)
             os.chdir(wd)
 
-            task = self._mrjob_cls(
-                args=self._args_for_task(step_num, task_type))
-            task.sandbox(stdin=stdin, stdout=stdout, stderr=stderr)
+            try:
+                task = self._mrjob_cls(
+                    args=self._args_for_task(step_num, task_type))
+                task.sandbox(stdin=stdin, stdout=stdout, stderr=stderr)
 
-            task.execute()
+                task.execute()
+            except:
+                # so users can figure out where the exception came from
+                self._error_while_reading_from = getattr(
+                    stdin, 'name', 'STDIN')
+                raise
 
     def _run_multiple(self, tasks, num_processes=None):
         """Just run the tasks inline, one at a time.
@@ -92,8 +101,17 @@ class InlineMRJobRunner(SimMRJobRunner):
         for func, args, kwargs in tasks:
             func(*args, **kwargs)
 
+    def _log_cause_of_error(self, ex):
+        """Just tell what file we were reading from (since they'll see
+        the stacktrace from the actual exception)"""
+        if self._error_while_reading_from:
+            log.error('Error while reading from %s:\n' %
+                      self._error_while_reading_from)
+
     # avoid subprocesses
 
+    # TODO: won't need this once we break this out into MRJobBinRunner
+    # (see #1617)
     def _create_setup_wrapper_script(self, local=False):
         # inline mode doesn't need this (no subprocesses)
         pass

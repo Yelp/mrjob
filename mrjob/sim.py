@@ -120,10 +120,10 @@ class SimMRJobRunner(MRJobRunner):
 
                     self._run_reducers(step_num, num_reducer_tasks)
 
-                self._print_counters(step_num)
+                self._log_counters(step_num)
 
             except Exception as ex:
-                self._print_counters(step_num)
+                self._log_counters(step_num)
                 self._log_cause_of_error(ex)
 
                 raise
@@ -581,21 +581,10 @@ class SimMRJobRunner(MRJobRunner):
 
         self._sort_input(input_paths, output_path)
 
-    def _print_counters(self, step_num):
+    def _log_counters(self, step_num):
         counters = self.counters()[step_num]
         if counters:
-            log.info(_format_counters(counters))
-
-
-
-
-
-
-
-
-
-
-
+            log.info(_format_counters(counters) + '\n')
 
 
 def _chmod_u_rx(path, recursive=False):

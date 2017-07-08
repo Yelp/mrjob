@@ -18,6 +18,7 @@ them together. Useful for testing, not terrible for running medium-sized
 jobs on all CPUs."""
 import logging
 import os
+import pickle
 import platform
 from multiprocessing import Pool
 from subprocess import CalledProcessError
@@ -120,7 +121,7 @@ class LocalMRJobRunner(SimMRJobRunner):
         pool = Pool(processes=num_processes)
 
         try:
-            results = [pool.apply_async(*task) for task in tasks]
+            results = [pool.apply_async(*_pickle_wrap(task)) for task in tasks]
             for result in results:
                 result.get()
 
@@ -138,7 +139,11 @@ class LocalMRJobRunner(SimMRJobRunner):
 
     def _log_cause_of_error(self, ex):
         if not isinstance(ex, _TaskFailedException):
+            # if something went wrong inside mrjob, the stacktrace
+            # will bubble up to the top level
             return
+
+        # not using LogInterpretationMixin because it would be overkill
 
         input_path = self._task_input_path(
             ex.task_type, ex.step_num, ex.task_num)
@@ -212,3 +217,43 @@ class LocalMRJobRunner(SimMRJobRunner):
         else:
             # only sort on the reducer key (see #660)
             return ['sort', '-t', '\t', '-k', '1,1', '-s']
+
+
+
+# pickle utilities, to protect multiprocessing from itself
+
+def _pickle_wrap(task):
+    """Wrap task to make sure we don't return unpickleable results
+    or raise unpickleable exceptions, which causes multiprocessing
+    to stall."""
+    func, args, kwargs = task
+
+    return (_pickle_safe, (func,) + tuple(args), kwargs)
+
+
+def _pickle_safe(func, *args, **kwargs):
+    try:
+        result = func(*args, **kwargs)
+        if _is_pickleable(result):
+            # so far, our tasks only ever return None. just to be safe
+            return result
+        else:
+            return None
+    except Exception as ex:
+        if _is_pickleable(ex):
+            raise
+        else:
+            raise Exception(str(ex))
+
+
+def _is_pickleable(ex):
+    """Check if we can pickle and unpickle the given exception
+
+    For example, Python will happily pickle a CalledProcessError,
+    only to be unable to unpickle it
+    """
+    try:
+        pickle.loads(pickle.dumps(ex))
+        return True
+    except:
+        return False

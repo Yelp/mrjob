@@ -21,7 +21,6 @@ from subprocess import PIPE
 from subprocess import Popen
 from unittest import TestCase
 
-from mrjob.parse import _find_python_traceback
 from mrjob.parse import _parse_port_range_list
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
@@ -30,101 +29,6 @@ from mrjob.parse import is_uri
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
-
-
-class FindPythonTracebackTestCase(TestCase):
-
-    EXAMPLE_TRACEBACK = b"""Traceback (most recent call last):
-  File "mr_collect_per_search_info_remote.py", line 8, in <module>
-    from batch.stat_loader_remote.protocols import MySQLLoadProtocol
-  File "/mnt/var/lib/hadoop/mapred/taskTracker/jobcache/job_201108022217_0001/attempt_201108022217_0001_m_000001_0/work/yelp-src-tree. tar.gz/batch/stat_loader_remote/protocols.py", line 4, in <module>
-ImportError: No module named mr3po.mysqldump
-Traceback (most recent call last):
-  File "wrapper.py", line 16, in <module>
-    check_call(sys.argv[1:])
-  File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
-    raise CalledProcessError(retcode, cmd)
-subprocess.CalledProcessError: Command '['python', 'mr_collect_per_search_info_remote.py', '--step-num=0', '--mapper']' returned non-  zero exit status 1
-"""
-
-    EXAMPLE_STDERR_TRACEBACK_1 = b"""mr_profile_test.py:27: Warning: 'with' will become a reserved keyword in Python 2.6
-  File "mr_profile_test.py", line 27
-    with open('/mnt/var/log/hadoop/profile/bloop', 'w') as f:
-            ^
-SyntaxError: invalid syntax
-Traceback (most recent call last):
-  File "wrapper.py", line 16, in <module>
-    check_call(sys.argv[1:])
-  File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
-    raise CalledProcessError(retcode, cmd)
-subprocess.CalledProcessError: Command '['python', 'mr_profile_test.py', '--step-num=0', '--reducer', '--input-protocol', 'raw_value', '--output-protocol', 'json', '--protocol', 'json']' returned non-zero exit status 1
-"""
-
-    EXAMPLE_STDERR_TRACEBACK_2 = b"""tools/csv-to-myisam.c:18:19: error: mysql.h: No such file or directory
-make: *** [tools/csv-to-myisam] Error 1
-Traceback (most recent call last):
-  File "wrapper.py", line 11, in <module>
-    check_call('cd yelp-src-tree.tar.gz; ln -sf $(readlink -f config/emr/level.py) config/level.py; make -f Makefile.emr', shell=True, stdout=open('/dev/null', 'w'))
-  File "/usr/lib/python2.7/subprocess.py", line 462, in check_call
-    raise CalledProcessError(retcode, cmd)
-subprocess.CalledProcessError: Command 'cd yelp-src-tree.tar.gz; ln -sf $(readlink -f config/emr/level.py) config/level.py; make -f    Makefile.emr' returned non-zero exit status 2
-"""
-
-    def test_find_python_traceback(self):
-        def run(*args):
-            return Popen(args, stdout=PIPE, stderr=PIPE).communicate()
-
-        # sanity-check normal operations
-        ok_stdout, ok_stderr = run('python', '-c', "print(sorted('321'))")
-        self.assertEqual(ok_stdout.rstrip(), b"['1', '2', '3']")
-        self.assertEqual(_find_python_traceback(BytesIO(ok_stderr)), None)
-
-        # Oops, can't sort a number.
-        stdout, stderr = run('python', '-c', "print(sorted(321))")
-
-        # We expect something like this:
-        #
-         # Traceback (most recent call last):
-        #   File "<string>", line 1, in <module>
-        # TypeError: 'int' object is not iterable
-        self.assertEqual(stdout, b'')
-        # save the traceback for the next step
-        tb = _find_python_traceback(BytesIO(stderr))
-        self.assertNotEqual(tb, None)
-        assert isinstance(tb, list)
-        # The first line ("Traceback...") is not skipped
-        self.assertIn("Traceback (most recent call last):", tb[0])
-        self.assertIn("TypeError: 'int' object is not iterable", tb[-1])
-
-        # PyPy doesn't support -v
-        if hasattr(sys, 'pypy_version_info'):
-            return
-
-        # make sure we can find the same traceback in noise
-        verbose_stdout, verbose_stderr = run(
-            'python', '-v', '-c', "print(sorted(321))")
-        self.assertEqual(verbose_stdout, b'')
-        self.assertNotEqual(verbose_stderr, stderr)
-        verbose_tb = _find_python_traceback(BytesIO(verbose_stderr))
-        self.assertEqual(verbose_tb, tb)
-
-    def test_find_multiple_python_tracebacks(self):
-        total_traceback = self.EXAMPLE_TRACEBACK + b'junk\n'
-        tb = _find_python_traceback(BytesIO(total_traceback))
-        self.assertEqual(''.join(tb),
-                         self.EXAMPLE_TRACEBACK.decode('ascii'))
-
-    def test_find_python_traceback_with_more_stderr(self):
-        total_traceback = self.EXAMPLE_STDERR_TRACEBACK_1 + b'junk\n'
-        tb = _find_python_traceback(BytesIO(total_traceback))
-        self.assertEqual(''.join(tb),
-                         self.EXAMPLE_STDERR_TRACEBACK_1.decode('ascii'))
-
-    def test_find_python_traceback_with_more_stderr_2(self):
-        total_traceback = self.EXAMPLE_STDERR_TRACEBACK_2 + b'junk\n'
-        tb = _find_python_traceback(BytesIO(total_traceback))
-        self.assertEqual(''.join(tb),
-                         self.EXAMPLE_STDERR_TRACEBACK_2.decode('ascii'))
 
 
 class ParseMRJobStderrTestCase(TestCase):

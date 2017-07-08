@@ -625,6 +625,9 @@ def _split_records(record_gen, split_size, reducer_key=None):
     for group_id, grouped_records in itertools.groupby(
             grouped_record_gen, key=lambda gr: gr[0]):
         yield (record for _, record in grouped_records)
+    else:
+        # special case for empty files
+        yield ()
 
 
 def _group_records_for_split(record_gen, split_size, reducer_key=None):

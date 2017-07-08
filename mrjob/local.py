@@ -232,28 +232,11 @@ def _pickle_wrap(task):
 
 
 def _pickle_safe(func, *args, **kwargs):
+    """Dumb down *func* so that we don't try to pass anything
+    unpickleable through multiprocessing."""
     try:
-        result = func(*args, **kwargs)
-        if _is_pickleable(result):
-            # so far, our tasks only ever return None. just to be safe
-            return result
-        else:
-            return None
+        func(*args, **kwargs)  # always return None
+    except _TaskFailedException:
+        raise  # we know these are pickleable
     except Exception as ex:
-        if _is_pickleable(ex):
-            raise
-        else:
-            raise Exception(str(ex))
-
-
-def _is_pickleable(ex):
-    """Check if we can pickle and unpickle the given exception
-
-    For example, Python will happily pickle a CalledProcessError,
-    only to be unable to unpickle it
-    """
-    try:
-        pickle.loads(pickle.dumps(ex))
-        return True
-    except:
-        return False
+        raise Exception(str(ex))  # we know this is pickleable

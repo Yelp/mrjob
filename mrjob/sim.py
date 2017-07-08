@@ -277,7 +277,7 @@ class SimMRJobRunner(MRJobRunner):
         j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%04d%d_0' % (
             self._job_key, task_type.lower(), step_num, task_num)
 
-        j['mapreduce.task.ismap'] = (task_type == 'mapper')
+        j['mapreduce.task.ismap'] = str(task_type == 'mapper').lower()
 
         # TODO: is this the correct format?
         j['mapreduce.task.partition'] = str(task_num)
@@ -297,7 +297,7 @@ class SimMRJobRunner(MRJobRunner):
 
             # mapreduce.job.cache.local.archives
             # mapreduce.job.cache.local.files
-            j['mapreduce.job.cache.local%ss' % x] = ','.join(
+            j['mapreduce.job.cache.local.%ss' % x] = ','.join(
                 join(working_dir, name) for name, path in named_paths)
 
         if map_split:

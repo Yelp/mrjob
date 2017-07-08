@@ -20,6 +20,7 @@
 import gzip
 import os
 import os.path
+import stat
 from io import BytesIO
 from unittest import TestCase
 
@@ -226,19 +227,17 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
     # this class is also used to test local mode
     RUNNER = 'inline'
 
-    def test_input_files_and_setting_number_of_tasks(self):
+
+    def test_input_files(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:
             input_file.write(b'bar\nqux\nfoo\n')
 
         input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
-        input_gz = gzip.GzipFile(input_gz_path, 'wb')
-        input_gz.write(b'foo\n')
-        input_gz.close()
+        with gzip.GzipFile(input_gz_path, 'wb') as input_gz:
+            input_gz.write(b'foo\n')
 
         mr_job = MRWordCount(['-r', self.RUNNER,
-                              '--jobconf=mapred.map.tasks=3',
-                              '--jobconf=mapred.reduce.tasks=3',
                               input_path, input_gz_path])
         mr_job.sandbox()
 
@@ -249,7 +248,7 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
 
             results.extend(mr_job.parse_output(runner.cat_output()))
 
-            self.assertEqual(runner.counters()[0]['count']['combiners'], 3)
+            self.assertGreater(runner.counters()[0]['count']['combiners'], 2)
 
         self.assertEqual(sorted(results),
                          [(input_path, 3), (input_gz_path, 1)])
@@ -260,9 +259,12 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         return []
 
     def test_jobconf_simulated_by_runner(self):
-        input_path = os.path.join(self.tmp_dir, 'input')
-        with open(input_path, 'wb') as input_file:
-            input_file.write(b'foo\n')
+        # use a .gz file so there's only one split
+        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        with gzip.GzipFile(input_gz_path, 'wb') as input_gz:
+            input_gz.write(b'foo\n')
+        input_gz_size = os.stat(input_gz_path)[stat.ST_SIZE]
+
 
         upload_path = os.path.join(self.tmp_dir, 'upload')
         with open(upload_path, 'wb') as upload_file:
@@ -274,9 +276,8 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         mr_job = MRTestJobConf(['-r', self.RUNNER,
                                 '--no-bootstrap-mrjob',
                                 '--jobconf=user.defined=something',
-                                '--jobconf=mapred.map.tasks=1',
                                 '--file', upload_path,
-                               input_path])
+                               input_gz_path])
 
         mr_job.sandbox()
 
@@ -296,9 +297,10 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         working_dir = results['mapreduce.job.local.dir']
         self.assertEqual(working_dir,
                          os.path.join(runner._get_local_tmp_dir(),
-                                      'job_local_dir', '0', 'mapper', '0'))
+                                      'step', '000', 'mapper', '00000', 'wd'))
 
         self.assertEqual(results['mapreduce.job.cache.archives'], '')
+
         expected_cache_files = [
             script_path + '#mr_test_jobconf.py',
             upload_path + '#upload'
@@ -309,6 +311,7 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         self.assertEqual(
             sorted(results['mapreduce.job.cache.files'].split(',')),
             sorted(expected_cache_files))
+
         self.assertEqual(results['mapreduce.job.cache.local.archives'], '')
         expected_local_files = [
             os.path.join(working_dir, 'mr_test_jobconf.py'),
@@ -322,8 +325,9 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
             sorted(expected_local_files))
         self.assertEqual(results['mapreduce.job.id'], runner._job_key)
 
-        self.assertEqual(results['mapreduce.map.input.file'], input_path)
-        self.assertEqual(results['mapreduce.map.input.length'], '4')
+        self.assertEqual(results['mapreduce.map.input.file'], input_gz_path)
+        self.assertEqual(results['mapreduce.map.input.length'],
+                         str(input_gz_size))
         self.assertEqual(results['mapreduce.map.input.start'], '0')
         self.assertEqual(results['mapreduce.task.attempt.id'],
                          'attempt_%s_mapper_00000_0' % runner._job_key)
@@ -351,21 +355,6 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         # user.defined gets re-defined in the second step
         self.assertEqual(results[(0, 'user.defined')], 'something')
         self.assertEqual(results[(1, 'user.defined')], 'nothing')
-
-    def test_per_step_jobconf_can_set_number_of_tasks(self):
-        mr_job = MRTestPerStepJobConf([
-            '-r', self.RUNNER, '--jobconf', 'mapred.map.tasks=2',
-        ])
-        # need at least two items of input to get two map tasks
-        mr_job.sandbox(BytesIO(b'foo\nbar\n'))
-
-        with mr_job.make_runner() as runner:
-            runner.run()
-
-            # sanity test: --jobconf should definitely work
-            self.assertEqual(runner.counters()[0]['count']['mapper_init'], 2)
-            # the job sets its own mapred.map.tasks to 4 for the 2nd step
-            self.assertEqual(runner.counters()[1]['count']['mapper_init'], 4)
 
 
 class InlineMRJobRunnerNoMapperTestCase(SandboxedTestCase):

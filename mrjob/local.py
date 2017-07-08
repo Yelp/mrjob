@@ -23,6 +23,8 @@ from multiprocessing import Pool
 from subprocess import CalledProcessError
 from subprocess import check_call
 
+from mrjob.logs.errors import _format_error
+from mrjob.logs.task import _parse_task_stderr
 from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
@@ -34,24 +36,20 @@ from mrjob.util import cmd_line
 log = logging.getLogger(__name__)
 
 
-class TaskFailedException(StepFailedException):
-    """Extension of :py:class:`~mrjob.step.StepFailedException` that blames
-    one particular task."""
-    _FIELDS = StepFailedException._FIELDS + ('task_type', 'input_path')
+class _TaskFailedException(StepFailedException):
+    """Extension of :py:class:`~mrjob.step.StepFailedException` that
+    blames one particular task."""
+    _FIELDS = StepFailedException._FIELDS + ('task_type', 'task_num')
 
     def __init__(
             self, reason=None, step_num=None, num_steps=None, step_desc=None,
-            task_type=None, input_path=None):
-        super(TaskFailedException, self).__init__(
+            task_type=None, task_num=None):
+        super(_TaskFailedException, self).__init__(
             reason=reason, step_num=step_num,
             num_steps=num_steps, step_desc=step_desc)
 
         self.task_type = task_type
-        self.input_path = input_path
-
-    def __str__(self):
-        return (super(TaskFailedException, self).__str__() +
-            ' while reading from:\n  %s' % self.input_path)
+        self.task_num = task_num
 
 
 class LocalRunnerOptionStore(RunnerOptionStore):
@@ -96,8 +94,8 @@ class LocalMRJobRunner(SimMRJobRunner):
         # should we fall back to sorting in memory?
         self._bad_sort_bin = False
 
-    def _invoke_task(
-            self, task_type, step_num, stdin, stdout, stderr, wd, env):
+    def _invoke_task(self, task_type, step_num, task_num,
+                     stdin, stdout, stderr, wd, env):
 
         args = self._substep_args(step_num, task_type)
 
@@ -109,12 +107,12 @@ class LocalMRJobRunner(SimMRJobRunner):
             check_call(args, stdin=stdin, stdout=stdout, stderr=stderr,
                        cwd=wd, env=env)
         except Exception as ex:
-            raise TaskFailedException(
+            raise _TaskFailedException(
                 reason=str(ex),
                 step_num=step_num,
                 num_steps=self._num_steps(),
                 task_type=task_type,
-                input_path=getattr(stdin, 'name', 'STDIN')
+                task_num=task_num,
             )
 
     def _run_multiple(self, tasks, num_processes=None):
@@ -137,6 +135,30 @@ class LocalMRJobRunner(SimMRJobRunner):
             raise
         finally:
             pool.join()
+
+    def _log_cause_of_error(self, ex):
+        if not isinstance(ex, _TaskFailedException):
+            return
+
+        input_path = self._task_input_path(
+            ex.task_type, ex.step_num, ex.task_num)
+        stderr_path = self._task_stderr_path(
+            ex.task_type, ex.step_num, ex.task_num)
+
+        if self.fs.exists(stderr_path):  # it should, but just to be safe
+            with open(stderr_path, 'rb') as stderr:
+                task_error = _parse_task_stderr(stderr)
+                if task_error:
+                    task_error['path'] = stderr_path
+                    log.error('Cause of failure:\n\n%s\n\n' %
+                              _format_error(dict(
+                                  split=dict(path=input_path),
+                                  task_error=task_error)))
+                    return
+
+        # fallback if we can't find the error (e.g. the job does something
+        # weird to stderr or stack traces)
+        log.error('Error while reading from %s:\n' % input_path)
 
     def _sort_input(self, input_paths, output_path):
         """Try sorting with the :command:`sort` binary before falling

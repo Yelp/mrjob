@@ -21,6 +21,8 @@ from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
 from .wrap import _cat_log
 from .wrap import _ls_logs
+from mrjob.parse import _COUNTER_RE
+from mrjob.parse import _STATUS_RE
 
 
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
@@ -51,7 +53,15 @@ _PRE_YARN_TASK_LOG_PATH_RE = re.compile(
 
 
 # ignore warnings about initializing log4j in task stderr
-_TASK_STDERR_IGNORE_RE = re.compile(r'^log4j:WARN .*$')
+_LOG4J_WARN_RE = re.compile(r'^log4j:WARN .*$')
+
+# also ignore counters and status messages (this only happens in
+# local mode, where there's no real Hadoop to filter them out)
+_TASK_STDERR_IGNORE_RES = [
+    _COUNTER_RE,
+    _STATUS_RE,
+    _LOG4J_WARN_RE,
+]
 
 # this is the start of a Java stacktrace that Hadoop 1 always logs to
 # stderr when tasks fail (see #1430)
@@ -433,21 +443,24 @@ def _parse_task_stderr(lines):
             else:
                 stack_trace_start_line = None
 
-        # ignore warnings about initializing log4j
-        if _TASK_STDERR_IGNORE_RE.match(line):
+        # ignore warnings about initializing log4j, counters, etc.
+        if any(ir.match(line) for ir in _TASK_STDERR_IGNORE_RES):
             # ignored lines shouldn't count as part of the line range
             if task_error and 'num_lines' not in task_error:
                 task_error['num_lines'] = line_num - task_error['start_line']
             continue
         elif not task_error or line.startswith('+ '):
+            # stderr log should only contain counters and status
+            # messages in local mode
             task_error = dict(
                 message=line,
                 start_line=line_num)
         else:
             task_error['message'] += '\n' + line
+            task_error['num_lines'] = None
 
     if task_error:
-        if 'num_lines' not in task_error:
+        if not task_error.get('num_lines'):
             end_line = stack_trace_start_line or (line_num + 1)
             task_error['num_lines'] = end_line - task_error['start_line']
         return task_error

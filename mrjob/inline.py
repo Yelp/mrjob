@@ -75,8 +75,8 @@ class InlineMRJobRunner(SimMRJobRunner):
         # used to explain exceptions
         self._error_while_reading_from = None
 
-    def _invoke_task(
-            self, task_type, step_num, stdin, stdout, stderr, wd, env):
+    def _invoke_task(self, task_type, step_num, task_num,
+                     stdin, stdout, stderr, wd, env):
         """Just run tasks in the same process."""
 
         with save_current_environment(), save_cwd():
@@ -90,9 +90,12 @@ class InlineMRJobRunner(SimMRJobRunner):
 
                 task.execute()
             except:
-                # so users can figure out where the exception came from
-                self._error_while_reading_from = getattr(
-                    stdin, 'name', 'STDIN')
+                # so users can figure out where the exception came from;
+                # see _log_cause_of_error(). we can't wrap the exception
+                # because then we lose the stacktrace (which is the whole
+                # point of the inline runner)
+                self._error_while_reading_from = self._task_input_path(
+                    task_type, step_num, task_num)
                 raise
 
     def _run_multiple(self, tasks, num_processes=None):

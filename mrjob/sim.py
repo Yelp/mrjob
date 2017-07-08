@@ -77,8 +77,8 @@ class SimMRJobRunner(MRJobRunner):
 
     # re-implement these in your subclass
 
-    def _invoke_task(
-            self, task_type, step_num, stdin, stdout, stderr, wd, env):
+    def _invoke_task(self, task_type, step_num, task_num,
+                     stdin, stdout, stderr, wd, env):
         """Run the given mapper/reducer, with the job's file handles
         working dir, and environment already set up."""
         NotImplementedError
@@ -147,7 +147,7 @@ class SimMRJobRunner(MRJobRunner):
                 open(stderr_path, 'wb') as stderr:
 
             self._invoke_task(
-                task_type, step_num, stdin, stdout, stderr, wd, env)
+                task_type, step_num, task_num, stdin, stdout, stderr, wd, env)
 
     def _run_mappers_and_combiners(self, step_num, map_splits):
         # TODO: possibly catch step failure
@@ -584,7 +584,7 @@ class SimMRJobRunner(MRJobRunner):
     def _log_counters(self, step_num):
         counters = self.counters()[step_num]
         if counters:
-            log.info(_format_counters(counters) + '\n')
+            log.info('\n%s\n' % _format_counters(counters))
 
 
 def _chmod_u_rx(path, recursive=False):
@@ -603,8 +603,6 @@ def _symlink_or_copy(path, dest):
     else:
         # TODO: use shutil.copy2() or shutil.copytree()
         raise NotImplementedError
-
-
 
 
 def _split_records(record_gen, split_size, reducer_key=None):

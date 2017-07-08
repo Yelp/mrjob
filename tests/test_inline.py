@@ -403,18 +403,3 @@ class InlineMRJobRunnerFSTestCase(SandboxedTestCase):
 
     def test_cant_handle_uris(self):
         self.assertRaises(IOError, self.runner.fs.ls, 's3://walrus/foo')
-
-
-class ErrorOnBadPathsTestCase(TestCase):
-
-    def setUp(self):
-        self.fs = mock.create_autospec(Filesystem)
-        self.paths = ['/one', '/two' '/three/*']
-
-    def test_with_paths(self):
-        _error_on_bad_paths(self.fs, self.paths)
-        self.fs.exists.assert_called_once_with(self.paths[0])
-
-    def test_no_paths(self):
-        self.fs.exists.return_value = False
-        self.assertRaises(ValueError, _error_on_bad_paths, self.fs, self.paths)

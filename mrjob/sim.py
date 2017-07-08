@@ -215,11 +215,14 @@ class SimMRJobRunner(MRJobRunner):
         """Copy working directory files into a shared directory,
         simulating the way Hadoop's Distributed Cache works on nodes."""
         cache_dir = self._dist_cache_dir(step_num)
+
+        log.debug('creating simulated Distributed Cache dir: %s' % cache_dir)
         self.fs.mkdir(cache_dir)
 
         for name, path in self._working_dir_mgr.name_to_path('file').items():
 
             dest = self._path_in_dist_cache_dir(name, step_num)
+            log.debug('copying %s -> %s' % (path, dest))
             shutil.copy(path, dest)
             _chmod_u_rx(dest)
 
@@ -227,6 +230,7 @@ class SimMRJobRunner(MRJobRunner):
                 'archive').items():
 
             dest = self._path_in_dist_cache_dir(name, step_num)
+            log.debug('unarchiving %s -> %s' % (path, dest))
             unarchive(path, dest)
             _chmod_u_rx(dest, recursive=True)
 
@@ -588,8 +592,13 @@ class SimMRJobRunner(MRJobRunner):
 
 
 def _chmod_u_rx(path, recursive=False):
-    # TODO: implement this
-    pass
+    if recursive:
+        for dirname, _, filenames in os.walk(path, followlinks=True):
+            for filename in filenames:
+                _chmod_u_rx(join(dirname, filename))
+    else:
+        if hasattr(os, 'chmod'):  # only available on Unix, Windows
+            os.chmod(path, stat.S_IRUSR | stat.S_IXUSR)
 
 
 def _symlink_or_copy(path, dest):

@@ -270,7 +270,7 @@ class SimMRJobRunner(MRJobRunner):
             self, task_type, step_num, task_num, map_split=None):
         j = {}
 
-        # TODO: these are really poor imtations of Hadoop keys. See #1254
+        # TODO: these are really poor imtations of Hadoop IDs. See #1254
         j['mapreduce.job.id'] = self._job_key
         j['mapreduce.task.id'] = 'task_%s_%s_%04d%d' % (
             self._job_key, task_type.lower(), step_num, task_num)
@@ -619,15 +619,15 @@ def _split_records(record_gen, split_size, reducer_key=None):
     records (as generators such that the total number of bytes in each group
     only barely exceeds *split_size*, and, if *reducer_key* is set, consecutive
     records with the same key will be in the same split."""
-    labeled_record_gen = _label_records_for_split(
+    grouped_record_gen = _group_records_for_split(
         record_gen, split_size, reducer_key)
 
-    for label, labeled_records in itertools.groupby(
-            labeled_record_gen, key=lambda lr: lr[0]):
-        yield (record for _, record in labeled_records)
+    for group_id, grouped_records in itertools.groupby(
+            grouped_record_gen, key=lambda gr: gr[0]):
+        yield (record for _, record in grouped_records)
 
 
-def _label_records_for_split(record_gen, split_size, reducer_key=None):
+def _group_records_for_split(record_gen, split_size, reducer_key=None):
     """Helper for _split_records()."""
     split_num = 0
     bytes_in_split = 0

@@ -28,12 +28,12 @@ class MRWordCount(MRJob):
         for word in WORD_RE.findall(line):
             yield (jobconf_from_env("mapreduce.map.input.file"), 1)
 
-    def reducer(self, name, counts):
-        yield (name, sum(counts))
-
     def combiner(self, name, counts):
         self.increment_counter('count', 'combiners', 1)
         yield name, sum(counts)
+
+    def reducer(self, name, counts):
+        yield (name, sum(counts))
 
 
 if __name__ == '__main__':

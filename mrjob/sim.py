@@ -183,8 +183,8 @@ class SimMRJobRunner(MRJobRunner):
         else:
             # if no mapper, just pass the data through (see #1141)
             _symlink_or_copy(
-                self._task_output_path('mapper', step_num, task_num),
-                self._task_input_path('mapper', step_num, task_num))
+                self._task_input_path('mapper', step_num, task_num),
+                self._task_output_path('mapper', step_num, task_num))
 
         if 'combiner' in step:
             self._sort_combiner_input(step_num, task_num)

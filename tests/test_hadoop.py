@@ -105,6 +105,10 @@ class TestFullyQualifyHDFSPath(TestCase):
         self.assertEqual(fully_qualify_hdfs_path('s3n://bucket/oh/noes'),
                          's3n://bucket/oh/noes')
 
+    def test_s3a_uri(self):
+        self.assertEqual(fully_qualify_hdfs_path('s3a://bucket/oh/noes'),
+                         's3a://bucket/oh/noes')
+
     def test_other_uri(self):
         self.assertEqual(fully_qualify_hdfs_path('foo://bar/baz'),
                          'foo://bar/baz')

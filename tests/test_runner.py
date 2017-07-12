@@ -1437,8 +1437,8 @@ class SetupTestCase(SandboxedTestCase):
 
     def test_wrapper_script_only_writes_to_stderr(self):
         job = MROSWalkJob([
-            '-r', 'local',
             '--setup', 'echo stray output',
+            '-r', 'local',
         ])
         job.sandbox()
 
@@ -1451,9 +1451,11 @@ class SetupTestCase(SandboxedTestCase):
 
                 output = b''.join(r.cat_output())
 
-                # stray ouput should be in stderr, not the job's output
-                self.assertIn('stray output', stderr.getvalue())
+                # stray ouput should be in stderr files, not the job's output
                 self.assertNotIn(b'stray output', output)
+
+                with open(r._task_stderr_path('mapper', 0, 0), 'rb') as stderr:
+                    self.assertIn(b'stray output', stderr.read())
 
 
 class ClosedRunnerTestCase(EmptyMrjobConfTestCase):

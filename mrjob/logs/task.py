@@ -446,7 +446,7 @@ def _parse_task_stderr(lines):
         # ignore warnings about initializing log4j, counters, etc.
         if any(ir.match(line) for ir in _TASK_STDERR_IGNORE_RES):
             # ignored lines shouldn't count as part of the line range
-            if task_error and 'num_lines' not in task_error:
+            if task_error and task_error.get('num_lines') is None:
                 task_error['num_lines'] = line_num - task_error['start_line']
             continue
         elif not task_error or line.startswith('+ '):
@@ -460,7 +460,7 @@ def _parse_task_stderr(lines):
             task_error['num_lines'] = None
 
     if task_error:
-        if not task_error.get('num_lines'):
+        if task_error.get('num_lines') is None:
             end_line = stack_trace_start_line or (line_num + 1)
             task_error['num_lines'] = end_line - task_error['start_line']
         return task_error

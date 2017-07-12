@@ -407,23 +407,29 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
     def test_python_dash_v_as_python_bin(self):
         python_cmd = cmd_line([sys.executable or 'python', '-v'])
         mr_job = MRTwoStepJob(['--python-bin', python_cmd, '--no-conf',
-                               '-r', 'local', '-v'])
+                               '-r', 'local'])
         mr_job.sandbox(stdin=[b'bar\n'])
 
         with no_handlers_for_logger():
-            mr_job.run_job()
+            with mr_job.make_runner() as runner:
+                runner.run()
 
-        # expect debugging messages in stderr.
-        stderr = mr_job.stderr.getvalue()
+                # expect python -v crud in stderr
 
-        # stderr is huge, so don't use assertIn()
-        self.assertTrue(b'import mrjob' in stderr or     # Python 2
-                        b"import 'mrjob'" in stderr)  # Python 3
-        self.assertTrue(b'#' in stderr)
+                with open(runner._task_stderr_path('mapper', 0, 0)) as lines:
+                    self.assertTrue(any(
+                        'import mrjob' in line or # Python 2
+                        "import 'mrjob'" in line
+                        for line in lines))
 
-        # should still get expected results
-        self.assertEqual(sorted(mr_job.stdout.getvalue().splitlines()),
-                         sorted([b'1\tnull', b'1\t"bar"']))
+                with open(runner._task_stderr_path('mapper', 0, 0)) as lines:
+                    self.assertTrue(any(
+                        '#' in line for line in lines))
+
+                # should still get expected results
+                self.assertEqual(
+                    sorted(to_lines(runner.cat_output())),
+                    sorted([b'1\tnull\n', b'1\t"bar"\n']))
 
 
 class StepsPythonBinTestCase(TestCase):

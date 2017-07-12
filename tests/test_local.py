@@ -322,53 +322,6 @@ class TimeoutException(Exception):
     pass
 
 
-class LargeAmountsOfStderrTestCase(TestCase):
-
-    def setUp(self):
-        self.set_alarm()
-
-    def tearDown(self):
-        self.restore_old_alarm_handler()
-
-    def set_alarm(self):
-        # if the test fails, it'll stall forever, so set an alarm
-        def alarm_handler(*args, **kwargs):
-            raise TimeoutException('Stalled on large amounts of stderr;'
-                                   ' probably pipe buffer is full.')
-        self._old_alarm_handler = signal.signal(signal.SIGALRM, alarm_handler)
-        signal.alarm(30)
-
-    def restore_old_alarm_handler(self):
-        signal.alarm(0)
-        signal.signal(signal.SIGALRM, self._old_alarm_handler)
-
-    def test_large_amounts_of_stderr(self):
-        mr_job = MRVerboseJob(['--no-conf', '-r', 'local', '-v'])
-        mr_job.sandbox()
-
-        try:
-            with no_handlers_for_logger():
-                mr_job.run_job()
-        except TimeoutException:
-            raise
-        except SystemExit:
-            # we expect the job to throw a StepFailedException,
-            # which causes run_job to call sys.exit()
-
-            # look for expected output from MRVerboseJob
-            stderr = mr_job.stderr.getvalue()
-            self.assertIn(
-                b"Counters: 1\n\tFoo\n\t\tBar=10000", stderr)
-            self.assertIn(b'Status: 0\n', stderr)
-            self.assertIn(b'Status: 99\n', stderr)
-            self.assertNotIn(b'Status: 100\n', stderr)
-            self.assertIn(b'STDERR: Qux\n', stderr)
-            # exception should appear in exception message
-            self.assertIn(b'BOOM', stderr)
-        else:
-            raise AssertionError()
-
-
 class ExitWithoutExceptionTestCase(TestCase):
 
     def test_exit_42_job(self):

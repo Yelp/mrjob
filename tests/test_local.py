@@ -553,7 +553,7 @@ class CompatTestCase(EmptyMrjobConfTestCase):
         job = MRWordCount(['-r', 'local'])
         with job.make_runner() as runner:
             simulated_jobconf = runner._simulate_jobconf_for_step(
-                0, 'mapper', 0, '/tmp/foo')
+                'mapper', 0, 0)
             self.assertIn(
                 'mapred.cache.localArchives', simulated_jobconf)
             self.assertIn(
@@ -563,7 +563,7 @@ class CompatTestCase(EmptyMrjobConfTestCase):
         job = MRWordCount(['-r', 'local', '--hadoop-version', '1.2.1'])
         with job.make_runner() as runner:
             simulated_jobconf = runner._simulate_jobconf_for_step(
-                0, 'mapper', 0, '/tmp/foo')
+                'mapper', 0, 0)
             self.assertIn(
                 'mapred.cache.localArchives', simulated_jobconf)
             self.assertNotIn(
@@ -573,7 +573,7 @@ class CompatTestCase(EmptyMrjobConfTestCase):
         job = MRWordCount(['-r', 'local', '--hadoop-version', '2.7.2'])
         with job.make_runner() as runner:
             simulated_jobconf = runner._simulate_jobconf_for_step(
-                0, 'mapper', 0, '/tmp/foo')
+                'mapper', 0, 0)
             self.assertIn(
                 'mapreduce.job.cache.local.archives', simulated_jobconf)
             self.assertNotIn(

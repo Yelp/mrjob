@@ -24,7 +24,8 @@ from os.path import relpath
 
 from mrjob.cat import is_compressed
 from mrjob.cat import open_input
-from mrjob.compat import translate_jobconf_dict
+from mrjob.compat import translate_jobconf
+from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_local_envs
 from mrjob.logs.counters import _format_counters
 from mrjob.parse import parse_mr_job_stderr
@@ -175,6 +176,9 @@ class SimMRJobRunner(MRJobRunner):
     def counters(self):
         return self._counters
 
+    def get_hadoop_version(self):
+        return self._opts['hadoop_version']
+
     def _run_mapper_and_combiner(self, step_num, task_num, map_split):
         step = self._get_step(step_num)
 
@@ -307,8 +311,18 @@ class SimMRJobRunner(MRJobRunner):
             for key, value in map_split.items():
                 j['mapreduce.map.input.' + key] = str(value)
 
-        # translate to correct Hadoop version
-        return translate_jobconf_dict(j, self.get_hadoop_version(), warn=False)
+        # translate to correct version
+
+        # don't use translate_jobconf_dict(); that's meant to add keys
+        # to user-supplied jobconf
+        hadoop_version = self.get_hadoop_version()
+
+        if hadoop_version:
+            return {translate_jobconf(k, hadoop_version): v
+                    for k, v in j.items()}
+        else:
+            return {tk: v for k, v in j.items()
+                    for tk in translate_jobconf_for_all_versions(k)}
 
     def _num_mappers(self, step_num):
         # TODO: look up mapred.job.maps (convert to int) in _jobconf_for_step()

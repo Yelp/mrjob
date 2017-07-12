@@ -22,6 +22,10 @@ import stat
 import sys
 import tempfile
 from io import BytesIO
+from os.path import dirname
+from os.path import exists
+from os.path import join
+from os.path import realpath
 from unittest import TestCase
 from unittest import skipIf
 
@@ -72,16 +76,16 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         # read from STDIN, a regular file, and a .gz
         stdin = BytesIO(b'foo\nbar\n')
 
-        input_path = os.path.join(self.tmp_dir, 'input')
+        input_path = join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nqux\n')
 
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz_path = join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'wb')
         input_gz.write(b'foo\n')
         input_gz.close()
 
-        input_gz_glob = os.path.join(self.tmp_dir, '*.gz')
+        input_gz_glob = join(self.tmp_dir, '*.gz')
 
         mr_job = MRTwoStepJob(['-r', 'local', '-', input_path, input_gz_glob])
         mr_job.sandbox(stdin=stdin)
@@ -96,12 +100,12 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
-            assert os.path.exists(local_tmp_dir)
+            assert exists(local_tmp_dir)
 
             self.assertGreater(runner.counters()[0]['count']['combiners'], 0)
 
         # make sure cleanup happens
-        assert not os.path.exists(local_tmp_dir)
+        assert not exists(local_tmp_dir)
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
@@ -114,11 +118,11 @@ class TestsToPort:
         # read from STDIN, a regular file, and a .gz
         stdin = BytesIO(b'foo\nbar\n')
 
-        input_path = os.path.join(self.tmp_dir, 'input')
+        input_path = join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:
             input_file.write(b'bar\nqux\n')
 
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz_path = join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'wb')
         input_gz.write(b'foo\n')
         input_gz.close()
@@ -139,21 +143,21 @@ class TestsToPort:
             results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
-            assert os.path.exists(local_tmp_dir)
+            assert exists(local_tmp_dir)
 
         # make sure cleanup happens
-        assert not os.path.exists(local_tmp_dir)
+        assert not exists(local_tmp_dir)
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
 
     def test_get_file_splits_test(self):
         # set up input paths
-        input_path = os.path.join(self.tmp_dir, 'input')
+        input_path = join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nqux\nfoo\nbar\nqux\nfoo\n')
 
-        input_path2 = os.path.join(self.tmp_dir, 'input2')
+        input_path2 = join(self.tmp_dir, 'input2')
         with open(input_path2, 'wb') as input_file:
             input_file.write(b'foo\nbar\nbar\n')
 
@@ -177,7 +181,7 @@ class TestsToPort:
 
     def test_get_file_splits_sorted_test(self):
         # set up input paths
-        input_path = os.path.join(self.tmp_dir, 'input')
+        input_path = join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:
             input_file.write(
                 b'1\tbar\n1\tbar\n1\tbar\n2\tfoo\n2\tfoo\n2\tfoo\n3\tqux\n'
@@ -208,11 +212,11 @@ class TestsToPort:
         contents_normal = [b'foo\n', b'bar\n', b'bar\n']
         all_contents_sorted = sorted(contents_gz + contents_normal)
 
-        input_gz_path = os.path.join(dir_path_name, 'input.gz')
+        input_gz_path = join(dir_path_name, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'wb')
         input_gz.write(b''.join(contents_gz))
         input_gz.close()
-        input_path2 = os.path.join(dir_path_name, 'input2')
+        input_path2 = join(dir_path_name, 'input2')
         with open(input_path2, 'wb') as input_file:
             input_file.write(b''.join(contents_normal))
 
@@ -274,9 +278,9 @@ class TestsToPort:
                               {'group': {'counter_name': 2}}])
 
     def test_gz_split_regression(self):
-        gz_path_1 = os.path.join(self.tmp_dir, '1.gz')
-        gz_path_2 = os.path.join(self.tmp_dir, '2.gz')
-        path_3 = os.path.join(self.tmp_dir, '3')
+        gz_path_1 = join(self.tmp_dir, '1.gz')
+        gz_path_2 = join(self.tmp_dir, '2.gz')
+        path_3 = join(self.tmp_dir, '3')
 
         input_gz_1 = gzip.GzipFile(gz_path_1, 'wb')
         input_gz_1.write(b'x\n')
@@ -555,9 +559,14 @@ class CommandSubstepTestCase(SandboxedTestCase):
             self.assertEqual(sorted(lines), sorted(data.split()))
 
     def test_uniq_combiner(self):
-        data = b'x\nx\nx\nx\nx\nx\n'
-        job = MRCmdJob(['--combiner-cmd=uniq', '--runner=local'])
-        job.sandbox(stdin=BytesIO(data))
+        # put data in a .gz to force a single map taxsk
+        x_gz_path = join(self.tmp_dir, 'data.gz')
+        with gzip.open(x_gz_path, 'wb') as x_gz:
+            x_gz.write(b'x\nx\nx\nx\nx\nx\n')
+
+        job = MRCmdJob(['--combiner-cmd=uniq', '--runner=local', x_gz_path])
+        job.sandbox()
+
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
@@ -572,10 +581,9 @@ class CommandSubstepTestCase(SandboxedTestCase):
 
             r.run()
 
-            # there are 2 map tasks, each of which has 1 combiner, and all rows
-            # are the same, so we should end up with just 2 values
-
-            self.assertEqual(b''.join(r.cat_output()), b'x\nx\n')
+            # there is only one map task, thus only one combiner,
+            # thus there should only be one value
+            self.assertEqual(b''.join(r.cat_output()), b'x\n')
 
     def test_cat_reducer(self):
         data = b'x\ny\nz\n'
@@ -599,28 +607,35 @@ class CommandSubstepTestCase(SandboxedTestCase):
             self.assertEqual(sorted(lines), [b'x$\n', b'y$\n', b'z$\n'])
 
     def test_multiple(self):
-        data = b'x\nx\nx\nx\nx\nx\n'
-        mapper_cmd = 'cat -e'
+        # put data in a .gz to force a single map task
+        x_gz_path = join(self.tmp_dir, 'data.gz')
+        with gzip.open(x_gz_path, 'wb') as x_gz:
+            x_gz.write(b'x\nx\nx\nx\nx\nx\n')
+
         reducer_cmd = _bash_wrap('wc -l | tr -Cd "[:digit:]"')
         job = MRCmdJob([
             '--runner', 'local',
-            '--mapper-cmd', mapper_cmd,
+            '--mapper-cmd', 'cat -e',
             '--combiner-cmd', 'uniq',
-            '--reducer-cmd', reducer_cmd])
-        job.sandbox(stdin=BytesIO(data))
+            '--reducer-cmd', reducer_cmd,
+            x_gz_path])
+        job.sandbox()
+
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),
                 [{
                     'type': 'streaming',
-                    'mapper': {'type': 'command', 'command': mapper_cmd},
+                    'mapper': {'type': 'command', 'command': 'cat -e'},
                     'combiner': {'type': 'command', 'command': 'uniq'},
                     'reducer': {'type': 'command', 'command': reducer_cmd},
                 }])
 
             r.run()
 
-            self.assertEqual(list(r.cat_output()), [b'2'])
+            self.assertEqual(
+                sum(int(v) for _, v in job.parse_output(r.cat_output())),
+                1)
 
     def test_multiple_2(self):
         data = b'x\ny\nz\n'

@@ -165,6 +165,11 @@ class LocalMRJobRunner(SimMRJobRunner):
         # weird to stderr or stack traces)
         log.error('Error while reading from %s:\n' % input_path)
 
+    def _default_python_bin(self, local=False):
+        """Always return *sys.executable*, if defined"""
+        return super(LocalMRJobRunner, self)._default_python_bin(
+            local=True)
+
     def _sort_input(self, input_paths, output_path):
         """Try sorting with the :command:`sort` binary before falling
         back to in-memory sort."""

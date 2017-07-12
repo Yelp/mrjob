@@ -861,7 +861,7 @@ class MRJobRunner(object):
         # prepend set -e etc.
         cmd_str = '; '.join(self._sh_pre_commands() + [cmd_str])
 
-        return self._sh_bin() + ['-c', "'%s'" % cmd_str.replace("'", "'\\''")]
+        return self._sh_bin() + ['-c', cmd_str]
 
     def _render_substep(self, step_num, mrc):
         step = self._get_step(step_num)

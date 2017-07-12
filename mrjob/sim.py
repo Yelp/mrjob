@@ -19,8 +19,11 @@ import shutil
 import stat
 from multiprocessing import cpu_count
 from os.path import dirname
+from os.path import isdir
 from os.path import join
 from os.path import relpath
+from shutil import copy2
+from shutil import copytree
 
 from mrjob.cat import is_compressed
 from mrjob.cat import open_input
@@ -624,8 +627,11 @@ def _symlink_or_copy(path, dest):
         log.debug('creating symlink %s <- %s' % (path, dest))
         os.symlink(relpath(path, dirname(dest)), dest)
     else:
-        # TODO: use shutil.copy2() or shutil.copytree()
-        raise NotImplementedError
+        log.debug('copying %s -> %s' % (dest, path))
+        if isdir(path):
+            copytree(path, dest)
+        else:
+            copy2(path, dest)
 
 
 def _split_records(record_gen, split_size, reducer_key=None):

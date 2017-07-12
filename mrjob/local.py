@@ -239,4 +239,4 @@ def _pickle_safe(func, *args, **kwargs):
     except _TaskFailedException:
         raise  # we know these are pickleable
     except Exception as ex:
-        raise Exception(str(ex))  # we know this is pickleable
+        raise Exception(repr(ex))  # we know this is pickleable

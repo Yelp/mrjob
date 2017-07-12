@@ -525,12 +525,12 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
                 # however, if mrjob is installed, we need to verify that
                 # we're using the installed version and not a bootstrapped copy
-                output = list(runner.cat_output())
+                output = list(mr_job.parse_output(runner.cat_output()))
 
                 self.assertEqual(len(output), 1)
 
                 # script should not load mrjob from local_tmp_dir
-                _, script_mrjob_dir = mr_job.parse_output_line(output[0])
+                _, script_mrjob_dir = output[0]
                 self.assertFalse(script_mrjob_dir.startswith(local_tmp_dir))
 
 

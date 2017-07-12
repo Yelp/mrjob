@@ -37,7 +37,6 @@ class CompositeFilesystem(Filesystem):
 
         # Forward through to children for backward compatibility
         for fs in self.filesystems:
-            log.debug(repr((name, self.filesystems)))
             if hasattr(fs, name):
                 return getattr(fs, name)
         raise AttributeError(name)

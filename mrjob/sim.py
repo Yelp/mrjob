@@ -575,7 +575,7 @@ class SimMRJobRunner(MRJobRunner):
         if self._sort_values:
             lines.sort()
         else:
-            lines.sort(key=lambda line: line.split('\t')[0])
+            lines.sort(key=lambda line: line.split(b'\t')[0])
 
         with open(output_path, 'wb') as output:
             for line in lines:

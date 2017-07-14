@@ -80,6 +80,9 @@ _SORT_VALUES_JOBCONF = {
 _SORT_VALUES_PARTITIONER = \
     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
 
+# no need to escape arguments that only include these characters
+_HADOOP_SAFE_ARG_RE = re.compile(r'^[\w\./=-]*$')
+
 
 class RunnerOptionStore(OptionStore):
     # 'base' is aritrary; if an option support all runners, it won't
@@ -867,7 +870,9 @@ class MRJobRunner(object):
         step = self._get_step(step_num)
 
         if mrc in step:
-            return cmd_line(self._substep_args(step_num, mrc))
+            # cmd_line() does things that shell is fine with but
+            # Hadoop Streaming finds confusing.
+            return _hadoop_cmd_line(self._substep_args(step_num, mrc))
         else:
             if mrc == 'mapper':
                 return 'cat'
@@ -1683,3 +1688,17 @@ class MRJobRunner(object):
             for line in err:
                 log.error('STDERR: %s' % line.rstrip('\r\n'))
         raise CalledProcessError(proc.returncode, args)
+
+
+def _hadoop_cmd_line(args):
+    """Escape args of a command line in a way that Hadoop can process
+    them."""
+    return ' '.join(_hadoop_escape_arg(arg) for arg in args)
+
+
+def _hadoop_escape_arg(arg):
+    """Escape a single command argument in a way that Hadoop can process it."""
+    if _HADOOP_SAFE_ARG_RE.match(arg):
+        return arg
+    else:
+        return "'%s'" % arg.replace("'", r"'\''")

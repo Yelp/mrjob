@@ -21,8 +21,7 @@ from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
 from .wrap import _cat_log
 from .wrap import _ls_logs
-from mrjob.parse import _COUNTER_RE
-from mrjob.parse import _STATUS_RE
+from mrjob import parse
 
 
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
@@ -51,6 +50,12 @@ _PRE_YARN_TASK_LOG_PATH_RE = re.compile(
     r'(?P<attempt_num>\d+))/'
     r'(?P<log_type>stderr|syslog)(?P<suffix>\.\w{1,3})?$')
 
+# ignore counters and status (only happens in sim runners, where task stderr
+# is dumped straight to a file).
+
+# convert from bytes regex to text regex
+_COUNTER_RE = re.compile(parse._COUNTER_RE.pattern.decode('ascii'))
+_STATUS_RE = re.compile(parse._STATUS_RE.pattern.decode('ascii'))
 
 # ignore warnings about initializing log4j in task stderr
 _LOG4J_WARN_RE = re.compile(r'^log4j:WARN .*$')

@@ -151,7 +151,8 @@ class LocalMRJobRunner(SimMRJobRunner):
             ex.task_type, ex.step_num, ex.task_num)
 
         if self.fs.exists(stderr_path):  # it should, but just to be safe
-            with open(stderr_path, 'rb') as stderr:
+            # log-parsing code expects "str", not bytes; open in text mode
+            with open(stderr_path) as stderr:
                 task_error = _parse_task_stderr(stderr)
                 if task_error:
                     task_error['path'] = stderr_path

@@ -739,6 +739,8 @@ class FilterTestCase(SandboxedTestCase):
 
         job = MRFilterJob([
             '--mapper-filter', 'cat -e', '--runner=local', input_gz_path])
+        job.sandbox()
+
         with job.make_runner() as r:
             self.assertEqual(
                 r._get_steps(),

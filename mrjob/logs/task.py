@@ -413,7 +413,8 @@ def _parse_task_syslog(lines):
 
     return result
 
-
+# TODO: allow filtering of bad lines to happen elsewhere, pass this
+# function numbered lines
 def _parse_task_stderr(lines):
     """Attempt to explain any error in task stderr, be it a Python
     exception or a problem with a setup command (see #1203).

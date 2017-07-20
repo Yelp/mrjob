@@ -17,6 +17,7 @@ import logging
 import os
 import shutil
 import stat
+from functools import partial
 from multiprocessing import cpu_count
 from os.path import dirname
 from os.path import isdir
@@ -81,11 +82,13 @@ class SimMRJobRunner(MRJobRunner):
 
     # re-implement these in your subclass
 
-    def _invoke_task_func(self, task_type, step_num, task_num,
-                     stdin, stdout, stderr, wd, env):
-        """Return a no-args function that runs the given
+    def _invoke_task_func(self, task_type, step_num, task_num):
+        """Return a function that runs the given
         mapper/reducer. This needs to be pickleable if tasks are going
         to be invoked through multiprocessing (e.g. local mode).
+
+        The function takes the arguments *stdin*, *stdout*, *stderr*,
+        *wd* (path of working directory), and *env* (environment dictionary).
 
         The job's filehandle, working dir (*wd*) and environment
         will be provided.
@@ -137,27 +140,24 @@ class SimMRJobRunner(MRJobRunner):
 
                 raise
 
-    def _run_task(self, task_type, step_num, task_num, map_split=None):
-        """Run one mapper, reducer, or combiner.
+    def _run_task_func(self, task_type, step_num, task_num, map_split=None):
+        """Returns a no-args function that runs one mapper, reducer, or
+         combiner.
 
         This sets up everything the task needs to run, then passes it off to
         :py:meth:`_invoke_task_func`.
         """
-        log.debug('running step %d, %s %d' % (step_num, task_type, task_num))
-
         input_path = self._task_input_path(task_type, step_num, task_num)
         stderr_path = self._task_stderr_path(task_type, step_num, task_num)
         output_path = self._task_output_path(task_type, step_num, task_num)
         wd = self._setup_working_dir(task_type, step_num, task_num)
         env = self._env_for_task(task_type, step_num, task_num, map_split)
 
-        with open(input_path, 'rb') as stdin, \
-                open(output_path, 'wb') as stdout, \
-                open(stderr_path, 'wb') as stderr:
-
-            self._invoke_task_func(
-                task_type, step_num, task_num,
-                stdin, stdout, stderr, wd, env)()
+        return partial(
+            _run_task,
+            self._invoke_task_func(task_type, step_num, task_num),
+            task_type, step_num, task_num,
+            input_path, output_path, stderr_path, wd, env)
 
     def _run_mappers_and_combiners(self, step_num, map_splits):
         # TODO: possibly catch step failure
@@ -192,7 +192,7 @@ class SimMRJobRunner(MRJobRunner):
         step = self._get_step(step_num)
 
         if 'mapper' in step:
-            self._run_task('mapper', step_num, task_num, map_split)
+            self._run_task_func('mapper', step_num, task_num, map_split)()
         else:
             # if no mapper, just pass the data through (see #1141)
             _symlink_or_copy(
@@ -201,15 +201,13 @@ class SimMRJobRunner(MRJobRunner):
 
         if 'combiner' in step:
             self._sort_combiner_input(step_num, task_num)
-            self._run_task('combiner', step_num, task_num)
+            self._run_task_func('combiner', step_num, task_num)()
 
     def _run_reducers(self, step_num, num_reducer_tasks):
         try:
             self._run_multiple(
-                (_apply_method,
-                 (self, '_run_task', 'reducer', step_num, task_num),
-                 {})
-                 for task_num in range(num_reducer_tasks)
+                (self._run_task_func('reducer', step_num, task_num), (), {})
+                for task_num in range(num_reducer_tasks)
             )
         finally:
             self._parse_task_counters('reducer', step_num)
@@ -637,6 +635,20 @@ def _group_records_for_split(record_gen, split_size, reducer_key=None):
 
         yield split_num, record
         bytes_in_split += len(record)
+
+
+def _run_task(invoke_task,
+              task_type, step_num, task_num,
+              input_path, output_path, stderr_path, wd, env):
+    """Set up filehandles and call *invoke_task()*."""
+    log.debug('running step %d, %s %d' % (step_num, task_type, task_num))
+
+    with open(input_path, 'rb') as stdin, \
+            open(output_path, 'wb') as stdout, \
+            open(stderr_path, 'wb') as stderr:
+
+      invoke_task(
+          stdin, stdout, stderr, wd, env)
 
 
 def _sort_lines(input_paths, output_path, sort_values=False):

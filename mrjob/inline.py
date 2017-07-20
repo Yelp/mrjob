@@ -75,12 +75,11 @@ class InlineMRJobRunner(SimMRJobRunner):
         # used to explain exceptions
         self._error_while_reading_from = None
 
-    def _invoke_task_func(self, task_type, step_num, task_num,
-                          stdin, stdout, stderr, wd, env):
+    def _invoke_task_func(self, task_type, step_num, task_num):
         """Just run tasks in the same process."""
 
         # Don't care about pickleability since this runs in the same process
-        def invoke_task():
+        def invoke_task(stdin, stdout, stderr, wd, env):
             with save_current_environment(), save_cwd():
                 os.environ.update(env)
                 os.chdir(wd)

@@ -96,16 +96,14 @@ class LocalMRJobRunner(SimMRJobRunner):
         # should we fall back to sorting in memory?
         self._bad_sort_bin = False
 
-    def _invoke_task_func(self, task_type, step_num, task_num,
-                          stdin, stdout, stderr, wd, env):
-
+    def _invoke_task_func(self, task_type, step_num, task_num):
         args = self._substep_args(step_num, task_type)
         num_steps = self._num_steps()
 
+        # stdin, stdout, stderr, wd, and env will be passed in later
         return partial(
             _invoke_task_in_subprocess,
             task_type, step_num, task_num,
-            stdin, stdout, stderr, wd, env,
             args, num_steps)
 
     def _run_multiple(self, tasks, num_processes=None):
@@ -128,12 +126,6 @@ class LocalMRJobRunner(SimMRJobRunner):
             raise
         finally:
             pool.join()
-
-    def _run_multiple(self, tasks, num_processes=None):
-        """Just run the tasks inline, one at a time.
-        """
-        for func, args, kwargs in tasks:
-            func(*args, **kwargs)
 
     def _log_cause_of_error(self, ex):
         if not isinstance(ex, _TaskFailedException):
@@ -229,8 +221,8 @@ class LocalMRJobRunner(SimMRJobRunner):
 
 def _invoke_task_in_subprocess(
         task_type, step_num, task_num,
-        stdin, stdout, stderr, wd, env,
-        args, num_steps):
+        args, num_steps,
+        stdin, stdout, stderr, wd, env):
     """A pickleable function that invokes a task in a subprocess."""
     log.debug('> %s' % cmd_line(args))
 

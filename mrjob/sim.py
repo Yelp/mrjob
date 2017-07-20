@@ -81,10 +81,15 @@ class SimMRJobRunner(MRJobRunner):
 
     # re-implement these in your subclass
 
-    def _invoke_task(self, task_type, step_num, task_num,
+    def _invoke_task_func(self, task_type, step_num, task_num,
                      stdin, stdout, stderr, wd, env):
-        """Run the given mapper/reducer, with the job's file handles
-        working dir, and environment already set up."""
+        """Return a no-args function that runs the given
+        mapper/reducer. This needs to be pickleable if tasks are going
+        to be invoked through multiprocessing (e.g. local mode).
+
+        The job's filehandle, working dir (*wd*) and environment
+        will be provided.
+        """
         NotImplementedError
 
     def _run_multiple(self, tasks, num_processes=None):
@@ -136,7 +141,7 @@ class SimMRJobRunner(MRJobRunner):
         """Run one mapper, reducer, or combiner.
 
         This sets up everything the task needs to run, then passes it off to
-        :py:meth:`_invoke_task`.
+        :py:meth:`_invoke_task_func`.
         """
         log.debug('running step %d, %s %d' % (step_num, task_type, task_num))
 
@@ -150,8 +155,9 @@ class SimMRJobRunner(MRJobRunner):
                 open(output_path, 'wb') as stdout, \
                 open(stderr_path, 'wb') as stderr:
 
-            self._invoke_task(
-                task_type, step_num, task_num, stdin, stdout, stderr, wd, env)
+            self._invoke_task_func(
+                task_type, step_num, task_num,
+                stdin, stdout, stderr, wd, env)()
 
     def _run_mappers_and_combiners(self, step_num, map_splits):
         # TODO: possibly catch step failure

@@ -20,6 +20,7 @@ import logging
 import os
 import pickle
 import platform
+from functools import partial
 from multiprocessing import Pool
 from subprocess import CalledProcessError
 from subprocess import check_call
@@ -95,26 +96,17 @@ class LocalMRJobRunner(SimMRJobRunner):
         # should we fall back to sorting in memory?
         self._bad_sort_bin = False
 
-    def _invoke_task(self, task_type, step_num, task_num,
-                     stdin, stdout, stderr, wd, env):
+    def _invoke_task_func(self, task_type, step_num, task_num,
+                          stdin, stdout, stderr, wd, env):
 
         args = self._substep_args(step_num, task_type)
+        num_steps = self._num_steps()
 
-        #for key, value in sorted(env.items()):
-        #    log.debug('> export %s=%s' % (key, value))
-        log.debug('> %s' % cmd_line(args))
-
-        try:
-            check_call(args, stdin=stdin, stdout=stdout, stderr=stderr,
-                       cwd=wd, env=env)
-        except Exception as ex:
-            raise _TaskFailedException(
-                reason=str(ex),
-                step_num=step_num,
-                num_steps=self._num_steps(),
-                task_type=task_type,
-                task_num=task_num,
-            )
+        return partial(
+            _invoke_task_in_subprocess,
+            task_type, step_num, task_num,
+            stdin, stdout, stderr, wd, env,
+            args, num_steps)
 
     def _run_multiple(self, tasks, num_processes=None):
         """Use multiprocessing to run in parallel."""
@@ -136,6 +128,12 @@ class LocalMRJobRunner(SimMRJobRunner):
             raise
         finally:
             pool.join()
+
+    def _run_multiple(self, tasks, num_processes=None):
+        """Just run the tasks inline, one at a time.
+        """
+        for func, args, kwargs in tasks:
+            func(*args, **kwargs)
 
     def _log_cause_of_error(self, ex):
         if not isinstance(ex, _TaskFailedException):
@@ -227,6 +225,27 @@ class LocalMRJobRunner(SimMRJobRunner):
 
 
 # pickle utilities, to protect multiprocessing from itself
+
+
+def _invoke_task_in_subprocess(
+        task_type, step_num, task_num,
+        stdin, stdout, stderr, wd, env,
+        args, num_steps):
+    """A pickleable function that invokes a task in a subprocess."""
+    log.debug('> %s' % cmd_line(args))
+
+    try:
+        check_call(args, stdin=stdin, stdout=stdout, stderr=stderr,
+                   cwd=wd, env=env)
+    except Exception as ex:
+        raise _TaskFailedException(
+            reason=str(ex),
+            step_num=step_num,
+            num_steps=num_steps,
+            task_type=task_type,
+            task_num=task_num,
+        )
+
 
 def _pickle_wrap(task):
     """Wrap task to make sure we don't return unpickleable results

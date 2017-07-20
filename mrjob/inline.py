@@ -75,27 +75,34 @@ class InlineMRJobRunner(SimMRJobRunner):
         # used to explain exceptions
         self._error_while_reading_from = None
 
-    def _invoke_task(self, task_type, step_num, task_num,
-                     stdin, stdout, stderr, wd, env):
+    def _invoke_task_func(self, task_type, step_num, task_num,
+                          stdin, stdout, stderr, wd, env):
         """Just run tasks in the same process."""
-        with save_current_environment(), save_cwd():
-            os.environ.update(env)
-            os.chdir(wd)
 
-            try:
-                task = self._mrjob_cls(
-                    args=self._args_for_task(step_num, task_type))
-                task.sandbox(stdin=stdin, stdout=stdout, stderr=stderr)
+        # Don't care about pickleability since this runs in the same process
+        def invoke_task():
+            with save_current_environment(), save_cwd():
+                os.environ.update(env)
+                os.chdir(wd)
 
-                task.execute()
-            except:
-                # so users can figure out where the exception came from;
-                # see _log_cause_of_error(). we can't wrap the exception
-                # because then we lose the stacktrace (which is the whole
-                # point of the inline runner)
-                self._error_while_reading_from = self._task_input_path(
-                    task_type, step_num, task_num)
-                raise
+                try:
+                    task = self._mrjob_cls(
+                        args=self._args_for_task(step_num, task_type))
+                    task.sandbox(stdin=stdin, stdout=stdout, stderr=stderr)
+
+                    task.execute()
+                except:
+                    # so users can figure out where the exception came from;
+                    # see _log_cause_of_error(). we can't wrap the exception
+                    # because then we lose the stacktrace (which is the whole
+                    # point of the inline runner)
+
+                    # TODO: could write this to a file instead
+                    self._error_while_reading_from = self._task_input_path(
+                        task_type, step_num, task_num)
+                    raise
+
+        return invoke_task
 
     def _run_multiple(self, tasks, num_processes=None):
         """Just run the tasks inline, one at a time.

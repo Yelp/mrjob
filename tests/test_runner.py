@@ -30,6 +30,7 @@ from subprocess import CalledProcessError
 from tarfile import ReadError
 from time import sleep
 from unittest import TestCase
+from unittest import skip
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
@@ -300,6 +301,8 @@ class TestCatOutput(SandboxedTestCase):
         # should issue deprecation warning
         self.assertEqual(log.warning.call_count, 1)
 
+
+@skip('_invoke_sort() is no longer a runner method')
 class TestInvokeSort(TestCase):
 
     def setUp(self):

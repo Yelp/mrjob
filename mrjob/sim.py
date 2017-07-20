@@ -563,23 +563,7 @@ class SimMRJobRunner(MRJobRunner):
         By default this sorts in memory, but you can override this to
         use the :command:`sort` binary, etc.
         """
-        # sort in memory
-        log.debug('sorting in memory: %s -> %s' %
-                  (', '.join(input_paths), output_path))
-        lines = []
-
-        for input_path in input_paths:
-            with open(input_path, 'rb') as input:
-                lines.extend(input)
-
-        if self._sort_values:
-            lines.sort()
-        else:
-            lines.sort(key=lambda line: line.split(b'\t')[0])
-
-        with open(output_path, 'wb') as output:
-            for line in lines:
-                output.write(line)
+        _sort_lines(input_paths, output_path, sort_values=self._sort_values)
 
     def _sort_combiner_input(self, step_num, task_num):
         input_path = self._task_output_path('mapper', step_num, task_num)
@@ -608,7 +592,15 @@ class SimMRJobRunner(MRJobRunner):
             log.info('\n%s\n' % _format_counters(counters))
 
 
+
+def _apply_method(self, method_name, *args, **kwargs):
+    """Shim to turn method calls into pickleable function calls."""
+    getattr(self, method_name)(*args, **kwargs)
+
+
 def _chmod_u_rx(path, recursive=False):
+    """make *path* user readable and executable. If *recursive* is true,
+    make *path* and everything inside it executable."""
     if recursive:
         for dirname, _, filenames in os.walk(path, followlinks=True):
             for filename in filenames:
@@ -616,38 +608,6 @@ def _chmod_u_rx(path, recursive=False):
     else:
         if hasattr(os, 'chmod'):  # only available on Unix, Windows
             os.chmod(path, stat.S_IRUSR | stat.S_IXUSR)
-
-
-def _symlink_or_copy(path, dest):
-    """Symlink from *dest* to *path*, using relative paths if possible.
-
-    If symlinks aren't available, copy path to dest instead.
-    """
-    if hasattr(os, 'symlink'):
-        log.debug('creating symlink %s <- %s' % (path, dest))
-        os.symlink(relpath(path, dirname(dest)), dest)
-    else:
-        log.debug('copying %s -> %s' % (dest, path))
-        if isdir(path):
-            copytree(path, dest)
-        else:
-            copy2(path, dest)
-
-
-def _split_records(record_gen, split_size, reducer_key=None):
-    """Given a stream of records (bytestrings, usually lines), yield groups of
-    records (as generators such that the total number of bytes in each group
-    only barely exceeds *split_size*, and, if *reducer_key* is set, consecutive
-    records with the same key will be in the same split."""
-    grouped_record_gen = _group_records_for_split(
-        record_gen, split_size, reducer_key)
-
-    for group_id, grouped_records in itertools.groupby(
-            grouped_record_gen, key=lambda gr: gr[0]):
-        yield (record for _, record in grouped_records)
-    else:
-        # special case for empty files
-        yield ()
 
 
 def _group_records_for_split(record_gen, split_size, reducer_key=None):
@@ -673,6 +633,57 @@ def _group_records_for_split(record_gen, split_size, reducer_key=None):
         bytes_in_split += len(record)
 
 
-def _apply_method(self, method_name, *args, **kwargs):
-    """Shim to turn method calls into pickleable function calls."""
-    getattr(self, method_name)(*args, **kwargs)
+def _sort_lines(input_paths, output_path, sort_values=False):
+    """Sort lines from *input_paths* and output them into *output_path*.
+
+    If *sort_values* is true, sort by the entire line; otherwise just sort
+    by everything up to the first tab.
+    """
+    log.debug('sorting in memory: %s -> %s' %
+              (', '.join(input_paths), output_path))
+    lines = []
+
+    for input_path in input_paths:
+        with open(input_path, 'rb') as input:
+            lines.extend(input)
+
+    if sort_values:
+        lines.sort()
+    else:
+        lines.sort(key=lambda line: line.split(b'\t')[0])
+
+    with open(output_path, 'wb') as output:
+        for line in lines:
+            output.write(line)
+
+
+def _split_records(record_gen, split_size, reducer_key=None):
+    """Given a stream of records (bytestrings, usually lines), yield groups of
+    records (as generators such that the total number of bytes in each group
+    only barely exceeds *split_size*, and, if *reducer_key* is set, consecutive
+    records with the same key will be in the same split."""
+    grouped_record_gen = _group_records_for_split(
+        record_gen, split_size, reducer_key)
+
+    for group_id, grouped_records in itertools.groupby(
+            grouped_record_gen, key=lambda gr: gr[0]):
+        yield (record for _, record in grouped_records)
+    else:
+        # special case for empty files
+        yield ()
+
+
+def _symlink_or_copy(path, dest):
+    """Symlink from *dest* to *path*, using relative paths if possible.
+
+    If symlinks aren't available, copy path to dest instead.
+    """
+    if hasattr(os, 'symlink'):
+        log.debug('creating symlink %s <- %s' % (path, dest))
+        os.symlink(relpath(path, dirname(dest)), dest)
+    else:
+        log.debug('copying %s -> %s' % (dest, path))
+        if isdir(path):
+            copytree(path, dest)
+        else:
+            copy2(path, dest)

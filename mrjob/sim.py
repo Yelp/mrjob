@@ -163,14 +163,11 @@ class SimMRJobRunner(MRJobRunner):
             input_path, output_path, stderr_path, wd, env)
 
     def _run_mappers_and_combiners(self, step_num, map_splits):
-        # TODO: possibly catch step failure
         try:
             self._run_multiple(
-                (_apply_method,
-                 (self, '_run_mapper_and_combiner',
-                  step_num, task_num, map_split),
-                 {})
-                 for task_num, map_split in enumerate(map_splits)
+                (self._run_mapper_and_combiner_func(
+                    step_num, task_num, map_split), (), {})
+                for task_num, map_split in enumerate(map_splits)
             )
         finally:
             self._parse_task_counters('mapper', step_num)
@@ -191,20 +188,41 @@ class SimMRJobRunner(MRJobRunner):
     def get_hadoop_version(self):
         return self._opts['hadoop_version']
 
-    def _run_mapper_and_combiner(self, step_num, task_num, map_split):
+    def _run_mapper_and_combiner_func(self, step_num, task_num, map_split):
+        """Returns a no-args function that runs one mapper, plus the
+        corresponding combiner if there is one."""
         step = self._get_step(step_num)
 
+        mapper_input_path = self._task_input_path(
+            'mapper', step_num, task_num)
+        mapper_output_path = self._task_output_path(
+            'mapper', step_num, task_num)
+
+        run_mapper = None
+
         if 'mapper' in step:
-            self._run_task_func('mapper', step_num, task_num, map_split)()
-        else:
-            # if no mapper, just pass the data through (see #1141)
-            _symlink_or_copy(
-                self._task_input_path('mapper', step_num, task_num),
-                self._task_output_path('mapper', step_num, task_num))
+            run_mapper = self._run_task_func(
+                'mapper', step_num, task_num, map_split)
+
+        sort_input = self._sort_input_func()
+
+        combiner_input_path = None
+        run_combiner = None
+        # don't need combiner_output_path; *run_combiner* already knows it
 
         if 'combiner' in step:
-            self._sort_combiner_input(step_num, task_num)
-            self._run_task_func('combiner', step_num, task_num)()
+            # create combiner dir
+            self.fs.mkdir(self._task_dir('combiner', step_num, task_num))
+
+            combiner_input_path = self._task_input_path(
+                'combiner', step_num, task_num)
+            run_combiner = self._run_task_func(
+                'combiner', step_num, task_num, map_split)
+
+        return partial(
+            _run_mapper_and_combiner,
+            run_mapper, sort_input, run_combiner,
+            mapper_input_path, mapper_output_path, combiner_input_path)
 
     def _run_reducers(self, step_num, num_reducer_tasks):
         try:
@@ -567,17 +585,10 @@ class SimMRJobRunner(MRJobRunner):
         """Returns a function that sorts lines from one or more input paths
         into a new file. Takes the arguments *input_path* and *output_path*.
 
-        By default this sorts in memory, but you can override this to
+        By default, sorts in memory, but you can override this to
         use the :command:`sort` binary, etc.
         """
         return partial(_sort_lines_in_memory, sort_values=self._sort_values)
-
-    def _sort_combiner_input(self, step_num, task_num):
-        input_path = self._task_output_path('mapper', step_num, task_num)
-        output_path = self._task_input_path('combiner', step_num, task_num)
-        self.fs.mkdir(dirname(output_path))
-
-        self._sort_input_func()([input_path], output_path)
 
     def _sort_reducer_input(self, step_num, num_map_tasks):
         step = self._get_step(step_num)
@@ -637,6 +648,23 @@ def _group_records_for_split(record_gen, split_size, reducer_key=None):
 
         yield split_num, record
         bytes_in_split += len(record)
+
+
+def _run_mapper_and_combiner(
+        run_mapper, sort_input, run_combiner,
+        mapper_input_path, mapper_output_path, combiner_input_path):
+    """Helper for :py:meth:`SimMRJobRunner._run_mapper_and_combiner_func`."""
+    # we don't need *combiner_output_path* because *run_combiner* already
+    # knows it
+
+    if run_mapper:
+        run_mapper()
+    else:
+        _symlink_or_copy(mapper_input_path, mapper_output_path)
+
+    if run_combiner:
+        sort_input([mapper_output_path], combiner_input_path)
+        run_combiner()
 
 
 def _run_task(invoke_task,

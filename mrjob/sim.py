@@ -39,6 +39,9 @@ from mrjob.util import unarchive
 log = logging.getLogger(__name__)
 
 
+# This class defers execution to a lot of other functions because of local
+# mode which uses :mod:`multiprocessing`, which relies on pickling.
+
 class SimMRJobRunner(MRJobRunner):
 
     # keyword arguments that we ignore because they require real Hadoop.
@@ -560,21 +563,21 @@ class SimMRJobRunner(MRJobRunner):
     def _sorted_reducer_input_path(self, step_num):
         return join(self._step_dir(step_num), 'reducer', 'sorted-input')
 
-    def _sort_input(self, input_paths, output_path):
-        """Sort lines from one or more input paths into a new file
-        at *output_path*.
+    def _sort_input_func(self):
+        """Returns a function that sorts lines from one or more input paths
+        into a new file. Takes the arguments *input_path* and *output_path*.
 
         By default this sorts in memory, but you can override this to
         use the :command:`sort` binary, etc.
         """
-        _sort_lines(input_paths, output_path, sort_values=self._sort_values)
+        return partial(_sort_lines_in_memory, sort_values=self._sort_values)
 
     def _sort_combiner_input(self, step_num, task_num):
         input_path = self._task_output_path('mapper', step_num, task_num)
         output_path = self._task_input_path('combiner', step_num, task_num)
         self.fs.mkdir(dirname(output_path))
 
-        self._sort_input([input_path], output_path)
+        self._sort_input_func()([input_path], output_path)
 
     def _sort_reducer_input(self, step_num, num_map_tasks):
         step = self._get_step(step_num)
@@ -588,13 +591,12 @@ class SimMRJobRunner(MRJobRunner):
             for task_num in range(num_map_tasks)
         ]
 
-        self._sort_input(input_paths, output_path)
+        self._sort_input_func()(input_paths, output_path)
 
     def _log_counters(self, step_num):
         counters = self.counters()[step_num]
         if counters:
             log.info('\n%s\n' % _format_counters(counters))
-
 
 
 def _apply_method(self, method_name, *args, **kwargs):
@@ -640,7 +642,10 @@ def _group_records_for_split(record_gen, split_size, reducer_key=None):
 def _run_task(invoke_task,
               task_type, step_num, task_num,
               input_path, output_path, stderr_path, wd, env):
-    """Set up filehandles and call *invoke_task()*."""
+    """Set up filehandles and call *invoke_task()*.
+
+    Helper for :py:meth:`SimMRJobRunner._run_task_func`.
+    """
     log.debug('running step %d, %s %d' % (step_num, task_type, task_num))
 
     with open(input_path, 'rb') as stdin, \
@@ -651,7 +656,7 @@ def _run_task(invoke_task,
           stdin, stdout, stderr, wd, env)
 
 
-def _sort_lines(input_paths, output_path, sort_values=False):
+def _sort_lines_in_memory(input_paths, output_path, sort_values=False):
     """Sort lines from *input_paths* and output them into *output_path*.
 
     If *sort_values* is true, sort by the entire line; otherwise just sort

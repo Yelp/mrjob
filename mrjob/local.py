@@ -32,6 +32,7 @@ from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.runner import RunnerOptionStore
 from mrjob.sim import SimMRJobRunner
+from mrjob.sim import _sort_lines_in_memory
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 
@@ -92,9 +93,6 @@ class LocalMRJobRunner(SimMRJobRunner):
           standalone Hadoop instance and running your job with ``-r hadoop``.
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
-
-        # should we fall back to sorting in memory?
-        self._bad_sort_bin = False
 
     def _invoke_task_func(self, task_type, step_num, task_num):
         args = self._substep_args(step_num, task_type)
@@ -161,45 +159,16 @@ class LocalMRJobRunner(SimMRJobRunner):
         return super(LocalMRJobRunner, self)._default_python_bin(
             local=True)
 
-    def _sort_input(self, input_paths, output_path):
+    def _sort_input_func(self):
         """Try sorting with the :command:`sort` binary before falling
         back to in-memory sort."""
-        if input_paths and not (
-                self._bad_sort_bin or platform.system() == 'Windows'):
-            env = os.environ.copy()
-
-            # ignore locale when sorting
-            env['LC_ALL'] = 'C'
-
-            # Make sure that the tmp dir environment variables are changed if
-            # the default is changed.
-            env['TMP'] = self._opts['local_tmp_dir']
-            env['TMPDIR'] = self._opts['local_tmp_dir']
-
-            err_path = os.path.join(self._get_local_tmp_dir(), 'sort-stderr')
-
-            with open(output_path, 'wb') as output:
-                with open(err_path, 'wb') as err:
-                    args = self._sort_bin() + list(input_paths)
-                    log.debug('> %s' % cmd_line(args))
-                    try:
-                        check_call(args, stdout=output, stderr=err, env=env)
-                        return
-                    except CalledProcessError:
-                        log.error(
-                            '`%s` failed, falling back to in-memory sort' %
-                            cmd_line(self._sort_bin()))
-                        with open(err_path) as read_err:
-                            for line in read_err:
-                                log.error('STDERR: %s' % line.rstrip('\r\n'))
-                    except OSError:
-                        log.error(
-                            'no sort binary, falling back to in-memory sort')
-
-        self._bad_sort_bin = True
-
-        # in-memory sort
-        super(LocalMRJobRunner, self)._sort_input(input_paths, output_path)
+        if platform.system() == 'Windows':  # we assume Unix sort
+            return super(LocalMRJobRunner, self)._sort_input_func()
+        else:
+            return partial(
+                _sort_lines_with_sort_bin,
+                sort_bin=self._sort_bin(),
+                tmp_dir=self._opts['local_tmp_dir'])
 
     def _sort_bin(self):
         """The binary to use to sort input.
@@ -257,3 +226,42 @@ def _pickle_safe(func, *args, **kwargs):
         raise  # we know these are pickleable
     except Exception as ex:
         raise Exception(repr(ex))  # we know this is pickleable
+
+
+def _sort_lines_with_sort_bin(input_paths, output_path, sort_bin,
+                              sort_values=False, tmp_dir=None):
+    """Sort lines the given *input_paths* into *output_path*,
+    using *sort_bin*. If there is a problem, fall back to in-memory sort.
+
+    This is a helper for :py:meth:`LocalMRJobRunner._sort_input_func`.
+
+    *tmp_dir* determines the value of :envvar:`$TMP` and :envvar:`$TMPDIR`
+    that *sort_bin* sees.
+    """
+    if input_paths:
+        env = os.environ.copy()
+
+        # ignore locale when sorting
+        env['LC_ALL'] = 'C'
+
+        # Make sure that the tmp dir environment variables are changed if
+        # the default is changed.
+        env['TMP'] = tmp_dir
+        env['TMPDIR'] = tmp_dir
+
+        with open(output_path, 'wb') as output:
+            args = sort_bin + list(input_paths)
+            log.debug('> %s' % cmd_line(args))
+
+            try:
+                check_call(args, stdout=output, env=env)
+                return
+            except CalledProcessError:
+                log.error(
+                    '`%s` failed, falling back to in-memory sort' %
+                    cmd_line(self._sort_bin()))
+            except OSError:
+                log.error(
+                    'no sort binary, falling back to in-memory sort')
+
+    _sort_lines_in_memory(input_paths, output_path, sort_values=sort_values)

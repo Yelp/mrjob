@@ -103,12 +103,6 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         return invoke_task
 
-    def _run_multiple(self, tasks, num_processes=None):
-        """Just run the tasks inline, one at a time.
-        """
-        for func, args, kwargs in tasks:
-            func(*args, **kwargs)
-
     def _log_cause_of_error(self, ex):
         """Just tell what file we were reading from (since they'll see
         the stacktrace from the actual exception)"""

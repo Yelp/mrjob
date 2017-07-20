@@ -98,12 +98,14 @@ class SimMRJobRunner(MRJobRunner):
         """
         NotImplementedError
 
-    def _run_multiple(self, tasks, num_processes=None):
-        """Run multiple tasks, possibly in parallel. Tasks are tuples of
-        ``(func, args, kwargs)``. *func* must be pickleable; if you want to run
-        instance methods, use :py:func:`_apply_method` to wrap them.
+    def _run_multiple(self, funcs, num_processes=None):
+        """Run multiple no-args functions, possibly in parallel using
+        :py:mod:`multiprocessing` (if so all *funcs* must be pickleable).
+
+        By default, we just call *funcs* one at a time
         """
-        raise NotImplementedError
+        for func in funcs:
+            func()
 
     def _log_cause_of_error(self, ex):
         """Log why the job failed."""
@@ -165,8 +167,8 @@ class SimMRJobRunner(MRJobRunner):
     def _run_mappers_and_combiners(self, step_num, map_splits):
         try:
             self._run_multiple(
-                (self._run_mapper_and_combiner_func(
-                    step_num, task_num, map_split), (), {})
+                self._run_mapper_and_combiner_func(
+                    step_num, task_num, map_split)
                 for task_num, map_split in enumerate(map_splits)
             )
         finally:
@@ -227,7 +229,7 @@ class SimMRJobRunner(MRJobRunner):
     def _run_reducers(self, step_num, num_reducer_tasks):
         try:
             self._run_multiple(
-                (self._run_task_func('reducer', step_num, task_num), (), {})
+                self._run_task_func('reducer', step_num, task_num)
                 for task_num in range(num_reducer_tasks)
             )
         finally:

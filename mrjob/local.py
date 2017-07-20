@@ -104,12 +104,16 @@ class LocalMRJobRunner(SimMRJobRunner):
             task_type, step_num, task_num,
             args, num_steps)
 
-    def _run_multiple(self, tasks, num_processes=None):
+    def _run_multiple(self, funcs, num_processes=None):
         """Use multiprocessing to run in parallel."""
         pool = Pool(processes=num_processes)
 
         try:
-            results = [pool.apply_async(*_pickle_wrap(task)) for task in tasks]
+            results = [
+                pool.apply_async(partial(_pickle_safe, func))
+                for func in funcs
+            ]
+
             for result in results:
                 result.get()
 
@@ -208,20 +212,11 @@ def _invoke_task_in_subprocess(
         )
 
 
-def _pickle_wrap(task):
-    """Wrap task to make sure we don't return unpickleable results
-    or raise unpickleable exceptions, which causes multiprocessing
-    to stall."""
-    func, args, kwargs = task
-
-    return (_pickle_safe, (func,) + tuple(args), kwargs)
-
-
-def _pickle_safe(func, *args, **kwargs):
-    """Dumb down *func* so that we don't try to pass anything
-    unpickleable through multiprocessing."""
+def _pickle_safe(func):
+    """Call no-args function *func*, returning *None* and ensuring
+    that any exception raised is pickleable."""
     try:
-        func(*args, **kwargs)  # always return None
+        func()  # always return None
     except _TaskFailedException:
         raise  # we know these are pickleable
     except Exception as ex:

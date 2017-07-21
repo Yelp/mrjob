@@ -54,7 +54,7 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
     OPTION_STORE_CLASS = HadoopInTheCloudOptionStore
 
     # so far, every service provides the ability to run bootstrap scripts
-    BOOTSTRAP_MRJOB_IN_SETUP = False
+    _BOOTSTRAP_MRJOB_IN_SETUP = False
 
 
     def __init__(self, **kwargs):

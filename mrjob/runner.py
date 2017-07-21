@@ -190,7 +190,7 @@ class MRJobRunner(object):
 
     # if this is true, when bootstrap_mrjob is true, add it through the
     # setup script
-    BOOTSTRAP_MRJOB_IN_SETUP = True
+    _BOOTSTRAP_MRJOB_IN_SETUP = True
 
     OPTION_STORE_CLASS = RunnerOptionStore
 
@@ -992,7 +992,7 @@ class MRJobRunner(object):
 
         setup = self._setup
 
-        if self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
+        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_SETUP:
             # patch setup to add mrjob.zip to PYTHONPATH
             mrjob_zip = self._create_mrjob_zip()
             # this is a file, not an archive, since Python can import directly
@@ -1571,7 +1571,7 @@ class MRJobRunner(object):
 
         # Spark doesn't have setup scripts; instead, we need to add
         # mrjob to
-        if self._bootstrap_mrjob() and self.BOOTSTRAP_MRJOB_IN_SETUP:
+        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_SETUP:
             py_files.append(self._create_mrjob_zip())
 
         return py_files

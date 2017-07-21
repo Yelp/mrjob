@@ -1005,7 +1005,7 @@ class SparkPyFilesTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             # this happens in runners that run on a cluster
-            runner.BOOTSTRAP_MRJOB_IN_SETUP = False
+            runner._BOOTSTRAP_MRJOB_IN_SETUP = False
             self.assertEqual(runner._spark_py_files(),
                              [])
 

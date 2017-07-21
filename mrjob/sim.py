@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # Copyright 2009-2013 Yelp and Contributors
 # Copyright 2015-2017 Yelp
 #
@@ -13,74 +12,37 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Run an MRJob locally by forking off a bunch of processes and piping
-them together. Useful for testing."""
 import itertools
 import logging
 import os
 import shutil
 import stat
+from functools import partial
+from multiprocessing import cpu_count
+from os.path import dirname
+from os.path import isdir
+from os.path import join
+from os.path import relpath
+from shutil import copy2
+from shutil import copytree
 
-from mrjob.compat import jobconf_from_dict
+from mrjob.cat import is_compressed
+from mrjob.cat import open_input
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_local_envs
 from mrjob.logs.counters import _format_counters
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
+from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
-from mrjob.runner import RunnerOptionStore
-from mrjob.util import read_input
 from mrjob.util import unarchive
-
 
 log = logging.getLogger(__name__)
 
 
-class SimRunnerOptionStore(RunnerOptionStore):
-    # these are the same for 'local' and 'inline' runners
-    ALLOWED_KEYS = _allowed_keys('local')
-    COMBINERS = _combiners('local')
-    DEPRECATED_ALIASES = _deprecated_aliases('local')
-
+# This class defers execution to a lot of other functions because of local
+# mode which uses :mod:`multiprocessing`, which relies on pickling.
 
 class SimMRJobRunner(MRJobRunner):
-    """Abstract base class for runners for testing jobs in development
-
-    The inline and local runners inherit from this class so functionality
-    common to them has been moved here.:py:method:`_run_step` must be overriden
-    by classes that extend SimMRJobRunner
-
-    :py:class:`LocalMRJobRunner` and :py:class:`InlineMRJobRunner` simulate
-    the following jobconf variables (and their Hadoop 1 equivalents):
-
-    * ``mapreduce.job.cache.archives`` (``mapred.cache.archives``)
-    * ``mapreduce.job.cache.files`` (``mapred.cache.files``)
-    * ``mapreduce.job.cache.local.archives`` (``mapred.cache.localArchives``)
-    * ``mapreduce.job.cache.local.files`` (``mapred.cache.localFiles``)
-    * ``mapreduce.job.id`` (``mapred.job.id``)
-    * ``mapreduce.job.local.dir`` (``job.local.dir``)
-    * ``mapreduce.map.input.file`` (``map.input.file``)
-    * ``mapreduce.map.input.length`` (``map.input.length``)
-    * ``mapreduce.map.input.start`` (``map.input.start``)
-    * ``mapreduce.task.attempt.id`` (``mapred.task.id``)
-    * ``mapreduce.task.id`` (``mapred.tip.id``)
-    * ``mapreduce.task.ismap`` (``mapred.task.is.map``)
-    * ``mapreduce.task.output.dir`` (``mapred.work.output.dir``)
-    * ``mapreduce.task.partition`` (``mapred.task.partition``)
-
-    Your job can read these from the environment using
-    :py:func:`~mrjob.compat.jobconf_from_env()`.
-
-    If you specify *hadoop_version*, we'll only simulate environment variables
-    for that version of Hadoop.
-    """
-    OPTION_STORE_CLASS = SimRunnerOptionStore
-
-    # try to run at least two tasks to catch bugs
-    _DEFAULT_MAP_TASKS = 2
-    _DEFAULT_REDUCE_TASKS = 2
 
     # keyword arguments that we ignore because they require real Hadoop.
     # We look directly at self._<kwarg_name> because they aren't in
@@ -89,7 +51,6 @@ class SimMRJobRunner(MRJobRunner):
         '_hadoop_input_format',
         '_hadoop_output_format',
         '_partitioner',
-        '_step_output_dir',
     ]
 
     # options that we ignore becaue they require real Hadoop.
@@ -99,19 +60,20 @@ class SimMRJobRunner(MRJobRunner):
 
     def __init__(self, **kwargs):
         super(SimMRJobRunner, self).__init__(**kwargs)
-        self._prev_outfiles = []
+
         self._counters = []
 
-    def _warn_ignored_opts(self):
-        """ If the user has provided options that are not supported
-        by the dev runners log warnings for each of the ignored options
-        """
+        # warn about ignored keyword arguments
+        # TODO: no need to look at attrs, just look at kwargs
+
         for ignored_attr in self._IGNORED_HADOOP_ATTRS:
             value = getattr(self, ignored_attr)
             if value is not None:
                 log.warning(
                     'ignoring %s keyword arg (requires real Hadoop): %r' %
                     (ignored_attr[1:], value))
+
+        # TODO: libjars should just not be an option for local runners
 
         for ignored_opt in self._IGNORED_HADOOP_OPTS:
             value = self._opts.get(ignored_opt)
@@ -120,311 +82,193 @@ class SimMRJobRunner(MRJobRunner):
                     'ignoring %s option (requires real Hadoop): %r' %
                     (ignored_opt, value))
 
-    def _symlink_to_file_or_copy(self, path, dest):
-        """Symlink from *dest* to the absolute version of *path*.
 
-        If symlinks aren't available, copy *path* to *dest* instead."""
-        if hasattr(os, 'symlink'):
-            path = os.path.abspath(path)
-            log.debug('creating symlink %s <- %s' % (path, dest))
-            os.symlink(path, dest)
-        else:
-            log.debug('copying %s -> %s' % (path, dest))
-            shutil.copyfile(path, dest)
+    # re-implement these in your subclass
 
-    def _setup_working_dir(self, working_dir):
-        """Make a working directory with symlinks to our script and
-        external files. Return name of the script"""
-        log.debug('setting up working dir in %s' % working_dir)
+    def _invoke_task_func(self, task_type, step_num, task_num):
+        """Return a function that runs the given
+        mapper/reducer. This needs to be pickleable if tasks are going
+        to be invoked through multiprocessing (e.g. local mode).
 
-        # create the working directory
-        self.fs.mkdir(working_dir)
+        The function takes the arguments *stdin*, *stdout*, *stderr*,
+        *wd* (path of working directory), and *env* (environment dictionary).
 
-        files = self._working_dir_mgr.name_to_path('file').items()
-        # give all our files names, and symlink or unarchive them
-        for name, path in files:
-            dest = os.path.join(working_dir, name)
-            self._symlink_to_file_or_copy(path, dest)
-
-        archives = self._working_dir_mgr.name_to_path('archive').items()
-        for name, path in archives:
-            dest = os.path.join(working_dir, name)
-            log.debug('unarchiving %s -> %s' % (path, dest))
-            unarchive(path, dest)
-
-    def _setup_output_dir(self):
-        if not self._output_dir:
-            self._output_dir = os.path.join(
-                self._get_local_tmp_dir(), 'output')
-
-        if not os.path.isdir(self._output_dir):
-            log.debug('Creating output directory %s' % self._output_dir)
-            self.fs.mkdir(self._output_dir)
-
-    def _check_step_works_with_runner(self, step_dict):
-        """ Raise an exception if the runner cannot run this step
-
-        Implemented by :py:class:`mrjob.inline.InlineMRJobRunner`
+        The job's filehandle, working dir (*wd*) and environment
+        will be provided.
         """
+        NotImplementedError
+
+    def _run_multiple(self, funcs, num_processes=None):
+        """Run multiple no-args functions, possibly in parallel using
+        :py:mod:`multiprocessing` (if so all *funcs* must be pickleable).
+
+        By default, we just call *funcs* one at a time
+        """
+        for func in funcs:
+            func()
+
+    def _log_cause_of_error(self, ex):
+        """Log why the job failed."""
         pass
 
     def _run(self):
-        self._warn_ignored_opts()
-        _error_on_bad_paths(self.fs, self._input_paths)
+        self._check_input_exists()
         self._create_setup_wrapper_script(local=True)
-        self._setup_output_dir()
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
             log.info('Running step %d of %d...' % (
                 step_num + 1, self._num_steps()))
 
-            self._check_step_works_with_runner(step)
             self._counters.append({})
 
-            self._invoke_step(step_num, 'mapper')
+            try:
+                self._create_dist_cache_dir(step_num)
+                self.fs.mkdir(self._output_dir_for_step(step_num))
 
-            if 'reducer' in step:
-                # sort the output. Treat this as a mini-step for the purpose
-                # of self._prev_outfiles
-                sort_output_path = os.path.join(
-                    self._get_local_tmp_dir(),
-                    'step-%04d-mapper-sorted' % step_num)
+                map_splits = self._split_mapper_input(
+                    self._input_paths_for_step(step_num), step_num)
 
-                self._invoke_sort(self._step_input_paths(), sort_output_path)
-                self._prev_outfiles = [sort_output_path]
+                self._run_mappers_and_combiners(step_num, map_splits)
 
-                # run the reducer
-                self._invoke_step(step_num, 'reducer')
+                if 'reducer' in step:
+                    self._sort_reducer_input(step_num, len(map_splits))
+                    num_reducer_tasks = self._split_reducer_input(step_num)
 
-        # move final output to output directory
-        for i, outfile in enumerate(self._prev_outfiles):
-            final_outfile = os.path.join(self._output_dir, 'part-%05d' % i)
-            log.debug('Moving %s -> %s' % (outfile, final_outfile))
-            shutil.move(outfile, final_outfile)
+                    self._run_reducers(step_num, num_reducer_tasks)
 
-    def _invoke_step(self, step_num, step_type):
-        """Run the mapper or reducer for the given step.
+                self._log_counters(step_num)
+
+            except Exception as ex:
+                self._log_counters(step_num)
+                self._log_cause_of_error(ex)
+
+                raise
+
+    def _run_task_func(self, task_type, step_num, task_num, map_split=None):
+        """Returns a no-args function that runs one mapper, reducer, or
+         combiner.
+
+        This sets up everything the task needs to run, then passes it off to
+        :py:meth:`_invoke_task_func`.
         """
+        input_path = self._task_input_path(task_type, step_num, task_num)
+        stderr_path = self._task_stderr_path(task_type, step_num, task_num)
+        output_path = self._task_output_path(task_type, step_num, task_num)
+        wd = self._setup_working_dir(task_type, step_num, task_num)
+        env = self._env_for_task(task_type, step_num, task_num, map_split)
+
+        return partial(
+            _run_task,
+            self._invoke_task_func(task_type, step_num, task_num),
+            task_type, step_num, task_num,
+            input_path, output_path, stderr_path, wd, env)
+
+    def _run_mappers_and_combiners(self, step_num, map_splits):
+        try:
+            self._run_multiple(
+                self._run_mapper_and_combiner_func(
+                    step_num, task_num, map_split)
+                for task_num, map_split in enumerate(map_splits)
+            )
+        finally:
+            self._parse_task_counters('mapper', step_num)
+            self._parse_task_counters('combiner', step_num)
+
+    def _parse_task_counters(self, task_type, step_num):
+        """Parse all stderr files from the given task (if any)."""
+        stderr_paths = self.fs.ls(self._task_stderr_paths_glob(
+            task_type, step_num))
+
+        for stderr_path in stderr_paths:
+            with open(stderr_path, 'rb') as stderr:
+                parse_mr_job_stderr(stderr, counters=self._counters[step_num])
+
+    def counters(self):
+        return self._counters
+
+    def get_hadoop_version(self):
+        return self._opts['hadoop_version']
+
+    def _run_mapper_and_combiner_func(self, step_num, task_num, map_split):
+        """Returns a no-args function that runs one mapper, plus the
+        corresponding combiner if there is one."""
         step = self._get_step(step_num)
 
-        if step['type'] != 'streaming':
-            raise Exception("LocalMRJobRunner cannot run %s steps" %
-                            step['type'])
+        mapper_input_path = self._task_input_path(
+            'mapper', step_num, task_num)
+        mapper_output_path = self._task_output_path(
+            'mapper', step_num, task_num)
 
-        jobconf = self._jobconf_for_step(step_num)
+        run_mapper = None
 
-        outfile_prefix = 'step-%04d-%s' % (step_num, step_type)
+        if 'mapper' in step:
+            run_mapper = self._run_task_func(
+                'mapper', step_num, task_num, map_split)
 
-        # allow setting number of tasks from jobconf
-        if step_type == 'reducer':
-            num_tasks = int(jobconf_from_dict(
-                jobconf, 'mapreduce.job.reduces', self._DEFAULT_REDUCE_TASKS))
-        else:
-            num_tasks = int(jobconf_from_dict(
-                jobconf, 'mapreduce.job.maps', self._DEFAULT_MAP_TASKS))
+        sort_input = self._sort_input_func()
 
-        # get file splits for mappers and reducers
-        keep_sorted = (step_type == 'reducer')
-        file_splits = self._get_file_splits(
-            self._step_input_paths(), num_tasks, keep_sorted=keep_sorted)
+        combiner_input_path = None
+        run_combiner = None
+        # don't need combiner_output_path; *run_combiner* already knows it
 
-        # since we have grapped the files from the _prev_outfiles as input
-        # to this step reset _prev_outfiles
-        self._prev_outfiles = []
+        if 'combiner' in step:
+            # create combiner dir
+            self.fs.mkdir(self._task_dir('combiner', step_num, task_num))
 
-        # Start the tasks associated with the step:
-        # if we need to sort, then just sort all input files into one file
-        # otherwise, split the files needed for mappers and reducers
-        # and setup the task environment for each
+            combiner_input_path = self._task_input_path(
+                'combiner', step_num, task_num)
+            run_combiner = self._run_task_func(
+                'combiner', step_num, task_num, map_split)
 
-        # The correctly-ordered list of task_num, file_name pairs
-        file_tasks = sorted([
-            (t['task_num'], file_name) for file_name, t
-            in file_splits.items()], key=lambda t: t[0])
+        return partial(
+            _run_mapper_and_combiner,
+            run_mapper, sort_input, run_combiner,
+            mapper_input_path, mapper_output_path, combiner_input_path)
 
-        for task_num, input_path in file_tasks:
-            # make a new working_dir for each task
-            working_dir = os.path.join(
-                self._get_local_tmp_dir(),
-                'job_local_dir', str(step_num), step_type, str(task_num))
-            self._setup_working_dir(working_dir)
+    def _run_reducers(self, step_num, num_reducer_tasks):
+        try:
+            self._run_multiple(
+                self._run_task_func('reducer', step_num, task_num)
+                for task_num in range(num_reducer_tasks)
+            )
+        finally:
+            self._parse_task_counters('reducer', step_num)
 
-            log.debug("File name %s" % input_path)
-            # setup environment variables
-            split_kwargs = {}
-            if step_type == 'mapper':
-                # mappers have extra file split info
-                split_kwargs = dict(
-                    input_file=file_splits[input_path]['orig_name'],
-                    input_start=file_splits[input_path]['start'],
-                    input_length=file_splits[input_path]['length'])
+    def _check_input_exists(self):
+        if not self._opts['check_input_paths']:
+            return
 
-            env = self._subprocess_env(
-                step_num, step_type, task_num, working_dir, **split_kwargs)
+        for path in self._input_paths:
+            # '-' (stdin) always exists
+            if path != '-' and not self.fs.exists(path):
+                raise AssertionError(
+                    'Input path %s does not exist!' % (path,))
 
-            output_path = os.path.join(
-                self._get_local_tmp_dir(),
-                outfile_prefix + '_part-%05d' % task_num)
-            log.debug('Writing to %s' % output_path)
+    def _create_dist_cache_dir(self, step_num):
+        """Copy working directory files into a shared directory,
+        simulating the way Hadoop's Distributed Cache works on nodes."""
+        cache_dir = self._dist_cache_dir(step_num)
 
-            self._run_step(step_num, step_type, input_path, output_path,
-                           working_dir, env)
+        log.debug('creating simulated Distributed Cache dir: %s' % cache_dir)
+        self.fs.mkdir(cache_dir)
 
-            self._prev_outfiles.append(output_path)
+        for name, path in self._working_dir_mgr.name_to_path('file').items():
 
-        self._per_step_runner_finish(step_num)
-        counters = self._counters[step_num]
-        if counters:
-            log.info(_format_counters(counters))
+            dest = self._path_in_dist_cache_dir(name, step_num)
+            log.debug('copying %s -> %s' % (path, dest))
+            shutil.copy(path, dest)
+            _chmod_u_rx(dest)
 
-    def _run_step(self, step_num, step_type, input_path, output_path,
-                  working_dir, env):
-        """ Runner specific per step method
-        Inline and local runners override this method
-        """
-        raise NotImplementedError("Subclass must implement this method")
+        for name, path in self._working_dir_mgr.name_to_path(
+                'archive').items():
 
-    def _per_step_runner_finish(self, step_num):
-        """ Runner specific method to be executed to mark the step completion.
-        Only the local runner implements this method
-        """
-        pass
+            dest = self._path_in_dist_cache_dir(name, step_num)
+            log.debug('unarchiving %s -> %s' % (path, dest))
+            unarchive(path, dest)
+            _chmod_u_rx(dest, recursive=True)
 
-    def _get_file_splits(self, input_paths, num_splits, keep_sorted=False):
-        """ Split the input files into (roughly) *num_splits* files. Gzipped
-        files are not split, but each gzipped file counts as one split.
-
-        :param input_paths: Iterable of paths to be split
-        :param num_splits: Number of splits to target
-        :param keep_sorted: If True, group lines by key
-
-        Returns a dictionary that maps split_file names to a dictionary of
-        properties:
-
-        * *orig_name*: the original name of the file whose data is in
-                          the split
-        * *start*: where the split starts
-        * *length*: the length of the split
-        """
-        # sanity check: if keep_sorted is True, we should only have one file
-        assert(not keep_sorted or len(input_paths) == 1)
-
-        file_names = {}
-        input_paths_to_split = []
-
-        # Each file is assigned a 'task number' as if coming from some previous
-        # task. The task number is used to choose the split file name, and
-        # sometimes the file name of the sorted split. This is done so that
-        # when the output files are combined after the final step, they are in
-        # sorted order due to already being lexicographically sorted.
-
-        for input_path in input_paths:
-            for path in self.fs.ls(input_path):
-                if path.endswith('.gz'):
-                    # do not split compressed files
-                    absolute_path = os.path.abspath(path)
-                    file_names[absolute_path] = {
-                        'orig_name': absolute_path,
-                        'start': 0,
-                        'task_num': len(file_names),
-                        'length': os.stat(absolute_path)[stat.ST_SIZE],
-                    }
-                    # this counts as "one split"
-                    num_splits -= 1
-                else:
-                    # do split uncompressed files
-                    input_paths_to_split.append(path)
-
-        # exit early if no uncompressed files given
-        if not input_paths_to_split:
-            return file_names
-
-        # account for user giving fewer splits than there are compressed files
-        num_splits = max(num_splits, 1)
-
-        # determine the size of each file split
-        total_size = 0
-        for input_path in input_paths_to_split:
-            for path in self.fs.ls(input_path):
-                total_size += os.stat(path)[stat.ST_SIZE]
-        split_size = total_size / num_splits
-
-        # we want each file split to be as close to split_size as possible
-        # we also want different input files to be in different splits
-        tmp_directory = self._get_local_tmp_dir()
-
-        # Helper functions:
-        def create_outfile(orig_name='', start=''):
-            # create a new output file and initialize its properties dict
-            task_num = len(file_names)
-            outfile_name = os.path.join(tmp_directory,
-                                        'input_part-%05d' % task_num)
-            new_file = {
-                'orig_name': orig_name,
-                'start': start,
-                'task_num': task_num,
-            }
-            file_names[outfile_name] = new_file
-            return outfile_name
-
-        def line_group_generator(input_path):
-            # Generate lines from a given input_path, if keep_sorted is True,
-            # group lines by key; otherwise have one line per group
-            # concatenate all lines with the same key and yield them
-            # together
-            if keep_sorted:
-                def reducer_key(line):
-                    return line.split(b'\t')[0]
-
-                # assume that input is a collection of key <tab> value pairs
-                # match all non-tab characters
-                for _, lines in itertools.groupby(
-                        read_input(input_path), key=reducer_key):
-                    yield lines
-            else:
-                for line in read_input(input_path):
-                    yield (line,)
-
-        for path in input_paths_to_split:
-            # create a new split file for each new path
-
-            # initialize file and accumulators
-            outfile_name = create_outfile(path, 0)
-            bytes_written = 0
-            total_bytes = 0
-            outfile = None
-
-            try:
-                outfile = open(outfile_name, 'wb')
-
-                # write each line to a file as long as we are within the limit
-                # (split_size)
-                for line_group in line_group_generator(path):
-                    if bytes_written >= split_size:
-                        # new split file if we exceeded the limit
-                        file_names[outfile_name]['length'] = bytes_written
-                        total_bytes += bytes_written
-
-                        outfile_name = create_outfile(path, total_bytes)
-                        outfile.close()
-                        outfile = open(outfile_name, 'wb')
-
-                        bytes_written = 0
-
-                    for line in line_group:
-                        outfile.write(line)
-                        bytes_written += len(line)
-
-                file_names[outfile_name]['length'] = bytes_written
-            finally:
-                if outfile is not None:
-                    outfile.close()
-
-        return file_names
-
-    def _subprocess_env(self, step_num, step_type, task_num, working_dir,
-                        **split_kwargs):
+    def _env_for_task(self, task_type, step_num, task_num, map_split=None):
         """Set up environment variables for a subprocess (mapper, etc.)
 
         This combines, in decreasing order of priority:
@@ -443,7 +287,7 @@ class SimMRJobRunner(MRJobRunner):
         user_jobconf = self._jobconf_for_step(step_num)
 
         simulated_jobconf = self._simulate_jobconf_for_step(
-            step_num, step_type, task_num, working_dir, **split_kwargs)
+            task_type, step_num, task_num, map_split)
 
         def to_env(jobconf):
             return dict((k.replace('.', '_'), str(v))
@@ -457,109 +301,442 @@ class SimMRJobRunner(MRJobRunner):
                                   self._opts['cmdenv'])
 
     def _simulate_jobconf_for_step(
-            self, step_num, step_type, task_num, working_dir,
-            input_file=None, input_start=None, input_length=None):
-        """Simulate jobconf variables set by Hadoop to indicate input
-        files, files uploaded, working directory, etc. for a particular step.
-
-        Returns a dictionary mapping jobconf variable name
-        (e.g. ``'mapreduce.map.input.file'``) to its value, which is always
-        a string.
-        """
-        # By convention, we use the newer (Hadoop 2) jobconf names and
-        # translate them at the very end.
+            self, task_type, step_num, task_num, map_split=None):
         j = {}
 
+        # TODO: these are really poor imtations of Hadoop IDs. See #1254
         j['mapreduce.job.id'] = self._job_key
-        j['mapreduce.task.output.dir'] = self._output_dir
-        j['mapreduce.job.local.dir'] = working_dir
-        # archives and files for jobconf
-        cache_archives = []
-        cache_files = []
-        cache_local_archives = []
-        cache_local_files = []
-
-        files = self._working_dir_mgr.name_to_path('file').items()
-        for name, path in files:
-            cache_files.append('%s#%s' % (path, name))
-            cache_local_files.append(os.path.join(working_dir, name))
-
-        archives = self._working_dir_mgr.name_to_path('archive').items()
-        for name, path in archives:
-            cache_archives.append('%s#%s' % (path, name))
-            cache_local_archives.append(os.path.join(working_dir, name))
-
-        # TODO: could add mtime info here too (e.g.
-        # mapreduce.job.cache.archives.timestamps) here too
-        j['mapreduce.job.cache.files'] = (','.join(cache_files))
-        j['mapreduce.job.cache.local.files'] = (','.join(cache_local_files))
-        j['mapreduce.job.cache.archives'] = (','.join(cache_archives))
-        j['mapreduce.job.cache.local.archives'] = (
-            ','.join(cache_local_archives))
-
-        # task and attempt IDs
-        # TODO: these are a crappy imitation of task/attempt IDs (see #1254)
         j['mapreduce.task.id'] = 'task_%s_%s_%04d%d' % (
-            self._job_key, step_type.lower(), step_num, task_num)
-        # (we only have one attempt)
+            self._job_key, task_type.lower(), step_num, task_num)
         j['mapreduce.task.attempt.id'] = 'attempt_%s_%s_%04d%d_0' % (
-            self._job_key, step_type.lower(), step_num, task_num)
+            self._job_key, task_type.lower(), step_num, task_num)
 
-        # not actually sure what's correct for combiners here. It'll definitely
-        # be true if we're just using pipes to simulate a combiner though
-        j['mapreduce.task.ismap'] = str(
-            step_type in ('mapper', 'combiner')).lower()
+        j['mapreduce.task.ismap'] = str(task_type == 'mapper').lower()
 
+        # TODO: is this the correct format?
         j['mapreduce.task.partition'] = str(task_num)
 
-        if input_file is not None:
-            j['mapreduce.map.input.file'] = input_file
-        if input_start is not None:
-            j['mapreduce.map.input.start'] = str(input_start)
-        if input_length is not None:
-            j['mapreduce.map.input.length'] = str(input_length)
+        j['mapreduce.task.output.dir'] = self._output_dir_for_step(step_num)
 
-        version = self.get_hadoop_version()
-        if version:
-            # translate to correct version
-            j = dict((translate_jobconf(k, version), v) for k, v in j.items())
+        working_dir = self._task_working_dir(task_type, step_num, task_num)
+        j['mapreduce.job.local.dir'] = working_dir
+
+        for x in ('archive', 'file'):
+            named_paths = sorted(self._working_dir_mgr.name_to_path(x).items())
+
+            # mapreduce.job.cache.archives
+            # mapreduce.job.cache.files
+            j['mapreduce.job.cache.%ss' % x] = ','.join(
+                '%s#%s' % (path, name) for name, path in named_paths)
+
+            # mapreduce.job.cache.local.archives
+            # mapreduce.job.cache.local.files
+            j['mapreduce.job.cache.local.%ss' % x] = ','.join(
+                join(working_dir, name) for name, path in named_paths)
+
+        if map_split:
+            # mapreduce.map.input.file
+            # mapreduce.map.input.start
+            # mapreduce.map.input.length
+            for key, value in map_split.items():
+                j['mapreduce.map.input.' + key] = str(value)
+
+        # translate to correct version
+
+        # don't use translate_jobconf_dict(); that's meant to add keys
+        # to user-supplied jobconf
+        hadoop_version = self.get_hadoop_version()
+
+        if hadoop_version:
+            return {translate_jobconf(k, hadoop_version): v
+                    for k, v in j.items()}
         else:
-            # use all versions
-            j = dict((variant, v)
-                     for k, v in j.items()
-                     for variant in translate_jobconf_for_all_versions(k))
+            return {tk: v for k, v in j.items()
+                    for tk in translate_jobconf_for_all_versions(k)}
 
-        return j
+    def _num_mappers(self, step_num):
+        # TODO: look up mapred.job.maps (convert to int) in _jobconf_for_step()
+        return cpu_count()
 
-    def get_hadoop_version(self):
-        return self._opts['hadoop_version']
+    def _num_reducers(self, step_num):
+        # TODO: look up mapred.job.reduces in _jobconf_for_step()
+        return cpu_count()
 
-    def _step_input_paths(self):
-        """Decide where to get input for a step. Dump stdin to a temp file
-        if need be."""
-        if self._prev_outfiles:
-            return self._prev_outfiles
+    def _split_mapper_input(self, input_paths, step_num):
+        """Take one or more input paths (which may be compressed) and split
+        it to create the input files for the map tasks.
+
+        Yields "splits", which are dictionaries with the following keys:
+
+        input: path of input for one mapper
+        file: path of original file
+        start, length: chunk of original file in *input*
+
+        Uncompressed files will not be split (even ``.bz2`` files);
+        uncompressed files will be split as to to attempt to create
+        twice as many input files as there are mappers.
+        """
+        input_paths = list(input_paths)
+
+        # determine split size
+        split_size = self._pick_mapper_split_size(input_paths, step_num)
+
+        # yield output fileobjs as needed
+        split_fileobj_gen = self._yield_split_fileobjs('mapper', step_num)
+
+        results = []
+
+        for path in input_paths:
+            with open_input(path) as src:
+                if is_compressed(path):
+                    # if file is compressed, uncompress it into a single split
+
+                    # Hadoop tracks the compressed file's size
+                    size = os.stat(path)[stat.ST_SIZE]
+
+                    with next(split_fileobj_gen) as dest:
+                        shutil.copyfileobj(src, dest)
+
+                    results.append(dict(
+                        file=path,
+                        start=0,
+                        length=size,
+                    ))
+                else:
+                    # otherwise, split into one or more input files
+                    start = 0
+                    length = 0
+
+                    for lines in _split_records(src, split_size):
+                        with next(split_fileobj_gen) as dest:
+                            for line in lines:
+                                dest.write(line)
+                                length += len(line)
+
+                        results.append(dict(
+                            file=path,
+                            start=start,
+                            length=length,
+                        ))
+
+                        start += length
+                        length = 0
+
+        return results
+
+    def _pick_mapper_split_size(self, input_paths, step_num):
+        if not isinstance(input_paths, list):
+            raise TypeError
+
+        target_num_splits = self._num_mappers(step_num) * 2
+
+        # decide on a split size to approximate target_num_splits
+        num_compressed = 0
+        uncompressed_bytes = 0
+
+        for path in input_paths:
+            if path.endswith('.gz') or path.endswith('.bz'):
+                num_compressed += 1
+            else:
+                uncompressed_bytes += os.stat(path)[stat.ST_SIZE]
+
+        return uncompressed_bytes // max(
+            target_num_splits - num_compressed, 1)
+
+    def _split_reducer_input(self, step_num):
+        """Split a single, uncompressed file containing sorted input for the
+        reducer into input files for each reducer task.
+
+        Yield the paths of the reducer input files."""
+        path = self._sorted_reducer_input_path(step_num)
+
+        log.debug('splitting reducer input: %s' % path)
+
+        size = os.stat(path)[stat.ST_SIZE]
+        split_size = size // (self._num_reducers(step_num) * 2)
+
+        # yield output fileobjs as needed
+        split_fileobj_gen = self._yield_split_fileobjs('reducer', step_num)
+
+        def reducer_key(line):
+            return line.split(b'\t')[0]
+
+        num_reducer_tasks = 0
+
+        with open(path, 'rb') as src:
+            for records in _split_records(src, split_size, reducer_key):
+                with next(split_fileobj_gen) as dest:
+                    for record in records:
+                        dest.write(record)
+                    num_reducer_tasks += 1
+
+        return num_reducer_tasks
+
+    def _yield_split_fileobjs(self, task_type, step_num):
+        """Used to split input for the given mapper/reducer.
+
+        Yields writeable fileobjs for input splits (check their *name*
+        attribute to get the path)
+        """
+        for task_num in itertools.count():
+            path = self._task_input_path(task_type, step_num, task_num)
+            self.fs.mkdir(dirname(path))
+            yield open(path, 'wb')
+
+    def _setup_working_dir(self, task_type, step_num, task_num):
+        wd = self._task_working_dir(task_type, step_num, task_num)
+        self.fs.mkdir(wd)
+
+        for type in ('archive', 'file'):
+            for name, path in (
+                    self._working_dir_mgr.name_to_path(type).items()):
+                _symlink_or_copy(
+                    self._path_in_dist_cache_dir(name, step_num),
+                    join(wd, name))
+
+        return wd
+
+    def _last_task_type_in_step(self, step_num):
+        step = self._get_step(step_num)
+
+        if step.get('reducer'):
+            return 'reducer'
+        elif step.get('combiner'):
+            return 'combiner'
         else:
-            return self._get_input_paths()
+            return 'mapper'
 
-    def counters(self):
-        return self._counters
+    # directory structure
+
+    # cache/
+
+    def _dist_cache_dir(self, step_num):
+        return join(self._step_dir(step_num), 'cache')
+
+    # cache/<name>
+
+    def _path_in_dist_cache_dir(self, name, step_num):
+        return join(self._dist_cache_dir(step_num), name)
+
+    # step/<step_num>/
+
+    def _step_dir(self, step_num):
+        return join(self._get_local_tmp_dir(), 'step', '%03d' % step_num)
+
+    def _input_paths_for_step(self, step_num):
+        if step_num == 0:
+            return [path for input_path_glob in self._get_input_paths()
+                    for path in self.fs.ls(input_path_glob)]
+        else:
+            return self.fs.ls(
+                join(self._output_dir_for_step(step_num - 1), 'part-*'))
+
+    def _output_dir_for_step(self, step_num):
+        if step_num == self._num_steps() - 1:
+            if not self._output_dir:
+                self._output_dir = join(self._get_local_tmp_dir(), 'output')
+            return self._output_dir
+        else:
+            return self._intermediate_output_uri(step_num, local=True)
+
+    def _default_step_output_dir(self):
+        return join(self._get_local_tmp_dir(), 'step-output')
+
+    # step/<step_num>/<task_type>/<task_num>/
+
+    def _task_dir(self, task_type, step_num, task_num):
+        return join(self._step_dir(step_num), task_type, '%05d' % task_num)
+
+    def _task_input_path(self, task_type, step_num, task_num):
+        return join(
+            self._task_dir(task_type, step_num, task_num), 'input')
+
+    def _task_stderr_path(self, task_type, step_num, task_num):
+        return join(
+            self._task_dir(task_type, step_num, task_num), 'stderr')
+
+    def _task_stderr_paths_glob(self, task_type, step_num):
+        return join(
+            self._step_dir(step_num), task_type, '*', 'stderr')
+
+    def _task_output_path(self, task_type, step_num, task_num):
+        """Where to output data for the given task.
+
+        Usually this is just a file named "output" in the task's directory,
+        but if it's the last task type in the step (usually the reducer),
+        it outputs directly to part-XXXXX files in the step's output directory.
+        """
+        if task_type == self._last_task_type_in_step(step_num):
+            return join(
+                self._output_dir_for_step(step_num), 'part-%05d' % task_num)
+        else:
+            return join(
+                self._task_dir(task_type, step_num, task_num), 'output')
+
+    # step/<step_num>/<task_type>/<task_num>/wd
+
+    def _task_working_dir(self, task_type, step_num, task_num):
+        return join(self._task_dir(task_type, step_num, task_num), 'wd')
+
+    # need this specifically since there's a global sort of reducer input
+
+    def _sorted_reducer_input_path(self, step_num):
+        return join(self._step_dir(step_num), 'reducer', 'sorted-input')
+
+    def _sort_input_func(self):
+        """Returns a function that sorts lines from one or more input paths
+        into a new file. Takes the arguments *input_path* and *output_path*.
+
+        By default, sorts in memory, but you can override this to
+        use the :command:`sort` binary, etc.
+        """
+        return partial(_sort_lines_in_memory, sort_values=self._sort_values)
+
+    def _sort_reducer_input(self, step_num, num_map_tasks):
+        step = self._get_step(step_num)
+
+        output_path = self._sorted_reducer_input_path(step_num)
+        self.fs.mkdir(dirname(output_path))
+
+        prev_task_type = 'combiner' if step.get('combiner') else 'mapper'
+        input_paths = [
+            self._task_output_path(prev_task_type, step_num, task_num)
+            for task_num in range(num_map_tasks)
+        ]
+
+        self._sort_input_func()(input_paths, output_path)
+
+    def _log_counters(self, step_num):
+        counters = self.counters()[step_num]
+        if counters:
+            log.info('\n%s\n' % _format_counters(counters))
 
 
-def _error_on_bad_paths(fs, paths):
-    """Raise an exception if there is not at least one valid path.
+def _apply_method(self, method_name, *args, **kwargs):
+    """Shim to turn method calls into pickleable function calls."""
+    getattr(self, method_name)(*args, **kwargs)
 
-    :param fs: a filesystem used to check if a path exists
-    :type fs: :class:`mrjob.fs.base.Filesystem`
-    :param paths: a list of file paths or globs
-    :type paths: list of strings
-    :raises ValueError: if there are no valid paths
+
+def _chmod_u_rx(path, recursive=False):
+    """make *path* user readable and executable. If *recursive* is true,
+    make *path* and everything inside it executable."""
+    if recursive:
+        for dirname, _, filenames in os.walk(path, followlinks=True):
+            for filename in filenames:
+                _chmod_u_rx(join(dirname, filename))
+    else:
+        if hasattr(os, 'chmod'):  # only available on Unix, Windows
+            os.chmod(path, stat.S_IRUSR | stat.S_IXUSR)
+
+
+def _group_records_for_split(record_gen, split_size, reducer_key=None):
+    """Helper for _split_records()."""
+    split_num = 0
+    bytes_in_split = 0
+
+    last_key_value = None
+
+    for record in record_gen:
+        same_key = False
+
+        if reducer_key:
+            key_value = reducer_key(record)
+            same_key = (key_value == last_key_value)
+            last_key_value = key_value
+
+        if bytes_in_split >= split_size and not same_key:
+            split_num += 1
+            bytes_in_split = 0
+
+        yield split_num, record
+        bytes_in_split += len(record)
+
+
+def _run_mapper_and_combiner(
+        run_mapper, sort_input, run_combiner,
+        mapper_input_path, mapper_output_path, combiner_input_path):
+    """Helper for :py:meth:`SimMRJobRunner._run_mapper_and_combiner_func`."""
+    # we don't need *combiner_output_path* because *run_combiner* already
+    # knows it
+
+    if run_mapper:
+        run_mapper()
+    else:
+        _symlink_or_copy(mapper_input_path, mapper_output_path)
+
+    if run_combiner:
+        sort_input([mapper_output_path], combiner_input_path)
+        run_combiner()
+
+
+def _run_task(invoke_task,
+              task_type, step_num, task_num,
+              input_path, output_path, stderr_path, wd, env):
+    """Set up filehandles and call *invoke_task()*.
+
+    Helper for :py:meth:`SimMRJobRunner._run_task_func`.
     """
-    for path in paths:
-        if path == '-':
-            return
-        if fs.exists(path):
-            return
+    log.debug('running step %d, %s %d' % (step_num, task_type, task_num))
 
-    raise ValueError("At least one valid path is required. "
-                     "None found in %s" % paths)
+    with open(input_path, 'rb') as stdin, \
+            open(output_path, 'wb') as stdout, \
+            open(stderr_path, 'wb') as stderr:
+
+      invoke_task(
+          stdin, stdout, stderr, wd, env)
+
+
+def _sort_lines_in_memory(input_paths, output_path, sort_values=False):
+    """Sort lines from *input_paths* and output them into *output_path*.
+
+    If *sort_values* is true, sort by the entire line; otherwise just sort
+    by everything up to the first tab.
+    """
+    log.debug('sorting in memory: %s -> %s' %
+              (', '.join(input_paths), output_path))
+    lines = []
+
+    for input_path in input_paths:
+        with open(input_path, 'rb') as input:
+            lines.extend(input)
+
+    if sort_values:
+        lines.sort()
+    else:
+        lines.sort(key=lambda line: line.split(b'\t')[0])
+
+    with open(output_path, 'wb') as output:
+        for line in lines:
+            output.write(line)
+
+
+def _split_records(record_gen, split_size, reducer_key=None):
+    """Given a stream of records (bytestrings, usually lines), yield groups of
+    records (as generators such that the total number of bytes in each group
+    only barely exceeds *split_size*, and, if *reducer_key* is set, consecutive
+    records with the same key will be in the same split."""
+    grouped_record_gen = _group_records_for_split(
+        record_gen, split_size, reducer_key)
+
+    for group_id, grouped_records in itertools.groupby(
+            grouped_record_gen, key=lambda gr: gr[0]):
+        yield (record for _, record in grouped_records)
+    else:
+        # special case for empty files
+        yield ()
+
+
+def _symlink_or_copy(path, dest):
+    """Symlink from *dest* to *path*, using relative paths if possible.
+
+    If symlinks aren't available, copy path to dest instead.
+    """
+    if hasattr(os, 'symlink'):
+        log.debug('creating symlink %s <- %s' % (path, dest))
+        os.symlink(relpath(path, dirname(dest)), dest)
+    else:
+        log.debug('copying %s -> %s' % (dest, path))
+        if isdir(path):
+            copytree(path, dest)
+        else:
+            copy2(path, dest)

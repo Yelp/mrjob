@@ -27,6 +27,9 @@ from mrjob.job import MRJob
 class MRJobWhereAreYou(MRJob):
     """Output what directory the mrjob library is in."""
 
+    def mapper(self):
+        pass
+
     def mapper_final(self):
         yield (None, None)
 

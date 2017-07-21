@@ -14,66 +14,51 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Run an MRJob locally by forking off a bunch of processes and piping
-them together. Useful for testing."""
-import inspect
+them together. Useful for testing, not terrible for running medium-sized
+jobs on all CPUs."""
 import logging
+import os
+import pickle
+import platform
+from functools import partial
+from multiprocessing import Pool
 from subprocess import CalledProcessError
-from subprocess import Popen
-from subprocess import PIPE
+from subprocess import check_call
 
-import mrjob.cat
-from mrjob.logs.counters import _format_counters
-from mrjob.parse import _find_python_traceback
-from mrjob.parse import parse_mr_job_stderr
-from mrjob.py2 import string_types
+from mrjob.logs.errors import _format_error
+from mrjob.logs.task import _parse_task_stderr
+from mrjob.options import _allowed_keys
+from mrjob.options import _combiners
+from mrjob.options import _deprecated_aliases
+from mrjob.runner import RunnerOptionStore
 from mrjob.sim import SimMRJobRunner
+from mrjob.sim import _sort_lines_in_memory
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
-from mrjob.util import shlex_split
-
 
 log = logging.getLogger(__name__)
 
 
-def _chain_procs(procs_args, **kwargs):
-    """Input: List of lists of command line arguments.
+class _TaskFailedException(StepFailedException):
+    """Extension of :py:class:`~mrjob.step.StepFailedException` that
+    blames one particular task."""
+    _FIELDS = StepFailedException._FIELDS + ('task_type', 'task_num')
 
-    These arg lists will be turned into Popen objects with the keyword
-    arguments specified as kwargs to this function. For procs X, Y, and Z, X
-    stdout will go to Y stdin and Y stdout will go to Z stdin. So for
-    P[i < |procs|-1], stdout is replaced with a pipe to the next process. For
-    P[i > 0], stdin is replaced with a pipe from the previous process.
-    Otherwise, the kwargs are passed through to the Popen constructor without
-    modification, so you can specify stdin/stdout/stderr file objects and have
-    them behave as expected.
+    def __init__(
+            self, reason=None, step_num=None, num_steps=None, step_desc=None,
+            task_type=None, task_num=None):
+        super(_TaskFailedException, self).__init__(
+            reason=reason, step_num=step_num,
+            num_steps=num_steps, step_desc=step_desc)
 
-    The return value is a list of Popen objects created, in the same order as
-    *procs_args*.
+        self.task_type = task_type
+        self.task_num = task_num
 
-    In most ways, this function makes several processes that act as one in
-    terms of input and output.
-    """
-    last_stdout = None
 
-    procs = []
-    for i, args in enumerate(procs_args):
-        proc_kwargs = kwargs.copy()
-
-        # first proc shouldn't override any kwargs
-        # other procs should get stdin from last proc's stdout
-        if i > 0:
-            proc_kwargs['stdin'] = last_stdout
-
-        # last proc shouldn't override stdout
-        # other procs should have stdout sent to next proc
-        if i < len(procs_args) - 1:
-            proc_kwargs['stdout'] = PIPE
-
-        proc = Popen(args, **proc_kwargs)
-        last_stdout = proc.stdout
-        procs.append(proc)
-
-    return procs
+class LocalRunnerOptionStore(RunnerOptionStore):
+    ALLOWED_KEYS = _allowed_keys('local')
+    COMBINERS = _combiners('local')
+    DEPRECATED_ALIASES = _deprecated_aliases('local')
 
 
 class LocalMRJobRunner(SimMRJobRunner):
@@ -83,14 +68,13 @@ class LocalMRJobRunner(SimMRJobRunner):
     Unlike :py:class:`~mrjob.job.InlineMRJobRunner`, this actually spawns
     multiple subprocesses for each task.
 
-    This is fairly inefficient and *not* a substitute for Hadoop; it's
-    main purpose is to help you test out :mrjob-opt:`setup` commands.
-
     It's rare to need to instantiate this class directly (see
     :py:meth:`~LocalMRJobRunner.__init__` for details).
 
     """
     alias = 'local'
+
+    OPTION_STORE_CLASS = LocalRunnerOptionStore
 
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
@@ -110,154 +94,169 @@ class LocalMRJobRunner(SimMRJobRunner):
         """
         super(LocalMRJobRunner, self).__init__(**kwargs)
 
-        self._all_proc_dicts = []
+    def _invoke_task_func(self, task_type, step_num, task_num):
+        args = self._substep_args(step_num, task_type)
+        num_steps = self._num_steps()
 
-        # jobconf variables set by our own job (e.g. files "uploaded")
-        #
-        # By convention, we use the Hadoop 2 versions of the
-        # jobconf variables internally (they get auto-translated before
-        # running the job)
-        self._internal_jobconf = {}
+        # stdin, stdout, stderr, wd, and env will be passed in later
+        return partial(
+            _invoke_task_in_subprocess,
+            task_type, step_num, task_num,
+            args, num_steps)
 
-        # add mrjob/cat.py to working dir so we can invoke it to uncompress
-        # input files (see #1540)
-        self._working_dir_mgr.add('file', self._cat_py())
+    def _run_multiple(self, funcs, num_processes=None):
+        """Use multiprocessing to run in parallel."""
+        pool = Pool(processes=num_processes)
 
-    def _run_step(self, step_num, step_type, input_path, output_path,
-                  working_dir, env):
-        step = self._get_step(step_num)
+        try:
+            results = [
+                pool.apply_async(partial(_pickle_safe, func))
+                for func in funcs
+            ]
 
-        if step_type == 'mapper':
-            procs_args = self._mapper_arg_chain(
-                step, step_num, input_path)
-        elif step_type == 'reducer':
-            procs_args = self._reducer_arg_chain(
-                step, step_num, input_path)
+            for result in results:
+                result.get()
 
-        proc_dicts = self._invoke_processes(
-            procs_args, output_path, working_dir, env)
-        self._all_proc_dicts.extend(proc_dicts)
+        # make sure that the pool (and its file descriptors, etc.)
+        # don't stay open. This doesn't matter much for individual jobs,
+        # but it makes our automated tasks run out of file descriptors.
 
-    def _per_step_runner_finish(self, step_num):
-        for proc_dict in self._all_proc_dicts:
-            self._wait_for_process(proc_dict, step_num)
+            pool.close()
+        except:
+            # if there's an error in one task, terminate all others
+            pool.terminate()
+            raise
+        finally:
+            pool.join()
 
-        self._all_proc_dicts = []
+    def _log_cause_of_error(self, ex):
+        if not isinstance(ex, _TaskFailedException):
+            # if something went wrong inside mrjob, the stacktrace
+            # will bubble up to the top level
+            return
 
-    def _cat_py(self):
-        """Return the path of mrjob.cat."""
-        return inspect.getsourcefile(mrjob.cat)
+        # not using LogInterpretationMixin because it would be overkill
 
-    def _cat_args(self, input_path):
-        """Return a command line that can call mrjob's internal "cat" script
-        from any working directory, without mrjob in PYTHONPATH"""
-        return self._python_bin() + [
-            self._working_dir_mgr.name('file', self._cat_py()),
-            input_path
-        ]
+        input_path = self._task_input_path(
+            ex.task_type, ex.step_num, ex.task_num)
+        stderr_path = self._task_stderr_path(
+            ex.task_type, ex.step_num, ex.task_num)
 
-    def _mapper_arg_chain(self, step_dict, step_num, input_path):
-        procs_args = []
+        if self.fs.exists(stderr_path):  # it should, but just to be safe
+            # log-parsing code expects "str", not bytes; open in text mode
+            with open(stderr_path) as stderr:
+                task_error = _parse_task_stderr(stderr)
+                if task_error:
+                    task_error['path'] = stderr_path
+                    log.error('Cause of failure:\n\n%s\n\n' %
+                              _format_error(dict(
+                                  split=dict(path=input_path),
+                                  task_error=task_error)))
+                    return
 
-        procs_args.append(self._cat_args(input_path))
-
-        if 'mapper' in step_dict:
-            procs_args.append(shlex_split(
-                self._substep_cmd_line(step_num, 'mapper')))
-
-        if 'combiner' in step_dict:
-            procs_args.append(['sort'])
-            # _substep_args may return more than one process
-            procs_args.append(shlex_split(
-                self._substep_cmd_line(step_num, 'combiner')))
-
-        return procs_args
-
-    def _reducer_arg_chain(self, step_dict, step_num, input_path):
-        if 'reducer' not in step_dict:
-            return []
-
-        procs_args = []
-
-        procs_args.append(self._cat_args(input_path))
-        procs_args.append(shlex_split(
-            self._substep_cmd_line(step_num, 'reducer')))
-
-        return procs_args
-
-    def _invoke_processes(self, procs_args, output_path, working_dir, env):
-        """invoke the process described by *args* and write to *output_path*
-
-        :param combiner_args: If this mapper has a combiner, we need to do
-                              some extra shell wrangling, so pass the combiner
-                              arguments in separately.
-
-        :return: dict(proc=Popen, args=[process args], write_to=file)
-        """
-        log.debug('> %s > %s' % (' | '.join(
-            args if isinstance(args, string_types) else cmd_line(args)
-            for args in procs_args), output_path))
-
-        with open(output_path, 'wb') as write_to:
-            procs = _chain_procs(procs_args, stdout=write_to, stderr=PIPE,
-                                 cwd=working_dir, env=env)
-            return [{'args': a, 'proc': proc, 'write_to': write_to}
-                    for a, proc in zip(procs_args, procs)]
-
-    def _wait_for_process(self, proc_dict, step_num):
-        # handle counters, status msgs, and other stuff on stderr
-        proc = proc_dict['proc']
-
-        stderr_lines = self._process_stderr_from_script(
-            proc.stderr, step_num=step_num)
-        tb_lines = _find_python_traceback(stderr_lines)
-
-        # proc.stdout isn't always defined
-        if proc.stdout:
-            proc.stdout.close()
-        proc.stderr.close()
-
-        returncode = proc.wait()
-
-        if returncode != 0:
-            # show counters before raising exception
-            counters = self._counters[step_num]
-            if counters:
-                log.info(_format_counters(counters))
-
-            # try to throw a useful exception
-            if tb_lines:
-                for line in tb_lines:
-                    log.error(line.rstrip('\r\n'))
-
-            reason = str(
-                CalledProcessError(returncode, proc_dict['args']))
-            raise StepFailedException(
-                reason=reason, step_num=step_num,
-                num_steps=len(self._get_steps()))
-
-    def _process_stderr_from_script(self, stderr, step_num=0):
-        """Handle stderr a line at time:
-
-        * for counter lines, store counters
-        * for status message, log the status change
-        * for all other lines, log an error, and yield the lines
-        """
-        for line in stderr:
-            # just pass one line at a time to parse_mr_job_stderr(),
-            # so we can print error and status messages in realtime
-            parsed = parse_mr_job_stderr(
-                [line], counters=self._counters[step_num])
-
-            # in practice there's only going to be at most one line in
-            # one of these lists, but the code is cleaner this way
-            for status in parsed['statuses']:
-                log.info('Status: %s' % status)
-
-            for line in parsed['other']:
-                log.debug('STDERR: %s' % line.rstrip('\r\n'))
-                yield line
+        # fallback if we can't find the error (e.g. the job does something
+        # weird to stderr or stack traces)
+        log.error('Error while reading from %s:\n' % input_path)
 
     def _default_python_bin(self, local=False):
+        """Always return *sys.executable*, if defined"""
         return super(LocalMRJobRunner, self)._default_python_bin(
             local=True)
+
+    def _sort_input_func(self):
+        """Try sorting with the :command:`sort` binary before falling
+        back to in-memory sort."""
+        if platform.system() == 'Windows':  # we assume Unix sort
+            return super(LocalMRJobRunner, self)._sort_input_func()
+        else:
+            return partial(
+                _sort_lines_with_sort_bin,
+                sort_bin=self._sort_bin(),
+                tmp_dir=self._opts['local_tmp_dir'])
+
+    def _sort_bin(self):
+        """The binary to use to sort input.
+
+        (On Windows, we go straight to sorting in memory.)
+        """
+        if self._opts['sort_bin']:
+            return self._opts['sort_bin']
+        elif self._sort_values:
+            return ['sort']
+        else:
+            # only sort on the reducer key (see #660)
+            return ['sort', '-t', '\t', '-k', '1,1', '-s']
+
+
+
+# pickle utilities, to protect multiprocessing from itself
+
+
+def _invoke_task_in_subprocess(
+        task_type, step_num, task_num,
+        args, num_steps,
+        stdin, stdout, stderr, wd, env):
+    """A pickleable function that invokes a task in a subprocess."""
+    log.debug('> %s' % cmd_line(args))
+
+    try:
+        check_call(args, stdin=stdin, stdout=stdout, stderr=stderr,
+                   cwd=wd, env=env)
+    except Exception as ex:
+        raise _TaskFailedException(
+            reason=str(ex),
+            step_num=step_num,
+            num_steps=num_steps,
+            task_type=task_type,
+            task_num=task_num,
+        )
+
+
+def _pickle_safe(func):
+    """Call no-args function *func*, returning *None* and ensuring
+    that any exception raised is pickleable."""
+    try:
+        func()  # always return None
+    except _TaskFailedException:
+        raise  # we know these are pickleable
+    except Exception as ex:
+        raise Exception(repr(ex))  # we know this is pickleable
+
+
+def _sort_lines_with_sort_bin(input_paths, output_path, sort_bin,
+                              sort_values=False, tmp_dir=None):
+    """Sort lines the given *input_paths* into *output_path*,
+    using *sort_bin*. If there is a problem, fall back to in-memory sort.
+
+    This is a helper for :py:meth:`LocalMRJobRunner._sort_input_func`.
+
+    *tmp_dir* determines the value of :envvar:`$TMP` and :envvar:`$TMPDIR`
+    that *sort_bin* sees.
+    """
+    if input_paths:
+        env = os.environ.copy()
+
+        # ignore locale when sorting
+        env['LC_ALL'] = 'C'
+
+        # Make sure that the tmp dir environment variables are changed if
+        # the default is changed.
+        env['TMP'] = tmp_dir
+        env['TMPDIR'] = tmp_dir
+
+        with open(output_path, 'wb') as output:
+            args = sort_bin + list(input_paths)
+            log.debug('> %s' % cmd_line(args))
+
+            try:
+                check_call(args, stdout=output, env=env)
+                return
+            except CalledProcessError:
+                log.error(
+                    '`%s` failed, falling back to in-memory sort' %
+                    cmd_line(self._sort_bin()))
+            except OSError:
+                log.error(
+                    'no sort binary, falling back to in-memory sort')
+
+    _sort_lines_in_memory(input_paths, output_path, sort_values=sort_values)

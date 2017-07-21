@@ -31,6 +31,10 @@ class CompositeFilesystem(Filesystem):
         self.filesystems = filesystems
 
     def __getattr__(self, name):
+        # don't confuse pickling when it looks for __getnewargs__, __getstate__
+        if name.startswith('__'):
+            raise AttributeError(name)
+
         # Forward through to children for backward compatibility
         for fs in self.filesystems:
             if hasattr(fs, name):

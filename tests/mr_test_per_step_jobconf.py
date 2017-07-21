@@ -33,7 +33,8 @@ class MRTestPerStepJobConf(MRJob):
                    jobconf_from_env(jobconf, None))
 
     def mapper(self, key, value):
-        yield key, value
+        if key:
+            yield key, value
 
     def steps(self):
         return([

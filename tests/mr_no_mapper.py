@@ -27,7 +27,7 @@ class MRNoMapper(MRJob):
         yield sum(ones), word
 
     def reducer2(self, count, words):
-        yield count, list(words)
+        yield count, sorted(words)
 
     def steps(self):
         return [MRStep(mapper=self.mapper, reducer=self.reducer),

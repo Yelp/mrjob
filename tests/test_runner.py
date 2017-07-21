@@ -30,6 +30,7 @@ from subprocess import CalledProcessError
 from tarfile import ReadError
 from time import sleep
 from unittest import TestCase
+from unittest import skip
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
@@ -300,6 +301,8 @@ class TestCatOutput(SandboxedTestCase):
         # should issue deprecation warning
         self.assertEqual(log.warning.call_count, 1)
 
+
+@skip('_invoke_sort() is no longer a runner method')
 class TestInvokeSort(TestCase):
 
     def setUp(self):
@@ -1437,8 +1440,8 @@ class SetupTestCase(SandboxedTestCase):
 
     def test_wrapper_script_only_writes_to_stderr(self):
         job = MROSWalkJob([
-            '-r', 'local',
             '--setup', 'echo stray output',
+            '-r', 'local',
         ])
         job.sandbox()
 
@@ -1451,9 +1454,11 @@ class SetupTestCase(SandboxedTestCase):
 
                 output = b''.join(r.cat_output())
 
-                # stray ouput should be in stderr, not the job's output
-                self.assertIn('stray output', stderr.getvalue())
+                # stray ouput should be in stderr files, not the job's output
                 self.assertNotIn(b'stray output', output)
+
+                with open(r._task_stderr_path('mapper', 0, 0), 'rb') as stderr:
+                    self.assertIn(b'stray output', stderr.read())
 
 
 class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
@@ -1481,7 +1486,7 @@ class InterpreterTestCase(TestCase):
                          [sys.executable])
 
     def test_python_bin(self):
-        runner = MRJobRunner(python_bin=['python', '-v'])
+        runner = LocalMRJobRunner(python_bin=['python', '-v'])
         self.assertEqual(runner._python_bin(), ['python', '-v'])
         self.assertEqual(runner._interpreter(), ['python', '-v'])
         self.assertEqual(runner._interpreter(steps=True), [sys.executable])

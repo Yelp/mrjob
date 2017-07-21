@@ -21,6 +21,7 @@ from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
 from .wrap import _cat_log
 from .wrap import _ls_logs
+from mrjob import parse
 
 
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
@@ -49,9 +50,23 @@ _PRE_YARN_TASK_LOG_PATH_RE = re.compile(
     r'(?P<attempt_num>\d+))/'
     r'(?P<log_type>stderr|syslog)(?P<suffix>\.\w{1,3})?$')
 
+# ignore counters and status (only happens in sim runners, where task stderr
+# is dumped straight to a file).
+
+# convert from bytes regex to text regex
+_COUNTER_RE = re.compile(parse._COUNTER_RE.pattern.decode('ascii'))
+_STATUS_RE = re.compile(parse._STATUS_RE.pattern.decode('ascii'))
 
 # ignore warnings about initializing log4j in task stderr
-_TASK_STDERR_IGNORE_RE = re.compile(r'^log4j:WARN .*$')
+_LOG4J_WARN_RE = re.compile(r'^log4j:WARN .*$')
+
+# also ignore counters and status messages (this only happens in
+# local mode, where there's no real Hadoop to filter them out)
+_TASK_STDERR_IGNORE_RES = [
+    _COUNTER_RE,
+    _STATUS_RE,
+    _LOG4J_WARN_RE,
+]
 
 # this is the start of a Java stacktrace that Hadoop 1 always logs to
 # stderr when tasks fail (see #1430)
@@ -398,7 +413,8 @@ def _parse_task_syslog(lines):
 
     return result
 
-
+# TODO: allow filtering of bad lines to happen elsewhere, pass this
+# function numbered lines
 def _parse_task_stderr(lines):
     """Attempt to explain any error in task stderr, be it a Python
     exception or a problem with a setup command (see #1203).
@@ -433,21 +449,24 @@ def _parse_task_stderr(lines):
             else:
                 stack_trace_start_line = None
 
-        # ignore warnings about initializing log4j
-        if _TASK_STDERR_IGNORE_RE.match(line):
+        # ignore warnings about initializing log4j, counters, etc.
+        if any(ir.match(line) for ir in _TASK_STDERR_IGNORE_RES):
             # ignored lines shouldn't count as part of the line range
-            if task_error and 'num_lines' not in task_error:
+            if task_error and task_error.get('num_lines') is None:
                 task_error['num_lines'] = line_num - task_error['start_line']
             continue
         elif not task_error or line.startswith('+ '):
+            # stderr log should only contain counters and status
+            # messages in local mode
             task_error = dict(
                 message=line,
                 start_line=line_num)
         else:
             task_error['message'] += '\n' + line
+            task_error['num_lines'] = None
 
     if task_error:
-        if 'num_lines' not in task_error:
+        if task_error.get('num_lines') is None:
             end_line = stack_trace_start_line or (line_num + 1)
             task_error['num_lines'] = end_line - task_error['start_line']
         return task_error

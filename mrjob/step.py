@@ -80,6 +80,7 @@ class StepFailedException(Exception):
     you may wish to catch it if you
     :ref:`run your job programatically <runners-programmatically>`.
     """
+    _FIELDS = ('reason', 'step_num', 'num_steps', 'step_desc')
 
     def __init__(
             self, reason=None, step_num=None, num_steps=None, step_desc=None):
@@ -113,8 +114,7 @@ class StepFailedException(Exception):
         return '%s(%s)' % (
             self.__class__.__name__,
             ', '.join(('%s=%r' % (k, getattr(self, k))
-                       for k in ('reason', 'step_num',
-                                 'num_steps', 'step_desc')
+                       for k in self._FIELDS
                        if getattr(self, k) is not None)))
 
 

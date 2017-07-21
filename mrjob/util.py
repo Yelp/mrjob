@@ -460,6 +460,7 @@ def which(cmd, path=None):
     as a keyword argument.
     """
     if hasattr(shutil, 'which'):
+        # added in Python 3.3
         return shutil.which(cmd, path=path)
     elif path is None and os.environ.get('PATH') is None:
         # find_executable() errors if neither path nor $PATH is set

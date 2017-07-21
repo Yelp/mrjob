@@ -57,6 +57,7 @@ from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
+from mrjob.util import shlex_split
 from mrjob.util import to_lines
 from mrjob.util import zip_dir
 
@@ -78,6 +79,9 @@ _SORT_VALUES_JOBCONF = {
 # partitioner for sort_values
 _SORT_VALUES_PARTITIONER = \
     'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner'
+
+# no need to escape arguments that only include these characters
+_HADOOP_SAFE_ARG_RE = re.compile(r'^[\w\./=-]*$')
 
 
 class RunnerOptionStore(OptionStore):
@@ -781,6 +785,7 @@ class MRJobRunner(object):
          * invoking ``cat.py`` in local mode
          * the Python binary for Spark (``$PYSPARK_PYTHON``)
         """
+        # python_bin isn't an option for inline runners
         return self._opts['python_bin'] or self._default_python_bin()
 
     def _steps_python_bin(self):
@@ -809,12 +814,7 @@ class MRJobRunner(object):
             return ['python%d' % sys.version_info[0]]
 
     def _script_args_for_step(self, step_num, mrc):
-        assert self._script_path
-
-        args = self._executable() + [
-            '--step-num=%d' % step_num,
-            '--%s' % mrc,
-        ] + self._mr_job_extra_args()
+        args = self._executable() + self._args_for_task(step_num, mrc)
 
         if self._setup_wrapper_script_path:
             return (self._sh_bin() +
@@ -824,32 +824,55 @@ class MRJobRunner(object):
         else:
             return args
 
-    def _substep_cmd_line(self, step_num, mrc):
+    def _args_for_task(self, step_num, mrc):
+        return [
+            '--step-num=%d' % step_num,
+            '--%s' % mrc,
+        ] + self._mr_job_extra_args()
+
+
+    def _substep_args(self, step_num, mrc):
         step = self._get_step(step_num)
 
         if step[mrc]['type'] == 'command':
+            cmd = step[mrc]['command']
+
             # never wrap custom hadoop streaming commands in bash
-            return step[mrc]['command']
+            if isinstance(cmd, string_types):
+                return shlex_split(cmd)
+            else:
+                return cmd
 
         elif step[mrc]['type'] == 'script':
-            cmd_str = cmd_line(self._script_args_for_step(step_num, mrc))
+            script_args = self._script_args_for_step(step_num, mrc)
 
-            # filter input and pipe for great speed, if user asks
-            # but we have to wrap the command in sh -c
             if 'pre_filter' in step[mrc]:
                 return self._sh_wrap(
-                    '%s | %s' % (step[mrc]['pre_filter'], cmd_str))
+                    '%s | %s' % (step[mrc]['pre_filter'],
+                                 cmd_line(script_args)))
             else:
-                return cmd_str
+                return script_args
         else:
             raise ValueError("Invalid %s step %d: %r" % (
                 mrc, step_num, step[mrc]))
+
+    def _sh_wrap(self, cmd_str):
+        """Helper for _substep_args()
+
+        Wrap command in sh -c '...' to allow for pipes, etc.
+        Use *sh_bin* option."""
+        # prepend set -e etc.
+        cmd_str = '; '.join(self._sh_pre_commands() + [cmd_str])
+
+        return self._sh_bin() + ['-c', cmd_str]
 
     def _render_substep(self, step_num, mrc):
         step = self._get_step(step_num)
 
         if mrc in step:
-            return self._substep_cmd_line(step_num, mrc)
+            # cmd_line() does things that shell is fine with but
+            # Hadoop Streaming finds confusing.
+            return _hadoop_cmd_line(self._substep_args(step_num, mrc))
         else:
             if mrc == 'mapper':
                 return 'cat'
@@ -909,16 +932,6 @@ class MRJobRunner(object):
             self._render_substep(step_num, 'combiner'),
             self._render_substep(step_num, 'reducer'),
         )
-
-    def _sh_wrap(self, cmd_str):
-        """Wrap command in sh -c '...' to allow for pipes, etc.
-        Use *sh_bin* option."""
-        # prepend set -e etc.
-        cmd_str = '; '.join(self._sh_pre_commands() + [cmd_str])
-
-        return "%s -c '%s'" % (
-            cmd_line(self._sh_bin()),
-            cmd_str.replace("'", "'\\''"))
 
     def _mr_job_extra_args(self, local=False):
         """Return arguments to add to every invocation of MRJob.
@@ -1202,11 +1215,11 @@ class MRJobRunner(object):
 
         return [self._stdin_path if p == '-' else p for p in self._input_paths]
 
-    def _intermediate_output_uri(self, step_num):
+    def _intermediate_output_uri(self, step_num, local=False):
         """A URI for intermediate output for the given step number."""
-        # TODO: if we enable this for local runners, use os.path.join()
-        # for them.
-        return posixpath.join(
+        join = os.path.join if local else posixpath.join
+
+        return join(
             self._step_output_dir or self._default_step_output_dir(),
             '%04d' % step_num)
 
@@ -1603,75 +1616,16 @@ class MRJobRunner(object):
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
 
-    def _invoke_sort(self, input_paths, output_path):
-        """Use the local sort command to sort one or more input files. Raise
-        an exception if there is a problem.
 
-        This is is just a wrapper to handle limitations of Windows sort
-        (see Issue #288).
+def _hadoop_cmd_line(args):
+    """Escape args of a command line in a way that Hadoop can process
+    them."""
+    return ' '.join(_hadoop_escape_arg(arg) for arg in args)
 
-        :type input_paths: list of str
-        :param input_paths: paths of one or more input files
-        :type output_path: str
-        :param output_path: where to pipe sorted output into
-        """
-        if not input_paths:
-            raise ValueError('Must specify at least one input path.')
 
-        # ignore locale when sorting
-        env = os.environ.copy()
-        env['LC_ALL'] = 'C'
-
-        # Make sure that the tmp dir environment variables are changed if
-        # the default is changed.
-        env['TMP'] = self._opts['local_tmp_dir']
-        env['TMPDIR'] = self._opts['local_tmp_dir']
-        env['TEMP'] = self._opts['local_tmp_dir']
-
-        log.debug('Writing to %s' % output_path)
-
-        err_path = os.path.join(self._get_local_tmp_dir(), 'sort-stderr')
-
-        # assume we're using UNIX sort unless we know otherwise
-        if (not self._sort_is_windows_sort) or len(input_paths) == 1:
-            with open(output_path, 'wb') as output:
-                with open(err_path, 'wb') as err:
-                    args = ['sort'] + list(input_paths)
-                    log.debug('> %s' % cmd_line(args))
-                    try:
-                        check_call(args, stdout=output, stderr=err, env=env)
-                        return
-                    except CalledProcessError:
-                        pass
-
-        # Looks like we're using Windows sort
-        self._sort_is_windows_sort = True
-
-        log.debug('Piping files into sort for Windows compatibility')
-        with open(output_path, 'wb') as output:
-            with open(err_path, 'wb') as err:
-                args = ['sort']
-                log.debug('> %s' % cmd_line(args))
-                proc = Popen(args, stdin=PIPE, stdout=output, stderr=err,
-                             env=env)
-
-                # shovel bytes into the sort process
-                for input_path in input_paths:
-                    with open(input_path, 'rb') as input:
-                        while True:
-                            buf = input.read(_BUFFER_SIZE)
-                            if not buf:
-                                break
-                            proc.stdin.write(buf)
-
-                proc.stdin.close()
-                proc.wait()
-
-                if proc.returncode == 0:
-                    return
-
-        # looks like there was a problem. log it and raise an error
-        with open(err_path) as err:
-            for line in err:
-                log.error('STDERR: %s' % line.rstrip('\r\n'))
-        raise CalledProcessError(proc.returncode, args)
+def _hadoop_escape_arg(arg):
+    """Escape a single command argument in a way that Hadoop can process it."""
+    if _HADOOP_SAFE_ARG_RE.match(arg):
+        return arg
+    else:
+        return "'%s'" % arg.replace("'", r"'\''")

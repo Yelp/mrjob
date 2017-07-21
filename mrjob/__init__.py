@@ -76,6 +76,7 @@ __credits__ = [
     'James Lim <jim@affirm.com>',
     'Shusen Liu <liushusen.smart@gmail.com>',
     'Adrian Maceiras <amac425@utexas.edu>',
+    'Chet Mancini <chetmancini@gmail.com>',
     'Dallas Marlow <dallas@vineapp.com>',
     'Colin Matthias <cmatthias@cogolabs.com>',
     'Baris Metin <bmetin@yelp.com>',

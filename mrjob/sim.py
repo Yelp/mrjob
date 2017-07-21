@@ -612,11 +612,6 @@ class SimMRJobRunner(MRJobRunner):
             log.info('\n%s\n' % _format_counters(counters))
 
 
-def _apply_method(self, method_name, *args, **kwargs):
-    """Shim to turn method calls into pickleable function calls."""
-    getattr(self, method_name)(*args, **kwargs)
-
-
 def _chmod_u_rx(path, recursive=False):
     """make *path* user readable and executable. If *recursive* is true,
     make *path* and everything inside it executable."""

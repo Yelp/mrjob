@@ -230,6 +230,7 @@ class URITestCase(TestCase):
     def test_is_s3_uri(self):
         self.assertEqual(is_s3_uri('s3://a/uri'), True)
         self.assertEqual(is_s3_uri('s3n://a/uri'), True)
+        self.assertEqual(is_s3_uri('s3a://a/uri'), True)
         self.assertEqual(is_s3_uri('hdfs://a/uri'), False)
 
     def test_parse_s3_uri(self):

@@ -65,7 +65,7 @@ def parse_s3_uri(uri):
     If ``uri`` is not an S3 URI, raise a ValueError
     """
     components = urlparse(uri)
-    if (components.scheme not in ('s3', 's3n') or
+    if (components.scheme not in ('s3', 's3n', 's3a') or
         '/' not in components.path):  # noqa
 
         raise ValueError('Invalid S3 URI: %s' % uri)

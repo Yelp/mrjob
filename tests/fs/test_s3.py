@@ -128,6 +128,15 @@ class S3FSTestCase(MockBoto3TestCase):
                          ['s3n://walrus/data/bar',
                           's3n://walrus/data/baz'])
 
+    def test_ls_s3a(self):
+        self.add_mock_s3_data(
+            {'walrus': {'data/bar': b'abc123',
+                        'data/baz': b'123abc'}})
+
+        self.assertEqual(list(self.fs.ls('s3a://walrus/data/*')),
+                         ['s3a://walrus/data/bar',
+                          's3a://walrus/data/baz'])
+
     def test_du(self):
         self.add_mock_s3_data({
             'walrus': {'data/foo': b'abcde',

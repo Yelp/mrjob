@@ -387,7 +387,7 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
     else:
         file_type = '-'
 
-    if scheme in ('s3', 's3n'):
+    if scheme in ('s3', 's3n', 's3a'):
         # no user and group on S3 (see Pull Request #573)
         user_and_group = ''
     else:

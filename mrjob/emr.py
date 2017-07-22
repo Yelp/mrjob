@@ -448,7 +448,45 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """
     alias = 'emr'
 
-    OPTION_STORE_CLASS = EMRRunnerOptionStore
+    OPT_NAMES = {
+        'additional_emr_info',
+        'applications',
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        'aws_session_token',
+        'bootstrap_actions',
+        'bootstrap_spark',
+        'cloud_log_dir',
+        'cloud_upload_part_size',
+        'core_instance_bid_price',
+        'ec2_key_pair',
+        'ec2_key_pair_file',
+        'emr_action_on_failure',
+        'emr_api_params',
+        'emr_configurations',
+        'emr_endpoint',
+        'enable_emr_debugging',
+        'hadoop_extra_args',
+        'hadoop_streaming_jar',
+        'iam_endpoint',
+        'iam_instance_profile',
+        'iam_service_role',
+        'master_instance_bid_price',
+        'mins_to_end_of_hour',
+        'pool_clusters',
+        'pool_name',
+        'pool_wait_minutes',
+        'release_label',
+        's3_endpoint',
+        'ssh_bin',
+        'ssh_bind_ports',
+        'ssh_tunnel',
+        'ssh_tunnel_is_open',
+        'subnet',
+        'tags',
+        'task_instance_bid_price',
+        'visible_to_all_users',
+    }
 
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
@@ -490,11 +528,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # to this manager just before we need them.
         s3_files_dir = self._cloud_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
-
-        if not (isinstance(self._opts['additional_emr_info'], string_types) or
-                self._opts['additional_emr_info'] is None):
-            self._opts['additional_emr_info'] = json.dumps(
-                self._opts['additional_emr_info'])
 
         # master node setup script (handled later by
         # _add_master_node_setup_files_for_upload())
@@ -544,6 +577,85 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # set of step numbers (0-indexed) where we waited 5 minutes for logs to
         # transfer to S3 (so we don't do it twice)
         self._waited_for_logs_on_s3 = set()
+
+    ### Options ###
+
+    def _default_opts(self):
+        return combine_dicts(
+            super(EMRRunnerOptionStore, self)._default_opts(),
+            dict(
+                bootstrap_python=None,
+                check_cluster_every=30,
+                cleanup_on_failure=['JOB'],
+                cloud_fs_sync_secs=5.0,
+                cloud_upload_part_size=100,  # 100 MB
+                image_version=_DEFAULT_IMAGE_VERSION,
+                max_hours_idle=0.5,
+                mins_to_end_of_hour=5.0,
+                num_core_instances=0,
+                num_task_instances=0,
+                pool_clusters=True,
+                pool_name='default',
+                pool_wait_minutes=0,
+                region=_DEFAULT_EMR_REGION,
+                sh_bin=None,  # see _sh_bin(), below
+                ssh_bin=['ssh'],
+                # don't use a list because it makes it hard to read option
+                # values when running in verbose mode. See #1284
+                ssh_bind_ports=xrange(40001, 40841),
+                ssh_tunnel=False,
+                ssh_tunnel_is_open=False,
+                visible_to_all_users=True,
+            )
+        )
+
+    def _combine_opts(self, opt_list):
+        """Convert image_version of 4.x and later to release_label."""
+        opts = super(EMRJobRunner, self)._combine_opts(opt_list)
+
+        if (version_gte(opts['image_version'], '4') and
+                not opts['release_label']):
+            opts['release_label'] = 'emr-' + self['image_version']
+
+        return opts
+
+    def _fix_opt(self, opt_key, opt_value, source):
+        """Fix and check various EMR-specific options"""
+        opt_value = super(EMRJobRunner, self)._fix_opt(
+            opt_key, opt_value, source)
+
+        # *_instance_bid_price
+        if opt_key.endswith('_instance_bid_price'):
+            if not opt_value:
+                return None
+
+            try:
+                return float(opt_value) or None
+            except ValueError:
+                return opt_value  # maybe EMR will accept non-floats?
+
+        # additional_emr_info
+        elif opt_key == 'additional_emr_info' and not isinstance(
+                opt_value, (string_types, type(None))):
+            return json.dumps(opt_value)
+
+        # emr_configurations
+        elif opt_key == 'emr_configurations':
+            return [_fix_configuration_opt(c) for c in opt_value]
+
+        # mins_to_end_of_hour
+        elif opt_key == 'mins_to_end_of_hour':
+            if not opt_value >= _MIN_MINS_TO_END_OF_HOUR:
+                raise ValueError(
+                    'mins_to_end_of_hour (from %s) must be at least %.1f' % (
+                        source, _MIN_MINS_TO_END_OF_HOUR))
+
+        # region
+        elif opt_key == 'region':
+            return opt_value or _DEFAULT_EMR_REGION
+
+        else:
+            return opt_value
 
     def _default_python_bin(self, local=False):
         """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,

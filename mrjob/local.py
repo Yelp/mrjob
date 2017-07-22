@@ -18,7 +18,6 @@ them together. Useful for testing, not terrible for running medium-sized
 jobs on all CPUs."""
 import logging
 import os
-import pickle
 import platform
 from functools import partial
 from multiprocessing import Pool
@@ -74,7 +73,9 @@ class LocalMRJobRunner(SimMRJobRunner):
     """
     alias = 'local'
 
-    OPTION_STORE_CLASS = LocalRunnerOptionStore
+    OPT_NAMES = SimMRJobRunner.OPT_NAMES | {
+        'sort_bin',
+    }
 
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
@@ -254,7 +255,7 @@ def _sort_lines_with_sort_bin(input_paths, output_path, sort_bin,
             except CalledProcessError:
                 log.error(
                     '`%s` failed, falling back to in-memory sort' %
-                    cmd_line(self._sort_bin()))
+                    cmd_line(sort_bin))
             except OSError:
                 log.error(
                     'no sort binary, falling back to in-memory sort')

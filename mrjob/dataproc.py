@@ -200,6 +200,10 @@ class DataprocRunnerOptionStore(HadoopInTheCloudOptionStore):
     COMBINERS = _combiners('dataproc')
     DEPRECATED_ALIASES = _deprecated_aliases('dataproc')
 
+    OPT_NAMES = HadoopInTheCloudOptionStore.OPT_NAMES | {
+        'gcp_project',
+    }
+
     DEFAULT_FALLBACKS = {
         'core_instance_type': 'instance_type',
         'task_instance_type': 'instance_type'
@@ -265,7 +269,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     """
     alias = 'dataproc'
 
-    OPTION_STORE_CLASS = DataprocRunnerOptionStore
+    OPT_NAMES = HadoopInTheCloudOptionStore.OPT_NAMES | {
+        'gcp_project',
+    }
 
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.dataproc.DataprocJobRunner` takes the same
@@ -274,6 +280,20 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         which can be defaulted in :ref:`mrjob.conf <mrjob.conf>`.
         """
         super(DataprocJobRunner, self).__init__(**kwargs)
+
+        # Dataproc requires a master and >= 2 core instances
+        # num_core_instances refers ONLY to number of CORE instances and does
+        # NOT include the required 1 instance for master
+        # In other words, minimum cluster size is 3 machines, 1 master and 2
+        # "num_core_instances" workers
+        if self._opts['num_core_instances'] < _DATAPROC_MIN_WORKERS:
+            raise DataprocException(
+                'Dataproc expects at LEAST %d workers' % _DATAPROC_MIN_WORKERS)
+
+        if (self._opts['core_instance_type'] !=
+                self._opts['task_instance_type']):
+            raise DataprocException(
+                'Dataproc v1 expects core/task instance types to be identical')
 
         # Lazy-load gcloud config as needed - invocations fail in PyCharm
         # debugging
@@ -327,6 +347,24 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # NOTE - log_interpretations will be empty except job_id until we
         # parse task logs
         self._log_interpretations = []
+
+    def _default_opts(self):
+        return combine_dicts(
+             super(DataprocJobRunner, self)._default_opts(),
+             dict(
+                 bootstrap_python=True,
+                 check_cluster_every=_DEFAULT_CHECK_CLUSTER_EVERY,
+                 cleanup=['CLUSTER', 'JOB', 'LOCAL_TMP'],
+                 cloud_fs_sync_secs=_DEFAULT_CLOUD_FS_SYNC_SECS,
+                 image_version=_DEFAULT_IMAGE_VERSION,
+                 instance_type=_DEFAULT_INSTANCE_TYPE,
+                 master_instance_type=_DEFAULT_INSTANCE_TYPE,
+                 max_hours_idle=_DEFAULT_MAX_HOURS_IDLE,
+                 num_core_instances=_DATAPROC_MIN_WORKERS,
+                 num_task_instances=0,
+                 sh_bin=['/bin/sh', '-ex'],
+            )
+        )
 
     def gcloud_config(self):
         """Lazy load gcloud SDK configs"""

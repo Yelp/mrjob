@@ -181,6 +181,15 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
         # others will be filled as needed)
         self._log_interpretations = []
 
+    def _default_opts(self):
+        return combine_dicts(
+            super(HadoopJobRunner, self)._default_opts(),
+            dict(
+                hadoop_tmp_dir='tmp/mrjob',
+                spark_master='yarn',
+            )
+        )
+
     @property
     def fs(self):
         """:py:class:`mrjob.fs.base.Filesystem` object for HDFS and the local

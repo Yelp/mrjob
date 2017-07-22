@@ -421,7 +421,7 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
     from multiple paths due to symlinks.
     """
     if conf_paths is None:
-        return load_opts_from_mrjob_conf(runner_alias)
+        results = load_opts_from_mrjob_conf(runner_alias)
     else:
         # don't include conf files that were loaded earlier in conf_paths
         already_loaded = []
@@ -434,7 +434,10 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
             results = load_opts_from_mrjob_conf(
                 runner_alias, path, already_loaded=already_loaded) + results
 
-        return results
+    if runner_alias and not any(conf for path, conf in results):
+        log.warning('No configs specified for %s runner' % runner_alias)
+
+    return results
 
 
 ### writing mrjob.conf ###

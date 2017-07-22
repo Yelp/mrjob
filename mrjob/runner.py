@@ -28,10 +28,8 @@ import shutil
 import sys
 import tarfile
 import tempfile
-from subprocess import CalledProcessError
 from subprocess import Popen
 from subprocess import PIPE
-from subprocess import check_call
 
 import mrjob.step
 from mrjob.compat import translate_jobconf
@@ -39,6 +37,7 @@ from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
+from mrjob.conf import combine_opts
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.conf import OptionStore
 from mrjob.fs.composite import CompositeFilesystem
@@ -85,7 +84,7 @@ _HADOOP_SAFE_ARG_RE = re.compile(r'^[\w\./=-]*$')
 
 
 class RunnerOptionStore(OptionStore):
-    # 'base' is aritrary; if an option support all runners, it won't
+    # 'base' is aritrary; if an option supports all runners, it won't
     # have "runners" set in _RUNNER_OPTS at all
     ALLOWED_KEYS = _allowed_keys('base')
     COMBINERS = _combiners('base')
@@ -188,10 +187,37 @@ class MRJobRunner(object):
     #: or ``'hadoop'``
     alias = None
 
+    OPT_NAMES = {
+        'bootstrap_mrjob',
+        'check_input_paths',
+        'cleanup',
+        'cleanup_on_failure',
+        'cmdenv',
+        'interpreter',
+        'jobconf',
+        'label',
+        'libjars',
+        'local_tmp_dir',
+        'owner',
+        'py_files',
+        'python_bin',
+        'setup',
+        'sh_bin',
+        'spark_args',
+        'spark_submit_bin',
+        'steps_interpreter',
+        'steps_python_bin',
+        'task_python_bin',
+        'upload_archives',
+        'upload_dirs',
+        'upload_files'
+    }
+
     # if this is true, when bootstrap_mrjob is true, add it through the
     # setup script
     _BOOTSTRAP_MRJOB_IN_SETUP = True
 
+    # TODO: remove this
     OPTION_STORE_CLASS = RunnerOptionStore
 
     ### methods to call from your batch script ###
@@ -283,7 +309,25 @@ class MRJobRunner(object):
         """
         self._ran_job = False
 
-        self._opts = self.OPTION_STORE_CLASS(self.alias, opts, conf_paths)
+        # opts are made from:
+        #
+        # empty defaults (everything set to None)
+        # runner-specific defaults
+        # opts from config file(s)
+        # opts from command line
+        self._opts = self._combine_confs(
+            [(None, {key: None for key in self.OPT_NAMES})] +
+            [(None, self._default_opts())] +
+            load_opts_from_mrjob_confs(self.alias, conf_paths) +
+            [('the command line', opts)]
+        )
+
+        log.debug('Active configuration:')
+        log.debug(pprint.pformat({
+            opt_key: self._obfuscate(opt_key, opt_value)
+            for opt_key, opt_value in self.items()
+        }))
+
         self._fs = None
 
         # a local tmp directory that will be cleaned up when we're done
@@ -406,6 +450,135 @@ class MRJobRunner(object):
         # this variable marks whether a cleanup has happened and this runner's
         # output stream is no longer available.
         self._closed = False
+
+    ### Options ####
+
+    def _default_opts(self):
+        try:
+            owner = getpass.getuser()
+        except:
+            owner = None
+
+        return dict(
+            check_input_paths=True,
+            cleanup=['ALL'],
+            cleanup_on_failure=['NONE'],
+            local_tmp_dir=tempfile.gettempdir(),
+            owner=owner,
+            sh_bin=['sh', '-ex'],
+        )
+
+    def _combine_confs(self, source_and_opt_list):
+        """Combine several opt dictionaries into one.
+
+        *source_and_opt_list* is a list of tuples of *source*,
+        *opts* where *opts* is a dictionary and *source* is either
+        None or a description of where the opts came from (usually a path).
+
+        Only override this if you need truly fine-grained control,
+        including knowledge of the options' source.
+        """
+        opt_list = [
+            self._fix_opts(opts, source)
+            for source, opts in source_and_opt_list
+        ]
+
+        return self._combine_opts(opt_list)
+
+    def _combine_opts(self, opt_list):
+        """Combine several opt dictionaries into one. *opt_list*
+        is a list of dictionaries containing validated options
+
+        Override this if you need to base options off the values of
+        other options, but don't need to issue warnings etc.
+        about the options' source.
+        """
+        combiners = _combiners(self.alias)
+
+        return combine_opts(combiners, *opt_list)
+
+    def _fix_opts(self, opts, source=None):
+        """Take an options dictionary, and either return a sanitized
+        version of it, or raise an exception.
+
+        *source* is either a string describing where the opts came from
+        or None.
+
+        This ensures that opt dictionaries are really dictionaries
+        and handles deprecated options.
+        """
+        if source is None:
+            source = 'defaults'  # defaults shouldn't trigger warnings
+
+        if not isinstance(opts, dict):
+            raise TypeError(
+                'options for %s (from %s) must be a dict' %
+                self.runner_alias, source)
+
+        deprecated_aliases = _deprecated_aliases(self.alias)
+
+        results = {}
+
+        for k, v in sorted(opts.items()):
+
+            # rewrite deprecated aliases
+            if k in deprecated_aliases:
+                if v is None:  # don't care
+                    continue
+
+                aliased_opt = deprecated_aliases
+
+                log.warning('Deprecated option %s (from %s) has been renamed'
+                            ' to %s and will be removed in v0.7.0' % (
+                                k, source, aliased_opt))
+
+                if opts.get(aliased_opt) is not None:
+                    return  # don't overwrite non-aliased opt
+
+                k = aliased_opt
+
+            if k in self.OPT_NAMES:
+                results[k] = self._fix_opt(k, v, source)
+            else:
+                log.warning('Unexpected option %s (from %s)' % (k, source))
+
+        return results
+
+    def _fix_opt(self, opt_key, opt_value, source):
+        """Fix a single option, returning its correct value or raising
+        an exception.
+
+        This currently handles cleanup opts.
+
+        Override this if you require additional opt validation or cleanup.
+        """
+        if opt_key in ('cleanup', 'cleanup_on_failure'):
+            return self._fix_cleanup_opt(opt_key, opt_value, source)
+        else:
+            return opt_value
+
+    def _fix_cleanup_opt(self, opt_key, opt_value, source):
+        """Fix a cleanup option, or raise ValueError."""
+        if isinstance(opt_value, string_types):
+            opt_value = [opt_value]
+
+        if 'NONE' in opt_value and len(set(opt_value)) > 1:
+            raise ValueError(
+                'Cannot clean up both nothing and something!'
+                ' (%s option from %s)' % (opt_key, source))
+
+        for cleanup_type in opt_value:
+            if cleanup_type not in CLEANUP_CHOICES:
+                raise ValueError(
+                    '%s must be one of %s, not %s (from %s)' % (
+                        opt_key, ', '.join(CLEANUP_CHOICES), opt_value))
+
+        return opt_value
+
+    def _obfuscate_opt(self, opt_key, opt_value):
+        """Return value of opt to show in debug printout. Used to obfuscate
+        credentials, etc."""
+        return opt_value
 
     ### Filesystem object ###
 

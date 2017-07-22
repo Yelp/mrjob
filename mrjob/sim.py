@@ -58,6 +58,10 @@ class SimMRJobRunner(MRJobRunner):
         'libjars',
     ]
 
+    OPT_NAMES = MRJobRunner.OPT_NAMES | {
+        'hadoop_version',
+    }
+
     def __init__(self, **kwargs):
         super(SimMRJobRunner, self).__init__(**kwargs)
 

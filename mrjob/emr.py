@@ -448,7 +448,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """
     alias = 'emr'
 
-    OPT_NAMES = {
+    OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
         'additional_emr_info',
         'applications',
         'aws_access_key_id',
@@ -582,7 +582,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _default_opts(self):
         return combine_dicts(
-            super(EMRRunnerOptionStore, self)._default_opts(),
+            super(EMRJobRunner, self)._default_opts(),
             dict(
                 bootstrap_python=None,
                 check_cluster_every=30,
@@ -615,7 +615,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         if (version_gte(opts['image_version'], '4') and
                 not opts['release_label']):
-            opts['release_label'] = 'emr-' + self['image_version']
+            opts['release_label'] = 'emr-' + opts['image_version']
 
         return opts
 
@@ -626,17 +626,20 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # *_instance_bid_price
         if opt_key.endswith('_instance_bid_price'):
-            if not opt_value:
+            if not opt_value:  # don't allow blank bid price
                 return None
 
             try:
-                return float(opt_value) or None
-            except ValueError:
-                return opt_value  # maybe EMR will accept non-floats?
+                if not float(opt_value):
+                    return None
+            except ValueError:  # maybe EMR allows non-floats?
+                pass
+
+                return str(opt_value)  # should be str, not a number
 
         # additional_emr_info
         elif opt_key == 'additional_emr_info' and not isinstance(
-                opt_value, (string_types, type(None))):
+                opt_value, string_types):
             return json.dumps(opt_value)
 
         # emr_configurations
@@ -650,8 +653,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     'mins_to_end_of_hour (from %s) must be at least %.1f' % (
                         source, _MIN_MINS_TO_END_OF_HOUR))
 
+            return opt_value
+
         # region
         elif opt_key == 'region':
+            # don't allow blank region
             return opt_value or _DEFAULT_EMR_REGION
 
         else:

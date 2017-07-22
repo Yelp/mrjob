@@ -324,8 +324,8 @@ class MRJobRunner(object):
 
         log.debug('Active configuration:')
         log.debug(pprint.pformat({
-            opt_key: self._obfuscate(opt_key, opt_value)
-            for opt_key, opt_value in self.items()
+            opt_key: self._obfuscate_opt(opt_key, opt_value)
+            for opt_key, opt_value in self._opts.items()
         }))
 
         self._fs = None
@@ -538,7 +538,7 @@ class MRJobRunner(object):
                 k = aliased_opt
 
             if k in self.OPT_NAMES:
-                results[k] = self._fix_opt(k, v, source)
+                results[k] = None if v is None else self._fix_opt(k, v, source)
             else:
                 log.warning('Unexpected option %s (from %s)' % (k, source))
 
@@ -546,7 +546,7 @@ class MRJobRunner(object):
 
     def _fix_opt(self, opt_key, opt_value, source):
         """Fix a single option, returning its correct value or raising
-        an exception.
+        an exception. This is not called for options that are ``None``.
 
         This currently handles cleanup opts.
 

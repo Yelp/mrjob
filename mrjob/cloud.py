@@ -123,9 +123,9 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
         # instance_type only affects master_instance_type if there are
         # no other instances
         if opts['num_core_instances'] > 0 or opts['num_task_instances'] > 0:
-            propagate_to = ('core_instance_type', 'task_instance_type')
+            propagate_to = ['core_instance_type', 'task_instance_type']
         else:
-            propagate_to = ('master_instance_type')
+            propagate_to = ['master_instance_type']
 
         for k in propagate_to:
             if opts[k] is None or (

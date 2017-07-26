@@ -1151,13 +1151,6 @@ def _for_runner(config, runner_alias):
     return bool(runner_aliases & config.get('runners'))
 
 
-def _allowed_keys(runner_alias):
-    return set(
-        name for name, config in _RUNNER_OPTS.items()
-        if _for_runner(config, runner_alias),
-    )
-
-
 def _combiners(runner_alias):
     results = {}
 

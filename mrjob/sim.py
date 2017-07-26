@@ -30,6 +30,7 @@ from mrjob.cat import is_compressed
 from mrjob.cat import open_input
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
+from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.logs.counters import _format_counters
 from mrjob.parse import parse_mr_job_stderr
@@ -86,6 +87,12 @@ class SimMRJobRunner(MRJobRunner):
                     'ignoring %s option (requires real Hadoop): %r' %
                     (ignored_opt, value))
 
+    def _opt_combiners(self):
+        """Combine *cmdenv* with :py:func:`~mrjob.conf.combine_local_envs`"""
+        return combine_dicts(
+            super(SimMRJobRunner, self)._opt_combiners(),
+            dict(cmdenv=combine_local_envs),
+        )
 
     # re-implement these in your subclass
 

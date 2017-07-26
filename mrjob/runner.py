@@ -392,9 +392,14 @@ class MRJobRunner(object):
         other options, but don't need to issue warnings etc.
         about the options' source.
         """
-        combiners = _combiners(self.alias)
+        return combine_opts(self._opt_combiners(), *opt_list)
 
-        return combine_opts(combiners, *opt_list)
+    def _opt_combiners(self):
+        """A dictionary mapping opt name to combiner funciton. This
+        won't necessarily include every opt name (we default to
+        :py:func:`~mrjob.conf.combine_value`).
+        """
+        return _combiners(self.OPT_NAMES)
 
     def _fix_opts(self, opts, source=None):
         """Take an options dictionary, and either return a sanitized
@@ -414,7 +419,7 @@ class MRJobRunner(object):
                 'options for %s (from %s) must be a dict' %
                 self.runner_alias, source)
 
-        deprecated_aliases = _deprecated_aliases(self.alias)
+        deprecated_aliases = _deprecated_aliases(self.OPT_NAMES)
 
         results = {}
 

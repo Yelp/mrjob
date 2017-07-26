@@ -26,7 +26,6 @@ from optparse import SUPPRESS_USAGE
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
-from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
@@ -231,8 +230,6 @@ _RUNNER_TO_ANCESTORS = {
 #   (if left blank, we use combine_values())
 # deprecated: if true, this option is deprecated and slated for removal
 # deprecated_aliases: list of old names for this option slated for removal
-# runner_combiners: map from runner alias to different combiner to use
-#   for that runner (we use this to get combine_local_envs() on sim runners)
 # runners: list of aliases of runners that support this option (leave out
 #   for options common to all runners
 # switches: list of switches to add to option parser for this option. Items
@@ -457,10 +454,6 @@ _RUNNER_OPTS = dict(
     ),
     cmdenv=dict(
         combiner=combine_envs,
-        runner_combiners=dict(
-            inline=combine_local_envs,
-            local=combine_local_envs,
-        ),
         switches=[
             (['--cmdenv'], dict(
                 callback=_key_value_callback,
@@ -1151,27 +1144,19 @@ def _for_runner(config, runner_alias):
     return bool(runner_aliases & config.get('runners'))
 
 
-def _combiners(runner_alias):
+def _combiners(opt_names, runner_alias=None):
+    return {
+        name: config['combiner']
+        for name, config in _RUNNER_OPTS.items()
+        if name in opt_names and 'combiner' in config
+    }
+
+
+def _deprecated_aliases(opt_names):
     results = {}
 
     for name, config in _RUNNER_OPTS.items():
-        if not _for_runner(config, runner_alias):
-            continue
-
-        combiner = (config.get('runner_combiners', {}).get(runner_alias) or
-                    config.get('combiner'))
-
-        if combiner:
-            results[name] = combiner
-
-    return results
-
-
-def _deprecated_aliases(runner_alias):
-    results = {}
-
-    for name, config in _RUNNER_OPTS.items():
-        if not _for_runner(config, runner_alias):
+        if name not in opt_names:
             continue
 
         if config.get('deprecated_aliases'):

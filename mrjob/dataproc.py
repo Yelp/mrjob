@@ -200,10 +200,6 @@ class DataprocRunnerOptionStore(HadoopInTheCloudOptionStore):
     COMBINERS = _combiners('dataproc')
     DEPRECATED_ALIASES = _deprecated_aliases('dataproc')
 
-    OPT_NAMES = HadoopInTheCloudOptionStore.OPT_NAMES | {
-        'gcp_project',
-    }
-
     DEFAULT_FALLBACKS = {
         'core_instance_type': 'instance_type',
         'task_instance_type': 'instance_type'
@@ -269,7 +265,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     """
     alias = 'dataproc'
 
-    OPT_NAMES = HadoopInTheCloudOptionStore.OPT_NAMES | {
+    OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
         'gcp_project',
     }
 

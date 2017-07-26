@@ -39,10 +39,8 @@ from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_opts
 from mrjob.conf import load_opts_from_mrjob_confs
-from mrjob.conf import OptionStore
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.options import _allowed_keys
 from mrjob.options import _combiners
 from mrjob.options import _deprecated_aliases
 from mrjob.options import CLEANUP_CHOICES
@@ -83,102 +81,6 @@ _SORT_VALUES_PARTITIONER = \
 _HADOOP_SAFE_ARG_RE = re.compile(r'^[\w\./=-]*$')
 
 
-class RunnerOptionStore(OptionStore):
-    # 'base' is aritrary; if an option supports all runners, it won't
-    # have "runners" set in _RUNNER_OPTS at all
-    ALLOWED_KEYS = _allowed_keys('base')
-    COMBINERS = _combiners('base')
-    DEPRECATED_ALIASES = _deprecated_aliases('base')
-
-    def __init__(self, alias, opts, conf_paths):
-        """
-        :param alias: Runner alias (e.g. ``'local'``)
-        :param opts: Keyword args to runner's constructor (usually from the
-                     command line).
-        :param conf_paths: An iterable of paths to config files
-        """
-        super(RunnerOptionStore, self).__init__()
-
-        # sanitize incoming options and issue warnings for bad keys
-        opts = self.validated_options(opts)
-
-        unsanitized_opt_dicts = load_opts_from_mrjob_confs(
-            alias, conf_paths=conf_paths)
-
-        for path, mrjob_conf_opts in unsanitized_opt_dicts:
-            self.cascading_dicts.append(self.validated_options(
-                mrjob_conf_opts, from_where=(' from %s' % path)))
-
-        self.cascading_dicts.append(opts)
-
-        if (len(self.cascading_dicts) > 2 and
-                all(len(d) == 0 for d in self.cascading_dicts[2:-1]) and
-                (len(conf_paths or []) > 0)):
-            log.warning('No configs specified for %s runner' % alias)
-
-        self.populate_values_from_cascading_dicts()
-
-        log.debug('Active configuration:')
-        log.debug(pprint.pformat(
-            dict((opt_key, self._obfuscate(opt_key, opt_value))
-                 for opt_key, opt_value in self.items())))
-
-    def default_options(self):
-        super_opts = super(RunnerOptionStore, self).default_options()
-
-        try:
-            owner = getpass.getuser()
-        except:
-            owner = None
-
-        return combine_dicts(super_opts, {
-            'check_input_paths': True,
-            'cleanup': ['ALL'],
-            'cleanup_on_failure': ['NONE'],
-            'local_tmp_dir': tempfile.gettempdir(),
-            'owner': owner,
-            'sh_bin': ['sh', '-ex'],
-        })
-
-    def validated_options(self, opts, from_where=''):
-        opts = super(RunnerOptionStore, self).validated_options(
-            opts, from_where)
-
-        self._fix_cleanup_opt('cleanup', opts, from_where)
-        self._fix_cleanup_opt('cleanup_on_failure', opts, from_where)
-
-        return opts
-
-    def _fix_cleanup_opt(self, opt_key, opts, from_where=''):
-        if opts.get(opt_key) is None:
-            return
-
-        opt_list = opts[opt_key]
-
-        # runner expects list of string, not string
-        if isinstance(opt_list, string_types):
-            opt_list = [opt_list]
-
-        if 'NONE' in opt_list and len(set(opt_list)) > 1:
-            raise ValueError('Cannot clean up both nothing and something!')
-
-        def handle_cleanup_opt(opt):
-            if opt in CLEANUP_CHOICES:
-                return opt
-
-            raise ValueError('%s must be one of %s, not %s' % (
-                opt_key, ', '.join(CLEANUP_CHOICES), opt))
-
-        opt_list = [handle_cleanup_opt(opt) for opt in opt_list]
-
-        opts[opt_key] = opt_list
-
-    def _obfuscate(self, opt_key, opt_value):
-        """Return value of opt to show in debug printout. Used to obfuscate
-        credentials, etc."""
-        return opt_value
-
-
 class MRJobRunner(object):
     """Abstract base class for all runners"""
 
@@ -216,9 +118,6 @@ class MRJobRunner(object):
     # if this is true, when bootstrap_mrjob is true, add it through the
     # setup script
     _BOOTSTRAP_MRJOB_IN_SETUP = True
-
-    # TODO: remove this
-    OPTION_STORE_CLASS = RunnerOptionStore
 
     ### methods to call from your batch script ###
 

@@ -38,13 +38,9 @@ from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_hadoop_jar_command_stderr
 from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.wrap import _logs_exist
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_uri
 from mrjob.py2 import to_unicode
 from mrjob.runner import MRJobRunner
-from mrjob.runner import RunnerOptionStore
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
@@ -113,20 +109,6 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
 
 
-class HadoopRunnerOptionStore(RunnerOptionStore):
-
-    ALLOWED_KEYS = _allowed_keys('hadoop')
-    COMBINERS = _combiners('hadoop')
-    DEPRECATED_ALIASES = _deprecated_aliases('hadoop')
-
-    def default_options(self):
-        super_opts = super(HadoopRunnerOptionStore, self).default_options()
-        return combine_dicts(super_opts, {
-            'hadoop_tmp_dir': 'tmp/mrjob',
-            'spark_master': 'yarn',
-        })
-
-
 class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
     Invoked when you run your job with ``-r hadoop``.
@@ -135,8 +117,6 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     URLs to refer to files on HDFS.
     """
     alias = 'hadoop'
-
-    OPTION_STORE_CLASS = HadoopRunnerOptionStore
 
     OPT_NAMES = MRJobRunner.OPT_NAMES | {
         'bootstrap_spark',

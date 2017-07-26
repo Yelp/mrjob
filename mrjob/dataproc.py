@@ -41,7 +41,6 @@ except ImportError:
 
 import mrjob
 from mrjob.cloud import HadoopInTheCloudJobRunner
-from mrjob.cloud import HadoopInTheCloudOptionStore
 from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
@@ -50,9 +49,6 @@ from mrjob.fs.gcs import GCSFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.gcs import is_gcs_uri
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.setup import UploadDirManager
@@ -193,58 +189,6 @@ def _cfg_to_dot_path_dict(cfg_parser):
 
 class DataprocException(Exception):
     pass
-
-
-class DataprocRunnerOptionStore(HadoopInTheCloudOptionStore):
-    ALLOWED_KEYS = _allowed_keys('dataproc')
-    COMBINERS = _combiners('dataproc')
-    DEPRECATED_ALIASES = _deprecated_aliases('dataproc')
-
-    DEFAULT_FALLBACKS = {
-        'core_instance_type': 'instance_type',
-        'task_instance_type': 'instance_type'
-    }
-
-    def __init__(self, alias, opts, conf_paths):
-        super(DataprocRunnerOptionStore, self).__init__(
-            alias, opts, conf_paths)
-
-        # Dataproc requires a master and >= 2 core instances
-        # num_core_instances refers ONLY to number of CORE instances and does
-        # NOT include the required 1 instance for master
-        # In other words, minimum cluster size is 3 machines, 1 master and 2
-        # "num_core_instances" workers
-        if self['num_core_instances'] < _DATAPROC_MIN_WORKERS:
-            raise DataprocException(
-                'Dataproc expects at LEAST %d workers' % _DATAPROC_MIN_WORKERS)
-
-        for varname, fallback_varname in self.DEFAULT_FALLBACKS.items():
-            self[varname] = self[varname] or self[fallback_varname]
-
-        if self['core_instance_type'] != self['task_instance_type']:
-            raise DataprocException(
-                'Dataproc v1 expects core/task instance types to be identical')
-
-    def default_options(self):
-        super_opts = super(DataprocRunnerOptionStore, self).default_options()
-        return combine_dicts(super_opts, {
-            'bootstrap_python': True,
-            'image_version': _DEFAULT_IMAGE_VERSION,
-            'check_cluster_every': _DEFAULT_CHECK_CLUSTER_EVERY,
-
-            'instance_type': _DEFAULT_INSTANCE_TYPE,
-            'master_instance_type': _DEFAULT_INSTANCE_TYPE,
-
-            'num_core_instances': _DATAPROC_MIN_WORKERS,
-            'num_task_instances': 0,
-
-            'cloud_fs_sync_secs': _DEFAULT_CLOUD_FS_SYNC_SECS,
-
-            'max_hours_idle': _DEFAULT_MAX_HOURS_IDLE,
-            'sh_bin': ['/bin/sh', '-ex'],
-
-            'cleanup': ['CLUSTER', 'JOB', 'LOCAL_TMP']
-        })
 
 
 class DataprocJobRunner(HadoopInTheCloudJobRunner):

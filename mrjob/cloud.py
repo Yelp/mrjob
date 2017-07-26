@@ -17,11 +17,7 @@ import os
 import pipes
 from os.path import basename
 
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
 from mrjob.runner import MRJobRunner
-from mrjob.runner import RunnerOptionStore
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
@@ -37,13 +33,6 @@ _EXT_TO_UNARCHIVE_CMD = {
     '.tar.gz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
     '.tgz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
 }
-
-
-class HadoopInTheCloudOptionStore(RunnerOptionStore):
-
-    ALLOWED_KEYS = _allowed_keys('_cloud')
-    COMBINERS = _combiners('_cloud')
-    DEPRECATED_ALIASES = _deprecated_aliases('_cloud')
 
 
 class HadoopInTheCloudJobRunner(MRJobRunner):

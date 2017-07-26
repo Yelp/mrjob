@@ -635,7 +635,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             except ValueError:  # maybe EMR allows non-floats?
                 pass
 
-                return str(opt_value)  # should be str, not a number
+            return str(opt_value)  # should be str, not a number
 
         # additional_emr_info
         elif opt_key == 'additional_emr_info' and not isinstance(

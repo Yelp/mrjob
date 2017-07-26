@@ -28,6 +28,7 @@ from mrjob.emr import EMRRunnerOptionStore
 from mrjob.hadoop import HadoopRunnerOptionStore
 from mrjob.py2 import StringIO
 from mrjob.runner import RunnerOptionStore
+from mrjob.inline import InlineMRJobRunner
 from mrjob.inline import InlineRunnerOptionStore
 from mrjob.local import LocalRunnerOptionStore
 from mrjob.util import log_to_stream
@@ -82,7 +83,8 @@ class ConfigFilesTestCase(TempdirTestCase):
 
     def opts_for_conf(self, name, conf):
         conf_path = self.save_conf(name, conf)
-        return RunnerOptionStore('inline', {}, [conf_path])
+        runner = InlineMRJobRunner(conf_paths=[conf_path])
+        return runner._opts
 
 
 class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
@@ -103,7 +105,7 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                 'python_bin': 'py3k',
                 'py_files': ['/mylib.zip'],
                 'setup': [
-                    ['thing1'],
+                    'thing1',
                 ],
             }
         }
@@ -131,7 +133,7 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                     'python_bin': 'py4k',
                     'py_files': ['/yourlib.zip'],
                     'setup': [
-                        ['thing2'],
+                        'thing2',
                     ],
                 }
             }
@@ -169,9 +171,9 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
         })
 
     def test_combine_lists(self):
-        self.assertEqual(self.opts_1['setup'], [['thing1']])
+        self.assertEqual(self.opts_1['setup'], ['thing1'])
         self.assertEqual(self.opts_2['setup'],
-                         [['thing1'], ['thing2']])
+                         ['thing1', 'thing2'])
 
     def test_combine_paths(self):
         self.assertEqual(self.opts_1['local_tmp_dir'], '/tmp')

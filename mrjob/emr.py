@@ -315,11 +315,12 @@ class EMRRunnerOptionStore(HadoopInTheCloudOptionStore):
     def default_options(self):
         super_opts = super(EMRRunnerOptionStore, self).default_options()
         return combine_dicts(super_opts, {
-            'image_version': _DEFAULT_IMAGE_VERSION,
-            'region': _DEFAULT_EMR_REGION,
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
+            'cloud_fs_sync_secs': 5.0,
+            'cloud_upload_part_size': 100,  # 100 MB
+            'image_version': _DEFAULT_IMAGE_VERSION,
             'max_hours_idle': 0.5,
             'mins_to_end_of_hour': 5.0,
             'num_core_instances': 0,
@@ -327,8 +328,7 @@ class EMRRunnerOptionStore(HadoopInTheCloudOptionStore):
             'pool_clusters': True,
             'pool_name': 'default',
             'pool_wait_minutes': 0,
-            'cloud_fs_sync_secs': 5.0,
-            'cloud_upload_part_size': 100,  # 100 MB
+            'region': _DEFAULT_EMR_REGION,
             'sh_bin': None,  # see _sh_bin(), below
             'ssh_bin': ['ssh'],
             # don't use a list because it makes it hard to read option values

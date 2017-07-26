@@ -104,33 +104,35 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
 
     def _combine_opts(self, opt_list):
         """Propagate *instance_type* to other instance type opts, if not
-        already set."""
+        already set.
+
+        Also propagate core instance type to task instance type, if it's
+        not already set.
+        """
         opts = super(HadoopInTheCloudJobRunner, self)._combine_opts(opt_list)
 
-        if opts['instance_type'] is None:
-            return opts  # nothing special to do
+        if opts['instance_type']:
+            # figure out how late in the configs opt was set (setting
+            # --instance_type on the command line overrides core_instance_type
+            # set in configs)
+            opt_priority = {k: -1 for k in opts}
 
-        # figure out how late in the configs opt was set (setting
-        # --instance_type on the command line overrides core_instance_type
-        # set in configs)
-        opt_priority = {k: -1 for k in opts}
+            for i, sub_opts in enumerate(opt_list):
+                for k, v in sub_opts.items():
+                    if v == opts[k]:
+                        opt_priority[k] = i
 
-        for i, sub_opts in enumerate(opt_list):
-            for k, v in sub_opts.items():
-                if v == opts[k]:
-                    opt_priority[k] = i
+            # instance_type only affects master_instance_type if there are
+            # no other instances
+            if opts['num_core_instances'] or opts['num_task_instances']:
+                propagate_to = ['core_instance_type', 'task_instance_type']
+            else:
+                propagate_to = ['master_instance_type']
 
-        # instance_type only affects master_instance_type if there are
-        # no other instances
-        if opts['num_core_instances'] > 0 or opts['num_task_instances'] > 0:
-            propagate_to = ['core_instance_type', 'task_instance_type']
-        else:
-            propagate_to = ['master_instance_type']
-
-        for k in propagate_to:
-            if opts[k] is None or (
-                    opt_priority[k] < opt_priority['instance_type']):
-                opts[k] = opts['instance_type']
+            for k in propagate_to:
+                if opts[k] is None or (
+                        opt_priority[k] < opt_priority['instance_type']):
+                    opts[k] = opts['instance_type']
 
         if not opts['task_instance_type']:
             opts['task_instance_type'] = opts['core_instance_type']

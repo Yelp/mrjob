@@ -195,7 +195,7 @@ class CommandLineArgsTestCase(TestCase):
             '-v',
             '--foo-size=9',
             '--bar-name', 'Alembic',
-            '--enable-baz-mode', '--disable-quuxing',
+           '--enable-baz-mode', '--disable-quuxing',
             '--pill-type', 'red',
             '--planck-constant', '1',
             '--planck-constant', '42',
@@ -430,7 +430,7 @@ class JobRunnerKwargsTestCase(TestCase):
 
         self.assertEqual(
             option_names,
-            (runner_class.OPTION_STORE_CLASS.ALLOWED_KEYS -
+            (runner_class.OPT_NAMES -
              self.CONF_ONLY_OPTIONS)
         )
 

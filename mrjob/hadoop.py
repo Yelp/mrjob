@@ -138,6 +138,16 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
 
     OPTION_STORE_CLASS = HadoopRunnerOptionStore
 
+    OPT_NAMES = MRJobRunner.OPT_NAMES | {
+        'bootstrap_spark',
+        'hadoop_bin',
+        'hadoop_extra_args',
+        'hadoop_log_dirs',
+        'hadoop_streaming_jar',
+        'hadoop_tmp_dir',
+        'spark_master',
+    }
+
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.hadoop.HadoopJobRunner` takes the same arguments
         as :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options

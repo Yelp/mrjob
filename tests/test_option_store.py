@@ -23,57 +23,18 @@ import mrjob.conf
 import mrjob.hadoop
 from mrjob.conf import ClearedValue
 from mrjob.conf import dump_mrjob_conf
-from mrjob.dataproc import DataprocRunnerOptionStore
-from mrjob.emr import EMRRunnerOptionStore
-from mrjob.hadoop import HadoopRunnerOptionStore
 from mrjob.py2 import StringIO
-from mrjob.runner import RunnerOptionStore
 from mrjob.inline import InlineMRJobRunner
-from mrjob.inline import InlineRunnerOptionStore
-from mrjob.local import LocalRunnerOptionStore
 from mrjob.util import log_to_stream
 
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 
 
-class TempdirTestCase(TestCase):
-    """Patch mrjob.conf, create a temp directory, and save the environment for
-    each test
-    """
+class ConfigFilesTestCase(SandboxedTestCase):
 
-    def setUp(self):
-        super(TempdirTestCase, self).setUp()
-
-        # tmp dir
-        self.tmp_dir = mkdtemp()
-        self.addCleanup(rmtree, self.tmp_dir)
-
-        # environment
-        self._old_environ = os.environ.copy()
-
-    def tearDown(self):
-        os.environ.clear()
-        os.environ.update(self._old_environ)
-
-    def makedirs(self, path):
-        abs_path = os.path.join(self.tmp_dir, path)
-        if not os.path.isdir(abs_path):
-            os.makedirs(abs_path)
-        return abs_path
-
-    def makefile(self, path, contents):
-        self.makedirs(os.path.split(path)[0])
-        abs_path = os.path.join(self.tmp_dir, path)
-        with open(abs_path, 'w') as f:
-            f.write(contents)
-        return abs_path
-
-    def abs_paths(self, *paths):
-        return [os.path.join(self.tmp_dir, path) for path in paths]
-
-
-class ConfigFilesTestCase(TempdirTestCase):
+    MRJOB_CONF_CONTENTS = None  # don't patch load_opts_from_mrjob_confsq
 
     def save_conf(self, name, conf):
         conf_path = os.path.join(self.tmp_dir, name)
@@ -197,8 +158,8 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
 
         stderr = StringIO()
         with no_handlers_for_logger():
-            log_to_stream('mrjob.runner', stderr)
-            RunnerOptionStore('inline', {}, [path])
+            log_to_stream('mrjob.conf', stderr)
+            InlineMRJobRunner(conf_paths=[path])
             self.assertEqual(
                 "No configs specified for inline runner\n",
                 stderr.getvalue())
@@ -239,8 +200,8 @@ class MultipleConfigFilesMachineryTestCase(ConfigFilesTestCase):
 
         stderr = StringIO()
         with no_handlers_for_logger():
-            log_to_stream('mrjob.runner', stderr)
-            RunnerOptionStore('inline', {}, [path])
+            log_to_stream('mrjob.conf', stderr)
+            InlineMRJobRunner(conf_paths=[path])
             self.assertEqual(
                 "",
                 stderr.getvalue())
@@ -282,8 +243,10 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
     def test_multiple_configs_via_runner_args(self):
         path_left = self.save_conf('left.conf', self.BASE_CONFIG_LEFT)
         path_right = self.save_conf('right.conf', self.BASE_CONFIG_RIGHT)
-        opts = RunnerOptionStore('inline', {}, [path_left, path_right])
-        self.assertEqual(opts['jobconf'],
+
+        runner = InlineMRJobRunner(conf_paths=[path_left, path_right])
+
+        self.assertEqual(runner._opts['jobconf'],
                          dict(from_left=1, from_both=2, from_right=2))
 
 
@@ -308,7 +271,8 @@ class ClearTagTestCase(ConfigFilesTestCase):
         super(ClearTagTestCase, self).setUp()
 
         self.base_conf_path = self.save_conf('base.conf', self.BASE_CONF)
-        self.base_opts = RunnerOptionStore('inline', {}, [self.base_conf_path])
+        runner = InlineMRJobRunner(conf_paths=[self.base_conf_path])
+        self.base_opts = runner._opts
 
     def test_clear_cmdenv_path(self):
         opts = self.opts_for_conf('extend.conf', {
@@ -383,114 +347,31 @@ class TestExtraKwargs(ConfigFilesTestCase):
 
     def test_extra_kwargs_in_mrjob_conf_okay(self):
         with logger_disabled('mrjob.runner'):
-            opts = RunnerOptionStore('inline', {}, [self.path])
-            self.assertEqual(opts['setup'], ['echo foo'])
-            self.assertNotIn('qux', opts)
+            runner = InlineMRJobRunner(conf_paths=[self.path])
+            self.assertEqual(runner._opts['setup'], ['echo foo'])
+            self.assertNotIn('qux', runner._opts)
 
     def test_extra_kwargs_passed_in_directly_okay(self):
         with logger_disabled('mrjob.runner'):
-            opts = RunnerOptionStore(
-                'inline', {'local_tmp_dir': '/var/tmp', 'foo': 'bar'}, [])
-            self.assertEqual(opts['local_tmp_dir'], '/var/tmp')
-            self.assertNotIn('bar', opts)
+            runner = InlineMRJobRunner(
+                foo='bar',
+                local_tmp_dir='/var/tmp',
+                conf_paths=[],
+            )
+
+            self.assertEqual(runner._opts['local_tmp_dir'], '/var/tmp')
+            self.assertNotIn('bar', runner._opts)
 
 
-class OptionStoreSanityCheckTestCase(TestCase):
+class OptDebugPrintoutTestCase(ConfigFilesTestCase):
 
-    # catch typos etc. in option store definition. See #1322
-
-    def assert_option_store_is_sane(self, _class):
-        self.assertLessEqual(set(_class.COMBINERS),
-                             _class.ALLOWED_KEYS)
-        self.assertLessEqual(set(_class.DEPRECATED_ALIASES.values()),
-                             _class.ALLOWED_KEYS)
-
-    def test_runner_option_store_is_sane(self):
-        self.assert_option_store_is_sane(RunnerOptionStore)
-
-    def test_dataproc_runner_option_store_is_sane(self):
-        self.assert_option_store_is_sane(DataprocRunnerOptionStore)
-
-    def test_emr_runner_option_store_is_sane(self):
-        self.assert_option_store_is_sane(EMRRunnerOptionStore)
-
-    def test_hadoop_runner_option_store_is_sane(self):
-        self.assert_option_store_is_sane(HadoopRunnerOptionStore)
-
-    def test_inline_runner_option_store_is_sane(self):
-        self.assert_option_store_is_sane(InlineRunnerOptionStore)
-
-    def test_local_runner_option_store_is_sane(self):
-        self.assert_option_store_is_sane(LocalRunnerOptionStore)
-
-
-class OptionStoreDebugPrintoutTestCase(ConfigFilesTestCase):
-
-    def get_debug_printout(self, opt_store_class, alias, opts):
+    def test_option_debug_printout(self):
         stderr = StringIO()
 
         with no_handlers_for_logger():
             log_to_stream('mrjob.runner', stderr, debug=True)
 
-            # debug printout happens in constructor
-            opt_store_class(alias, opts, [])
+            InlineMRJobRunner(owner='dave')
 
-        return stderr.getvalue()
-
-    def test_option_debug_printout(self):
-        printout = self.get_debug_printout(
-            RunnerOptionStore, 'inline', dict(owner='dave'))
-
-        self.assertIn("'owner'", printout)
-        self.assertIn("'dave'", printout)
-
-    def test_non_obfuscated_option_on_emr(self):
-        printout = self.get_debug_printout(
-            EMRRunnerOptionStore, 'emr', dict(owner='dave'))
-
-        self.assertIn("'owner'", printout)
-        self.assertIn("'dave'", printout)
-
-    def test_aws_access_key_id(self):
-        printout = self.get_debug_printout(
-            EMRRunnerOptionStore, 'emr', dict(
-                aws_access_key_id='AKIATOPQUALITYSALESEVENT'))
-
-        self.assertIn("'aws_access_key_id'", printout)
-        self.assertIn("'...VENT'", printout)
-
-    def test_aws_access_key_id_with_wrong_type(self):
-        printout = self.get_debug_printout(
-            EMRRunnerOptionStore, 'emr', dict(
-                aws_access_key_id=['AKIATOPQUALITYSALESEVENT']))
-
-        self.assertIn("'aws_access_key_id'", printout)
-        self.assertNotIn('VENT', printout)
-        self.assertIn("'...'", printout)
-
-    def test_aws_secret_access_key(self):
-        printout = self.get_debug_printout(
-            EMRRunnerOptionStore, 'emr', dict(
-                aws_secret_access_key='PASSWORD'))
-
-        self.assertIn("'aws_secret_access_key'", printout)
-        self.assertNotIn('PASSWORD', printout)
-        self.assertIn("'...'", printout)
-
-    def test_aws_session_token(self):
-        printout = self.get_debug_printout(
-            EMRRunnerOptionStore, 'emr', dict(
-                aws_session_token='TOKEN'))
-
-        self.assertIn("'aws_session_token'", printout)
-        self.assertNotIn('TOKEN', printout)
-        self.assertIn("'...'", printout)
-
-    def test_dont_obfuscate_empty_opts(self):
-        printout = self.get_debug_printout(
-            EMRRunnerOptionStore, 'emr', {})
-
-        self.assertNotIn("'...'", printout)
-        self.assertIn("'aws_access_key_id'", printout)
-        self.assertIn("'aws_secret_access_key'", printout)
-        self.assertIn("'aws_session_token'", printout)
+        self.assertIn("'owner'", stderr.getvalue())
+        self.assertIn("'dave'", stderr.getvalue())

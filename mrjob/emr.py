@@ -663,6 +663,25 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             return opt_value
 
+    def _obfuscate_opt(self, opt_key, opt_value):
+        """Obfuscate AWS credentials."""
+        # don't need to obfuscate empty values
+        if not opt_value:
+            return opt_value
+
+        if opt_key in ('aws_secret_access_key', 'aws_session_token'):
+            # don't expose any part of secret credentials
+            return '...'
+        elif opt_key == 'aws_access_key_id':
+            if isinstance(opt_value, string_types):
+                return '...' + opt_value[-4:]
+            else:
+                # don't expose aws_access_key_id if it was accidentally
+                # put in a list or something
+                return '...'
+        else:
+            return opt_value
+
     def _default_python_bin(self, local=False):
         """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,
         except when running Python 2, we explicitly pick :command:`python2.7`

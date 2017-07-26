@@ -571,7 +571,8 @@ class MRJobRunner(object):
             if cleanup_type not in CLEANUP_CHOICES:
                 raise ValueError(
                     '%s must be one of %s, not %s (from %s)' % (
-                        opt_key, ', '.join(CLEANUP_CHOICES), opt_value))
+                        opt_key, ', '.join(CLEANUP_CHOICES), opt_value,
+                        source))
 
         return opt_value
 

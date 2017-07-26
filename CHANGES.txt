@@ -94,6 +94,7 @@ v0.6.0, 2017-06-?? -- ???
      * get_ami_version()
      * get_emr_job_flow_id()
      * make_persistent_job_flow()
+ * removed *job_runner_kwargs() runner methods
  * removed OptionStore classes and MRJobRunner.OPTION_STORE_CLASS
  * removed deprecated passthrough to runner.fs
  * removed deprecated switches:

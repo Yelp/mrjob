@@ -634,9 +634,9 @@ class EMRAPIParamsTestCase(MockBoto3TestCase):
             '--no-emr-api-param', 'VisibleToAllUsers'])
 
         self.assertNotIn('no_emr_api_params',
-                         sorted(job.emr_job_runner_kwargs()))
+                         sorted(job._runner_kwargs()))
         self.assertNotIn('no_emr_api_param',
-                         sorted(job.emr_job_runner_kwargs()))
+                         sorted(job._runner_kwargs()))
 
         with job.make_runner() as runner:
             self.assertNotIn('no_emr_api_params', sorted(runner._opts))

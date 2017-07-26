@@ -470,15 +470,26 @@ class MRJob(MRJobLauncher):
                                  " probably means you tried to use it from"
                                  " __main__, which doesn't work." % w)
 
-        # support inline runner when running from the MRJob itself
-        from mrjob.inline import InlineMRJobRunner
-
-        # inline is the default, not local
-        if not self.options.runner or self.options.runner == 'inline':
-            return InlineMRJobRunner(mrjob_cls=self.__class__,
-                                     **self.inline_job_runner_kwargs())
-
         return super(MRJob, self).make_runner()
+
+    def _runner_class(self):
+        """Runner class as indicated by ``--runner``. Defaults to ``'inline'``.
+        """
+        if not self.options.runner or self.options.runner == 'inline':
+            from mrjob.inline import InlineMRJobRunner
+            return InlineMRJobRunner
+
+        else:
+            return super(MRJob, self)._runner_class()
+
+    def _runner_kwargs(self):
+        """If we're building an inline runner, include mrjob_cls in kwargs."""
+        kwargs = super(MRJob, self)._runner_kwargs()
+
+        if self._runner_class().alias == 'inline':
+            kwargs = dict(mrjob_cls=self.__class__, **kwargs)
+
+        return kwargs
 
     def _get_step(self, step_num, expected_type):
         """Helper for run_* methods"""

@@ -28,7 +28,6 @@ from mrjob.conf import combine_dicts
 from mrjob.options import _add_basic_options
 from mrjob.options import _add_job_options
 from mrjob.options import _add_runner_options
-from mrjob.options import _allowed_keys
 from mrjob.options import _pick_runner_opts
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
@@ -165,27 +164,7 @@ class MRJobLauncher(object):
 
         :rtype: :py:class:`mrjob.runner.MRJobRunner`
         """
-        if self.options.runner == 'emr':
-            # avoid requiring dependencies (such as boto3) for other runners
-            from mrjob.emr import EMRJobRunner
-            return EMRJobRunner(**self.emr_job_runner_kwargs())
-
-        elif self.options.runner == 'dataproc':
-            from mrjob.dataproc import DataprocJobRunner
-            return DataprocJobRunner(**self.dataproc_job_runner_kwargs())
-
-        elif self.options.runner == 'hadoop':
-            from mrjob.hadoop import HadoopJobRunner
-            return HadoopJobRunner(**self.hadoop_job_runner_kwargs())
-
-        elif self.options.runner == 'inline':
-            raise ValueError("inline is not supported in the multi-lingual"
-                             " launcher.")
-
-        else:
-            # run locally by default
-            from mrjob.local import LocalMRJobRunner
-            return LocalMRJobRunner(**self.local_job_runner_kwargs())
+        return self._runner_class()(**self._runner_kwargs())
 
     @classmethod
     def set_up_logging(cls, quiet=False, verbose=False, stream=None):
@@ -393,85 +372,40 @@ class MRJobLauncher(object):
 
         self._process_args(args)
 
-    def inline_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job locally
-        (``-r inline``).
+    def _runner_class(self):
+        """Runner class, as indicated by ``--runner``. This uses conditional
+        imports to avoid importing runner modules that we don't need (and may
+        not have libraries for).
 
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs locally.
+        Defaults to ``'local'`` and disallows use of inline runner.
         """
-        return self._job_runner_kwargs_for_runner('inline')
+        if self.options.runner == 'dataproc':
+            from mrjob.dataproc import DataprocJobRunner
+            return DataprocJobRunner
 
-    def local_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job locally
-        (``-r local``).
+        elif self.options.runner == 'emr':
+            from mrjob.emr import EMRJobRunner
+            return EMRJobRunner
 
-        :return: map from arg name to value
+        elif self.options.runner == 'hadoop':
+            from mrjob.hadoop import HadoopJobRunner
+            return HadoopJobRunner
 
-        Re-define this if you want finer control when running jobs locally.
-        """
-        return self._job_runner_kwargs_for_runner('local')
+        elif self.options.runner == 'inline':
+            raise ValueError("inline is not supported in the multi-lingual"
+                             " launcher.")
 
-    def emr_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job on EMR
-        (``-r emr``).
+        else:
+            # run locally by default
+            from mrjob.local import LocalMRJobRunner
+            return LocalMRJobRunner
 
-        :return: map from arg name to value
+    def _runner_kwargs(self):
+        opt_names = self._runner_class().OPT_NAMES
 
-        Re-define this if you want finer control when running jobs on EMR.
-        """
-        return self._job_runner_kwargs_for_runner('emr')
-
-    def dataproc_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job on EMR
-        (``-r emr``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs on EMR.
-        """
-        return self._job_runner_kwargs_for_runner('dataproc')
-
-    def hadoop_job_runner_kwargs(self):
-        """Keyword arguments to create create runners when
-        :py:meth:`make_runner` is called, when we run a job on EMR
-        (``-r hadoop``).
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control when running jobs on hadoop.
-        """
-        return self._job_runner_kwargs_for_runner('hadoop')
-
-    def _job_runner_kwargs_for_runner(self, runner_alias):
-        """Helper method that powers the *_job_runner_kwargs()
-        methods."""
-        # user can no longer silently ignore switches by overriding
-        # job_runner_kwargs()
-        return combine_dicts(
-            self._kwargs_from_switches(_allowed_keys(runner_alias)),
-            self.job_runner_kwargs(),
-        )
-
-    def job_runner_kwargs(self):
-        """Keyword arguments used to create runners when
-        :py:meth:`make_runner` is called.
-
-        :return: map from arg name to value
-
-        Re-define this if you want finer control of runner initialization.
-
-        You might find :py:meth:`mrjob.conf.combine_dicts` useful if you
-        want to add or change lots of keyword arguments.
-        """
         return combine_dicts(
             self._non_option_kwargs(),
-            self._kwargs_from_switches(_allowed_keys('base')),
+            self._kwargs_from_switches(opt_names),
             self._job_kwargs(),
         )
 

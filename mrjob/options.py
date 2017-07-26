@@ -1286,10 +1286,9 @@ def _add_step_options(opt_group):
 
 ### other utilities for switches ###
 
-def _print_help_for_runner(runner_alias, include_deprecated=False):
+def _print_help_for_runner(opt_names, include_deprecated=False):
     help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
 
-    opt_names = _pick_runner_opts(runner_alias)
     _add_runner_options(help_parser, opt_names,
                         include_deprecated=include_deprecated)
 

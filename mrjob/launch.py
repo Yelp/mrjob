@@ -129,7 +129,8 @@ class MRJobLauncher(object):
         """Print help for this job. This will either print runner
         or basic help. Override to allow other kinds of help."""
         if options.runner:
-            _print_help_for_runner(options.runner, options.deprecated)
+            _print_help_for_runner(
+                self._runner_opt_names(), options.deprecated)
         else:
             _print_basic_help(self.option_parser,
                               self._usage(),
@@ -401,13 +402,15 @@ class MRJobLauncher(object):
             return LocalMRJobRunner
 
     def _runner_kwargs(self):
-        opt_names = self._runner_class().OPT_NAMES
 
         return combine_dicts(
             self._non_option_kwargs(),
-            self._kwargs_from_switches(opt_names),
+            self._kwargs_from_switches(self._runner_opt_names()),
             self._job_kwargs(),
         )
+
+    def _runner_opt_names(self):
+        return self._runner_class().OPT_NAMES
 
     def _non_option_kwargs(self):
         """Keyword arguments to runner constructor that can't be set

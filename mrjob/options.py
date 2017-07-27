@@ -215,12 +215,6 @@ _DEPRECATED_NON_RUNNER_OPTS = set([
 
 ### runner opts ###
 
-# map from runner to ancestors, if any
-_RUNNER_TO_ANCESTORS = {
-    'dataproc': {'_cloud'},
-    'emr': {'_cloud'},
-}
-
 # map from runner option name to dict with the following keys (all optional):
 # cloud_role:
 #   'connect' if needed when interacting with cloud services at all
@@ -230,8 +224,6 @@ _RUNNER_TO_ANCESTORS = {
 #   (if left blank, we use combine_values())
 # deprecated: if true, this option is deprecated and slated for removal
 # deprecated_aliases: list of old names for this option slated for removal
-# runners: list of aliases of runners that support this option (leave out
-#   for options common to all runners
 # switches: list of switches to add to option parser for this option. Items
 #   have the format (['--switch-names', ...], dict(**kwargs)), where kwargs
 #   can be:
@@ -245,10 +237,12 @@ _RUNNER_TO_ANCESTORS = {
 #        to 'string' for callback
 #   You can't set the option parser's default; we use [] if *action* is
 #   'append' and None otherwise.
+#
+# the list of which options apply to which runner is in the runner class
+# itself (e.g. EMRJobRunner.OPT_NAMES)
 _RUNNER_OPTS = dict(
     additional_emr_info=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--additional-emr-info'], dict(
                 help='A JSON string for selecting additional features on EMR',
@@ -258,7 +252,6 @@ _RUNNER_OPTS = dict(
     applications=dict(
         cloud_role='launch',
         combiner=combine_lists,
-        runners={'emr'},
         switches=[
             (['--application'], dict(
                 action='append',
@@ -269,20 +262,16 @@ _RUNNER_OPTS = dict(
     ),
     aws_access_key_id=dict(
         cloud_role='connect',
-        runners={'emr'},
     ),
     aws_secret_access_key=dict(
         cloud_role='connect',
-        runners={'emr'},
     ),
     aws_session_token=dict(
         cloud_role='connect',
-        runners={'emr'},
     ),
     bootstrap=dict(
         cloud_role='launch',
         combiner=combine_lists,
-        runners={'_cloud'},
         switches=[
             (['--bootstrap'], dict(
                 action='append',
@@ -297,7 +286,6 @@ _RUNNER_OPTS = dict(
     bootstrap_actions=dict(
         cloud_role='launch',
         combiner=combine_lists,
-        runners={'emr'},
         switches=[
             (['--bootstrap-action'], dict(
                 action='append',
@@ -329,7 +317,6 @@ _RUNNER_OPTS = dict(
     ),
     bootstrap_python=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--bootstrap-python'], dict(
                 action='store_true',
@@ -346,7 +333,6 @@ _RUNNER_OPTS = dict(
     ),
     bootstrap_spark=dict(
         cloud_role='launch',
-        runners={'emr', 'hadoop'},
         switches=[
             (['--bootstrap-spark'], dict(
                 action='store_true',
@@ -371,7 +357,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     check_cluster_every=dict(
-        runners={'_cloud'},
         switches=[
             (['--check-cluster-every'], dict(
                 help=('How often (in seconds) to check status of your'
@@ -401,7 +386,6 @@ _RUNNER_OPTS = dict(
     ),
     cloud_fs_sync_secs=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--cloud-fs-sync-secs'], dict(
                 help=('How long to wait for remote FS to reach eventual'
@@ -415,7 +399,6 @@ _RUNNER_OPTS = dict(
     cloud_log_dir=dict(
         cloud_role='launch',
         combiner=combine_paths,
-        runners={'emr'},
         switches=[
             (['--cloud-log-dir'], dict(
                 help='URI on remote FS to write logs into',
@@ -425,7 +408,6 @@ _RUNNER_OPTS = dict(
     cloud_tmp_dir=dict(
         cloud_role='launch',
         combiner=combine_paths,
-        runners={'_cloud'},
         switches=[
             (['--cloud-tmp-dir'], dict(
                 help='URI on remote FS to use as our temp directory.',
@@ -434,7 +416,6 @@ _RUNNER_OPTS = dict(
     ),
     cloud_upload_part_size=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--cloud-upload-part-size'], dict(
                 help=('Upload files to S3 in parts no bigger than this many'
@@ -445,7 +426,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     cluster_id=dict(
-        runners={'_cloud'},
         switches=[
             (['--cluster-id'], dict(
                 help='ID of an existing cluster to run our job on',
@@ -465,7 +445,6 @@ _RUNNER_OPTS = dict(
     ),
     core_instance_bid_price=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--core-instance-bid-price'], dict(
                 help=('Bid price to specify for core nodes when'
@@ -476,7 +455,6 @@ _RUNNER_OPTS = dict(
     ),
     core_instance_type=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--core-instance-type'], dict(
                 help='Type of GCE/EC2 core instance(s) to launch',
@@ -485,7 +463,6 @@ _RUNNER_OPTS = dict(
     ),
     ec2_key_pair=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--ec2-key-pair'], dict(
                 help='Name of the SSH key pair you set up for EMR',
@@ -494,7 +471,6 @@ _RUNNER_OPTS = dict(
     ),
     ec2_key_pair_file=dict(
         combiner=combine_paths,
-        runners={'emr'},
         switches=[
             (['--ec2-key-pair-file'], dict(
                 help='Path to file containing SSH key for EMR',
@@ -502,7 +478,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     emr_action_on_failure=dict(
-        runners={'emr'},
         switches=[
             (['--emr-action-on-failure'], dict(
                 help=('Action to take when a step fails'
@@ -513,7 +488,6 @@ _RUNNER_OPTS = dict(
     emr_api_params=dict(
         cloud_role='launch',
         combiner=combine_dicts,
-        runners={'emr'},
         switches=[
             (['--emr-api-param'], dict(
                 callback=_key_value_callback,
@@ -532,7 +506,6 @@ _RUNNER_OPTS = dict(
     emr_configurations=dict(
         cloud_role='launch',
         combiner=combine_lists,
-        runners={'emr'},
         switches=[
             (['--emr-configuration'], dict(
                 callback=_append_json_callback,
@@ -545,7 +518,6 @@ _RUNNER_OPTS = dict(
     ),
     emr_endpoint=dict(
         cloud_role='connect',
-        runners={'emr'},
         switches=[
             (['--emr-endpoint'], dict(
                 help=('Force mrjob to connect to EMR on this endpoint'
@@ -556,7 +528,6 @@ _RUNNER_OPTS = dict(
     ),
     enable_emr_debugging=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--enable-emr-debugging'], dict(
                 action='store_true',
@@ -570,7 +541,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     gcp_project=dict(
-        runners={'dataproc'},
         switches=[
             (['--gcp-project'], dict(
                 help='Project to run Dataproc jobs in'
@@ -579,14 +549,12 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_bin=dict(
         combiner=combine_cmds,
-        runners={'hadoop'},
         switches=[
             (['--hadoop-bin'], dict(help='path to hadoop binary')),
         ],
     ),
     hadoop_extra_args=dict(
         combiner=combine_lists,
-        runners={'emr', 'hadoop'},
         switches=[
             (['--hadoop-arg'], dict(
                 action='append',
@@ -597,7 +565,6 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_log_dirs=dict(
         combiner=combine_path_lists,
-        runners={'hadoop'},
         switches=[
             (['--hadoop-log-dirs'], dict(
                 action='append',
@@ -608,7 +575,6 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_streaming_jar=dict(
         combiner=combine_paths,
-        runners={'emr', 'hadoop'},
         switches=[
             (['--hadoop-streaming-jar'], dict(
                 help=('Path of your hadoop streaming jar (locally, or on'
@@ -619,7 +585,6 @@ _RUNNER_OPTS = dict(
     ),
     hadoop_tmp_dir=dict(
         combiner=combine_paths,
-        runners={'hadoop'},
         switches=[
             (['--hadoop-tmp-dir'], dict(
                 help='Temp space on HDFS (default is tmp/mrjob)',
@@ -627,7 +592,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     hadoop_version=dict(
-        runners={'inline', 'local'},
         switches=[
             (['--hadoop-version'], dict(
                 help='Specific version of Hadoop to simulate',
@@ -636,7 +600,6 @@ _RUNNER_OPTS = dict(
     ),
     iam_endpoint=dict(
         cloud_role='launch',  # not 'connect'; only used to create clusters
-        runners={'emr'},
         switches=[
             (['--iam-endpoint'], dict(
                 help=('Force mrjob to connect to IAM on this endpoint'
@@ -646,7 +609,6 @@ _RUNNER_OPTS = dict(
     ),
     iam_instance_profile=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--iam-instance-profile'], dict(
                 help=('EC2 instance profile to use for the EMR cluster -- see'
@@ -656,7 +618,6 @@ _RUNNER_OPTS = dict(
     ),
     iam_service_role=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--iam-service-role'], dict(
                 help=('IAM service role to use for the EMR cluster -- see'
@@ -666,7 +627,6 @@ _RUNNER_OPTS = dict(
     ),
     image_version=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--image-version'], dict(
                 help='EMR/Dataproc machine image to launch clusters with',
@@ -675,7 +635,6 @@ _RUNNER_OPTS = dict(
     ),
     instance_type=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--instance-type'], dict(
                 help=('Type of GCE/EC2 instance(s) to launch \n'
@@ -731,7 +690,6 @@ _RUNNER_OPTS = dict(
     ),
     master_instance_bid_price=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--master-instance-bid-price'], dict(
                 help=('Bid price to specify for the master node when'
@@ -742,7 +700,6 @@ _RUNNER_OPTS = dict(
     ),
     master_instance_type=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--master-instance-type'], dict(
                 help='Type of GCE/EC2 master instance to launch',
@@ -751,7 +708,6 @@ _RUNNER_OPTS = dict(
     ),
     max_hours_idle=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--max-hours-idle'], dict(
                 help=("If we create a cluster, have it automatically"
@@ -763,7 +719,6 @@ _RUNNER_OPTS = dict(
     ),
     mins_to_end_of_hour=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--mins-to-end-of-hour'], dict(
                 help=("If --max-hours-idle is set, control how close to the"
@@ -775,7 +730,6 @@ _RUNNER_OPTS = dict(
     ),
     num_core_instances=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--num-core-instances'], dict(
                 help='Total number of core instances to launch',
@@ -785,7 +739,6 @@ _RUNNER_OPTS = dict(
     ),
     num_task_instances=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--num-task-instances'], dict(
                 help='Total number of task instances to launch',
@@ -803,7 +756,6 @@ _RUNNER_OPTS = dict(
     ),
     pool_clusters=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--pool-clusters'], dict(
                 action='store_true',
@@ -821,7 +773,6 @@ _RUNNER_OPTS = dict(
     ),
     pool_name=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--pool-name'], dict(
                 help='Specify a pool name to join. Default is "default"',
@@ -829,7 +780,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     pool_wait_minutes=dict(
-        runners={'emr'},
         switches=[
             (['--pool-wait-minutes'], dict(
                 help=('Wait for a number of minutes for a cluster to finish'
@@ -860,7 +810,6 @@ _RUNNER_OPTS = dict(
     ),
     region=dict(
         cloud_role='connect',
-        runners={'_cloud'},
         switches=[
             (['--region'], dict(
                 help='GCE/AWS region to run Dataproc/EMR jobs in.',
@@ -869,7 +818,6 @@ _RUNNER_OPTS = dict(
     ),
     release_label=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--release-label'], dict(
                 help=('Release Label (e.g. "emr-4.0.0"). Overrides'
@@ -879,7 +827,6 @@ _RUNNER_OPTS = dict(
     ),
     s3_endpoint=dict(
         cloud_role='connect',
-        runners={'emr'},
         switches=[
             (['--s3-endpoint'], dict(
                 help=("Force mrjob to connect to S3 on this endpoint (e.g."
@@ -913,7 +860,6 @@ _RUNNER_OPTS = dict(
     ),
     sort_bin=dict(
         combiner=combine_cmds,
-        runners={'local'},
         switches=[
             (['--sort-bin'], dict(
                 help=('Alternate shell command for the external sort binary.'
@@ -932,7 +878,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     spark_master=dict(
-        runners={'hadoop'},
         switches=[
             (['--spark-master'], dict(
                 help=('--master argument to spark-submit (e.g. '
@@ -950,7 +895,6 @@ _RUNNER_OPTS = dict(
     ),
     ssh_bin=dict(
         combiner=combine_cmds,
-        runners={'emr'},
         switches=[
             (['--ssh-bin'], dict(
                 help=("Name/path of ssh binary. Arguments are allowed (e.g."
@@ -959,7 +903,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     ssh_bind_ports=dict(
-        runners={'emr'},
         switches=[
             (['--ssh-bind-ports'], dict(
                 callback=_port_range_callback,
@@ -971,7 +914,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     ssh_tunnel=dict(
-        runners={'emr'},
         switches=[
             (['--ssh-tunnel'], dict(
                 action='store_true',
@@ -986,7 +928,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
     ssh_tunnel_is_open=dict(
-        runners={'emr'},
         switches=[
             (['--ssh-tunnel-is-open'], dict(
                 action='store_true',
@@ -1021,7 +962,6 @@ _RUNNER_OPTS = dict(
     ),
     subnet=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--subnet'], dict(
                 help=('ID of Amazon VPC subnet to launch cluster in. If not'
@@ -1033,7 +973,6 @@ _RUNNER_OPTS = dict(
     tags=dict(
         cloud_role='launch',
         combiner=combine_dicts,
-        runners={'emr'},
         switches=[
             (['--tag'], dict(
                 callback=_key_value_callback,
@@ -1045,7 +984,6 @@ _RUNNER_OPTS = dict(
     ),
     task_instance_bid_price=dict(
         cloud_role='launch',
-        runners={'emr'},
         switches=[
             (['--task-instance-bid-price'], dict(
                 help=('Bid price to specify for task nodes when'
@@ -1055,7 +993,6 @@ _RUNNER_OPTS = dict(
     ),
     task_instance_type=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--task-instance-type'], dict(
                 help='Type of GCE/EC2 task instance(s) to launch',
@@ -1107,7 +1044,6 @@ _RUNNER_OPTS = dict(
     visible_to_all_users=dict(
         cloud_role='launch',
         deprecated=True,
-        runners={'emr'},
         switches=[
             (['--visible-to-all-users'], dict(
                 action='store_true',
@@ -1123,7 +1059,6 @@ _RUNNER_OPTS = dict(
     ),
     zone=dict(
         cloud_role='launch',
-        runners={'_cloud'},
         switches=[
             (['--zone'], dict(
                 help=('GCE zone/AWS availability zone to run Dataproc/EMR jobs'
@@ -1132,16 +1067,6 @@ _RUNNER_OPTS = dict(
         ],
     ),
 )
-
-
-def _for_runner(config, runner_alias):
-    if not (runner_alias and config.get('runners')):
-        return True
-
-    runner_aliases = (
-        {runner_alias} | _RUNNER_TO_ANCESTORS.get(runner_alias, set()))
-
-    return bool(runner_aliases & config.get('runners'))
 
 
 def _combiners(opt_names, runner_alias=None):
@@ -1166,24 +1091,21 @@ def _deprecated_aliases(opt_names):
     return results
 
 
-def _pick_runner_opts(runner_alias=None, cloud_role=None):
-    """Return a set of option names that work for the given runner
-    (if specified) and fullfill the given cloud roles (if specified).
-
-    By convention, you can use runner_alias ``'base'`` to get options
-    available to all runners.
-    """
-    return set(
-        opt_name for opt_name, conf in _RUNNER_OPTS.items()
-        if (_for_runner(conf, runner_alias) and
-            (cloud_role is None or
-             cloud_role == conf.get('cloud_role')))
-    )
+def _filter_by_role(opt_names, *cloud_roles):
+    return {
+        opt_name
+        for opt_name, conf in _RUNNER_OPTS.items()
+        if conf.get('cloud_role') in cloud_roles
+    }
 
 
-def _add_runner_options(parser, opt_names, include_deprecated=True):
-    # add options (switches) for the given runner opts to the given
-    # options parser, alphabetically by destination.
+def _add_runner_options(parser, opt_names=None, include_deprecated=True):
+    """add options (switches) for the given runner opts to the given
+    options parser, alphabetically by destination. If *opt_names* is
+    None, include all runner opts."""
+    if opt_names is None:
+        opt_names = set(_RUNNER_OPTS)
+
     for opt_name in sorted(opt_names):
         _add_runner_options_for_opt(
             parser, opt_name, include_deprecated=include_deprecated)

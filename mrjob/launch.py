@@ -28,7 +28,6 @@ from mrjob.conf import combine_dicts
 from mrjob.options import _add_basic_options
 from mrjob.options import _add_job_options
 from mrjob.options import _add_runner_options
-from mrjob.options import _pick_runner_opts
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
 from mrjob.step import StepFailedException
@@ -246,7 +245,7 @@ class MRJobLauncher(object):
 
         _add_basic_options(self.option_parser)
         _add_job_options(self.option_parser)
-        _add_runner_options(self.option_parser, _pick_runner_opts())
+        _add_runner_options(self.option_parser)
 
     def is_task(self):
         """True if this is a mapper, combiner, or reducer.

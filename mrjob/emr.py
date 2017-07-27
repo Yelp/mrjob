@@ -55,7 +55,6 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
 from mrjob.cloud import HadoopInTheCloudJobRunner
-from mrjob.cloud import HadoopInTheCloudOptionStore
 from mrjob.compat import map_version
 from mrjob.compat import version_gte
 from mrjob.conf import combine_dicts
@@ -82,9 +81,6 @@ from mrjob.logs.step import _interpret_emr_step_stderr
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _ls_emr_step_stderr_logs
 from mrjob.logs.step import _ls_emr_step_syslogs
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
 from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import _parse_progress_from_job_tracker
@@ -290,139 +286,6 @@ def _get_reason(cluster_or_step):
     return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
-class EMRRunnerOptionStore(HadoopInTheCloudOptionStore):
-
-    ALLOWED_KEYS = _allowed_keys('emr')
-    COMBINERS = _combiners('emr')
-    DEPRECATED_ALIASES = _deprecated_aliases('emr')
-
-    def __init__(self, alias, opts, conf_paths):
-        super(EMRRunnerOptionStore, self).__init__(alias, opts, conf_paths)
-
-        # don't allow region to be ''
-        if not self['region']:
-            self['region'] = _DEFAULT_EMR_REGION
-
-        # don't allow mins_to_end_of_hour to be small
-        if not self['mins_to_end_of_hour'] >= _MIN_MINS_TO_END_OF_HOUR:
-            raise ValueError('mins_to_end_of_hour must be at least %.1f' %
-                             _MIN_MINS_TO_END_OF_HOUR)
-
-        self._fix_emr_configurations_opt()
-        self._fix_instance_opts()
-        self._fix_release_label_opt()
-
-    def default_options(self):
-        super_opts = super(EMRRunnerOptionStore, self).default_options()
-        return combine_dicts(super_opts, {
-            'image_version': _DEFAULT_IMAGE_VERSION,
-            'region': _DEFAULT_EMR_REGION,
-            'bootstrap_python': None,
-            'check_cluster_every': 30,
-            'cleanup_on_failure': ['JOB'],
-            'max_hours_idle': 0.5,
-            'mins_to_end_of_hour': 5.0,
-            'num_core_instances': 0,
-            'num_task_instances': 0,
-            'pool_clusters': True,
-            'pool_name': 'default',
-            'pool_wait_minutes': 0,
-            'cloud_fs_sync_secs': 5.0,
-            'cloud_upload_part_size': 100,  # 100 MB
-            'sh_bin': None,  # see _sh_bin(), below
-            'ssh_bin': ['ssh'],
-            # don't use a list because it makes it hard to read option values
-            # when running in verbose mode. See #1284
-            'ssh_bind_ports': xrange(40001, 40841),
-            'ssh_tunnel': False,
-            'ssh_tunnel_is_open': False,
-            'visible_to_all_users': True,
-        })
-
-    def _fix_emr_configurations_opt(self):
-        """Normalize emr_configurations, raising an exception if we find
-        serious problems.
-        """
-        self['emr_configurations'] = [
-            _fix_configuration_opt(c) for c in self['emr_configurations']]
-
-    def _fix_instance_opts(self):
-        """If the *instance_type* option is set, override instance
-        type for the nodes that actually run tasks (see Issue #66). Allow
-        command-line arguments to override defaults and arguments
-        in mrjob.conf (see Issue #311).
-
-        Also, make sure that bid prices of zero are converted to None.
-        """
-        # If task instance type is not set, use core instance type
-        # (This is mostly so that we don't inadvertently join a pool
-        # with task instance types with too little memory.)
-        if not self['task_instance_type']:
-            self['task_instance_type'] = (
-                self['core_instance_type'])
-
-        # Allow ec2 instance type to override other instance types
-        instance_type = self['instance_type']
-        if instance_type:
-            # core instances
-            if (self._opt_priority['instance_type'] >
-                    self._opt_priority['core_instance_type']):
-                self['core_instance_type'] = instance_type
-
-            # master instance only does work when it's the only instance
-            if (self['num_core_instances'] <= 0 and
-                self['num_task_instances'] <= 0 and
-                (self._opt_priority['instance_type'] >
-                 self._opt_priority['master_instance_type'])):
-                self['master_instance_type'] = instance_type
-
-            # task instances
-            if (self._opt_priority['instance_type'] >
-                    self._opt_priority['task_instance_type']):
-                self['task_instance_type'] = instance_type
-
-        # convert a bid price of '0' to None
-        for role in _INSTANCE_ROLES:
-            opt_name = '%s_instance_bid_price' % role
-            if not self[opt_name]:
-                self[opt_name] = None
-            else:
-                # convert "0", "0.00" etc. to None
-                try:
-                    value = float(self[opt_name])
-                    if value == 0:
-                        self[opt_name] = None
-                except ValueError:
-                    pass  # maybe EMR will accept non-floats?
-
-    def _fix_release_label_opt(self):
-        """If *release_label* is not set and *image_version* is set to version
-        4 or higher (which the EMR API won't accept), set *release_label*
-        to "emr-" plus *image_version*. (Leave *image_version* as-is;
-        *release_label* overrides it anyway.)"""
-        if (version_gte(self['image_version'], '4') and
-                not self['release_label']):
-            self['release_label'] = 'emr-' + self['image_version']
-
-    def _obfuscate(self, opt_key, opt_value):
-        # don't need to obfuscate empty values
-        if not opt_value:
-            return opt_value
-
-        if opt_key in ('aws_secret_access_key', 'aws_session_token'):
-            # don't expose any part of secret credentials
-            return '...'
-        elif opt_key == 'aws_access_key_id':
-            if isinstance(opt_value, string_types):
-                return '...' + opt_value[-4:]
-            else:
-                # don't expose aws_access_key_id if it was accidentally
-                # put in a list or something
-                return '...'
-        else:
-            return opt_value
-
-
 class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
     Invoked when you run your job with ``-r emr``.
@@ -448,7 +311,45 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """
     alias = 'emr'
 
-    OPTION_STORE_CLASS = EMRRunnerOptionStore
+    OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
+        'additional_emr_info',
+        'applications',
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        'aws_session_token',
+        'bootstrap_actions',
+        'bootstrap_spark',
+        'cloud_log_dir',
+        'cloud_upload_part_size',
+        'core_instance_bid_price',
+        'ec2_key_pair',
+        'ec2_key_pair_file',
+        'emr_action_on_failure',
+        'emr_api_params',
+        'emr_configurations',
+        'emr_endpoint',
+        'enable_emr_debugging',
+        'hadoop_extra_args',
+        'hadoop_streaming_jar',
+        'iam_endpoint',
+        'iam_instance_profile',
+        'iam_service_role',
+        'master_instance_bid_price',
+        'mins_to_end_of_hour',
+        'pool_clusters',
+        'pool_name',
+        'pool_wait_minutes',
+        'release_label',
+        's3_endpoint',
+        'ssh_bin',
+        'ssh_bind_ports',
+        'ssh_tunnel',
+        'ssh_tunnel_is_open',
+        'subnet',
+        'tags',
+        'task_instance_bid_price',
+        'visible_to_all_users',
+    }
 
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
@@ -490,11 +391,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # to this manager just before we need them.
         s3_files_dir = self._cloud_tmp_dir + 'files/'
         self._upload_mgr = UploadDirManager(s3_files_dir)
-
-        if not (isinstance(self._opts['additional_emr_info'], string_types) or
-                self._opts['additional_emr_info'] is None):
-            self._opts['additional_emr_info'] = json.dumps(
-                self._opts['additional_emr_info'])
 
         # master node setup script (handled later by
         # _add_master_node_setup_files_for_upload())
@@ -544,6 +440,110 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # set of step numbers (0-indexed) where we waited 5 minutes for logs to
         # transfer to S3 (so we don't do it twice)
         self._waited_for_logs_on_s3 = set()
+
+    ### Options ###
+
+    def _default_opts(self):
+        return combine_dicts(
+            super(EMRJobRunner, self)._default_opts(),
+            dict(
+                bootstrap_python=None,
+                check_cluster_every=30,
+                cleanup_on_failure=['JOB'],
+                cloud_fs_sync_secs=5.0,
+                cloud_upload_part_size=100,  # 100 MB
+                image_version=_DEFAULT_IMAGE_VERSION,
+                max_hours_idle=0.5,
+                mins_to_end_of_hour=5.0,
+                num_core_instances=0,
+                num_task_instances=0,
+                pool_clusters=True,
+                pool_name='default',
+                pool_wait_minutes=0,
+                region=_DEFAULT_EMR_REGION,
+                sh_bin=None,  # see _sh_bin(), below
+                ssh_bin=['ssh'],
+                # don't use a list because it makes it hard to read option
+                # values when running in verbose mode. See #1284
+                ssh_bind_ports=xrange(40001, 40841),
+                ssh_tunnel=False,
+                ssh_tunnel_is_open=False,
+                visible_to_all_users=True,
+            )
+        )
+
+    def _combine_opts(self, opt_list):
+        """Convert image_version of 4.x and later to release_label."""
+        opts = super(EMRJobRunner, self)._combine_opts(opt_list)
+
+        if (version_gte(opts['image_version'], '4') and
+                not opts['release_label']):
+            opts['release_label'] = 'emr-' + opts['image_version']
+
+        return opts
+
+    def _fix_opt(self, opt_key, opt_value, source):
+        """Fix and check various EMR-specific options"""
+        opt_value = super(EMRJobRunner, self)._fix_opt(
+            opt_key, opt_value, source)
+
+        # *_instance_bid_price
+        if opt_key.endswith('_instance_bid_price'):
+            if not opt_value:  # don't allow blank bid price
+                return None
+
+            try:
+                if not float(opt_value):
+                    return None
+            except ValueError:  # maybe EMR allows non-floats?
+                pass
+
+            return str(opt_value)  # should be str, not a number
+
+        # additional_emr_info
+        elif opt_key == 'additional_emr_info' and not isinstance(
+                opt_value, string_types):
+            return json.dumps(opt_value)
+
+        # emr_configurations
+        elif opt_key == 'emr_configurations':
+            return [_fix_configuration_opt(c) for c in opt_value]
+
+        # mins_to_end_of_hour
+        elif opt_key == 'mins_to_end_of_hour':
+            if not opt_value >= _MIN_MINS_TO_END_OF_HOUR:
+                raise ValueError(
+                    'mins_to_end_of_hour (from %s) must be at least %.1f' % (
+                        source, _MIN_MINS_TO_END_OF_HOUR))
+
+            return opt_value
+
+        # region
+        elif opt_key == 'region':
+            # don't allow blank region
+            return opt_value or _DEFAULT_EMR_REGION
+
+        else:
+            return opt_value
+
+    def _obfuscate_opt(self, opt_key, opt_value):
+        """Obfuscate AWS credentials."""
+        # don't need to obfuscate empty values
+        if not opt_value:
+            return opt_value
+
+        if opt_key in ('aws_secret_access_key', 'aws_session_token'):
+            # don't expose any part of secret credentials
+            return '...'
+        elif opt_key == 'aws_access_key_id':
+            if isinstance(opt_value, string_types):
+                return '...' + opt_value[-4:]
+            else:
+                # don't expose aws_access_key_id if it was accidentally
+                # put in a list or something
+                return '...'
+        else:
+            return opt_value
 
     def _default_python_bin(self, local=False):
         """Like :py:meth:`mrjob.runner.MRJobRunner._default_python_bin`,

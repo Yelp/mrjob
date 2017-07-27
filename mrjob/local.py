@@ -18,7 +18,6 @@ them together. Useful for testing, not terrible for running medium-sized
 jobs on all CPUs."""
 import logging
 import os
-import pickle
 import platform
 from functools import partial
 from multiprocessing import Pool
@@ -27,10 +26,6 @@ from subprocess import check_call
 
 from mrjob.logs.errors import _format_error
 from mrjob.logs.task import _parse_task_stderr
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
-from mrjob.runner import RunnerOptionStore
 from mrjob.sim import SimMRJobRunner
 from mrjob.sim import _sort_lines_in_memory
 from mrjob.step import StepFailedException
@@ -55,12 +50,6 @@ class _TaskFailedException(StepFailedException):
         self.task_num = task_num
 
 
-class LocalRunnerOptionStore(RunnerOptionStore):
-    ALLOWED_KEYS = _allowed_keys('local')
-    COMBINERS = _combiners('local')
-    DEPRECATED_ALIASES = _deprecated_aliases('local')
-
-
 class LocalMRJobRunner(SimMRJobRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing purposes.
     Invoked when you run your job with ``-r local``.
@@ -74,7 +63,9 @@ class LocalMRJobRunner(SimMRJobRunner):
     """
     alias = 'local'
 
-    OPTION_STORE_CLASS = LocalRunnerOptionStore
+    OPT_NAMES = SimMRJobRunner.OPT_NAMES | {
+        'sort_bin',
+    }
 
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
@@ -254,7 +245,7 @@ def _sort_lines_with_sort_bin(input_paths, output_path, sort_bin,
             except CalledProcessError:
                 log.error(
                     '`%s` failed, falling back to in-memory sort' %
-                    cmd_line(self._sort_bin()))
+                    cmd_line(sort_bin))
             except OSError:
                 log.error(
                     'no sort binary, falling back to in-memory sort')

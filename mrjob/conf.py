@@ -33,103 +33,7 @@ from mrjob.py2 import string_types
 from mrjob.util import expand_path
 from mrjob.util import shlex_split
 
-
 log = logging.getLogger(__name__)
-
-
-class OptionStore(dict):
-    """Encapsulates logic about a configuration. With the exception of the
-    constructor, it can be accessed like a dictionary."""
-
-    #: Set of valid keys for this type of configuration
-    ALLOWED_KEYS = set()
-
-    #: Mapping of key to function used to combine multiple values to override,
-    #: augment, etc. Leave blank for :py:func:`combine_values()`.
-    COMBINERS = {}
-
-    #: Mapping from old name for an option to its new name
-    DEPRECATED_ALIASES = {}
-
-    def __init__(self):
-        super(OptionStore, self).__init__()
-        self.cascading_dicts = [
-            dict((key, None) for key in self.ALLOWED_KEYS),
-            self.default_options(),
-        ]
-
-    def default_options(self):
-        """Default options for this :py:class:`OptionStore`"""
-        return {}
-
-    def validated_options(self, opts, from_where=''):
-        results = {}
-
-        for k, v in sorted(opts.items()):
-            if k in self.DEPRECATED_ALIASES:
-                if v is None:
-                    continue
-
-                aliased_opt = self.DEPRECATED_ALIASES[k]
-
-                log.warning('Deprecated option %s%s has been renamed to %s'
-                            ' and will be removed in v0.7.0' % (
-                                k, from_where, aliased_opt))
-
-                if opts.get(aliased_opt) is None:
-                    results[aliased_opt] = v
-
-            elif k in self.ALLOWED_KEYS:
-                results[k] = v
-
-            else:
-                log.warning('Unexpected option %s%s' % (k, from_where))
-
-        return results
-
-    def populate_values_from_cascading_dicts(self):
-        """When ``cascading_dicts`` has been built, use it to populate the
-        dictionary with the ultimate values.
-        """
-        self.update(combine_opts(self.COMBINERS, *self.cascading_dicts))
-        self._opt_priority = self._calculate_opt_priority()
-
-    def is_default(self, key):
-        return self._opt_priority[key] < 2
-
-    def __getitem__(self, key):
-        if key in self.ALLOWED_KEYS:
-            return super(OptionStore, self).__getitem__(key)
-        else:
-            raise KeyError(key)
-
-    def __setitem__(self, key, value):
-        if key in self.ALLOWED_KEYS:
-            return super(OptionStore, self).__setitem__(key, value)
-        else:
-            raise KeyError(key)
-
-    def _calculate_opt_priority(self):
-        """Keep track of where in the order opts were specified,
-        to handle opts that affect the same thing (e.g. ec2_*instance_type).
-
-        Here is a rough guide to the values set by this function. They are
-
-            Where specified     Priority
-            unset everywhere    -1
-            blank               0
-            non-blank default   1
-            base conf file      2
-            inheriting conf     [3-n]
-            command line        n+1
-        """
-        opt_priority = dict((opt, -1) for opt in self)
-        for priority, opt_dict in enumerate(self.cascading_dicts):
-            if opt_dict:
-                for opt, value in opt_dict.items():
-                    if value is not None:
-                        opt_priority[opt] = priority
-        return opt_priority
 
 
 ### finding config files ###
@@ -421,7 +325,7 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
     from multiple paths due to symlinks.
     """
     if conf_paths is None:
-        return load_opts_from_mrjob_conf(runner_alias)
+        results = load_opts_from_mrjob_conf(runner_alias)
     else:
         # don't include conf files that were loaded earlier in conf_paths
         already_loaded = []
@@ -434,7 +338,10 @@ def load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
             results = load_opts_from_mrjob_conf(
                 runner_alias, path, already_loaded=already_loaded) + results
 
-        return results
+    if runner_alias and not any(conf for path, conf in results):
+        log.warning('No configs specified for %s runner' % runner_alias)
+
+    return results
 
 
 ### writing mrjob.conf ###

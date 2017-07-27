@@ -20,22 +20,12 @@ import logging
 import os
 
 from mrjob.job import MRJob
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
 #from mrjob.parse import parse_mr_job_stderr
-from mrjob.runner import RunnerOptionStore
 from mrjob.sim import SimMRJobRunner
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
 
 log = logging.getLogger(__name__)
-
-
-class InlineRunnerOptionStore(RunnerOptionStore):
-    ALLOWED_KEYS = _allowed_keys('inline')
-    COMBINERS = _combiners('inline')
-    DEPRECATED_ALIASES = _deprecated_aliases('inline')
 
 
 class InlineMRJobRunner(SimMRJobRunner):
@@ -53,8 +43,6 @@ class InlineMRJobRunner(SimMRJobRunner):
     Hadoop/EMR, use ``-r local`` (see
     :py:class:`~mrjob.local.LocalMRJobRunner`).
     """
-    OPTION_STORE_CLASS = InlineRunnerOptionStore
-
     alias = 'inline'
 
     def __init__(self, mrjob_cls=None, **kwargs):

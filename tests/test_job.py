@@ -622,7 +622,7 @@ class JobConfTestCase(TestCase):
     def test_empty(self):
         mr_job = MRJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'], {})
+        self.assertEqual(mr_job._runner_kwargs()['jobconf'], {})
 
     def test_cmd_line_options(self):
         mr_job = MRJob([
@@ -631,7 +631,7 @@ class JobConfTestCase(TestCase):
             '--jobconf', 'mapred.qux=quux',
         ])
 
-        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+        self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.foo': 'baz',  # second option takes priority
                           'mapred.qux': 'quux'})
 
@@ -658,7 +658,7 @@ class JobConfTestCase(TestCase):
     def test_jobconf_method(self):
         mr_job = self.MRJobConfJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+        self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.foo': 'garply',
                           'mapred.bar.bar.baz': 'foo'})
 
@@ -669,7 +669,7 @@ class JobConfTestCase(TestCase):
             '--jobconf', 'mapred.qux=quux',
         ])
 
-        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+        self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.bar.bar.baz': 'foo',
                           'mapred.foo': 'baz',  # command line takes priority
                           'mapred.qux': 'quux'})
@@ -677,7 +677,7 @@ class JobConfTestCase(TestCase):
     def test_redefined_jobconf_method(self):
         mr_job = self.MRJobConfMethodJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+        self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.baz': 'bar'})
 
     def test_redefined_jobconf_method_overrides_cmd_line(self):
@@ -687,7 +687,7 @@ class JobConfTestCase(TestCase):
         ])
 
         # --jobconf is ignored because that's the way we defined jobconf()
-        self.assertEqual(mr_job.job_runner_kwargs()['jobconf'],
+        self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.baz': 'bar'})
 
 
@@ -696,25 +696,25 @@ class LibjarsTestCase(TestCase):
     def test_default(self):
         job = MRJob()
 
-        self.assertEqual(job.job_runner_kwargs()['libjars'], [])
+        self.assertEqual(job._runner_kwargs()['libjars'], [])
 
     def test_libjar_option(self):
         job = MRJob(['--libjar', 'honey.jar'])
 
-        self.assertEqual(job.job_runner_kwargs()['libjars'], ['honey.jar'])
+        self.assertEqual(job._runner_kwargs()['libjars'], ['honey.jar'])
 
     def test_libjars_attr(self):
         with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
             job = MRJob()
 
-            self.assertEqual(job.job_runner_kwargs()['libjars'],
+            self.assertEqual(job._runner_kwargs()['libjars'],
                              ['/left/dora.jar'])
 
     def test_libjars_attr_plus_option(self):
         with patch.object(MRJob, 'LIBJARS', ['/left/dora.jar']):
             job = MRJob(['--libjar', 'honey.jar'])
 
-            self.assertEqual(job.job_runner_kwargs()['libjars'],
+            self.assertEqual(job._runner_kwargs()['libjars'],
                              ['/left/dora.jar', 'honey.jar'])
 
     def test_libjars_attr_relative_path(self):
@@ -724,7 +724,7 @@ class LibjarsTestCase(TestCase):
             job = MRJob()
 
             self.assertEqual(
-                job.job_runner_kwargs()['libjars'],
+                job._runner_kwargs()['libjars'],
                 [os.path.join(job_dir, 'cookie.jar'), '/left/dora.jar'])
 
     def test_libjars_environment_variables(self):
@@ -738,7 +738,7 @@ class LibjarsTestCase(TestCase):
                 # libjars() peeks into envvars to figure out if the path
                 # is relative or absolute
                 self.assertEqual(
-                    job.job_runner_kwargs()['libjars'],
+                    job._runner_kwargs()['libjars'],
                     ['$A/cookie.jar', os.path.join(job_dir, '$B/honey.jar')])
 
     def test_override_libjars(self):
@@ -746,7 +746,7 @@ class LibjarsTestCase(TestCase):
             job = MRJob(['--libjar', 'cookie.jar'])
 
             # ignore switch, don't resolve relative path
-            self.assertEqual(job.job_runner_kwargs()['libjars'], ['honey.jar'])
+            self.assertEqual(job._runner_kwargs()['libjars'], ['honey.jar'])
 
 
 class MRSortValuesAndMore(MRSortValues):
@@ -776,25 +776,25 @@ class HadoopFormatTestCase(TestCase):
     def test_empty(self):
         mr_job = MRJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
+        self.assertEqual(mr_job._runner_kwargs()['hadoop_input_format'],
                          None)
-        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
+        self.assertEqual(mr_job._runner_kwargs()['hadoop_output_format'],
                          None)
 
     def test_hadoop_format_attributes(self):
         mr_job = MRHadoopFormatJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
+        self.assertEqual(mr_job._runner_kwargs()['hadoop_input_format'],
                          'mapred.FooInputFormat')
-        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
+        self.assertEqual(mr_job._runner_kwargs()['hadoop_output_format'],
                          'mapred.BarOutputFormat')
 
     def test_hadoop_format_methods(self):
         mr_job = self.MRHadoopFormatMethodJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_input_format'],
+        self.assertEqual(mr_job._runner_kwargs()['hadoop_input_format'],
                          'mapred.ReasonableInputFormat')
-        self.assertEqual(mr_job.job_runner_kwargs()['hadoop_output_format'],
+        self.assertEqual(mr_job._runner_kwargs()['hadoop_output_format'],
                          'mapred.EbcdicDb2EnterpriseXmlOutputFormat')
 
 
@@ -806,13 +806,13 @@ class PartitionerTestCase(TestCase):
     def test_empty(self):
         mr_job = MRJob()
 
-        self.assertEqual(mr_job.job_runner_kwargs()['partitioner'], None)
+        self.assertEqual(mr_job._runner_kwargs()['partitioner'], None)
 
     def test_partitioner_attr(self):
         mr_job = self.MRPartitionerJob()
 
         self.assertEqual(
-            mr_job.job_runner_kwargs()['partitioner'],
+            mr_job._runner_kwargs()['partitioner'],
             'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
 
 
@@ -1091,9 +1091,9 @@ class StepsTestCase(TestCase):
         # regression test for #656
         j = self.SingleStepJobConfMethodJob(['--no-conf'])
 
-        # overriding jobconf() should affect job_runner_kwargs()
+        # overriding jobconf() should affect _runner_kwargs()
         # but not step definitions
-        self.assertEqual(j.job_runner_kwargs()['jobconf'],
+        self.assertEqual(j._runner_kwargs()['jobconf'],
                          {'mapred.baz': 'bar'})
 
         self.assertEqual(
@@ -1310,3 +1310,58 @@ class PrintHelpTestCase(SandboxedTestCase):
 
         output = self.stdout.getvalue()
         self.assertIn('--reducer-cmd-2', output)
+
+
+class RunnerKwargsTestCase(TestCase):
+    # ensure that switches exist for every option passed to runners
+
+    NON_OPTION_KWARGS = set([
+        'conf_paths',
+        'extra_args',
+        'file_upload_args',
+        'hadoop_input_format',
+        'hadoop_output_format',
+        'input_paths',
+        'mr_job_script',
+        'output_dir',
+        'partitioner',
+        'sort_values',
+        'stdin',
+        'step_output_dir',
+    ])
+
+    CONF_ONLY_OPTIONS = set([
+        'aws_access_key_id',
+        'aws_secret_access_key',
+        'aws_session_token',
+        'local_tmp_dir',
+    ])
+
+    def _test_runner_kwargs(self, runner_alias):
+        launcher = MRJob(args=['/path/to/script', '-r', runner_alias])
+
+        runner_class = launcher._runner_class()
+        kwargs = launcher._runner_kwargs()
+
+        option_names = set(kwargs) - self.NON_OPTION_KWARGS - {'mrjob_cls'}
+
+        self.assertEqual(
+            option_names,
+            (runner_class.OPT_NAMES -
+             self.CONF_ONLY_OPTIONS)
+        )
+
+    def test_dataproc(self):
+        self._test_runner_kwargs('dataproc')
+
+    def test_emr(self):
+        self._test_runner_kwargs('emr')
+
+    def test_hadoop(self):
+        self._test_runner_kwargs('hadoop')
+
+    def test_inline(self):
+        self._test_runner_kwargs('inline')
+
+    def test_local(self):
+        self._test_runner_kwargs('local')

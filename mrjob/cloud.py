@@ -17,11 +17,7 @@ import os
 import pipes
 from os.path import basename
 
-from mrjob.options import _allowed_keys
-from mrjob.options import _combiners
-from mrjob.options import _deprecated_aliases
 from mrjob.runner import MRJobRunner
-from mrjob.runner import RunnerOptionStore
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
@@ -39,23 +35,32 @@ _EXT_TO_UNARCHIVE_CMD = {
 }
 
 
-class HadoopInTheCloudOptionStore(RunnerOptionStore):
-
-    ALLOWED_KEYS = _allowed_keys('_cloud')
-    COMBINERS = _combiners('_cloud')
-    DEPRECATED_ALIASES = _deprecated_aliases('_cloud')
-
-
 class HadoopInTheCloudJobRunner(MRJobRunner):
     """Abstract base class for all Hadoop-in-the-cloud services."""
 
     alias = '_cloud'
 
-    OPTION_STORE_CLASS = HadoopInTheCloudOptionStore
+    OPT_NAMES = MRJobRunner.OPT_NAMES | {
+        'bootstrap',
+        'bootstrap_python',
+        'check_cluster_every',
+        'cloud_fs_sync_secs',
+        'cloud_tmp_dir',
+        'cluster_id',
+        'core_instance_type',
+        'image_version',
+        'instance_type',
+        'master_instance_type',
+        'max_hours_idle',
+        'num_core_instances',
+        'num_task_instances',
+        'region',
+        'task_instance_type',
+        'zone',
+    }
 
     # so far, every service provides the ability to run bootstrap scripts
-    BOOTSTRAP_MRJOB_IN_SETUP = False
-
+    _BOOTSTRAP_MRJOB_IN_SETUP = False
 
     def __init__(self, **kwargs):
         super(HadoopInTheCloudJobRunner, self).__init__(**kwargs)
@@ -82,6 +87,46 @@ class HadoopInTheCloudJobRunner(MRJobRunner):
 
         # we'll create this script later, as needed
         self._master_bootstrap_script_path = None
+
+
+    ### Options ###
+
+    def _combine_opts(self, opt_list):
+        """Propagate *instance_type* to other instance type opts, if not
+        already set.
+
+        Also propagate core instance type to task instance type, if it's
+        not already set.
+        """
+        opts = super(HadoopInTheCloudJobRunner, self)._combine_opts(opt_list)
+
+        if opts['instance_type']:
+            # figure out how late in the configs opt was set (setting
+            # --instance_type on the command line overrides core_instance_type
+            # set in configs)
+            opt_priority = {k: -1 for k in opts}
+
+            for i, sub_opts in enumerate(opt_list):
+                for k, v in sub_opts.items():
+                    if v == opts[k]:
+                        opt_priority[k] = i
+
+            # instance_type only affects master_instance_type if there are
+            # no other instances
+            if opts['num_core_instances'] or opts['num_task_instances']:
+                propagate_to = ['core_instance_type', 'task_instance_type']
+            else:
+                propagate_to = ['master_instance_type']
+
+            for k in propagate_to:
+                if opts[k] is None or (
+                        opt_priority[k] < opt_priority['instance_type']):
+                    opts[k] = opts['instance_type']
+
+        if not opts['task_instance_type']:
+            opts['task_instance_type'] = opts['core_instance_type']
+
+        return opts
 
     ### Bootstrapping ###
 

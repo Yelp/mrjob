@@ -634,9 +634,9 @@ class EMRAPIParamsTestCase(MockBoto3TestCase):
             '--no-emr-api-param', 'VisibleToAllUsers'])
 
         self.assertNotIn('no_emr_api_params',
-                         sorted(job.emr_job_runner_kwargs()))
+                         sorted(job._runner_kwargs()))
         self.assertNotIn('no_emr_api_param',
-                         sorted(job.emr_job_runner_kwargs()))
+                         sorted(job._runner_kwargs()))
 
         with job.make_runner() as runner:
             self.assertNotIn('no_emr_api_params', sorted(runner._opts))
@@ -6403,3 +6403,61 @@ class ProgressHtmlOverSshTestCase(MockBoto3TestCase):
         self.assertIsNone(self._launch_and_get_progress_html())
 
         self.assertTrue(self._ssh_run.called)
+
+
+class EMRCredentialsObfuscationTestCase(MockBoto3TestCase):
+
+    def get_debug_printout(self, **opts):
+        stderr = StringIO()
+
+        with no_handlers_for_logger():
+            log_to_stream('mrjob.runner', stderr, debug=True)
+
+            # debug printout happens in constructor
+            EMRJobRunner(**opts)
+
+        return stderr.getvalue()
+
+    def test_non_obfuscated_option_on_emr(self):
+        printout = self.get_debug_printout(owner='dave')
+
+        self.assertIn("'owner'", printout)
+        self.assertIn("'dave'", printout)
+
+    def test_aws_access_key_id(self):
+        printout = self.get_debug_printout(
+            aws_access_key_id='AKIATOPQUALITYSALESEVENT')
+
+        self.assertIn("'aws_access_key_id'", printout)
+        self.assertIn("'...VENT'", printout)
+
+    def test_aws_access_key_id_with_wrong_type(self):
+        printout = self.get_debug_printout(
+            aws_access_key_id=['AKIATOPQUALITYSALESEVENT'])
+
+        self.assertIn("'aws_access_key_id'", printout)
+        self.assertNotIn('VENT', printout)
+        self.assertIn("'...'", printout)
+
+    def test_aws_secret_access_key(self):
+        printout = self.get_debug_printout(
+            aws_secret_access_key='PASSWORD')
+
+        self.assertIn("'aws_secret_access_key'", printout)
+        self.assertNotIn('PASSWORD', printout)
+        self.assertIn("'...'", printout)
+
+    def test_aws_session_token(self):
+        printout = self.get_debug_printout(aws_session_token='TOKEN')
+
+        self.assertIn("'aws_session_token'", printout)
+        self.assertNotIn('TOKEN', printout)
+        self.assertIn("'...'", printout)
+
+    def test_dont_obfuscate_empty_opts(self):
+        printout = self.get_debug_printout()
+
+        self.assertNotIn("'...'", printout)
+        self.assertIn("'aws_access_key_id'", printout)
+        self.assertIn("'aws_secret_access_key'", printout)
+        self.assertIn("'aws_session_token'", printout)

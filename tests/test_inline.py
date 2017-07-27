@@ -227,7 +227,6 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
     # this class is also used to test local mode
     RUNNER = 'inline'
 
-
     def test_input_files(self):
         input_path = os.path.join(self.tmp_dir, 'input')
         with open(input_path, 'wb') as input_file:

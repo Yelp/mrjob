@@ -92,11 +92,6 @@ configuration options.
 
 Job runner configuration
 ------------------------
-.. automethod:: MRJob.job_runner_kwargs
-.. automethod:: MRJob.local_job_runner_kwargs
-.. automethod:: MRJob.dataproc_job_runner_kwargs
-.. automethod:: MRJob.emr_job_runner_kwargs
-.. automethod:: MRJob.hadoop_job_runner_kwargs
 .. automethod:: MRJob.generate_passthrough_arguments
 .. automethod:: MRJob.generate_file_upload_args
 .. automethod:: MRJob.mr_job_script

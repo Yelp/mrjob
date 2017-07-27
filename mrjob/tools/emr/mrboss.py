@@ -55,7 +55,7 @@ from mrjob.job import MRJob
 from mrjob.options import _add_basic_options
 from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
-from mrjob.options import _pick_runner_opts
+from mrjob.options import _filter_by_role
 from mrjob.py2 import to_unicode
 from mrjob.ssh import _ssh_copy_key
 from mrjob.ssh import _ssh_run_with_recursion
@@ -76,8 +76,8 @@ def main(cl_args=None):
     _add_basic_options(option_parser)
     _add_runner_options(
         option_parser,
-        _pick_runner_opts('emr', 'connect') | set(
-            ['ssh_bin', 'ec2_key_pair_file'])
+        {'ec2_key_pair_file', 'ssh_bin'} | _filter_by_role(
+            EMRJobRunner.OPT_NAMES, 'connect')
     )
 
     _alphabetize_options(option_parser)

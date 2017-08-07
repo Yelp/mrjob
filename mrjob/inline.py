@@ -106,11 +106,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         # inline mode doesn't need this (no subprocesses)
         pass
 
-    def _get_steps(self):
-        """Redefine this so that we can get step descriptions without
-        calling a subprocess."""
-        if self._steps is None:
-            job_args = ['--steps'] + self._mr_job_extra_args(local=True)
-            self._steps = self._mrjob_cls(args=job_args)._steps_desc()
-
-        return self._steps
+    def _load_steps(self):
+        """Get step descriptions without calling a subprocess."""
+        job_args = ['--steps'] + self._mr_job_extra_args(local=True)
+        return self._mrjob_cls(args=job_args)._steps_desc()

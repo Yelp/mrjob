@@ -16,7 +16,6 @@
 import copy
 import datetime
 import getpass
-import json
 import logging
 import os
 import os.path
@@ -28,15 +27,12 @@ import shutil
 import sys
 import tarfile
 import tempfile
-from subprocess import Popen
-from subprocess import PIPE
 
 import mrjob.step
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_dicts
-from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_opts
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.fs.composite import CompositeFilesystem
@@ -51,7 +47,6 @@ from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
-from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
@@ -778,43 +773,17 @@ class MRJobRunner(object):
         Results are cached, so call this as many times as you want.
         """
         if self._steps is None:
-            if not self._script_path:
-                self._steps = []
-            else:
-                args = (self._executable(True) + ['--steps'] +
-                        self._mr_job_extra_args(local=True))
-                log.debug('> %s' % cmd_line(args))
-                # add . to PYTHONPATH (in case mrjob isn't actually installed)
-                env = combine_local_envs(os.environ,
-                                         {'PYTHONPATH': os.path.abspath('.')})
-                steps_proc = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
-                stdout, stderr = steps_proc.communicate()
-
-                if steps_proc.returncode != 0:
-                    raise Exception(
-                        'error getting step information: \n%s' % stderr)
-
-                # on Python 3, convert stdout to str so we can json.loads() it
-                if not isinstance(stdout, str):
-                    stdout = stdout.decode('utf_8')
-
-                try:
-                    steps = json.loads(stdout)
-                except ValueError:
-                    raise ValueError("Bad --steps response: \n%s" % stdout)
-
-                # verify that this is a proper step description
-                if not steps or not stdout:
-                    raise ValueError('step description is empty!')
-                for step in steps:
-                    if step['type'] not in STEP_TYPES:
-                        raise ValueError(
-                            'unexpected step type %r in steps %r' % (
-                                step['type'], stdout))
-
-                self._steps = steps
+            self._steps = self._load_steps()
 
         return self._steps
+
+    def _load_steps(self):
+        """Ask job how many steps it has, and whether
+        there are mappers and reducers for each step.
+
+        Returns output as described in :ref:`steps-format`.
+        """
+        raise NotImplementedError
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""

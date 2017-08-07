@@ -75,6 +75,12 @@ _SORT_VALUES_PARTITIONER = \
 class MRJobRunner(object):
     """Abstract base class for all runners"""
 
+    # this class handles the basic runner framework, arguments to mrjobs,
+    # and setting up job working dirs and environments
+
+    # command lines to run substeps are handled by
+    # mrjob.bin.MRJobBinRunner
+
     #: alias for this runner; used for picking section of
     #: :py:mod:``mrjob.conf`` to load one of ``'local'``, ``'emr'``,
     #: or ``'hadoop'``

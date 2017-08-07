@@ -15,7 +15,6 @@
 import compileall
 import datetime
 import getpass
-import inspect
 import os
 import os.path
 import shutil
@@ -39,12 +38,9 @@ from mrjob.conf import ClearedValue
 from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from mrjob.inline import InlineMRJobRunner
-from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.runner import MRJobRunner
-from mrjob.step import INPUT
-from mrjob.step import OUTPUT
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 from mrjob.util import to_lines
@@ -52,12 +48,8 @@ from mrjob.util import to_lines
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_os_walk_job import MROSWalkJob
-from tests.mr_partitioner import MRPartitioner
-from tests.mr_sort_values import MRSortValues
-from tests.mr_sort_values_and_more import MRSortValuesAndMore
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
-from tests.py2 import Mock
 from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
@@ -455,242 +447,6 @@ sys.exit(13)
 
         runner._sort_is_windows_sort = True
         self.environment_variable_checks(runner, ['TMP'])
-
-
-class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
-
-    # hadoop_extra_args is tested in tests.test_hadoop.HadoopExtraArgsTestCase
-
-    def test_empty(self):
-        job = MRWordCount()
-        with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0), [])
-
-    def test_cmdenv(self):
-        job = MRWordCount(['--cmdenv', 'FOO=bar',
-                           '--cmdenv', 'BAZ=qux',
-                           '--cmdenv', 'BAX=Arnold'])
-        with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0),
-                             ['-cmdenv', 'BAX=Arnold',
-                              '-cmdenv', 'BAZ=qux',
-                              '-cmdenv', 'FOO=bar',
-                              ])
-
-    def test_hadoop_input_format(self):
-        input_format = 'org.apache.hadoop.mapred.SequenceFileInputFormat'
-
-        # one-step job
-        job1 = MRWordCount()
-        # no cmd-line argument for this because it's part of job semantics
-        job1.HADOOP_INPUT_FORMAT = input_format
-        with job1.make_runner() as runner1:
-            self.assertEqual(runner1._hadoop_args_for_step(0),
-                             ['-inputformat', input_format])
-
-        # multi-step job: only use -inputformat on the first step
-        job2 = MRTwoStepJob()
-        job2.HADOOP_INPUT_FORMAT = input_format
-        with job2.make_runner() as runner2:
-            self.assertEqual(runner2._hadoop_args_for_step(0),
-                             ['-inputformat', input_format])
-            self.assertEqual(runner2._hadoop_args_for_step(1), [])
-
-    def test_hadoop_output_format(self):
-        output_format = 'org.apache.hadoop.mapred.SequenceFileOutputFormat'
-
-        # one-step job
-        job1 = MRWordCount()
-        # no cmd-line argument for this because it's part of job semantics
-        job1.HADOOP_OUTPUT_FORMAT = output_format
-        with job1.make_runner() as runner1:
-            self.assertEqual(runner1._hadoop_args_for_step(0),
-                             ['-outputformat', output_format])
-
-        # multi-step job: only use -outputformat on the last step
-        job2 = MRTwoStepJob()
-        job2.HADOOP_OUTPUT_FORMAT = output_format
-        with job2.make_runner() as runner2:
-            self.assertEqual(runner2._hadoop_args_for_step(0), [])
-            self.assertEqual(runner2._hadoop_args_for_step(1),
-                             ['-outputformat', output_format])
-
-    def test_jobconf(self):
-        jobconf_args = ['--jobconf', 'FOO=bar',
-                        '--jobconf', 'BAZ=qux',
-                        '--jobconf', 'BAX=Arnold']
-
-        job = MRWordCount(jobconf_args)
-        with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0),
-                             ['-D', 'BAX=Arnold',
-                              '-D', 'BAZ=qux',
-                              '-D', 'FOO=bar',
-                              ])
-
-    def test_empty_jobconf_values(self):
-        # value of None means to omit that jobconf
-        job = MRWordCount()
-        # no way to pass in None from the command line
-        job.JOBCONF = {'foo': '', 'bar': None}
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner._hadoop_args_for_step(0),
-                             ['-D', 'foo='])
-
-    def test_configuration_translation(self):
-        job = MRWordCount(
-            ['--jobconf', 'mapred.jobtracker.maxtasks.per.job=1'])
-
-        with job.make_runner() as runner:
-            with no_handlers_for_logger('mrjob.runner'):
-                with patch.object(runner,
-                                  'get_hadoop_version', return_value='2.7.1'):
-                    self.assertEqual(
-                        runner._hadoop_args_for_step(0),
-                        ['-D', 'mapred.jobtracker.maxtasks.per.job=1',
-                         '-D', 'mapreduce.jobtracker.maxtasks.perjob=1'
-                         ])
-
-    def test_jobconf_from_step(self):
-        jobconf = {'FOO': 'bar', 'BAZ': 'qux'}
-        # Hack in steps rather than creating a new MRJob subclass
-        runner = LocalMRJobRunner(jobconf=jobconf)
-        runner._steps = [{'jobconf': {'BAZ': 'quux', 'BAX': 'Arnold'}}]
-
-        self.assertEqual(runner._hadoop_args_for_step(0),
-                         ['-D', 'BAX=Arnold',
-                          '-D', 'BAZ=quux',
-                          '-D', 'FOO=bar',
-                          ])
-
-    def test_partitioner(self):
-        job = MRPartitioner([])
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._hadoop_args_for_step(0),
-                ['-partitioner',
-                 'org.apache.hadoop.mapred.lib.HashPartitioner']
-            )
-
-
-class SparkScriptArgsTestCase(SandboxedTestCase):
-
-    def setUp(self):
-        super(SparkScriptArgsTestCase, self).setUp()
-
-        # don't bother with actual input/output URIs, which
-        # are tested elsewhere
-        def mock_interpolate_input_and_output(args, step_num):
-            def interpolate(arg):
-                if arg == INPUT:
-                    return '<step %d input>' % step_num
-                elif arg == OUTPUT:
-                    return '<step %d output>' % step_num
-                else:
-                    return arg
-
-            return [interpolate(arg) for arg in args]
-
-        self.start(patch(
-            'mrjob.runner.MRJobRunner._interpolate_input_and_output',
-            side_effect=mock_interpolate_input_and_output))
-
-    def test_spark_mr_job(self):
-        job = MRNullSpark(['-r', 'local'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['--step-num=0',
-                 '--spark',
-                 '<step 0 input>',
-                 '<step 0 output>'])
-
-    def test_spark_passthrough_arg(self):
-        job = MRNullSpark(['-r', 'local', '--extra-spark-arg', '--verbose'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['--step-num=0',
-                 '--spark',
-                 '--extra-spark-arg',
-                 '--verbose',
-                 '<step 0 input>',
-                 '<step 0 output>'])
-
-    def test_spark_file_arg(self):
-        foo_path = self.makefile('foo')
-
-        job = MRNullSpark(['-r', 'local', '--extra-file', foo_path])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['--step-num=0',
-                 '--spark',
-                 '--extra-file',
-                 'foo',
-                 '<step 0 input>',
-                 '<step 0 output>'])
-
-            name_to_path = runner._working_dir_mgr.name_to_path('file')
-            self.assertIn('foo', name_to_path)
-            self.assertEqual(name_to_path['foo'], foo_path)
-
-    def test_spark_jar(self):
-        job = MRSparkJar(['-r', 'local',
-                          '--jar-arg', 'foo', '--jar-arg', 'bar'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['foo', 'bar'])
-
-    def test_spark_jar_interpolation(self):
-        job = MRSparkJar(['-r', 'local',
-                          '--jar-arg', OUTPUT, '--jar-arg', INPUT])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['<step 0 output>', '<step 0 input>'])
-
-    def test_spark_script(self):
-        job = MRSparkScript(['-r', 'local',
-                             '--script-arg', 'foo', '--script-arg', 'bar'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['foo', 'bar'])
-
-    def test_spark_script_interpolation(self):
-        job = MRSparkScript(['-r', 'local',
-                             '--script-arg', OUTPUT, '--script-arg', INPUT])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_args(0),
-                ['<step 0 output>', '<step 0 input>'])
-
-    def test_streaming_step_not_okay(self):
-        job = MRTwoStepJob(['-r', 'local'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertRaises(
-                TypeError,
-                runner._spark_script_args, 0)
 
 
 class CheckInputPathsTestCase(TestCase):
@@ -1202,122 +958,6 @@ class RemoteCreateDirArchiveTestCase(MockBoto3TestCase):
                              [os.path.join('bar', 'baz'), 'foo'])
         finally:
             tar_gz.close()
-
-
-class SortValuesTestCase(SandboxedTestCase):
-
-    def test_no_sort_values(self):
-        mr_job = MRTwoStepJob()
-        mr_job.sandbox()
-
-        self.assertFalse(mr_job.sort_values())
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(runner._jobconf_for_step(0), {})
-            self.assertNotIn('-partitioner', runner._hadoop_args_for_step(0))
-
-    def test_sort_values_jobconf_version_agnostic(self):
-        # this only happens in local runners
-        mr_job = MRSortValues()
-        mr_job.sandbox()
-
-        self.assertTrue(mr_job.sort_values())
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(runner._jobconf_for_step(0), {
-                'mapred.text.key.partitioner.options': '-k1,1',
-                'mapreduce.partition.keypartitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
-            })
-
-    def test_sort_values_jobconf_hadoop_1(self):
-        mr_job = MRSortValues(['--hadoop-version', '1.0.0'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(runner._jobconf_for_step(0), {
-                'mapred.text.key.partitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
-            })
-
-    def test_sort_values_jobconf_hadoop_2(self):
-        mr_job = MRSortValues(['--hadoop-version', '2.0.0'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(runner._jobconf_for_step(0), {
-                'mapreduce.partition.keypartitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
-            })
-
-    def test_job_can_override_jobconf(self):
-        mr_job = MRSortValuesAndMore(['--hadoop-version', '2.0.0'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(
-                runner._jobconf_for_step(0), {
-                    'mapreduce.partition.keycomparator.options': '-k1 -k2nr',
-                    'mapreduce.partition.keypartitioner.options': '-k1,1',
-                    'stream.num.map.output.key.fields': 3,
-                }
-            )
-
-    def test_steps_can_override_jobconf(self):
-        mr_job = MRSortValuesAndMore(['--hadoop-version', '2.0.0'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(
-                runner._jobconf_for_step(1), {
-                    'mapreduce.job.output.key.comparator.class':
-                    'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
-                    'mapreduce.partition.keycomparator.options': '-k1 -k2nr',
-                    'mapreduce.partition.keypartitioner.options': '-k1,1',
-                    'stream.num.map.output.key.fields': 3,
-                }
-            )
-
-    def test_cmd_line_can_override_jobconf(self):
-        mr_job = MRSortValues([
-            '--hadoop-version', '2.0.0',
-            '--jobconf', 'stream.num.map.output.key.fields=3',
-        ])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            self.assertEqual(
-                runner._jobconf_for_step(0), {
-                    'mapreduce.partition.keypartitioner.options': '-k1,1',
-                    'stream.num.map.output.key.fields': '3',
-                }
-            )
-
-    def test_partitioner(self):
-        mr_job = MRSortValues()
-        mr_job.sandbox()
-
-        self.assertTrue(mr_job.sort_values())
-
-        with mr_job.make_runner() as runner:
-            hadoop_args = runner._hadoop_args_for_step(0)
-            self.assertIn('-partitioner', hadoop_args)
-            self.assertEqual(
-                hadoop_args[hadoop_args.index('-partitioner') + 1],
-                'org.apache.hadoop.mapred.lib.KeyFieldBasedPartitioner')
-
-    def test_job_can_override_partitioner(self):
-        mr_job = MRSortValuesAndMore()
-        mr_job.sandbox()
-
-        self.assertTrue(mr_job.sort_values())
-
-        with mr_job.make_runner() as runner:
-            hadoop_args = runner._hadoop_args_for_step(0)
-            self.assertIn('-partitioner', hadoop_args)
-            self.assertEqual(
-                hadoop_args[hadoop_args.index('-partitioner') + 1],
-                'org.apache.hadoop.mapred.lib.HashPartitioner')
 
 
 class ConfigFilesTestCase(SandboxedTestCase):

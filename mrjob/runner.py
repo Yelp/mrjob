@@ -73,12 +73,12 @@ _SORT_VALUES_PARTITIONER = \
 class MRJobRunner(object):
     """Abstract base class for all runners"""
 
-    # this class handles the basic runner framework, arguments to mrjobs,
-    # and setting up job working dirs and environments. this will put files
-    # from setup scripts and bootstrap_mrjob into the working dir, but
-    # won't actually run those scripts
+    # this class handles the basic runner framework, options and config files,
+    # arguments to mrjobs, and setting up job working dirs and environments.
+    # this will put files from setup scripts, py_files, and bootstrap_mrjob
+    # into the job's working dir, but won't actually run/import them
     #
-    # command lines to run substeps are handled by
+    # command lines to run substeps (including Spark) are handled by
     # mrjob.bin.MRJobBinRunner
 
     #: alias for this runner; used for picking section of
@@ -94,7 +94,6 @@ class MRJobRunner(object):
         'cmdenv',
         'jobconf',
         'label',
-        'libjars',
         'local_tmp_dir',
         'owner',
         'py_files',
@@ -1068,13 +1067,6 @@ class MRJobRunner(object):
             return _SORT_VALUES_PARTITIONER
         else:
             return None
-
-    def _libjar_paths(self):
-        """Paths or URIs of libjars, from Hadoop/Spark's point of view.
-
-        Override this for non-local libjars (e.g. on EMR).
-        """
-        return self._opts['libjars']
 
     def _parse_setup_and_py_files(self):
         """Parse the *setup* option with

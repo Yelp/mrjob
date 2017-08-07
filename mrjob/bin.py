@@ -46,6 +46,7 @@ class MRJobBinRunner(MRJobRunner):
 
     OPT_NAMES = MRJobRunner.OPT_NAMES | {
         'interpreter',
+        'libjars',
         'python_bin',
         'sh_bin',
         'spark_args',
@@ -333,6 +334,13 @@ class MRJobBinRunner(MRJobRunner):
                 args.extend(['-D', '%s=%s' % (key, value)])
 
         return args
+
+    def _libjar_paths(self):
+        """Paths or URIs of libjars, from Hadoop/Spark's point of view.
+
+        Override this for non-local libjars (e.g. on EMR).
+        """
+        return self._opts['libjars']
 
     ### setup scripts ###
 

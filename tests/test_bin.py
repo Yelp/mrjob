@@ -13,20 +13,30 @@
 # limitations under the License.
 """Test the runner base class MRJobBinRunner"""
 import inspect
+import os
+import signal
+import stat
 import sys
+from io import BytesIO
+from shutil import make_archive
 from unittest import TestCase
+from zipfile import ZipFile
+from zipfile import ZIP_DEFLATED
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
+from mrjob.py2 import StringIO
 from mrjob.step import INPUT
 from mrjob.step import OUTPUT
+from mrjob.util import log_to_stream
 
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_filter_job import MRFilterJob
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_no_runner import MRNoRunner
 from tests.mr_null_spark import MRNullSpark
+from tests.mr_os_walk_job import MROSWalkJob
 from tests.mr_partitioner import MRPartitioner
 from tests.mr_sort_values import MRSortValues
 from tests.mr_sort_values_and_more import MRSortValuesAndMore
@@ -511,6 +521,259 @@ class RenderSubstepTestCase(SandboxedTestCase):
                 "sh -ex -c 'set -v;"
                 " cat | %s mr_filter_job.py --step-num=0 --mapper"
                 " --mapper-filter cat'" % sys.executable)
+
+
+class SetupTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(SetupTestCase, self).setUp()
+
+        self.foo_dir = self.makedirs('foo')
+
+        self.foo_py = os.path.join(self.tmp_dir, 'foo', 'foo.py')
+
+        # if our job can import foo, getsize will return 2x as many bytes
+        with open(self.foo_py, 'w') as foo_py:
+            foo_py.write('import os.path\n'
+                         'from os.path import getsize as _real_getsize\n'
+                         'os.path.getsize = lambda p: _real_getsize(p) * 2')
+
+        self.foo_sh = os.path.join(self.tmp_dir, 'foo', 'foo.sh')
+
+        with open(self.foo_sh, 'w') as foo_sh:
+            foo_sh.write('#!/bin/sh\n'
+                         'touch foo.sh-made-this\n')
+        os.chmod(self.foo_sh, stat.S_IRWXU)
+
+        self.foo_tar_gz = make_archive(
+            os.path.join(self.tmp_dir, 'foo'), 'gztar', self.foo_dir)
+
+        self.foo_zip = os.path.join(self.tmp_dir, 'foo.zip')
+        zf = ZipFile(self.foo_zip, 'w', ZIP_DEFLATED)
+        zf.write(self.foo_py, 'foo.py')
+        zf.close()
+
+        self.foo_py_size = os.path.getsize(self.foo_py)
+        self.foo_sh_size = os.path.getsize(self.foo_sh)
+        self.foo_tar_gz_size = os.path.getsize(self.foo_tar_gz)
+        self.foo_zip_size = os.path.getsize(self.foo_zip)
+
+    def test_file_upload(self):
+        job = MROSWalkJob(['-r', 'local',
+                           '--file', self.foo_sh,
+                           '--file', self.foo_sh + '#bar.sh',
+                           ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
+        self.assertEqual(path_to_size.get('./bar.sh'), self.foo_sh_size)
+
+    def test_archive_upload(self):
+        job = MROSWalkJob(['-r', 'local',
+                           '--archive', self.foo_tar_gz,
+                           '--archive', self.foo_tar_gz + '#foo',
+                           ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            with no_handlers_for_logger('mrjob.local'):
+                r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+                         self.foo_py_size)
+        self.assertEqual(path_to_size.get('./foo/foo.py'),
+                         self.foo_py_size)
+
+    def test_dir_upload(self):
+        job = MROSWalkJob(['-r', 'local',
+                           '--dir', self.foo_dir,
+                           '--dir', self.foo_dir + '#bar'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            with no_handlers_for_logger('mrjob.local'):
+                r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        self.assertEqual(path_to_size.get('./foo/foo.py'),
+                         self.foo_py_size)
+        self.assertEqual(path_to_size.get('./bar/foo.py'),
+                         self.foo_py_size)
+
+    def test_python_archive(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'export PYTHONPATH=%s#/:$PYTHONPATH' % self.foo_tar_gz
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+                         self.foo_py_size * 2)
+
+    def test_python_dir_archive(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'export PYTHONPATH=%s/#:$PYTHONPATH' % self.foo_dir
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.tar.gz/foo.py'),
+                         self.foo_py_size * 2)
+
+    def test_python_zip_file(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'export PYTHONPATH=%s#:$PYTHONPATH' % self.foo_zip
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.zip'),
+                         self.foo_zip_size * 2)
+
+    def test_py_file(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--py-file', self.foo_zip,
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        # foo.py should be there, and getsize() should be patched to return
+        # double the number of bytes
+        self.assertEqual(path_to_size.get('./foo.zip'),
+                         self.foo_zip_size * 2)
+
+    def test_setup_command(self):
+        job = MROSWalkJob(
+            ['-r', 'local',
+             '--setup', 'touch bar'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+        self.assertIn('./bar', path_to_size)
+
+    def test_setup_script(self):
+        job = MROSWalkJob(
+            ['-r', 'local',
+             '--setup', self.foo_sh + '#'])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            r.run()
+
+            path_to_size = dict(job.parse_output(r.cat_output()))
+
+            self.assertEqual(path_to_size.get('./foo.sh'), self.foo_sh_size)
+            self.assertIn('./foo.sh-made-this', path_to_size)
+
+    def test_bad_setup_command(self):
+        bar_path = os.path.join(self.tmp_dir, 'bar')
+        baz_path = os.path.join(self.tmp_dir, 'baz')
+
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'touch %s' % bar_path,
+            '--setup', 'false',  # always "fails"
+            '--setup', 'touch %s' % baz_path,
+            '--cleanup-on-failure=ALL',
+        ])
+        job.sandbox()
+
+        with job.make_runner() as r:
+            self.assertRaises(Exception, r.run)
+
+            # first command got run but not third one
+            self.assertTrue(os.path.exists(bar_path))
+            self.assertFalse(os.path.exists(baz_path))
+
+    def test_stdin_bypasses_wrapper_script(self):
+        job = MROSWalkJob([
+            '-r', 'local',
+            '--setup', 'cat > stdin.txt',
+        ])
+        job.sandbox(stdin=BytesIO(b'some input\n'))
+
+        # local mode doesn't currently pipe input into stdin
+        # (see issue #567), so this test would hang if it failed
+        def alarm_handler(*args, **kwargs):
+            raise Exception('Setup script stalled on stdin')
+
+        try:
+            self._old_alarm_handler = signal.signal(
+                signal.SIGALRM, alarm_handler)
+            signal.alarm(10)
+
+            with job.make_runner() as r:
+                r.run()
+
+                path_to_size = dict(job.parse_output(r.cat_output()))
+
+                self.assertEqual(path_to_size.get('./stdin.txt'), 0)
+                # input gets passed through by identity mapper
+                self.assertEqual(path_to_size.get(None), 'some input')
+
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, self._old_alarm_handler)
+
+    def test_wrapper_script_only_writes_to_stderr(self):
+        job = MROSWalkJob([
+            '--setup', 'echo stray output',
+            '-r', 'local',
+        ])
+        job.sandbox()
+
+        with no_handlers_for_logger('mrjob.local'):
+            stderr = StringIO()
+            log_to_stream('mrjob.local', stderr, debug=True)
+
+            with job.make_runner() as r:
+                r.run()
+
+                output = b''.join(r.cat_output())
+
+                # stray ouput should be in stderr files, not the job's output
+                self.assertNotIn(b'stray output', output)
+
+                with open(r._task_stderr_path('mapper', 0, 0), 'rb') as stderr:
+                    self.assertIn(b'stray output', stderr.read())
 
 
 class SetupWrapperScriptContentTestCase(SandboxedTestCase):

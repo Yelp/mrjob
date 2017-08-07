@@ -19,7 +19,6 @@ import getpass
 import logging
 import os
 import os.path
-import pipes
 import posixpath
 import pprint
 import re
@@ -48,7 +47,6 @@ from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.step import _is_spark_step_type
-from mrjob.util import cmd_line
 from mrjob.util import to_lines
 from mrjob.util import zip_dir
 
@@ -76,8 +74,10 @@ class MRJobRunner(object):
     """Abstract base class for all runners"""
 
     # this class handles the basic runner framework, arguments to mrjobs,
-    # and setting up job working dirs and environments
-
+    # and setting up job working dirs and environments. this will put files
+    # from setup scripts and bootstrap_mrjob into the working dir, but
+    # won't actually run those scripts
+    #
     # command lines to run substeps are handled by
     # mrjob.bin.MRJobBinRunner
 
@@ -99,7 +99,6 @@ class MRJobRunner(object):
         'owner',
         'py_files',
         'setup',
-        'sh_bin',
         'upload_archives',
         'upload_dirs',
         'upload_files'
@@ -249,9 +248,6 @@ class MRJobRunner(object):
         self._job_key = self._make_unique_job_key(
             label=self._opts['label'], owner=self._opts['owner'])
 
-        # we'll create the wrapper script later
-        self._setup_wrapper_script_path = None
-
         # extra args to our job
         self._extra_args = list(extra_args) if extra_args else []
 
@@ -287,10 +283,11 @@ class MRJobRunner(object):
                 'archive', archive_path, name=ud['name'])
             self._spark_archives.append((ud['name'], archive_path))
 
-        # py_files and setup
+        # py_files
+
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
-        self._setup = self._parse_setup()
+        self._setup = self._parse_setup_and_py_files()
         for cmd in self._setup:
             for token in cmd:
                 if isinstance(token, dict):
@@ -332,10 +329,6 @@ class MRJobRunner(object):
         # A cache for self._get_steps(); also useful as a test hook
         self._steps = None
 
-        # if this is True, we have to pipe input into the sort command
-        # rather than feed it multiple files
-        self._sort_is_windows_sort = None
-
         # this variable marks whether a cleanup has happened and this runner's
         # output stream is no longer available.
         self._closed = False
@@ -354,7 +347,6 @@ class MRJobRunner(object):
             cleanup_on_failure=['NONE'],
             local_tmp_dir=tempfile.gettempdir(),
             owner=owner,
-            sh_bin=['sh', '-ex'],
         )
 
     def _combine_confs(self, source_and_opt_list):
@@ -804,15 +796,6 @@ class MRJobRunner(object):
             '--%s' % mrc,
         ] + self._mr_job_extra_args()
 
-    def _sh_wrap(self, cmd_str):
-        """Helper for _substep_args()
-
-        Wrap command in sh -c '...' to allow for pipes, etc.
-        Use *sh_bin* option."""
-        # prepend set -e etc.
-        cmd_str = '; '.join(self._sh_pre_commands() + [cmd_str])
-
-        return self._sh_bin() + ['-c', cmd_str]
     def _mr_job_extra_args(self, local=False):
         """Return arguments to add to every invocation of MRJob.
 
@@ -839,163 +822,6 @@ class MRJobRunner(object):
             else:
                 args.append(self._working_dir_mgr.name(**path_dict))
         return args
-
-    def _sh_bin(self):
-        """The sh binary and any arguments, as a list. Override this
-        if, for example, a runner needs different default values
-        depending on circumstances (see :py:class:`~mrjob.emr.EMRJobRunner`).
-        """
-        return self._opts['sh_bin']
-
-    def _sh_pre_commands(self):
-        """A list of lines to put at the very start of any sh script
-        (e.g. ``set -e`` when ``sh -e`` wont work, see #1549)
-        """
-        return []
-
-    def _create_setup_wrapper_script(
-            self, dest='setup-wrapper.sh', local=False):
-        """Create the wrapper script, and write it into our local temp
-        directory (by default, to a file named wrapper.sh).
-
-        This will set ``self._setup_wrapper_script_path``, and add it to
-        ``self._working_dir_mgr``
-
-        This will do nothing if ``self._setup`` is empty or
-        this method has already been called.
-
-        If *local* is true, use local line endings (e.g. Windows). Otherwise,
-        use UNIX line endings (see #1071).
-        """
-        if self._setup_wrapper_script_path:
-            return
-
-        setup = self._setup
-
-        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_SETUP:
-            # patch setup to add mrjob.zip to PYTHONPATH
-            mrjob_zip = self._create_mrjob_zip()
-            # this is a file, not an archive, since Python can import directly
-            # from .zip files
-            path_dict = {'type': 'file', 'name': None, 'path': mrjob_zip}
-            self._working_dir_mgr.add(**path_dict)
-            setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
-
-        if not setup:
-            return
-
-        path = os.path.join(self._get_local_tmp_dir(), dest)
-        log.debug('Writing wrapper script to %s' % path)
-
-        contents = self._setup_wrapper_script_content(setup)
-        for line in contents:
-            log.debug('WRAPPER: ' + line.rstrip('\n'))
-
-        if local:
-            with open(path, 'w') as f:
-                for line in contents:
-                    f.write(line)
-        else:
-            with open(path, 'wb') as f:
-                for line in contents:
-                    f.write(line.encode('utf-8'))
-
-        self._setup_wrapper_script_path = path
-        self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
-
-    def _parse_setup(self):
-        """Parse the *setup* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`, and patch in *py_files*.
-        """
-        setup = []
-
-        # py_files
-        for path in self._opts['py_files']:
-            # Spark (at least v1.3.1) doesn't work with # and --py-files,
-            # see #1375
-            if '#' in path:
-                raise ValueError("py_files cannot contain '#'")
-            path_dict = parse_legacy_hash_path('file', path)
-            setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
-
-        # setup
-        for cmd in self._opts['setup']:
-            setup.append(parse_setup_cmd(cmd))
-
-        return setup
-
-    def _setup_wrapper_script_content(self, setup, mrjob_zip_name=None):
-        """Return a (Bourne) shell script that runs the setup commands and then
-        executes whatever is passed to it (this will be our mapper/reducer),
-        as a list of strings (one for each line, including newlines).
-
-        We obtain a file lock so that two copies of the setup commands
-        cannot run simultaneously on the same machine (this helps for running
-        :command:`make` on a shared source code archive, for example).
-        """
-        out = []
-
-        def writeln(line=''):
-            out.append(line + '\n')
-
-        # hook for 'set -e', etc.
-        pre_commands = self._sh_pre_commands()
-        if pre_commands:
-            for cmd in pre_commands:
-                writeln(cmd)
-            writeln()
-
-        # we're always going to execute this script as an argument to
-        # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
-
-        writeln('# store $PWD')
-        writeln('__mrjob_PWD=$PWD')
-        writeln()
-
-        writeln('# obtain exclusive file lock')
-        # Basically, we're going to tie file descriptor 9 to our lockfile,
-        # use a subprocess to obtain a lock (which we somehow inherit too),
-        # and then release the lock by closing the file descriptor.
-        # File descriptors 10 and higher are used internally by the shell,
-        # so 9 is as out-of-the-way as we can get.
-        writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_key)
-        # would use flock(1), but it's not always available
-        writeln("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
-                cmd_line(self._python_bin()))
-        writeln()
-
-        writeln('# setup commands')
-        # group setup commands so we can redirect their input/output (see
-        # below). Don't use parens; this would invoke a subshell, which would
-        # keep us from exporting environment variables to the task.
-        writeln('{')
-        for cmd in setup:
-            # reconstruct the command line, substituting $__mrjob_PWD/<name>
-            # for path dicts
-            line = '  '  # indent, since these commands are in a group
-            for token in cmd:
-                if isinstance(token, dict):
-                    # it's a path dictionary
-                    line += '$__mrjob_PWD/'
-                    line += pipes.quote(self._working_dir_mgr.name(**token))
-                else:
-                    # it's raw script
-                    line += token
-            writeln(line)
-        # redirect setup commands' input/output so they don't interfere
-        # with the task (see Issue #803).
-        writeln('} 0</dev/null 1>&2')
-        writeln()
-
-        writeln('# release exclusive file lock')
-        writeln('exec 9>&-')
-        writeln()
-
-        writeln('# run task from the original working directory')
-        writeln('cd $__mrjob_PWD')
-        writeln('"$@"')
-
-        return out
 
     def _dir_archive_path(self, dir_path):
         """Assign a path for the archive of *dir_path* but don't
@@ -1249,6 +1075,27 @@ class MRJobRunner(object):
         Override this for non-local libjars (e.g. on EMR).
         """
         return self._opts['libjars']
+
+    def _parse_setup_and_py_files(self):
+        """Parse the *setup* option with
+        :py:func:`mrjob.setup.parse_setup_cmd()`, and patch in *py_files*.
+        """
+        setup = []
+
+        # py_files
+        for path in self._opts['py_files']:
+            # Spark (at least v1.3.1) doesn't work with # and --py-files,
+            # see #1375
+            if '#' in path:
+                raise ValueError("py_files cannot contain '#'")
+            path_dict = parse_legacy_hash_path('file', path)
+            setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
+
+        # setup
+        for cmd in self._opts['setup']:
+            setup.append(parse_setup_cmd(cmd))
+
+        return setup
 
     def _upload_args(self):
         # just upload every file and archive in the working dir manager

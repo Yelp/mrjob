@@ -57,12 +57,6 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 
-# used to match command lines
-if PY2:
-    PYTHON_BIN = 'python'
-else:
-    PYTHON_BIN = 'python3'
-
 
 class WithStatementTestCase(TestCase):
 
@@ -1012,7 +1006,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                         'SOMETHING': 'Y',
                         'SOMETHING_ELSE': 'Z',
                     },
-
                     'hadoop_streaming_jar': 'banana.jar',
                     'jobconf': {
                         'lorax_speaks_for': 'mazda',

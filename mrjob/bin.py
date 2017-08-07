@@ -18,6 +18,7 @@
 import json
 import logging
 import os
+import pipes
 import re
 import sys
 from subprocess import Popen
@@ -25,6 +26,7 @@ from subprocess import PIPE
 
 import mrjob.step
 from mrjob.compat import translate_jobconf
+from mrjob.conf import combine_dicts
 from mrjob.conf import combine_local_envs
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
@@ -45,12 +47,28 @@ class MRJobBinRunner(MRJobRunner):
     OPT_NAMES = MRJobRunner.OPT_NAMES | {
         'interpreter',
         'python_bin',
+        'sh_bin',
         'spark_args',
         'spark_submit_bin',
         'steps_interpreter',
         'steps_python_bin',
         'task_python_bin',
     }
+
+    def __init__(self, **kwargs):
+        super(MRJobBinRunner, self).__init__(**kwargs)
+
+        # we'll create the wrapper script later
+        self._setup_wrapper_script_path = None
+
+
+    def _default_opts(self):
+        return combine_dicts(
+            super(MRJobBinRunner, self)._default_opts(),
+            dict(
+                sh_bin=['sh', '-ex'],
+            )
+        )
 
     def _load_steps(self):
         if not self._script_path:
@@ -315,6 +333,154 @@ class MRJobBinRunner(MRJobRunner):
                 args.extend(['-D', '%s=%s' % (key, value)])
 
         return args
+
+    ### setup scripts ###
+
+    def _create_setup_wrapper_script(
+            self, dest='setup-wrapper.sh', local=False):
+        """Create the wrapper script, and write it into our local temp
+        directory (by default, to a file named wrapper.sh).
+
+        This will set ``self._setup_wrapper_script_path``, and add it to
+        ``self._working_dir_mgr``
+
+        This will do nothing if ``self._setup`` is empty or
+        this method has already been called.
+
+        If *local* is true, use local line endings (e.g. Windows). Otherwise,
+        use UNIX line endings (see #1071).
+        """
+        if self._setup_wrapper_script_path:
+            return
+
+        setup = self._setup
+
+        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_SETUP:
+            # patch setup to add mrjob.zip to PYTHONPATH
+            mrjob_zip = self._create_mrjob_zip()
+            # this is a file, not an archive, since Python can import directly
+            # from .zip files
+            path_dict = {'type': 'file', 'name': None, 'path': mrjob_zip}
+            self._working_dir_mgr.add(**path_dict)
+            setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
+
+        if not setup:
+            return
+
+        path = os.path.join(self._get_local_tmp_dir(), dest)
+        log.debug('Writing wrapper script to %s' % path)
+
+        contents = self._setup_wrapper_script_content(setup)
+        for line in contents:
+            log.debug('WRAPPER: ' + line.rstrip('\n'))
+
+        if local:
+            with open(path, 'w') as f:
+                for line in contents:
+                    f.write(line)
+        else:
+            with open(path, 'wb') as f:
+                for line in contents:
+                    f.write(line.encode('utf-8'))
+
+        self._setup_wrapper_script_path = path
+        self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
+
+    def _setup_wrapper_script_content(self, setup, mrjob_zip_name=None):
+        """Return a (Bourne) shell script that runs the setup commands and then
+        executes whatever is passed to it (this will be our mapper/reducer),
+        as a list of strings (one for each line, including newlines).
+
+        We obtain a file lock so that two copies of the setup commands
+        cannot run simultaneously on the same machine (this helps for running
+        :command:`make` on a shared source code archive, for example).
+        """
+        out = []
+
+        def writeln(line=''):
+            out.append(line + '\n')
+
+        # hook for 'set -e', etc.
+        pre_commands = self._sh_pre_commands()
+        if pre_commands:
+            for cmd in pre_commands:
+                writeln(cmd)
+            writeln()
+
+        # we're always going to execute this script as an argument to
+        # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
+
+        writeln('# store $PWD')
+        writeln('__mrjob_PWD=$PWD')
+        writeln()
+
+        writeln('# obtain exclusive file lock')
+        # Basically, we're going to tie file descriptor 9 to our lockfile,
+        # use a subprocess to obtain a lock (which we somehow inherit too),
+        # and then release the lock by closing the file descriptor.
+        # File descriptors 10 and higher are used internally by the shell,
+        # so 9 is as out-of-the-way as we can get.
+        writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_key)
+        # would use flock(1), but it's not always available
+        writeln("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
+                cmd_line(self._python_bin()))
+        writeln()
+
+        writeln('# setup commands')
+        # group setup commands so we can redirect their input/output (see
+        # below). Don't use parens; this would invoke a subshell, which would
+        # keep us from exporting environment variables to the task.
+        writeln('{')
+        for cmd in setup:
+            # reconstruct the command line, substituting $__mrjob_PWD/<name>
+            # for path dicts
+            line = '  '  # indent, since these commands are in a group
+            for token in cmd:
+                if isinstance(token, dict):
+                    # it's a path dictionary
+                    line += '$__mrjob_PWD/'
+                    line += pipes.quote(self._working_dir_mgr.name(**token))
+                else:
+                    # it's raw script
+                    line += token
+            writeln(line)
+        # redirect setup commands' input/output so they don't interfere
+        # with the task (see Issue #803).
+        writeln('} 0</dev/null 1>&2')
+        writeln()
+
+        writeln('# release exclusive file lock')
+        writeln('exec 9>&-')
+        writeln()
+
+        writeln('# run task from the original working directory')
+        writeln('cd $__mrjob_PWD')
+        writeln('"$@"')
+
+        return out
+
+    def _sh_bin(self):
+        """The sh binary and any arguments, as a list. Override this
+        if, for example, a runner needs different default values
+        depending on circumstances (see :py:class:`~mrjob.emr.EMRJobRunner`).
+        """
+        return self._opts['sh_bin']
+
+    def _sh_pre_commands(self):
+        """A list of lines to put at the very start of any sh script
+        (e.g. ``set -e`` when ``sh -e`` wont work, see #1549)
+        """
+        return []
+
+    def _sh_wrap(self, cmd_str):
+        """Helper for _substep_args()
+
+        Wrap command in sh -c '...' to allow for pipes, etc.
+        Use *sh_bin* option."""
+        # prepend set -e etc.
+        cmd_str = '; '.join(self._sh_pre_commands() + [cmd_str])
+
+        return self._sh_bin() + ['-c', cmd_str]
 
     ### spark ###
 

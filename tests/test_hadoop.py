@@ -51,8 +51,8 @@ from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.test_bin import PYTHON_BIN
 from tests.test_local import _bash_wrap
-from tests.test_runner import PYTHON_BIN
 
 
 class MockHadoopTestCase(SandboxedTestCase):

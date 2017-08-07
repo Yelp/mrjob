@@ -33,6 +33,15 @@ log = logging.getLogger(__name__)
 
 class MRJobBinRunner(MRJobRunner):
 
+    OPT_NAMES = MRJobRunner.OPT_NAMES | {
+        'interpreter',
+        'python_bin',
+        'steps',
+        'steps_interpreter',
+        'steps_python_bin',
+        'task_python_bin',
+    }
+
     def _load_steps(self):
         if not self._script_path:
             return []

@@ -77,7 +77,9 @@ class SimMRJobRunner(MRJobRunner):
                     (key, value))
 
         # TODO: libjars should just not be an option for local runners
-
+        #
+        # however, the job class can still set it; might want to handle
+        # this in the job itself
         for ignored_opt in self._IGNORED_HADOOP_OPTS:
             value = self._opts.get(ignored_opt)
             if value:  # ignore [], the default value of libjars

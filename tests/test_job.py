@@ -1347,8 +1347,9 @@ class RunnerKwargsTestCase(TestCase):
 
         self.assertEqual(
             option_names,
+            # libjars can be set by the job
             (runner_class.OPT_NAMES -
-             self.CONF_ONLY_OPTIONS)
+             self.CONF_ONLY_OPTIONS | {'libjars'})
         )
 
     def test_dataproc(self):

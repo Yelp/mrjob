@@ -51,8 +51,8 @@ from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.test_bin import PYTHON_BIN
 from tests.test_local import _bash_wrap
-from tests.test_runner import PYTHON_BIN
 
 
 class MockHadoopTestCase(SandboxedTestCase):
@@ -1013,7 +1013,7 @@ class SparkStepArgsTestCase(SandboxedTestCase):
 
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_submit_args',
+            'mrjob.bin.MRJobBinRunner._spark_submit_args',
             return_value=['<spark submit args>']))
 
     def test_spark_step(self):
@@ -1209,7 +1209,7 @@ class SetupLineEncodingTestCase(MockHadoopTestCase):
         # tests #1071. Unfortunately, we mostly run these tests on machines
         # that use unix line endings anyway. So monitor open() instead
         with patch(
-                'mrjob.runner.open', create=True, side_effect=open) as m_open:
+                'mrjob.bin.open', create=True, side_effect=open) as m_open:
             with logger_disabled('mrjob.hadoop'):
                 with job.make_runner() as runner:
                     runner.run()

@@ -24,6 +24,7 @@ from multiprocessing import Pool
 from subprocess import CalledProcessError
 from subprocess import check_call
 
+from mrjob.bin import MRJobBinRunner
 from mrjob.logs.errors import _format_error
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.sim import SimMRJobRunner
@@ -50,7 +51,7 @@ class _TaskFailedException(StepFailedException):
         self.task_num = task_num
 
 
-class LocalMRJobRunner(SimMRJobRunner):
+class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
     """Runs an :py:class:`~mrjob.job.MRJob` locally, for testing purposes.
     Invoked when you run your job with ``-r local``.
 
@@ -63,7 +64,7 @@ class LocalMRJobRunner(SimMRJobRunner):
     """
     alias = 'local'
 
-    OPT_NAMES = SimMRJobRunner.OPT_NAMES | {
+    OPT_NAMES = SimMRJobRunner.OPT_NAMES | MRJobBinRunner.OPT_NAMES | {
         'sort_bin',
     }
 

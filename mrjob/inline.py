@@ -63,6 +63,12 @@ class InlineMRJobRunner(SimMRJobRunner):
         # used to explain exceptions
         self._error_while_reading_from = None
 
+        if self._opts['py_files']:
+            log.warning("inline runner doesn't import py_files")
+
+        if self._opts['setup']:
+            log.warning("inline runner can't run setup commands")
+
     def _invoke_task_func(self, task_type, step_num, task_num):
         """Just run tasks in the same process."""
 
@@ -98,19 +104,7 @@ class InlineMRJobRunner(SimMRJobRunner):
             log.error('Error while reading from %s:\n' %
                       self._error_while_reading_from)
 
-    # avoid subprocesses
-
-    # TODO: won't need this once we break this out into MRJobBinRunner
-    # (see #1617)
-    def _create_setup_wrapper_script(self, local=False):
-        # inline mode doesn't need this (no subprocesses)
-        pass
-
-    def _get_steps(self):
-        """Redefine this so that we can get step descriptions without
-        calling a subprocess."""
-        if self._steps is None:
-            job_args = ['--steps'] + self._mr_job_extra_args(local=True)
-            self._steps = self._mrjob_cls(args=job_args)._steps_desc()
-
-        return self._steps
+    def _load_steps(self):
+        """Get step descriptions without calling a subprocess."""
+        job_args = ['--steps'] + self._mr_job_extra_args(local=True)
+        return self._mrjob_cls(args=job_args)._steps_desc()

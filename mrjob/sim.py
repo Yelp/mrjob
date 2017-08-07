@@ -48,10 +48,10 @@ class SimMRJobRunner(MRJobRunner):
     # keyword arguments that we ignore because they require real Hadoop.
     # We look directly at self._<kwarg_name> because they aren't in
     # self._opts
-    _IGNORED_HADOOP_ATTRS = [
-        '_hadoop_input_format',
-        '_hadoop_output_format',
-        '_partitioner',
+    _IGNORED_HADOOP_KWARGS = [
+        'hadoop_input_format',
+        'hadoop_output_format',
+        'partitioner',
     ]
 
     # options that we ignore becaue they require real Hadoop.
@@ -69,14 +69,12 @@ class SimMRJobRunner(MRJobRunner):
         self._counters = []
 
         # warn about ignored keyword arguments
-        # TODO: no need to look at attrs, just look at kwargs
-
-        for ignored_attr in self._IGNORED_HADOOP_ATTRS:
-            value = getattr(self, ignored_attr)
+        for key in self._IGNORED_HADOOP_KWARGS:
+            value = kwargs.get(key)
             if value is not None:
                 log.warning(
                     'ignoring %s keyword arg (requires real Hadoop): %r' %
-                    (ignored_attr[1:], value))
+                    (key, value))
 
         # TODO: libjars should just not be an option for local runners
 
@@ -124,7 +122,8 @@ class SimMRJobRunner(MRJobRunner):
 
     def _run(self):
         self._check_input_exists()
-        self._create_setup_wrapper_script(local=True)
+        if hasattr(self, '_create_setup_wrapper_script'):  # inline doesn't
+            self._create_setup_wrapper_script(local=True)
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):

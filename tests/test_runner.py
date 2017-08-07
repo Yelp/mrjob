@@ -1471,64 +1471,6 @@ class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
         self.assertTrue(runner._closed)
 
 
-class InterpreterTestCase(TestCase):
-
-    def default_python_bin(self):
-        return ['python'] if PY2 else ['python3']
-
-    def test_default(self):
-        runner = MRJobRunner()
-        self.assertEqual(runner._python_bin(),
-                         self.default_python_bin())
-        self.assertEqual(runner._interpreter(),
-                         self.default_python_bin())
-        self.assertEqual(runner._interpreter(steps=True),
-                         [sys.executable])
-
-    def test_python_bin(self):
-        runner = LocalMRJobRunner(python_bin=['python', '-v'])
-        self.assertEqual(runner._python_bin(), ['python', '-v'])
-        self.assertEqual(runner._interpreter(), ['python', '-v'])
-        self.assertEqual(runner._interpreter(steps=True), [sys.executable])
-
-    def test_steps_python_bin(self):
-        runner = MRJobRunner(steps_python_bin=['python', '-v'])
-        self.assertEqual(runner._python_bin(), self.default_python_bin())
-        self.assertEqual(runner._interpreter(), self.default_python_bin())
-        self.assertEqual(runner._interpreter(steps=True), ['python', '-v'])
-
-    def test_task_python_bin(self):
-        runner = MRJobRunner(task_python_bin=['python', '-v'])
-        self.assertEqual(runner._python_bin(), self.default_python_bin())
-        self.assertEqual(runner._interpreter(), ['python', '-v'])
-        self.assertEqual(runner._interpreter(steps=True),
-                         [sys.executable])
-
-    def test_interpreter(self):
-        runner = MRJobRunner(interpreter=['ruby'])
-        self.assertEqual(runner._interpreter(), ['ruby'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
-
-    def test_steps_interpreter(self):
-        # including whether steps_interpreter overrides interpreter
-        runner = MRJobRunner(interpreter=['ruby', '-v'],
-                             steps_interpreter=['ruby'])
-        self.assertEqual(runner._interpreter(), ['ruby', '-v'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
-
-    def test_interpreter_overrides_python_bin(self):
-        runner = MRJobRunner(interpreter=['ruby'],
-                             python_bin=['python', '-v'])
-        self.assertEqual(runner._interpreter(), ['ruby'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
-
-    def test_interpreter_overrides_steps_python_bin(self):
-        runner = MRJobRunner(interpreter=['ruby'],
-                             steps_python_bin=['python', '-v'])
-        self.assertEqual(runner._interpreter(), ['ruby'])
-        self.assertEqual(runner._interpreter(steps=True), ['ruby'])
-
-
 class BootstrapMRJobTestCase(TestCase):
     # this just tests _bootstrap_mrjob() (i.e. whether to bootstrap mrjob);
     # actual testing of bootstrapping is in test_local

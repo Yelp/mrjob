@@ -575,113 +575,6 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
             )
 
 
-class SparkPyFilesTestCase(SandboxedTestCase):
-
-    def test_default(self):
-        job = MRNullSpark()
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner._spark_py_files(),
-                             [runner._create_mrjob_zip()])
-
-    def test_eggs(self):
-        # by default, we pass py_files directly to Spark
-        egg1_path = self.makefile('dragon.egg')
-        egg2_path = self.makefile('horton.egg')
-
-        job = MRNullSpark(['--py-file', egg1_path, '--py-file', egg2_path])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_py_files(),
-                [egg1_path, egg2_path, runner._create_mrjob_zip()]
-            )
-
-    def test_no_bootstrap_mrjob(self):
-        job = MRNullSpark(['--no-bootstrap-mrjob'])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner._spark_py_files(),
-                             [])
-
-    def test_no_bootstrap_mrjob_in_setup(self):
-        job = MRNullSpark([])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            # this happens in runners that run on a cluster
-            runner._BOOTSTRAP_MRJOB_IN_SETUP = False
-            self.assertEqual(runner._spark_py_files(),
-                             [])
-
-    def test_no_hash_paths(self):
-        egg_path = self.makefile('horton.egg')
-
-        job = MRNullSpark(['--py-file', egg_path + '#mayzie.egg'])
-        job.sandbox()
-
-        self.assertRaises(ValueError, job.make_runner)
-
-
-class SparkScriptPathTestCase(SandboxedTestCase):
-
-    def setUp(self):
-        super(SparkScriptPathTestCase, self).setUp()
-
-        self.mock_interpolate_spark_script_path = self.start(patch(
-            'mrjob.runner.MRJobRunner._interpolate_spark_script_path'))
-
-    def test_spark_mr_job(self):
-        job = MRNullSpark()
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_path(0),
-                self.mock_interpolate_spark_script_path(
-                    inspect.getfile(MRNullSpark))
-            )
-
-    def test_spark_jar(self):
-        # _spark_script_path() also works with jars
-        self.fake_jar = self.makefile('fake.jar')
-
-        job = MRSparkJar(['--jar', self.fake_jar])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_path(0),
-                self.mock_interpolate_spark_script_path(
-                    self.fake_jar)
-            )
-
-    def test_spark_script(self):
-        self.fake_script = self.makefile('fake_script.py')
-
-        job = MRSparkScript(['--script', self.fake_script])
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertEqual(
-                runner._spark_script_path(0),
-                self.mock_interpolate_spark_script_path(
-                    self.fake_script)
-            )
-
-    def test_streaming_step_not_okay(self):
-        job = MRTwoStepJob()
-        job.sandbox()
-
-        with job.make_runner() as runner:
-            self.assertRaises(
-                TypeError,
-                runner._spark_script_path, 0)
-
-
 class SparkScriptArgsTestCase(SandboxedTestCase):
 
     def setUp(self):
@@ -705,7 +598,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
             side_effect=mock_interpolate_input_and_output))
 
     def test_spark_mr_job(self):
-        job = MRNullSpark()
+        job = MRNullSpark(['-r', 'local'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -717,7 +610,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                  '<step 0 output>'])
 
     def test_spark_passthrough_arg(self):
-        job = MRNullSpark(['--extra-spark-arg', '--verbose'])
+        job = MRNullSpark(['-r', 'local', '--extra-spark-arg', '--verbose'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -733,7 +626,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
     def test_spark_file_arg(self):
         foo_path = self.makefile('foo')
 
-        job = MRNullSpark(['--extra-file', foo_path])
+        job = MRNullSpark(['-r', 'local', '--extra-file', foo_path])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -751,7 +644,8 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
             self.assertEqual(name_to_path['foo'], foo_path)
 
     def test_spark_jar(self):
-        job = MRSparkJar(['--jar-arg', 'foo', '--jar-arg', 'bar'])
+        job = MRSparkJar(['-r', 'local',
+                          '--jar-arg', 'foo', '--jar-arg', 'bar'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -760,7 +654,8 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 ['foo', 'bar'])
 
     def test_spark_jar_interpolation(self):
-        job = MRSparkJar(['--jar-arg', OUTPUT, '--jar-arg', INPUT])
+        job = MRSparkJar(['-r', 'local',
+                          '--jar-arg', OUTPUT, '--jar-arg', INPUT])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -769,7 +664,8 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 ['<step 0 output>', '<step 0 input>'])
 
     def test_spark_script(self):
-        job = MRSparkScript(['--script-arg', 'foo', '--script-arg', 'bar'])
+        job = MRSparkScript(['-r', 'local',
+                             '--script-arg', 'foo', '--script-arg', 'bar'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -778,7 +674,8 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 ['foo', 'bar'])
 
     def test_spark_script_interpolation(self):
-        job = MRSparkScript(['--script-arg', OUTPUT, '--script-arg', INPUT])
+        job = MRSparkScript(['-r', 'local',
+                             '--script-arg', OUTPUT, '--script-arg', INPUT])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -787,7 +684,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 ['<step 0 output>', '<step 0 input>'])
 
     def test_streaming_step_not_okay(self):
-        job = MRTwoStepJob()
+        job = MRTwoStepJob(['-r', 'local'])
         job.sandbox()
 
         with job.make_runner() as runner:

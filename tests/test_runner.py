@@ -711,7 +711,6 @@ class ConfigFilesTestCase(SandboxedTestCase):
         return runner._opts
 
 
-@skip('some of this only works with MRJobBinRunner')
 class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
 
     BASIC_CONF = {
@@ -727,7 +726,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                 },
                 'label': 'organic',
                 'local_tmp_dir': '/tmp',
-                'python_bin': 'py3k',
                 'py_files': ['/mylib.zip'],
                 'setup': [
                     'thing1',
@@ -754,7 +752,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                     },
                     'label': 'usda_organic',
                     'local_tmp_dir': '/var/tmp',
-                    'python_bin': 'py4k',
                     'py_files': ['/yourlib.zip'],
                     'setup': [
                         'thing2',
@@ -769,10 +766,6 @@ class MultipleConfigFilesValuesTestCase(ConfigFilesTestCase):
                                          self.BASIC_CONF)
         self.opts_2 = self.opts_for_conf('mrjob.larger.conf',
                                          self.larger_conf())
-
-    def test_combine_cmds(self):
-        self.assertEqual(self.opts_1['python_bin'], ['py3k'])
-        self.assertEqual(self.opts_2['python_bin'], ['py4k'])
 
     def test_combine_dicts(self):
         self.assertEqual(self.opts_1['jobconf'], {

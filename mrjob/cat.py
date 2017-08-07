@@ -129,24 +129,3 @@ def to_chunks(readable, bufsize=1024):
             yield chunk
         else:
             return
-
-
-def _main():
-    args = sys.argv[1:]
-    if len(args) != 1:
-        raise ValueError('please pass a single path')
-    path = args[0]
-
-    # we want to write bytes
-    if hasattr(sys.stdout, 'buffer'):
-        stdout_buffer = sys.stdout.buffer
-    else:
-        stdout_buffer = sys.stdout
-
-    with open(path, 'rb') as f:
-        for chunk in decompress(f, path):
-            stdout_buffer.write(chunk)
-
-
-if __name__ == '__main__':
-    _main()

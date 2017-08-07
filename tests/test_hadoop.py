@@ -1013,7 +1013,7 @@ class SparkStepArgsTestCase(SandboxedTestCase):
 
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_submit_args',
+            'mrjob.bin.MRJobBinRunner._spark_submit_args',
             return_value=['<spark submit args>']))
 
     def test_spark_step(self):

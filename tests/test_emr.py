@@ -3722,7 +3722,7 @@ class SparkStepTestCase(MockBoto3TestCase):
 
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_submit_args',
+            'mrjob.bin.MRJobBinRunner._spark_submit_args',
             return_value=['<spark submit args>']))
 
     # TODO: test warning for for AMIs prior to 3.8.0, which don't offer Spark
@@ -3796,7 +3796,7 @@ class SparkJarStepTestCase(MockBoto3TestCase):
 
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_submit_args',
+            'mrjob.bin.MRJobBinRunner._spark_submit_args',
             return_value=['<spark submit args>']))
 
     def test_jar_gets_uploaded(self):
@@ -3831,7 +3831,7 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
 
         # _spark_submit_args() is tested elsewhere
         self.start(patch(
-            'mrjob.runner.MRJobRunner._spark_submit_args',
+            'mrjob.bin.MRJobBinRunner._spark_submit_args',
             return_value=['<spark submit args>']))
 
     def test_script_gets_uploaded(self):

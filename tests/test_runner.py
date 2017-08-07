@@ -1471,28 +1471,6 @@ class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
         self.assertTrue(runner._closed)
 
 
-class BootstrapMRJobTestCase(TestCase):
-    # this just tests _bootstrap_mrjob() (i.e. whether to bootstrap mrjob);
-    # actual testing of bootstrapping is in test_local
-
-    def test_default(self):
-        runner = MRJobRunner(conf_paths=[])
-        self.assertEqual(runner._bootstrap_mrjob(), True)
-
-    def test_no_bootstrap_mrjob(self):
-        runner = MRJobRunner(conf_paths=[], bootstrap_mrjob=False)
-        self.assertEqual(runner._bootstrap_mrjob(), False)
-
-    def test_interpreter(self):
-        runner = MRJobRunner(conf_paths=[], interpreter=['ruby'])
-        self.assertEqual(runner._bootstrap_mrjob(), False)
-
-    def test_bootstrap_mrjob_overrides_interpreter(self):
-        runner = MRJobRunner(
-            conf_paths=[], interpreter=['ruby'], bootstrap_mrjob=True)
-        self.assertEqual(runner._bootstrap_mrjob(), True)
-
-
 class StepInputAndOutputURIsTestCase(SandboxedTestCase):
 
     def test_two_step_job(self):

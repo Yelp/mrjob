@@ -100,6 +100,7 @@ v0.6.0, 2017-06-?? -- ???
  * removed deprecated switches:
    * --partitioner
  * removed deprecated JOB_FLOW and *SCRATCH cleanup types
+ * mrjob.cat is no longer executable
 
 v0.5.10, 2017-05-12 -- loose ends
  * JSON protcols use rapidjson if ujson unavailable (#1579)

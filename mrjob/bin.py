@@ -18,10 +18,12 @@
 import json
 import logging
 import os
+import sys
 from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.conf import combine_local_envs
+from mrjob.py2 import PY2
 from mrjob.runner import MRJobRunner
 from mrjob.step import STEP_TYPES
 from mrjob.util import cmd_line
@@ -67,3 +69,62 @@ class MRJobBinRunner(MRJobRunner):
                         step['type'], stdout))
 
         return steps
+
+    ### interpreter/python binary ###
+
+    def _interpreter(self, steps=False):
+        if steps:
+            return (self._opts['steps_interpreter'] or
+                    self._opts['interpreter'] or
+                    self._steps_python_bin())
+        else:
+            return (self._opts['interpreter'] or
+                    self._task_python_bin())
+
+    def _executable(self, steps=False):
+        if steps:
+            return self._interpreter(steps=True) + [self._script_path]
+        else:
+            return self._interpreter() + [
+                self._working_dir_mgr.name('file', self._script_path)]
+
+    def _python_bin(self):
+        """Python binary used for everything other than invoking the job.
+        For invoking jobs with ``--steps``, see :py:meth:`_steps_python_bin`,
+        and for everything else (e.g. ``--mapper``, ``--spark``), see
+        :py:meth:`_task_python_bin`, which defaults to this method if
+        :mrjob-opt:`task_python_bin` isn't set.
+
+        Other ways mrjob uses Python:
+         * file locking in setup wrapper scripts
+         * finding site-packages dir to bootstrap mrjob on clusters
+         * invoking ``cat.py`` in local mode
+         * the Python binary for Spark (``$PYSPARK_PYTHON``)
+        """
+        # python_bin isn't an option for inline runners
+        return self._opts['python_bin'] or self._default_python_bin()
+
+    def _steps_python_bin(self):
+        """Python binary used to invoke job with ``--steps``"""
+        return (self._opts['steps_python_bin'] or
+                self._default_python_bin(local=True))
+
+    def _task_python_bin(self):
+        """Python binary used to invoke job with ``--mapper``,
+        ``--reducer``, ``--spark``, etc."""
+        return (self._opts['task_python_bin'] or
+                self._python_bin())
+
+    def _default_python_bin(self, local=False):
+        """The default python command. If local is true, try to use
+        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
+
+        This returns a single-item list (because it's a command).
+        """
+        if local and sys.executable:
+            return [sys.executable]
+        elif PY2:
+            return ['python']
+        else:
+            # e.g. python3
+            return ['python%d' % sys.version_info[0]]

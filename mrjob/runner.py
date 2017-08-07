@@ -802,64 +802,6 @@ class MRJobRunner(object):
         """Are any of our steps Spark steps (either spark or spark_script)"""
         return any(_is_spark_step_type(step['type'])
                    for step in self._get_steps())
-
-    def _interpreter(self, steps=False):
-        if steps:
-            return (self._opts['steps_interpreter'] or
-                    self._opts['interpreter'] or
-                    self._steps_python_bin())
-        else:
-            return (self._opts['interpreter'] or
-                    self._task_python_bin())
-
-    def _executable(self, steps=False):
-        if steps:
-            return self._interpreter(steps=True) + [self._script_path]
-        else:
-            return self._interpreter() + [
-                self._working_dir_mgr.name('file', self._script_path)]
-
-    def _python_bin(self):
-        """Python binary used for everything other than invoking the job.
-        For invoking jobs with ``--steps``, see :py:meth:`_steps_python_bin`,
-        and for everything else (e.g. ``--mapper``, ``--spark``), see
-        :py:meth:`_task_python_bin`, which defaults to this method if
-        :mrjob-opt:`task_python_bin` isn't set.
-
-        Other ways mrjob uses Python:
-         * file locking in setup wrapper scripts
-         * finding site-packages dir to bootstrap mrjob on clusters
-         * invoking ``cat.py`` in local mode
-         * the Python binary for Spark (``$PYSPARK_PYTHON``)
-        """
-        # python_bin isn't an option for inline runners
-        return self._opts['python_bin'] or self._default_python_bin()
-
-    def _steps_python_bin(self):
-        """Python binary used to invoke job with ``--steps``"""
-        return (self._opts['steps_python_bin'] or
-                self._default_python_bin(local=True))
-
-    def _task_python_bin(self):
-        """Python binary used to invoke job with ``--mapper``,
-        ``--reducer``, ``--spark``, etc."""
-        return (self._opts['task_python_bin'] or
-                self._python_bin())
-
-    def _default_python_bin(self, local=False):
-        """The default python command. If local is true, try to use
-        sys.executable. Otherwise use 'python' or 'python3' as appropriate.
-
-        This returns a single-item list (because it's a command).
-        """
-        if local and sys.executable:
-            return [sys.executable]
-        elif PY2:
-            return ['python']
-        else:
-            # e.g. python3
-            return ['python%d' % sys.version_info[0]]
-
     def _script_args_for_step(self, step_num, mrc):
         args = self._executable() + self._args_for_task(step_num, mrc)
 
@@ -876,7 +818,6 @@ class MRJobRunner(object):
             '--step-num=%d' % step_num,
             '--%s' % mrc,
         ] + self._mr_job_extra_args()
-
 
     def _substep_args(self, step_num, mrc):
         step = self._get_step(step_num)

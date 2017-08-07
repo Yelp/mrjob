@@ -26,6 +26,7 @@ try:
 except ImportError:
     pty = None
 
+from mrjob.bin import MRJobBinRunner
 from mrjob.compat import uses_yarn
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
@@ -40,7 +41,6 @@ from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.wrap import _logs_exist
 from mrjob.parse import is_uri
 from mrjob.py2 import to_unicode
-from mrjob.runner import MRJobRunner
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
@@ -109,7 +109,7 @@ def fully_qualify_hdfs_path(path):
         return 'hdfs:///user/%s/%s' % (getpass.getuser(), path)
 
 
-class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
+class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on your Hadoop cluster.
     Invoked when you run your job with ``-r hadoop``.
 
@@ -118,7 +118,7 @@ class HadoopJobRunner(MRJobRunner, LogInterpretationMixin):
     """
     alias = 'hadoop'
 
-    OPT_NAMES = MRJobRunner.OPT_NAMES | {
+    OPT_NAMES = MRJobBinRunner.OPT_NAMES | {
         'bootstrap_spark',
         'hadoop_bin',
         'hadoop_extra_args',

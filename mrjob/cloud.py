@@ -17,7 +17,7 @@ import os
 import pipes
 from os.path import basename
 
-from mrjob.runner import MRJobRunner
+from mrjob.bin import MRJobBinRunner
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
@@ -35,12 +35,12 @@ _EXT_TO_UNARCHIVE_CMD = {
 }
 
 
-class HadoopInTheCloudJobRunner(MRJobRunner):
+class HadoopInTheCloudJobRunner(MRJobBinRunner):
     """Abstract base class for all Hadoop-in-the-cloud services."""
 
     alias = '_cloud'
 
-    OPT_NAMES = MRJobRunner.OPT_NAMES | {
+    OPT_NAMES = MRJobBinRunner.OPT_NAMES | {
         'bootstrap',
         'bootstrap_python',
         'check_cluster_every',

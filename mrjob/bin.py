@@ -46,7 +46,6 @@ class MRJobBinRunner(MRJobRunner):
 
     OPT_NAMES = MRJobRunner.OPT_NAMES | {
         'interpreter',
-        'libjars',
         'python_bin',
         'sh_bin',
         'spark_args',

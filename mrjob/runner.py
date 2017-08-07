@@ -86,6 +86,8 @@ class MRJobRunner(object):
     #: or ``'hadoop'``
     alias = None
 
+    # libjars is only here because the job can set it; might want to
+    # handle this with a warning from the launcher instead
     OPT_NAMES = {
         'bootstrap_mrjob',
         'check_input_paths',
@@ -94,6 +96,7 @@ class MRJobRunner(object):
         'cmdenv',
         'jobconf',
         'label',
+        'libjars',
         'local_tmp_dir',
         'owner',
         'py_files',

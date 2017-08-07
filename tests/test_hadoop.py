@@ -1209,7 +1209,7 @@ class SetupLineEncodingTestCase(MockHadoopTestCase):
         # tests #1071. Unfortunately, we mostly run these tests on machines
         # that use unix line endings anyway. So monitor open() instead
         with patch(
-                'mrjob.runner.open', create=True, side_effect=open) as m_open:
+                'mrjob.bin.open', create=True, side_effect=open) as m_open:
             with logger_disabled('mrjob.hadoop'):
                 with job.make_runner() as runner:
                     runner.run()

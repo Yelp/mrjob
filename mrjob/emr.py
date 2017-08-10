@@ -334,6 +334,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',
+        'instance_groups',
         'master_instance_bid_price',
         'mins_to_end_of_hour',
         'pool_clusters',

@@ -1202,6 +1202,26 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         return self._opts[role + '_instance_bid_price']
 
+    def _instance_groups(self):
+        """Which instance groups do we want to request?
+
+        Returns the value of the ``InstanceGroups`` parameter
+        passed to the EMR API.
+        """
+        if self._opts['instance_groups']:
+            return self._opts['instance_groups']
+
+        return [
+            _build_instance_group(
+                role=role,
+                instance_type=self._instance_type(role),
+                num_instances=self._num_instances(role),
+                bid_price=self._instance_bid_price(role),
+            )
+            for role in _INSTANCE_ROLES
+            if self._num_instances(role)
+        ]
+
     def _create_cluster(self, persistent=False):
         """Create an empty cluster on EMR, and return the ID of that
         job.
@@ -1279,28 +1299,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._opts['zone']:
             Instances['Placement'] = dict(AvailabilityZone=self._opts['zone'])
 
-        # The old, simple API, available if we're not using task instances
-        # or bid prices
-        if not (self._num_instances('task') or
-                any(self._instance_bid_price(role)
-                    for role in _INSTANCE_ROLES)):
-            Instances['InstanceCount'] = self._num_instances('core') + 1
-            Instances['MasterInstanceType'] = self._instance_type('master')
-            Instances['SlaveInstanceType'] = self._instance_type('core')
-        else:
-            Instances['InstanceGroups'] = []
-
-            # Create a list of InstanceGroups
-            for role in _INSTANCE_ROLES:
-                num_instances = self._num_instances(role)
-
-                if num_instances:
-                    Instances['InstanceGroups'].append(
-                        _build_instance_group(
-                            role=role,
-                            instance_type=self._instance_type(role),
-                            num_instances=self._num_instances(role),
-                            bid_price=self._instance_bid_price(role)))
+        Instances['InstanceGroups'] = self._instance_groups()
 
         # bootstrap actions
         kwargs['BootstrapActions'] = BootstrapActions = []

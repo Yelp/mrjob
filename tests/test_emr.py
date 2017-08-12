@@ -1789,11 +1789,11 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         emr_client = EMRJobRunner(conf_paths=[]).make_emr_client()
         emr_client.terminate_job_flows(JobFlowIds=[actual_cluster_id])
 
-    def make_simple_runner(self, pool_name):
+    def make_simple_runner(self, pool_name, *args):
         """Make an EMRJobRunner that is ready to try to find a pool to join"""
         mr_job = MRTwoStepJob([
             '-r', 'emr', '-v', '--pool-clusters',
-            '--pool-name', pool_name])
+            '--pool-name', pool_name] + list(args))
         mr_job.sandbox()
         runner = mr_job.make_runner()
         self.prepare_runner_for_ssh(runner)
@@ -2505,8 +2505,10 @@ class PoolMatchingTestCase(MockBoto3TestCase):
                                                    minutes_ago=20,
                                                    num_core_instances=1)
 
-        runner_1 = self.make_simple_runner('pool1')
-        runner_2 = self.make_simple_runner('pool1')
+        runner_1 = self.make_simple_runner(
+            'pool1', '--num-core-instances', '1')
+        runner_2 = self.make_simple_runner(
+            'pool1', '--num-core-instances', '1')
 
         self.assertEqual(runner_1._find_cluster(), cluster_id_1)
         self.assertEqual(runner_2._find_cluster(), cluster_id_2)
@@ -2753,9 +2755,9 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         # cluster 1 should be preferable
         cluster1_id = self.make_pooled_cluster(num_core_instances=20)
         self.mock_emr_self_termination.add(cluster1_id)
-        cluster2_id = self.make_pooled_cluster()
+        cluster2_id = self.make_pooled_cluster(num_core_instances=1)
 
-        job = MRTwoStepJob(['-r', 'emr'])
+        job = MRTwoStepJob(['-r', 'emr', '--num-core-instances', '1'])
         job.sandbox()
 
         with job.make_runner() as runner:

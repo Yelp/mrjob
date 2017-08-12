@@ -3033,6 +3033,7 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
     # one per role)
     r = {ig['InstanceRole'].lower(): ig for ig in requested_igs}
 
+    # just require roles to match (see #1630)
     if set(a) != set(r):
         log.debug("    instance group roles don't match")
         return None

@@ -3040,7 +3040,7 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
     sort_keys = {}
     for role in sorted(r):
         sort_key = _igs_for_same_role_satisfy(a[role], r[role])
-        if sort_key is None:  # doesn't satisfy
+        if not sort_key:  # doesn't satisfy
             return None
         sort_keys[role] = sort_key
 
@@ -3053,11 +3053,11 @@ def _igs_for_same_role_satisfy(actual_igs, requested_ig):
     """
     # bid price/on-demand
     if not all(_ig_satisfies_bid_price(ig, requested_ig) for ig in actual_igs):
-        return False
+        return None
 
     # memory
     if not all(_ig_satisfies_mem(ig, requested_ig) for ig in actual_igs):
-        return False
+        return None
 
     # CPU (this returns # of compute units or None)
     return _igs_satisfy_cpu(actual_igs, requested_ig)

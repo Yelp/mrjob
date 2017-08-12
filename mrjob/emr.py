@@ -2620,7 +2620,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
             requested_igs = self._instance_groups()
 
-            ig_sort_key = _instance_groups_satisfy(requested_igs, actual_igs)
+            ig_sort_key = _instance_groups_satisfy(actual_igs, requested_igs)
 
             if not ig_sort_key:
                 return
@@ -3056,11 +3056,11 @@ def _igs_for_same_role_satisfy(actual_igs, requested_ig):
         return False
 
     # memory
-    if not all(_ig_satisfies_mem(requested_ig, ig) for ig in actual_igs):
+    if not all(_ig_satisfies_mem(ig, requested_ig) for ig in actual_igs):
         return False
 
     # CPU (this returns # of compute units or None)
-    return _igs_satisfy_cpu(requested_ig, actual_igs)
+    return _igs_satisfy_cpu(actual_igs, requested_ig)
 
 
 def _ig_satisfies_bid_price(actual_ig, requested_ig):

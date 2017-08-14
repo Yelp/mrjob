@@ -2098,6 +2098,31 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--instance-groups', json.dumps(INSTANCE_GROUPS)])
 
+    def test_instance_groups_match_instance_type_and_count(self):
+        # setting instance type and count is just a shorthand
+        # for --instance-groups
+
+        INSTANCE_GROUPS = [
+            dict(
+                InstanceRole='MASTER',
+                InstanceCount=1,
+                InstanceType='m1.medium',
+            ),
+            dict(
+                InstanceRole='CORE',
+                InstanceCount=20,
+                InstanceType='m2.4xlarge',
+            ),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_type='m2.4xlarge',
+            num_core_instances=20)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(INSTANCE_GROUPS)])
+
     def test_join_pool_with_more_of_same_instance_type(self):
         _, cluster_id = self.make_pooled_cluster(
             instance_type='m2.4xlarge',

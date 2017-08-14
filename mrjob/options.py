@@ -647,6 +647,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         switches=[
             (['--instance-groups'], dict(
+                callback=_json_callback,
                 help=('detailed JSON list of instance configs, including'
                       ' EBS configuration. See docs for --instance-groups'
                       ' at http://docs.aws.amazon.com/cli/latest/reference'

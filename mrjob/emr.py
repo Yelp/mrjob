@@ -3033,9 +3033,13 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
     # one per role)
     r = {ig['InstanceRole'].lower(): ig for ig in requested_igs}
 
-    # just require roles to match (see #1630)
+    # update request to account for extra instance groups
+    # see #1630 for what we do when roles don't match
+    if set(a) - set(r):
+        r = _add_missing_ig_roles_to_request(r, set(a) - set(r))
+
     if set(a) != set(r):
-        log.debug("    instance group roles don't match")
+        log.debug("    missing instance group roles")
         return None
 
     sort_keys = {}
@@ -3046,6 +3050,37 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
         sort_keys[role] = sort_key
 
     return tuple(sort_keys.get(role) for role in ('core', 'task', 'master'))
+
+
+def _add_missing_ig_roles_to_request(missing_roles, role_to_ig):
+    """Helper for :py:func:`_instance_groups_satisfy`. Add requests for
+    *missing_roles* to *role_to_ig* so that we have a better chance of
+    matching the cluster's actual instance groups."""
+    # see #1630 for discussion
+
+    # don't worry about modifying or duplicating data structures; this is
+    # a helper func
+
+    # so we can match instance capacity but not care about amount of CPU
+    def _with_zero_instances(ig):
+        ig = dict(ig)
+        ig['InstanceCount'] = 0
+        return ig
+
+    if 'core' in missing_roles:
+        if list(role_to_ig) == 'master':
+            # both core and master have to satisfy master-only request
+            role_to_ig['core'] = role_to_ig['master']
+        elif 'task' in role_to_ig:
+            # make sure tasks won't crash on the core instances
+            role_to_ig['core'] = _with_zero_instances(role_to_ig['task'])
+
+    if 'task' in missing_roles:
+        # make sure tasks won't crash on the task instances
+        if 'core' in role_to_ig:
+            role_to_ig['task'] = _with_zero_instances(role_to_ig['core'])
+
+    return role_to_ig
 
 
 def _igs_for_same_role_satisfy(actual_igs, requested_ig):

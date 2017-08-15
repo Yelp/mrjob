@@ -2177,6 +2177,96 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--instance-type', 'c1.xlarge'])
 
+    # tests of what happens when user specifies a single master and
+    # pooling tries to join clusters with core and/or task instances
+
+    def test_master_alone_joins_master_and_core(self):
+        _, cluster_id = self.make_pooled_cluster(
+            num_core_instances=2)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters'])
+
+    def test_master_alone_requires_big_enough_core_instances(self):
+        _, cluster_id = self.make_pooled_cluster(
+            master_instance_type='c1.xlarge',
+            num_core_instances=2)  # core instances are c1.medium
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--master-instance-type', 'c1.xlarge'])
+
+    def test_master_alone_requires_big_enough_master_when_with_core(self):
+        _, cluster_id = self.make_pooled_cluster(
+            core_instance_type='c1.xlarge',
+            num_core_instances=2)  # master instances are c1.medium
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--master-instance-type', 'c1.xlarge'])
+
+    def test_master_alone_accepts_master_core_task(self):
+        _, cluster_id = self.make_pooled_cluster(
+            num_core_instances=2,
+            num_task_instances=2)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters'])
+
+    def test_master_alone_does_not_accept_too_small_task_instances(self):
+        _, cluster_id = self.make_pooled_cluster(
+            master_instance_type='c1.xlarge',
+            core_instance_type='c1.xlarge',
+            task_instance_type='m1.medium',
+            num_core_instances=2,
+            num_task_instances=2)
+
+        self.assertDoesNotJoin(cluster_id, [
+                '-r', 'emr', '-v', '--pool-clusters',
+                '--master-instance-type', 'c1.xlarge'])
+
+    def test_accept_extra_task_instances(self):
+        _, cluster_id = self.make_pooled_cluster(
+            instance_type='c1.xlarge',
+            num_core_instances=3,
+            num_task_instances=1)
+
+        # doesn't matter that there are less than 3 task instances;
+        # just has to be big enough to run tasks
+
+        self.assertJoins(cluster_id, [
+             '-r', 'emr', '-v', '--pool-clusters',
+             '--instance-type', 'c1.xlarge',
+             '--num-core-instances', '3'])
+
+    def test_reject_too_small_extra_task_instances(self):
+        _, cluster_id = self.make_pooled_cluster(
+            core_instance_type='c1.xlarge',
+            task_instance_type='m1.medium',
+            num_core_instances=3,
+            num_task_instances=1)
+
+        # doesn't matter that there are less than 3 task instances;
+        # just has to be big enough to run tasks
+
+        self.assertDoesNotJoin(cluster_id, [
+             '-r', 'emr', '-v', '--pool-clusters',
+             '--instance-type', 'c1.xlarge',
+             '--num-core-instances', '3'])
+
+    def test_extra_task_instances_dont_count_in_total_cpu(self):
+        _, cluster_id = self.make_pooled_cluster(
+            instance_type='c1.xlarge',
+            num_core_instances=2,
+            num_task_instances=2)
+
+        # 4 instance total, but only core instances count
+
+        self.assertDoesNotJoin(cluster_id, [
+             '-r', 'emr', '-v', '--pool-clusters',
+             '--instance-type', 'c1.xlarge',
+             '--num-core-instances', '3'])
+
     def test_unknown_instance_type_against_matching_pool(self):
         _, cluster_id = self.make_pooled_cluster(
             instance_type='a1.sauce',

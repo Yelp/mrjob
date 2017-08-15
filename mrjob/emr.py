@@ -3036,7 +3036,7 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
     # update request to account for extra instance groups
     # see #1630 for what we do when roles don't match
     if set(a) - set(r):
-        r = _add_missing_ig_roles_to_request(r, set(a) - set(r))
+        r = _add_missing_ig_roles_to_request(set(a) - set(r), r)
 
     if set(a) != set(r):
         log.debug("    missing instance group roles")
@@ -3062,23 +3062,16 @@ def _add_missing_ig_roles_to_request(missing_roles, role_to_ig):
     # a helper func
 
     # so we can match instance capacity but not care about amount of CPU
-    def _with_zero_instances(ig):
-        ig = dict(ig)
-        ig['InstanceCount'] = 0
-        return ig
 
-    if 'core' in missing_roles:
-        if list(role_to_ig) == 'master':
-            # both core and master have to satisfy master-only request
-            role_to_ig['core'] = role_to_ig['master']
-        elif 'task' in role_to_ig:
-            # make sure tasks won't crash on the core instances
-            role_to_ig['core'] = _with_zero_instances(role_to_ig['task'])
+    if 'core' in missing_roles and list(role_to_ig) == ['master']:
+        # both core and master have to satisfy master-only request
+        role_to_ig['core'] = role_to_ig['master']
 
-    if 'task' in missing_roles:
-        # make sure tasks won't crash on the task instances
-        if 'core' in role_to_ig:
-            role_to_ig['task'] = _with_zero_instances(role_to_ig['core'])
+    if 'task' in missing_roles and 'core' in role_to_ig:
+        # make sure tasks won't crash on the task instances,
+        # but don't require the same amount of CPU
+        role_to_ig['task'] = dict(role_to_ig['core'])
+        role_to_ig['task']['InstanceCount'] = 0
 
     return role_to_ig
 

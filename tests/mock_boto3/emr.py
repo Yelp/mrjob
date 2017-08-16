@@ -647,14 +647,6 @@ class MockEMRClient(object):
                     _validate_param(
                         EbsConfiguration, 'EbsBlockDeviceConfigs', list)
 
-                    if 'VolumesPerInstance' in EbsConfiguration:
-                        _validate_param(
-                            EbsConfiguration, 'VolumesPerInstance', int)
-                        VolumesPerInstance = EbsConfiguration[
-                            'VolumesPerInstance']
-                    else:
-                        VolumesPerInstance = 1
-
                     for EbsBlockDeviceConfig in (
                             EbsConfiguration['EbsBlockDeviceConfigs']):
                         _validate_param(
@@ -662,12 +654,44 @@ class MockEMRClient(object):
                         VolumeSpecification = (
                             EbsBlockDeviceConfig['VolumeSpecification'])
 
-                        if 'Iops' in VolumeSpecification:
-                            _validate_param(VolumeSpecification, 'Iops', int)
-
                         _validate_param(VolumeSpecification, 'SizeInGB', int)
                         _validate_param(VolumeSpecification, 'VolumeType',
                                         string_types)
+
+
+                        if 'Iops' in VolumeSpecification:
+                            _validate_param(VolumeSpecification, 'Iops', int)
+                            Iops = VolumeSpecification['Iops']
+
+                            if VolumeSpecification['VolumeType'] != 'io1':
+                                raise _ValidationException(
+                                    operation_name,
+                                    'IOPS setting is not supported for volume'
+                                    ' type')
+
+                            if Iops < 100:
+                                raise _ValidationException(
+                                    operation_name,
+                                    'The iops is less than minimum value(100).'
+                                )
+
+                            if Iops > 20000:
+                                raise _ValidationException(
+                                    operation_name,
+                                    'The iops is more than maximum'
+                                    ' value(20000).')
+                        elif VolumeSpecification['VolumeType'] == 'io1':
+                            raise _ValidationException(
+                                operation_name,
+                                'IOPS setting is required for volume type.')
+
+                        if 'VolumesPerInstance' in EbsBlockDeviceConfig:
+                            _validate_param(EbsBlockDeviceConfig,
+                                            'VolumesPerInstance', int)
+                            VolumesPerInstance = EbsBlockDeviceConfig[
+                                'VolumesPerInstance']
+                        else:
+                            VolumesPerInstance = 1
 
                         for _ in range(VolumesPerInstance):
                             # /dev/sdc, /dev/sdd, etc.

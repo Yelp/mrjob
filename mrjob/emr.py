@@ -3206,20 +3206,19 @@ def _ebs_volumes_satisfy(actual_volumes, req_volumes):
 
 def _ebs_volume_satisfies(actual_volume, req_volume):
     """Does the given actual EBS volume satisfy the given request?"""
-    if req_volume.get('VolumeType'):
-        if req_volume['VolumeType'] != actual_volume.get('VolumeType'):
-            log.debug('    wrong EBS volume type')
-            return False
+    if req_volume.get('VolumeType') != actual_volume.get('VolumeType'):
+        log.debug('    wrong EBS volume type')
+        return False
 
-    if req_volume.get('SizeInGB'):
-        if not req_volume['SizeInGB'] <= actual_volume.get('SizeInGB', 0):
-            log.debug('    EBS volume too small')
-            return False
+    if not req_volume.get('SizeInGB', 0) <= actual_volume.get('SizeInGB', 0):
+        log.debug('    EBS volume too small')
+        return False
 
-    if req_volume.get('Iops'):
-        if not (req_volume['Iops'] <= actual_volume.get('Iops', 0)):
-            log.debug('    EBS volume too slow')
-            return False
+    # Iops isn't really "optional"; it has to be set if volume type is
+    # io1 and not set otherwise
+    if not (req_volume.get('Iops', 0) <= actual_volume.get('Iops', 0)):
+        log.debug('    EBS volume too slow')
+        return False
 
     return True
 

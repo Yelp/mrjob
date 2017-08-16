@@ -2309,6 +2309,34 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--instance-type', 'a1.sauce',
             '--num-core-instances', '2'])
 
+    def _ig_with_ebs_config(
+            self, ebs_device_configs, ebs_optimized=None, role='master'):
+        """Build an instance group request with the given list of
+        EBS device configs. Optionally turn on EBS optimization
+        and specify a different instance role (``'master'`` by default)."""
+        ebs_config = dict(EbsBlockDeviceConfigs=ebs_device_configs)
+        if ebs_optimized is not None:
+            ebs_config['EbsOptimized'] = ebs_optimized
+
+        return dict(
+            EbsConfiguration=ebs_config,
+            InstanceRole=role.upper(),
+            InstanceCount=1,
+            InstanceType='m1.medium',
+        )
+
+    def test_can_join_cluster_with_same_ebs_config(self):
+        instance_groups = [self._ig_with_ebs_config(
+            [dict(VolumeSpecification=dict(SizeInGB=100, VolumeType='gp2'))]
+        )]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_groups=instance_groups)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(instance_groups)])
+
     def test_can_join_cluster_with_same_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(
             master_instance_bid_price='0.25')

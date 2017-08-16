@@ -634,6 +634,49 @@ class MockEMRClient(object):
 
                 ig['BidPrice'] = BidPrice
 
+            # EbsConfiguration
+            if 'EbsConfiguration' in InstanceGroup:
+                EbsConfiguration = InstanceGroup.pop('EbsConfiguration')
+
+                if 'EbsOptimized' in EbsConfiguration:
+                    _validate_param(InstanceGroup, 'EbsOptimized', bool)
+                    if EbsConfiguration['EbsOptimized']:
+                        ig['EbsOptimized'] = True
+
+                if 'EbsBlockDeviceConfigs' in EbsConfiguration:
+                    _validate_param(
+                        EbsConfiguration, 'EbsBlockDeviceConfigs', list)
+
+                    if 'VolumesPerInstance' in EbsConfiguration:
+                        _validate_param(
+                            EbsConfiguration, 'VolumesPerInstance', int)
+                        VolumesPerInstance = EbsConfiguration[
+                            'VolumesPerInstance']
+                    else:
+                        VolumesPerInstance = 1
+
+                    for EbsBlockDeviceConfig in (
+                            EbsConfiguration['EbsBlockDeviceConfigs']):
+                        _validate_param(
+                            EbsBlockDeviceConfig, 'VolumeSpecification', dict)
+                        VolumeSpecification = (
+                            EbsBlockDeviceConfig['VolumeSpecification'])
+
+                        if 'Iops' in VolumeSpecification:
+                            _validate_param(VolumeSpecification, 'Iops', int)
+
+                        _validate_param(VolumeSpecification, 'SizeInGB', int)
+                        _validate_param(VolumeSpecification, 'VolumeType',
+                                        string_types)
+
+                        for _ in range(VolumesPerInstance):
+                            # /dev/sdc, /dev/sdd, etc.
+                            device = 'dev/sd' + chr(
+                                ord('c') + len(ig['EbsBlockDevices']))
+                            ig['EbsBlockDevices'].append(dict(
+                                Device=device,
+                                VolumeSpecification=dict(VolumeSpecification)))
+
             if InstanceGroup:
                 raise NotImplementedError(
                     'mock_boto3 does not support these InstanceGroup'
@@ -1256,6 +1299,7 @@ def _validate_param(params, name, type=None):
             _validate_param_enum(params[name], type)
         else:
             _validate_param_type(params[name], type)
+
 
 def _validate_param_type(value, type):
     """Raise ParamValidationError if *value* isn't an instance of

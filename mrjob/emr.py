@@ -3104,15 +3104,15 @@ def _ig_satisfies_bid_price(actual_ig, requested_ig):
     if actual_ig['Market'] == 'ON_DEMAND':
         return True
 
-    if requested_ig['Market'] == 'ON_DEMAND':
+    if requested_ig.get('Market', 'ON_DEMAND') == 'ON_DEMAND':
         log.debug('    spot instance, requested on-demand')
         return False
 
-    if actual_ig['BidPrice'] == requested_ig['BidPrice']:
+    if actual_ig['BidPrice'] == requested_ig.get('BidPrice'):
         return True
 
     try:
-        if float(actual_ig['BidPrice']) >= float(requested_ig['BidPrice']):
+        if float(actual_ig['BidPrice']) >= float(requested_ig.get('BidPrice')):
             return True
         else:
             # low bid prices mean cluster is more likely to be

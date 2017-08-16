@@ -639,7 +639,7 @@ class MockEMRClient(object):
                 EbsConfiguration = InstanceGroup.pop('EbsConfiguration')
 
                 if 'EbsOptimized' in EbsConfiguration:
-                    _validate_param(InstanceGroup, 'EbsOptimized', bool)
+                    _validate_param(EbsConfiguration, 'EbsOptimized', bool)
                     if EbsConfiguration['EbsOptimized']:
                         ig['EbsOptimized'] = True
 

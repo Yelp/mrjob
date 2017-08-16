@@ -2310,10 +2310,14 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--num-core-instances', '2'])
 
     def _ig_with_ebs_config(
-            self, ebs_device_configs, ebs_optimized=None, role='master'):
+            self, ebs_device_configs=(), ebs_optimized=None, role='master'):
         """Build an instance group request with the given list of
         EBS device configs. Optionally turn on EBS optimization
         and specify a different instance role (``'master'`` by default)."""
+        if not ebs_device_configs:
+            ebs_device_configs=[
+                dict(VolumeSpecification=dict(SizeInGB=100, VolumeType='gp2'))]
+
         ebs_config = dict(EbsBlockDeviceConfigs=ebs_device_configs)
         if ebs_optimized is not None:
             ebs_config['EbsOptimized'] = ebs_optimized
@@ -2326,9 +2330,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         )
 
     def test_can_join_cluster_with_same_ebs_config(self):
-        instance_groups = [self._ig_with_ebs_config(
-            [dict(VolumeSpecification=dict(SizeInGB=100, VolumeType='gp2'))]
-        )]
+        instance_groups = [self._ig_with_ebs_config()]
 
         _, cluster_id = self.make_pooled_cluster(
             instance_groups=instance_groups)
@@ -2336,6 +2338,95 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--instance-groups', json.dumps(instance_groups)])
+
+    def test_cluster_must_have_ebs_config_if_requested(self):
+        instance_groups = [self._ig_with_ebs_config()]
+
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(instance_groups)])
+
+    def test_any_ebs_config_okay_if_none_requested(self):
+        instance_groups = [self._ig_with_ebs_config()]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_groups=instance_groups)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters'])
+
+    def test_join_ebs_optimized_cluster(self):
+        instance_groups = [self._ig_with_ebs_config(ebs_optimized=True)]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_groups=instance_groups)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(instance_groups)])
+
+    def test_require_ebs_optimized(self):
+        requested_igs = [self._ig_with_ebs_config(ebs_optimized=True)]
+        actual_igs = [self._ig_with_ebs_config()]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_groups=actual_igs)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(requested_igs)])
+
+    def test_allow_ebs_optimized_if_not_requested(self):
+        requested_igs = [self._ig_with_ebs_config()]
+        actual_igs = [self._ig_with_ebs_config(ebs_optimized=True)]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_groups=actual_igs)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(requested_igs)])
+
+    def test_ebs_volume_must_be_same_type(self):
+        requested_igs=[self._ig_with_ebs_config([dict(
+            VolumeSpecification=dict(SizeInGB=100, VolumeType='standard'))])]
+        actual_igs=[self._ig_with_ebs_config([dict(
+            VolumeSpecification=dict(SizeInGB=100, VolumeType='gp2'))])]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_groups=actual_igs)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(requested_igs)])
+
+    def test_more_ebs_storage_okay(self):
+        requested_igs=[self._ig_with_ebs_config([dict(
+            VolumeSpecification=dict(SizeInGB=100, VolumeType='standard'))])]
+        actual_igs=[self._ig_with_ebs_config([dict(
+            VolumeSpecification=dict(SizeInGB=200, VolumeType='standard'))])]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_groups=actual_igs)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(requested_igs)])
+
+    def test_less_ebs_storage_not_okay(self):
+        requested_igs=[self._ig_with_ebs_config([dict(
+            VolumeSpecification=dict(SizeInGB=100, VolumeType='standard'))])]
+        actual_igs=[self._ig_with_ebs_config([dict(
+            VolumeSpecification=dict(SizeInGB=50, VolumeType='standard'))])]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_groups=actual_igs)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-groups', json.dumps(requested_igs)])
 
     def test_can_join_cluster_with_same_bid_price(self):
         _, cluster_id = self.make_pooled_cluster(

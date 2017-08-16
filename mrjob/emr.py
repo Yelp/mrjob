@@ -3088,6 +3088,10 @@ def _igs_for_same_role_satisfy(actual_igs, requested_ig):
     if not all(_ig_satisfies_mem(ig, requested_ig) for ig in actual_igs):
         return None
 
+    # EBS volumes
+    if not all(_ig_satisfies_ebs(ig, requested_ig) for ig in actual_igs):
+        return None
+
     # CPU (this returns # of compute units or None)
     return _igs_satisfy_cpu(actual_igs, requested_ig)
 
@@ -3142,6 +3146,84 @@ def _ig_satisfies_mem(actual_ig, requested_ig):
         return False
 
 
+def _ig_satisfies_ebs(actual_ig, requested_ig):
+    """Does *actual_ig* have EBS volumes that satisfy *requested_ig*.
+
+    If *requested_ig* doesn't have an EBS Configuration, we return
+    True.
+
+    If *requested_ig* requests EBS optimization, *actual_ig* should provide
+    it.
+
+    Finally, *actual_ig* should have the same or better block devices
+    as those in *requested_ig* (same volume type, at least as much IOPS
+    and volume size).
+    """
+    req_ebs_config = requested_ig.get('EbsConfiguration')
+
+    if not req_ebs_config:
+        return True
+
+    if (req_ebs_config.get('EbsOptimized')
+            and not actual_ig.get('EbsOptimized')):
+        log.debug('    need EBS-optimized instances')
+        return False
+
+    req_device_configs = req_ebs_config.get('EbsBlockDeviceConfigs')
+
+    if not req_device_configs:
+        return True
+
+    req_volumes = []
+
+    for req_device_config in req_device_configs:
+        volume = req_device_config['VolumeSpecification']
+        num_volumes = req_device_config.get('VolumesPerInstance', 1)
+
+        req_volumes.extend([volume] * num_volumes)
+
+    actual_volumes = [
+        bd.get('VolumeSpecification', {})
+        for bd in actual_ig.get('EbsBlockDevices', [])]
+
+    return _ebs_volumes_satisfy(actual_volumes, req_volumes)
+
+
+def _ebs_volumes_satisfy(actual_volumes, req_volumes):
+    """Does the given list of actual EBS volumes satisfy the given request?
+
+    Just compare them one by one (we want each actual device to be
+    bigger/faster; just having the same amount of capacity or iops
+    isn't enough).
+    """
+    if len(req_volumes) > len(actual_volumes):
+        log.debug('    more EBS volumes requested than available')
+        return False
+
+    return all(_ebs_volume_satisfies(a, r)
+               for a, r in zip(actual_volumes, req_volumes))
+
+
+def _ebs_volume_satisfies(actual_volume, req_volume):
+    """Does the given actual EBS volume satisfy the given request?"""
+    if req_volume.get('VolumeType'):
+        if req_volume['VolumeType'] != actual_volume.get('VolumeType'):
+            log.debug('    wrong EBS volume type')
+            return False
+
+    if req_volume.get('SizeInGB'):
+        if not req_volume['SizeInGB'] <= actual_volume.get('SizeInGB', 0):
+            log.debug('    EBS volume too small')
+            return False
+
+    if req_volume.get('Iops'):
+        if not (req_volume['Iops'] <= actual_volume.get('Iops', 0)):
+            log.debug('    EBS volume too slow')
+            return False
+
+    return True
+
+
 def _igs_satisfy_cpu(actual_igs, requested_ig):
     """Does the list of actual instance groups satisfy the CPU requirements
     of the requested instance group?
@@ -3149,7 +3231,7 @@ def _igs_satisfy_cpu(actual_igs, requested_ig):
     If so, return the number of compute units. Otherwise, return ``None``
 
     If the requested instance type is unknown, just return the number
-    of acutal instances of the same type.
+    of actual instances of the same type.
     """
     requested_type = requested_ig['InstanceType']
     num_requested = requested_ig['InstanceCount']
@@ -3178,7 +3260,6 @@ def _igs_satisfy_cpu(actual_igs, requested_ig):
     else:
         log.debug('    not enough compute units')
         return None
-
 
 
 def _build_instance_group(role, instance_type, num_instances, bid_price):

@@ -272,6 +272,36 @@ Cluster creation and configuration
         2.5.
 
 .. mrjob-opt::
+    :config: instance_groups
+    :switch: --max-hours-idle
+    :set: emr
+    :default: ``None``
+
+    A list of instance group definitions to pass to the EMR API. Pass a JSON
+    string on the command line or use data structures in the config file
+    (which is itself basically JSON).
+
+    This is the primary way to configure EBS volumes. For example:
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            instance_groups:
+            - InstanceRole: MASTER
+              InstanceCount: 1
+              InstanceType: m1.medium
+            - InstanceRole: CORE
+              InstanceCount: 10
+              InstanceType: c1.xlarge
+              EbsConfiguration:
+                EbsOptimized: true
+                EbsBlockDeviceConfigs:
+                - VolumeSpecification:
+                    SizeInGB: 100
+                    VolumeType: gp2
+
+.. mrjob-opt::
     :config: max_hours_idle
     :switch: --max-hours-idle
     :type: :ref:`string <data-type-string>`

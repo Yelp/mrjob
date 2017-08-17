@@ -67,7 +67,7 @@ CLEANUP_CHOICES = [
 ### custom callbacks ###
 
 def _default_to(parser, dest, value):
-    """Helper function; set the given optino dest to *value* if it's None.
+    """Helper function; set the given option dest to *value* if it's None.
 
     This lets us create callbacks that don't require default to be set
     to a container."""
@@ -147,6 +147,16 @@ def _append_json_callback(option, opt_str, value, parser):
             opt_str, str(e)))
 
     getattr(parser.values, option.dest).append(j)
+
+
+def _json_callback(option, opt_str, value, parser):
+    try:
+        j = json.loads(value)
+    except ValueError as e:
+        parser.error('Malformed JSON passed to %s: %s' % (
+            opt_str, str(e)))
+
+    setattr(parser.values, option.dest, j)
 
 
 def _port_range_callback(option, opt_str, value, parser):
@@ -640,6 +650,18 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--image-version'], dict(
                 help='EMR/Dataproc machine image to launch clusters with',
+            )),
+        ],
+    ),
+    instance_groups=dict(
+        cloud_role='launch',
+        switches=[
+            (['--instance-groups'], dict(
+                callback=_json_callback,
+                help=('detailed JSON list of instance configs, including'
+                      ' EBS configuration. See docs for --instance-groups'
+                      ' at http://docs.aws.amazon.com/cli/latest/reference'
+                      '/emr/create-cluster.html'),
             )),
         ],
     ),

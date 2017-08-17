@@ -653,6 +653,73 @@ class MockEMRClient(object):
 
                 ig['BidPrice'] = BidPrice
 
+            # EbsConfiguration
+            if 'EbsConfiguration' in InstanceGroup:
+                EbsConfiguration = InstanceGroup.pop('EbsConfiguration')
+
+                if 'EbsOptimized' in EbsConfiguration:
+                    _validate_param(EbsConfiguration, 'EbsOptimized', bool)
+                    if EbsConfiguration['EbsOptimized']:
+                        ig['EbsOptimized'] = True
+
+                if 'EbsBlockDeviceConfigs' in EbsConfiguration:
+                    _validate_param(
+                        EbsConfiguration, 'EbsBlockDeviceConfigs', list)
+
+                    for EbsBlockDeviceConfig in (
+                            EbsConfiguration['EbsBlockDeviceConfigs']):
+                        _validate_param(
+                            EbsBlockDeviceConfig, 'VolumeSpecification', dict)
+                        VolumeSpecification = (
+                            EbsBlockDeviceConfig['VolumeSpecification'])
+
+                        _validate_param(VolumeSpecification, 'SizeInGB', int)
+                        _validate_param(VolumeSpecification, 'VolumeType',
+                                        string_types)
+
+
+                        if 'Iops' in VolumeSpecification:
+                            _validate_param(VolumeSpecification, 'Iops', int)
+                            Iops = VolumeSpecification['Iops']
+
+                            if VolumeSpecification['VolumeType'] != 'io1':
+                                raise _ValidationException(
+                                    operation_name,
+                                    'IOPS setting is not supported for volume'
+                                    ' type')
+
+                            if Iops < 100:
+                                raise _ValidationException(
+                                    operation_name,
+                                    'The iops is less than minimum value(100).'
+                                )
+
+                            if Iops > 20000:
+                                raise _ValidationException(
+                                    operation_name,
+                                    'The iops is more than maximum'
+                                    ' value(20000).')
+                        elif VolumeSpecification['VolumeType'] == 'io1':
+                            raise _ValidationException(
+                                operation_name,
+                                'IOPS setting is required for volume type.')
+
+                        if 'VolumesPerInstance' in EbsBlockDeviceConfig:
+                            _validate_param(EbsBlockDeviceConfig,
+                                            'VolumesPerInstance', int)
+                            VolumesPerInstance = EbsBlockDeviceConfig[
+                                'VolumesPerInstance']
+                        else:
+                            VolumesPerInstance = 1
+
+                        for _ in range(VolumesPerInstance):
+                            # /dev/sdc, /dev/sdd, etc.
+                            device = 'dev/sd' + chr(
+                                ord('c') + len(ig['EbsBlockDevices']))
+                            ig['EbsBlockDevices'].append(dict(
+                                Device=device,
+                                VolumeSpecification=dict(VolumeSpecification)))
+
             if InstanceGroup:
                 raise NotImplementedError(
                     'mock_boto3 does not support these InstanceGroup'
@@ -1275,6 +1342,7 @@ def _validate_param(params, name, type=None):
             _validate_param_enum(params[name], type)
         else:
             _validate_param_type(params[name], type)
+
 
 def _validate_param_type(value, type):
     """Raise ParamValidationError if *value* isn't an instance of

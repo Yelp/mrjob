@@ -126,6 +126,16 @@ def _cleanup_callback(option, opt_str, value, parser):
     setattr(parser.values, option.dest, result)
 
 
+def _subnets_callback(option, opt_str, value, parser):
+    """callback to parse a comma-separated list of subnets.
+
+    This eliminates whitespace
+    """
+    subnets = [s.strip() for s in value.split(',') if s]
+
+    setattr(parser.values, option.dest, subnets)
+
+
 def _append_json_callback(option, opt_str, value, parser):
     """callback to parse JSON and append it to a list."""
     _default_to(parser, option.dest, [])
@@ -966,7 +976,13 @@ _RUNNER_OPTS = dict(
             (['--subnet'], dict(
                 help=('ID of Amazon VPC subnet to launch cluster in. If not'
                       ' set or empty string, cluster is launched in the normal'
-                      ' AWS cloud'),
+                      ' AWS cloud.'),
+            )),
+            (['--subnets'], dict(
+                callback=_subnets_callback,
+                help=('Like --subnets, but with a comma-separated list, to'
+                      ' specify multiple subnets in conjunction with'
+                      ' --instance-fleets'),
             )),
         ],
     ),

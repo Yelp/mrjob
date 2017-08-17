@@ -523,6 +523,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # don't allow blank region
             return opt_value or _DEFAULT_EMR_REGION
 
+        # subnet should be None, a string, or a multi-item list
+        elif opt_key == 'subnet':
+            return _fix_subnet_opt(opt_value)
+
         else:
             return opt_value
 
@@ -1364,7 +1368,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             kwargs['Configurations'] = self._opts['emr_configurations']
 
         if self._opts['subnet']:
-            Instances['Ec2SubnetId'] = self._opts['subnet']
+            # handle lists of subnets (for instance fleets)
+            if isinstance(self._opts['subnet'], list):
+                Instances['Ec2SubnetIds'] = self._opts['subnet']
+            else:
+                Instances['Ec2SubnetId'] = self._opts['subnet']
 
         if self._opts['emr_api_params']:
             kwargs.update(self._opts['emr_api_params'])
@@ -2588,7 +2596,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 return
 
             subnet = cluster['Ec2InstanceAttributes'].get('Ec2SubnetId')
-            if subnet != (self._opts['subnet'] or None):
+            if isinstance(self._opts['subnet'], list):
+                matches = (subnet in self._opts['subnet'])
+            else:
+                matches = (subnet == self._opts['subnet'])
+
+            if not matches:
                 log.debug('    subnet mismatch')
                 return
 
@@ -3076,6 +3089,21 @@ def _fix_configuration_opt(c):
             del c['Configurations']
 
     return c
+
+
+def _fix_subnet_opt(subnet):
+    """Return either None, a string, or a list with at least two items."""
+    if not subnet:
+        return None
+
+    if isinstance(subnet, string_types):
+        return subnet
+
+    subnet = list(subnet)
+    if len(subnet) == 1:
+        return subnet[0]
+    else:
+        return subnet
 
 
 def _build_instance_group(role, instance_type, num_instances, bid_price):

@@ -445,9 +445,28 @@ class MockEMRClient(object):
 
         # Ec2SubnetId
         if 'Ec2SubnetId' in Instances:
+            if 'Ec2SubnetIds' in Instances:
+                # TODO: get actual error message
+                raise _error('Ec2SubnetId and Ec2SubnetIds together')
+
             _validate_param(Instances, 'Ec2SubnetId', string_types)
             cluster['Ec2InstanceAttributes']['Ec2SubnetId'] = (
                 Instances.pop('Ec2SubnetId'))
+
+        # Ec2SubnetIds
+        if 'Ec2SubnetIds' in Instances:
+            _validate_param(Instances, 'Ec2SubnetIds', list)
+            Ec2SubnetIds = Instances.pop('Ec2SubnetIds')
+            if not Ec2SubnetIds:
+                # TODO: get actual error message
+                raise _error('empty Ec2SubnetIds')
+
+            # TODO: require InstanceFleets to be set
+
+            for subnet_id in Ec2SubnetIds:
+                _validate_param_type(subnet_id, string_types)
+                # arbitrarily choose last subnet ID
+                cluster['Ec2InstanceAttributes']['Ec2SubnetIds'] = subnet_id
 
         # KeepJobFlowAliveWhenNoSteps
         if 'KeepJobFlowAliveWhenNoSteps' in Instances:

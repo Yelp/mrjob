@@ -334,6 +334,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',
+        'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
         'mins_to_end_of_hour',
@@ -1303,7 +1304,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._opts['zone']:
             Instances['Placement'] = dict(AvailabilityZone=self._opts['zone'])
 
-        Instances['InstanceGroups'] = self._instance_groups()
+        if self._opts['instance_fleets']:
+            Instances['InstanceFleets'] = self._opts['instance_fleets']
+        else:
+            Instances['InstanceGroups'] = self._instance_groups()
 
         # bootstrap actions
         kwargs['BootstrapActions'] = BootstrapActions = []

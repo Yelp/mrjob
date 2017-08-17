@@ -665,6 +665,18 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    instance_fleets=dict(
+        cloud_role='launch',
+        switches=[
+            (['--instance-fleets'], dict(
+                callback=_json_callback,
+                help=('detailed JSON list of instance fleets, including'
+                      ' EBS configuration. See docs for --instance-fleets'
+                      ' at http://docs.aws.amazon.com/cli/latest/reference'
+                      '/emr/create-cluster.html'),
+            )),
+        ],
+    ),
     instance_type=dict(
         cloud_role='launch',
         switches=[

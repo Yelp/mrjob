@@ -44,6 +44,11 @@ cluster's instances provide at least as much memory and at least as much CPU as
 your job requests. If there is a tie, it picks clusters that are closest to
 the end of a full hour, to minimize wasted instance hours.
 
+Pooling is also somewhat flexible about EBS volumes (see
+:mrjob-opt:`instance_groups`). Each volume must have the same volume type,
+but larger volumes or volumes with more I/O ops per second are acceptable,
+as are additional volumes of any type.
+
 mrjob's pooling won't add more than 1000 steps to a cluster, as the
 EMR API won't show more than this many steps. (For `very old AMIs <http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/AddingStepstoaJobFlow.html>`__
 there is a stricter limit of 256 steps).

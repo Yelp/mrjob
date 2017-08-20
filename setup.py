@@ -26,8 +26,8 @@ try:
             'ujson': ['ujson'],
         },
         'install_requires': [
-            'boto3>=1.4.4',
-            'botocore>=1.5.0',
+            'boto3>=1.4.6',
+            'botocore>=1.6.0',
             #'google-api-python-client>=1.5.0'  # see below
             'PyYAML>=3.08',
         ],

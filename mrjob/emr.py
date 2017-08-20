@@ -3067,22 +3067,43 @@ def _fix_subnet_opt(subnet):
         return subnet
 
 
-def _instance_groups_satisfy_fleets(actual_igs, req_fleets):
-    """Do the actual instance groups from a cluster satisfy the requested
-    instance fleets, for the purpose of pooling?"
+def _build_instance_group(role, instance_type, num_instances, bid_price):
+    """Helper method for creating instance groups. For use when
+    creating a cluster using a list of InstanceGroups
 
-    the format of *actual_igs* is here:
-    http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_ListInstanceGroups.html
-
-    and the format of *req_fleets* is here:
-    http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_InstanceFleetConfig.html
+        - Role is either 'master', 'core', or 'task'.
+        - instance_type is an EC2 instance type
+        - count is an int
+        - bid_price is a number, a string, or None. If None,
+          this instance group will be use the ON-DEMAND market
+          instead of the SPOT market.
     """
-    return _igs_satisfy_request(
-        actual_igs, req_fleets,
-        req_role_field='InstanceFleetType',
-        req_count_fields=['TargetOnDemandCapacity', 'TargetSpotCapacity'],
-        match_for_role_func=_igs_for_role_satisfy_fleet)
+    if role not in _INSTANCE_ROLES:
+        raise ValueError
 
+    if not instance_type:
+        raise ValueError
+
+    if not num_instances:
+        raise ValueError
+
+    ig = dict(
+        InstanceCount=num_instances,
+        InstanceRole=role.upper(),
+        InstanceType=instance_type,
+        Market='ON_DEMAND',
+        Name=role,  # just name the groups "core", "master", and "task"
+    )
+
+    if bid_price:
+        ig['Market'] = 'SPOT'
+        ig['BidPrice'] = str(bid_price)  # must be a string
+
+    return ig
+
+
+\
+### pooled cluster matching: instance groups ###
 
 def _instance_groups_satisfy(actual_igs, requested_igs):
     """Do the actual instance groups from a cluster satisfy the requested
@@ -3093,31 +3114,19 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
     and the format of *actual_igs* is here:
     http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_ListInstanceGroups.html
     """
-    return _igs_satisfy_request(
-        actual_igs, requested_igs,
-        req_role_field='InstanceRole',
-        req_count_fields=['InstanceCount'],
-        match_for_role_func=_igs_for_same_role_satisfy)
-
-
-def _igs_satisfy_request(actual_igs, request, req_role_field, req_count_fields,
-                         match_for_role_func):
-    """Common code for :py:func:`
-    :py:func:`_instance_groups_satisfy_fleets` and
-    :py:func:`_instance_groups_satisfy`."""
-
     # a is a map from role to actual instance groups
     a = defaultdict(list)
     for ig in actual_igs:
         a[ig['InstanceGroupType'].lower()].append(ig)
 
     # r is a map from role to request (should be only one per role)
-    r = {req[req_role_field].lower(): req for req in request}
+    r = {req['InstanceRole'].lower(): req for req in requested_igs}
 
     # updated request to account for extra instance groups
     # see #1630 for what we do when roles don't match
     if set(a) - set(r):
-        r = _add_missing_roles_to_request(set(a) - set(r), r, req_count_fields)
+        r = _add_missing_roles_to_request(set(a) - set(r), r,
+                                          ['InstanceCount'])
 
     if set(a) != set(r):
         log.debug("    missing instance group roles")
@@ -3125,41 +3134,12 @@ def _igs_satisfy_request(actual_igs, request, req_role_field, req_count_fields,
 
     sort_keys = {}
     for role in sorted(r):
-        sort_key = match_for_role_func(a[role], r[role])
+        sort_key = _igs_for_same_role_satisfy(a[role], r[role])
         if not sort_key:  # doesn't satisfy
             return None
         sort_keys[role] = sort_key
 
     return tuple(sort_keys.get(role) for role in ('core', 'task', 'master'))
-
-
-def _add_missing_roles_to_request(
-        missing_roles, role_to_req, req_count_fields):
-    """Helper for :py:func:`_igs_satisfy_request`. Add requests for
-    *missing_roles* to *role_to_ig* so that we have a better chance of
-    matching the cluster's actual instance groups."""
-    # see #1630 for discussion
-
-    # don't worry about modifying *role_to_req*; this is
-    # a helper func
-
-    if 'core' in missing_roles and list(role_to_req) == ['master']:
-        # both core and master have to satisfy master-only request
-        role_to_req['core'] = role_to_req['master']
-
-    if 'task' in missing_roles and 'core' in role_to_req:
-        # make sure tasks won't crash on the task instances,
-        # but don't require the same amount of CPU
-        role_to_req['task'] = dict(role_to_req['core'])
-        for req_count_field in req_count_fields:
-            role_to_req['task'][req_count_field] = 0
-
-    return role_to_req
-
-
-def _igs_for_role_satisfy_fleet(actual_igs, req_fleet):
-    # TODO: start here
-    pass
 
 
 def _igs_for_same_role_satisfy(actual_igs, requested_ig):
@@ -3347,36 +3327,69 @@ def _igs_satisfy_cpu(actual_igs, requested_ig):
         return None
 
 
-def _build_instance_group(role, instance_type, num_instances, bid_price):
-    """Helper method for creating instance groups. For use when
-    creating a cluster using a list of InstanceGroups
 
-        - Role is either 'master', 'core', or 'task'.
-        - instance_type is an EC2 instance type
-        - count is an int
-        - bid_price is a number, a string, or None. If None,
-          this instance group will be use the ON-DEMAND market
-          instead of the SPOT market.
-    """
-    if role not in _INSTANCE_ROLES:
-        raise ValueError
+### pooled cluster matching: instance fleets ###
 
-    if not instance_type:
-        raise ValueError
+def _instance_fleets_satisfy(actual_fleets, req_fleets):
+    """Common code for :py:func:`
+    :py:func:`_instance_groups_satisfy_fleets` and
+    :py:func:`_instance_groups_satisfy`."""
 
-    if not num_instances:
-        raise ValueError
+    # a is a map from role to actual instance fleet
+    # (unlike with groups, there can never be more than one fleet per role)
+    a = {f['InstanceFleetType'].lower(): f for f in actual_fleets}
 
-    ig = dict(
-        InstanceCount=num_instances,
-        InstanceRole=role.upper(),
-        InstanceType=instance_type,
-        Market='ON_DEMAND',
-        Name=role,  # just name the groups "core", "master", and "task"
-    )
+    # r is a map from role to request (should be only one per role)
+    r = {f['InstanceFleetType'].lower(): f for f in req_fleets}
 
-    if bid_price:
-        ig['Market'] = 'SPOT'
-        ig['BidPrice'] = str(bid_price)  # must be a string
+    # updated request to account for extra instance groups
+    # see #1630 for what we do when roles don't match
+    if set(a) - set(r):
+        r = _add_missing_roles_to_request(
+            set(a) - set(r), r,
+            ['TargetOnDemandCapacity', 'TargetSpotCapacity'])
 
-    return ig
+    if set(a) != set(r):
+        log.debug("    missing instance fleet roles")
+        return None
+
+    sort_keys = {}
+    for role in sorted(r):
+        sort_key = _fleet_for_same_role_satisfies(a[role], r[role])
+        if not sort_key:  # doesn't satisfy
+            return None
+        sort_keys[role] = sort_key
+
+    return tuple(sort_keys.get(role) for role in ('core', 'task', 'master'))
+
+
+def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
+    # TODO: start here
+    pass
+
+
+### pooled cluster matching: common code ###
+
+
+def _add_missing_roles_to_request(
+        missing_roles, role_to_req, req_count_fields):
+    """Helper for :py:func:`_igs_satisfy_request`. Add requests for
+    *missing_roles* to *role_to_ig* so that we have a better chance of
+    matching the cluster's actual instance groups."""
+    # see #1630 for discussion
+
+    # don't worry about modifying *role_to_req*; this is
+    # a helper func
+
+    if 'core' in missing_roles and list(role_to_req) == ['master']:
+        # both core and master have to satisfy master-only request
+        role_to_req['core'] = role_to_req['master']
+
+    if 'task' in missing_roles and 'core' in role_to_req:
+        # make sure tasks won't crash on the task instances,
+        # but don't require the same amount of CPU
+        role_to_req['task'] = dict(role_to_req['core'])
+        for req_count_field in req_count_fields:
+            role_to_req['task'][req_count_field] = 0
+
+    return role_to_req

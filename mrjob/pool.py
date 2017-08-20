@@ -273,14 +273,14 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
     actual_specs = {spec['InstanceType']: spec
                     for spec in actual_fleet['InstanceTypeSpecifications']}
     req_specs = {spec['InstanceType']: spec
-                 for spec in req_fleet['InstanceTypeSpecifications']}
+                 for spec in req_fleet['InstanceTypeConfigs']}
 
     if set(actual_specs) - set(req_specs):
         log.debug('    fleet may include wrong instance types')
         return
 
     if not all(_fleet_spec_satsifies(actual_specs[t], req_specs[t])
-                for t in actual_specs):
+               for t in actual_specs):
         return
 
     # capacity
@@ -316,14 +316,14 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
 
 
 def _get_timeout_action(fleet):
-    return fleet['InstanceTypeSpecifications'].get(
+    return fleet.get(
         'LaunchSpecifications', {}).get(
             'SpotSpecification', {}).get(
                 'TimeoutAction')
 
 
 def _get_timeout_duration(fleet):
-    return fleet['InstanceTypeSpecifications'].get(
+    return fleet.get(
         'LaunchSpecifications', {}).get(
             'SpotSpecification', {}).get(
                 'TimeoutAction', 0.0)

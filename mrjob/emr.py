@@ -2643,11 +2643,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 # mock_boto3 doesn't yet support this
 
-                #actual_fleets = list(_boto3_paginate(
-                #    'InstanceFleets', emr_client, 'list_instance_fleets',
-                #    ClusterId=cluster['Id']))
-
-                actual_fleets = []
+                actual_fleets = list(_boto3_paginate(
+                    'InstanceFleets', emr_client, 'list_instance_fleets',
+                    ClusterId=cluster['Id']))
 
                 req_fleets = self._opts['instance_fleets']
 

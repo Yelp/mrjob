@@ -2629,21 +2629,40 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     log.debug('    unfinished steps')
                     return
 
-            # check memory and compute units, bailing out if we hit
-            # an instance with too little memory
-            actual_igs = list(_boto3_paginate(
-                'InstanceGroups', emr_client, 'list_instance_groups',
-                ClusterId=cluster['Id']))
+            collection_type = cluster.get('InstanceCollectionType',
+                                          'INSTANCE_GROUP')
 
-            requested_igs = self._instance_groups()
+            instance_sort_key = None
 
-            ig_sort_key = _instance_groups_satisfy(actual_igs, requested_igs)
+            if self._opts['instance_fleets']:
+                if collection_type != 'INSTANCE_FLEET':
+                    log.debug('    does not use instance fleets')
+                    return
 
-            if not ig_sort_key:
+                # TODO add logic for instance fleets
+                log.debug('    pooling not yet supported for instance fleets')
                 return
+            else:
+                if collection_type != 'INSTANCE_GROUP':
+                    log.debug('    does not use instance groups')
+                    return
+
+                # check memory and compute units, bailing out if we hit
+                # an instance with too little memory
+                actual_igs = list(_boto3_paginate(
+                    'InstanceGroups', emr_client, 'list_instance_groups',
+                    ClusterId=cluster['Id']))
+
+                requested_igs = self._instance_groups()
+
+                instance_sort_key = _instance_groups_satisfy(
+                    actual_igs, requested_igs)
+
+                if not instance_sort_key:
+                    return
 
             # prioritize "best" clusters, with time as tiebreaker
-            sort_key = (ig_sort_key, _est_time_to_hour(cluster))
+            sort_key = (instance_sort_key, _est_time_to_hour(cluster))
 
             log.debug('    OK')
             key_cluster_steps_list.append(

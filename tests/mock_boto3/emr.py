@@ -495,6 +495,7 @@ class MockEMRClient(object):
 
             self._add_instance_groups(
                 operation_name, Instances.pop('InstanceGroups'), cluster)
+            cluster['InstanceCollectionType'] = 'INSTANCE_GROUP'
         # TODO: will need to support instance fleets at some point
         else:
             # build our own instance groups
@@ -523,6 +524,7 @@ class MockEMRClient(object):
 
             self._add_instance_groups(
                 operation_name, instance_groups, cluster, now=now)
+            cluster['InstanceCollectionType'] = 'INSTANCE_GROUP'
 
         if Instances:
             raise NotImplementedError(

@@ -670,7 +670,7 @@ class MockEMRClient(object):
         return specs
 
     def _instance_type_config_to_spec(
-            self, operation_name, InstanceTypeConfig, InstanceFleetType):
+            self, operation_name, InstanceTypeConfig, Name, InstanceFleetType):
 
         def _error(message):
             return _ValidationException(operation_name, message)
@@ -706,7 +706,8 @@ class MockEMRClient(object):
             if 'BidPriceAsPercentageOfOnDemandPrice' in InstanceTypeConfig:
                 raise _error('Specify at most one of bidPrice or'
                              ' bidPriceAsPercentageOfOnDemandPrice value for'
-                             ' the Spot Instance fleet : dupes request.')
+                             ' the Spot Instance fleet : %s request.' % (
+                                 Name or null))
 
             _validate_param(InstanceTypeConfig, 'BidPrice', string_types)
             BidPrice = InstanceTypeConfig.pop('BidPrice')

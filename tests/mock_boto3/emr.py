@@ -1442,9 +1442,19 @@ class MockEMRClient(object):
             cluster['MasterPublicDnsName'] = 'master.%s.mock' % cluster['Id']
 
             # instances are now provisioned
-            for ig in cluster['_InstanceGroups']:
-                ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
-                ig['Status']['State'] = 'BOOTSTRAPPING'
+            if cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
+                for fleet in cluster['_InstanceFleets']:
+                    fleet['ProvisionedOnDemandCapacity'] = fleet[
+                        'RequestedOnDemandCapacity']
+                    fleet['ProvisionedSpotCapacity'] = fleet[
+                        'RequestedSpotCapacity']
+                    fleet['Status']['State'] = 'BOOTSTRAPPING'
+
+            else:
+                for ig in cluster['_InstanceGroups']:
+                    ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
+                    ig['Status']['State'] = 'BOOTSTRAPPING'
+
 
             return
 
@@ -1466,8 +1476,13 @@ class MockEMRClient(object):
         # if job is BOOTSTRAPPING, move it along to RUNNING and continue
         if cluster['Status']['State'] == 'BOOTSTRAPPING':
             cluster['Status']['State'] = 'RUNNING'
-            for ig in cluster['_InstanceGroups']:
-                ig['Status']['State'] = 'RUNNING'
+
+            if cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
+                for fleet in cluster['_InstanceFleets']:
+                    fleet['Status']['State'] = 'RUNNING'
+            else:
+                for ig in cluster['_InstanceGroups']:
+                    ig['Status']['State'] = 'RUNNING'
 
         # at this point, should be RUNNING or WAITING
         assert cluster['Status']['State'] in ('RUNNING', 'WAITING')

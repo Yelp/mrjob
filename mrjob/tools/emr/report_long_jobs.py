@@ -41,6 +41,8 @@ Options::
                         -us-west-1.amazonaws.com). You usually shouldn't set
                         this; by default mrjob will choose the correct
                         endpoint for each S3 bucket based on its location.
+  -x, --exclude=TAG_KEY,TAG_VALUE
+                        Exclude clusters that have the specified tag key/value pair
   -v, --verbose         print more messages to stderr
 """
 from __future__ import print_function
@@ -85,8 +87,13 @@ def main(args=None):
         'Clusters', emr_client, 'list_clusters',
         ClusterStates=['STARTING', 'BOOTSTRAPPING', 'RUNNING'])
 
+    if not options.exclude:
+        filtered_cluster_summaries = cluster_summaries
+    else:
+        filtered_cluster_summaries = _filter_clusters(cluster_summaries, emr_client, options.exclude)
+
     job_info = _find_long_running_jobs(
-        emr_client, cluster_summaries, min_time, now=now)
+        emr_client, filtered_cluster_summaries, min_time, now=now)
 
     _print_report(job_info)
 
@@ -102,6 +109,22 @@ def _runner_kwargs(options):
     return kwargs
 
 
+def _filter_clusters(cluster_summaries, emr_client, exclude_strings):
+    exclude_as_dicts = []
+    for exclude_string in exclude_strings:
+        exclude_key, exclude_value = exclude_string.split(',')
+        exclude_as_dicts.append({'Key': exclude_key, 'Value': exclude_value})
+
+    for cs in cluster_summaries:
+        cluster_id = cs['Id']
+        cluster_tags = emr_client.describe_cluster(ClusterId=cluster_id)['Cluster']['Tags']
+        for cluster_tag in cluster_tags:
+            if cluster_tag in exclude_as_dicts:
+                break
+        else:
+            yield cs
+
+
 def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
     """Identify jobs that have been running or pending for a long time.
 
@@ -110,6 +133,8 @@ def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
                      pending longer than this
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
+    :param exclude: A list of strings of the form TAG_KEY:TAG_VALUE
+                Excludes any clusters that have tags that match
 
     For each job that is running or pending longer than *min_time*, yields
     a dictionary with the following keys:
@@ -226,6 +251,13 @@ def _make_option_parser():
         default=DEFAULT_MIN_HOURS,
         help=('Minimum number of hours a job can run before we report it.'
               ' Default: %default'))
+
+    option_parser.add_option(
+        '-x', '--exclude', action='append',
+        help=('Exclude clusters that match the specified tags.'
+            ' Specifed in the form TAG_KEY,TAG_VALUE.'
+        )
+    )
 
     _add_basic_options(option_parser)
     _add_runner_options(

@@ -2635,6 +2635,41 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--master-instance-bid-price', '77.77',
             '--task-instance-bid-price', '22.00'])
 
+    def test_same_instance_fleet_config(self):
+        INSTANCE_FLEETS = [
+            dict(
+                InstanceFleetType='MASTER',
+                InstanceTypeConfigs=[
+                    dict(
+                        InstanceType='m1.medium'
+                    ),
+                ],
+                TargetOnDemandCapacity=1,
+            ),
+            dict(
+                InstanceFleetType='CORE',
+                InstanceTypeConfigs=[
+                    dict(
+                        InstanceType='m1.medium',
+                        WeightedCapacity=1,
+                    ),
+                    dict(
+                        InstanceType='m1.large',
+                        WeightedCapacity=2,
+                    ),
+                ],
+                TargetOnDemandCapacity=2,
+            ),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=INSTANCE_FLEETS)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(INSTANCE_FLEETS)
+        ])
+
     def test_dont_join_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 

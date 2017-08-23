@@ -561,8 +561,8 @@ class MockEMRClient(object):
 
         # only allowed for AMI 4.8.0+ and 5.1.0+
         if not (cluster.get('ReleaseLabel') and
-                map_version(INSTANCE_FLEET_AMI_VERSIONS,
-                            cluster['ReleaseLabel'].lstrip('emr-'))):
+                map_version(cluster['ReleaseLabel'].lstrip('emr-'),
+                            INSTANCE_FLEET_AMI_VERSIONS)):
             raise _error('Instance fleets are not available for the release.')
 
         if cluster.get('_InstanceGroups') or cluster.get('_InstanceFleets'):
@@ -613,9 +613,9 @@ class MockEMRClient(object):
                 fleet['Name'] = InstanceFleet.pop['Name']
 
             # InstanceTypeConfigs
-            _validate_param(InstanceFleet, 'InstanceTypeConfigs', dict)
+            _validate_param(InstanceFleet, 'InstanceTypeConfigs', list)
             fleet['InstanceTypeSpecifications'] = (
-                self._instance_type_config_to_specs(
+                self._instance_type_configs_to_specs(
                     operation_name,
                     InstanceFleet.pop('InstanceTypeConfigs'),
                     fleet.get('Name'), fleet['InstanceFleetType']))
@@ -665,7 +665,8 @@ class MockEMRClient(object):
 
             specs.append(
                 self._instance_type_config_to_spec(
-                    InstanceTypeConfig, InstanceType))
+                    operation_name,
+                    InstanceTypeConfig, Name, InstanceFleetType))
 
         return specs
 

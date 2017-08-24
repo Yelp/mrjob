@@ -119,6 +119,7 @@ class MockEMRClient(object):
     OPERATION_NAME_TO_RESULT_KEY = dict(
         list_bootstrap_actions='BootstrapActions',
         list_clusters='Clusters',
+        list_instance_fleets='InstanceFleets',
         list_instance_groups='InstanceGroups',
         list_instances='Instances',
         list_steps='Steps',
@@ -619,6 +620,26 @@ class MockEMRClient(object):
                     operation_name,
                     InstanceFleet.pop('InstanceTypeConfigs'),
                     fleet.get('Name'), fleet['InstanceFleetType']))
+
+            # target capacity
+            for target_field in ('TargetOnDemandCapacity',
+                                 'TargetSpotCapacity'):
+                if target_field in InstanceFleet:
+                    _validate_param(InstanceFleet, target_field, int)
+                    fleet[target_field] = InstanceFleet.pop(target_field)
+
+            target_capacity = (fleet['TargetOnDemandCapacity'] +
+                               fleet['TargetSpotCapacity'])
+
+            if role == 'MASTER' and target_capacity != 1:
+                raise _error('A master instance fleet can only have a target'
+                             ' capacity of 1. Revise the configuration and'
+                             ' resubmit.')
+            elif target_capacity < 1:
+                raise _error('The instance fleet (%s) should have a value of'
+                             ' one or greater for either'
+                             ' targetOnDemandCapacity or targetSpotCapacity.' %
+                             fleet.get('Name', 'null'))
 
             if InstanceFleet:
                 raise NotImplementedError(

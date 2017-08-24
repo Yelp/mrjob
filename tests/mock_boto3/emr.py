@@ -789,6 +789,8 @@ class MockEMRClient(object):
                 'mock_boto3 does not support these InstanceTypeConfig'
                 ' params: %s' % ', '.join(sorted(InstanceTypeConfig)))
 
+        return spec
+
     def _ebs_block_device_configs_to_block_devices(
             self, operation_name, EbsBlockDeviceConfigs):
 

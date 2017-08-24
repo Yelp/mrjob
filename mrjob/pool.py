@@ -240,8 +240,6 @@ def _instance_fleets_satisfy(actual_fleets, req_fleets):
     :py:func:`_instance_groups_satisfy_fleets` and
     :py:func:`_instance_groups_satisfy`."""
 
-    import pdb; pdb.set_trace()
-
     # a is a map from role to actual instance fleet
     # (unlike with groups, there can never be more than one fleet per role)
     a = {f['InstanceFleetType'].lower(): f for f in actual_fleets}

@@ -110,6 +110,10 @@ def _runner_kwargs(options):
 
 
 def _filter_clusters(cluster_summaries, emr_client, exclude_strings):
+    """ Filter out clusters that have tags matching any specified in exclude_strings.
+    :param cluster_summaries: a list of :py:mod:`boto3` cluster summary data structures
+    :param exclude_strings: A list of strings of the form TAG_KEY,TAG_VALUE
+    """
     exclude_as_dicts = []
     for exclude_string in exclude_strings:
         exclude_key, exclude_value = exclude_string.split(',')
@@ -133,8 +137,6 @@ def _find_long_running_jobs(emr_client, cluster_summaries, min_time, now=None):
                      pending longer than this
     :param now: the current UTC time, as a :py:class:`datetime.datetime`.
                 Defaults to the current time.
-    :param exclude: A list of strings of the form TAG_KEY:TAG_VALUE
-                Excludes any clusters that have tags that match
 
     For each job that is running or pending longer than *min_time*, yields
     a dictionary with the following keys:

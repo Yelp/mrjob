@@ -2649,7 +2649,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             weighted_capacities=None,
             ebs_device_configs=None,
             ebs_optimized=None,
-            on_demand_capacity=1, spot_capacity=0):
+            on_demand_capacity=1, spot_capacity=0, spot_spec=None):
 
         config = dict(InstanceFleetType=role.upper(), InstanceTypeConfigs=[])
 
@@ -2677,6 +2677,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
                 instance_config['EbsConfiguration'] = EbsConfiguration
 
             config['InstanceTypeConfigs'].append(instance_config)
+
+        if spot_spec:
+            config['LaunchSpecifications'] = dict(SpotSpecification=spot_spec)
 
         if on_demand_capacity:
             config['TargetOnDemandCapacity'] = on_demand_capacity
@@ -2927,7 +2930,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--instance-fleets', json.dumps(fleets)
         ])
 
-    def test_better_ebs_devices_okay(self):
+    def test_fleet_with_better_ebs_devices_okay(self):
         actual_fleets = [
             self._fleet_config(ebs_device_configs=[dict(
                 VolumeSpecification=dict(VolumeType='standard', SizeInGB=200))
@@ -2947,7 +2950,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--instance-fleets', json.dumps(req_fleets)
         ])
 
-    def test_worse_ebs_devices_not_okay(self):
+    def test_fleet_with_worse_ebs_devices_not_okay(self):
         actual_fleets = [
             self._fleet_config(ebs_device_configs=[dict(
                 VolumeSpecification=dict(VolumeType='standard', SizeInGB=50))
@@ -2966,6 +2969,24 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
             '--instance-fleets', json.dumps(req_fleets)
+        ])
+
+    def test_fleet_that_terminates_on_spot_timeout(self):
+        fleets = [
+            self._fleet_config(
+                spot_spec=dict(
+                    TimeoutAction='TERMINATE_CLUSTER',
+                    TimeoutDurationMinutes=1440,
+                ),
+            ),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(fleets)
         ])
 
     def test_dont_join_full_cluster(self):

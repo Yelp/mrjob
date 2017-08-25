@@ -621,6 +621,25 @@ class MockEMRClient(object):
                     InstanceFleet.pop('InstanceTypeConfigs'),
                     fleet.get('Name'), fleet['InstanceFleetType']))
 
+            # LaunchSpecifications
+            if 'LaunchSpecifications' in InstanceFleet:
+                _validate_param(InstanceFleet, 'LaunchSpecifications', dict)
+                LaunchSpecifications = InstanceFleet.pop(
+                    'LaunchSpecifications')
+
+                _validate_param(LaunchSpecifications, 'SpotSpecification')
+                SpotSpecification = LaunchSpecifications['SpotSpecification']
+
+                _validate_param(
+                    SpotSpecification, 'TimeoutAction', string_types)
+                _validate_param_enum(
+                    SpotSpecification['TimeoutAction'],
+                    ['SWITCH_TO_ON_DEMAND', 'TERMINATE_CLUSTER'])
+                _validate_param(
+                    SpotSpecification, 'TimeoutDurationMinutes', int)
+
+                fleet['LaunchSpecifications'] = deepcopy(LaunchSpecifications)
+
             # target capacity
             for target_field in ('TargetOnDemandCapacity',
                                  'TargetSpotCapacity'):

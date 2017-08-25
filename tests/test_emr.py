@@ -1761,6 +1761,15 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         mock_cluster['Status']['Timeline']['CreationDateTime'] = (
             _boto3_now() - timedelta(minutes=minutes_ago))
         mock_cluster['MasterPublicDnsName'] = 'mockmaster'
+
+        # instance fleets cares about provisioned instances
+        if mock_cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
+            for fleet in mock_cluster['_InstanceFleets']:
+                fleet['ProvisionedOnDemandCapacity'] = fleet[
+                    'TargetOnDemandCapacity']
+                fleet['ProvisionedSpotCapacity'] = fleet[
+                    'TargetSpotCapacity']
+
         return runner, cluster_id
 
     def get_cluster(self, job_args, job_class=MRTwoStepJob):
@@ -2635,39 +2644,261 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--master-instance-bid-price', '77.77',
             '--task-instance-bid-price', '22.00'])
 
+    def _fleet_config(
+            self, role='MASTER', instance_types=None,
+            weighted_capacities=None,
+            ebs_optimized=None,
+            on_demand_capacity=1, spot_capacity=0):
+
+        config = dict(InstanceFleetType=role.upper(), InstanceTypeConfigs=[])
+
+        if not instance_types:
+            instance_types = 'm1.medium'
+
+        if not weighted_capacities:
+            weighted_capacities = {}
+
+        for instance_type in instance_types:
+            instance_config = dict(InstanceType=instance_type)
+            if weighted_capacities.get(instance_type):
+                instance_config['WeightedCapacity'] = (
+                    weighted_capacities[instance_type])
+
+            if ebs_optimized is not None:
+                instance_config['EbsConfiguration'] = dict(
+                    EbsOptimized=ebs_optimized)
+
+            config['InstanceTypeConfigs'].append(instance_config)
+
+        if on_demand_capacity:
+            config['TargetOnDemandCapacity'] = on_demand_capacity
+
+        if spot_capacity:
+            config['TargetSpotCapacity'] = spot_capacity
+
+        return config
+
     def test_same_instance_fleet_config(self):
-        INSTANCE_FLEETS = [
-            dict(
-                InstanceFleetType='MASTER',
-                InstanceTypeConfigs=[
-                    dict(
-                        InstanceType='m1.medium'
-                    ),
-                ],
-                TargetOnDemandCapacity=1,
-            ),
-            dict(
-                InstanceFleetType='CORE',
-                InstanceTypeConfigs=[
-                    dict(
-                        InstanceType='m1.medium',
-                        WeightedCapacity=1,
-                    ),
-                    dict(
-                        InstanceType='m1.large',
-                        WeightedCapacity=2,
-                    ),
-                ],
-                TargetOnDemandCapacity=2,
-            ),
+        fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(role='CORE',
+                               instance_types=['m1.medium', 'm1.large'],
+                               weighted_capacities={'m1.large': 2})
         ]
 
         _, cluster_id = self.make_pooled_cluster(
-            instance_fleets=INSTANCE_FLEETS)
+            instance_fleets=fleets)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
-            '--instance-fleets', json.dumps(INSTANCE_FLEETS)
+            '--instance-fleets', json.dumps(fleets)
+        ])
+
+    def test_instance_groups_dont_satisfy_fleets(self):
+        fleets = [self._fleet_config(instance_types=['m1.medium', 'm1.large'])]
+
+        _, cluster_id = self.make_pooled_cluster(
+            master_instance_type='m1.large')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(fleets)])
+
+    def test_weighted_capacities_must_match(self):
+        actual_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(role='CORE',
+                               instance_types=['m1.medium', 'm1.large'],
+                               weighted_capacities={'m1.large': 2})
+        ]
+
+        req_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(role='CORE',
+                               instance_types=['m1.medium', 'm1.large'],
+                               weighted_capacities={'m1.large': 3})
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)])
+
+    def test_matching_fleet_capacity(self):
+        fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=3, spot_capacity=4),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(fleets)])
+
+    def test_extra_fleet_capacity(self):
+        actual_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=4, spot_capacity=5),
+        ]
+
+        req_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=3, spot_capacity=4),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)])
+
+    def test_less_fleet_capacity(self):
+        actual_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=2, spot_capacity=3),
+        ]
+
+        req_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=3, spot_capacity=4),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)])
+
+    def test_on_demand_can_count_for_missing_spot_capcity(self):
+        actual_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=4, spot_capacity=3),
+        ]
+
+        req_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=3, spot_capacity=4),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)])
+
+    def test_spot_cant_count_for_missing_on_demand_capcity(self):
+        actual_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=3, spot_capacity=4),
+        ]
+
+        req_fleets = [
+            self._fleet_config(role='MASTER'),
+            self._fleet_config(
+                role='CORE',
+                on_demand_capacity=4, spot_capacity=3),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)])
+
+    def test_extra_requested_fleet_instance_okay(self):
+        actual_fleets = [
+            self._fleet_config(instance_types=['m1.medium', 'm1.large'])]
+
+        req_fleets = [
+            self._fleet_config(
+                instance_types=['m1.medium', 'm1.large', 'm1.xlarge'])]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)])
+
+    def test_missing_requested_fleet_instance_not_okay(self):
+        actual_fleets = [
+            self._fleet_config(instance_types=['m1.medium', 'm1.large'])]
+
+        req_fleets = [
+            self._fleet_config(
+                instance_types=['m1.medium'])]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)])
+
+    def test_ebs_optimized_fleet(self):
+        fleets = [
+            self._fleet_config(ebs_optimized=True)]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(fleets)
+        ])
+
+    def test_unnecessary_fleet_ebs_optimization_okay(self):
+        actual_fleets = [
+            self._fleet_config(ebs_optimized=True)]
+
+        req_fleets = [
+            self._fleet_config(ebs_optimized=False)]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)
+        ])
+
+    def test_missing_fleet_ebs_optimization_not_okay(self):
+        actual_fleets = [
+            self._fleet_config(ebs_optimized=False)]
+
+        req_fleets = [
+            self._fleet_config(ebs_optimized=True)]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)
         ])
 
     def test_dont_join_full_cluster(self):

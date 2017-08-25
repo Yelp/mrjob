@@ -1470,16 +1470,15 @@ class MockEMRClient(object):
             if cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
                 for fleet in cluster['_InstanceFleets']:
                     fleet['ProvisionedOnDemandCapacity'] = fleet[
-                        'RequestedOnDemandCapacity']
+                        'TargetOnDemandCapacity']
                     fleet['ProvisionedSpotCapacity'] = fleet[
-                        'RequestedSpotCapacity']
+                        'TargetSpotCapacity']
                     fleet['Status']['State'] = 'BOOTSTRAPPING'
 
             else:
                 for ig in cluster['_InstanceGroups']:
                     ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
                     ig['Status']['State'] = 'BOOTSTRAPPING'
-
 
             return
 

@@ -285,14 +285,14 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
 
     # capacity
     actual_on_demand = actual_fleet.get('ProvisionedOnDemandCapacity', 0)
-    req_on_demand = req_fleet.get('RequestedOnDemandCapacity', 0)
+    req_on_demand = req_fleet.get('TargetOnDemandCapacity', 0)
 
     if req_on_demand > actual_on_demand:
         log.debug('    not enough on-demand capacity')
         return
 
     actual_spot = actual_fleet.get('ProvisionedSpotCapacity', 0)
-    req_spot = req_fleet.get('RequestedSpotCapacity', 0)
+    req_spot = req_fleet.get('TargetSpotCapacity', 0)
 
     # allow extra on-demand instances to serve as spot instances
     if req_spot > actual_spot + (actual_on_demand - req_on_demand):

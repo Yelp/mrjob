@@ -305,9 +305,8 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
             log.debug('    self-terminating fleet not requested')
             return
 
-        if ((actual_spot < actual_fleet.get('TargetSpotCapacity', 0)) and
-            (_get_timeout_duration(actual_fleet) <
-             _get_timeout_duration(req_fleet))):
+        if (_get_timeout_duration(actual_fleet) <
+                _get_timeout_duration(req_fleet)):
             log.debug('    fleet may self-terminate prematurely')
             return
 
@@ -326,7 +325,7 @@ def _get_timeout_duration(fleet):
     return fleet.get(
         'LaunchSpecifications', {}).get(
             'SpotSpecification', {}).get(
-                'TimeoutAction', 0.0)
+                'TimeoutDurationMinutes', 0.0)
 
 
 def _fleet_spec_satsifies(actual_spec, req_spec):

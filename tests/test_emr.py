@@ -2989,6 +2989,115 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--instance-fleets', json.dumps(fleets)
         ])
 
+    def test_fleet_that_might_terminate(self):
+        actual_fleets = [
+            self._fleet_config(
+                spot_spec=dict(
+                    TimeoutAction='TERMINATE_CLUSTER',
+                    TimeoutDurationMinutes=1440,
+                ),
+                spot_capacity=1,
+                on_demand_capacity=0,
+            )
+        ]
+
+        req_fleets = [
+            self._fleet_config(on_demand_capacity=0, spot_capacity=1)
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)
+        ])
+
+    def test_fleet_that_might_terminate_prematurely(self):
+        actual_fleets = [
+            self._fleet_config(
+                spot_spec=dict(
+                    TimeoutAction='TERMINATE_CLUSTER',
+                    TimeoutDurationMinutes=1440,
+                ),
+                spot_capacity=1,
+                on_demand_capacity=0,
+            ),
+        ]
+
+        req_fleets = [
+            self._fleet_config(
+                spot_spec=dict(
+                    TimeoutAction='TERMINATE_CLUSTER',
+                    TimeoutDurationMinutes=2880,
+                ),
+                spot_capacity=1,
+                on_demand_capacity=0,
+            ),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)
+        ])
+
+    def test_fleet_that_might_terminate_but_more_slowly(self):
+        actual_fleets = [
+            self._fleet_config(
+                spot_spec=dict(
+                    TimeoutAction='TERMINATE_CLUSTER',
+                    TimeoutDurationMinutes=1440,
+                ),
+                spot_capacity=1,
+                on_demand_capacity=0,
+            ),
+        ]
+
+        req_fleets = [
+            self._fleet_config(
+                spot_spec=dict(
+                    TimeoutAction='TERMINATE_CLUSTER',
+                    TimeoutDurationMinutes=770,
+                ),
+                spot_capacity=1,
+                on_demand_capacity=0,
+            ),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)
+        ])
+
+    def test_join_fleet_that_wont_terminate(self):
+        actual_fleets = [self._fleet_config()]
+
+        req_fleets = [
+            self._fleet_config(
+                spot_spec=dict(
+                    TimeoutAction='TERMINATE_CLUSTER',
+                    TimeoutDurationMinutes=770,
+                ),
+                spot_capacity=1,
+                on_demand_capacity=0,
+            ),
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)
+        ])
+
+
     def test_dont_join_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()
 

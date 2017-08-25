@@ -36,6 +36,7 @@ CLUSTERS = [
                 CreationDateTime=parse('2010-06-06T00:05:00Z'),
             ),
         ),
+        Tags=[],
         _steps=[],
     ),
     dict(
@@ -47,6 +48,7 @@ CLUSTERS = [
                 CreationDateTime=parse('2010-06-06T00:05:00Z'),
             ),
         ),
+        Tags=[],
         _steps=[],
     ),
     dict(
@@ -59,6 +61,7 @@ CLUSTERS = [
                 ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
+        Tags=[dict(Key='my_key', Value='my_value')],
         _Steps=[
             dict(
                 Name='mr_denial: Step 1 of 5',
@@ -81,6 +84,7 @@ CLUSTERS = [
                 ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
+        Tags=[],
         _Steps=[
             dict(
                 Name='mr_denial: Step 1 of 5',
@@ -113,6 +117,7 @@ CLUSTERS = [
                 ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
+        Tags=[],
         _Steps=[
             dict(
                 Name='mr_denial: Step 1 of 5',
@@ -151,6 +156,7 @@ CLUSTERS = [
                 ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
+        Tags=[],
         _Steps=[
             dict(
                 Name='mr_bargaining: Step 3 of 5',
@@ -170,6 +176,7 @@ CLUSTERS = [
                 ReadyDateTime=parse('2010-06-06T00:15:00Z'),
             ),
         ),
+        Tags=[],
         _Steps=[
             dict(
                 Name='mr_bargaining: Step 3 of 5',
@@ -200,6 +207,7 @@ CLUSTERS = [
             ),
         ),
         State='COMPLETED',
+        Tags=[],
         _Steps=[
             dict(
                 Name='mr_acceptance: Step 5 of 5',
@@ -260,6 +268,18 @@ class ReportLongJobsTestCase(MockBoto3TestCase):
 
         lines = [line for line in StringIO(self.stdout.getvalue())]
         self.assertEqual(len(lines), len(CLUSTERS_BY_ID) - 1)
+        self.assertNotIn('j-COMPLETED', self.stdout.getvalue())
+
+    def test_exclude(self):
+        for cluster in CLUSTERS:
+            self.add_mock_emr_cluster(cluster)
+
+        main(['-q', '--no-conf', '-x', 'my_key,my_value'])
+
+        lines = [line for line in StringIO(self.stdout.getvalue())]
+        self.assertEqual(len(lines), len(CLUSTERS_BY_ID) - 2)
+        self.assertNotIn('j-COMPLETED', self.stdout.getvalue())
+        self.assertNotIn('j-RUNNING1STEP', self.stdout.getvalue())
 
 
 class FindLongRunningJobsTestCase(MockBoto3TestCase):

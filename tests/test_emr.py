@@ -2647,13 +2647,14 @@ class PoolMatchingTestCase(MockBoto3TestCase):
     def _fleet_config(
             self, role='MASTER', instance_types=None,
             weighted_capacities=None,
+            ebs_device_configs=None,
             ebs_optimized=None,
             on_demand_capacity=1, spot_capacity=0):
 
         config = dict(InstanceFleetType=role.upper(), InstanceTypeConfigs=[])
 
         if not instance_types:
-            instance_types = 'm1.medium'
+            instance_types = ['m1.medium']
 
         if not weighted_capacities:
             weighted_capacities = {}
@@ -2664,9 +2665,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
                 instance_config['WeightedCapacity'] = (
                     weighted_capacities[instance_type])
 
+            EbsConfiguration = {}
+
+            if ebs_device_configs is not None:
+                EbsConfiguration['EbsBlockDeviceConfigs'] = ebs_device_configs
+
             if ebs_optimized is not None:
-                instance_config['EbsConfiguration'] = dict(
-                    EbsOptimized=ebs_optimized)
+                EbsConfiguration['EbsOptimized'] = ebs_optimized
+
+            if EbsConfiguration:
+                instance_config['EbsConfiguration'] = EbsConfiguration
 
             config['InstanceTypeConfigs'].append(instance_config)
 
@@ -2892,6 +2900,65 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
         req_fleets = [
             self._fleet_config(ebs_optimized=True)]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)
+        ])
+
+    # fleets use the same code for comparing EBS configs as instance
+    # groups, so we don't need to test all the ways EBS configs can match
+
+    def test_fleet_with_ebs_configs(self):
+        fleets = [
+            self._fleet_config(ebs_device_configs=[dict(
+                VolumeSpecification=dict(VolumeType='standard', SizeInGB=200))
+            ])
+        ]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(fleets)
+        ])
+
+    def test_better_ebs_devices_okay(self):
+        actual_fleets = [
+            self._fleet_config(ebs_device_configs=[dict(
+                VolumeSpecification=dict(VolumeType='standard', SizeInGB=200))
+            ])
+        ]
+
+        req_fleets = [
+            self._fleet_config(ebs_device_configs=[dict(
+                VolumeSpecification=dict(VolumeType='standard', SizeInGB=100))
+            ])
+        ]
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=actual_fleets)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(req_fleets)
+        ])
+
+    def test_worse_ebs_devices_not_okay(self):
+        actual_fleets = [
+            self._fleet_config(ebs_device_configs=[dict(
+                VolumeSpecification=dict(VolumeType='standard', SizeInGB=50))
+            ])
+        ]
+
+        req_fleets = [
+            self._fleet_config(ebs_device_configs=[dict(
+                VolumeSpecification=dict(VolumeType='standard', SizeInGB=100))
+            ])
+        ]
 
         _, cluster_id = self.make_pooled_cluster(
             instance_fleets=actual_fleets)

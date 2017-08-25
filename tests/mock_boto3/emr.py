@@ -777,12 +777,10 @@ class MockEMRClient(object):
                 _validate_param(EbsConfiguration,
                                 'EbsBlockDeviceConfigs', list)
 
-                spec['EbsBlockDeviceConfigs'] = (
+                spec['EbsBlockDevices'].extend(
                     self._ebs_block_device_configs_to_block_devices(
                         operation_name,
-                        EbsConfiguration['EbsBlockDeeviceConfigs']))
-
-        spec.setdefault('EbsBlockDeviceConfigs', [])
+                        EbsConfiguration['EbsBlockDeviceConfigs']))
 
         if InstanceTypeConfig:
             raise NotImplementedError(

@@ -221,7 +221,7 @@ _CHEAPEST_INSTANCE_TYPE = 'm1.medium'
 _CHEAPEST_2_X_INSTANCE_TYPE = 'm1.small'
 
 # these are the only kinds of instance roles that exist
-_INSTANCE_ROLES = ('master', 'core', 'task')
+_INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 
 # use to disable multipart uploading
 _HUGE_PART_THRESHOLD = 2 ** 256
@@ -1164,13 +1164,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _instance_type(self, role):
         """What instance type should we use for the given role?
-        (one of 'master', 'core', 'task')"""
+        (one of 'MASTER', 'CORE', 'TASK')"""
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
         # explicitly set
-        if self._opts[role + '_instance_type']:
-            return self._opts[role + '_instance_type']
+        if self._opts[role.lower() + '_instance_type']:
+            return self._opts[role.lower() + '_instance_type']
 
         elif self._instance_is_worker(role):
             # using *instance_type* here is defensive programming;
@@ -1188,7 +1188,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
-        return (role != 'master' or
+        return (role != 'MASTER' or
                 sum(self._num_instances(role)
                     for role in _INSTANCE_ROLES) == 1)
 
@@ -1197,17 +1197,17 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
-        if role == 'master':
+        if role == 'MASTER':
             return 1  # there can be only one
         else:
-            return self._opts['num_' + role + '_instances']
+            return self._opts['num_' + role.lower() + '_instances']
 
     def _instance_bid_price(self, role):
         """What's the bid price for the given role (if any)?"""
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
-        return self._opts[role + '_instance_bid_price']
+        return self._opts[role.lower() + '_instance_bid_price']
 
     def _instance_groups(self):
         """Which instance groups do we want to request?
@@ -3081,7 +3081,7 @@ def _build_instance_group(role, instance_type, num_instances, bid_price):
     """Helper method for creating instance groups. For use when
     creating a cluster using a list of InstanceGroups
 
-        - Role is either 'master', 'core', or 'task'.
+        - role is either 'MASTER', 'CORE', or 'TASK'.
         - instance_type is an EC2 instance type
         - count is an int
         - bid_price is a number, a string, or None. If None,
@@ -3099,10 +3099,10 @@ def _build_instance_group(role, instance_type, num_instances, bid_price):
 
     ig = dict(
         InstanceCount=num_instances,
-        InstanceRole=role.upper(),
+        InstanceRole=role,
         InstanceType=instance_type,
         Market='ON_DEMAND',
-        Name=role,  # just name the groups "core", "master", and "task"
+        Name=role.lower(),  # just name the groups "core", "master", and "task"
     )
 
     if bid_price:

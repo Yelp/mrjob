@@ -99,10 +99,10 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
     # a is a map from role to actual instance groups
     a = defaultdict(list)
     for ig in actual_igs:
-        a[ig['InstanceGroupType'].lower()].append(ig)
+        a[ig['InstanceGroupType']].append(ig)
 
     # r is a map from role to request (should be only one per role)
-    r = {req['InstanceRole'].lower(): req for req in requested_igs}
+    r = {req['InstanceRole']: req for req in requested_igs}
 
     # updated request to account for extra instance groups
     # see #1630 for what we do when roles don't match
@@ -121,7 +121,7 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
             return None
         sort_keys[role] = sort_key
 
-    return tuple(sort_keys.get(role) for role in ('core', 'task', 'master'))
+    return tuple(sort_keys.get(role) for role in ('CORE', 'TASK', 'MASTER'))
 
 
 def _igs_for_same_role_satisfy(actual_igs, requested_ig):
@@ -242,10 +242,10 @@ def _instance_fleets_satisfy(actual_fleets, req_fleets):
 
     # a is a map from role to actual instance fleet
     # (unlike with groups, there can never be more than one fleet per role)
-    a = {f['InstanceFleetType'].lower(): f for f in actual_fleets}
+    a = {f['InstanceFleetType']: f for f in actual_fleets}
 
     # r is a map from role to request (should be only one per role)
-    r = {f['InstanceFleetType'].lower(): f for f in req_fleets}
+    r = {f['InstanceFleetType']: f for f in req_fleets}
 
     # updated request to account for extra instance groups
     # see #1630 for what we do when roles don't match
@@ -265,7 +265,7 @@ def _instance_fleets_satisfy(actual_fleets, req_fleets):
             return None
         sort_keys[role] = sort_key
 
-    return tuple(sort_keys.get(role) for role in ('core', 'task', 'master'))
+    return tuple(sort_keys.get(role) for role in ('CORE', 'TASK', 'MASTER'))
 
 
 def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
@@ -395,16 +395,16 @@ def _add_missing_roles_to_request(
     # don't worry about modifying *role_to_req*; this is
     # a helper func
 
-    if 'core' in missing_roles and list(role_to_req) == ['master']:
+    if 'CORE' in missing_roles and list(role_to_req) == ['MASTER']:
         # both core and master have to satisfy master-only request
-        role_to_req['core'] = role_to_req['master']
+        role_to_req['CORE'] = role_to_req['MASTER']
 
-    if 'task' in missing_roles and 'core' in role_to_req:
+    if 'TASK' in missing_roles and 'CORE' in role_to_req:
         # make sure tasks won't crash on the task instances,
         # but don't require the same amount of CPU
-        role_to_req['task'] = dict(role_to_req['core'])
+        role_to_req['TASK'] = dict(role_to_req['CORE'])
         for req_count_field in req_count_fields:
-            role_to_req['task'][req_count_field] = 0
+            role_to_req['TASK'][req_count_field] = 0
 
     return role_to_req
 

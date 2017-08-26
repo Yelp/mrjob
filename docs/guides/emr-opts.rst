@@ -272,8 +272,45 @@ Cluster creation and configuration
         2.5.
 
 .. mrjob-opt::
+    :config: instance_fleets
+    :switch: --instance-fleet
+    :set: emr
+    :default: ``None``
+
+    A list of instance fleet definitions to pass to the EMR API. Pass a JSON
+    string on the command line or use data structures in the config file
+    (which is itself basically JSON).
+
+    *instance_fleets* overrides :mrjob-opt:`instance_groups` and other
+    instance configuration options.
+
+    .. code-block:: yaml
+
+        runners:
+          emr:
+            instance_fleets:
+            - InstanceFleetType: MASTER
+              InstanceTypeConfigs:
+              - InstanceType: m1.medium
+              TargetOnDemandCapacity: 1
+            - InstanceFleetType: CORE
+              TargetSpotCapacity: 2
+              TargetOnDemandCapacity: 2
+              LaunchSpecifications:
+                SpotSpecification:
+                  TimeoutDurationMinutes: 20
+                  TimeoutAction: SWITCH_TO_ON_DEMAND
+              InstanceTypeConfigs:
+              - InstanceType: m1.medium
+                BidPriceAsPercentageOfOnDemandPrice: 50
+                WeightedCapacity: 1
+              - InstanceType: m1.large
+                BidPriceAsPercentageOfOnDemandPrice: 50
+                WeightedCapacity: 2
+
+.. mrjob-opt::
     :config: instance_groups
-    :switch: --max-hours-idle
+    :switch: --instance-groups
     :set: emr
     :default: ``None``
 

@@ -486,6 +486,19 @@ class SubnetTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
                          None)
 
+    def test_subnets_option(self):
+        instance_fleets = [dict(
+            InstanceFleetType='MASTER',
+            InstanceTypeConfigs=[dict(InstanceType='m1.medium')],
+            TargetOnDemandCapacity=1)]
+
+        cluster = self.run_and_get_cluster(
+            '--subnets', 'subnet-ffffffff,subnet-eeeeeeee',
+            '--instance-fleets', json.dumps(instance_fleets))
+
+        self.assertIn(cluster['Ec2InstanceAttributes'].get('Ec2SubnetId'),
+                      ['subnet-ffffffff', 'subnet-eeeeeeee'])
+
 
 class IAMTestCase(MockBoto3TestCase):
 
@@ -2058,6 +2071,18 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertJoins(cluster_id, [
             '-r', 'emr', '--pool-clusters',
             '--subnet', ''])
+
+    def test_list_of_subnets(self):
+        # subnets only works with instance fleets
+        fleets = [self._fleet_config()]
+
+        _, cluster_id = self.make_pooled_cluster(
+            instance_fleets=fleets, subnet='subnet-eeeeeeee')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--instance-fleets', json.dumps(fleets),
+            '--subnets', 'subnet-eeeeeeee,subnet-ffffffff'])
 
     def test_pooling_with_additional_emr_info(self):
         info = '{"tomatoes": "actually a fruit!"}'

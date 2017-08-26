@@ -463,19 +463,20 @@ class MockEMRClient(object):
                 Instances.pop('Ec2SubnetId'))
 
         # Ec2SubnetIds
-        if 'Ec2SubnetIds' in Instances:
+        if Instances.get('Ec2SubnetIds'):
+            if 'InstanceFleets' not in Instances:
+                raise _error('Only one subnet may be specified for clusters'
+                             ' configured with instance groups or instance'
+                             ' count, master and slave instance type. Revise'
+                             ' the configuration and resubmit.')
+
             _validate_param(Instances, 'Ec2SubnetIds', list)
             Ec2SubnetIds = Instances.pop('Ec2SubnetIds')
-            if not Ec2SubnetIds:
-                # TODO: get actual error message
-                raise _error('empty Ec2SubnetIds')
-
-            # TODO: require InstanceFleets to be set
 
             for subnet_id in Ec2SubnetIds:
                 _validate_param_type(subnet_id, string_types)
                 # arbitrarily choose last subnet ID
-                cluster['Ec2InstanceAttributes']['Ec2SubnetIds'] = subnet_id
+                cluster['Ec2InstanceAttributes']['Ec2SubnetId'] = subnet_id
 
         # KeepJobFlowAliveWhenNoSteps
         if 'KeepJobFlowAliveWhenNoSteps' in Instances:

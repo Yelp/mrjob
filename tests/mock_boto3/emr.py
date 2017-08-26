@@ -572,7 +572,7 @@ class MockEMRClient(object):
 
         new_fleets = []  # don't update _InstanceFleets if there's an error
 
-        roles = set()  # roles already handled, UPPERCASE
+        roles = set()  # roles already handled
 
         for i, InstanceFleet in enumerate(InstanceFleets):
             _validate_param_type(InstanceFleet, dict)
@@ -962,7 +962,8 @@ class MockEMRClient(object):
                     "1 validation error detected: value '%s' at"
                     " 'instances.instanceGroups.%d.member.market' failed"
                     " to satify constraint: Member must satisfy enum value"
-                    " set: [SPOT, ON_DEMAND]" % (role, i + 1))
+                    " set: [SPOT, ON_DEMAND]" % (
+                        InstanceGroup['Market'], i + 1))
                 ig['Market'] = InstanceGroup.pop('Market')
 
             # BidPrice

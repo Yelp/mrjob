@@ -2321,11 +2321,11 @@ class PoolMatchingTestCase(MockBoto3TestCase):
     def _ig_with_ebs_config(
             self, device_configs=(), iops=None,
             num_volumes=None,
-            optimized=None, role='master',
+            optimized=None, role='MASTER',
             volume_size=100, volume_type=None):
         """Build an instance group request with the given list of
         EBS device configs. Optionally turn on EBS optimization
-        and specify a different instance role (``'master'`` by default)."""
+        and specify a different instance role (``'MASTER'`` by default)."""
         if not device_configs:
             # io1 is the only volume type that accepts IOPS
             if volume_type is None:
@@ -2346,7 +2346,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
         return dict(
             EbsConfiguration=ebs_config,
-            InstanceRole=role.upper(),
+            InstanceRole=role,
             InstanceCount=1,
             InstanceType='m1.medium',
         )
@@ -2564,7 +2564,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
 
     def test_match_ebs_specs_on_multiple_roles(self):
         igs = [self._ig_with_ebs_config(volume_size=10),
-               self._ig_with_ebs_config(role='core')]
+               self._ig_with_ebs_config(role='CORE')]
 
         _, cluster_id = self.make_pooled_cluster(
             instance_groups=igs)
@@ -2576,10 +2576,10 @@ class PoolMatchingTestCase(MockBoto3TestCase):
     def test_ebs_must_match_on_all_roles(self):
         requested_igs = [
             self._ig_with_ebs_config(volume_size=10),
-            self._ig_with_ebs_config(role='core', volume_type='standard')]
+            self._ig_with_ebs_config(role='CORE', volume_type='standard')]
         actual_igs = [
             self._ig_with_ebs_config(volume_size=10),
-            self._ig_with_ebs_config(role='core', volume_type='gp2')]
+            self._ig_with_ebs_config(role='CORE', volume_type='gp2')]
 
         _, cluster_id = self.make_pooled_cluster(
             instance_groups=actual_igs)
@@ -2651,7 +2651,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             ebs_optimized=None,
             on_demand_capacity=1, spot_capacity=0, spot_spec=None):
 
-        config = dict(InstanceFleetType=role.upper(), InstanceTypeConfigs=[])
+        config = dict(InstanceFleetType=role, InstanceTypeConfigs=[])
 
         if not instance_types:
             instance_types = ['m1.medium']

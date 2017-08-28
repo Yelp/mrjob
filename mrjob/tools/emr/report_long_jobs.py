@@ -43,7 +43,8 @@ Options::
                         this; by default mrjob will choose the correct
                         endpoint for each S3 bucket based on its location.
   -x, --exclude=TAG_KEY,TAG_VALUE
-                        Exclude clusters that have the specified tag key/value pair
+                        Exclude clusters that have the specified tag key/value
+                        pair
   -v, --verbose         print more messages to stderr
 """
 from __future__ import print_function
@@ -91,7 +92,8 @@ def main(args=None):
     if not options.exclude:
         filtered_cluster_summaries = cluster_summaries
     else:
-        filtered_cluster_summaries = _filter_clusters(cluster_summaries, emr_conn, options.exclude)
+        filtered_cluster_summaries = _filter_clusters(
+            cluster_summaries, emr_conn, options.exclude)
 
     job_info = _find_long_running_jobs(
         emr_conn, filtered_cluster_summaries, min_time, now=now)
@@ -111,8 +113,10 @@ def _runner_kwargs(options):
 
 
 def _filter_clusters(cluster_summaries, emr_conn, exclude_strings):
-    """ Filter out clusters that have tags matching any specified in exclude_strings.
-    :param cluster_summaries: a list of :py:mod:`boto3` cluster summary data structures
+    """Filter out clusters that have tags matching any specified in
+    exclude_strings.
+    :param cluster_summaries: a list of :py:mod:`boto3` cluster summary data
+                              structures
     :param exclude_strings: A list of strings of the form TAG_KEY,TAG_VALUE
     """
     exclude_as_dicts = []
@@ -125,7 +129,8 @@ def _filter_clusters(cluster_summaries, emr_conn, exclude_strings):
         # import pdb; pdb.set_trace()
         cluster_tags = emr_conn.describe_cluster(cluster_id).tags
         for cluster_tag in cluster_tags:
-            if {'Key': cluster_tag.key, 'Value': cluster_tag.value} in exclude_as_dicts:
+            if ({'Key': cluster_tag.key, 'Value': cluster_tag.value}
+                    in exclude_as_dicts):
                 break
         else:
             yield cs
@@ -262,8 +267,7 @@ def _make_option_parser():
     option_parser.add_option(
         '-x', '--exclude', action='append',
         help=('Exclude clusters that match the specified tags.'
-            ' Specifed in the form TAG_KEY,TAG_VALUE.'
-        )
+              ' Specifed in the form TAG_KEY,TAG_VALUE.')
     )
 
     _add_basic_options(option_parser)

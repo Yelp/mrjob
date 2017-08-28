@@ -3126,7 +3126,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             try:
                 igs = list(_yield_all_instance_groups(emr_conn, cluster.id))
-            except boto.exception.EmrResponseError as ex:
+            except boto.exception.EmrResponseError:
                 # don't error if we encounter an instance fleet (see #1639)
                 return
 
@@ -3533,7 +3533,7 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
         try:
             instance_groups = list(_yield_all_instance_groups(
                 self.make_emr_conn(), self.get_cluster_id()))
-        except boto.exception.EmrResponseError as ex:
+        except boto.exception.EmrResponseError:
             # don't error if we encounter an instance fleet (see #1639)
             return None
 

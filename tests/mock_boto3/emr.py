@@ -81,6 +81,14 @@ LIFETIME_STEP_LIMIT_AMI_VERSIONS = {
     '3.1.1': False,
 }
 
+# does the given AMI version support instance fleets?
+INSTANCE_FLEET_AMI_VERSIONS = {
+    '4': False,
+    '4.8': True,
+    '5.0': False,
+    '5.1': True,
+}
+
 # a cluster can't have more than this many active steps (or more than this
 # many steps total
 STEP_ADD_LIMIT = 256
@@ -98,6 +106,7 @@ DEFAULT_MAX_STEPS_RETURNED = 50
 DUMMY_APPLICATION_VERSION = '0.0.0'
 
 
+
 # TODO: raise InvalidRequest: Missing required header for this
 # request: x-amz-content-sha256 when region name is clearly invalid
 
@@ -110,6 +119,7 @@ class MockEMRClient(object):
     OPERATION_NAME_TO_RESULT_KEY = dict(
         list_bootstrap_actions='BootstrapActions',
         list_clusters='Clusters',
+        list_instance_fleets='InstanceFleets',
         list_instance_groups='InstanceGroups',
         list_instances='Instances',
         list_steps='Steps',
@@ -211,13 +221,12 @@ class MockEMRClient(object):
         # our newly created cluster, as described by describe_cluster(), plus:
         #
         # _BootstrapActions: as described by list_bootstrap_actions()
+        # _InstanceFleets: as described by list_instance_fleets()
         # _InstanceGroups: as described by list_instance_groups()
         # _Steps: as decribed by list_steps(), but not reversed
-        #
-        # TODO: at some point when we implement instance fleets,
-        # _InstanceGroups will become optional
         cluster = dict(
             _BootstrapActions=[],
+            _InstanceFleets=[],
             _InstanceGroups=[],
             _Steps=[],
             Applications=[],
@@ -445,9 +454,29 @@ class MockEMRClient(object):
 
         # Ec2SubnetId
         if 'Ec2SubnetId' in Instances:
+            if 'Ec2SubnetIds' in Instances:
+                # TODO: get actual error message
+                raise _error('Ec2SubnetId and Ec2SubnetIds together')
+
             _validate_param(Instances, 'Ec2SubnetId', string_types)
             cluster['Ec2InstanceAttributes']['Ec2SubnetId'] = (
                 Instances.pop('Ec2SubnetId'))
+
+        # Ec2SubnetIds
+        if Instances.get('Ec2SubnetIds'):
+            if 'InstanceFleets' not in Instances:
+                raise _error('Only one subnet may be specified for clusters'
+                             ' configured with instance groups or instance'
+                             ' count, master and slave instance type. Revise'
+                             ' the configuration and resubmit.')
+
+            _validate_param(Instances, 'Ec2SubnetIds', list)
+            Ec2SubnetIds = Instances.pop('Ec2SubnetIds')
+
+            for subnet_id in Ec2SubnetIds:
+                _validate_param_type(subnet_id, string_types)
+                # arbitrarily choose last subnet ID
+                cluster['Ec2InstanceAttributes']['Ec2SubnetId'] = subnet_id
 
         # KeepJobFlowAliveWhenNoSteps
         if 'KeepJobFlowAliveWhenNoSteps' in Instances:
@@ -465,18 +494,25 @@ class MockEMRClient(object):
             cluster['Ec2InstanceAttributes']['Ec2AvailabilityZone'] = (
                 Placement['AvailabilityZone'])
 
-        if 'InstanceGroups' in Instances:
-            if any(x in Instances for x in ('MasterInstanceType',
-                                            'SlaveInstanceType',
-                                            'InstanceCount')):
-                raise _error(
+        # don't allow mixing and matching of instance def types
+        num_config_types = sum(
+            any(x in Instances for x in fields)
+            for fields in [
+                {'InstanceFleets'},
+                {'InstanceGroups'},
+                {'InstanceCount', 'MasterInstanceType', 'SlaveInstanceType'}])
+        if num_config_types > 1:
+            raise _error(
                     'Please configure instances using one and only one of the'
                     ' following: instance groups; instance fleets; instance'
                     ' count, master and slave instance type.')
 
+        if 'InstanceGroups' in Instances:
             self._add_instance_groups(
                 operation_name, Instances.pop('InstanceGroups'), cluster)
-        # TODO: will need to support instance fleets at some point
+        elif 'InstanceFleets' in Instances:
+            self._add_instance_fleets(
+                operation_name, Instances.pop('InstanceFleets'), cluster)
         else:
             # build our own instance groups
             instance_groups = []
@@ -511,6 +547,327 @@ class MockEMRClient(object):
                     operation_name,
                     ', '.join('Instances.%s' % k for k in sorted(Instances))))
 
+    def _add_instance_fleets(self, operation_name, InstanceFleets, cluster,
+                             now=None):
+        """Add instance fleets from *InstanceFleets* to the mock cluster
+        *cluster*. This is just a helper for :py:meth:`add_instances`;
+        there is no ``AddInstanceFleets`` operation.
+        """
+        _validate_param_type(InstanceFleets, (list, tuple))
+
+        if now is None:
+            now = _boto3_now()
+
+        def _error(message):
+            return _ValidationException(operation_name, message)
+
+        # only allowed for AMI 4.8.0+ and 5.1.0+
+        if not (cluster.get('ReleaseLabel') and
+                map_version(cluster['ReleaseLabel'].lstrip('emr-'),
+                            INSTANCE_FLEET_AMI_VERSIONS)):
+            raise _error('Instance fleets are not available for the release.')
+
+        if cluster.get('_InstanceGroups') or cluster.get('_InstanceFleets'):
+            raise ValueError(
+                "cluster already has instance groups or instance fleets")
+
+        new_fleets = []  # don't update _InstanceFleets if there's an error
+
+        roles = set()  # roles already handled
+
+        for i, InstanceFleet in enumerate(InstanceFleets):
+            _validate_param_type(InstanceFleet, dict)
+            InstanceFleet = dict(InstanceFleet)
+
+            fleet = dict(
+                Id='if-FAKE',
+                InstanceFleetType='',
+                InstanceTypeSpecifications=[],
+                ProvisionedOnDemandCapacity=0,
+                ProvisionedSpotCapacity=0,
+                Status=dict(
+                    State='PROVISIONING',
+                    StateChangeReason=dict(Message=''),
+                    Timeline=dict(CreationDateTime=now),
+                ),
+                TargetOnDemandCapacity=0,
+                TargetSpotCapacity=0,
+            )
+
+            # InstanceFleetType (required)
+            _validate_param(InstanceFleet, 'InstanceFleetType',
+                            ['MASTER', 'CORE', 'TASK'])
+            role = InstanceFleet.pop('InstanceFleetType')
+
+            # check for duplicate roles
+            if role in roles:
+                raise _error(
+                    'Multiple %s instance groups supplied, you'
+                    ' must specify exactly one %s instance group' %
+                    (role.lower(), role.lower()))
+            roles.add(role)
+
+            fleet['InstanceFleetType'] = role
+
+            # Name
+            if 'Name' in InstanceFleet:
+                _validate_param(InstanceFleet, 'Name', string_types)
+                fleet['Name'] = InstanceFleet.pop['Name']
+
+            # InstanceTypeConfigs
+            _validate_param(InstanceFleet, 'InstanceTypeConfigs', list)
+            fleet['InstanceTypeSpecifications'] = (
+                self._instance_type_configs_to_specs(
+                    operation_name,
+                    InstanceFleet.pop('InstanceTypeConfigs'),
+                    fleet.get('Name'), fleet['InstanceFleetType']))
+
+            # LaunchSpecifications
+            if 'LaunchSpecifications' in InstanceFleet:
+                _validate_param(InstanceFleet, 'LaunchSpecifications', dict)
+                LaunchSpecifications = InstanceFleet.pop(
+                    'LaunchSpecifications')
+
+                _validate_param(LaunchSpecifications, 'SpotSpecification')
+                SpotSpecification = LaunchSpecifications['SpotSpecification']
+
+                _validate_param(
+                    SpotSpecification, 'TimeoutAction', string_types)
+                _validate_param_enum(
+                    SpotSpecification['TimeoutAction'],
+                    ['SWITCH_TO_ON_DEMAND', 'TERMINATE_CLUSTER'])
+                _validate_param(
+                    SpotSpecification, 'TimeoutDurationMinutes', int)
+
+                fleet['LaunchSpecifications'] = deepcopy(LaunchSpecifications)
+
+            # target capacity
+            for target_field in ('TargetOnDemandCapacity',
+                                 'TargetSpotCapacity'):
+                if target_field in InstanceFleet:
+                    _validate_param(InstanceFleet, target_field, int)
+                    fleet[target_field] = InstanceFleet.pop(target_field)
+
+            target_capacity = (fleet['TargetOnDemandCapacity'] +
+                               fleet['TargetSpotCapacity'])
+
+            if role == 'MASTER' and target_capacity != 1:
+                raise _error('A master instance fleet can only have a target'
+                             ' capacity of 1. Revise the configuration and'
+                             ' resubmit.')
+            elif target_capacity < 1:
+                raise _error('The instance fleet (%s) should have a value of'
+                             ' one or greater for either'
+                             ' targetOnDemandCapacity or targetSpotCapacity.' %
+                             fleet.get('Name', 'null'))
+
+            if InstanceFleet:
+                raise NotImplementedError(
+                    'mock_boto3 does not support these InstanceFleet'
+                    ' params: %s' % ', '.join(sorted(InstanceFleet)))
+
+            new_fleets.append(fleet)
+
+        # TASK roles require CORE roles (to host HDFS)
+        if 'TASK' in roles and 'CORE' not in roles:
+            raise _error(
+                'Clusters with task instance fleets must also define core'
+                ' instance fleets.')
+
+        # MASTER role is required
+        if 'MASTER' not in roles:
+            raise _error('No master instance fleets were supplied; you must'
+                         ' specify exactly one master instance fleet. Revise'
+                         ' the configuration and resubmit.')
+
+        cluster['_InstanceFleets'].extend(new_fleets)
+
+        cluster['InstanceCollectionType'] = 'INSTANCE_FLEET'
+
+    def _instance_type_configs_to_specs(
+            self, operation_name,
+            InstanceTypeConfigs, Name, InstanceFleetType):
+        """Validate InstanceTypeConfigs from fleet request, and convert
+        to InstanceTypeSpecifications (from ListInstanceFleets)."""
+        specs = []
+
+        instance_types = set()  # so we don't get duplicates
+
+        for InstanceTypeConfig in InstanceTypeConfigs:
+            _validate_param(InstanceTypeConfig, 'InstanceType', string_types)
+            InstanceType = InstanceTypeConfig['InstanceType']
+
+            if InstanceType in instance_types:
+                raise _ValidationException(
+                    operation_name,
+                    'The instance fleet: %s contains duplicate instance types'
+                    ' [%s]. Revise the configuration and resubmit.' % (
+                        Name or 'null', InstanceType))
+
+            specs.append(
+                self._instance_type_config_to_spec(
+                    operation_name,
+                    InstanceTypeConfig, Name, InstanceFleetType))
+
+        return specs
+
+    def _instance_type_config_to_spec(
+            self, operation_name, InstanceTypeConfig, Name, InstanceFleetType):
+
+        def _error(message):
+            return _ValidationException(operation_name, message)
+
+        spec = {}  # the result
+
+        # make a copy so we can pop out fields as we
+        InstanceTypeConfig = dict(InstanceTypeConfig)
+
+        # InstanceType
+        _validate_param(InstanceTypeConfig, 'InstanceType', string_types)
+        spec['InstanceType'] = InstanceTypeConfig.pop('InstanceType')
+
+        # WeightedCapacity
+        if 'WeightedCapacity' not in InstanceTypeConfig:
+            WeightedCapacity = 1  # the default
+        else:
+            _validate_param(InstanceTypeConfig, 'WeightedCapacity', int)
+            WeightedCapacity = InstanceTypeConfig.pop('WeightedCapacity')
+            if InstanceFleetType == 'MASTER' and WeightedCapacity != 1:
+                raise _error('All instance types in the master instance fleet'
+                             ' must have weighted capacity as 1. Revise the'
+                             ' configuration and resubmit.')
+            elif WeightedCapacity < 1:
+                raise _error('Weighted capacity cannot be zero. Revise the'
+                             ' configuration and resubmit.')
+
+        spec['WeightedCapacity'] = WeightedCapacity
+
+        # BidPrice
+        if 'BidPrice' in InstanceTypeConfig:
+
+            if 'BidPriceAsPercentageOfOnDemandPrice' in InstanceTypeConfig:
+                raise _error('Specify at most one of bidPrice or'
+                             ' bidPriceAsPercentageOfOnDemandPrice value for'
+                             ' the Spot Instance fleet : %s request.' % (
+                                 Name or null))
+
+            _validate_param(InstanceTypeConfig, 'BidPrice', string_types)
+            BidPrice = InstanceTypeConfig.pop('BidPrice')
+
+            try:
+                if not float(BidPrice) > 0:
+                        raise _error('The bid price is negative or zero.')
+            except (TypeError, ValueError):
+                raise _error(
+                    'The bid price supplied for an instance fleet is'
+                    ' invalid')
+
+            if '.' in BidPrice and len(BidPrice.split('.', 1)[1]) > 3:
+                    raise _error('No more than 3 digits are allowed after'
+                                 ' decimal place in bid price')
+
+            spec['BidPrice'] = BidPrice
+
+        elif 'BidPriceAsPercentageOfOnDemandPrice' in InstanceTypeConfig:
+            _validate_param(InstanceTypeConfig,
+                            'BidPriceAsPercentageOfOnDemandPrice',
+                            (int, float))
+            # boto3 disallows negative prices, API doesn't seem to care
+            spec['BidPriceAsPercentageOfOnDemandPrice'] = float(
+                InstanceTypeConfig.pop('BidPriceAsPercentageOfOnDemandPrice'))
+
+        else:
+            spec['BidPriceAsPercentageOfOnDemandPrice'] = 100.0
+
+        # EbsConfiguration
+        spec['EbsBlockDevices'] = []
+
+        if 'EbsConfiguration' in InstanceTypeConfig:
+            _validate_param(InstanceTypeConfig, 'EbsConfiguration', dict)
+            EbsConfiguration = InstanceTypeConfig.pop('EbsConfiguration')
+
+            # EbsOptimized
+            if 'EbsOptimized' in EbsConfiguration:
+                _validate_param(EbsConfiguration, 'EbsOptimized', bool)
+                if EbsConfiguration['EbsOptimized']:
+                    spec['EbsOptimized'] = True
+
+            # EbsBlockDeviceConfigs
+            if 'EbsBlockDeviceConfigs' in EbsConfiguration:
+                _validate_param(EbsConfiguration,
+                                'EbsBlockDeviceConfigs', list)
+
+                spec['EbsBlockDevices'].extend(
+                    self._ebs_block_device_configs_to_block_devices(
+                        operation_name,
+                        EbsConfiguration['EbsBlockDeviceConfigs']))
+
+        if InstanceTypeConfig:
+            raise NotImplementedError(
+                'mock_boto3 does not support these InstanceTypeConfig'
+                ' params: %s' % ', '.join(sorted(InstanceTypeConfig)))
+
+        return spec
+
+    def _ebs_block_device_configs_to_block_devices(
+            self, operation_name, EbsBlockDeviceConfigs):
+
+        devices = []
+
+        for EbsBlockDeviceConfig in EbsBlockDeviceConfigs:
+            _validate_param(
+                EbsBlockDeviceConfig, 'VolumeSpecification', dict)
+            VolumeSpecification = (
+                EbsBlockDeviceConfig['VolumeSpecification'])
+
+            _validate_param(VolumeSpecification, 'SizeInGB', int)
+            _validate_param(VolumeSpecification, 'VolumeType',
+                            string_types)
+
+            if 'Iops' in VolumeSpecification:
+                _validate_param(VolumeSpecification, 'Iops', int)
+                Iops = VolumeSpecification['Iops']
+
+                if VolumeSpecification['VolumeType'] != 'io1':
+                    raise _ValidationException(
+                        operation_name,
+                        'IOPS setting is not supported for volume'
+                        ' type')
+
+                if Iops < 100:
+                    raise _ValidationException(
+                        operation_name,
+                        'The iops is less than minimum value(100).'
+                    )
+
+                if Iops > 20000:
+                    raise _ValidationException(
+                        operation_name,
+                        'The iops is more than maximum'
+                        ' value(20000).')
+            elif VolumeSpecification['VolumeType'] == 'io1':
+                raise _ValidationException(
+                    operation_name,
+                    'IOPS setting is required for volume type.')
+
+            if 'VolumesPerInstance' in EbsBlockDeviceConfig:
+                _validate_param(EbsBlockDeviceConfig,
+                                'VolumesPerInstance', int)
+                VolumesPerInstance = EbsBlockDeviceConfig[
+                    'VolumesPerInstance']
+            else:
+                VolumesPerInstance = 1
+
+            for _ in range(VolumesPerInstance):
+                # /dev/sdc, /dev/sdd, etc.
+                device = 'dev/sd' + chr(
+                    ord('c') + len(devices))
+                devices.append(dict(
+                    Device=device,
+                    VolumeSpecification=dict(VolumeSpecification)))
+
+        return devices
+
     def _add_instance_groups(self, operation_name, InstanceGroups, cluster,
                              now=None):
         """Add instance groups from *InstanceGroups* to the mock
@@ -525,7 +882,7 @@ class MockEMRClient(object):
             now = _boto3_now()
 
         # currently, this is just a helper method for run_job_flow()
-        if cluster.get('_InstanceGroups'):
+        if cluster.get('_InstanceGroups') or cluster.get('_InstanceFleets'):
             raise NotImplementedError(
                 "mock_boto3 doesn't support adding instance groups")
 
@@ -606,7 +963,8 @@ class MockEMRClient(object):
                     "1 validation error detected: value '%s' at"
                     " 'instances.instanceGroups.%d.member.market' failed"
                     " to satify constraint: Member must satisfy enum value"
-                    " set: [SPOT, ON_DEMAND]" % (role, i + 1))
+                    " set: [SPOT, ON_DEMAND]" % (
+                        InstanceGroup['Market'], i + 1))
                 ig['Market'] = InstanceGroup.pop('Market')
 
             # BidPrice
@@ -647,59 +1005,10 @@ class MockEMRClient(object):
                     _validate_param(
                         EbsConfiguration, 'EbsBlockDeviceConfigs', list)
 
-                    for EbsBlockDeviceConfig in (
-                            EbsConfiguration['EbsBlockDeviceConfigs']):
-                        _validate_param(
-                            EbsBlockDeviceConfig, 'VolumeSpecification', dict)
-                        VolumeSpecification = (
-                            EbsBlockDeviceConfig['VolumeSpecification'])
-
-                        _validate_param(VolumeSpecification, 'SizeInGB', int)
-                        _validate_param(VolumeSpecification, 'VolumeType',
-                                        string_types)
-
-
-                        if 'Iops' in VolumeSpecification:
-                            _validate_param(VolumeSpecification, 'Iops', int)
-                            Iops = VolumeSpecification['Iops']
-
-                            if VolumeSpecification['VolumeType'] != 'io1':
-                                raise _ValidationException(
-                                    operation_name,
-                                    'IOPS setting is not supported for volume'
-                                    ' type')
-
-                            if Iops < 100:
-                                raise _ValidationException(
-                                    operation_name,
-                                    'The iops is less than minimum value(100).'
-                                )
-
-                            if Iops > 20000:
-                                raise _ValidationException(
-                                    operation_name,
-                                    'The iops is more than maximum'
-                                    ' value(20000).')
-                        elif VolumeSpecification['VolumeType'] == 'io1':
-                            raise _ValidationException(
-                                operation_name,
-                                'IOPS setting is required for volume type.')
-
-                        if 'VolumesPerInstance' in EbsBlockDeviceConfig:
-                            _validate_param(EbsBlockDeviceConfig,
-                                            'VolumesPerInstance', int)
-                            VolumesPerInstance = EbsBlockDeviceConfig[
-                                'VolumesPerInstance']
-                        else:
-                            VolumesPerInstance = 1
-
-                        for _ in range(VolumesPerInstance):
-                            # /dev/sdc, /dev/sdd, etc.
-                            device = 'dev/sd' + chr(
-                                ord('c') + len(ig['EbsBlockDevices']))
-                            ig['EbsBlockDevices'].append(dict(
-                                Device=device,
-                                VolumeSpecification=dict(VolumeSpecification)))
+                    ig['EbsBlockDevices'].extend(
+                        self._ebs_block_device_configs_to_block_devices(
+                            operation_name,
+                            EbsConfiguration['EbsBlockDeviceConfigs']))
 
             if InstanceGroup:
                 raise NotImplementedError(
@@ -719,6 +1028,8 @@ class MockEMRClient(object):
                          ' specify exactly one master instance group')
 
         cluster['_InstanceGroups'].extend(new_igs)
+
+        cluster['InstanceCollectionType'] = 'INSTANCE_GROUP'
 
     def _add_steps(self, operation_name, Steps, cluster, now=None):
         if now is None:
@@ -1019,8 +1330,31 @@ class MockEMRClient(object):
 
         return dict(Instances=instances)
 
+    def list_instance_fleets(self, ClusterId):
+        cluster = self._get_mock_cluster('ListInstanceFleets', ClusterId)
+
+        if cluster.get('_InstanceGroups'):
+            raise _InvalidRequestException(
+                'ListInstanceFleets',
+                'Instance groups and instance fleets are mutually exclusive.'
+                ' The EMR cluster specified in the request uses instance'
+                ' groups. The ListInstanceFleets operation does not support'
+                ' clusters that use instance groups. Use the'
+                ' ListInstanceGroups operation instead.')
+
+        return dict(InstanceFleets=deepcopy(cluster['_InstanceFleets']))
+
     def list_instance_groups(self, ClusterId):
         cluster = self._get_mock_cluster('ListInstanceGroups', ClusterId)
+
+        if cluster.get('_InstanceFleets'):
+            raise _InvalidRequestException(
+                'ListInstanceGroups',
+                'Instance fleets and instance groups are mutually exclusive.'
+                ' The EMR cluster specified in the request uses instance'
+                ' fleets. The ListInstanceGroups operation does not support'
+                ' clusters that use instance fleets. Use the'
+                ' ListInstanceFleets operation instead.')
 
         return dict(InstanceGroups=deepcopy(cluster['_InstanceGroups']))
 
@@ -1152,9 +1486,18 @@ class MockEMRClient(object):
             cluster['MasterPublicDnsName'] = 'master.%s.mock' % cluster['Id']
 
             # instances are now provisioned
-            for ig in cluster['_InstanceGroups']:
-                ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
-                ig['Status']['State'] = 'BOOTSTRAPPING'
+            if cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
+                for fleet in cluster['_InstanceFleets']:
+                    fleet['ProvisionedOnDemandCapacity'] = fleet[
+                        'TargetOnDemandCapacity']
+                    fleet['ProvisionedSpotCapacity'] = fleet[
+                        'TargetSpotCapacity']
+                    fleet['Status']['State'] = 'BOOTSTRAPPING'
+
+            else:
+                for ig in cluster['_InstanceGroups']:
+                    ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
+                    ig['Status']['State'] = 'BOOTSTRAPPING'
 
             return
 
@@ -1176,8 +1519,13 @@ class MockEMRClient(object):
         # if job is BOOTSTRAPPING, move it along to RUNNING and continue
         if cluster['Status']['State'] == 'BOOTSTRAPPING':
             cluster['Status']['State'] = 'RUNNING'
-            for ig in cluster['_InstanceGroups']:
-                ig['Status']['State'] = 'RUNNING'
+
+            if cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
+                for fleet in cluster['_InstanceFleets']:
+                    fleet['Status']['State'] = 'RUNNING'
+            else:
+                for ig in cluster['_InstanceGroups']:
+                    ig['Status']['State'] = 'RUNNING'
 
         # at this point, should be RUNNING or WAITING
         assert cluster['Status']['State'] in ('RUNNING', 'WAITING')

@@ -126,6 +126,16 @@ def _cleanup_callback(option, opt_str, value, parser):
     setattr(parser.values, option.dest, result)
 
 
+def _subnets_callback(option, opt_str, value, parser):
+    """callback to parse a comma-separated list of subnets.
+
+    This eliminates whitespace
+    """
+    subnets = [s.strip() for s in value.split(',') if s]
+
+    setattr(parser.values, option.dest, subnets)
+
+
 def _append_json_callback(option, opt_str, value, parser):
     """callback to parse JSON and append it to a list."""
     _default_to(parser, option.dest, [])
@@ -655,6 +665,18 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    instance_fleets=dict(
+        cloud_role='launch',
+        switches=[
+            (['--instance-fleets'], dict(
+                callback=_json_callback,
+                help=('detailed JSON list of instance fleets, including'
+                      ' EBS configuration. See docs for --instance-fleets'
+                      ' at http://docs.aws.amazon.com/cli/latest/reference'
+                      '/emr/create-cluster.html'),
+            )),
+        ],
+    ),
     instance_type=dict(
         cloud_role='launch',
         switches=[
@@ -988,7 +1010,13 @@ _RUNNER_OPTS = dict(
             (['--subnet'], dict(
                 help=('ID of Amazon VPC subnet to launch cluster in. If not'
                       ' set or empty string, cluster is launched in the normal'
-                      ' AWS cloud'),
+                      ' AWS cloud.'),
+            )),
+            (['--subnets'], dict(
+                callback=_subnets_callback,
+                help=('Like --subnets, but with a comma-separated list, to'
+                      ' specify multiple subnets in conjunction with'
+                      ' --instance-fleets'),
             )),
         ],
     ),

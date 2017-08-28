@@ -49,6 +49,11 @@ Pooling is also somewhat flexible about EBS volumes (see
 but larger volumes or volumes with more I/O ops per second are acceptable,
 as are additional volumes of any type.
 
+If you are using :mrjob-opt:`instance_fleets`, your jobs will only join other
+clusters which use instance fleets. The rules are similar, but jobs will
+only join clusters whose fleets use the same set of instances or a subset;
+there is no concept of "better" instances.
+
 mrjob's pooling won't add more than 1000 steps to a cluster, as the
 EMR API won't show more than this many steps. (For `very old AMIs <http://docs.aws.amazon.com/ElasticMapReduce/latest/DeveloperGuide/AddingStepstoaJobFlow.html>`__
 there is a stricter limit of 256 steps).

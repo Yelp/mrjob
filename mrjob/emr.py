@@ -86,6 +86,8 @@ from mrjob.parse import is_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.pool import _est_time_to_hour
+from mrjob.pool import _instance_fleets_satisfy
+from mrjob.pool import _instance_groups_satisfy
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
@@ -219,7 +221,7 @@ _CHEAPEST_INSTANCE_TYPE = 'm1.medium'
 _CHEAPEST_2_X_INSTANCE_TYPE = 'm1.small'
 
 # these are the only kinds of instance roles that exist
-_INSTANCE_ROLES = ('master', 'core', 'task')
+_INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 
 # use to disable multipart uploading
 _HUGE_PART_THRESHOLD = 2 ** 256
@@ -334,6 +336,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',
+        'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
         'mins_to_end_of_hour',
@@ -523,6 +526,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         elif opt_key == 'region':
             # don't allow blank region
             return opt_value or _DEFAULT_EMR_REGION
+
+        # subnet should be None, a string, or a multi-item list
+        elif opt_key == 'subnet':
+            return _fix_subnet_opt(opt_value)
 
         else:
             return opt_value
@@ -1157,13 +1164,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _instance_type(self, role):
         """What instance type should we use for the given role?
-        (one of 'master', 'core', 'task')"""
+        (one of 'MASTER', 'CORE', 'TASK')"""
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
         # explicitly set
-        if self._opts[role + '_instance_type']:
-            return self._opts[role + '_instance_type']
+        if self._opts[role.lower() + '_instance_type']:
+            return self._opts[role.lower() + '_instance_type']
 
         elif self._instance_is_worker(role):
             # using *instance_type* here is defensive programming;
@@ -1181,7 +1188,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
-        return (role != 'master' or
+        return (role != 'MASTER' or
                 sum(self._num_instances(role)
                     for role in _INSTANCE_ROLES) == 1)
 
@@ -1190,17 +1197,17 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
-        if role == 'master':
+        if role == 'MASTER':
             return 1  # there can be only one
         else:
-            return self._opts['num_' + role + '_instances']
+            return self._opts['num_' + role.lower() + '_instances']
 
     def _instance_bid_price(self, role):
         """What's the bid price for the given role (if any)?"""
         if role not in _INSTANCE_ROLES:
             raise ValueError
 
-        return self._opts[role + '_instance_bid_price']
+        return self._opts[role.lower() + '_instance_bid_price']
 
     def _instance_groups(self):
         """Which instance groups do we want to request?
@@ -1299,7 +1306,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._opts['zone']:
             Instances['Placement'] = dict(AvailabilityZone=self._opts['zone'])
 
-        Instances['InstanceGroups'] = self._instance_groups()
+        if self._opts['instance_fleets']:
+            Instances['InstanceFleets'] = self._opts['instance_fleets']
+        else:
+            Instances['InstanceGroups'] = self._instance_groups()
 
         # bootstrap actions
         kwargs['BootstrapActions'] = BootstrapActions = []
@@ -1364,7 +1374,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             kwargs['Configurations'] = self._opts['emr_configurations']
 
         if self._opts['subnet']:
-            Instances['Ec2SubnetId'] = self._opts['subnet']
+            # handle lists of subnets (for instance fleets)
+            if isinstance(self._opts['subnet'], list):
+                Instances['Ec2SubnetIds'] = self._opts['subnet']
+            else:
+                Instances['Ec2SubnetId'] = self._opts['subnet']
 
         if self._opts['emr_api_params']:
             kwargs.update(self._opts['emr_api_params'])
@@ -2588,7 +2602,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 return
 
             subnet = cluster['Ec2InstanceAttributes'].get('Ec2SubnetId')
-            if subnet != (self._opts['subnet'] or None):
+            if isinstance(self._opts['subnet'], list):
+                matches = (subnet in self._opts['subnet'])
+            else:
+                matches = (subnet == self._opts['subnet'])
+
+            if not matches:
                 log.debug('    subnet mismatch')
                 return
 
@@ -2612,21 +2631,48 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     log.debug('    unfinished steps')
                     return
 
-            # check memory and compute units, bailing out if we hit
-            # an instance with too little memory
-            actual_igs = list(_boto3_paginate(
-                'InstanceGroups', emr_client, 'list_instance_groups',
-                ClusterId=cluster['Id']))
+            collection_type = cluster.get('InstanceCollectionType',
+                                          'INSTANCE_GROUP')
 
-            requested_igs = self._instance_groups()
+            instance_sort_key = None
 
-            ig_sort_key = _instance_groups_satisfy(actual_igs, requested_igs)
+            if self._opts['instance_fleets']:
+                if collection_type != 'INSTANCE_FLEET':
+                    log.debug('    does not use instance fleets')
+                    return
 
-            if not ig_sort_key:
+                # mock_boto3 doesn't yet support this
+
+                actual_fleets = list(_boto3_paginate(
+                    'InstanceFleets', emr_client, 'list_instance_fleets',
+                    ClusterId=cluster['Id']))
+
+                req_fleets = self._opts['instance_fleets']
+
+                # TODO add logic for instance fleets
+                instance_sort_key = _instance_fleets_satisfy(
+                    actual_fleets, req_fleets)
+            else:
+                if collection_type != 'INSTANCE_GROUP':
+                    log.debug('    does not use instance groups')
+                    return
+
+                # check memory and compute units, bailing out if we hit
+                # an instance with too little memory
+                actual_igs = list(_boto3_paginate(
+                    'InstanceGroups', emr_client, 'list_instance_groups',
+                    ClusterId=cluster['Id']))
+
+                requested_igs = self._instance_groups()
+
+                instance_sort_key = _instance_groups_satisfy(
+                    actual_igs, requested_igs)
+
+            if not instance_sort_key:
                 return
 
             # prioritize "best" clusters, with time as tiebreaker
-            sort_key = (ig_sort_key, _est_time_to_hour(cluster))
+            sort_key = (instance_sort_key, _est_time_to_hour(cluster))
 
             log.debug('    OK')
             key_cluster_steps_list.append(
@@ -3016,256 +3062,26 @@ def _fix_configuration_opt(c):
     return c
 
 
-def _instance_groups_satisfy(actual_igs, requested_igs):
-    """Do the *actual* instance groups from a cluster satisfy the *requested*
-    ones, for the purpose of pooling?
-
-    The formats are slightly different; the format of *requested* is here:
-    http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_InstanceGroup.html
-    and the format of *actual* is here:
-    http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_ListInstanceGroups.html
-    """
-    a = defaultdict(list)
-    for ig in actual_igs:
-        a[ig['InstanceGroupType'].lower()].append(ig)
-
-    # change req to a map from role to instance group (should be only
-    # one per role)
-    r = {ig['InstanceRole'].lower(): ig for ig in requested_igs}
-
-    # update request to account for extra instance groups
-    # see #1630 for what we do when roles don't match
-    if set(a) - set(r):
-        r = _add_missing_ig_roles_to_request(set(a) - set(r), r)
-
-    if set(a) != set(r):
-        log.debug("    missing instance group roles")
+def _fix_subnet_opt(subnet):
+    """Return either None, a string, or a list with at least two items."""
+    if not subnet:
         return None
 
-    sort_keys = {}
-    for role in sorted(r):
-        sort_key = _igs_for_same_role_satisfy(a[role], r[role])
-        if not sort_key:  # doesn't satisfy
-            return None
-        sort_keys[role] = sort_key
+    if isinstance(subnet, string_types):
+        return subnet
 
-    return tuple(sort_keys.get(role) for role in ('core', 'task', 'master'))
-
-
-def _add_missing_ig_roles_to_request(missing_roles, role_to_ig):
-    """Helper for :py:func:`_instance_groups_satisfy`. Add requests for
-    *missing_roles* to *role_to_ig* so that we have a better chance of
-    matching the cluster's actual instance groups."""
-    # see #1630 for discussion
-
-    # don't worry about modifying or duplicating data structures; this is
-    # a helper func
-
-    # so we can match instance capacity but not care about amount of CPU
-
-    if 'core' in missing_roles and list(role_to_ig) == ['master']:
-        # both core and master have to satisfy master-only request
-        role_to_ig['core'] = role_to_ig['master']
-
-    if 'task' in missing_roles and 'core' in role_to_ig:
-        # make sure tasks won't crash on the task instances,
-        # but don't require the same amount of CPU
-        role_to_ig['task'] = dict(role_to_ig['core'])
-        role_to_ig['task']['InstanceCount'] = 0
-
-    return role_to_ig
-
-
-def _igs_for_same_role_satisfy(actual_igs, requested_ig):
-    """Does the *actual* list of instance groups satisfy the *requested*
-    one?
-    """
-    # bid price/on-demand
-    if not all(_ig_satisfies_bid_price(ig, requested_ig) for ig in actual_igs):
-        return None
-
-    # memory
-    if not all(_ig_satisfies_mem(ig, requested_ig) for ig in actual_igs):
-        return None
-
-    # EBS volumes
-    if not all(_ig_satisfies_ebs(ig, requested_ig) for ig in actual_igs):
-        return None
-
-    # CPU (this returns # of compute units or None)
-    return _igs_satisfy_cpu(actual_igs, requested_ig)
-
-
-def _ig_satisfies_bid_price(actual_ig, requested_ig):
-    """Does the actual instance group definition satisfy the bid price
-    (or lack thereof) of the requested instance group?
-    """
-    # on-demand instances satisfy every bid price
-    if actual_ig['Market'] == 'ON_DEMAND':
-        return True
-
-    if requested_ig.get('Market', 'ON_DEMAND') == 'ON_DEMAND':
-        log.debug('    spot instance, requested on-demand')
-        return False
-
-    if actual_ig['BidPrice'] == requested_ig.get('BidPrice'):
-        return True
-
-    try:
-        if float(actual_ig['BidPrice']) >= float(requested_ig.get('BidPrice')):
-            return True
-        else:
-            # low bid prices mean cluster is more likely to be
-            # yanked away
-            log.debug('    bid price too low')
-            return False
-    except ValueError:
-        log.debug('    non-float bid price')
-        return False
-
-
-def _ig_satisfies_mem(actual_ig, requested_ig):
-    """Does the actual instance group satisfy the memory requirements of
-    the requested instance group?"""
-    actual_type = actual_ig['InstanceType']
-    requested_type = requested_ig['InstanceType']
-
-    # this works even for unknown instance types
-    if actual_type == requested_type:
-        return True
-
-    try:
-        if (EC2_INSTANCE_TYPE_TO_MEMORY[actual_type] >=
-                EC2_INSTANCE_TYPE_TO_MEMORY[requested_type]):
-            return True
-        else:
-            log.debug('    too little memory')
-            return False
-    except KeyError:
-        log.debug('    unknown instance type')
-        return False
-
-
-def _ig_satisfies_ebs(actual_ig, requested_ig):
-    """Does *actual_ig* have EBS volumes that satisfy *requested_ig*.
-
-    If *requested_ig* doesn't have an EBS Configuration, we return
-    True.
-
-    If *requested_ig* requests EBS optimization, *actual_ig* should provide
-    it.
-
-    Finally, *actual_ig* should have the same or better block devices
-    as those in *requested_ig* (same volume type, at least as much IOPS
-    and volume size).
-    """
-    req_ebs_config = requested_ig.get('EbsConfiguration')
-
-    if not req_ebs_config:
-        return True
-
-    if (req_ebs_config.get('EbsOptimized')
-            and not actual_ig.get('EbsOptimized')):
-        log.debug('    need EBS-optimized instances')
-        return False
-
-    req_device_configs = req_ebs_config.get('EbsBlockDeviceConfigs')
-
-    if not req_device_configs:
-        return True
-
-    req_volumes = []
-
-    for req_device_config in req_device_configs:
-        volume = req_device_config['VolumeSpecification']
-        num_volumes = req_device_config.get('VolumesPerInstance', 1)
-
-        req_volumes.extend([volume] * num_volumes)
-
-    actual_volumes = [
-        bd.get('VolumeSpecification', {})
-        for bd in actual_ig.get('EbsBlockDevices', [])]
-
-    return _ebs_volumes_satisfy(actual_volumes, req_volumes)
-
-
-def _ebs_volumes_satisfy(actual_volumes, req_volumes):
-    """Does the given list of actual EBS volumes satisfy the given request?
-
-    Just compare them one by one (we want each actual device to be
-    bigger/faster; just having the same amount of capacity or iops
-    isn't enough).
-    """
-    if len(req_volumes) > len(actual_volumes):
-        log.debug('    more EBS volumes requested than available')
-        return False
-
-    return all(_ebs_volume_satisfies(a, r)
-               for a, r in zip(actual_volumes, req_volumes))
-
-
-def _ebs_volume_satisfies(actual_volume, req_volume):
-    """Does the given actual EBS volume satisfy the given request?"""
-    if req_volume.get('VolumeType') != actual_volume.get('VolumeType'):
-        log.debug('    wrong EBS volume type')
-        return False
-
-    if not req_volume.get('SizeInGB', 0) <= actual_volume.get('SizeInGB', 0):
-        log.debug('    EBS volume too small')
-        return False
-
-    # Iops isn't really "optional"; it has to be set if volume type is
-    # io1 and not set otherwise
-    if not (req_volume.get('Iops', 0) <= actual_volume.get('Iops', 0)):
-        log.debug('    EBS volume too slow')
-        return False
-
-    return True
-
-
-def _igs_satisfy_cpu(actual_igs, requested_ig):
-    """Does the list of actual instance groups satisfy the CPU requirements
-    of the requested instance group?
-
-    If so, return the number of compute units. Otherwise, return ``None``
-
-    If the requested instance type is unknown, just return the number
-    of actual instances of the same type.
-    """
-    requested_type = requested_ig['InstanceType']
-    num_requested = requested_ig['InstanceCount']
-
-    # count number of compute units (cu)
-    if requested_type in EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS:
-        requested_cu = (
-            num_requested * EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS[requested_type])
-
-        # don't require instances to be running; we'd be worse off if
-        # we started our own cluster from scratch. (This can happen if
-        # the previous job finished while some task instances were
-        # still being provisioned.)
-        actual_cu = sum(
-            ig['RequestedInstanceCount'] *
-            EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(ig['InstanceType'], 0.0)
-            for ig in actual_igs)
+    subnet = list(subnet)
+    if len(subnet) == 1:
+        return subnet[0]
     else:
-        # unknown instance type, just count # of matching instances
-        requested_cu = num_requested
-        actual_cu = sum(ig['RequestedInstanceCount'] for ig in actual_igs
-                         if ig['InstanceType'] == requested_type)
-
-    if actual_cu >= requested_cu:
-        return actual_cu
-    else:
-        log.debug('    not enough compute units')
-        return None
+        return subnet
 
 
 def _build_instance_group(role, instance_type, num_instances, bid_price):
     """Helper method for creating instance groups. For use when
     creating a cluster using a list of InstanceGroups
 
-        - Role is either 'master', 'core', or 'task'.
+        - role is either 'MASTER', 'CORE', or 'TASK'.
         - instance_type is an EC2 instance type
         - count is an int
         - bid_price is a number, a string, or None. If None,
@@ -3283,10 +3099,10 @@ def _build_instance_group(role, instance_type, num_instances, bid_price):
 
     ig = dict(
         InstanceCount=num_instances,
-        InstanceRole=role.upper(),
+        InstanceRole=role,
         InstanceType=instance_type,
         Market='ON_DEMAND',
-        Name=role,  # just name the groups "core", "master", and "task"
+        Name=role.lower(),  # just name the groups "core", "master", and "task"
     )
 
     if bid_price:

@@ -2715,7 +2715,7 @@ class PoolMatchingTestCase(MockBotoTestCase):
         _, cluster_id = self.make_pooled_cluster()
 
         with patch.object(MockEmrConnection, 'list_instance_groups',
-                   side_effect=INSTANCE_FLEETS_ERROR):
+                          side_effect=INSTANCE_FLEETS_ERROR):
             self.assertDoesNotJoin(
                 cluster_id,
                 ['-r', 'emr', '--pool-clusters'])
@@ -6185,7 +6185,7 @@ class TestClusterSparkSupportWarning(MockBotoTestCase):
             runner._launch()
 
             with patch.object(MockEmrConnection, 'list_instance_groups',
-                   side_effect=INSTANCE_FLEETS_ERROR):
+                              side_effect=INSTANCE_FLEETS_ERROR):
                 message = runner._cluster_spark_support_warning()
                 self.assertIsNone(message)
 

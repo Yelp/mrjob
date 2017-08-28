@@ -6177,6 +6177,18 @@ class TestClusterSparkSupportWarning(MockBotoTestCase):
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
 
+    def test_cant_list_instance_groups(self):
+        job = MRNullSpark(['-r', 'emr', '--image-version', '4.0.0'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            with patch.object(MockEmrConnection, 'list_instance_groups',
+                   side_effect=INSTANCE_FLEETS_ERROR):
+                message = runner._cluster_spark_support_warning()
+                self.assertIsNone(message)
+
 
 class ImageVersionGteTestCase(MockBotoTestCase):
 

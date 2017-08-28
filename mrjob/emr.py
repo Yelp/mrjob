@@ -3127,10 +3127,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             try:
                 igs = list(_yield_all_instance_groups(emr_conn, cluster.id))
             except EmrResponseError as ex:
-                if 'fleets' in ex.message.lower():
-                    return
-                else:
-                    raise
+                # don't error if we encounter an instance fleet (see #1639)
+                return
 
             for ig in igs:
                 # if you edit this code, please don't rely on any particular
@@ -3536,10 +3534,8 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
             instance_groups = list(_yield_all_instance_groups(
                 self.make_emr_conn(), self.get_cluster_id()))
         except EmrResponseError as ex:
-            if 'fleets' in ex.message.lower():
-                return None
-            else:
-                raise
+            # don't error if we encounter an instance fleet (see #1639)
+            return None
 
         for ig in instance_groups:
             # master doesn't matter if it's not running tasks

@@ -83,7 +83,10 @@ class RetryGoRound(object):
 
         # pretend to be the original function
         f = getattr(self.__alternatives[self.__start_index], name)
-        return wraps(f)(call_and_maybe_retry)
+        if hasattr(f, '__name__'):
+            return wraps(f)(call_and_maybe_retry)
+        else:
+            return f
 
 
 class RetryWrapper(object):

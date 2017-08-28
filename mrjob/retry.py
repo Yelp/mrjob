@@ -1,5 +1,6 @@
 # Copyright 2009-2013 Yelp, David Marin
 # Copyright 2015 Yelp
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -82,7 +83,10 @@ class RetryGoRound(object):
 
         # pretend to be the original function
         f = getattr(self.__alternatives[self.__start_index], name)
-        return wraps(f)(call_and_maybe_retry)
+        if hasattr(f, '__name__'):
+            return wraps(f)(call_and_maybe_retry)
+        else:
+            return f
 
 
 class RetryWrapper(object):
@@ -160,5 +164,6 @@ class RetryWrapper(object):
                         raise
 
         # pretend to be the original function
-        call_and_maybe_retry.__name__ == f.__name__
+        if hasattr(f, '__name__'):
+            call_and_maybe_retry.__name__ == f.__name__
         return call_and_maybe_retry

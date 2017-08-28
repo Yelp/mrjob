@@ -3123,7 +3123,14 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
 
             # check memory and compute units, bailing out if we hit
             # an instance with too little memory
-            for ig in _yield_all_instance_groups(emr_conn, cluster.id):
+
+            try:
+                igs = list(_yield_all_instance_groups(emr_conn, cluster.id))
+            except boto.exception.EmrResponseError as ex:
+                # don't error if we encounter an instance fleet (see #1639)
+                return
+
+            for ig in igs:
                 # if you edit this code, please don't rely on any particular
                 # ordering of instance groups (see #1316)
                 role = ig.instancegrouptype.lower()
@@ -3523,8 +3530,12 @@ class EMRJobRunner(MRJobRunner, LogInterpretationMixin):
                             image_version, _MIN_SPARK_PY3_AMI_VERSION))
 
         # make sure there's enough memory to run Spark
-        instance_groups = list(_yield_all_instance_groups(
-            self.make_emr_conn(), self.get_cluster_id()))
+        try:
+            instance_groups = list(_yield_all_instance_groups(
+                self.make_emr_conn(), self.get_cluster_id()))
+        except boto.exception.EmrResponseError as ex:
+            # don't error if we encounter an instance fleet (see #1639)
+            return None
 
         for ig in instance_groups:
             # master doesn't matter if it's not running tasks

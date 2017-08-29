@@ -1,4 +1,4 @@
-v0.6.0, 2017-06-?? -- ???
+v0.6.0, 2017-09-?? -- ???
  * enable_emr_debugging works with 4.x AMIs and later
  * use boto3 instead of boto
    * removed make_*_conn() from EMRJobRunner (use make_*_client())
@@ -101,6 +101,10 @@ v0.6.0, 2017-06-?? -- ???
    * --partitioner
  * removed deprecated JOB_FLOW and *SCRATCH cleanup types
  * mrjob.cat is no longer executable
+
+v0.5.11, 2017-08-28 -- tweak report-long-jobs
+ * report-long-jobs tool can exclude jobs based on tag (#1636)
+ * mrjob won't crash when inspecting instance fleet clusters (#1639)
 
 v0.5.10, 2017-05-12 -- loose ends
  * JSON protcols use rapidjson if ujson unavailable (#1579)

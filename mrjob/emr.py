@@ -2641,15 +2641,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     log.debug('    does not use instance fleets')
                     return
 
-                # mock_boto3 doesn't yet support this
-
                 actual_fleets = list(_boto3_paginate(
                     'InstanceFleets', emr_client, 'list_instance_fleets',
                     ClusterId=cluster['Id']))
 
                 req_fleets = self._opts['instance_fleets']
 
-                # TODO add logic for instance fleets
                 instance_sort_key = _instance_fleets_satisfy(
                     actual_fleets, req_fleets)
             else:
@@ -2990,6 +2987,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                             image_version, _MIN_SPARK_PY3_AMI_VERSION))
 
         emr_client = self.make_emr_client()
+
+        # TODO: add support for instance fleets
 
         # make sure instance groups have enough memory to run Spark
         igs = list(_boto3_paginate(

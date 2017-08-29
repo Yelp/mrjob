@@ -106,7 +106,7 @@ def _runner_kwargs(options):
     :py:class:`EMRJobRunner`
     """
     kwargs = options.__dict__.copy()
-    for unused_arg in ('quiet', 'verbose', 'min_hours'):
+    for unused_arg in ('quiet', 'verbose', 'min_hours', 'exclude'):
         del kwargs[unused_arg]
 
     return kwargs

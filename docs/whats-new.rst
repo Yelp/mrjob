@@ -4,6 +4,17 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.5.11:
+
+0.5.11
+------
+
+The :ref:`report-long-jobs` utility can now ignore certain clusters based on
+EMR tags.
+
+This version deals more gracefully with clusters that use instance fleets,
+preventing crashes that may occur in some rare edge cases.
+
 .. _v0.5.10:
 
 0.5.10

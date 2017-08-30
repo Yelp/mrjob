@@ -163,7 +163,7 @@ _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 _DEFAULT_EMR_REGION = 'us-west-2'
 
 # default AMI to use on EMR. This will be updated with each version
-_DEFAULT_IMAGE_VERSION = '4.8.2'
+_DEFAULT_IMAGE_VERSION = '5.8.0'
 
 # first AMI version that we can't run bash -e on (see #1548)
 _BAD_BASH_IMAGE_VERSION = '5.2.0'

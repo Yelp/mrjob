@@ -40,6 +40,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.emr import _3_X_SPARK_BOOTSTRAP_ACTION
 from mrjob.emr import _3_X_SPARK_SUBMIT
 from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
+from mrjob.emr import _BAD_BASH_IMAGE_VERSION
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _HUGE_PART_THRESHOLD
 from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
@@ -1391,7 +1392,12 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         with open(runner._master_bootstrap_script_path) as f:
             lines = [line.rstrip() for line in f]
 
-        self.assertEqual(lines[0], '#!/bin/sh -ex')
+        if version_gte(image_version or _DEFAULT_IMAGE_VERSION,
+                       _BAD_BASH_IMAGE_VERSION):
+            self.assertEqual(lines[0], '#!/bin/sh -x')
+            self.assertEqual(lines[1], 'set -e')
+        else:
+            self.assertEqual(lines[0], '#!/bin/sh -ex')
 
         # check PWD gets stored
         self.assertIn('__mrjob_PWD=$PWD', lines)
@@ -1688,7 +1694,8 @@ class MasterNodeSetupScriptTestCase(MockBoto3TestCase):
         with open(runner._master_node_setup_script_path, 'rb') as f:
             contents = f.read()
 
-        self.assertTrue(contents.startswith(b'#!/bin/sh -ex\n'))
+        self.assertTrue(contents.startswith(b'#!/bin/sh -x\n'))
+        self.assertIn(b'set -e', contents)
         self.assertIn(b'aws s3 cp ', contents)
         self.assertNotIn(b'hadoop fs -copyToLocal ', contents)
         self.assertIn(b'chmod u+rx ', contents)
@@ -4266,13 +4273,13 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
                 '%s#my_job.py' % runner._upload_mgr.uri('my_job.py'),
                 '-input', 'input', '-output', 'output',
                 '-mapper',
-                "/bin/sh -ex -c 'grep anything | %s"
+                "/bin/sh -x -c 'set -e; grep anything | %s"
                 " my_job.py --step-num=0 --mapper'" % PYTHON_BIN,
                 '-combiner',
-                "/bin/sh -ex -c 'grep nothing | %s"
+                "/bin/sh -x -c 'set -e; grep nothing | %s"
                 " my_job.py --step-num=0 --combiner'" % PYTHON_BIN,
                 '-reducer',
-                "/bin/sh -ex -c 'grep something | %s"
+                "/bin/sh -x -c 'set -e; grep something | %s"
                 " my_job.py --step-num=0 --reducer'" % PYTHON_BIN,
             ])
 
@@ -4292,7 +4299,7 @@ class BuildStreamingStepTestCase(MockBoto3TestCase):
                 '-D', 'mapreduce.job.reduces=0',
                 '-input', 'input', '-output', 'output',
                 '-mapper',
-                "/bin/sh -ex -c 'bash -c '\\''grep"
+                "/bin/sh -x -c 'set -e; bash -c '\\''grep"
                 " '\\''\\'\\'''\\''anything'\\''\\'\\'''\\'''\\'' | %s"
                 " my_job.py --step-num=0 --mapper'" % PYTHON_BIN,
             ])
@@ -4380,7 +4387,7 @@ class DefaultPythonBinTestCase(MockBoto3TestCase):
     def test_default_ami(self):
         # this tests 4.x AMIs
         runner = EMRJobRunner()
-        self.assertTrue(runner._opts['image_version'].startswith('4.'))
+        self.assertTrue(runner._opts['image_version'].startswith('5.'))
         self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
 
     def test_4_x_release_label(self):

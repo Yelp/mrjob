@@ -236,7 +236,7 @@ Cluster creation and configuration
     :switch: --image-version
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: ``'4.8.2'``
+    :default: ``'5.8.0'``
 
     EMR AMI (Amazon Machine Image) version to use. This controls which Hadoop
     version(s) are available and which version of Python is installed, among

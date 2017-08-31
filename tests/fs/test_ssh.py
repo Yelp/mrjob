@@ -15,8 +15,8 @@ import bz2
 import os
 import shutil
 
+import mrjob.fs.ssh
 from mrjob.fs.ssh import SSHFilesystem
-from mrjob import ssh
 
 from tests.compress import gzip_compress
 from tests.fs import MockSubprocessTestCase
@@ -30,7 +30,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.ec2_key_pair_file = self.makefile('key.pem', 'i am an ssh key')
         self.fs = SSHFilesystem(['ssh'], self.ec2_key_pair_file)
         self.set_up_mock_ssh()
-        self.mock_popen(ssh, mock_ssh_main, self.env)
+        self.mock_popen(mrjob.fs.ssh, mock_ssh_main, self.env)
 
     def set_up_mock_ssh(self):
         self.master_ssh_root = self.makedirs('testmaster')

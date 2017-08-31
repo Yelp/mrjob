@@ -22,6 +22,7 @@ from mrjob.cat import decompress
 from mrjob.cat import to_chunks
 from mrjob.fs.base import Filesystem
 from mrjob.py2 import to_unicode
+from mrjob.util import cmd_line
 from mrjob.util import random_identifier
 from mrjob.util import to_lines
 
@@ -113,6 +114,7 @@ class SSHFilesystem(Filesystem):
 
         args = self._ssh_cmd_args(address, cmd_args)
 
+        log.debug('  > ' + cmd_line(args))
         try:
             p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=stdin)
         except OSError as ex:
@@ -138,7 +140,7 @@ class SSHFilesystem(Filesystem):
 
     def _ssh_copy_key(self, address):
         """Copy ``self._ec2_key_pair_file`` to all hosts in *address*
-        that need it. ``'master|core1|foo'``, we'll first copy a key
+        that need it. ``'master!core1!foo'``, we'll first copy a key
         pair file to ``core1`` (via ``master``) and then to ``foo``
         (via ``master`` and ``core``).
 
@@ -153,13 +155,13 @@ class SSHFilesystem(Filesystem):
         if key_addr not in self._hosts_with_key_pair_file:
             key_pair_file = self._remote_key_pair_file
             cmd_args = [
-                'sh', '-c', 'cat > %s; chmod 600 %s' % (
+                'sh', '-c', 'cat > %s && chmod 600 %s' % (
                     key_pair_file, key_pair_file)]
 
             with open(self._ec2_key_pair_file, 'rb') as key_pair:
                 # any previous hosts in the chain will get key pairs first
                 # because _ssh_run() calls _ssh_copy_key()
-                self._ssh_run(cmd_args, stdin=key_pair)
+                self._ssh_run(key_addr, cmd_args, stdin=key_pair)
 
             self._hosts_with_key_pair_file.add(key_addr)
 

@@ -120,7 +120,7 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
 
     for addr in addresses:
 
-        stdout, stderr = runner._ssh_fs._ssh_run(addr, cmd_args)
+        stdout, stderr = runner.fs._ssh_run(addr, cmd_args)
 
         if print_stderr:
             print('---')

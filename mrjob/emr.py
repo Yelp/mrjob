@@ -1897,7 +1897,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             tunnel_config['name']))
 
         try:
-            stdout, _ = self._ssh_fs._ssh_run(host, ['curl', remote_url])
+            stdout, _ = self.fs._ssh_run(host, ['curl', remote_url])
             return stdout
         except Exception as e:
             log.debug('    failed: %s' % str(e))

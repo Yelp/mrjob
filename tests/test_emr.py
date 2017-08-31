@@ -1070,7 +1070,7 @@ class EC2InstanceGroupTestCase(MockBoto3TestCase):
             {'instance_type': 'c1.xlarge'},
             master=(1, 'c1.xlarge', None))
 
-        # set master and slave in mrjob.conf, 2 instances
+        # set master and worker in mrjob.conf, 2 instances
         self.set_in_mrjob_conf(master_instance_type='m1.large',
                                core_instance_type='m2.xlarge',
                                num_core_instances=2)
@@ -1316,13 +1316,13 @@ class TestSSHLs(MockBoto3TestCase):
         self.prepare_runner_for_ssh(self.runner)
 
     def test_ssh_ls(self):
-        self.add_slave()
+        self.add_worker()
 
         mock_ssh_dir('testmaster', 'test')
         mock_ssh_file('testmaster', posixpath.join('test', 'one'), b'')
         mock_ssh_file('testmaster', posixpath.join('test', 'two'), b'')
-        mock_ssh_dir('testmaster!testslave0', 'test')
-        mock_ssh_file('testmaster!testslave0',
+        mock_ssh_dir('testmaster!testworker0', 'test')
+        mock_ssh_file('testmaster!testworker0',
                       posixpath.join('test', 'three'), b'')
 
         self.assertEqual(
@@ -1330,8 +1330,8 @@ class TestSSHLs(MockBoto3TestCase):
             ['ssh://testmaster/test/one', 'ssh://testmaster/test/two'])
 
         self.assertEqual(
-            list(self.runner.fs.ls('ssh://testmaster!testslave0/test')),
-            ['ssh://testmaster!testslave0/test/three'])
+            list(self.runner.fs.ls('ssh://testmaster!testworker0/test')),
+            ['ssh://testmaster!testworker0/test/three'])
 
         # ls() is a generator, so the exception won't fire until we list() it
         self.assertRaises(IOError, list,

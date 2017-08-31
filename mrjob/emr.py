@@ -2010,7 +2010,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # dir_name=None means don't try to SSH in.
         #
         # TODO: If the failure is on the master node, we could just look in
-        # /mnt/var/log/bootstrap-actions. However, if it's on a slave node,
+        # /mnt/var/log/bootstrap-actions. However, if it's on a worker node,
         # we'd have to look up its internal IP using the ListInstances
         # API call. This *would* be a bit faster though. See #1346.
         return self._stream_log_dirs(
@@ -2115,7 +2115,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Stream log dirs for any kind of log.
 
         Our general strategy is first, if SSH is enabled, to SSH into the
-        master node (and possibly slaves, if *ssh_to_workers* is set).
+        master node (and possibly workers, if *ssh_to_workers* is set).
 
         If this doesn't work, we have to look on S3. If the cluster is
         TERMINATING, we first wait for it to terminate (since that
@@ -2131,7 +2131,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                         hosts.extend(self._ssh_worker_hosts())
                         host_desc += ' and task/core nodes'
                     except IOError:
-                        log.warning('Could not get slave addresses for %s' %
+                        log.warning('Could not get worker addresses for %s' %
                                     ssh_host)
 
                 path = posixpath.join(_EMR_LOG_DIR, dir_name)

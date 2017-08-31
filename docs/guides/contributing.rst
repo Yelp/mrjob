@@ -84,8 +84,6 @@ mrjob's modules can be put in four categories:
     * :py:mod:`mrjob.retry`: Wrapper for S3 and EMR connections to handle
       recoverable errors
 
-    * :py:mod:`mrjob.ssh`: Run commands on EMR cluster machines
-
 * Interacting with different "filesystems"
 
   * :py:mod:`mrjob.fs.base`: Common functionality

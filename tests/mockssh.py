@@ -129,7 +129,7 @@ def main(stdin, stdout, stderr, args, environ):
         return 0
 
     def receive_poor_mans_scp(host, args):
-        """Mock SSH behavior for :py:func:`~mrjob.ssh.poor_mans_scp()`"""
+        """Mock SSH behavior for uploading SSH key with sh -c "cat ..." """
         dest = _SCP_RE.match(args[2]).group('filename')
         try:
             path = os.path.join(path_for_host(host, environ), dest)
@@ -141,7 +141,7 @@ def main(stdin, stdout, stderr, args, environ):
             return 1
 
     def ls(host, args):
-        """Mock SSH behavior for :py:func:`~mrjob.ssh._ssh_ls()`"""
+        """Mock SSH behavior for running the ``find`` command over SSH"""
         dest = args[1]
         if dest == '-L':
             dest = args[2]
@@ -164,7 +164,7 @@ def main(stdin, stdout, stderr, args, environ):
         return 0
 
     def cat(host, args):
-        """Mock SSH behavior for :py:func:`~mrjob.ssh._ssh_cat()`"""
+        """Mock SSH behavior for running cat <path> over SSH"""
         local_dest = rel_posix_to_abs_local(host, args[1], environ)
         if not os.path.exists(local_dest):
             print('No such file or directory:', local_dest, file=stderr)

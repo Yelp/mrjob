@@ -115,7 +115,7 @@ def rel_posix_to_abs_local(host, path, environ=None):
 
 
 _SLAVE_ADDR_RE = re.compile(r'^(?P<master>.*?)!(?P<slave>.*?)=(?P<dir>.*)$')
-_SCP_RE = re.compile(r'^.*"cat > (?P<filename>.*?)".*$')
+_SCP_RE = re.compile(r'cat > (?P<filename>.*?) &&.*$')
 
 
 def main(stdin, stdout, stderr, args, environ):
@@ -130,7 +130,7 @@ def main(stdin, stdout, stderr, args, environ):
 
     def receive_poor_mans_scp(host, args):
         """Mock SSH behavior for :py:func:`~mrjob.ssh.poor_mans_scp()`"""
-        dest = _SCP_RE.match(args[0]).group('filename')
+        dest = _SCP_RE.match(args[2]).group('filename')
         try:
             path = os.path.join(path_for_host(host, environ), dest)
             with open(path, 'w') as f:
@@ -193,12 +193,8 @@ def main(stdin, stdout, stderr, args, environ):
                 print('sudo required', file=stderr)
                 return 1
 
-        # Get slave addresses (this is 'bash -c "hadoop dfsadmn ...')
-        if remote_args[0].startswith('bash -c "hadoop'):
-            return slave_addresses()
-
-        # Accept stdin for a file transfer (this is 'bash -c "cat > ...')
-        if remote_args[0].startswith('bash -c "cat'):
+        # Accept stdin for a file transfer (this is 'sh -c "cat > ...')
+        if remote_args[:2] == ['sh', '-c'] and len(remote_args) == 3:
             return receive_poor_mans_scp(host, remote_args)
 
         # ls (this is 'find -type f ...')

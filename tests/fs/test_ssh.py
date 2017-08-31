@@ -158,7 +158,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
         self.require_sudo()
 
-        self.assertRaises(IOError, self.fs._cat_file, remote_path)
+        self.assertRaises(IOError, list, self.fs._cat_file(remote_path))
 
     def test_cat_with_required_sudo(self):
         self.make_master_file(os.path.join('data', 'foo'), 'foo\nfoo\n')
@@ -185,7 +185,7 @@ class SSHFSTestCase(MockSubprocessTestCase):
         remote_path = 'ssh://testmaster!testslave1/f'
         self.require_sudo()
 
-        self.assertRaises(IOError, self.fs._cat_file, remote_path)
+        self.assertRaises(IOError, list, self.fs._cat_file(remote_path))
 
     def test_slave_cat_with_required_sudo(self):
         self.add_slave()

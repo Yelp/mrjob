@@ -174,13 +174,14 @@ class SSHFilesystem(Filesystem):
     def ls(self, uri_glob):
         m = _SSH_URI_RE.match(uri_glob)
         addr = m.group('hostname')
-        path = m.group('filesystem_path')
+        path_to_ls = m.group('filesystem_path')
 
         out = self._ssh_run_and_stream_output(
-            addr, ['find', '-L', path, '-type', 'f'])
+            addr, ['find', '-L', path_to_ls, '-type', 'f'])
 
         for line in to_lines(out):
-            yield to_unicode(line).rstrip('\n')
+            path = to_unicode(line).rstrip('\n')
+            yield 'ssh://%s%s' % (addr, path)
 
     def md5sum(self, path):
         raise IOError()  # not implemented

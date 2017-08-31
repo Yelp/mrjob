@@ -954,6 +954,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         popen_exception = None
 
         for bind_port in self._pick_ssh_bind_ports():
+            # this could be refactored to use SSHFilesystem._ssh_launch(),
+            # but that would probably just make this code less readable
             args = self._opts['ssh_bin'] + [
                 '-o', 'VerifyHostKeyDNS=no',
                 '-o', 'StrictHostKeyChecking=no',

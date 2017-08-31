@@ -19,12 +19,10 @@ from subprocess import Popen
 from subprocess import PIPE
 
 from mrjob.cat import decompress
-from mrjob.cat import to_chunks
 from mrjob.fs.base import Filesystem
 from mrjob.py2 import to_unicode
 from mrjob.util import cmd_line
 from mrjob.util import random_identifier
-from mrjob.util import to_lines
 
 
 _SSH_URI_RE = re.compile(
@@ -106,23 +104,34 @@ class SSHFilesystem(Filesystem):
 
         return args
 
-    def _ssh_run_and_stream_output(self, address, cmd_args, stdin=None):
-        """Run the given command, streaming output one line at a time.
-
-        We assume stderr will be small enough not to stall the process."""
+    def _ssh_launch(self, address, cmd_args, stdin=None):
+        """Copy SSH keys if necessary, then launch the given command
+        over SSH and return a Popen."""
         self._ssh_copy_key(address)
 
         args = self._ssh_cmd_args(address, cmd_args)
 
         log.debug('  > ' + cmd_line(args))
         try:
-            p = Popen(args, stdout=PIPE, stderr=PIPE, stdin=stdin)
+            return Popen(args, stdout=PIPE, stderr=PIPE, stdin=stdin)
         except OSError as ex:
             raise IOError(ex.strerror)
 
-        for chunk in to_chunks(p.stdout):
-            yield chunk
+    def _ssh_run(self, address, cmd_args, stdin=None):
+        """Run the given SSH command, and raise an IOError if it fails.
 
+        Use this for commands with a bounded amount of output.
+        """
+        p = self._ssh_launch(address, cmd_args, stdin=stdin)
+
+        stdout, stderr = p.communicate()
+
+        if p.returncode != 0:
+            raise IOError(to_unicode(stderr))
+
+    def _ssh_finish_run(self, p):
+        """Close file handles and do error handling on a ``Popen``
+        who we've read stdout from but done nothing else."""
         stderr = p.stderr.read()
 
         p.stdout.close()
@@ -132,11 +141,6 @@ class SSHFilesystem(Filesystem):
 
         if returncode != 0:
             raise IOError(stderr)
-
-    def _ssh_run(self, address, cmd_args, stdin=None):
-        out = self._ssh_run_and_stream_output(address, cmd_args, stdin=stdin)
-        for _ in out:
-            pass
 
     def _ssh_copy_key(self, address):
         """Copy ``self._ec2_key_pair_file`` to all hosts in *address*
@@ -176,12 +180,14 @@ class SSHFilesystem(Filesystem):
         addr = m.group('hostname')
         path_to_ls = m.group('filesystem_path')
 
-        out = self._ssh_run_and_stream_output(
+        p = self._ssh_launch(
             addr, ['find', '-L', path_to_ls, '-type', 'f'])
 
-        for line in to_lines(out):
+        for line in p.stdout:
             path = to_unicode(line).rstrip('\n')
             yield 'ssh://%s%s' % (addr, path)
+
+        self._ssh_finish_run(p)
 
     def md5sum(self, path):
         raise IOError()  # not implemented
@@ -191,10 +197,12 @@ class SSHFilesystem(Filesystem):
         addr = m.group('hostname')
         path = m.group('filesystem_path')
 
-        out = self._ssh_run_and_stream_output(addr, ['cat', path])
+        p = self._ssh_launch(addr, ['cat', path])
 
-        for chunk in decompress(out, path):
+        for chunk in decompress(p.stdout, path):
             yield chunk
+
+        self._ssh_finish_run(p)
 
     def mkdir(self, dest):
         raise IOError()  # not implemented

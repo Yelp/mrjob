@@ -133,24 +133,24 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.make_master_file(os.path.join('data', 'foo'), 'foo\nfoo\n')
         remote_path = self.fs.join('ssh://testmaster/data', 'foo')
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n', b'foo\n'])
+        self.assertEqual(b''.join(self.fs._cat_file(remote_path)),
+                         b'foo\nfoo\n')
 
     def test_cat_bz2(self):
         self.make_master_file(os.path.join('data', 'foo.bz2'),
                               bz2.compress(b'foo\n' * 1000))
         remote_path = self.fs.join('ssh://testmaster/data', 'foo.bz2')
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n'] * 1000)
+        self.assertEqual(b''.join(self.fs._cat_file(remote_path)),
+                         b'foo\n' * 1000)
 
     def test_cat_gz(self):
         self.make_master_file(os.path.join('data', 'foo.gz'),
                               gzip_compress(b'foo\n' * 10000))
         remote_path = self.fs.join('ssh://testmaster/data', 'foo.gz')
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n'] * 10000)
+        self.assertEqual(b''.join(self.fs._cat_file(remote_path)),
+                         b'foo\n' * 10000)
 
     def test_cat_without_required_sudo(self):
         self.make_master_file(os.path.join('data', 'foo'), 'foo\nfoo\n')
@@ -168,16 +168,16 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
         self.fs.use_sudo_over_ssh()
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n', b'foo\n'])
+        self.assertEqual(b''.join(self.fs._cat_file(remote_path)),
+                         b'foo\nfoo\n')
 
     def test_slave_cat(self):
         self.add_slave()
         self.make_slave_file(1, 'f', 'foo\nfoo\n')
         remote_path = 'ssh://testmaster!testslave1/f'
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n', b'foo\n'])
+        self.assertEqual(b''.join(self.fs._cat_file(remote_path)),
+                         b'foo\nfoo\n')
 
     def test_slave_cat_without_required_sudo(self):
         self.add_slave()
@@ -195,8 +195,8 @@ class SSHFSTestCase(MockSubprocessTestCase):
 
         self.fs.use_sudo_over_ssh()
 
-        self.assertEqual(list(self.fs._cat_file(remote_path)),
-                         [b'foo\n', b'foo\n'])
+        self.assertEqual(b''.join(self.fs._cat_file(remote_path)),
+                         b'foo\nfoo\n')
 
     def test_du(self):
         self.make_master_file('f', 'contents')

@@ -206,7 +206,7 @@ def main(stdin, stdout, stderr, args, environ):
             return cat(host, remote_args)
 
         # Recursively call for slaves
-        if remote_args[0] == 'ssh':
+        if remote_args[0].split('/')[-1] == 'ssh':
             # Actually check the existence of the key file on the master node
             while not remote_args[remote_arg_pos] == '-i':
                 remote_arg_pos += 1
@@ -234,8 +234,9 @@ def main(stdin, stdout, stderr, args, environ):
             return run(slave_host, remote_args[remote_arg_pos + 1:],
                        stdout, stderr, environ, slave_key_file)
 
-        print(("Command line not recognized: %s" %
-               ' '.join(remote_args)), file=stderr)
+        cmd_line = ' '.join(pipes.quote(x) for x in remote_args)
+        print("Command line not recognized: %s" % cmd_line, file=stderr)
+
         return 1
 
     # Find where the user's commands begin

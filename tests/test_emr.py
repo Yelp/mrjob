@@ -7262,7 +7262,7 @@ class ProgressHtmlOverSshTestCase(MockBoto3TestCase):
     def setUp(self):
         super(ProgressHtmlOverSshTestCase, self).setUp()
 
-        self._ssh_run = self.start(patch('mrjob.emr._ssh_run',
+        self._ssh_run = self.start(patch('mrjob.fs.ssh.SSHFilesystem._ssh_run',
                                          return_value=(Mock(), Mock())))
 
         self._address_of_master = self.start(patch(
@@ -7288,9 +7288,7 @@ class ProgressHtmlOverSshTestCase(MockBoto3TestCase):
 
         self.assertIsNotNone(html)
         self._ssh_run.assert_called_once_with(
-            ['ssh'],
             self.MOCK_MASTER,
-            self.MOCK_EC2_KEY_PAIR_FILE,
             ['curl', self.MOCK_JOB_TRACKER_URL])
 
         self.assertEqual(html, self._ssh_run.return_value[0])

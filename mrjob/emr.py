@@ -95,7 +95,6 @@ from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
-from mrjob.ssh import _ssh_run
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
@@ -1896,11 +1895,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             tunnel_config['name']))
 
         try:
-            stdout, _ = _ssh_run(
-                self._opts['ssh_bin'],
-                host,
-                self._opts['ec2_key_pair_file'],
-                ['curl', remote_url])
+            stdout, _ = self._ssh_fs._ssh_run(host, ['curl', remote_url])
             return stdout
         except Exception as e:
             log.debug('    failed: %s' % str(e))

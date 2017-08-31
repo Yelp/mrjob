@@ -119,6 +119,7 @@ class SSHFilesystem(Filesystem):
 
     def _ssh_run(self, address, cmd_args, stdin=None):
         """Run the given SSH command, and raise an IOError if it fails.
+        Return ``(stdout, stderr)``
 
         Use this for commands with a bounded amount of output.
         """
@@ -128,6 +129,8 @@ class SSHFilesystem(Filesystem):
 
         if p.returncode != 0:
             raise IOError(to_unicode(stderr))
+
+        return stdout, stderr
 
     def _ssh_finish_run(self, p):
         """Close file handles and do error handling on a ``Popen``
@@ -220,7 +223,6 @@ class SSHFilesystem(Filesystem):
     def touchz(self, dest):
         raise IOError()  # not implemented
 
-    # TODO: rename to _use_sudo_over_ssh
     def use_sudo_over_ssh(self, sudo=True):
         """Use this to turn on *sudo* (we do this depending on the AMI
         version on EMR)."""

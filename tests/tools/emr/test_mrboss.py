@@ -72,13 +72,14 @@ class MRBossTestCase(MockBoto3TestCase):
         self.assertEqual(os.listdir(self.output_dir), ['master'])
 
     def test_two_nodes(self):
-        self.add_slave()
-        self.ssh_worker_hosts.return_value = ['testslave0']
+        self.add_worker()
+        self.ssh_worker_hosts.return_value = ['testworker0']
 
         self.runner._opts['num_core_instances'] = 1
 
         mock_ssh_file('testmaster', 'some_file', b'file contents 1')
-        mock_ssh_file('testmaster!testslave0', 'some_file', b'file contents 2')
+        mock_ssh_file('testmaster!testworker0', 'some_file',
+                      b'file contents 2')
 
         self.runner.fs  # force initialization of _ssh_fs
 
@@ -88,9 +89,10 @@ class MRBossTestCase(MockBoto3TestCase):
         with open(os.path.join(self.output_dir, 'master', 'stdout'), 'r') as f:
             self.assertEqual(f.read().rstrip(), 'file contents 1')
 
-        with open(os.path.join(self.output_dir, 'slave testslave0', 'stdout'),
-                  'r') as f:
+        with open(
+                os.path.join(self.output_dir, 'worker testworker0', 'stdout'),
+                'r') as f:
             self.assertEqual(f.read().strip(), 'file contents 2')
 
         self.assertEqual(sorted(os.listdir(self.output_dir)),
-                         ['master', 'slave testslave0'])
+                         ['master', 'worker testworker0'])

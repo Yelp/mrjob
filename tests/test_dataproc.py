@@ -548,7 +548,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             core=(5, HIGHCPU_GCE_INSTANCE),
             master=(1, DEFAULT_GCE_INSTANCE))
 
-    def test_explicit_master_and_slave_instance_types(self):
+    def test_explicit_master_and_worker_instance_types(self):
         self._test_instance_groups(
             {'master_instance_type': MICRO_GCE_INSTANCE},
             master=(1, MICRO_GCE_INSTANCE))
@@ -616,7 +616,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             {'master_instance_type': HIGHCPU_GCE_INSTANCE},
             master=(1, HIGHCPU_GCE_INSTANCE))
 
-        # set master and slave in mrjob.conf, 2 instances
+        # set master and worker in mrjob.conf, 2 instances
         self.set_in_mrjob_conf(master_instance_type=MICRO_GCE_INSTANCE,
                                instance_type=HIGHMEM_GCE_INSTANCE,
                                num_core_instances=2)

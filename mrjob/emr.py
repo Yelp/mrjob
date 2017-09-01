@@ -95,7 +95,6 @@ from mrjob.py2 import urlopen
 from mrjob.py2 import xrange
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
-from mrjob.ssh import _ssh_run
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
@@ -955,6 +954,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         popen_exception = None
 
         for bind_port in self._pick_ssh_bind_ports():
+            # this could be refactored to use SSHFilesystem._ssh_launch(),
+            # but that would probably just make this code less readable
             args = self._opts['ssh_bin'] + [
                 '-o', 'VerifyHostKeyDNS=no',
                 '-o', 'StrictHostKeyChecking=no',
@@ -1896,11 +1897,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             tunnel_config['name']))
 
         try:
-            stdout, _ = _ssh_run(
-                self._opts['ssh_bin'],
-                host,
-                self._opts['ec2_key_pair_file'],
-                ['curl', remote_url])
+            stdout, _ = self.fs._ssh_run(host, ['curl', remote_url])
             return stdout
         except Exception as e:
             log.debug('    failed: %s' % str(e))
@@ -2013,7 +2010,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # dir_name=None means don't try to SSH in.
         #
         # TODO: If the failure is on the master node, we could just look in
-        # /mnt/var/log/bootstrap-actions. However, if it's on a slave node,
+        # /mnt/var/log/bootstrap-actions. However, if it's on a worker node,
         # we'd have to look up its internal IP using the ListInstances
         # API call. This *would* be a bit faster though. See #1346.
         return self._stream_log_dirs(
@@ -2118,7 +2115,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Stream log dirs for any kind of log.
 
         Our general strategy is first, if SSH is enabled, to SSH into the
-        master node (and possibly slaves, if *ssh_to_workers* is set).
+        master node (and possibly workers, if *ssh_to_workers* is set).
 
         If this doesn't work, we have to look on S3. If the cluster is
         TERMINATING, we first wait for it to terminate (since that
@@ -2134,7 +2131,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                         hosts.extend(self._ssh_worker_hosts())
                         host_desc += ' and task/core nodes'
                     except IOError:
-                        log.warning('Could not get slave addresses for %s' %
+                        log.warning('Could not get worker addresses for %s' %
                                     ssh_host)
 
                 path = posixpath.join(_EMR_LOG_DIR, dir_name)

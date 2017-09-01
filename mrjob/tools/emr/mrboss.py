@@ -57,15 +57,13 @@ from mrjob.options import _add_runner_options
 from mrjob.options import _alphabetize_options
 from mrjob.options import _filter_by_role
 from mrjob.py2 import to_unicode
-from mrjob.ssh import _ssh_copy_key
-from mrjob.ssh import _ssh_run_with_recursion
 from mrjob.util import random_identifier
 from mrjob.util import shlex_split
 
 
 def main(cl_args=None):
     usage = 'usage: %prog CLUSTER_ID [options] "command string"'
-    description = ('Run a command on the master and all slaves of an EMR'
+    description = ('Run a command on the master and all worker nodes of an EMR'
                    ' cluster. Store stdout/stderr for results in OUTPUT_DIR.')
 
     option_parser = OptionParser(usage=usage, description=description)
@@ -107,9 +105,6 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     """Given an :py:class:`EMRJobRunner`, run the command specified by
     *cmd_args* on all nodes in the cluster and save the stdout and stderr of
     each run to subdirectories of *output_dir*.
-
-    You should probably have run :py:meth:`_enable_slave_ssh_access()` on the
-    runner before calling this function.
     """
     master_addr = runner._address_of_master()
     addresses = [master_addr]
@@ -117,25 +112,15 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     ssh_bin = runner._opts['ssh_bin']
     ec2_key_pair_file = runner._opts['ec2_key_pair_file']
 
-    keyfile = None
-    slave_addrs = runner._ssh_worker_hosts()
+    worker_addrs = runner._ssh_worker_hosts()
 
-    if slave_addrs:
-        addresses += ['%s!%s' % (master_addr, slave_addr)
-                      for slave_addr in slave_addrs]
-        # copying key file like a boss (name of keyfile doesn't really matter)
-        keyfile = 'mrboss-%s.pem' % random_identifier()
-        _ssh_copy_key(ssh_bin, master_addr, ec2_key_pair_file, keyfile)
+    if worker_addrs:
+        addresses += ['%s!%s' % (master_addr, worker_addr)
+                      for worker_addr in worker_addrs]
 
     for addr in addresses:
 
-        stdout, stderr = _ssh_run_with_recursion(
-            ssh_bin,
-            addr,
-            ec2_key_pair_file,
-            keyfile,
-            cmd_args,
-        )
+        stdout, stderr = runner.fs._ssh_run(addr, cmd_args)
 
         if print_stderr:
             print('---')
@@ -143,7 +128,7 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
             print(to_unicode(stderr), end=' ')
 
         if '!' in addr:
-            base_dir = os.path.join(output_dir, 'slave ' + addr.split('!')[1])
+            base_dir = os.path.join(output_dir, 'worker ' + addr.split('!')[1])
         else:
             base_dir = os.path.join(output_dir, 'master')
 

@@ -105,7 +105,7 @@ class MockBoto3TestCase(SandboxedTestCase):
     def simulate_emr_progress(self, cluster_id):
         self.client('emr')._simulate_progress(cluster_id)
 
-    def prepare_runner_for_ssh(self, runner, num_slaves=0):
+    def prepare_runner_for_ssh(self, runner, num_workers=0):
         # TODO: Refactor this abomination of a test harness
 
         # Set up environment variables
@@ -116,8 +116,8 @@ class MockBoto3TestCase(SandboxedTestCase):
         os.environ['MOCK_SSH_ROOTS'] = 'testmaster=%s' % master_ssh_root
         mock_ssh_dir('testmaster', _EMR_LOG_DIR + '/hadoop/history')
 
-        if not hasattr(self, 'slave_ssh_roots'):
-            self.slave_ssh_roots = []
+        if not hasattr(self, 'worker_ssh_roots'):
+            self.worker_ssh_roots = []
 
         self.addCleanup(self.teardown_ssh, master_ssh_root)
 
@@ -146,19 +146,19 @@ class MockBoto3TestCase(SandboxedTestCase):
         #runner.fs
 
     # TODO: this should be replaced
-    def add_slave(self):
-        """Add a mocked slave to the cluster. Caller is responsible for setting
+    def add_worker(self):
+        """Add a mocked worker to the cluster. Caller is responsible for setting
         runner._opts['num_ec2_instances'] to the correct number.
         """
-        slave_num = len(self.slave_ssh_roots)
-        new_dir = tempfile.mkdtemp(prefix='slave_%d_ssh_root.' % slave_num)
-        self.slave_ssh_roots.append(new_dir)
-        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testslave%d=%s'
-                                         % (slave_num, new_dir))
+        worker_num = len(self.worker_ssh_roots)
+        new_dir = tempfile.mkdtemp(prefix='worker_%d_ssh_root.' % worker_num)
+        self.worker_ssh_roots.append(new_dir)
+        os.environ['MOCK_SSH_ROOTS'] += (':testmaster!testworker%d=%s'
+                                         % (worker_num, new_dir))
 
     def teardown_ssh(self, master_ssh_root):
         shutil.rmtree(master_ssh_root)
-        for path in self.slave_ssh_roots:
+        for path in self.worker_ssh_roots:
             shutil.rmtree(path)
 
     def make_runner(self, *args):

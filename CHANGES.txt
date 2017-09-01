@@ -49,6 +49,7 @@ v0.6.0, 2017-09-?? -- ???
      * scrape_options_into_new_groups()
  * removed mrjob.retry.RetryGoRound
  * removed mrjob.setup.BootstrapWorkingDirManager
+ * removed mrjob.ssh
  * removed deprecated options:
    * bootstrap_cmds
    * bootstrap_files

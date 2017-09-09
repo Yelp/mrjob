@@ -1312,12 +1312,6 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
         print()
 
 
-# TODO: this is just here so that imports work. ArgumentParser already
-# does this automatically
-def _alphabetize_options(arg_parser):
-    pass
-
-
 def _optparse_kwargs_to_argparse(**kwargs):
     """Translate old keyword args to OptionParser.add_option() so they can be
     passed to ArgumentParser.add_argument().

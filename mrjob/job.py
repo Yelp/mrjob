@@ -666,7 +666,7 @@ class MRJob(MRJobLauncher):
         - If path is ``-``, read from STDIN.
         - Recursively read all files in a directory
         """
-        paths = self.args or ['-']
+        paths = self.parsed_args.args or ['-']
         for path in paths:
             for line in read_input(path, stdin=self.stdin):
                 yield line
@@ -825,10 +825,10 @@ class MRJob(MRJobLauncher):
         This is mostly useful inside :py:meth:`load_args`, to disable
         loading args when we aren't running inside Hadoop.
         """
-        return (self.args.run_mapper or
-                self.args.run_combiner or
-                self.args.run_reducer or
-                self.args.run_spark)
+        return (self.parsed_args.run_mapper or
+                self.parsed_args.run_combiner or
+                self.parsed_args.run_reducer or
+                self.parsed_args.run_spark)
 
     def _print_help(self, parsed_args):
         """Implement --help --steps"""
@@ -1018,7 +1018,7 @@ class MRJob(MRJobLauncher):
             else:
                 paths_from_libjars.append(os.path.join(script_dir, path))
 
-        return combine_lists(paths_from_libjars, self.args.libjars)
+        return combine_lists(paths_from_libjars, self.parsed_args.libjars)
 
     ### Partitioning ###
 
@@ -1090,7 +1090,7 @@ class MRJob(MRJobLauncher):
         """
 
         # deal with various forms of bad behavior by users
-        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.args.jobconf)
+        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.parsed_args.jobconf)
         filtered_jobconf = {}
 
         def format_hadoop_version(v_float):

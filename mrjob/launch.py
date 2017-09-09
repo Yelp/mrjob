@@ -154,10 +154,6 @@ class MRJobLauncher(object):
     def _print_help(self, options):
         """Print help for this job. This will either print runner
         or basic help. Override to allow other kinds of help."""
-        self.arg_parser.print_help()
-        return
-
-        # TODO: fix the below
         if options.runner:
             _print_help_for_runner(
                 self._runner_opt_names(), options.deprecated)

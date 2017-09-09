@@ -13,16 +13,16 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Functions to populate py:class:`OptionParser` and :py:class:`OptionGroup`
-objects with categorized command line parameters. This module should not be
-made public until at least 0.4 if not later or never.
+"""Functions to populate py:class:`~argparse.ArgumentParser``
+objects with categorized command line parameters.
 """
 from __future__ import print_function
 
 import json
+from argparse import ArgumentParser
+from argparse import SUPPRESS
 from optparse import OptionError
-from optparse import OptionParser
-from optparse import SUPPRESS_USAGE
+from logging import getLogger
 
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
@@ -31,6 +31,8 @@ from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.parse import _parse_port_range_list
+
+log = getLogger(__name__)
 
 #: cleanup options:
 #:
@@ -172,7 +174,7 @@ def _port_range_callback(option, opt_str, value, parser):
 
 # these are used by MRJob to determine what part of a job to run
 #
-# this just maps dest to the args and kwargs to OptionParser.add_option()
+# this just maps dest to the args and kwargs to ArgumentParser.add_argument
 # (minus the dest keyword arg)
 _STEP_OPTS = dict(
     run_combiner=(
@@ -238,18 +240,17 @@ _DEPRECATED_NON_RUNNER_OPTS = set([
 #   (if left blank, we use combine_values())
 # deprecated: if true, this option is deprecated and slated for removal
 # deprecated_aliases: list of old names for this option slated for removal
-# switches: list of switches to add to option parser for this option. Items
+# switches: list of switches to add to ArgumentParser for this option. Items
 #   have the format (['--switch-names', ...], dict(**kwargs)), where kwargs
 #   can be:
-#     action: action to pass to option parser (e.g. 'store_true')
-#     callback: option parser callback when action is 'callback'. implies
+#     action: action to pass to add_argument() (e.g. 'store_true')
+#     callback: ArgumentParser callback when action is 'callback'. implies
 #       action='callback'
 #     deprecated_aliases: list of old '--switch-names' slated for removal
-#     help: help string to pass to option parser
+#     help: help string to pass to add_argument()
 #     nargs: number of args for callback to parse (defaults to 1 for callback)
-#     type: option type for option parser to enforce (e.g. 'float'). defaults
-#        to 'string' for callback
-#   You can't set the option parser's default; we use [] if *action* is
+#     type: option type for add_argument() to enforce (e.g. float).
+#   You can't set the ArgumentParser's default; we use [] if *action* is
 #   'append' and None otherwise.
 #
 # the list of which options apply to which runner is in the runner class
@@ -1144,8 +1145,8 @@ def _filter_by_role(opt_names, *cloud_roles):
 
 
 def _add_runner_args(parser, opt_names=None, include_deprecated=True):
-    """add options (switches) for the given runner opts to the given
-    options parser, alphabetically by destination. If *opt_names* is
+    """add switches for the given runner opts to the given
+    ArgumentParser, alphabetically by destination. If *opt_names* is
     None, include all runner opts."""
     if opt_names is None:
         opt_names = set(_RUNNER_OPTS)
@@ -1198,7 +1199,7 @@ def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True):
 ### non-runner switches ###
 
 def _add_basic_args(parser):
-    """Options for all command line tools"""
+    """Switches for all command line tools"""
 
     parser.add_argument(
         '-c', '--conf-path', dest='conf_paths',
@@ -1245,7 +1246,7 @@ def _add_job_args(parser):
 
 
 def _add_step_args(parser):
-    """Add options that determine what part of the job a MRJob runs."""
+    """Add switches that determine what part of the job a MRJob runs."""
     for dest, (args, kwargs) in _STEP_OPTS.items():
         kwargs = dict(dest=dest, **kwargs)
         parser.add_argument(*args, **kwargs)
@@ -1254,21 +1255,19 @@ def _add_step_args(parser):
 ### other utilities for switches ###
 
 def _print_help_for_runner(opt_names, include_deprecated=False):
-    help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
+    help_parser = ArgumentParser(usage=SUPPRESS, add_help=False)
 
     _add_runner_args(help_parser, opt_names,
                      include_deprecated=include_deprecated)
 
-    _alphabetize_options(help_parser)
     help_parser.print_help()
 
 
 def _print_help_for_steps():
-    help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
+    help_parser = ArgumentParser(usage=SUPPRESS, add_help=False)
 
     _add_step_args(help_parser)
 
-    _alphabetize_options(help_parser)
     help_parser.print_help()
 
 
@@ -1277,25 +1276,24 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
     parser so that it can include custom options added by a
     :py:class:`~mrjob.job.MRJob`.
     """
-    help_parser = OptionParser(usage=usage, add_help_option=False)
+    help_parser = ArgumentParser(usage=usage, add_help=False)
 
-    for option in option_parser._get_all_options():
-        if option.dest in _RUNNER_OPTS:
+    for action in option_parser._get_optional_actions():
+        if action.dest in _RUNNER_OPTS:
             continue
 
-        if option.dest in _STEP_OPTS:
+        if action.dest in _STEP_OPTS:
             continue
 
-        if (option.dest in _DEPRECATED_NON_RUNNER_OPTS and
+        if (action.dest in _DEPRECATED_NON_RUNNER_OPTS and
                 not include_deprecated):
             continue
 
-        help_parser.add_option(
-            *(option._short_opts + option._long_opts),
-            dest=option.dest,
-            help=option.help)
+        help_parser.add_argument(
+            *(action.option_strings),
+            dest=action.dest,
+            help=action.help)
 
-    _alphabetize_options(help_parser)
     help_parser.print_help()
 
     print()
@@ -1309,9 +1307,10 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
         print()
 
 
-# TODO: need to update this for argparse
-def _alphabetize_options(opt_group):
-    opt_group.option_list.sort(key=lambda opt: opt.dest or '')
+# TODO: this is just here so that imports work. ArgumentParser already
+# does this automatically
+def _alphabetize_options(arg_parser):
+    pass
 
 
 def _optparse_kwargs_to_argparse(**kwargs):

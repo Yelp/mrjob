@@ -154,6 +154,10 @@ class MRJobLauncher(object):
     def _print_help(self, options):
         """Print help for this job. This will either print runner
         or basic help. Override to allow other kinds of help."""
+        self.arg_parser.print_help()
+        return
+
+        # TODO: fix the below
         if options.runner:
             _print_help_for_runner(
                 self._runner_opt_names(), options.deprecated)
@@ -227,8 +231,8 @@ class MRJobLauncher(object):
         # to log to it in Python 3
         log_stream = codecs.getwriter('utf_8')(self.stderr)
 
-        self.set_up_logging(quiet=self.args.quiet,
-                            verbose=self.args.verbose,
+        self.set_up_logging(quiet=self.parsed_args.quiet,
+                            verbose=self.parsed_args.verbose,
                             stream=log_stream)
 
         with self.make_runner() as runner:
@@ -240,7 +244,7 @@ class MRJobLauncher(object):
                 log.error(str(e))
                 sys.exit(1)
 
-            if not self.args.no_output:
+            if not self.parsed_args.no_output:
                 for chunk in runner.cat_output():
                     self.stdout.write(chunk)
                 self.stdout.flush()
@@ -275,12 +279,17 @@ class MRJobLauncher(object):
                 dest='script_path',
                 help='path of script to launch')
 
+        self.arg_parser.add_argument(
+            dest='args', nargs='*',
+            help=('input paths to read (or stdin if not set). If --spark'
+                  ' is set, the input and output path for the spark job.'))
+
         _add_basic_args(self.arg_parser)
         _add_job_args(self.arg_parser)
         _add_runner_args(self.arg_parser)
 
     def load_args(self, args):
-        """Load command-line options into ``self.args`` and
+        """Load command-line options into ``self.parsed_args`` and
         ``self._script_path``.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_args`.
@@ -294,18 +303,18 @@ class MRJobLauncher(object):
             def load_args(self, args):
                 super(MRYourJob, self).load_args(args)
 
-                self.stop_words = self.args.stop_words.split(',')
+                self.stop_words = self.parsed_args.stop_words.split(',')
                 ...
         """
-        self.args = self.arg_parser.parse_args(args)
+        self.parsed_args = self.arg_parser.parse_args(args)
 
-        if self.args.help:
-            self._print_help(self.args)
+        if self.parsed_args.help:
+            self._print_help(self.parsed_args)
             sys.exit(0)
 
         if self._script_path is None:
             # should always be set, just hedging
-            self._script_path = getattr(self.args, 'script_path', None)
+            self._script_path = getattr(self.parsed_args, 'script_path', None)
 
     def add_file_arg(self, *args, **kwargs):
         """Add a command-line option that sends an external file
@@ -382,11 +391,20 @@ class MRJobLauncher(object):
     ### old optparse shims ###
 
     @property
-    def options(self):
+    def args(self):
+        class_name = self.__class__.__name__
         log.warning(
-            '%s.options is now a deprecated alias for %s.args, and will'
-            ' be removed in v0.7.0')
-        return self.args
+            '%s.args is a deprecated alias for %s.parsed_args.args, and will'
+            ' be removed in v0.7.0' % (class_name, class_name))
+        return self.parsed_args
+
+    @property
+    def options(self):
+        class_name = self.__class__.__name__
+        log.warning(
+            '%s.options is a deprecated alias for %s.parsed_args, and will'
+            ' be removed in v0.7.0' % (class_name, class_name))
+        return self.parsed_args
 
     def configure_options(self):
         """.. deprecated:: 0.6.0
@@ -447,19 +465,19 @@ class MRJobLauncher(object):
 
         Defaults to ``'local'`` and disallows use of inline runner.
         """
-        if self.args.runner == 'dataproc':
+        if self.parsed_args.runner == 'dataproc':
             from mrjob.dataproc import DataprocJobRunner
             return DataprocJobRunner
 
-        elif self.args.runner == 'emr':
+        elif self.parsed_args.runner == 'emr':
             from mrjob.emr import EMRJobRunner
             return EMRJobRunner
 
-        elif self.args.runner == 'hadoop':
+        elif self.parsed_args.runner == 'hadoop':
             from mrjob.hadoop import HadoopJobRunner
             return HadoopJobRunner
 
-        elif self.args.runner == 'inline':
+        elif self.parsed_args.runner == 'inline':
             raise ValueError("inline is not supported in the multi-lingual"
                              " launcher.")
 
@@ -494,23 +512,23 @@ class MRJobLauncher(object):
         # upload args and pass them to extra_args. file_upload_args
         # should be deprecated.
         return dict(
-            conf_paths=self.args.conf_paths,
+            conf_paths=self.parsed_args.conf_paths,
             extra_args=[],
             file_upload_args=[],
             hadoop_input_format=self.hadoop_input_format(),
             hadoop_output_format=self.hadoop_output_format(),
-            input_paths=self.args,
+            input_paths=self.parsed_args.args,
             mr_job_script=self._script_path,
-            output_dir=self.args.output_dir,
+            output_dir=self.parsed_args.output_dir,
             partitioner=self.partitioner(),
             stdin=self.stdin,
-            step_output_dir=self.args.step_output_dir,
+            step_output_dir=self.parsed_args.step_output_dir,
         )
 
     def _kwargs_from_switches(self, keys):
         return dict(
-            (key, getattr(self.args, key))
-            for key in keys if hasattr(self.args, key)
+            (key, getattr(self.parsed_args, key))
+            for key in keys if hasattr(self.parsed_args, key)
         )
 
     def _job_kwargs(self):

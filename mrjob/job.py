@@ -22,7 +22,6 @@ import json
 import logging
 import os.path
 import sys
-from optparse import OptionGroup
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
@@ -30,7 +29,7 @@ from mrjob.conf import combine_lists
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _im_func
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.options import _add_step_options
+from mrjob.options import _add_step_args
 from mrjob.options import _print_help_for_steps
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
@@ -78,7 +77,7 @@ class MRJob(MRJobLauncher):
 
     @classmethod
     def _usage(cls):
-        return "usage: %prog [options] [input files]"
+        return "usage: %(prog)s [options]"
 
     ### Defining one-step streaming jobs ###
 
@@ -424,20 +423,20 @@ class MRJob(MRJobLauncher):
     def execute(self):
         # MRJob does Hadoop Streaming stuff, or defers to Launcher (superclass)
         # if not otherwise instructed
-        if self.options.show_steps:
+        if self.parsed_args.show_steps:
             self.show_steps()
 
-        elif self.options.run_mapper:
-            self.run_mapper(self.options.step_num)
+        elif self.parsed_args.run_mapper:
+            self.run_mapper(self.parsed_args.step_num)
 
-        elif self.options.run_combiner:
-            self.run_combiner(self.options.step_num)
+        elif self.parsed_args.run_combiner:
+            self.run_combiner(self.parsed_args.step_num)
 
-        elif self.options.run_reducer:
-            self.run_reducer(self.options.step_num)
+        elif self.parsed_args.run_reducer:
+            self.run_reducer(self.parsed_args.step_num)
 
-        elif self.options.run_spark:
-            self.run_spark(self.options.step_num)
+        elif self.parsed_args.run_spark:
+            self.run_spark(self.parsed_args.step_num)
 
         else:
             super(MRJob, self).execute()
@@ -462,7 +461,7 @@ class MRJob(MRJobLauncher):
     def _runner_class(self):
         """Runner class as indicated by ``--runner``. Defaults to ``'inline'``.
         """
-        if not self.options.runner or self.options.runner == 'inline':
+        if not self.parsed_args.runner or self.parsed_args.runner == 'inline':
             from mrjob.inline import InlineMRJobRunner
             return InlineMRJobRunner
 
@@ -616,9 +615,9 @@ class MRJob(MRJobLauncher):
         """
         step = self._get_step(step_num, SparkStep)
 
-        if len(self.args) != 2:
+        if len(self.parsed_args.args) != 2:
             raise ValueError('Wrong number of args')
-        input_path, output_path = self.args
+        input_path, output_path = self.parsed_args.args
 
         spark_method = step.spark
         spark_method(input_path, output_path)
@@ -802,47 +801,41 @@ class MRJob(MRJobLauncher):
 
     ### Command-line arguments ###
 
-    def configure_options(self):
+    def configure_args(self):
         """Define arguments for this script. Called from :py:meth:`__init__()`.
 
         Re-define to define custom command-line arguments or pass
         through existing ones::
 
-            def configure_options(self):
-                super(MRYourJob, self).configure_options()
+            def configure_args(self):
+                super(MRYourJob, self).configure_args()
 
-                self.add_passthrough_option(...)
-                self.add_file_option(...)
-                self.pass_through_option(...)
+                self.add_passthru_arg(...)
+                self.add_file_arg(...)
+                self.pass_arg_through(...)
                 ...
         """
+        super(MRJob, self).configure_args()
 
-        super(MRJob, self).configure_options()
-
-        # To run mappers or reducers
-        self._mux_opt_group = OptionGroup(
-            self.option_parser, 'Running specific parts of the job')
-        self.option_parser.add_option_group(self._mux_opt_group)
-
-        _add_step_options(self._mux_opt_group)
+        _add_step_args(self.arg_parser)
 
     def is_task(self):
         """True if this is a mapper, combiner, reducer, or Spark script.
 
-        This is mostly useful inside :py:meth:`load_options`, to disable
-        loading options when we aren't running inside Hadoop.
+        This is mostly useful inside :py:meth:`load_args`, to disable
+        loading args when we aren't running inside Hadoop.
         """
-        return (self.options.run_mapper or
-                self.options.run_combiner or
-                self.options.run_reducer or
-                self.options.run_spark)
+        return (self.args.run_mapper or
+                self.args.run_combiner or
+                self.args.run_reducer or
+                self.args.run_spark)
 
-    def _print_help(self, options):
+    def _print_help(self, parsed_args):
         """Implement --help --steps"""
-        if options.show_steps:
+        if parsed_args.show_steps:
             _print_help_for_steps()
         else:
-            super(MRJob, self)._print_help(options)
+            super(MRJob, self)._print_help(parsed_args)
 
     ### protocols ###
 
@@ -1025,7 +1018,7 @@ class MRJob(MRJobLauncher):
             else:
                 paths_from_libjars.append(os.path.join(script_dir, path))
 
-        return combine_lists(paths_from_libjars, self.options.libjars)
+        return combine_lists(paths_from_libjars, self.args.libjars)
 
     ### Partitioning ###
 
@@ -1097,7 +1090,7 @@ class MRJob(MRJobLauncher):
         """
 
         # deal with various forms of bad behavior by users
-        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.options.jobconf)
+        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.args.jobconf)
         filtered_jobconf = {}
 
         def format_hadoop_version(v_float):

@@ -27,6 +27,7 @@ from mrjob.conf import combine_dicts
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args
 from mrjob.options import _add_runner_args
+from mrjob.options import _optparse_kwargs_to_argparse
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
 from mrjob.step import StepFailedException
@@ -58,31 +59,6 @@ def _im_func(f):
         return f.__func__
     else:
         return f
-
-
-def _optparse_kwargs_to_argparse(**kwargs):
-    """Translate old keyword args to OptionParser.add_option() so they can be
-    passed to ArgumentParser.add_argument().
-
-    The two methods take almost identical arguments, so this is mostly a
-    matter of filtering.
-    """
-    if any(k.startswith('callback') for k in kwargs):
-        raise ValueError(
-            'mrjob does not emulate callback arguments to add_option(); please'
-            ' use argparse actions instead.')
-
-    # opt_group was a mrjob-specific feature that we've abandoned
-    if 'opt_group' in kwargs:
-        log.warning(
-            'ignoring opt_group keyword arg (mrjob no longer supports'
-            ' opt groups')
-        kwargs.pop('opt_group')
-
-    # pretty much everything else is the same. if people want to pass argparse
-    # kwargs through the old optparse interface (e.g. *action* or *required*)
-    # more power to 'em.
-    return kwargs
 
 
 class MRJobLauncher(object):
@@ -296,7 +272,7 @@ class MRJobLauncher(object):
         # if script path isn't set, expect it on the command line
         if self._script_path is None:
             self.arg_parser.add_argument(
-                'script_path', dest='script_path',
+                dest='script_path',
                 help='path of script to launch')
 
         _add_basic_args(self.arg_parser)

@@ -20,6 +20,7 @@ made public until at least 0.4 if not later or never.
 from __future__ import print_function
 
 import json
+from optparse import OptionError
 from optparse import OptionParser
 from optparse import SUPPRESS_USAGE
 
@@ -64,6 +65,17 @@ CLEANUP_CHOICES = [
 ]
 
 
+# map from optparse types to Python types
+_OPTPARSE_TYPES = dict(
+    choice=str,  # optparse only allows strings as choices
+    complex=complex,
+    float=float,
+    int=int,
+    long=int,
+    string=str,
+)
+
+
 ### custom callbacks ###
 
 def _default_to(parser, dest, value):
@@ -73,19 +85,6 @@ def _default_to(parser, dest, value):
     to a container."""
     if getattr(parser.values, dest) is None:
         setattr(parser.values, dest, value)
-
-
-def _append_to_conf_paths(option, opt_str, value, parser):
-    """conf_paths is None by default, but --no-conf or --conf-path should make
-    it a list.
-    """
-    # make a list to append to if conf_paths is None
-    _default_to(parser, 'conf_paths', [])
-
-    # this method is also called during generate_passthrough_arguments()
-    # the check below is to ensure that conf_paths are not duplicated
-    if value not in parser.values.conf_paths:
-        parser.values.conf_paths.append(value)
 
 
 def _key_value_callback(option, opt_str, value, parser):
@@ -180,7 +179,6 @@ _STEP_OPTS = dict(
         ['--combiner'],
         dict(
             action='store_true',
-            default=False,
             help='run a combiner',
         ),
     ),
@@ -188,7 +186,6 @@ _STEP_OPTS = dict(
         ['--mapper'],
         dict(
             action='store_true',
-            default=False,
             help='run a mapper'
         ),
     ),
@@ -196,7 +193,6 @@ _STEP_OPTS = dict(
         ['--reducer'],
         dict(
             action='store_true',
-            default=False,
             help='run a reducer',
         ),
     ),
@@ -204,7 +200,6 @@ _STEP_OPTS = dict(
         ['--spark'],
         dict(
             action='store_true',
-            default=False,
             help='run Spark code',
         ),
     ),
@@ -212,7 +207,6 @@ _STEP_OPTS = dict(
         ['--steps'],
         dict(
             action='store_true',
-            default=False,
             help=('print the mappers, combiners, and reducers that this job'
                   ' defines'),
         ),
@@ -220,7 +214,7 @@ _STEP_OPTS = dict(
     step_num=(
         ['--step-num'],
         dict(
-            type='int',
+            type=int,
             default=0,
             help='which step to execute (default is 0)',
         ),
@@ -412,7 +406,7 @@ _RUNNER_OPTS = dict(
                       ' consistency. This'
                       ' is typically less than a second but the'
                       ' default is 5.0 to be safe.'),
-                type='float',
+                type=float,
             )),
         ],
     ),
@@ -441,7 +435,7 @@ _RUNNER_OPTS = dict(
                 help=('Upload files to S3 in parts no bigger than this many'
                       ' megabytes. Default is 100 MiB. Set to 0 to disable'
                       ' multipart uploading entirely.'),
-                type='float',
+                type=float,
             )),
         ],
     ),
@@ -757,7 +751,7 @@ _RUNNER_OPTS = dict(
                 help=("If we create a cluster, have it automatically"
                       " terminate itself after it's been idle this many"
                       " hours"),
-                type='float',
+                type=float,
             )),
         ],
     ),
@@ -768,7 +762,7 @@ _RUNNER_OPTS = dict(
                 help=("If --max-hours-idle is set, control how close to the"
                       " end of an hour the cluster can automatically"
                       " terminate itself (default is 5 minutes)"),
-                type='float',
+                type=float,
             )),
         ],
     ),
@@ -777,7 +771,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--num-core-instances'], dict(
                 help='Total number of core instances to launch',
-                type='int',
+                type=int,
             )),
         ],
     ),
@@ -786,7 +780,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--num-task-instances'], dict(
                 help='Total number of task instances to launch',
-                type='int',
+                type=int,
             )),
         ],
     ),
@@ -829,7 +823,7 @@ _RUNNER_OPTS = dict(
                 help=('Wait for a number of minutes for a cluster to finish'
                       ' if a job finishes, run job on its cluster. Otherwise'
                       " create a new one. (0, the default, means don't wait)"),
-                type='int',
+                type=int,
             )),
         ],
     ),
@@ -1149,7 +1143,7 @@ def _filter_by_role(opt_names, *cloud_roles):
     }
 
 
-def _add_runner_options(parser, opt_names=None, include_deprecated=True):
+def _add_runner_args(parser, opt_names=None, include_deprecated=True):
     """add options (switches) for the given runner opts to the given
     options parser, alphabetically by destination. If *opt_names* is
     None, include all runner opts."""
@@ -1157,11 +1151,11 @@ def _add_runner_options(parser, opt_names=None, include_deprecated=True):
         opt_names = set(_RUNNER_OPTS)
 
     for opt_name in sorted(opt_names):
-        _add_runner_options_for_opt(
+        _add_runner_args_for_opt(
             parser, opt_name, include_deprecated=include_deprecated)
 
 
-def _add_runner_options_for_opt(parser, opt_name, include_deprecated=True):
+def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True):
     """Add switches for a single option (*opt_name*) to the given parser."""
     conf = _RUNNER_OPTS[opt_name]
 
@@ -1178,6 +1172,8 @@ def _add_runner_options_for_opt(parser, opt_name, include_deprecated=True):
         kwargs['dest'] = opt_name
 
         if kwargs.get('callback'):
+            continue  # TODO: handle callbacks
+
             kwargs.setdefault('action', 'callback')
             kwargs.setdefault('nargs', 1)
             kwargs.setdefault('type', 'string')
@@ -1187,73 +1183,72 @@ def _add_runner_options_for_opt(parser, opt_name, include_deprecated=True):
         else:
             kwargs['default'] = None
 
-        parser.add_option(*args, **kwargs)
+        parser.add_argument(*args, **kwargs)
 
         # add a switch for deprecated aliases
         if deprecated_aliases and include_deprecated:
             help = 'Deprecated alias%s for %s' % (
                 ('es' if len(deprecated_aliases) > 1 else ''),
                 args[-1])
-            parser.add_option(
+            parser.add_argument(
                 *deprecated_aliases,
                 **combine_dicts(kwargs, dict(help=help)))
 
 
 ### non-runner switches ###
 
-def _add_basic_options(opt_group):
+def _add_basic_args(parser):
     """Options for all command line tools"""
 
-    opt_group.add_option(
-        '-c', '--conf-path', dest='conf_paths', action='callback',
-        callback=_append_to_conf_paths, default=None, nargs=1,
-        type='string',
+    parser.add_argument(
+        '-c', '--conf-path', dest='conf_paths',
+        action='append',
         help='Path to alternate mrjob.conf file to read from')
 
-    opt_group.add_option(
+    parser.add_argument(
         '--no-conf', dest='conf_paths', action='store_const', const=[],
         help="Don't load mrjob.conf even if it's available")
 
-    opt_group.add_option(
+    parser.add_argument(
         '-q', '--quiet', dest='quiet', default=None,
         action='store_true',
         help="Don't print anything to stderr")
 
-    opt_group.add_option(
+    parser.add_argument(
         '-v', '--verbose', dest='verbose', default=None,
         action='store_true', help='print more messages to stderr')
 
 
-def _add_job_options(opt_group):
-    opt_group.add_option(
+def _add_job_args(parser):
+    parser.add_argument(
         '--no-output', dest='no_output',
         default=None, action='store_true',
         help="Don't stream output after job completion")
 
-    opt_group.add_option(
+    parser.add_argument(
         '-o', '--output-dir', dest='output_dir', default=None,
         help='Where to put final job output. This must be an s3:// URL ' +
         'for EMR, an HDFS path for Hadoop, and a system path for local,' +
         'and must be empty')
 
-    opt_group.add_option(
+    parser.add_argument(
         '-r', '--runner', dest='runner', default=None,
         choices=('local', 'hadoop', 'emr', 'inline', 'dataproc'),
         help=('Where to run the job; one of dataproc, emr, hadoop, inline,'
               ' or local'))
 
-    opt_group.add_option(
+    parser.add_argument(
         '--step-output-dir', dest='step_output_dir', default=None,
         help=('A directory to store output from job steps other than'
               ' the last one. Useful for debugging. Currently'
               ' ignored by local runners.'))
 
 
-def _add_step_options(opt_group):
+def _add_step_args(parser):
     """Add options that determine what part of the job a MRJob runs."""
     for dest, (args, kwargs) in _STEP_OPTS.items():
         kwargs = dict(dest=dest, **kwargs)
-        opt_group.add_option(*args, **kwargs)
+        parser.add_argument(*args, **kwargs)
 
 
 ### other utilities for switches ###
@@ -1261,8 +1256,8 @@ def _add_step_options(opt_group):
 def _print_help_for_runner(opt_names, include_deprecated=False):
     help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
 
-    _add_runner_options(help_parser, opt_names,
-                        include_deprecated=include_deprecated)
+    _add_runner_args(help_parser, opt_names,
+                     include_deprecated=include_deprecated)
 
     _alphabetize_options(help_parser)
     help_parser.print_help()
@@ -1271,7 +1266,7 @@ def _print_help_for_runner(opt_names, include_deprecated=False):
 def _print_help_for_steps():
     help_parser = OptionParser(usage=SUPPRESS_USAGE, add_help_option=False)
 
-    _add_step_options(help_parser)
+    _add_step_args(help_parser)
 
     _alphabetize_options(help_parser)
     help_parser.print_help()
@@ -1314,5 +1309,37 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
         print()
 
 
+# TODO: need to update this for argparse
 def _alphabetize_options(opt_group):
     opt_group.option_list.sort(key=lambda opt: opt.dest or '')
+
+
+def _optparse_kwargs_to_argparse(**kwargs):
+    """Translate old keyword args to OptionParser.add_option() so they can be
+    passed to ArgumentParser.add_argument().
+
+    The two methods take almost identical arguments, so this is mostly a
+    matter of filtering.
+    """
+    if any(k.startswith('callback') for k in kwargs):
+        raise OptionError(
+            'mrjob does not emulate callback arguments to add_option(); please'
+            ' use argparse actions instead.')
+
+    # translate type from string (optparse) to type (argparse)
+    if k.get('type') is not None:
+        if k['type'] not in _OPTPARSE_TYPES:
+            raise OptionError('invalid option type: %r' % k['type'])
+        k['type'] = _OPTPARSE_TYPES[k['type']]
+
+    # opt_group was a mrjob-specific feature that we've abandoned
+    if 'opt_group' in kwargs:
+        log.warning(
+            'ignoring opt_group keyword arg (mrjob no longer supports'
+            ' opt groups')
+        kwargs.pop('opt_group')
+
+    # pretty much everything else is the same. if people want to pass argparse
+    # kwargs through the old optparse interface (e.g. *action* or *required*)
+    # more power to 'em.
+    return kwargs

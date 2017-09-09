@@ -79,13 +79,10 @@ _OPTPARSE_TYPES = dict(
 )
 
 
-### custom callbacks ###
+### custom actions ###
 
 def _default_to(namespace, dest, value):
-    """Helper function; set the given option dest to *value* if it's None.
-
-    This lets us create callbacks that don't require default to be set
-    to a container."""
+    """Helper function; set the given attribute to *value* if it's None."""
     if getattr(namespace, dest) is None:
         setattr(namespace, dest, value)
 
@@ -109,10 +106,11 @@ class _KeyValueAction(Action):
         getattr(namespace, self.dest)[k] = v
 
 
-def _key_none_value_callback(option, opt_str, value, parser):
-    """callback to set KEY to None"""
-    _default_to(parser, option.dest, {})
-    getattr(parser.values, option.dest)[value] = None
+class _KeyNoneValueAction(Action):
+    """action to set KEY to None"""
+    def __call__(self, parser, namespace, value, option_string=None):
+        _default_to(namespace, self.dest, {})
+        getattr(namespace, self.dest)[k] = None
 
 
 class _CleanupAction(Action):
@@ -136,48 +134,56 @@ class _CleanupAction(Action):
         setattr(namespace, self.dest, result)
 
 
-def _subnets_callback(option, opt_str, value, parser):
-    """callback to parse a comma-separated list of subnets.
+class _SubnetsAction(Action):
+    """action to parse a comma-separated list of subnets.
 
     This eliminates whitespace
     """
-    subnets = [s.strip() for s in value.split(',') if s]
+    def __call__(self, parser, namespace, value, option_string=None):
+        subnets = [s.strip() for s in value.split(',') if s]
 
-    setattr(parser.values, option.dest, subnets)
-
-
-def _append_json_callback(option, opt_str, value, parser):
-    """callback to parse JSON and append it to a list."""
-    _default_to(parser, option.dest, [])
-
-    try:
-        j = json.loads(value)
-    except ValueError as e:
-        parser.error('Malformed JSON passed to %s: %s' % (
-            opt_str, str(e)))
-
-    getattr(parser.values, option.dest).append(j)
+        setattr(namespace, self.dest, subnets)
 
 
-def _json_callback(option, opt_str, value, parser):
-    try:
-        j = json.loads(value)
-    except ValueError as e:
-        parser.error('Malformed JSON passed to %s: %s' % (
-            opt_str, str(e)))
+class _AppendJSONAction(Action):
+    """action to parse JSON and append it to a list."""
+    def __call__(self, parser, namespace, value, option_string=None):
+        _default_to(namespace, option.dest, [])
 
-    setattr(parser.values, option.dest, j)
+        try:
+            j = json.loads(value)
+        except ValueError as e:
+            parser.error('Malformed JSON passed to %s: %s' % (
+                opt_str, str(e)))
+
+        getattr(namespace, option.dest).append(j)
 
 
-def _port_range_callback(option, opt_str, value, parser):
-    """callback to parse --ssh-bind-ports"""
-    try:
-        ports = _parse_port_range_list(value)
-    except ValueError as e:
-        parser.error('%s: invalid port range list %r: \n%s' %
-                     (opt_str, value, e.args[0]))
+class _JSONAction(Action):
+    """action to parse a JSON"""
 
-    setattr(parser.values, option.dest, ports)
+    def __call__(self, parser, namespace, value, option_string=None):
+        try:
+            j = json.loads(value)
+        except ValueError as e:
+            parser.error('Malformed JSON passed to %s: %s' % (
+                opt_str, str(e)))
+
+        setattr(namespace, option.dest, j)
+
+
+class _PortRangeAction(Action):
+    """action to parse --ssh-bind-ports"""
+
+    def __call__(self, parser, namespace, value, option_string=None):
+        try:
+            ports = _parse_port_range_list(value)
+        except ValueError as e:
+            parser.error('%s: invalid port range list %r: \n%s' %
+                         (opt_str, value, e.args[0]))
+
+        setattr(namespace, option.dest, ports)
+
 
 ### mux opts ###
 
@@ -518,7 +524,7 @@ _RUNNER_OPTS = dict(
                       ' times'),
             )),
             (['--no-emr-api-param'], dict(
-                callback=_key_none_value_callback,
+                action=_KeyNoneValueAction,
                 help=('Parameter to be unset when calling EMR API.'
                       ' You can use --no-emr-api-param multiple times.'),
             )),
@@ -529,7 +535,7 @@ _RUNNER_OPTS = dict(
         combiner=combine_lists,
         switches=[
             (['--emr-configuration'], dict(
-                callback=_append_json_callback,
+                action=_AppendJSONAction,
                 help=('Configuration to use on 4.x AMIs as a JSON-encoded'
                       ' dict; see'
                       ' http://docs.aws.amazon.com/ElasticMapReduce/latest/'
@@ -658,7 +664,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         switches=[
             (['--instance-groups'], dict(
-                callback=_json_callback,
+                action=_JSONAction,
                 help=('detailed JSON list of instance configs, including'
                       ' EBS configuration. See docs for --instance-groups'
                       ' at http://docs.aws.amazon.com/cli/latest/reference'
@@ -670,7 +676,7 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         switches=[
             (['--instance-fleets'], dict(
-                callback=_json_callback,
+                action=_JSONAction,
                 help=('detailed JSON list of instance fleets, including'
                       ' EBS configuration. See docs for --instance-fleets'
                       ' at http://docs.aws.amazon.com/cli/latest/reference'
@@ -950,7 +956,7 @@ _RUNNER_OPTS = dict(
     ssh_bind_ports=dict(
         switches=[
             (['--ssh-bind-ports'], dict(
-                callback=_port_range_callback,
+                action=_PortRangeAction,
                 help=('A list of port ranges that are safe to listen on,'
                       ' delimited by colons and commas, with syntax like'
                       ' 2000[:2001][,2003,2005:2008,etc].'
@@ -1014,7 +1020,7 @@ _RUNNER_OPTS = dict(
                       ' AWS cloud.'),
             )),
             (['--subnets'], dict(
-                callback=_subnets_callback,
+                action=_SubnetsAction,
                 help=('Like --subnets, but with a comma-separated list, to'
                       ' specify multiple subnets in conjunction with'
                       ' --instance-fleets'),
@@ -1177,10 +1183,6 @@ def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True):
         deprecated_aliases = kwargs.pop('deprecated_aliases', None)
 
         kwargs['dest'] = opt_name
-
-        # TODO: remove this when we get rid of callbacks
-        if kwargs.get('callback'):
-            continue
 
         if kwargs.get('action') == 'append':
             kwargs['default'] = []

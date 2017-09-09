@@ -1312,6 +1312,15 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
         print()
 
 
+# TODO: implement this
+def _parse_raw_args(parser, args):
+    """Simulate parsing by *parser*, return a list of tuples of
+    (dest, switch, args)"""
+    pass
+
+
+
+
 def _optparse_kwargs_to_argparse(**kwargs):
     """Translate old keyword args to OptionParser.add_option() so they can be
     passed to ArgumentParser.add_argument().

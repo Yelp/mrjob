@@ -124,6 +124,8 @@ def parse_and_save_options(option_parser, args):
     in *args* that correspond to that *dest*.
 
     This won't modify *option_parser*.
+
+    .. deprecated:: 0.6.0
     """
     arg_map = {}
 

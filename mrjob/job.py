@@ -28,6 +28,7 @@ from optparse import OptionGroup
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
 from mrjob.launch import MRJobLauncher
+from mrjob.launch import _im_func
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
 from mrjob.options import _add_step_options
 from mrjob.options import _print_help_for_steps
@@ -44,20 +45,6 @@ from mrjob.util import to_lines
 
 
 log = logging.getLogger(__name__)
-
-
-def _im_func(f):
-    """Wrapper to get at the underlying function belonging to a method.
-
-    Python 2 is slightly different because classes have "unbound methods"
-    which wrap the underlying function, whereas on Python 3 they're just
-    functions. (Methods work the same way on both versions.)
-    """
-    # "im_func" is the old Python 2 name for __func__
-    if hasattr(f, '__func__'):
-        return f.__func__
-    else:
-        return f
 
 
 class UsageError(Exception):
@@ -849,13 +836,6 @@ class MRJob(MRJobLauncher):
                 self.options.run_combiner or
                 self.options.run_reducer or
                 self.options.run_spark)
-
-    def _process_args(self, args):
-        """mrjob.launch takes the first arg as the script path, but mrjob.job
-        uses all args as input files. This method determines the behavior:
-        MRJob uses all args as input files.
-        """
-        self.args = args
 
     def _print_help(self, options):
         """Implement --help --steps"""

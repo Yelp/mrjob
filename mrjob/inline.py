@@ -55,7 +55,13 @@ class InlineMRJobRunner(SimMRJobRunner):
         starting up a standalone Hadoop instance and running your job with
         ``-r hadoop``."""
         super(InlineMRJobRunner, self).__init__(**kwargs)
-        if not (mrjob_cls is None or issubclass(mrjob_cls, MRJob)):
+        # if we run python -m mrjob.job, mrjob_cls is __main__.MRJob
+        # which is identical to (but not a subclass of) mrjob.job.MRJob
+        #
+        # the base MRJob still isn't runnable, but this yields a more
+        # useful error about the step having no mappers or reducers
+        if not (mrjob_cls is None or issubclass(mrjob_cls, MRJob)
+                or mrjob_cls.__module__ == '__main__'):
             raise TypeError
 
         self._mrjob_cls = mrjob_cls

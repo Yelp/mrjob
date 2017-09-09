@@ -19,6 +19,7 @@ objects with categorized command line parameters.
 from __future__ import print_function
 
 import json
+from argparse import Action
 from argparse import ArgumentParser
 from argparse import SUPPRESS
 from optparse import OptionError
@@ -80,26 +81,32 @@ _OPTPARSE_TYPES = dict(
 
 ### custom callbacks ###
 
-def _default_to(parser, dest, value):
+def _default_to(namespace, dest, value):
     """Helper function; set the given option dest to *value* if it's None.
 
     This lets us create callbacks that don't require default to be set
     to a container."""
-    if getattr(parser.values, dest) is None:
-        setattr(parser.values, dest, value)
+    if getattr(namespace, dest) is None:
+        setattr(namespace, dest, value)
 
 
-def _key_value_callback(option, opt_str, value, parser):
-    """callback for KEY=VALUE pairs"""
+
+# these actions are only used by _add_runner_args(), so we can assume *value*
+# is a string
+
+class _KeyValueAction(Action):
+    """action for KEY=VALUE pairs"""
     # used for --cmdenv, --emr-api-param, and more
-    try:
-        k, v = value.split('=', 1)
-    except ValueError:
-        parser.error('%s argument %r is not of the form KEY=VALUE' % (
-            opt_str, value))
 
-    _default_to(parser, option.dest, {})
-    getattr(parser.values, option.dest)[k] = v
+    def __call__(self, parser, namespace, value, option_string=None):
+        try:
+            k, v = value.split('=', 1)
+        except ValueError:
+            parser.error('%s argument %r is not of the form KEY=VALUE' % (
+                opt_str, value))
+
+        _default_to(namespace, self.dest, {})
+        getattr(namespace, self.dest)[k] = v
 
 
 def _key_none_value_callback(option, opt_str, value, parser):
@@ -108,23 +115,25 @@ def _key_none_value_callback(option, opt_str, value, parser):
     getattr(parser.values, option.dest)[value] = None
 
 
-def _cleanup_callback(option, opt_str, value, parser):
-    """callback to parse a comma-separated list of cleanup constants."""
-    result = []
+class _CleanupAction(Action):
+    """action to parse a comma-separated list of cleanup constants."""
 
-    for choice in value.split(','):
-        if choice in CLEANUP_CHOICES:
-            result.append(choice)
-        else:
-            parser.error(
-                '%s got %s, which is not one of: %s' %
-                (opt_str, choice, ', '.join(CLEANUP_CHOICES)))
+    def __call__(self, parser, namespace, value, option_string=None):
+        result = []
+
+        for choice in value.split(','):
+            if choice in CLEANUP_CHOICES:
+                result.append(choice)
+            else:
+                parser.error(
+                    '%s got %s, which is not one of: %s' %
+                    (opt_str, choice, ', '.join(CLEANUP_CHOICES)))
 
         if 'NONE' in result and len(set(result)) > 1:
             parser.error(
                 '%s: Cannot clean up both nothing and something!' % opt_str)
 
-    setattr(parser.values, option.dest, result)
+        setattr(namespace, self.dest, result)
 
 
 def _subnets_callback(option, opt_str, value, parser):
@@ -244,11 +253,8 @@ _DEPRECATED_NON_RUNNER_OPTS = set([
 #   have the format (['--switch-names', ...], dict(**kwargs)), where kwargs
 #   can be:
 #     action: action to pass to add_argument() (e.g. 'store_true')
-#     callback: ArgumentParser callback when action is 'callback'. implies
-#       action='callback'
 #     deprecated_aliases: list of old '--switch-names' slated for removal
 #     help: help string to pass to add_argument()
-#     nargs: number of args for callback to parse (defaults to 1 for callback)
 #     type: option type for add_argument() to enforce (e.g. float).
 #   You can't set the ArgumentParser's default; we use [] if *action* is
 #   'append' and None otherwise.
@@ -382,7 +388,7 @@ _RUNNER_OPTS = dict(
     cleanup=dict(
         switches=[
             (['--cleanup'], dict(
-                callback=_cleanup_callback,
+                action=_CleanupAction,
                 help=('Comma-separated list of which directories to delete'
                       ' when a job succeeds, e.g. TMP,LOGS. Choices:'
                       ' %s (default: ALL)' % ', '.join(CLEANUP_CHOICES)),
@@ -392,7 +398,7 @@ _RUNNER_OPTS = dict(
     cleanup_on_failure=dict(
         switches=[
             (['--cleanup-on-failure'], dict(
-                callback=_cleanup_callback,
+                action=_CleanupAction,
                 help=('Comma-separated list of which directories to delete'
                       ' when a job fails, e.g. TMP,LOGS. Choices:'
                       ' %s (default: NONE)' % ', '.join(CLEANUP_CHOICES)),
@@ -451,7 +457,7 @@ _RUNNER_OPTS = dict(
         combiner=combine_envs,
         switches=[
             (['--cmdenv'], dict(
-                callback=_key_value_callback,
+                action=_KeyValueAction,
                 help=('Set an environment variable for your job inside Hadoop '
                       'streaming. Must take the form KEY=VALUE. You can use'
                       ' --cmdenv multiple times.'),
@@ -505,7 +511,7 @@ _RUNNER_OPTS = dict(
         combiner=combine_dicts,
         switches=[
             (['--emr-api-param'], dict(
-                callback=_key_value_callback,
+                action=_KeyValueAction,
                 help=('Additional parameter to pass directly to the EMR'
                       ' API when creating a cluster. Should take the form'
                       ' KEY=VALUE. You can use --emr-api-param multiple'
@@ -697,7 +703,7 @@ _RUNNER_OPTS = dict(
         combiner=combine_dicts,
         switches=[
             (['--jobconf'], dict(
-                callback=_key_value_callback,
+                action=_KeyValueAction,
                 help=('-D arg to pass through to hadoop streaming; should'
                       ' take the form KEY=VALUE. You can use --jobconf'
                       ' multiple times.'),
@@ -1020,7 +1026,7 @@ _RUNNER_OPTS = dict(
         combiner=combine_dicts,
         switches=[
             (['--tag'], dict(
-                callback=_key_value_callback,
+                action=_KeyValueAction,
                 help=('Metadata tags to apply to the EMR cluster; '
                       'should take the form KEY=VALUE. You can use --tag '
                       'multiple times'),
@@ -1172,12 +1178,9 @@ def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True):
 
         kwargs['dest'] = opt_name
 
+        # TODO: remove this when we get rid of callbacks
         if kwargs.get('callback'):
-            continue  # TODO: handle callbacks
-
-            kwargs.setdefault('action', 'callback')
-            kwargs.setdefault('nargs', 1)
-            kwargs.setdefault('type', 'string')
+            continue
 
         if kwargs.get('action') == 'append':
             kwargs['default'] = []

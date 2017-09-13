@@ -28,6 +28,7 @@ from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args
 from mrjob.options import _add_runner_args
 from mrjob.options import _optparse_kwargs_to_argparse
+from mrjob.options import _parse_raw_args
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
 from mrjob.step import StepFailedException
@@ -87,8 +88,8 @@ class MRJobLauncher(object):
             time.tzset()
 
         # argument dests for args to pass through
-        self._passthru_args = set()
-        self._file_args = set()
+        self._passthru_arg_dests = set()
+        self._file_arg_dests = set()
 
         # there is no equivalent in argparse
         # remove this in v0.7.0
@@ -341,7 +342,7 @@ class MRJobLauncher(object):
 
         pass_opt = self.arg_parser.add_option(*args, **kwargs)
 
-        self._file_args.add(pass_opt.dest)
+        self._file_arg_dests.add(pass_opt.dest)
 
     def add_passthru_arg(self, *args, **kwargs):
         """Function to create options which both the job runner
@@ -363,7 +364,7 @@ class MRJobLauncher(object):
         """
         pass_opt = self.arg_parser.add_argument(*args, **kwargs)
 
-        self._passthru_args.add(pass_opt.dest)
+        self._passthru_arg_dests.add(pass_opt.dest)
 
     def pass_arg_through(self, opt_str):
         """Pass the given argument through to the job."""
@@ -372,7 +373,7 @@ class MRJobLauncher(object):
         # to be stable, and theres no non-hidden interface
         for action in self.arg_parser._get_optional_actions():
             if opt_str in action.option_strings or opt_str == action.dest:
-                self._passthru_args.add(action.dest)
+                self._passthru_arg_dests.add(action.dest)
         else:
             raise ValueError('unknown arg: %s', opt_str)
 
@@ -483,7 +484,6 @@ class MRJobLauncher(object):
             return LocalMRJobRunner
 
     def _runner_kwargs(self):
-
         return combine_dicts(
             self._non_option_kwargs(),
             self._kwargs_from_switches(self._runner_opt_names()),
@@ -500,13 +500,24 @@ class MRJobLauncher(object):
         These should match the (named) arguments to
         :py:meth:`~mrjob.runner.MRJobRunner.__init__`.
         """
-        # TODO: parse passthru and file upload args
-        # extra_args is just a list
-        # file_upload_args is a list of tuples of (--arg, path)
+        # build extra_args and file_upload_args
         #
-        # instead, extra_args should create dictionaries for file
-        # upload args and pass them to extra_args. file_upload_args
-        # should be deprecated.
+        # TODO: deprecate file_upload_args, represent paths to upload
+        # as dictionaries in extra_args
+        raw_args = _parse_raw_args(self.arg_parser, self._cl_args)
+
+        extra_args = []
+        file_upload_args = []
+
+        for dest, option_string, args in raw_args:
+            if dest in self._passthru_arg_dests:
+                if option_string:
+                    extra_args.append(option_string)
+                extra_args.extend(args)
+
+            elif dest in self._file_arg_dests:
+                file_upload_args.append((option_string, args[0]))
+
         return dict(
             conf_paths=self.parsed_args.conf_paths,
             extra_args=[],

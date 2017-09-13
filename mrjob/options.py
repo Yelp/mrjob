@@ -22,7 +22,6 @@ import json
 from argparse import Action
 from argparse import ArgumentParser
 from argparse import SUPPRESS
-from optparse import OptionError
 from logging import getLogger
 
 from mrjob.conf import combine_cmds
@@ -108,7 +107,7 @@ class _KeyValueAction(Action):
             k, v = value.split('=', 1)
         except ValueError:
             parser.error('%s argument %r is not of the form KEY=VALUE' % (
-                opt_str, value))
+                option_string, value))
 
         _default_to(namespace, self.dest, {})
         getattr(namespace, self.dest)[k] = v
@@ -188,7 +187,7 @@ class _PortRangeAction(Action):
             ports = _parse_port_range_list(value)
         except ValueError as e:
             parser.error('%s: invalid port range list %r: \n%s' %
-                         (opt_str, value, e.args[0]))
+                         (option_string, value, e.args[0]))
 
         setattr(namespace, option.dest, ports)
 
@@ -1358,14 +1357,14 @@ def _optparse_kwargs_to_argparse(**kwargs):
     matter of filtering.
     """
     if any(k.startswith('callback') for k in kwargs):
-        raise OptionError(
+        raise ValueError(
             'mrjob does not emulate callback arguments to add_option(); please'
             ' use argparse actions instead.')
 
     # translate type from string (optparse) to type (argparse)
     if kwargs.get('type') is not None:
         if kwargs['type'] not in _OPTPARSE_TYPES:
-            raise OptionError('invalid option type: %r' % kwargs['type'])
+            raise ValueError('invalid option type: %r' % kwargs['type'])
         kwargs['type'] = _OPTPARSE_TYPES[kwargs['type']]
 
     # opt_group was a mrjob-specific feature that we've abandoned

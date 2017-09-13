@@ -54,6 +54,9 @@ class MRJob(MRJobLauncher):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
 
+    # script path is whatever file our subclass of MRJob is in
+    _FIRST_ARG_IS_SCRIPT_PATH = False
+
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
 

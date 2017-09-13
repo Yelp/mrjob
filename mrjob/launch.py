@@ -69,6 +69,8 @@ class MRJobLauncher(object):
     effectively part of the :py:class:`~mrjob.job.MRJob` class itself and
     should not be used externally in any way.
     """
+    # only MRJobLauncher expects the first argument to be script_path
+    _FIRST_ARG_IS_SCRIPT_PATH = True
 
     def __init__(self, script_path=None, args=None, from_cl=False):
         """
@@ -271,7 +273,7 @@ class MRJobLauncher(object):
             help='include help for deprecated options')
 
         # if script path isn't set, expect it on the command line
-        if self._script_path is None:
+        if self._FIRST_ARG_IS_SCRIPT_PATH:
             self.arg_parser.add_argument(
                 dest='script_path',
                 help='path of script to launch')
@@ -309,9 +311,9 @@ class MRJobLauncher(object):
             self._print_help(self.parsed_args)
             sys.exit(0)
 
-        if self._script_path is None:
+        if self._FIRST_ARG_IS_SCRIPT_PATH:
             # should always be set, just hedging
-            self._script_path = getattr(self.parsed_args, 'script_path', None)
+            self._script_path = self.parsed_args.script_path
 
     def add_file_arg(self, *args, **kwargs):
         """Add a command-line option that sends an external file
@@ -340,7 +342,7 @@ class MRJobLauncher(object):
             raise ArgumentError(
                 "file options must use the actions 'store' or 'append'")
 
-        pass_opt = self.arg_parser.add_option(*args, **kwargs)
+        pass_opt = self.arg_parser.add_argument(*args, **kwargs)
 
         self._file_arg_dests.add(pass_opt.dest)
 

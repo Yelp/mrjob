@@ -360,7 +360,7 @@ class MRJobLauncher(object):
         :py:meth:`add_file_arg` instead.
 
         If you want to pass through a built-in option (e.g. ``--runner``, use
-        :py:meth:`pass_arg_thru` instead.
+        :py:meth:`pass_arg_through` instead.
         """
         pass_opt = self.arg_parser.add_argument(*args, **kwargs)
 
@@ -374,6 +374,7 @@ class MRJobLauncher(object):
         for action in self.arg_parser._get_optional_actions():
             if opt_str in action.option_strings or opt_str == action.dest:
                 self._passthru_arg_dests.add(action.dest)
+                break
         else:
             raise ValueError('unknown arg: %s', opt_str)
 
@@ -451,7 +452,7 @@ class MRJobLauncher(object):
             'pass_through_option() is deprecated and will be removed in'
             ' v0.7.0. Use pass_arg_through() instead.')
 
-        self.pass_arg_thru(opt_str)
+        self.pass_arg_through(opt_str)
 
     ### runners ###
 

@@ -33,6 +33,14 @@ from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.parse import _parse_port_range_list
 
+# shims until we update tools
+_add_basic_options = None
+_add_runner_options = None
+_alphabetize_options = None
+
+
+
+
 log = getLogger(__name__)
 
 #: cleanup options:
@@ -1332,7 +1340,9 @@ def _parse_raw_args(parser, args):
 
     for action in actions:
         raw_parser.add_argument(*action.option_strings,
-                                action=RawArgAction, nargs=action.nargs)
+                                action=RawArgAction,
+                                dest=action.dest,
+                                nargs=action.nargs)
 
     # leave errors to the real parser
     raw_parser.parse_known_args(args)
@@ -1353,10 +1363,10 @@ def _optparse_kwargs_to_argparse(**kwargs):
             ' use argparse actions instead.')
 
     # translate type from string (optparse) to type (argparse)
-    if k.get('type') is not None:
-        if k['type'] not in _OPTPARSE_TYPES:
-            raise OptionError('invalid option type: %r' % k['type'])
-        k['type'] = _OPTPARSE_TYPES[k['type']]
+    if kwargs.get('type') is not None:
+        if kwargs['type'] not in _OPTPARSE_TYPES:
+            raise OptionError('invalid option type: %r' % kwargs['type'])
+        kwargs['type'] = _OPTPARSE_TYPES[kwargs['type']]
 
     # opt_group was a mrjob-specific feature that we've abandoned
     if 'opt_group' in kwargs:

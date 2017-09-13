@@ -1312,13 +1312,32 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
         print()
 
 
-# TODO: implement this
 def _parse_raw_args(parser, args):
     """Simulate parsing by *parser*, return a list of tuples of
-    (dest, switch, args)"""
-    pass
+    (dest, option_string, args).
 
+    If *args* contains unknown args or is otherwise malformed, we don't
+    raise an error (we leave this to the actual argument parser).
+    """
+    results = []
 
+    class RawArgAction(Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            # ignore *namespace*, append to *results*
+            results.append((self.dest, option_string, values))
+
+    raw_parser = ArgumentParser(add_help=False)
+
+    actions = parser._get_optional_actions() + parser._get_positional_actions()
+
+    for action in actions:
+        raw_parser.add_argument(*action.option_strings,
+                                action=RawArgAction, nargs=action.nargs)
+
+    # leave errors to the real parser
+    raw_parser.parse_known_args(args)
+
+    return results
 
 
 def _optparse_kwargs_to_argparse(**kwargs):

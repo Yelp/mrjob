@@ -42,6 +42,7 @@ v0.6.0, 2017-09-?? -- ???
      * pass_through_option -> pass_arg_through()
    * removed generate_passthough_arguments()
    * removed generate_file_upload_args()
+   * duplicate file upload args are passed through to job
  * removed deprecated functions:
    * mrjob.parse:
      * is_windows_path()

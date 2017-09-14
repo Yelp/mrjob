@@ -413,7 +413,7 @@ class MRJobLauncher(object):
         """
         pass  # deprecation warning is in __init__()
 
-    def load_options(self):
+    def load_options(self, args):
         """.. deprecated:: 0.6.0
 
         Use `:py:meth:`load_args` instead.

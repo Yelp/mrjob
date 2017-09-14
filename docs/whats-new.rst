@@ -4,6 +4,17 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.0:
+
+0.6.0
+-----
+
+Note that because :py:mod:`argparse` has different parsing rules than
+:py:mod:`optparse`, you have to use equal signs when passing an argument
+starting with a hyphen to another argument. For
+example, you now *must* use the form ``--hadoop-arg=-verbose``, not
+``--hadoop-arg -verbose``.
+
 .. _v0.5.11:
 
 0.5.11

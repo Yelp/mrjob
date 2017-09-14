@@ -32,14 +32,6 @@ from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.parse import _parse_port_range_list
 
-# shims until we update tools
-_add_basic_options = None
-_add_runner_options = None
-_alphabetize_options = None
-
-
-
-
 log = getLogger(__name__)
 
 #: cleanup options:

@@ -523,8 +523,8 @@ class MRJobLauncher(object):
 
         return dict(
             conf_paths=self.parsed_args.conf_paths,
-            extra_args=[],
-            file_upload_args=[],
+            extra_args=extra_args,
+            file_upload_args=file_upload_args,
             hadoop_input_format=self.hadoop_input_format(),
             hadoop_output_format=self.hadoop_output_format(),
             input_paths=self.parsed_args.args,

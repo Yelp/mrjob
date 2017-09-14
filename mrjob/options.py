@@ -1333,15 +1333,22 @@ def _parse_raw_args(parser, args):
             # ignore *namespace*, append to *results*
             results.append((self.dest, option_string, values))
 
+    def error(msg):
+        raise ValueError(msg)
+
     raw_parser = ArgumentParser(add_help=False)
+    raw_parser.error = error
 
     actions = parser._get_optional_actions() + parser._get_positional_actions()
 
     for action in actions:
+        # single args become single item lists
+        nargs = 1 if action.nargs is None else action.nargs
+
         raw_parser.add_argument(*action.option_strings,
                                 action=RawArgAction,
                                 dest=action.dest,
-                                nargs=action.nargs)
+                                nargs=nargs)
 
     # leave errors to the real parser
     raw_parser.parse_known_args(args)

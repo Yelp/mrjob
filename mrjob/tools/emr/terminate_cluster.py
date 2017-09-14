@@ -43,13 +43,12 @@ Options::
   -v, --verbose         print more messages to stderr
 """
 import logging
-from optparse import OptionParser
+from argparse import ArgumentParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_options
-from mrjob.options import _add_runner_options
-from mrjob.options import _alphabetize_options
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_runner_args
 from mrjob.options import _filter_by_role
 
 log = logging.getLogger(__name__)
@@ -57,46 +56,40 @@ log = logging.getLogger(__name__)
 
 def main(cl_args=None):
     # parser command-line args
-    option_parser = _make_option_parser()
-    options, args = option_parser.parse_args(cl_args)
-
-    if len(args) != 1:
-        option_parser.error('This tool takes exactly one argument.')
-    cluster_id = args[0]
+    arg_parser = _make_arg_parser()
+    options = arg_parser.parse_args(cl_args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     # create the persistent job
     runner = EMRJobRunner(**_runner_kwargs(options))
-    log.debug('Terminating cluster %s' % cluster_id)
+    log.debug('Terminating cluster %s' % options.cluster_id)
     runner.make_emr_client().terminate_job_flows(
-        JobFlowIds=[cluster_id])
-    log.info('Terminated cluster %s' % cluster_id)
+        JobFlowIds=[options.cluster_id])
+    log.info('Terminated cluster %s' % options.cluster_id)
 
 
-def _make_option_parser():
-    usage = '%prog [options] cluster-id'
+def _make_arg_parser():
     description = 'Terminate an existing EMR cluster.'
 
-    option_parser = OptionParser(usage=usage, description=description)
+    arg_parser = ArgumentParser(description=description)
 
-    option_parser.add_option(
+    arg_parser.add_argument(
         '-t', '--test', dest='test', default=False,
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
-    _add_basic_options(option_parser)
-    _add_runner_options(
-        option_parser,
+    _add_basic_args(arg_parser)
+    _add_runner_args(
+        arg_parser,
         _filter_by_role(EMRJobRunner.OPT_NAMES, 'connect'))
 
-    _alphabetize_options(option_parser)
-    return option_parser
+    return arg_parser
 
 
 def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
-    for unused_arg in ('quiet', 'verbose', 'test'):
+    for unused_arg in ('cluster_id', 'quiet', 'verbose', 'test'):
         del kwargs[unused_arg]
 
     return kwargs

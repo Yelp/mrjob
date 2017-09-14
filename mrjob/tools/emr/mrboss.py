@@ -46,58 +46,56 @@ Options::
 """
 from __future__ import print_function
 
-from optparse import OptionParser
 import os
-import sys
+from argparse import ArgumentParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_options
-from mrjob.options import _add_runner_options
-from mrjob.options import _alphabetize_options
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_runner_args
 from mrjob.options import _filter_by_role
 from mrjob.py2 import to_unicode
-from mrjob.util import random_identifier
 from mrjob.util import shlex_split
 
 
 def main(cl_args=None):
-    usage = 'usage: %prog CLUSTER_ID [options] "command string"'
+    usage = 'usage: %(prog)s CLUSTER_ID [options] "command string"'
     description = ('Run a command on the master and all worker nodes of an EMR'
                    ' cluster. Store stdout/stderr for results in OUTPUT_DIR.')
 
-    option_parser = OptionParser(usage=usage, description=description)
-    option_parser.add_option('-o', '--output-dir', dest='output_dir',
-                             default=None,
-                             help="Specify an output directory (default:"
-                             " CLUSTER_ID)")
-    _add_basic_options(option_parser)
-    _add_runner_options(
-        option_parser,
+    arg_parser = ArgumentParser(usage=usage, description=description)
+    arg_parser.add_argument('-o', '--output-dir', dest='output_dir',
+                            default=None,
+                            help="Specify an output directory (default:"
+                            " CLUSTER_ID)")
+
+    arg_parser.add_argument(dest='cluster_id',
+                            help='ID of cluster to run command on')
+    arg_parser.add_argument(dest='cmd_string',
+                            help='command to run, as a single string')
+
+    _add_basic_args(arg_parser)
+    _add_runner_args(
+        arg_parser,
         {'ec2_key_pair_file', 'ssh_bin'} | _filter_by_role(
             EMRJobRunner.OPT_NAMES, 'connect')
     )
 
-    _alphabetize_options(option_parser)
-
-    options, args = option_parser.parse_args(cl_args)
+    options = arg_parser.parse_args(cl_args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
     runner_kwargs = options.__dict__.copy()
-    for unused_arg in ('output_dir', 'quiet', 'verbose'):
+    for unused_arg in ('cluster_id', 'cmd_string', 'output_dir',
+                       'quiet', 'verbose'):
         del runner_kwargs[unused_arg]
 
-    if len(args) < 2:
-        option_parser.print_help()
-        sys.exit(1)
+    cmd_args = shlex_split(options.cmd_string)
 
-    cluster_id, cmd_string = args[:2]
-    cmd_args = shlex_split(cmd_string)
+    output_dir = os.path.abspath(options.output_dir or options.cluster_id)
 
-    output_dir = os.path.abspath(options.output_dir or cluster_id)
-
-    with EMRJobRunner(cluster_id=cluster_id, **runner_kwargs) as runner:
+    with EMRJobRunner(
+            cluster_id=options.cluster_id, **runner_kwargs) as runner:
         _run_on_all_nodes(runner, output_dir, cmd_args)
 
 
@@ -108,9 +106,6 @@ def _run_on_all_nodes(runner, output_dir, cmd_args, print_stderr=True):
     """
     master_addr = runner._address_of_master()
     addresses = [master_addr]
-
-    ssh_bin = runner._opts['ssh_bin']
-    ec2_key_pair_file = runner._opts['ec2_key_pair_file']
 
     worker_addrs = runner._ssh_worker_hosts()
 

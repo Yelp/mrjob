@@ -593,7 +593,9 @@ _RUNNER_OPTS = dict(
             (['--hadoop-arg'], dict(
                 action='append',
                 help=('Argument of any type to pass to hadoop '
-                      'streaming. You can use --hadoop-arg multiple times.'),
+                      'streaming. Use an equals sign to avoid confusing the'
+                      ' parser (e.g. --hadoop-arg=-verbose).'
+                      ' You can use --hadoop-arg multiple times.'),
             )),
         ],
     ),
@@ -931,6 +933,8 @@ _RUNNER_OPTS = dict(
             (['--spark-arg'], dict(
                 action='append',
                 help=('Argument of any type to pass to spark-submit.'
+                      ' Use an equals sign to avoid confusing the parser'
+                      ' (e.g. --spark-arg=--verbose).'
                       ' You can use --spark-arg multiple times.'),
             )),
         ],

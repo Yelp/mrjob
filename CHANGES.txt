@@ -31,6 +31,17 @@ v0.6.0, 2017-09-?? -- ???
    * is_mapper_or_reducer()
    * mr()
  * removed option groups (deprecated) from MRJobLauncher
+ * replaced optparse with argparse
+   * renamed attributes/methods (old name is a deprecated alias)
+     * add_file_option() -> add_file_arg()
+     * add_passthrough_option() -> add_passthru_arg()
+     * configure_options() -> configure_args()
+     * load_options() -> load_args()
+     * pass_through_option -> pass_arg_through()
+     * args -> options.args
+   * removed generate_passthough_arguments()
+   * removed generate_file_upload_args()
+   * duplicate file upload args are passed through to job
  * removed deprecated functions:
    * mrjob.parse:
      * is_windows_path()

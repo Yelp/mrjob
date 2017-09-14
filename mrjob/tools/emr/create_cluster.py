@@ -180,13 +180,12 @@ Options::
 """
 from __future__ import print_function
 
-from optparse import OptionParser
+from argparse import ArgumentParser
 
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_options
-from mrjob.options import _add_runner_options
-from mrjob.options import _alphabetize_options
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_runner_args
 from mrjob.options import _filter_by_role
 
 
@@ -203,11 +202,8 @@ def _runner_kwargs(cl_args=None):
     :py:class:`EMRJobRunner`
     """
     # parser command-line args
-    option_parser = _make_option_parser()
-    options, args = option_parser.parse_args(cl_args)
-
-    if args:
-        option_parser.error('takes no arguments')
+    arg_parser = _make_arg_parser()
+    options = arg_parser.parse_args(cl_args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
@@ -220,22 +216,21 @@ def _runner_kwargs(cl_args=None):
     return kwargs
 
 
-def _make_option_parser():
-    usage = '%prog [options]'
+def _make_arg_parser():
+    usage = '%(prog)s [options]'
     description = (
         'Create a persistent EMR cluster to run jobs in, and print its ID to'
         ' stdout. WARNING: Do not run'
         ' this without mrjob terminate-idle-clusters in your'
         ' crontab; clusters left idle can quickly become expensive!')
-    option_parser = OptionParser(usage=usage, description=description)
+    arg_parser = ArgumentParser(usage=usage, description=description)
 
-    _add_basic_options(option_parser)
-    _add_runner_options(
-        option_parser,
+    _add_basic_args(arg_parser)
+    _add_runner_args(
+        arg_parser,
         _filter_by_role(EMRJobRunner.OPT_NAMES, 'connect', 'launch'))
 
-    _alphabetize_options(option_parser)
-    return option_parser
+    return arg_parser
 
 
 if __name__ == '__main__':

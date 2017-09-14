@@ -48,17 +48,16 @@ Options::
 """
 from __future__ import print_function
 
+from argparse import ArgumentParser
 from datetime import timedelta
 import logging
-from optparse import OptionParser
 
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_options
-from mrjob.options import _add_runner_options
-from mrjob.options import _alphabetize_options
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_runner_args
 from mrjob.options import _filter_by_role
 from mrjob.util import strip_microseconds
 
@@ -71,11 +70,8 @@ log = logging.getLogger(__name__)
 def main(args=None):
     now = _boto3_now()
 
-    option_parser = _make_option_parser()
-    options, args = option_parser.parse_args(args)
-
-    if args:
-        option_parser.error('takes no arguments')
+    arg_parser = _make_arg_parser()
+    options = arg_parser.parse_args(args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
@@ -246,35 +242,33 @@ def _format_timedelta(time):
         return result
 
 
-def _make_option_parser():
-    usage = '%prog [options]'
+def _make_arg_parser():
+    usage = '%(prog)s [options]'
     description = ('Report jobs running for more than a certain number of'
                    ' hours (by default, %.1f). This can help catch buggy jobs'
                    ' and Hadoop/EMR operational issues.' % DEFAULT_MIN_HOURS)
 
-    option_parser = OptionParser(usage=usage, description=description)
+    arg_parser = ArgumentParser(usage=usage, description=description)
 
-    option_parser.add_option(
-        '--min-hours', dest='min_hours', type='float',
+    arg_parser.add_argument(
+        '--min-hours', dest='min_hours', type=float,
         default=DEFAULT_MIN_HOURS,
         help=('Minimum number of hours a job can run before we report it.'
               ' Default: %default'))
 
-    option_parser.add_option(
+    arg_parser.add_argument(
         '-x', '--exclude', action='append',
         help=('Exclude clusters that match the specified tags.'
               ' Specifed in the form TAG_KEY,TAG_VALUE.')
     )
 
-    _add_basic_options(option_parser)
-    _add_runner_options(
-        option_parser,
+    _add_basic_args(arg_parser)
+    _add_runner_args(
+        arg_parser,
         _filter_by_role(EMRJobRunner.OPT_NAMES, 'connect')
     )
 
-    _alphabetize_options(option_parser)
-
-    return option_parser
+    return arg_parser
 
 
 if __name__ == '__main__':

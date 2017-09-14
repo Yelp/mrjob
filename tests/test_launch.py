@@ -187,7 +187,7 @@ class CommandLineArgsTestCase(TestCase):
         # should use long option names (--protocol, not -p)
         # shouldn't include --limit because it's None
         # items should be in the order they were instantiated
-        self.assertEqual(mr_job.generate_passthrough_arguments(), [])
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [])
 
     def test_explicit_passthrough_options(self):
         mr_job = MRCustomJobLauncher(args=[
@@ -212,17 +212,17 @@ class CommandLineArgsTestCase(TestCase):
         self.assertEqual(mr_job.options.planck_constant, 42)
         self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
         self.assertEqual(
-            mr_job.generate_passthrough_arguments(),
+            mr_job._non_option_kwargs()['extra_args'],
             [
+                '--foo-size', '9',
                 '--bar-name', 'Alembic',
                 '--enable-baz-mode',
-                '--extra-special-arg', 'you',
-                '--extra-special-arg', 'me',
-                '--foo-size', '9',
+                '--disable-quuxing',
                 '--pill-type', 'red',
                 '--planck-constant', '1',
                 '--planck-constant', '42',
-                '--disable-quuxing',
+                '--extra-special-arg', 'you',
+                '--extra-special-arg', 'me',
                 '--runner', 'inline',
             ]
         )
@@ -245,17 +245,17 @@ class CommandLineArgsTestCase(TestCase):
         self.assertEqual(mr_job.options.planck_constant, 42)
         self.assertEqual(mr_job.options.extra_special_args, ['you', 'me'])
         self.assertEqual(
-            mr_job.generate_passthrough_arguments(),
+            mr_job._non_option_kwargs()['extra_args'],
+            # order is preserved, but args are separated from switches
             [
-                '-B', 'Alembic',
-                '-M',
-                '--extra-special-arg', 'you',
-                '--extra-special-arg', 'me',
                 '-F', '9',
+                '-B', 'Alembic',
+                '-M', '-Q',
                 '-T', 'red',
                 '-C', '1',
                 '-C', '42',
-                '-Q',
+                '--extra-special-arg', 'you',
+                '--extra-special-arg', 'me',
                 '-r', 'inline',
             ]
         )
@@ -270,10 +270,10 @@ class CommandLineArgsTestCase(TestCase):
     def test_bad_option_types(self):
         mr_job = MRJobLauncher(args=[''])
         self.assertRaises(
-            OptionError, mr_job.add_passthrough_option,
+            ValueError, mr_job.add_passthrough_option,
             '--stop-words', dest='stop_words', type='set', default=None)
         self.assertRaises(
-            OptionError, mr_job.add_passthrough_option,
+            ValueError, mr_job.add_passthrough_option,
             '--leave-a-msg', dest='leave_a_msg', action='callback',
             default=None)
 
@@ -286,7 +286,7 @@ class CommandLineArgsTestCase(TestCase):
         mr_job = MRCustomJobLauncher(args=[''])
         self.assertEqual(mr_job.options.foo_config, None)
         self.assertEqual(mr_job.options.accordian_files, [])
-        self.assertEqual(mr_job.generate_file_upload_args(), [])
+        self.assertEqual(mr_job._non_option_kwargs()['file_upload_args'], [])
 
     def test_explicit_file_options(self):
         mr_job = MRCustomJobLauncher(args=[
@@ -298,7 +298,8 @@ class CommandLineArgsTestCase(TestCase):
         self.assertEqual(mr_job.options.foo_config, '/etc/fooconf')
         self.assertEqual(mr_job.options.accordian_files, [
             'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
-        self.assertEqual(mr_job.generate_file_upload_args(), [
+        self.assertEqual(mr_job._non_option_kwargs()['file_upload_args'], [
+            ('--foo-config', '/tmp/.fooconf'),
             ('--foo-config', '/etc/fooconf'),
             ('--accordian-file', 'WeirdAl.mp3'),
             ('--accordian-file', '/home/dave/JohnLinnell.ogg')])

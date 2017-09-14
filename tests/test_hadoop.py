@@ -636,7 +636,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
 
         mr_job = MRTwoStepJob(['-r', 'hadoop', '-v',
                                '--no-conf', '--libjar', 'containsJars.jar',
-                               '--hadoop-arg', '-verbose'] + list(args)
+                               '--hadoop-arg=-verbose'] + list(args)
                               + ['-', local_input_path, remote_input_path]
                               + ['--jobconf', 'x=y'])
         mr_job.sandbox(stdin=stdin)
@@ -1290,7 +1290,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
 
     def test_hadoop_extra_args(self):
         # hadoop_extra_args doesn't exist in default runner
-        job = MRWordCount(['-r', self.RUNNER, '--hadoop-arg', '-foo'])
+        job = MRWordCount(['-r', self.RUNNER, '--hadoop-arg=-foo'])
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0), ['-foo'])
 
@@ -1298,7 +1298,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
         job = MRWordCount(
             ['-r', self.RUNNER,
              '--cmdenv', 'FOO=bar',
-             '--hadoop-arg', '-libjar', '--hadoop-arg', 'qux.jar',
+             '--hadoop-arg=-libjar', '--hadoop-arg', 'qux.jar',
              '--jobconf', 'baz=qux'])
         job.HADOOP_INPUT_FORMAT = 'FooInputFormat'
         job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'

@@ -15,16 +15,15 @@
 """Test the cluster termination tool"""
 from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.terminate_cluster import main as terminate_main
-from mrjob.tools.emr.terminate_cluster import _make_option_parser
+from mrjob.tools.emr.terminate_cluster import _make_arg_parser
 
 from tests.tools.emr import ToolTestCase
 
 
 class TerminateToolTestCase(ToolTestCase):
 
-    def test_make_option_parser(self):
-        _make_option_parser()
-        self.assertEqual(True, True)
+    def test_make_arg_parser(self):
+        _make_arg_parser()
 
     def test_terminate_cluster(self):
         cluster_id = self.make_cluster(pool_clusters=True)

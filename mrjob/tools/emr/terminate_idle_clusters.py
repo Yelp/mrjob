@@ -62,18 +62,17 @@ Options::
 """
 from __future__ import print_function
 
-from datetime import timedelta
 import logging
-from optparse import OptionParser
+from argparse import ArgumentParser
+from datetime import timedelta
 
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_options
-from mrjob.options import _add_runner_options
-from mrjob.options import _alphabetize_options
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_runner_args
 from mrjob.options import _filter_by_role
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
@@ -86,11 +85,8 @@ _DEFAULT_MAX_MINUTES_LOCKED = 1
 
 
 def main(cl_args=None):
-    option_parser = _make_option_parser()
-    options, args = option_parser.parse_args(cl_args)
-
-    if args:
-        option_parser.error('takes no arguments')
+    arg_parser = _make_arg_parser()
+    options = arg_parser.parse_args(cl_args)
 
     MRJob.set_up_logging(quiet=options.quiet,
                          verbose=options.verbose)
@@ -341,15 +337,15 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
         print(msg)
 
 
-def _make_option_parser():
-    usage = '%prog [options]'
+def _make_arg_parser():
+    usage = '%(prog)s [options]'
     description = ('Terminate idle EMR clusters that meet the criteria'
                    ' passed in on the command line (or, by default,'
                    ' clusters that have been idle for one hour).')
 
-    option_parser = OptionParser(usage=usage, description=description)
+    arg_parser = ArgumentParser(usage=usage, description=description)
 
-    option_parser.add_option(
+    arg_parser.add_argument(
         '--max-hours-idle', dest='max_hours_idle',
         default=None, type='float',
         help=('Max number of hours a cluster can go without bootstrapping,'
@@ -357,39 +353,38 @@ def _make_option_parser():
               ' even if there are pending steps which EMR has failed to'
               ' start. Make sure you set this higher than the amount of time'
               ' your jobs can take to start instances and bootstrap.'))
-    option_parser.add_option(
+    arg_parser.add_argument(
         '--max-mins-locked', dest='max_mins_locked',
         default=_DEFAULT_MAX_MINUTES_LOCKED, type='float',
         help='Max number of minutes a cluster can be locked while idle.')
-    option_parser.add_option(
+    arg_parser.add_argument(
         '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
         default=None, type='float',
         help=('Terminate clusters that are within this many minutes of'
               ' the end of a full hour since the job started running'
               ' AND have no pending steps.'))
-    option_parser.add_option(
+    arg_parser.add_argument(
         '--unpooled-only', dest='unpooled_only', action='store_true',
         default=False,
         help='Only terminate un-pooled clusters')
-    option_parser.add_option(
+    arg_parser.add_argument(
         '--pooled-only', dest='pooled_only', action='store_true',
         default=False,
         help='Only terminate pooled clusters')
-    option_parser.add_option(
+    arg_parser.add_argument(
         '--pool-name', dest='pool_name', default=None,
         help='Only terminate clusters in the given named pool.')
-    option_parser.add_option(
+    arg_parser.add_argument(
         '--dry-run', dest='dry_run', default=False,
         action='store_true',
         help="Don't actually kill idle jobs; just log that we would")
 
-    _add_basic_options(option_parser)
-    _add_runner_options(
-        option_parser,
+    _add_basic_args(arg_parser)
+    _add_runner_args(
+        arg_parser,
         _filter_by_role(EMRJobRunner.OPT_NAMES, 'connect'))
 
-    _alphabetize_options(option_parser)
-    return option_parser
+    return arg_parser
 
 
 if __name__ == '__main__':

@@ -49,18 +49,17 @@ from __future__ import print_function
 import math
 import logging
 import re
+from argparse import ArgumentParser
 from datetime import datetime
 from datetime import timedelta
 from time import sleep
-from optparse import OptionParser
 
 from mrjob.aws import _boto3_now
 from mrjob.aws import _boto3_paginate
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_options
-from mrjob.options import _add_runner_options
-from mrjob.options import _alphabetize_options
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_runner_args
 from mrjob.options import _filter_by_role
 from mrjob.pool import _legacy_pool_hash_and_name
 from mrjob.pool import _pool_hash_and_name
@@ -80,12 +79,9 @@ log = logging.getLogger(__name__)
 
 
 def main(args=None):
-    # parser command-line args
-    option_parser = _make_option_parser()
-    options, args = option_parser.parse_args(args)
-
-    if args:
-        option_parser.error('takes no arguments')
+    # parse command-line args
+    arg_parser = _make_arg_parser()
+    options = arg_parser.parse_args(args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
@@ -101,24 +97,23 @@ def main(args=None):
     _print_report(stats, now=now)
 
 
-def _make_option_parser():
-    usage = '%prog [options]'
+def _make_arg_parser():
+    usage = '%(prog)s [options]'
     description = 'Print a giant report on EMR usage.'
 
-    option_parser = OptionParser(usage=usage, description=description)
+    arg_parser = ArgumentParser(usage=usage, description=description)
 
-    option_parser.add_option(
-        '--max-days-ago', dest='max_days_ago', type='float', default=None,
+    arg_parser.add_argument(
+        '--max-days-ago', dest='max_days_ago', type=float, default=None,
         help=('Max number of days ago to look at jobs. By default, we go back'
               ' as far as EMR supports (currently about 2 months)'))
 
-    _add_basic_options(option_parser)
-    _add_runner_options(
-        option_parser,
+    _add_basic_args(arg_parser)
+    _add_runner_args(
+        arg_parser,
         _filter_by_role(EMRJobRunner.OPT_NAMES, 'connect'))
 
-    _alphabetize_options(option_parser)
-    return option_parser
+    return arg_parser
 
 
 def _runner_kwargs(options):

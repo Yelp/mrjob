@@ -20,20 +20,20 @@ import os
 import sys
 import time
 from io import BytesIO
-from optparse import Option
-from optparse import OptionError
-from optparse import OptionParser
+from argparse import ArgumentParser
+from argparse import ArgumentError
 
 from mrjob.conf import combine_dicts
-from mrjob.options import _add_basic_options
-from mrjob.options import _add_job_options
-from mrjob.options import _add_runner_options
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_job_args
+from mrjob.options import _add_runner_args
+from mrjob.options import _optparse_kwargs_to_argparse
+from mrjob.options import _parse_raw_args
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
-from mrjob.util import parse_and_save_options
 
 
 log = logging.getLogger(__name__)
@@ -48,6 +48,20 @@ _FAKE_OPTIONS = set([
 ])
 
 
+def _im_func(f):
+    """Wrapper to get at the underlying function belonging to a method.
+
+    Python 2 is slightly different because classes have "unbound methods"
+    which wrap the underlying function, whereas on Python 3 they're just
+    functions. (Methods work the same way on both versions.)
+    """
+    # "im_func" is the old Python 2 name for __func__
+    if hasattr(f, '__func__'):
+        return f.__func__
+    else:
+        return f
+
+
 class MRJobLauncher(object):
     """Handle running a MapReduce job on an executable from the command line.
     This class will eventually support running arbitrary executables; for now
@@ -55,10 +69,8 @@ class MRJobLauncher(object):
     effectively part of the :py:class:`~mrjob.job.MRJob` class itself and
     should not be used externally in any way.
     """
-
-    #: :py:class:`optparse.Option` subclass to use with the
-    #: :py:class:`optparse.OptionParser` instance.
-    OPTION_CLASS = Option
+    # only MRJobLauncher expects the first argument to be script_path
+    _FIRST_ARG_IS_SCRIPT_PATH = True
 
     def __init__(self, script_path=None, args=None, from_cl=False):
         """
@@ -69,7 +81,6 @@ class MRJobLauncher(object):
                         mrjob.cmd), don't override the option parser error
                         function (exit instead of throwing ValueError).
         """
-
         if script_path is not None:
             script_path = os.path.abspath(script_path)
         self._script_path = script_path
@@ -78,21 +89,33 @@ class MRJobLauncher(object):
         if hasattr(time, 'tzset'):
             time.tzset()
 
-        self._passthrough_options = []
-        self._file_options = []
+        # argument dests for args to pass through
+        self._passthru_arg_dests = set()
+        self._file_arg_dests = set()
 
-        self.option_parser = OptionParser(usage=self._usage(),
-                                          option_class=self.OPTION_CLASS,
-                                          add_help_option=False)
+        # there is no equivalent in argparse
+        # remove this in v0.7.0
+        if hasattr(self, 'OPTION_CLASS'):
+            log.warning('OPTION_CLASS attribute is ignored; '
+                        'mrjob now uses argparse instead of optparse')
 
-        self.configure_options()
+        self.arg_parser = ArgumentParser(usage=self._usage(),
+                                         add_help=False)
+        self.configure_args()
+
+        if (_im_func(self.configure_options) !=
+                _im_func(MRJobLauncher.configure_options)):
+            log.warning('configure_options() is deprecated and will be'
+                         ' removed in v0.7.0; please use configure_args()'
+                         ' instead.')
+            self.configure_options()
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script
         if args is _READ_ARGS_FROM_SYS_ARGV:
             self._cl_args = sys.argv[1:]
         else:
-            # don't pass sys.argv to self.option_parser, and have it
+            # don't pass sys.argv to self.arg_parser, and have it
             # raise an exception on error rather than printing to stderr
             # and exiting.
             self._cl_args = args or []
@@ -101,9 +124,16 @@ class MRJobLauncher(object):
                 raise ValueError(msg)
 
             if not from_cl:
-                self.option_parser.error = error
+                self.arg_parser.error = error
 
-        self.load_options(self._cl_args)
+        self.load_args(self._cl_args)
+
+        if (_im_func(self.load_options) !=
+                _im_func(MRJobLauncher.load_options)):
+            log.warning('load_options() is deprecated and will be'
+                         ' removed in v0.7.0; please use load_args()'
+                         ' instead.')
+            self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
@@ -122,7 +152,7 @@ class MRJobLauncher(object):
     def _usage(cls):
         """Command line usage string for this class"""
         return ("usage: mrjob run [script path|executable path|--help]"
-                " [options] [input files]")
+                " [options]")
 
     def _print_help(self, options):
         """Print help for this job. This will either print runner
@@ -131,7 +161,7 @@ class MRJobLauncher(object):
             _print_help_for_runner(
                 self._runner_opt_names(), options.deprecated)
         else:
-            _print_basic_help(self.option_parser,
+            _print_basic_help(self.arg_parser,
                               self._usage(),
                               options.deprecated)
 
@@ -220,90 +250,72 @@ class MRJobLauncher(object):
 
     ### Command-line arguments ###
 
-    def configure_options(self):
+    def configure_args(self):
         """Define arguments for this script. Called from :py:meth:`__init__()`.
 
         Re-define to define custom command-line arguments or pass
         through existing ones::
 
-            def configure_options(self):
-                super(MRYourJob, self).configure_options
+            def configure_args(self):
+                super(MRYourJob, self).configure_args()
 
-                self.add_passthrough_option(...)
-                self.add_file_option(...)
-                self.pass_through_option(...)
+                self.add_passthru_arg(...)
+                self.add_file_arg(...)
+                self.pass_arg_through(...)
                 ...
         """
-        self.option_parser.add_option(
-            '-h', '--help', dest='help', action='store_true', default=False,
+        self.arg_parser.add_argument(
+            '-h', '--help', dest='help', action='store_true',
             help='show this message and exit')
 
-        self.option_parser.add_option(
+        self.arg_parser.add_argument(
             '--deprecated', dest='deprecated', action='store_true',
-            default=False,
             help='include help for deprecated options')
 
-        _add_basic_options(self.option_parser)
-        _add_job_options(self.option_parser)
-        _add_runner_options(self.option_parser)
+        # if script path isn't set, expect it on the command line
+        if self._FIRST_ARG_IS_SCRIPT_PATH:
+            self.arg_parser.add_argument(
+                dest='script_path',
+                help='path of script to launch')
 
-    def is_task(self):
-        """True if this is a mapper, combiner, or reducer.
+        self.arg_parser.add_argument(
+            dest='args', nargs='*',
+            help=('input paths to read (or stdin if not set). If --spark'
+                  ' is set, the input and output path for the spark job.'))
 
-        This is mostly useful inside :py:meth:`load_options`, to disable
-        loading options when we aren't running inside Hadoop Streaming.
+        _add_basic_args(self.arg_parser)
+        _add_job_args(self.arg_parser)
+        _add_runner_args(self.arg_parser)
+
+    def load_args(self, args):
+        """Load command-line options into ``self.options`` and
+        ``self._script_path``.
+
+        Called from :py:meth:`__init__()` after :py:meth:`configure_args`.
+
+        :type args: list of str
+        :param args: a list of command line arguments. ``None`` will be
+                     treated the same as ``[]``.
+
+        Re-define if you want to post-process command-line arguments::
+
+            def load_args(self, args):
+                super(MRYourJob, self).load_args(args)
+
+                self.stop_words = self.options.stop_words.split(',')
+                ...
         """
-        return False
+        self.options = self.arg_parser.parse_args(args)
 
-    def add_passthrough_option(self, *args, **kwargs):
-        """Function to create options which both the job runner
-        and the job itself respect (we use this for protocols, for example).
+        if self.options.help:
+            self._print_help(self.options)
+            sys.exit(0)
 
-        Use it like you would use :py:func:`optparse.OptionParser.add_option`::
+        if self._FIRST_ARG_IS_SCRIPT_PATH:
+            # should always be set, just hedging
+            self._script_path = self.options.script_path
 
-            def configure_options(self):
-                super(MRYourJob, self).configure_options()
-                self.add_passthrough_option(
-                    '--max-ngram-size', type='int', default=4, help='...')
-
-        Specify an *opt_group* keyword argument to add the option to that
-        :py:class:`OptionGroup` rather than the top-level
-        :py:class:`OptionParser`.
-
-        If you want to pass files through to the mapper/reducer, use
-        :py:meth:`add_file_option` instead.
-
-        If you want to pass through a built-in option (e.g. ``--runner``, use
-        :py:meth:`pass_through_option` instead.
-        """
-        if 'opt_group' in kwargs:
-            pass_opt = kwargs.pop('opt_group').add_option(*args, **kwargs)
-        else:
-            pass_opt = self.option_parser.add_option(*args, **kwargs)
-
-        self._passthrough_options.append(pass_opt)
-
-    def pass_through_option(self, opt_str):
-        """Pass through a built-in option to tasks. For example, for
-        tasks to see which runner launched them::
-
-            def configure_options(self):
-                super(MRYourJob, self).configure_options()
-                self.pass_through_option('--runner')
-
-            def mapper_init(self):
-                if self.options.runner == 'emr':
-                    ...
-
-        *opt_str* can be a long option switch like ``--runner`` or a short
-        one like ``-r``.
-
-        .. versionadded:: 0.5.4
-        """
-        self._passthrough_options.append(
-            self.option_parser.get_option(opt_str))
-
-    def add_file_option(self, *args, **kwargs):
+    def add_file_arg(self, *args, **kwargs):
         """Add a command-line option that sends an external file
         (e.g. a SQLite DB) to Hadoop::
 
@@ -322,55 +334,121 @@ class MRJobLauncher(object):
         Hadoop). Use SQLite databases instead. If all you need is an on-disk
         hash table, try out the :py:mod:`sqlite3dbm` module.
         """
-        pass_opt = self.option_parser.add_option(*args, **kwargs)
+        if kwargs.get('type') not in (None, 'string'):
+            raise ArgumentError(
+                'file options must take strings')
 
-        if not pass_opt.type == 'string':
-            raise OptionError(
-                'passthrough file options must take strings' % pass_opt.type)
+        if kwargs.get('action') not in (None, 'append', 'store'):
+            raise ArgumentError(
+                "file options must use the actions 'store' or 'append'")
 
-        if pass_opt.action not in ('store', 'append'):
-            raise OptionError("passthrough file options must use the options"
-                              " 'store' or 'append'")
+        pass_opt = self.arg_parser.add_argument(*args, **kwargs)
 
-        self._file_options.append(pass_opt)
+        self._file_arg_dests.add(pass_opt.dest)
 
-    def _process_args(self, args):
-        """mrjob.launch takes the first arg as the script path, but mrjob.job
-        uses all args as input files. This method determines the behavior:
-        MRJobLauncher takes off the first arg as the script path.
+    def add_passthru_arg(self, *args, **kwargs):
+        """Function to create options which both the job runner
+        and the job itself respect (we use this for protocols, for example).
+
+        Use it like you would use
+        :py:func:`argparse.ArgumentParser.add_argument`::
+
+            def configure_args(self):
+                super(MRYourJob, self).configure_args()
+                self.add_passthru_arg(
+                    '--max-ngram-size', type='int', default=4, help='...')
+
+        If you want to pass files through to the mapper/reducer, use
+        :py:meth:`add_file_arg` instead.
+
+        If you want to pass through a built-in option (e.g. ``--runner``, use
+        :py:meth:`pass_arg_through` instead.
         """
-        if not self._script_path:
-            if len(args) < 1:
-                self.option_parser.error('Must supply script path')
-            else:
-                self._script_path = os.path.abspath(args[0])
-                self.args = args[1:]
+        pass_opt = self.arg_parser.add_argument(*args, **kwargs)
+
+        self._passthru_arg_dests.add(pass_opt.dest)
+
+    def pass_arg_through(self, opt_str):
+        """Pass the given argument through to the job."""
+
+        # _get_optional_actions() is hidden but the interface appears
+        # to be stable, and theres no non-hidden interface
+        for action in self.arg_parser._get_optional_actions():
+            if opt_str in action.option_strings or opt_str == action.dest:
+                self._passthru_arg_dests.add(action.dest)
+                break
+        else:
+            raise ValueError('unknown arg: %s', opt_str)
+
+    def is_task(self):
+        """True if this is a mapper, combiner, or reducer.
+
+        This is mostly useful inside :py:meth:`load_args`, to disable
+        loading args when we aren't running inside Hadoop Streaming.
+        """
+        return False
+
+    ### old optparse shims ###
+
+    @property
+    def args(self):
+        class_name = self.__class__.__name__
+        log.warning(
+            '%s.args is a deprecated alias for %s.options.args, and will'
+            ' be removed in v0.7.0' % (class_name, class_name))
+        return self.options
+
+    def configure_options(self):
+        """.. deprecated:: 0.6.0
+
+        Use `:py:meth:`configure_args` instead.
+        """
+        pass  # deprecation warning is in __init__()
 
     def load_options(self, args):
-        """Load command-line options into ``self.options``,
-        ``self._script_path``, and ``self.args``.
+        """.. deprecated:: 0.6.0
 
-        Called from :py:meth:`__init__()` after :py:meth:`configure_options`.
-
-        :type args: list of str
-        :param args: a list of command line arguments. ``None`` will be
-                     treated the same as ``[]``.
-
-        Re-define if you want to post-process command-line arguments::
-
-            def load_options(self, args):
-                super(MRYourJob, self).load_options(args)
-
-                self.stop_words = self.options.stop_words.split(',')
-                ...
+        Use `:py:meth:`load_args` instead.
         """
-        self.options, args = self.option_parser.parse_args(args)
+        pass  # deprecation warning is in __init__()
 
-        if self.options.help:
-            self._print_help(self.options)
-            sys.exit(0)
+    def add_file_option(self, *args, **kwargs):
+        """.. deprecated:: 0.6.0
 
-        self._process_args(args)
+        Like :py:meth:`add_file_arg` except that it emulates the
+        old :py:mod:`optparse` interface (which is almost identical).
+        """
+        log.warning(
+            'add_file_option() is deprecated and will be removed in'
+            ' v0.7.0. Use add_file_arg() instead.')
+
+        self.add_file_arg(*args, **_optparse_kwargs_to_argparse(**kwargs))
+
+    def add_passthrough_option(self, *args, **kwargs):
+        """.. deprecated:: 0.6.0
+
+        Like :py:meth:`add_passthru_arg` except that it emulates the
+        old :py:mod:`optparse` interface (which is almost identical).
+        """
+        log.warning(
+            'add_passthrough_option() is deprecated and will be removed in'
+            ' v0.7.0. Use add_passthru_arg() instead.')
+
+        self.add_passthru_arg(*args, **_optparse_kwargs_to_argparse(**kwargs))
+
+    def pass_through_option(self, opt_str):
+        """.. deprecated:: 0.6.0
+
+        Like :py:meth:`pass_arg_througj` except that it emulates the
+        old :py:mod:`optparse` interface (which is almost identical).
+        """
+        log.warning(
+            'pass_through_option() is deprecated and will be removed in'
+            ' v0.7.0. Use pass_arg_through() instead.')
+
+        self.pass_arg_through(opt_str)
+
+    ### runners ###
 
     def _runner_class(self):
         """Runner class, as indicated by ``--runner``. This uses conditional
@@ -401,7 +479,6 @@ class MRJobLauncher(object):
             return LocalMRJobRunner
 
     def _runner_kwargs(self):
-
         return combine_dicts(
             self._non_option_kwargs(),
             self._kwargs_from_switches(self._runner_opt_names()),
@@ -418,13 +495,36 @@ class MRJobLauncher(object):
         These should match the (named) arguments to
         :py:meth:`~mrjob.runner.MRJobRunner.__init__`.
         """
+        # build extra_args and file_upload_args
+        #
+        # TODO: deprecate file_upload_args, represent paths to upload
+        # as dictionaries in extra_args
+        raw_args = _parse_raw_args(self.arg_parser, self._cl_args)
+
+        extra_args = []
+        file_upload_args = []
+
+        for dest, option_string, args in raw_args:
+            if dest in self._passthru_arg_dests:
+                # special case for --hadoop-arg=-verbose etc.
+                if (option_string and len(args) == 1 and
+                        args[0].startswith('-')):
+                    extra_args.append('%s=%s' % (option_string, args[0]))
+                else:
+                    if option_string:
+                        extra_args.append(option_string)
+                    extra_args.extend(args)
+
+            elif dest in self._file_arg_dests:
+                file_upload_args.append((option_string, args[0]))
+
         return dict(
             conf_paths=self.options.conf_paths,
-            extra_args=self.generate_passthrough_arguments(),
-            file_upload_args=self.generate_file_upload_args(),
+            extra_args=extra_args,
+            file_upload_args=file_upload_args,
             hadoop_input_format=self.hadoop_input_format(),
             hadoop_output_format=self.hadoop_output_format(),
-            input_paths=self.args,
+            input_paths=self.options.args,
             mr_job_script=self._script_path,
             output_dir=self.options.output_dir,
             partitioner=self.partitioner(),
@@ -473,49 +573,6 @@ class MRJobLauncher(object):
     def sort_values(self):
         """See :py:meth:`mrjob.job.MRJob.sort_values`."""
         return None
-
-    ### More option stuff ###
-
-    def generate_passthrough_arguments(self):
-        """Returns a list of arguments to pass to subprocesses, either on
-        hadoop or executed via subprocess.
-
-        These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
-        as *extra_args*.
-        """
-        arg_map = parse_and_save_options(self.option_parser, self._cl_args)
-        output_args = []
-
-        passthrough_dests = sorted(
-            set(option.dest for option in self._passthrough_options))
-        for option_dest in passthrough_dests:
-            output_args.extend(arg_map.get(option_dest, []))
-
-        return output_args
-
-    def generate_file_upload_args(self):
-        """Figure out file upload args to pass through to the job runner.
-
-        Instead of generating a list of args, we're generating a list
-        of tuples of ``('--argname', path)``
-
-        These are passed to :py:meth:`mrjob.runner.MRJobRunner.__init__`
-        as ``file_upload_args``.
-        """
-        file_upload_args = []
-
-        master_option_dict = self.options.__dict__
-
-        for opt in self._file_options:
-            opt_prefix = opt.get_opt_string()
-            opt_value = master_option_dict[opt.dest]
-
-            if opt_value:
-                paths = opt_value if opt.action == 'append' else [opt_value]
-                for path in paths:
-                    file_upload_args.append((opt_prefix, path))
-
-        return file_upload_args
 
     ### Testing ###
 
@@ -571,10 +628,6 @@ class MRJobLauncher(object):
         self.stderr = stderr or BytesIO()
 
         return self
-
-
-def _dests(opt_group):
-    return set(s.dest for s in opt_group.option_list)
 
 
 if __name__ == '__main__':

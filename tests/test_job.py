@@ -1231,7 +1231,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         # currently there are no deprecated options to test against
         #self.assertNotIn('--partitioner', output)
         self.assertIn('add --deprecated', output)
-        self.assertNotIn('--deprecated=DEPRECATED', output)
+        self.assertNotIn('--deprecated DEPRECATED', output)
 
     def test_basic_help_deprecated(self):
         MRJob(['--help', '--deprecated'])
@@ -1250,7 +1250,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         # currently there are no deprecated options to test against
         #self.assertIn('--partitioner', output)
         self.assertNotIn('add --deprecated', output)
-        self.assertIn('--deprecated=DEPRECATED', output)
+        self.assertIn('--deprecated DEPRECATED', output)
 
     def test_runner_help(self):
         MRJob(['--help', '-r', 'emr'])

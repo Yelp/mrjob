@@ -76,24 +76,17 @@ See :ref:`writing-cl-opts` for information on adding command line options to
 your job. See :doc:`guides/configs-reference` for a complete list of all
 configuration options.
 
-.. automethod:: MRJob.configure_options
-.. automethod:: MRJob.add_passthrough_option
-.. automethod:: MRJob.add_file_option
-.. automethod:: MRJob.pass_through_option
-.. automethod:: MRJob.load_options
+.. automethod:: MRJob.configure_args
+.. automethod:: MRJob.add_passthru_arg
+.. automethod:: MRJob.add_file_arg
+.. automethod:: MRJob.pass_arg_through
+.. automethod:: MRJob.load_args
 .. automethod:: MRJob.is_task
-
-.. autoattribute:: MRJob.OPTION_CLASS
-
-   Redefine this if you want to use a subclass of :py:class:`optparse.Option`
-   for option parsing.
 
 .. _job-configuration:
 
 Job runner configuration
 ------------------------
-.. automethod:: MRJob.generate_passthrough_arguments
-.. automethod:: MRJob.generate_file_upload_args
 .. automethod:: MRJob.mr_job_script
 
 Running specific parts of jobs

@@ -44,34 +44,29 @@ Options::
                         would
   -v, --verbose         print more messages to stderr
 """
+from argparse import ArgumentParser
 from datetime import timedelta
 import logging
-from optparse import OptionParser
 
 from mrjob.aws import _boto3_now
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
-from mrjob.options import _add_basic_options
-from mrjob.options import _add_runner_options
-from mrjob.options import _alphabetize_options
+from mrjob.options import _add_basic_args
+from mrjob.options import _add_runner_args
 
 
 log = logging.getLogger(__name__)
 
 
 def main(cl_args=None):
-    option_parser = _make_option_parser()
-    options, args = option_parser.parse_args(cl_args)
+    arg_parser = _make_arg_parser()
+    options = arg_parser.parse_args(cl_args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
-    # make sure time and uris are given
-    if not args or len(args) < 2:
-        option_parser.error('Please specify time and one or more URIs')
+    time_old = _process_time(options.time_untouched)
 
-    time_old = _process_time(args[0])
-
-    for path in args[1:]:
+    for path in options.uris:
         _s3_cleanup(path, time_old,
                     dry_run=options.test,
                     **_runner_kwargs(options))
@@ -117,32 +112,36 @@ def _process_time(time):
         return timedelta(hours=int(time))
 
 
-def _make_option_parser():
-    usage = '%prog [options] <time-untouched> <URIs>'
+def _make_arg_parser():
     description = (
-        'Delete all files in a given URI that are older than a specified'
-        ' time.\n\nThe time parameter defines the threshold for removing'
-        ' files. If the file has not been accessed for *time*, the file is'
-        ' removed. The time argument is a number with an optional'
-        ' single-character suffix specifying the units: m for minutes, h for'
-        ' hours, d for days.  If no suffix is specified, time is in hours.')
+        'Delete all files at one or more URIs that are older than a'
+        ' specified time.')
 
-    option_parser = OptionParser(usage=usage, description=description)
+    arg_parser = ArgumentParser(description=description)
 
-    option_parser.add_option(
+    arg_parser.add_argument(
         '-t', '--test', dest='test', default=False,
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
-    _add_basic_options(option_parser)
-    _add_runner_options(
-        option_parser,
+    arg_parser.add_argument(
+        dest='time_untouched',
+        help='The time threshold for removing'
+        ' files. A number with an optional'
+        ' single-character suffix specifying the units: m for minutes, h for'
+        ' hours, d for days.  If no suffix is specified, time is in hours.')
+
+    arg_parser.add_argument(
+        dest='uris', nargs='+',
+        help='s3:// URIs specifying where to delete old files')
+
+    _add_basic_args(arg_parser)
+    _add_runner_args(
+        arg_parser,
         set(['region', 's3_endpoint']),
     )
 
-    _alphabetize_options(option_parser)
-
-    return option_parser
+    return arg_parser
 
 
 if __name__ == '__main__':

@@ -22,14 +22,14 @@ import json
 import logging
 import os.path
 import sys
-from optparse import OptionGroup
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
 from mrjob.launch import MRJobLauncher
+from mrjob.launch import _im_func
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV
-from mrjob.options import _add_step_options
+from mrjob.options import _add_step_args
 from mrjob.options import _print_help_for_steps
 from mrjob.protocol import JSONProtocol
 from mrjob.protocol import RawValueProtocol
@@ -46,20 +46,6 @@ from mrjob.util import to_lines
 log = logging.getLogger(__name__)
 
 
-def _im_func(f):
-    """Wrapper to get at the underlying function belonging to a method.
-
-    Python 2 is slightly different because classes have "unbound methods"
-    which wrap the underlying function, whereas on Python 3 they're just
-    functions. (Methods work the same way on both versions.)
-    """
-    # "im_func" is the old Python 2 name for __func__
-    if hasattr(f, '__func__'):
-        return f.__func__
-    else:
-        return f
-
-
 class UsageError(Exception):
     pass
 
@@ -67,6 +53,9 @@ class UsageError(Exception):
 class MRJob(MRJobLauncher):
     """The base class for all MapReduce jobs. See :py:meth:`__init__`
     for details."""
+
+    # script path is whatever file our subclass of MRJob is in
+    _FIRST_ARG_IS_SCRIPT_PATH = False
 
     def __init__(self, args=None):
         """Entry point for running your job from other Python code.
@@ -91,7 +80,7 @@ class MRJob(MRJobLauncher):
 
     @classmethod
     def _usage(cls):
-        return "usage: %prog [options] [input files]"
+        return "usage: %(prog)s [options]"
 
     ### Defining one-step streaming jobs ###
 
@@ -629,9 +618,9 @@ class MRJob(MRJobLauncher):
         """
         step = self._get_step(step_num, SparkStep)
 
-        if len(self.args) != 2:
+        if len(self.options.args) != 2:
             raise ValueError('Wrong number of args')
-        input_path, output_path = self.args
+        input_path, output_path = self.options.args
 
         spark_method = step.spark
         spark_method(input_path, output_path)
@@ -680,7 +669,7 @@ class MRJob(MRJobLauncher):
         - If path is ``-``, read from STDIN.
         - Recursively read all files in a directory
         """
-        paths = self.args or ['-']
+        paths = self.options.args or ['-']
         for path in paths:
             for line in read_input(path, stdin=self.stdin):
                 yield line
@@ -815,47 +804,34 @@ class MRJob(MRJobLauncher):
 
     ### Command-line arguments ###
 
-    def configure_options(self):
+    def configure_args(self):
         """Define arguments for this script. Called from :py:meth:`__init__()`.
 
         Re-define to define custom command-line arguments or pass
         through existing ones::
 
-            def configure_options(self):
-                super(MRYourJob, self).configure_options()
+            def configure_args(self):
+                super(MRYourJob, self).configure_args()
 
-                self.add_passthrough_option(...)
-                self.add_file_option(...)
-                self.pass_through_option(...)
+                self.add_passthru_arg(...)
+                self.add_file_arg(...)
+                self.pass_arg_through(...)
                 ...
         """
+        super(MRJob, self).configure_args()
 
-        super(MRJob, self).configure_options()
-
-        # To run mappers or reducers
-        self._mux_opt_group = OptionGroup(
-            self.option_parser, 'Running specific parts of the job')
-        self.option_parser.add_option_group(self._mux_opt_group)
-
-        _add_step_options(self._mux_opt_group)
+        _add_step_args(self.arg_parser)
 
     def is_task(self):
         """True if this is a mapper, combiner, reducer, or Spark script.
 
-        This is mostly useful inside :py:meth:`load_options`, to disable
-        loading options when we aren't running inside Hadoop.
+        This is mostly useful inside :py:meth:`load_args`, to disable
+        loading args when we aren't running inside Hadoop.
         """
         return (self.options.run_mapper or
                 self.options.run_combiner or
                 self.options.run_reducer or
                 self.options.run_spark)
-
-    def _process_args(self, args):
-        """mrjob.launch takes the first arg as the script path, but mrjob.job
-        uses all args as input files. This method determines the behavior:
-        MRJob uses all args as input files.
-        """
-        self.args = args
 
     def _print_help(self, options):
         """Implement --help --steps"""

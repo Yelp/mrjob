@@ -514,9 +514,14 @@ class MRJobLauncher(object):
 
         for dest, option_string, args in raw_args:
             if dest in self._passthru_arg_dests:
-                if option_string:
-                    extra_args.append(option_string)
-                extra_args.extend(args)
+                # special case for --hadoop-arg=-verbose etc.
+                if (option_string and len(args) == 1 and
+                        args[0].startswith('-')):
+                    extra_args.append('%s=%s' % (option_string, args[0]))
+                else:
+                    if option_string:
+                        extra_args.append(option_string)
+                    extra_args.extend(args)
 
             elif dest in self._file_arg_dests:
                 file_upload_args.append((option_string, args[0]))

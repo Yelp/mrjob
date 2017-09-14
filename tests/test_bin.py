@@ -1065,7 +1065,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                  '<step 0 output>'])
 
     def test_spark_passthrough_arg(self):
-        job = MRNullSpark(['-r', 'local', '--extra-spark-arg', '--verbose'])
+        job = MRNullSpark(['-r', 'local', '--extra-spark-arg=--verbose'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1073,8 +1073,7 @@ class SparkScriptArgsTestCase(SandboxedTestCase):
                 runner._spark_script_args(0),
                 ['--step-num=0',
                  '--spark',
-                 '--extra-spark-arg',
-                 '--verbose',
+                 '--extra-spark-arg=--verbose',
                  '<step 0 input>',
                  '<step 0 output>'])
 
@@ -1304,7 +1303,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
     def test_option_spark_args(self):
         job = MRNullSpark(['-r', 'local',
-                           '--spark-arg', '--name', '--spark-arg', 'Dave'])
+                           '--spark-arg=--name', '--spark-arg', 'Dave'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1319,7 +1318,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
     def test_job_spark_args(self):
         # --extra-spark-arg is a passthrough option for MRNullSpark
         job = MRNullSpark(['-r', 'local',
-                           '--extra-spark-arg', '-v'])
+                           '--extra-spark-arg=-v'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1334,8 +1333,8 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
     def test_job_spark_args_come_after_option_spark_args(self):
         job = MRNullSpark(
             ['-r', 'local',
-             '--extra-spark-arg', '-v',
-             '--spark-arg', '--name', '--spark-arg', 'Dave'])
+             '--extra-spark-arg=-v',
+             '--spark-arg=--name', '--spark-arg', 'Dave'])
         job.sandbox()
 
         with job.make_runner() as runner:

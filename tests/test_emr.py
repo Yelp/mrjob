@@ -4798,7 +4798,7 @@ class SparkScriptStepTestCase(MockBoto3TestCase):
 
         job = MRSparkScript(['-r', 'emr', '--script', self.fake_script,
                              '--script-arg', INPUT,
-                             '--script-arg', '-o',
+                             '--script-arg=-o',
                              '--script-arg', OUTPUT,
                              input1, input2])
         job.sandbox()

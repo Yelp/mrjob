@@ -250,13 +250,13 @@ def _make_arg_parser():
 
     arg_parser = ArgumentParser(usage=usage, description=description)
 
-    arg_parser.add_option(
+    arg_parser.add_argument(
         '--min-hours', dest='min_hours', type=float,
         default=DEFAULT_MIN_HOURS,
         help=('Minimum number of hours a job can run before we report it.'
               ' Default: %default'))
 
-    arg_parser.add_option(
+    arg_parser.add_argument(
         '-x', '--exclude', action='append',
         help=('Exclude clusters that match the specified tags.'
               ' Specifed in the form TAG_KEY,TAG_VALUE.')

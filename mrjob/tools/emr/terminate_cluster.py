@@ -79,6 +79,10 @@ def _make_arg_parser():
         action='store_true',
         help="Don't actually delete any files; just log that we would")
 
+    arg_parser.add_argument(
+        dest='cluster_id',
+        help='ID of cluster to terminate')
+
     _add_basic_args(arg_parser)
     _add_runner_args(
         arg_parser,

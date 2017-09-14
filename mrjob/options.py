@@ -132,11 +132,11 @@ class _CleanupAction(Action):
             else:
                 parser.error(
                     '%s got %s, which is not one of: %s' %
-                    (opt_str, choice, ', '.join(CLEANUP_CHOICES)))
+                    (option_string, choice, ', '.join(CLEANUP_CHOICES)))
 
         if 'NONE' in result and len(set(result)) > 1:
             parser.error(
-                '%s: Cannot clean up both nothing and something!' % opt_str)
+                '%s: Cannot clean up both nothing and something!' % option_string)
 
         setattr(namespace, self.dest, result)
 
@@ -155,15 +155,15 @@ class _SubnetsAction(Action):
 class _AppendJSONAction(Action):
     """action to parse JSON and append it to a list."""
     def __call__(self, parser, namespace, value, option_string=None):
-        _default_to(namespace, option.dest, [])
+        _default_to(namespace, self.dest, [])
 
         try:
             j = json.loads(value)
         except ValueError as e:
             parser.error('Malformed JSON passed to %s: %s' % (
-                opt_str, str(e)))
+                option_string, str(e)))
 
-        getattr(namespace, option.dest).append(j)
+        getattr(namespace, self.dest).append(j)
 
 
 class _JSONAction(Action):
@@ -174,9 +174,9 @@ class _JSONAction(Action):
             j = json.loads(value)
         except ValueError as e:
             parser.error('Malformed JSON passed to %s: %s' % (
-                opt_str, str(e)))
+                option_string, str(e)))
 
-        setattr(namespace, option.dest, j)
+        setattr(namespace, self.dest, j)
 
 
 class _PortRangeAction(Action):
@@ -189,7 +189,7 @@ class _PortRangeAction(Action):
             parser.error('%s: invalid port range list %r: \n%s' %
                          (option_string, value, e.args[0]))
 
-        setattr(namespace, option.dest, ports)
+        setattr(namespace, self.dest, ports)
 
 
 ### mux opts ###

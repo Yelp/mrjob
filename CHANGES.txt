@@ -37,9 +37,8 @@ v0.6.0, 2017-09-?? -- ???
      * add_passthrough_option() -> add_passthru_arg()
      * configure_options() -> configure_args()
      * load_options() -> load_args()
-     * options -> parsed_args
-     * args -> parsed_args.args
      * pass_through_option -> pass_arg_through()
+     * args -> options.args
    * removed generate_passthough_arguments()
    * removed generate_file_upload_args()
    * duplicate file upload args are passed through to job

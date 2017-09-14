@@ -426,20 +426,20 @@ class MRJob(MRJobLauncher):
     def execute(self):
         # MRJob does Hadoop Streaming stuff, or defers to Launcher (superclass)
         # if not otherwise instructed
-        if self.parsed_args.show_steps:
+        if self.options.show_steps:
             self.show_steps()
 
-        elif self.parsed_args.run_mapper:
-            self.run_mapper(self.parsed_args.step_num)
+        elif self.options.run_mapper:
+            self.run_mapper(self.options.step_num)
 
-        elif self.parsed_args.run_combiner:
-            self.run_combiner(self.parsed_args.step_num)
+        elif self.options.run_combiner:
+            self.run_combiner(self.options.step_num)
 
-        elif self.parsed_args.run_reducer:
-            self.run_reducer(self.parsed_args.step_num)
+        elif self.options.run_reducer:
+            self.run_reducer(self.options.step_num)
 
-        elif self.parsed_args.run_spark:
-            self.run_spark(self.parsed_args.step_num)
+        elif self.options.run_spark:
+            self.run_spark(self.options.step_num)
 
         else:
             super(MRJob, self).execute()
@@ -464,7 +464,7 @@ class MRJob(MRJobLauncher):
     def _runner_class(self):
         """Runner class as indicated by ``--runner``. Defaults to ``'inline'``.
         """
-        if not self.parsed_args.runner or self.parsed_args.runner == 'inline':
+        if not self.options.runner or self.options.runner == 'inline':
             from mrjob.inline import InlineMRJobRunner
             return InlineMRJobRunner
 
@@ -618,9 +618,9 @@ class MRJob(MRJobLauncher):
         """
         step = self._get_step(step_num, SparkStep)
 
-        if len(self.parsed_args.args) != 2:
+        if len(self.options.args) != 2:
             raise ValueError('Wrong number of args')
-        input_path, output_path = self.parsed_args.args
+        input_path, output_path = self.options.args
 
         spark_method = step.spark
         spark_method(input_path, output_path)
@@ -669,7 +669,7 @@ class MRJob(MRJobLauncher):
         - If path is ``-``, read from STDIN.
         - Recursively read all files in a directory
         """
-        paths = self.parsed_args.args or ['-']
+        paths = self.options.args or ['-']
         for path in paths:
             for line in read_input(path, stdin=self.stdin):
                 yield line
@@ -828,17 +828,17 @@ class MRJob(MRJobLauncher):
         This is mostly useful inside :py:meth:`load_args`, to disable
         loading args when we aren't running inside Hadoop.
         """
-        return (self.parsed_args.run_mapper or
-                self.parsed_args.run_combiner or
-                self.parsed_args.run_reducer or
-                self.parsed_args.run_spark)
+        return (self.options.run_mapper or
+                self.options.run_combiner or
+                self.options.run_reducer or
+                self.options.run_spark)
 
-    def _print_help(self, parsed_args):
+    def _print_help(self, options):
         """Implement --help --steps"""
-        if parsed_args.show_steps:
+        if options.show_steps:
             _print_help_for_steps()
         else:
-            super(MRJob, self)._print_help(parsed_args)
+            super(MRJob, self)._print_help(options)
 
     ### protocols ###
 
@@ -1021,7 +1021,7 @@ class MRJob(MRJobLauncher):
             else:
                 paths_from_libjars.append(os.path.join(script_dir, path))
 
-        return combine_lists(paths_from_libjars, self.parsed_args.libjars)
+        return combine_lists(paths_from_libjars, self.options.libjars)
 
     ### Partitioning ###
 
@@ -1093,7 +1093,7 @@ class MRJob(MRJobLauncher):
         """
 
         # deal with various forms of bad behavior by users
-        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.parsed_args.jobconf)
+        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.options.jobconf)
         filtered_jobconf = {}
 
         def format_hadoop_version(v_float):

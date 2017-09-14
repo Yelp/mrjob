@@ -230,8 +230,8 @@ class MRJobLauncher(object):
         # to log to it in Python 3
         log_stream = codecs.getwriter('utf_8')(self.stderr)
 
-        self.set_up_logging(quiet=self.parsed_args.quiet,
-                            verbose=self.parsed_args.verbose,
+        self.set_up_logging(quiet=self.options.quiet,
+                            verbose=self.options.verbose,
                             stream=log_stream)
 
         with self.make_runner() as runner:
@@ -243,7 +243,7 @@ class MRJobLauncher(object):
                 log.error(str(e))
                 sys.exit(1)
 
-            if not self.parsed_args.no_output:
+            if not self.options.no_output:
                 for chunk in runner.cat_output():
                     self.stdout.write(chunk)
                 self.stdout.flush()
@@ -288,7 +288,7 @@ class MRJobLauncher(object):
         _add_runner_args(self.arg_parser)
 
     def load_args(self, args):
-        """Load command-line options into ``self.parsed_args`` and
+        """Load command-line options into ``self.options`` and
         ``self._script_path``.
 
         Called from :py:meth:`__init__()` after :py:meth:`configure_args`.
@@ -302,18 +302,18 @@ class MRJobLauncher(object):
             def load_args(self, args):
                 super(MRYourJob, self).load_args(args)
 
-                self.stop_words = self.parsed_args.stop_words.split(',')
+                self.stop_words = self.options.stop_words.split(',')
                 ...
         """
-        self.parsed_args = self.arg_parser.parse_args(args)
+        self.options = self.arg_parser.parse_args(args)
 
-        if self.parsed_args.help:
-            self._print_help(self.parsed_args)
+        if self.options.help:
+            self._print_help(self.options)
             sys.exit(0)
 
         if self._FIRST_ARG_IS_SCRIPT_PATH:
             # should always be set, just hedging
-            self._script_path = self.parsed_args.script_path
+            self._script_path = self.options.script_path
 
     def add_file_arg(self, *args, **kwargs):
         """Add a command-line option that sends an external file
@@ -394,17 +394,9 @@ class MRJobLauncher(object):
     def args(self):
         class_name = self.__class__.__name__
         log.warning(
-            '%s.args is a deprecated alias for %s.parsed_args.args, and will'
+            '%s.args is a deprecated alias for %s.options.args, and will'
             ' be removed in v0.7.0' % (class_name, class_name))
-        return self.parsed_args
-
-    @property
-    def options(self):
-        class_name = self.__class__.__name__
-        log.warning(
-            '%s.options is a deprecated alias for %s.parsed_args, and will'
-            ' be removed in v0.7.0' % (class_name, class_name))
-        return self.parsed_args
+        return self.options
 
     def configure_options(self):
         """.. deprecated:: 0.6.0
@@ -465,19 +457,19 @@ class MRJobLauncher(object):
 
         Defaults to ``'local'`` and disallows use of inline runner.
         """
-        if self.parsed_args.runner == 'dataproc':
+        if self.options.runner == 'dataproc':
             from mrjob.dataproc import DataprocJobRunner
             return DataprocJobRunner
 
-        elif self.parsed_args.runner == 'emr':
+        elif self.options.runner == 'emr':
             from mrjob.emr import EMRJobRunner
             return EMRJobRunner
 
-        elif self.parsed_args.runner == 'hadoop':
+        elif self.options.runner == 'hadoop':
             from mrjob.hadoop import HadoopJobRunner
             return HadoopJobRunner
 
-        elif self.parsed_args.runner == 'inline':
+        elif self.options.runner == 'inline':
             raise ValueError("inline is not supported in the multi-lingual"
                              " launcher.")
 
@@ -527,23 +519,23 @@ class MRJobLauncher(object):
                 file_upload_args.append((option_string, args[0]))
 
         return dict(
-            conf_paths=self.parsed_args.conf_paths,
+            conf_paths=self.options.conf_paths,
             extra_args=extra_args,
             file_upload_args=file_upload_args,
             hadoop_input_format=self.hadoop_input_format(),
             hadoop_output_format=self.hadoop_output_format(),
-            input_paths=self.parsed_args.args,
+            input_paths=self.options.args,
             mr_job_script=self._script_path,
-            output_dir=self.parsed_args.output_dir,
+            output_dir=self.options.output_dir,
             partitioner=self.partitioner(),
             stdin=self.stdin,
-            step_output_dir=self.parsed_args.step_output_dir,
+            step_output_dir=self.options.step_output_dir,
         )
 
     def _kwargs_from_switches(self, keys):
         return dict(
-            (key, getattr(self.parsed_args, key))
-            for key in keys if hasattr(self.parsed_args, key)
+            (key, getattr(self.options, key))
+            for key in keys if hasattr(self.options, key)
         )
 
     def _job_kwargs(self):

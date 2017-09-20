@@ -540,19 +540,13 @@ _RUNNER_OPTS = dict(
     ),
     emr_api_params=dict(
         cloud_role='launch',
-        combiner=combine_dicts,
+        deprecated=True,
         switches=[
             (['--emr-api-param'], dict(
-                action=_KeyValueAction,
-                help=('Additional parameter to pass directly to the EMR'
-                      ' API when creating a cluster. Should take the form'
-                      ' KEY=VALUE. You can use --emr-api-param multiple'
-                      ' times'),
+                help=('deprecated. Use --extra-cluster-param instead'),
             )),
             (['--no-emr-api-param'], dict(
-                action=_KeyNoneValueAction,
-                help=('Parameter to be unset when calling EMR API.'
-                      ' You can use --no-emr-api-param multiple times.'),
+                help=('deprecated. Use --extra-cluster-param instead'),
             )),
         ],
     ),

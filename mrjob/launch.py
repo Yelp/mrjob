@@ -42,11 +42,6 @@ log = logging.getLogger(__name__)
 # sentinel value; used when running MRJob as a script
 _READ_ARGS_FROM_SYS_ARGV = '_READ_ARGS_FROM_SYS_ARGV'
 
-# options only used to modify other options; don't pass to runners
-_FAKE_OPTIONS = set([
-    'no_emr_api_params',
-])
-
 
 def _im_func(f):
     """Wrapper to get at the underlying function belonging to a method.

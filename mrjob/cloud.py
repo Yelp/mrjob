@@ -48,6 +48,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'cloud_tmp_dir',
         'cluster_id',
         'core_instance_type',
+        'extra_cluster_params',
         'image_version',
         'instance_type',
         'master_instance_type',

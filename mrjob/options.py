@@ -599,7 +599,8 @@ _RUNNER_OPTS = dict(
             (['--extra-cluster-param'], dict(
                 action=_KeyJSONValueAction,
                 help=('extra parameter to pass to cloud API when creating'
-                      ' a cluster. Takes the form <param>=<value>, where value'
+                      ' a cluster, to access features not currently supported'
+                      ' by mrjob. Takes the form <param>=<value>, where value'
                       ' is JSON or a string. Use <param>=null to unset a'
                       ' parameter'),
             )),

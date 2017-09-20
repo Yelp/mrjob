@@ -321,6 +321,11 @@ class MockEMRClient(object):
             running_ami_version, AMI_HADOOP_VERSION_UPDATES)
 
         if version_gte(running_ami_version, '4'):
+            if kwargs.get('SupportedProducts'):
+                raise _error(
+                    'Cannot specify supported products when release label is'
+                    ' used. Specify applications instead.')
+
             application_names = set(
                 a['Name'] for a in kwargs.pop('Applications', []))
 
@@ -348,6 +353,10 @@ class MockEMRClient(object):
              # 'hadoop' is lowercase if AmiVersion specified
              cluster['Applications'].append(
                  dict(Name='hadoop', Version=hadoop_version))
+
+             if kwargs.get('SupportedProducts'):
+                 for product in kwargs.pop('SupportedProducts'):
+                     cluster['Applications'].append(dict(Name=product))
 
         # Configurations
         if 'Configurations' in kwargs:

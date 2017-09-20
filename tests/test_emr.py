@@ -600,6 +600,16 @@ class IAMTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['ServiceRole'], 'EMR_DefaultRole')
 
 
+class ExtraClusterParamsTestCase(MockBoto3TestCase):
+
+    def test_set_param(self):
+        cluster = self.run_and_get_cluster(
+            '--image-version', '3.7.0',
+            '--extra-cluster-param', 'SupportedProducts=["mapr-m3"]')
+
+        self.assertIn('mapr-m3', [a['Name'] for a in cluster['Applications']])
+
+
 @unittest.skip('reworking emr_api_params for boto3, see #1574')
 class EMRAPIParamsTestCase(MockBoto3TestCase):
 

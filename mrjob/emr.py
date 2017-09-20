@@ -391,7 +391,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.warning('1.x AMIs will probably not work because they use'
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
 
-        if self._opts['emr_api_params']:
+        if self._opts['emr_api_params'] is not None:
             log.warning('emr_api_params is deprecated and does nothing.'
                         ' Please use extra_cluster_params instead')
 
@@ -2869,7 +2869,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cache['image_version'] = release_label.lstrip('emr-')
 
         cache['app_versions'] = dict(
-            (a['Name'].lower(), a['Version'])
+            (a['Name'].lower(), a.get('Version'))
             for a in cluster['Applications'])
 
         if cluster['Status']['State'] in ('RUNNING', 'WAITING'):

@@ -595,6 +595,7 @@ _RUNNER_OPTS = dict(
     ),
     extra_cluster_params=dict(
         cloud_role='launch',
+        combiner=combine_dicts,
         switches=[
             (['--extra-cluster-param'], dict(
                 action=_KeyJSONValueAction,

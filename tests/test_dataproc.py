@@ -382,6 +382,21 @@ class ZoneTestCase(MockGoogleAPITestCase):
                           cluster['config']['workerConfig']['machineTypeUri'])
 
 
+class ExtraClusterParamsTestCase(MockGoogleAPITestCase):
+
+    # just a basic test to make extra_cluster_params is respected.
+    # more extensive tests are found in tests.test_emr
+
+    def test_set_labels(self):
+        args = ['--extra-cluster-param', 'labels={"name": "wrench"}']
+
+        with self.make_runner(*args) as runner:
+            runner.run()
+
+            cluster = runner._api_cluster_get(runner._cluster_id)
+            self.assertEqual(cluster['labels']['name'], 'wrench')
+
+
 class RegionTestCase(MockGoogleAPITestCase):
 
     def test_default(self):

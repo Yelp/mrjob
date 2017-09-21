@@ -449,16 +449,11 @@ class VisibleToAllUsersTestCase(MockBoto3TestCase):
         cluster = self.run_and_get_cluster('--no-visible-to-all-users')
         self.assertEqual(cluster['VisibleToAllUsers'], False)
 
-    def test_force_to_bool(self):
-        # make sure mock_boto3 doesn't always convert to bool
-        self.assertRaises(ParamValidationError,
-                          self.run_and_get_cluster,
-                          '--emr-api-param', 'VisibleToAllUsers=1')
-
     def test_visible(self):
         cluster = self.run_and_get_cluster('--visible-to-all-users')
         self.assertEqual(cluster['VisibleToAllUsers'], True)
 
+    def test_force_to_bool(self):
         VISIBLE_MRJOB_CONF = {'runners': {'emr': {
             'check_cluster_every': 0.00,
             'cloud_fs_sync_secs': 0.00,
@@ -466,8 +461,14 @@ class VisibleToAllUsersTestCase(MockBoto3TestCase):
         }}}
 
         with mrjob_conf_patcher(VISIBLE_MRJOB_CONF):
-            visible_cluster = self.run_and_get_cluster()
-            self.assertEqual(visible_cluster['VisibleToAllUsers'], True)
+            cluster = self.run_and_get_cluster()
+            self.assertEqual(cluster['VisibleToAllUsers'], True)
+
+    def test_mock_boto3_does_not_force_to_bool(self):
+        # make sure that mrjob is converting to bool, not mock_boto3
+        self.assertRaises(ParamValidationError,
+                          self.run_and_get_cluster,
+                          '--extra-cluster-param', 'VisibleToAllUsers=1')
 
 
 class SubnetTestCase(MockBoto3TestCase):
@@ -600,115 +601,67 @@ class IAMTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['ServiceRole'], 'EMR_DefaultRole')
 
 
-@unittest.skip('reworking emr_api_params for boto3, see #1574')
-class EMRAPIParamsTestCase(MockBoto3TestCase):
+class ExtraClusterParamsTestCase(MockBoto3TestCase):
+
+    def test_set_unsupported_json_param(self):
+        cluster = self.run_and_get_cluster(
+            '--image-version', '3.7.0',
+            '--extra-cluster-param', 'SupportedProducts=["mapr-m3"]')
+
+        self.assertIn('mapr-m3', [a['Name'] for a in cluster['Applications']])
+
+    def test_set_unsupported_string_param(self):
+        cluster = self.run_and_get_cluster(
+            '--extra-cluster-param', 'AutoScalingRole=HankPym')
+
+        self.assertEqual(cluster['AutoScalingRole'], 'HankPym')
+
+    def test_bad_json_param_is_not_a_string(self):
+        self.assertRaises(ValueError, self.run_and_get_cluster,
+            '--image-version', '3.7.0',
+            '--extra-cluster-param', 'SupportedProducts=[mapr-m3]')
+
+    def test_set_existing_param(self):
+        cluster = self.run_and_get_cluster(
+            '--extra-cluster-param', 'Name=Dave')
+
+        self.assertEqual(cluster['Name'], 'Dave')
+
+    def test_unset_existing_param(self):
+        cluster = self.run_and_get_cluster(
+            '--extra-cluster-param', 'LogUri=null')
+
+        self.assertNotIn('LogUri', cluster)
+
+    def test_set_multiple_params(self):
+        cluster = self.run_and_get_cluster(
+            '--extra-cluster-param', 'AutoScalingRole=HankPym',
+            '--extra-cluster-param', 'Name=Dave')
+
+        self.assertEqual(cluster['AutoScalingRole'], 'HankPym')
+        self.assertEqual(cluster['Name'], 'Dave')
+
+
+class DeprecatedEMRAPIParamsTestCase(MockBoto3TestCase):
+
+    # emr_api_param is completely disabled
+
+    def setUp(self):
+        super(DeprecatedEMRAPIParamsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.emr.log'))
 
     def test_param_set(self):
-        cluster = self.run_and_get_cluster(
-            '--emr-api-param', 'Test.API=a', '--emr-api-param', 'Test.API2=b')
-        self.assertTrue('Test.API' in cluster._api_params)
-        self.assertTrue('Test.API2' in cluster._api_params)
-        self.assertEqual(cluster._api_params['Test.API'], 'a')
-        self.assertEqual(cluster._api_params['Test.API2'], 'b')
+        cluster = self.run_and_get_cluster('--emr-api-param', 'name=Dave')
+
+        self.assertTrue(self.log.warning.called)
+        self.assertNotEqual(cluster['Name'], 'Dave')
 
     def test_param_unset(self):
-        cluster = self.run_and_get_cluster(
-            '--no-emr-api-param', 'Test.API',
-            '--no-emr-api-param', 'Test.API2')
-        self.assertTrue('Test.API' in cluster._api_params)
-        self.assertTrue('Test.API2' in cluster._api_params)
-        self.assertIsNone(cluster._api_params['Test.API'])
-        self.assertIsNone(cluster._api_params['Test.API2'])
+        cluster = self.run_and_get_cluster('--no-emr-api-param', 'log_uri')
 
-    def test_invalid_param(self):
-        self.assertRaises(
-            ValueError, self.run_and_get_cluster,
-            '--emr-api-param', 'Test.API')
-
-    def test_overrides(self):
-        cluster = self.run_and_get_cluster(
-            '--emr-api-param', 'VisibleToAllUsers=false',
-            '--visible-to-all-users')
-        self.assertEqual(cluster.visibletoallusers, 'false')
-
-    def test_no_emr_api_param_command_line_switch(self):
-        job = MRWordCount([
-            '-r', 'emr',
-            '--emr-api-param', 'Instances.Ec2SubnetId=someID',
-            '--no-emr-api-param', 'VisibleToAllUsers'])
-
-        with job.make_runner() as runner:
-            self.assertEqual(runner._opts['emr_api_params'],
-                             {'Instances.Ec2SubnetId': 'someID',
-                              'VisibleToAllUsers': None})
-
-    def test_no_emr_api_params_is_not_a_real_option(self):
-        job = MRWordCount([
-            '-r', 'emr',
-            '--no-emr-api-param', 'VisibleToAllUsers'])
-
-        self.assertNotIn('no_emr_api_params',
-                         sorted(job._runner_kwargs()))
-        self.assertNotIn('no_emr_api_param',
-                         sorted(job._runner_kwargs()))
-
-        with job.make_runner() as runner:
-            self.assertNotIn('no_emr_api_params', sorted(runner._opts))
-            self.assertNotIn('no_emr_api_param', sorted(runner._opts))
-            self.assertEqual(runner._opts['emr_api_params'],
-                             {'VisibleToAllUsers': None})
-
-    def test_command_line_overrides_config(self):
-        # want to make sure a nulled-out param in the config file
-        # can't override a param set on the command line
-
-        API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
-            'check_cluster_every': 0.00,
-            'cloud_fs_sync_secs': 0.00,
-            'emr_api_params': {
-                'Instances.Ec2SubnetId': 'someID',
-                'VisibleToAllUsers': None,
-                'Name': 'eaten_by_a_whale',
-            },
-        }}}
-
-        job = MRWordCount([
-            '-r', 'emr',
-            '--no-emr-api-param', 'Instances.Ec2SubnetId',
-            '--emr-api-param', 'VisibleToAllUsers=true'])
-
-        with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
-            with job.make_runner() as runner:
-                self.assertEqual(runner._opts['emr_api_params'],
-                                 {'Instances.Ec2SubnetId': None,
-                                  'VisibleToAllUsers': 'true',
-                                  'Name': 'eaten_by_a_whale'})
-
-    def test_serialization(self):
-        # we can now serialize data structures from mrjob.conf
-
-        API_PARAMS_MRJOB_CONF = {'runners': {'emr': {
-            'check_cluster_every': 0.00,
-            'cloud_fs_sync_secs': 0.00,
-            'emr_api_params': {
-                'Foo': {'Bar': ['Baz', {'Qux': ['Quux', 'Quuux']}]}
-            },
-        }}}
-
-        job = MRWordCount(['-r', 'emr'])
-        job.sandbox()
-
-        with mrjob_conf_patcher(API_PARAMS_MRJOB_CONF):
-            with job.make_runner() as runner:
-                runner._launch()
-
-                api_params = runner._describe_cluster()._api_params
-                self.assertEqual(
-                    api_params.get('Foo.Bar.member.1'), 'Baz')
-                self.assertEqual(
-                    api_params.get('Foo.Bar.member.2.Qux.member.1'), 'Quux')
-                self.assertEqual(
-                    api_params.get('Foo.Bar.member.2.Qux.member.2'), 'Quuux')
+        self.assertTrue(self.log.warning.called)
+        self.assertIn('LogUri', cluster)
 
 
 class AMIAndHadoopVersionTestCase(MockBoto3TestCase):

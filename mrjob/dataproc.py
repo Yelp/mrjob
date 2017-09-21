@@ -122,7 +122,7 @@ _HADOOP_STREAMING_JAR_URI = (
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
 
-########## BEGIN - Helper fxns for _cluster_create_args ##########
+########## BEGIN - Helper fxns for _cluster_create_kwargs ##########
 def _gcp_zone_uri(project, zone):
     return (
         'https://www.googleapis.com/compute/%(gce_api_version)s/projects/'
@@ -141,7 +141,7 @@ def _gcp_instance_group_config(
         machineTypeUri=machine_uri,
         isPreemptible=is_preemptible
     )
-########## END -  Helper fxns for _cluster_create_args ###########
+########## END -  Helper fxns for _cluster_create_kwargs ###########
 
 
 def _wait_for(msg, sleep_secs):
@@ -645,7 +645,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             log.info(
                 'Creating Dataproc Hadoop cluster - %s' % self._cluster_id)
 
-            cluster_data = self._cluster_create_args()
+            cluster_data = self._cluster_create_kwargs()
 
             self._api_cluster_create(cluster_data)
 
@@ -802,7 +802,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     def get_cluster_id(self):
         return self._cluster_id
 
-    def _cluster_create_args(self):
+    def _cluster_create_kwargs(self):
         gcs_init_script_uris = []
         if self._master_bootstrap_script_path:
             gcs_init_script_uris.append(
@@ -865,9 +865,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             cluster_config['softwareConfig'] = dict(
                 imageVersion=self._opts['image_version'])
 
-        return dict(projectId=self._gcp_project,
+        kwargs = dict(projectId=self._gcp_project,
                     clusterName=self._cluster_id,
                     config=cluster_config)
+
+        return self._add_extra_cluster_params(kwargs)
 
     ### Dataproc-specific Stuff ###
 

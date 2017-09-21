@@ -50,6 +50,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'emr_configurations': None,
                 'emr_endpoint': None,
                 'enable_emr_debugging': None,
+                'extra_cluster_params': None,
                 'iam_endpoint': None,
                 'iam_instance_profile': None,
                 'iam_service_role': None,

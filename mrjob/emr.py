@@ -386,9 +386,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._output_dir = self._cloud_tmp_dir + 'output/'
 
         # check AMI version
+        # TODO: warn about AMIs that only have Python 2.6
         if self._opts['image_version'].startswith('1.'):
             log.warning('1.x AMIs will probably not work because they use'
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
+
+        if self._opts['emr_api_params'] is not None:
+            log.warning('emr_api_params is deprecated and does nothing.'
+                        ' Please use extra_cluster_params instead')
 
         # manage local files that we want to upload to S3. We'll add them
         # to this manager just before we need them.
@@ -1381,10 +1386,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             else:
                 Instances['Ec2SubnetId'] = self._opts['subnet']
 
-        if self._opts['emr_api_params']:
-            kwargs.update(self._opts['emr_api_params'])
-
-        return kwargs
+        return self._add_extra_cluster_params(kwargs)
 
     def _instance_profile(self):
         try:
@@ -2864,7 +2866,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cache['image_version'] = release_label.lstrip('emr-')
 
         cache['app_versions'] = dict(
-            (a['Name'].lower(), a['Version'])
+            (a['Name'].lower(), a.get('Version'))
             for a in cluster['Applications'])
 
         if cluster['Status']['State'] in ('RUNNING', 'WAITING'):

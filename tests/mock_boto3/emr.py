@@ -274,6 +274,11 @@ class MockEMRClient(object):
         _validate_param(kwargs, 'ServiceRole', string_types)
         cluster['ServiceRole'] = kwargs.pop('ServiceRole')
 
+        # AutoScalingRole
+        if 'AutoScalingRole' in kwargs:
+            _validate_param(kwargs, 'AutoScalingRole', string_types)
+            cluster['AutoScalingRole'] = kwargs.pop('AutoScalingRole')
+
         # AmiVersion and ReleaseLabel
         for version_param in ('AmiVersion', 'ReleaseLabel'):
             if version_param in kwargs:
@@ -321,6 +326,11 @@ class MockEMRClient(object):
             running_ami_version, AMI_HADOOP_VERSION_UPDATES)
 
         if version_gte(running_ami_version, '4'):
+            if kwargs.get('SupportedProducts'):
+                raise _error(
+                    'Cannot specify supported products when release label is'
+                    ' used. Specify applications instead.')
+
             application_names = set(
                 a['Name'] for a in kwargs.pop('Applications', []))
 
@@ -348,6 +358,11 @@ class MockEMRClient(object):
              # 'hadoop' is lowercase if AmiVersion specified
              cluster['Applications'].append(
                  dict(Name='hadoop', Version=hadoop_version))
+
+             if kwargs.get('SupportedProducts'):
+                 _validate_param(kwargs, 'SupportedProducts', (list, tuple))
+                 for product in kwargs.pop('SupportedProducts'):
+                     cluster['Applications'].append(dict(Name=product))
 
         # Configurations
         if 'Configurations' in kwargs:

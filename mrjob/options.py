@@ -19,6 +19,7 @@ objects with categorized command line parameters.
 from __future__ import print_function
 
 import json
+import re
 from argparse import Action
 from argparse import ArgumentParser
 from argparse import SUPPRESS
@@ -77,6 +78,9 @@ _OPTPARSE_TYPES = dict(
     string=str,
 )
 
+# use to identify malformed JSON
+_PROBABLY_JSON_RE = re.compile(r'^\s*[\{\[\"].*$')
+
 
 ### custom actions ###
 
@@ -109,7 +113,7 @@ class _KeyNoneValueAction(Action):
     """action to set KEY to None"""
     def __call__(self, parser, namespace, value, option_string=None):
         _default_to(namespace, self.dest, {})
-        getattr(namespace, self.dest)[k] = None
+        getattr(namespace, self.dest)[value] = None
 
 
 class _CleanupAction(Action):
@@ -156,6 +160,29 @@ class _AppendJSONAction(Action):
                 option_string, str(e)))
 
         getattr(namespace, self.dest).append(j)
+
+
+class _KeyJSONValueAction(Action):
+    """action for KEY=<json> pairs. Allows value to be a string, as long
+    as it doesn't start with ``[``, ``{``, or ``"``."""
+    # used for --extra-cluster-param
+
+    def __call__(self, parser, namespace, value, option_string=None):
+        try:
+            k, v = value.split('=', 1)
+        except ValueError:
+            parser.error('%s argument %r is not of the form KEY=VALUE' % (
+                option_string, value))
+
+        try:
+            v = json.loads(v)
+        except ValueError:
+            if _PROBABLY_JSON_RE.match(v):
+                parser.error('%s argument %r is not valid JSON' % (
+                    option_string, value))
+
+        _default_to(namespace, self.dest, {})
+        getattr(namespace, self.dest)[k] = v
 
 
 class _JSONAction(Action):
@@ -513,19 +540,13 @@ _RUNNER_OPTS = dict(
     ),
     emr_api_params=dict(
         cloud_role='launch',
-        combiner=combine_dicts,
+        deprecated=True,
         switches=[
             (['--emr-api-param'], dict(
-                action=_KeyValueAction,
-                help=('Additional parameter to pass directly to the EMR'
-                      ' API when creating a cluster. Should take the form'
-                      ' KEY=VALUE. You can use --emr-api-param multiple'
-                      ' times'),
+                help=('deprecated. Use --extra-cluster-param instead'),
             )),
             (['--no-emr-api-param'], dict(
-                action=_KeyNoneValueAction,
-                help=('Parameter to be unset when calling EMR API.'
-                      ' You can use --no-emr-api-param multiple times.'),
+                help=('deprecated. Use --extra-cluster-param instead'),
             )),
         ],
     ),
@@ -563,6 +584,20 @@ _RUNNER_OPTS = dict(
                 action='store_false',
                 help=('Disable storage of Hadoop logs in SimpleDB (the'
                       ' default)'),
+            )),
+        ],
+    ),
+    extra_cluster_params=dict(
+        cloud_role='launch',
+        combiner=combine_dicts,
+        switches=[
+            (['--extra-cluster-param'], dict(
+                action=_KeyJSONValueAction,
+                help=('extra parameter to pass to cloud API when creating'
+                      ' a cluster, to access features not currently supported'
+                      ' by mrjob. Takes the form <param>=<value>, where value'
+                      ' is JSON or a string. Use <param>=null to unset a'
+                      ' parameter'),
             )),
         ],
     ),

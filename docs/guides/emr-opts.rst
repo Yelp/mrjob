@@ -107,43 +107,57 @@ Cluster creation and configuration
       This used to be called *emr_applications*.
 
 .. mrjob-opt::
-    :config: emr_api_params
-    :switch: --emr-api-param, --no-emr-api-param
+    :config: extra_cluster_params
+    :switch: --extra-cluster-param
     :type: :ref:`dict <data-type-plain-dict>`
     :set: emr
     :default: ``{}``
 
-    Additional raw parameters to pass directly to the EMR API when creating a
+    Additional parameters to pass directly to the EMR API when creating a
     cluster. This allows old versions of `mrjob` to access new API features.
     See `the API documentation for RunJobFlow`_ for the full list of options.
 
     .. _`the API documentation for RunJobFlow`:
         http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_RunJobFlow.html
 
-    Option names and values are strings. On the command line, to set an option
-    use ``--emr-api-param KEY=VALUE``:
+    Option names are strings, and values are data structures. On the command
+    line, ``--extra-cluster-param name=value``:
 
     .. code-block:: sh
 
-        --emr-api-param Instances.Ec2SubnetId=someID
+        --extra-cluster-param SupportedProducts='["mapr-m3"]'
+        --extra-cluster-param AutoScalingRole=HankPym
 
-    and to suppress a value that would normally be passed to the API, use
-    ``--no-emr-api-param``:
+    *value* can be either a JSON or a string (unless it starts with ``{``,
+    ``[``, or ``"``, so that we don't convert malformed JSON to strings).
+    Parameters can be suppressed by setting them to ``null``:
 
     .. code-block:: sh
 
-        --no-emr-api-param VisibleToAllUsers
+        --extra-cluster-param LogUri=null
 
-    In the config file, ``emr_api_params`` is a dict; params can be suppressed
-    by setting them to ``null``:
+    This also works with Google dataproc:
+
+    .. code-block:: sh
+
+       --extra-cluster-param labels='{"name": "wrench"}'
+
+    In the config file, `extra_cluster_param` is a dict:
 
     .. code-block:: yaml
 
         runners:
           emr:
-            emr_api_params:
-              Instances.Ec2SubnetId: someID
-              VisibleToAllUsers: null
+            extra_cluster_params:
+              AutoScalingRole: HankPym
+              LogUri: null  # !clear works too
+              SupportedProducts:
+              - mapr-m3
+
+    .. versionadded:: 0.6.0
+
+       This replaces the old `emr_api_params` option, which only worked
+       with :py:mod:`boto` 2.
 
 .. mrjob-opt::
     :config: emr_configurations

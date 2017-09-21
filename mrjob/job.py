@@ -24,6 +24,7 @@ import os.path
 import sys
 
 # don't use relative imports, to allow this script to be invoked as __main__
+from mrjob.cat import decompress
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
 from mrjob.launch import MRJobLauncher
@@ -39,7 +40,6 @@ from mrjob.step import MRStep
 from mrjob.step import SparkStep
 from mrjob.step import _JOB_STEP_FUNC_PARAMS
 from mrjob.util import expand_path
-from mrjob.util import read_input
 from mrjob.util import to_lines
 
 
@@ -670,9 +670,15 @@ class MRJob(MRJobLauncher):
         - Recursively read all files in a directory
         """
         paths = self.options.args or ['-']
+
         for path in paths:
-            for line in read_input(path, stdin=self.stdin):
-                yield line
+            if path == '-':
+                for line in self.stdin:
+                    yield line
+            else:
+                with open(path, 'rb') as f:
+                    for line in to_lines(decompress(f, path)):
+                        yield line
 
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing

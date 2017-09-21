@@ -26,8 +26,8 @@ from os.path import relpath
 from shutil import copy2
 from shutil import copytree
 
+from mrjob.cat import decompress
 from mrjob.cat import is_compressed
-from mrjob.cat import open_input
 from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_dicts
@@ -399,7 +399,7 @@ class SimMRJobRunner(MRJobRunner):
         results = []
 
         for path in input_paths:
-            with open_input(path) as src:
+            with open(path, 'rb') as src:
                 if is_compressed(path):
                     # if file is compressed, uncompress it into a single split
 
@@ -407,7 +407,8 @@ class SimMRJobRunner(MRJobRunner):
                     size = os.stat(path)[stat.ST_SIZE]
 
                     with next(split_fileobj_gen) as dest:
-                        shutil.copyfileobj(src, dest)
+                        for chunk in decompress(src, path):
+                            dest.write(chunk)
 
                     results.append(dict(
                         file=path,

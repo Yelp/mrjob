@@ -77,14 +77,11 @@ def gunzip_stream(fileobj, bufsize=1024):
 
 
 def decompress(readable, path, bufsize=1024):
-    """Take *readable* which support the ``.read()`` method correponding to
+    """Take a *readable* which supports the ``.read()`` method correponding to
     the given path and returns an iterator that yields chunks of bytes,
     possibly decompressing based on *path*.
 
     if *readable* appears to be a fileobj, pass it through as-is.
-
-    Unlike :py:func:`open_input`, this can deal with things that don't support
-    the full fileobj interface (e.g. :py:mod:`boto3`'s ``StreamingBody``).
     """
     if path.endswith('.gz'):
         return gunzip_stream(readable)
@@ -102,21 +99,6 @@ def decompress(readable, path, bufsize=1024):
 
 def is_compressed(path):
     return path.endswith('.bz2') or path.endswith('.gz')
-
-
-def open_input(path):
-    """Open the given *path* and return a fileobj or, if it's a compressed
-    file, a fileobj-like object."""
-    if path.endswith('.gz'):
-        return gzip.open(path, 'rb')
-    elif path.endswith('.bz2'):
-        if bz2 is None:
-            raise Exception('bz2 module was not successfully imported'
-                            ' (likely not installed).')
-
-        return bz2.BZ2File(path, 'rb')
-    else:
-        return open(path, 'rb')
 
 
 def to_chunks(readable, bufsize=1024):

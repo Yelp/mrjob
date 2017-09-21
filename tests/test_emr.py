@@ -449,16 +449,11 @@ class VisibleToAllUsersTestCase(MockBoto3TestCase):
         cluster = self.run_and_get_cluster('--no-visible-to-all-users')
         self.assertEqual(cluster['VisibleToAllUsers'], False)
 
-    def test_force_to_bool(self):
-        # make sure mock_boto3 doesn't always convert to bool
-        self.assertRaises(ParamValidationError,
-                          self.run_and_get_cluster,
-                          '--emr-api-param', 'VisibleToAllUsers=1')
-
     def test_visible(self):
         cluster = self.run_and_get_cluster('--visible-to-all-users')
         self.assertEqual(cluster['VisibleToAllUsers'], True)
 
+    def test_force_to_bool(self):
         VISIBLE_MRJOB_CONF = {'runners': {'emr': {
             'check_cluster_every': 0.00,
             'cloud_fs_sync_secs': 0.00,
@@ -466,8 +461,14 @@ class VisibleToAllUsersTestCase(MockBoto3TestCase):
         }}}
 
         with mrjob_conf_patcher(VISIBLE_MRJOB_CONF):
-            visible_cluster = self.run_and_get_cluster()
-            self.assertEqual(visible_cluster['VisibleToAllUsers'], True)
+            cluster = self.run_and_get_cluster()
+            self.assertEqual(cluster['VisibleToAllUsers'], True)
+
+    def test_mock_boto3_does_not_force_to_bool(self):
+        # make sure that mrjob is converting to bool, not mock_boto3
+        self.assertRaises(ParamValidationError,
+                          self.run_and_get_cluster,
+                          '--extra-cluster-param', 'VisibleToAllUsers=1')
 
 
 class SubnetTestCase(MockBoto3TestCase):

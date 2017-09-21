@@ -19,6 +19,7 @@ import mimetypes
 from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
 from mrjob.parse import urlparse
+from mrjob.py2 import PY2
 from mrjob.runner import GLOB_RE
 
 try:
@@ -48,15 +49,22 @@ _GCS_API_VERSION = 'v1'
 _BINARY_MIMETYPE = 'application/octet-stream'
 _LS_FIELDS_TO_RETURN = 'nextPageToken,items(name,size,timeCreated,md5Hash)'
 
+if PY2:
+    base64_decode = base64.decodestring
+    base64_encode = base64.encodestring
+else:
+    base64_decode = base64.decodebytes
+    base64_encode = base64.encodebytes
+
 
 def _base64_to_hex(base64_encoded):
-    base64_decoded = base64.decodestring(base64_encoded)
+    base64_decoded = base64_decode(base64_encoded)
     return binascii.hexlify(base64_decoded)
 
 
 def _hex_to_base64(hex_encoded):
     hex_decoded = binascii.unhexlify(hex_encoded)
-    return base64.encodestring(hex_decoded)
+    return base64_encode(hex_decoded)
 
 
 def _path_glob_to_parsed_gcs_uri(path_glob):

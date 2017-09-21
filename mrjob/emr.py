@@ -1386,10 +1386,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             else:
                 Instances['Ec2SubnetId'] = self._opts['subnet']
 
-        kwargs.update(self._opts['extra_cluster_params'])
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
-        return kwargs
+        return self._add_extra_cluster_params(kwargs)
 
     def _instance_profile(self):
         try:

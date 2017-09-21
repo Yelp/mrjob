@@ -630,7 +630,7 @@ class ExtraClusterParamsTestCase(MockBoto3TestCase):
         cluster = self.run_and_get_cluster(
             '--extra-cluster-param', 'LogUri=null')
 
-        self.assertNotIn(cluster, 'LogUri')
+        self.assertNotIn('LogUri', cluster)
 
     def test_set_multiple_params(self):
         cluster = self.run_and_get_cluster(

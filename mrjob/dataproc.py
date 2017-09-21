@@ -869,10 +869,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                     clusterName=self._cluster_id,
                     config=cluster_config)
 
-        kwargs.update(self._opts['extra_cluster_params'])
-        kwargs = {k: v for k, v in kwargs.items() if v is not None}
-
-        return kwargs
+        return self._add_extra_cluster_params(kwargs)
 
     ### Dataproc-specific Stuff ###
 

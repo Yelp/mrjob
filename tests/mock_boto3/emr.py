@@ -274,6 +274,11 @@ class MockEMRClient(object):
         _validate_param(kwargs, 'ServiceRole', string_types)
         cluster['ServiceRole'] = kwargs.pop('ServiceRole')
 
+        # AutoScalingRole
+        if 'AutoScalingRole' in kwargs:
+            _validate_param(kwargs, 'AutoScalingRole', string_types)
+            cluster['AutoScalingRole'] = kwargs.pop('AutoScalingRole')
+
         # AmiVersion and ReleaseLabel
         for version_param in ('AmiVersion', 'ReleaseLabel'):
             if version_param in kwargs:
@@ -355,6 +360,7 @@ class MockEMRClient(object):
                  dict(Name='hadoop', Version=hadoop_version))
 
              if kwargs.get('SupportedProducts'):
+                 _validate_param(kwargs, 'SupportedProducts', (list, tuple))
                  for product in kwargs.pop('SupportedProducts'):
                      cluster['Applications'].append(dict(Name=product))
 

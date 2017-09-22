@@ -179,7 +179,12 @@ def read_file(path, fileobj=None, yields_lines=True, cleanup=None):
                          to objects on cluster filesystems)
     :param cleanup: Optional callback to call with no arguments when EOF is
                     reached or an exception is thrown.
+
+    .. deprecated:: 0.6.0
     """
+    log.warning('read_file() is deprecated and will be removed in v0.7.0.'
+                ' Try mrjob.cat.decompress() and mrjob.util.to_lines()')
+
     # sometimes values declared in the ``try`` block aren't accessible from the
     # ``finally`` block. not sure why.
     f = None
@@ -226,6 +231,13 @@ def read_input(path, stdin=None):
     log.warning('read_input() is deprecated and will be removed in v0.7.0.'
                 ' Try mrjob.cat.decompress() and mrjob.util.to_lines()')
 
+    for line in _read_input(path, stdin=stdin):
+        yield line
+
+
+def _read_input(path, stdin=None):
+    """Helper function for _read_input() (to avoid getting recursive
+    deprecation warnings)"""
     if stdin is None:
         stdin = sys.stdin
 

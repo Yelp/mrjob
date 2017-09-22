@@ -169,7 +169,11 @@ class ParseAndSaveOptionsTestCase(TestCase):
             })
 
 
-class ReadInputTestCase(TestCase):
+class DeprecatedReadInputTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(DeprecatedReadInputTestCase, self).setUp()
+        self.start(patch('mrjob.util.log'))
 
     @classmethod
     def setUpClass(cls):
@@ -432,19 +436,11 @@ class OnlyReadWrapper(object):
         return self.fp.read(*args, **kwargs)
 
 
-class ReadFileTestCase(TestCase):
+class DeprecatedReadFileTestCase(SandboxedTestCase):
 
     def setUp(self):
-        self.make_tmp_dir()
-
-    def tearDown(self):
-        self.rm_tmp_dir()
-
-    def make_tmp_dir(self):
-        self.tmp_dir = tempfile.mkdtemp()
-
-    def rm_tmp_dir(self):
-        shutil.rmtree(self.tmp_dir)
+        super(DeprecatedReadFileTestCase, self).setUp()
+        self.start(patch('mrjob.util.log'))
 
     def test_read_uncompressed_file(self):
         input_path = os.path.join(self.tmp_dir, 'input')

@@ -30,10 +30,10 @@ from unittest import TestCase
 from unittest import skipIf
 
 import mrjob
+from mrjob.cat import decompress
 from mrjob.local import LocalMRJobRunner
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
-from mrjob.util import read_file
 from mrjob.util import to_lines
 
 from tests.mr_cmd_job import MRCmdJob
@@ -239,7 +239,8 @@ class TestsToPort:
         # make sure all the data is preserved
         content = []
         for file_name in file_splits:
-            lines = list(read_file(file_name))
+            with open(file_name, 'rb') as f:
+                lines = list(to_lines(decompress(f, file_name)))
 
             # make sure the input_gz split got its entire contents
             if file_name == input_gz_path:

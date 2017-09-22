@@ -220,7 +220,12 @@ def read_input(path, stdin=None):
 
     You can redefine *stdin* for ease of testing. *stdin* can actually be
     any iterable that yields lines (e.g. a list).
+
+    .. deprecated:: 0.6.0
     """
+    log.warning('read_input() is deprecated and will be removed in v0.7.0.'
+                ' Try mrjob.cat.decompress() and mrjob.util.to_lines()')
+
     if stdin is None:
         stdin = sys.stdin
 

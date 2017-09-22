@@ -169,7 +169,11 @@ class ParseAndSaveOptionsTestCase(TestCase):
             })
 
 
-class ReadInputTestCase(TestCase):
+class DeprecatedReadInputTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(DeprecatedReadInputTestCase, self).setUp()
+        self.start(patch('mrjob.util.log'))
 
     @classmethod
     def setUpClass(cls):

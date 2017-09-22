@@ -211,8 +211,6 @@ class MRJobLauncher(object):
             log_to_stream(name='mrjob', debug=verbose, stream=stream)
             log_to_stream(name='__main__', debug=verbose, stream=stream)
 
-        log_to_null(name='boto3')
-
     def run_job(self):
         """Run the all steps of the job, logging errors (and debugging output
         if :option:`--verbose` is specified) to STDERR and streaming the

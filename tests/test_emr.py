@@ -7328,3 +7328,44 @@ class EMRCredentialsObfuscationTestCase(MockBoto3TestCase):
         self.assertIn("'aws_access_key_id'", printout)
         self.assertIn("'aws_secret_access_key'", printout)
         self.assertIn("'aws_session_token'", printout)
+
+
+class CheckInputPathsTestCase(MockBoto3TestCase):
+
+    def setUp(self):
+        super(CheckInputPathsTestCase, self).setUp()
+
+        # stop at _run()
+        self.start(patch('mrjob.emr.EMRJobRunner._run',
+                         side_effect=StopIteration))
+
+        # this assumes we really ran the job
+        self.cleanup = self.start(patch('mrjob.emr.EMRJobRunner.cleanup'))
+
+    def test_existing_s3_path(self):
+        self.add_mock_s3_data({'walrus': {'data/foo': b'foo\n'}})
+
+        job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo'])
+
+        with job.make_runner() as runner:
+            self.assertRaises(StopIteration, runner.run)
+
+    def test_nonexistent_s3_path(self):
+        job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo'])
+
+        with job.make_runner() as runner:
+            self.assertRaises(IOError, runner.run)
+
+    def test_dont_check_input_path(self):
+        job = MRTwoStepJob(['-r', 'emr', 's3://walrus/data/foo',
+                            '--no-check-input-paths'])
+
+        with job.make_runner() as runner:
+            self.assertRaises(StopIteration, runner.run)
+
+    def test_other_uri(self):
+        job = MRTwoStepJob(['-r', 'emr', 'hdfs:///path/to/input/'])
+
+        # no way to check hdfs://, ignore
+        with job.make_runner() as runner:
+            self.assertRaises(StopIteration, runner.run)

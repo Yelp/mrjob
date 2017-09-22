@@ -380,29 +380,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._launch_cluster()
 
     def _prepare_for_launch(self):
-        self._check_input_exists()
         self._check_output_not_exists()
         self._create_setup_wrapper_script()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_fs()
-
-    def _check_input_exists(self):
-        """Make sure all input exists before continuing with our job.
-        """
-        if not self._opts['check_input_paths']:
-            return
-
-        for path in self._input_paths:
-            if path == '-':
-                continue  # STDIN always exists
-
-            if is_uri(path) and not is_gcs_uri(path):
-                continue  # can't check non-GCS URIs, hope for the best
-
-            if not self.fs.exists(path):
-                raise AssertionError(
-                    'Input path %s does not exist!' % (path,))
 
     def _check_output_not_exists(self):
         """Verify the output path does not already exist. This avoids

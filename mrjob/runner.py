@@ -499,6 +499,7 @@ class MRJobRunner(object):
             raise AssertionError("Job already ran!")
 
         self._create_dir_archives()
+        self._check_input_paths()
         self._run()
         self._ran_job = True
 
@@ -922,6 +923,23 @@ class MRJobRunner(object):
                 self._stdin_path = stdin_path
 
         return [self._stdin_path if p == '-' else p for p in self._input_paths]
+
+    def _check_input_paths(self):
+        """Check that input exists prior to running the job, if the
+        `check_input_paths` option is true."""
+        if not self._opts['check_input_paths']:
+            return
+
+        for path in self._input_paths:
+            if path == '-':
+                    continue  # STDIN always exists
+
+            if not self.fs.can_handle_path(path):
+                continue  # e.g. non-S3 URIs on EMR
+
+            if not self.fs.exists(path):
+                raise IOError(
+                    'Input path %s does not exist!' % (path,))
 
     def _intermediate_output_uri(self, step_num, local=False):
         """A URI for intermediate output for the given step number."""

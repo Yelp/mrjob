@@ -123,7 +123,6 @@ class SimMRJobRunner(MRJobRunner):
         pass
 
     def _run(self):
-        self._check_input_exists()
         if hasattr(self, '_create_setup_wrapper_script'):  # inline doesn't
             self._create_setup_wrapper_script(local=True)
 
@@ -246,16 +245,6 @@ class SimMRJobRunner(MRJobRunner):
             )
         finally:
             self._parse_task_counters('reducer', step_num)
-
-    def _check_input_exists(self):
-        if not self._opts['check_input_paths']:
-            return
-
-        for path in self._input_paths:
-            # '-' (stdin) always exists
-            if path != '-' and not self.fs.exists(path):
-                raise AssertionError(
-                    'Input path %s does not exist!' % (path,))
 
     def _create_dist_cache_dir(self, step_num):
         """Copy working directory files into a shared directory,

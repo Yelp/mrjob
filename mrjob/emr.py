@@ -717,7 +717,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _prepare_for_launch(self):
         """Set up files needed for the job."""
-        self._check_input_exists()
         self._check_output_not_exists()
         self._create_setup_wrapper_script()
         self._add_bootstrap_files_for_upload()
@@ -741,21 +740,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._kill_ssh_tunnel()
 
         self._launch_emr_job()
-
-    def _check_input_exists(self):
-        """Make sure all input exists before continuing with our job.
-        """
-        if self._opts['check_input_paths']:
-            for path in self._input_paths:
-                if path == '-':
-                    continue  # STDIN always exists
-
-                if is_uri(path) and not is_s3_uri(path):
-                    continue  # can't check non-S3 URIs, hope for the best
-
-                if not self.fs.exists(path):
-                    raise AssertionError(
-                        'Input path %s does not exist!' % (path,))
 
     def _check_output_not_exists(self):
         """Verify the output path does not already exist. This avoids

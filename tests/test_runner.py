@@ -437,7 +437,46 @@ sys.exit(13)
         self.environment_variable_checks(runner, ['TMP'])
 
 
-class CheckInputPathsTestCase(TestCase):
+class CheckInputPathsTestCase(SandboxedTestCase):
+
+    def test_existing_input_paths(self):
+        data = self.makefile('data', contents=b'stuff')
+
+        job = MRWordCount([data])
+        with job.make_runner() as runner:
+            runner.run()
+
+    def test_nonexistent_input_paths(self):
+        missing_data = os.path.join(self.tmp_dir, 'data')
+
+        job = MRWordCount([missing_data])
+        with job.make_runner() as runner:
+            self.assertRaises(IOError, runner.run)
+
+    def test_disable_check_input_paths(self):
+        missing_data = os.path.join(self.tmp_dir, 'data')
+
+        job = MRWordCount(['--no-check-input-paths', missing_data])
+
+        self.start(patch('mrjob.inline.InlineMRJobRunner._run',
+                   side_effect=StopIteration))
+
+        with job.make_runner() as runner:
+            self.assertRaises(StopIteration, runner.run)
+
+    def test_stdin_is_fine(self):
+        job = MRWordCount()
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+    def test_dash_for_stdin(self):
+        job = MRWordCount(['-'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
 
     def test_check_input_paths_enabled_by_default(self):
         job = MRWordCount()
@@ -455,6 +494,7 @@ class CheckInputPathsTestCase(TestCase):
                 {'runners': {'inline': {'check_input_paths': False}}}):
             with job.make_runner() as runner:
                 self.assertFalse(runner._opts['check_input_paths'])
+
 
 
 class ClosedRunnerTestCase(EmptyMrjobConfTestCase):

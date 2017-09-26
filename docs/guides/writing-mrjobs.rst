@@ -668,7 +668,7 @@ Passing through existing options
 
 Occasionally, it'll be useful for mappers, reducers, etc. to be able to see
 the value of other command-line options. For this, use
-:py:meth:`~mrjob.job.MRJob.pass_through_option` with the corresponding
+:py:meth:`~mrjob.job.MRJob.pass_arg_through` with the corresponding
 command-line switch.
 
 For example, you might wish to fetch supporting data for your job from
@@ -680,7 +680,7 @@ locally::
         def configure_args(self):
             super(MRRunnerAwareJob, self).configure_args()
 
-            self.pass_through_option('--runner')
+            self.pass_arg_through('--runner')
 
         def mapper_init(self):
             if self.options.runner == 'emr':

@@ -73,7 +73,7 @@ class MRCustomJobLauncher(MRJobLauncher):
             '--extra-special-arg', '-S', action='append',
             dest='extra_special_args', default=[])
 
-        self.pass_through_option('--runner')
+        self.pass_arg_through('--runner')
 
         self.add_file_arg('--foo-config', dest='foo_config', default=None)
         self.add_file_arg('--accordian-file', dest='accordian_files',

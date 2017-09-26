@@ -314,7 +314,7 @@ class MRJobLauncher(object):
 
              def configure_args(self):
                 super(MRYourJob, self).configure_args()
-                self.add_file_option('--scoring-db', help=...)
+                self.add_file_arg('--scoring-db', help=...)
 
         This does the right thing: the file will be uploaded to the working
         dir of the script on Hadoop, and the script will be passed the same

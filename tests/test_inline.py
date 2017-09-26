@@ -140,7 +140,7 @@ class MRCustomFileOptionJob(MRJob):
 
     def configure_args(self):
         super(MRCustomFileOptionJob, self).configure_args()
-        self.add_file_option('--platform_file')
+        self.add_file_arg('--platform_file')
 
     def mapper_init(self):
         with open(self.options.platform_file) as f:

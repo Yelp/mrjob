@@ -75,9 +75,9 @@ class MRCustomJobLauncher(MRJobLauncher):
 
         self.pass_through_option('--runner')
 
-        self.add_file_option('--foo-config', dest='foo_config', default=None)
-        self.add_file_option('--accordian-file', dest='accordian_files',
-                             action='append', default=[])
+        self.add_file_arg('--foo-config', dest='foo_config', default=None)
+        self.add_file_arg('--accordian-file', dest='accordian_files',
+                          action='append', default=[])
 
 
 ### Test cases ###

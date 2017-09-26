@@ -620,7 +620,7 @@ several contexts: once for the initial invocation, and once for each task. If
 you just add an option to your job's option parser, that option's value won't
 be propagated to other runs of your script. Instead, you can use mrjob's option
 API: :py:meth:`~mrjob.job.MRJob.add_passthrough_option` and
-:py:meth:`~mrjob.job.MRJob.add_file_option`.
+:py:meth:`~mrjob.job.MRJob.add_file_arg`.
 
 .. _passthrough-opts:
 
@@ -714,7 +714,7 @@ you could do this::
 
         def configure_args(self):
             super(SqliteJob, self).configure_args()
-            self.add_file_option('--database')
+            self.add_file_arg('--database')
 
         def mapper_init(self):
             # make sqlite3 database available to mapper

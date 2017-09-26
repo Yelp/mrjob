@@ -22,11 +22,11 @@ class MRNullSpark(MRJob):
     def configure_args(self):
         super(MRNullSpark, self).configure_args()
 
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--extra-spark-arg', dest='extra_spark_args',
             action='append', default=[])
 
-        self.add_file_option(
+        self.add_file_arg(
             '--extra-file', dest='extra_file')
 
     def spark(self):

@@ -98,12 +98,12 @@ class MRJobLauncher(object):
                                          add_help=False)
         self.configure_args()
 
-        if (_im_func(self.configure_args) !=
-                _im_func(MRJobLauncher.configure_args)):
-            log.warning('configure_args() is deprecated and will be'
+        if (_im_func(self.configure_options) !=
+                _im_func(MRJobLauncher.configure_options)):
+            log.warning('configure_options() is deprecated and will be'
                          ' removed in v0.7.0; please use configure_args()'
                          ' instead.')
-            self.configure_args()
+            self.configure_options()
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script
@@ -123,12 +123,12 @@ class MRJobLauncher(object):
 
         self.load_args(self._cl_args)
 
-        if (_im_func(self.load_args) !=
-                _im_func(MRJobLauncher.load_args)):
-            log.warning('load_args() is deprecated and will be'
+        if (_im_func(self.load_options) !=
+                _im_func(MRJobLauncher.load_options)):
+            log.warning('load_options() is deprecated and will be'
                          ' removed in v0.7.0; please use load_args()'
                          ' instead.')
-            self.load_args(self._cl_args)
+            self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
@@ -391,14 +391,14 @@ class MRJobLauncher(object):
             ' be removed in v0.7.0' % (class_name, class_name))
         return self.options
 
-    def configure_args(self):
+    def configure_options(self):
         """.. deprecated:: 0.6.0
 
         Use `:py:meth:`configure_args` instead.
         """
         pass  # deprecation warning is in __init__()
 
-    def load_args(self, args):
+    def load_options(self, args):
         """.. deprecated:: 0.6.0
 
         Use `:py:meth:`load_args` instead.

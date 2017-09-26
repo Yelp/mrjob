@@ -123,12 +123,12 @@ class MRJobLauncher(object):
 
         self.load_args(self._cl_args)
 
-        if (_im_func(self.load_options) !=
-                _im_func(MRJobLauncher.load_options)):
-            log.warning('load_options() is deprecated and will be'
+        if (_im_func(self.load_args) !=
+                _im_func(MRJobLauncher.load_args)):
+            log.warning('load_args() is deprecated and will be'
                          ' removed in v0.7.0; please use load_args()'
                          ' instead.')
-            self.load_options(self._cl_args)
+            self.load_args(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing
         # See sandbox(), below.
@@ -398,7 +398,7 @@ class MRJobLauncher(object):
         """
         pass  # deprecation warning is in __init__()
 
-    def load_options(self, args):
+    def load_args(self, args):
         """.. deprecated:: 0.6.0
 
         Use `:py:meth:`load_args` instead.

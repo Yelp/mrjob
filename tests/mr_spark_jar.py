@@ -20,8 +20,8 @@ from mrjob.step import SparkJarStep
 
 class MRSparkJar(MRJob):
 
-    def configure_options(self):
-        super(MRSparkJar, self).configure_options()
+    def configure_args(self):
+        super(MRSparkJar, self).configure_args()
 
         self.add_passthrough_option(
             '--jar', dest='jar')

@@ -25,8 +25,8 @@ class MRCmdJob(MRJob):
 
     OUTPUT_PROTOCOL = RawValueProtocol
 
-    def configure_options(self):
-        super(MRCmdJob, self).configure_options()
+    def configure_args(self):
+        super(MRCmdJob, self).configure_args()
         self.add_passthrough_option('--mapper-cmd', default=None)
         self.add_passthrough_option('--combiner-cmd', default=None)
         self.add_passthrough_option('--reducer-cmd', default=None)

@@ -18,8 +18,8 @@ from mrjob.util import cmd_line
 
 class MRGrepJob(MRJob):
 
-    def configure_options(self):
-        super(MRGrepJob, self).configure_options()
+    def configure_args(self):
+        super(MRGrepJob, self).configure_args()
 
         self.add_passthrough_option(
             '-e', '--expression', type='str', default=None,

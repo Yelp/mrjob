@@ -129,8 +129,8 @@ def process_postfix_log_dict(decoded, bounce_rules):
 
 
 class MRPostfixBounce(MRJob):
-    def configure_options(self):
-        super(MRPostfixBounce, self).configure_options()
+    def configure_args(self):
+        super(MRPostfixBounce, self).configure_args()
         self.add_file_option(
             '--bounce-processing-rules',
             dest='bounce_processing_rules',

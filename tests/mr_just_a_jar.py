@@ -20,8 +20,8 @@ from mrjob.step import JarStep
 
 class MRJustAJar(MRJob):
 
-    def configure_options(self):
-        super(MRJustAJar, self).configure_options()
+    def configure_args(self):
+        super(MRJustAJar, self).configure_args()
 
         self.add_passthrough_option('--jar')
         self.add_passthrough_option('--main-class', default=None)

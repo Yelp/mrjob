@@ -499,8 +499,8 @@ instance. Here's an example that sneaks a peek at :ref:`writing-cl-opts`::
 
     class CommandLineProtocolJob(MRJob):
 
-        def configure_options(self):
-            super(CommandLineProtocolJob, self).configure_options()
+        def configure_args(self):
+            super(CommandLineProtocolJob, self).configure_args()
             self.add_passthrough_option(
                 '--output-format', default='raw', choices=['raw', 'json'],
                 help="Specify the output format of the job")
@@ -634,8 +634,8 @@ command line-switchable protocol example from before uses this feature::
 
     class CommandLineProtocolJob(MRJob):
 
-        def configure_options(self):
-            super(CommandLineProtocolJob, self).configure_options()
+        def configure_args(self):
+            super(CommandLineProtocolJob, self).configure_args()
             self.add_passthrough_option(
                 '--output-format', default='raw', choices=['raw', 'json'],
                 help="Specify the output format of the job")
@@ -677,8 +677,8 @@ locally::
 
     class MRRunnerAwareJob(MRJob):
 
-        def configure_options(self):
-            super(MRRunnerAwareJob, self).configure_options()
+        def configure_args(self):
+            super(MRRunnerAwareJob, self).configure_args()
 
             self.pass_through_option('--runner')
 
@@ -712,8 +712,8 @@ you could do this::
 
     class SqliteJob(MRJob):
 
-        def configure_options(self):
-            super(SqliteJob, self).configure_options()
+        def configure_args(self):
+            super(SqliteJob, self).configure_args()
             self.add_file_option('--database')
 
         def mapper_init(self):

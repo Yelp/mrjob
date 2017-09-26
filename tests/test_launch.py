@@ -51,8 +51,8 @@ def _mock_context_mgr(m, return_value):
 
 class MRCustomJobLauncher(MRJobLauncher):
 
-    def configure_options(self):
-        super(MRCustomJobLauncher, self).configure_options()
+    def configure_args(self):
+        super(MRCustomJobLauncher, self).configure_args()
 
         self.add_passthrough_option(
             '--foo-size', '-F', type='int', dest='foo_size', default=5)

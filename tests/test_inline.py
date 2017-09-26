@@ -118,8 +118,8 @@ class MRIncrementerJob(MRJob):
     INPUT_PROTOCOL = JSONValueProtocol
     OUTPUT_PROTOCOL = JSONValueProtocol
 
-    def configure_options(self):
-        super(MRIncrementerJob, self).configure_options()
+    def configure_args(self):
+        super(MRIncrementerJob, self).configure_args()
 
         self.add_passthrough_option('--times', type='int', default=1)
 
@@ -138,8 +138,8 @@ class MRCustomFileOptionJob(MRJob):
 
     multiplier = 1
 
-    def configure_options(self):
-        super(MRCustomFileOptionJob, self).configure_options()
+    def configure_args(self):
+        super(MRCustomFileOptionJob, self).configure_args()
         self.add_file_option('--platform_file')
 
     def mapper_init(self):

@@ -28,8 +28,8 @@ class MRTowerOfPowers(MRJob):
     INPUT_PROTOCOL = JSONValueProtocol
     OUTPUT_PROTOCOL = JSONValueProtocol
 
-    def configure_options(self):
-        super(MRTowerOfPowers, self).configure_options()
+    def configure_args(self):
+        super(MRTowerOfPowers, self).configure_args()
 
         self.add_file_option('--n-file')
 

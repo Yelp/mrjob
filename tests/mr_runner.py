@@ -17,8 +17,8 @@ from mrjob.job import MRJob
 class MRRunner(MRJob):
     """Print out ``self.option.runner`` in tasks."""
 
-    def configure_options(self):
-        super(MRRunner, self).configure_options()
+    def configure_args(self):
+        super(MRRunner, self).configure_args()
 
         self.pass_through_option('--runner')
 

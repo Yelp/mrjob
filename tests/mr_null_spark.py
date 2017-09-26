@@ -19,8 +19,8 @@ from mrjob.job import MRJob
 
 class MRNullSpark(MRJob):
 
-    def configure_options(self):
-        super(MRNullSpark, self).configure_options()
+    def configure_args(self):
+        super(MRNullSpark, self).configure_args()
 
         self.add_passthrough_option(
             '--extra-spark-arg', dest='extra_spark_args',

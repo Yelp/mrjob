@@ -48,8 +48,8 @@ class MRPageRank(MRJob):
 
     INPUT_PROTOCOL = JSONProtocol  # read the same format we write
 
-    def configure_options(self):
-        super(MRPageRank, self).configure_options()
+    def configure_args(self):
+        super(MRPageRank, self).configure_args()
 
         self.add_passthrough_option(
             '--iterations', dest='iterations', default=10, type='int',

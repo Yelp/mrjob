@@ -98,12 +98,12 @@ class MRJobLauncher(object):
                                          add_help=False)
         self.configure_args()
 
-        if (_im_func(self.configure_options) !=
-                _im_func(MRJobLauncher.configure_options)):
-            log.warning('configure_options() is deprecated and will be'
+        if (_im_func(self.configure_args) !=
+                _im_func(MRJobLauncher.configure_args)):
+            log.warning('configure_args() is deprecated and will be'
                          ' removed in v0.7.0; please use configure_args()'
                          ' instead.')
-            self.configure_options()
+            self.configure_args()
 
         # don't pass None to parse_args unless we're actually running
         # the MRJob script
@@ -312,8 +312,8 @@ class MRJobLauncher(object):
         """Add a command-line option that sends an external file
         (e.g. a SQLite DB) to Hadoop::
 
-             def configure_options(self):
-                super(MRYourJob, self).configure_options()
+             def configure_args(self):
+                super(MRYourJob, self).configure_args()
                 self.add_file_option('--scoring-db', help=...)
 
         This does the right thing: the file will be uploaded to the working
@@ -391,7 +391,7 @@ class MRJobLauncher(object):
             ' be removed in v0.7.0' % (class_name, class_name))
         return self.options
 
-    def configure_options(self):
+    def configure_args(self):
         """.. deprecated:: 0.6.0
 
         Use `:py:meth:`configure_args` instead.

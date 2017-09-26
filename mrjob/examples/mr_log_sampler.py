@@ -40,8 +40,8 @@ class MRLogSampler(MRJob):
     # record doesn't get Unicode-encoded
     INTERNAL_PROTOCOL = ReprProtocol
 
-    def configure_options(self):
-        super(MRLogSampler, self).configure_options()
+    def configure_args(self):
+        super(MRLogSampler, self).configure_args()
         self.add_passthrough_option(
             '--sample-size',
             type=int,

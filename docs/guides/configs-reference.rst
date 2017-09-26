@@ -53,7 +53,7 @@ Option                 Attribute                Method                   Default
 ====================== ======================== ======================== ========
 
 These options can be set by overriding your job's
-:py:meth:`~mrjob.job.MRJob.configure_options` to call the appropriate method:
+:py:meth:`~mrjob.job.MRJob.configure_args` to call the appropriate method:
 
 .. |extra_args| replace:: :py:meth:`extra_args <mrjob.runner.MRJobRunner.__init__>`
 .. |file_upload_args| replace:: :py:meth:`file_upload_args <mrjob.runner.MRJobRunner.__init__>`

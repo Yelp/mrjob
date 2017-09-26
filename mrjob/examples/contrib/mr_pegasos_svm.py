@@ -52,8 +52,8 @@ class MRsvm(MRJob):
         self.numMappers = 1             #number of mappers
         self.t = 1                      #iteration number
 
-    def configure_options(self):
-        super(MRsvm, self).configure_options()
+    def configure_args(self):
+        super(MRsvm, self).configure_args()
         self.add_passthrough_option(
             '--iterations', dest='iterations', default=2, type='int',
             help='T: number of iterations to run')

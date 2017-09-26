@@ -152,9 +152,9 @@ class MRTextClassifier(MRJob):
                 MRStep(reducer=self.score_documents_by_ngram),
                 MRStep(reducer=self.score_documents)]
 
-    def configure_options(self):
+    def configure_args(self):
         """Add command-line options specific to this script."""
-        super(MRTextClassifier, self).configure_options()
+        super(MRTextClassifier, self).configure_args()
 
         self.add_passthrough_option(
             '--min-df', dest='min_df', default=2, type='int',

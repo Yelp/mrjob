@@ -6931,6 +6931,22 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
 
+    def test_instance_fleet_okay(self):
+        instance_fleets = [dict(
+            InstanceFleetType='MASTER',
+            InstanceTypeConfigs=[dict(InstanceType='m1.large')],
+            TargetOnDemandCapacity=1)]
+
+        job = MRNullSpark(
+            ['-r', 'emr', '--instance-fleets', json.dumps(instance_fleets)])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNone(message)
+
     def test_instance_fleet_sole_master_too_small(self):
         instance_fleets = [dict(
             InstanceFleetType='MASTER',
@@ -6948,6 +6964,78 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
             self.assertIsNotNone(message)
             self.assertIn('too small', message)
             self.assertIn('stall', message)
+
+    def test_instance_fleet_core_instances_too_small(self):
+        instance_fleets = [
+            dict(
+                InstanceFleetType='MASTER',
+                InstanceTypeConfigs=[dict(InstanceType='m1.large')],
+                TargetOnDemandCapacity=1,
+            ),
+            dict(
+                InstanceFleetType='CORE',
+                InstanceTypeConfigs=[dict(InstanceType='m1.medium')],
+                TargetOnDemandCapacity=1,
+            ),
+        ]
+
+        job = MRNullSpark(
+            ['-r', 'emr', '--instance-fleets', json.dumps(instance_fleets)])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_instance_fleet_some_instances_too_small(self):
+        instance_fleets = [dict(
+            InstanceFleetType='MASTER',
+            InstanceTypeConfigs=[
+                dict(InstanceType='m1.medium'),
+                dict(InstanceType='m1.large'),
+                dict(InstanceType='c1.xlarge'),
+            ],
+            TargetOnDemandCapacity=1)]
+
+        job = MRNullSpark(
+            ['-r', 'emr', '--instance-fleets', json.dumps(instance_fleets)])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNotNone(message)
+            self.assertIn('too small', message)
+            self.assertIn('stall', message)
+
+    def test_instance_fleet_okay_with_core_instances_and_small_master(self):
+        instance_fleets = [
+            dict(
+                InstanceFleetType='MASTER',
+                InstanceTypeConfigs=[dict(InstanceType='m1.medium')],
+                TargetOnDemandCapacity=1,
+            ),
+            dict(
+                InstanceFleetType='CORE',
+                InstanceTypeConfigs=[dict(InstanceType='m1.large')],
+                TargetOnDemandCapacity=1,
+            ),
+        ]
+
+        job = MRNullSpark(
+            ['-r', 'emr', '--instance-fleets', json.dumps(instance_fleets)])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+
+            message = runner._cluster_spark_support_warning()
+            self.assertIsNone(message)
 
 
 class ImageVersionGteTestCase(MockBoto3TestCase):

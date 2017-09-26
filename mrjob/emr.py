@@ -2818,6 +2818,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """
         return self._get_cluster_info('app_versions')
 
+    def _get_collection_type(self):
+        """Return the collection type of the cluster (either
+        ``'INSTANCE_FLEET'`` or ``'INSTANCE_GROUP'``)."""
+        return self._get_cluster_info('collection_type')
+
     def _get_cluster_info(self, key):
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
@@ -2852,6 +2857,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         cache['app_versions'] = dict(
             (a['Name'].lower(), a.get('Version'))
             for a in cluster['Applications'])
+
+        cache['collection_type'] = cluster.get(
+            'InstanceCollectionType', 'INSTANCE_GROUP')
 
         if cluster['Status']['State'] in ('RUNNING', 'WAITING'):
             cache['master_public_dns'] = cluster['MasterPublicDnsName']
@@ -2902,7 +2910,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.debug('creating IAM client')
 
         raw_iam_client = boto3.client(
-            'iam',
+             'iam',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             aws_session_token=self._opts['aws_session_token'],
@@ -2971,22 +2979,37 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         emr_client = self.make_emr_client()
 
-        # TODO: add support for instance fleets
+        too_small_msg = ('  instance type %s is too small for Spark;'
+                         ' your job may stall forever')
 
-        # make sure instance groups have enough memory to run Spark
-        igs = list(_boto3_paginate(
-            'InstanceGroups', emr_client, 'list_instance_groups',
-            ClusterId=self.get_cluster_id()))
+        if self._get_collection_type() == 'INSTANCE_FLEET':
+            fleets = list(_boto3_paginate(
+                'InstanceFleets', emr_client, 'list_instance_fleets',
+                ClusterId=self.get_cluster_id()))
 
-        for ig in igs:
-            # master doesn't matter if it's not running tasks
-            if ig['InstanceGroupType'] == 'MASTER' and len(igs) > 1:
-                continue
+            for fleet in fleets:
+                # master doesn't matter if it's not running tasks
+                if fleet['InstanceFleetType'] == 'MASTER' and len(fleets) > 1:
+                    continue
 
-            mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig['InstanceType'])
-            if mem and mem < _MIN_SPARK_INSTANCE_MEMORY:
-                return ('  instance type %s is too small for Spark;'
-                        ' your job may stall forever' % ig['InstanceType'])
+                for spec in fleet['InstanceTypeSpecifications']:
+                    mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(spec['InstanceType'])
+                    if mem and mem < _MIN_SPARK_INSTANCE_MEMORY:
+                        return (too_small_msg % spec['InstanceType'])
+        else:
+            # instance groups
+            igs = list(_boto3_paginate(
+                'InstanceGroups', emr_client, 'list_instance_groups',
+                ClusterId=self.get_cluster_id()))
+
+            for ig in igs:
+                # master doesn't matter if it's not running tasks
+                if ig['InstanceGroupType'] == 'MASTER' and len(igs) > 1:
+                    continue
+
+                mem = EC2_INSTANCE_TYPE_TO_MEMORY.get(ig['InstanceType'])
+                if mem and mem < _MIN_SPARK_INSTANCE_MEMORY:
+                    return (too_small_msg % ig['InstanceType'])
 
         return None
 

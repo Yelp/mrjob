@@ -24,7 +24,7 @@ class MRJarAndStreaming(MRJob):
     def configure_args(self):
         super(MRJarAndStreaming, self).configure_args()
 
-        self.add_passthrough_option('--jar')
+        self.add_passthru_arg('--jar')
 
     def steps(self):
         return [

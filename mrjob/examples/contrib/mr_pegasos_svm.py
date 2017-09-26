@@ -54,11 +54,11 @@ class MRsvm(MRJob):
 
     def configure_args(self):
         super(MRsvm, self).configure_args()
-        self.add_passthrough_option(
-            '--iterations', dest='iterations', default=2, type='int',
+        self.add_passthrough_arg(
+            '--iterations', dest='iterations', default=2, type=int,
             help='T: number of iterations to run')
-        self.add_passthrough_option(
-            '--batchsize', dest='batchsize', default=100, type='int',
+        self.add_passthrough_arg(
+            '--batchsize', dest='batchsize', default=100, type=int,
             help='k: number of data points in a batch')
 
     def map(self, mapperId, inVals): #needs exactly 2 arguments

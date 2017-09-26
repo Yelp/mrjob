@@ -501,7 +501,7 @@ instance. Here's an example that sneaks a peek at :ref:`writing-cl-opts`::
 
         def configure_args(self):
             super(CommandLineProtocolJob, self).configure_args()
-            self.add_passthrough_option(
+            self.add_passthrough_arg(
                 '--output-format', default='raw', choices=['raw', 'json'],
                 help="Specify the output format of the job")
 
@@ -619,7 +619,7 @@ Recall from :ref:`how-your-program-is-run` that your script is executed in
 several contexts: once for the initial invocation, and once for each task. If
 you just add an option to your job's option parser, that option's value won't
 be propagated to other runs of your script. Instead, you can use mrjob's option
-API: :py:meth:`~mrjob.job.MRJob.add_passthrough_option` and
+API: :py:meth:`~mrjob.job.MRJob.add_passthru_arg` and
 :py:meth:`~mrjob.job.MRJob.add_file_arg`.
 
 .. _passthrough-opts:
@@ -636,7 +636,7 @@ command line-switchable protocol example from before uses this feature::
 
         def configure_args(self):
             super(CommandLineProtocolJob, self).configure_args()
-            self.add_passthrough_option(
+            self.add_passthru_arg(
                 '--output-format', default='raw', choices=['raw', 'json'],
                 help="Specify the output format of the job")
 
@@ -651,7 +651,7 @@ passed ``--output-format`` on the command line. When your script is run in any
 other context, such as on Hadoop, it adds ``--output-format=json`` to its
 command string.
 
-:py:meth:`~mrjob.job.MRJob.add_passthrough_option` takes the same arguments as
+:py:meth:`~mrjob.job.MRJob.add_passthru_arg` takes the same arguments as
 :py:meth:`optparse.OptionParser.add_option`. For more information, see the
 `optparse docs`_.
 

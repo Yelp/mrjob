@@ -27,10 +27,10 @@ class MRCmdJob(MRJob):
 
     def configure_args(self):
         super(MRCmdJob, self).configure_args()
-        self.add_passthrough_option('--mapper-cmd', default=None)
-        self.add_passthrough_option('--combiner-cmd', default=None)
-        self.add_passthrough_option('--reducer-cmd', default=None)
-        self.add_passthrough_option('--reducer-cmd-2', default=None)
+        self.add_passthru_arg('--mapper-cmd', default=None)
+        self.add_passthru_arg('--combiner-cmd', default=None)
+        self.add_passthru_arg('--reducer-cmd', default=None)
+        self.add_passthru_arg('--reducer-cmd-2', default=None)
 
     def steps(self):
         kwargs = {}

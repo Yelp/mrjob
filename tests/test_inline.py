@@ -121,7 +121,7 @@ class MRIncrementerJob(MRJob):
     def configure_args(self):
         super(MRIncrementerJob, self).configure_args()
 
-        self.add_passthrough_option('--times', type='int', default=1)
+        self.add_passthru_arg('--times', type=int, default=1)
 
     def mapper(self, _, value):
         yield None, value + 1

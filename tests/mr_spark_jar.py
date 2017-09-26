@@ -23,14 +23,14 @@ class MRSparkJar(MRJob):
     def configure_args(self):
         super(MRSparkJar, self).configure_args()
 
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--jar', dest='jar')
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--jar-main-class', dest='jar_main_class')
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--jar-arg', dest='jar_args',
             action='append', default=[])
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--jar-spark-arg', dest='jar_spark_args',
             action='append', default=[])
 

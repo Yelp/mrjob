@@ -156,33 +156,33 @@ class MRTextClassifier(MRJob):
         """Add command-line options specific to this script."""
         super(MRTextClassifier, self).configure_args()
 
-        self.add_passthrough_option(
-            '--min-df', dest='min_df', default=2, type='int',
+        self.add_passthrough_arg(
+            '--min-df', dest='min_df', default=2, type=int,
             help=('min number of documents an n-gram must appear in for us to'
                   ' count it. Default: %default'))
-        self.add_passthrough_option(
-            '--max-df', dest='max_df', default=10000000, type='int',
+        self.add_passthrough_arg(
+            '--max-df', dest='max_df', default=10000000, type=int,
             help=('max number of documents an n-gram may appear in for us to'
                   ' count it (this keeps reducers from running out of memory).'
                   ' Default: %default'))
-        self.add_passthrough_option(
+        self.add_passthrough_arg(
             '--max-ngram-size', dest='max_ngram_size',
-            default=DEFAULT_MAX_NGRAM_SIZE, type='int',
+            default=DEFAULT_MAX_NGRAM_SIZE, type=int,
             help='maximum phrase length to consider')
-        self.add_passthrough_option(
+        self.add_passthrough_arg(
             '--stop-words', dest='stop_words',
             default=', '.join(DEFAULT_STOP_WORDS),
             help=("comma-separated list of words to ignore. For example, "
                   "--stop-words 'in, the' would cause 'hole in the wall' to be"
                   " parsed as ['hole', 'wall']. Default: %default"))
-        self.add_passthrough_option(
+        self.add_passthrough_arg(
             '--short-doc-threshold', dest='short_doc_threshold',
-            type='int', default=None,
+            type=int, default=None,
             help=('Normally, for each n-gram size, we take the average score'
                   ' over all n-grams that appear. This allows us to penalize'
                   ' short documents by using this threshold as the denominator'
                   ' rather than the actual number of n-grams.'))
-        self.add_passthrough_option(
+        self.add_passthrough_arg(
             '--no-test-set', dest='no_test_set',
             action='store_true', default=False,
             help=("Choose about half of the documents to be the testing set"

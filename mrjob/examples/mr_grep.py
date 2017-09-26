@@ -21,8 +21,8 @@ class MRGrepJob(MRJob):
     def configure_args(self):
         super(MRGrepJob, self).configure_args()
 
-        self.add_passthrough_option(
-            '-e', '--expression', type='str', default=None,
+        self.add_passthrough_arg(
+            '-e', '--expression',
             help=( 'Expression to search for. Required.'))
 
     def mapper_cmd(self):
@@ -33,4 +33,3 @@ class MRGrepJob(MRJob):
 
 if __name__ == '__main__':
     MRGrepJob().run()
-

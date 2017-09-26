@@ -349,7 +349,7 @@ class MRJobLauncher(object):
             def configure_args(self):
                 super(MRYourJob, self).configure_args()
                 self.add_passthru_arg(
-                    '--max-ngram-size', type='int', default=4, help='...')
+                    '--max-ngram-size', type=int, default=4, help='...')
 
         If you want to pass files through to the mapper/reducer, use
         :py:meth:`add_file_arg` instead.

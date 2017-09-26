@@ -54,22 +54,22 @@ class MRCustomJobLauncher(MRJobLauncher):
     def configure_args(self):
         super(MRCustomJobLauncher, self).configure_args()
 
-        self.add_passthrough_option(
-            '--foo-size', '-F', type='int', dest='foo_size', default=5)
-        self.add_passthrough_option(
-            '--bar-name', '-B', type='string', dest='bar_name', default=None)
-        self.add_passthrough_option(
+        self.add_passthru_arg(
+            '--foo-size', '-F', type=int, dest='foo_size', default=5)
+        self.add_passthru_arg(
+            '--bar-name', '-B', dest='bar_name', default=None)
+        self.add_passthru_arg(
             '--enable-baz-mode', '-M', action='store_true', dest='baz_mode',
             default=False)
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--disable-quuxing', '-Q', action='store_false', dest='quuxing',
             default=True)
-        self.add_passthrough_option(
-            '--pill-type', '-T', type='choice', choices=(['red', 'blue']),
+        self.add_passthru_arg(
+            '--pill-type', '-T', choices=(['red', 'blue']),
             default='blue')
-        self.add_passthrough_option(
-            '--planck-constant', '-C', type='float', default=6.626068e-34)
-        self.add_passthrough_option(
+        self.add_passthru_arg(
+            '--planck-constant', '-C', type=float, default=6.626068e-34)
+        self.add_passthru_arg(
             '--extra-special-arg', '-S', action='append',
             dest='extra_special_args', default=[])
 
@@ -270,10 +270,10 @@ class CommandLineArgsTestCase(TestCase):
     def test_bad_option_types(self):
         mr_job = MRJobLauncher(args=[''])
         self.assertRaises(
-            ValueError, mr_job.add_passthrough_option,
+            ValueError, mr_job.add_passthru_arg,
             '--stop-words', dest='stop_words', type='set', default=None)
         self.assertRaises(
-            ValueError, mr_job.add_passthrough_option,
+            ValueError, mr_job.add_passthru_arg,
             '--leave-a-msg', dest='leave_a_msg', action='callback',
             default=None)
 

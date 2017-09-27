@@ -219,9 +219,6 @@ class MRJobBinRunner(MRJobRunner):
             else:
                 return None
 
-
-    # TODO: this is only used by non-local runners, and could
-    # conceivably be moved to some intermediary class (RealMRJobRunner?)
     def _hadoop_args_for_step(self, step_num):
         """Build a list of extra arguments to the hadoop binary.
 

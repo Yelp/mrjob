@@ -31,6 +31,7 @@ from mrjob.options import _optparse_kwargs_to_argparse
 from mrjob.options import _parse_raw_args
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
+from mrjob.setup import parse_legacy_hash_path
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
 from mrjob.util import log_to_stream
@@ -495,10 +496,12 @@ class MRJobLauncher(object):
         raw_args = _parse_raw_args(self.arg_parser, self._cl_args)
 
         extra_args = []
-        file_upload_args = []
 
         for dest, option_string, args in raw_args:
-            if dest in self._passthru_arg_dests:
+            if dest in self._file_arg_dests:
+                extra_args.append(option_string)
+                extra_args.append(parse_legacy_hash_path('file', args[0]))
+            elif dest in self._passthru_arg_dests:
                 # special case for --hadoop-arg=-verbose etc.
                 if (option_string and len(args) == 1 and
                         args[0].startswith('-')):
@@ -508,13 +511,9 @@ class MRJobLauncher(object):
                         extra_args.append(option_string)
                     extra_args.extend(args)
 
-            elif dest in self._file_arg_dests:
-                file_upload_args.append((option_string, args[0]))
-
         return dict(
             conf_paths=self.options.conf_paths,
             extra_args=extra_args,
-            file_upload_args=file_upload_args,
             hadoop_input_format=self.hadoop_input_format(),
             hadoop_output_format=self.hadoop_output_format(),
             input_paths=self.options.args,

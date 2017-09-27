@@ -347,7 +347,7 @@ def _make_arg_parser():
 
     arg_parser.add_argument(
         '--max-hours-idle', dest='max_hours_idle',
-        default=None, type='float',
+        default=None, type=float,
         help=('Max number of hours a cluster can go without bootstrapping,'
               ' running a step, or having a new step created. This will fire'
               ' even if there are pending steps which EMR has failed to'
@@ -355,11 +355,11 @@ def _make_arg_parser():
               ' your jobs can take to start instances and bootstrap.'))
     arg_parser.add_argument(
         '--max-mins-locked', dest='max_mins_locked',
-        default=_DEFAULT_MAX_MINUTES_LOCKED, type='float',
+        default=_DEFAULT_MAX_MINUTES_LOCKED, type=float,
         help='Max number of minutes a cluster can be locked while idle.')
     arg_parser.add_argument(
         '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
-        default=None, type='float',
+        default=None, type=float,
         help=('Terminate clusters that are within this many minutes of'
               ' the end of a full hour since the job started running'
               ' AND have no pending steps.'))

@@ -20,15 +20,15 @@ from mrjob.step import SparkScriptStep
 
 class MRSparkScript(MRJob):
 
-    def configure_options(self):
-        super(MRSparkScript, self).configure_options()
+    def configure_args(self):
+        super(MRSparkScript, self).configure_args()
 
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--script', dest='script')
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--script-arg', dest='script_args',
             action='append', default=[])
-        self.add_passthrough_option(
+        self.add_passthru_arg(
             '--script-spark-arg', dest='script_spark_args',
             action='append', default=[])
 

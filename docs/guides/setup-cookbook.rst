@@ -103,7 +103,7 @@ Making data files available to your job
 ---------------------------------------
 
 Best practice for one or a few files is to use passthrough options; see
-:py:meth:`~mrjob.job.MRJob.add_passthrough_option`.
+:py:meth:`~mrjob.job.MRJob.add_passthru_arg`.
 
 You can also use :mrjob-opt:`upload_files` to upload file(s) into a task's
 working directory (or :mrjob-opt:`upload_archives` for tarballs and other

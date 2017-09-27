@@ -53,19 +53,19 @@ Option                 Attribute                Method                   Default
 ====================== ======================== ======================== ========
 
 These options can be set by overriding your job's
-:py:meth:`~mrjob.job.MRJob.configure_options` to call the appropriate method:
+:py:meth:`~mrjob.job.MRJob.configure_args` to call the appropriate method:
 
 .. |extra_args| replace:: :py:meth:`extra_args <mrjob.runner.MRJobRunner.__init__>`
 .. |file_upload_args| replace:: :py:meth:`file_upload_args <mrjob.runner.MRJobRunner.__init__>`
 
-.. |add_passthrough_option| replace:: :py:meth:`~mrjob.job.MRJob.add_passthrough_option`
-.. |add_file_option| replace:: :py:meth:`~mrjob.job.MRJob.add_file_option`
+.. |add_passthru_arg| replace:: :py:meth:`~mrjob.job.MRJob.add_passthru_arg`
+.. |add_file_arg| replace:: :py:meth:`~mrjob.job.MRJob.add_file_arg`
 
 ====================== ======================== ========
 Option                 Method                   Default
 ====================== ======================== ========
-*extra_args*           |add_passthrough_option| ``[]``
-*file_upload_args*     |add_file_option|        ``[]``
+*extra_args*           |add_passthru_arg| ``[]``
+*file_upload_args*     |add_file_arg|        ``[]``
 ====================== ======================== ========
 
 All of the above can be passed as keyword arguments to

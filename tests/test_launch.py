@@ -42,6 +42,7 @@ from tests.py2 import MagicMock
 from tests.py2 import Mock
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
+from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_pythonpath
 
 
@@ -51,33 +52,56 @@ def _mock_context_mgr(m, return_value):
 
 class MRCustomJobLauncher(MRJobLauncher):
 
+    def configure_args(self):
+        super(MRCustomJobLauncher, self).configure_args()
+
+        self.add_passthru_arg(
+            '--foo-size', '-F', type=int, dest='foo_size', default=5)
+        self.add_passthru_arg(
+            '--bar-name', '-B', dest='bar_name', default=None)
+        self.add_passthru_arg(
+            '--enable-baz-mode', '-M', action='store_true', dest='baz_mode',
+            default=False)
+        self.add_passthru_arg(
+            '--disable-quuxing', '-Q', action='store_false', dest='quuxing',
+            default=True)
+        self.add_passthru_arg(
+            '--pill-type', '-T', choices=(['red', 'blue']),
+            default='blue')
+        self.add_passthru_arg(
+            '--planck-constant', '-C', type=float, default=6.626068e-34)
+        self.add_passthru_arg(
+            '--extra-special-arg', '-S', action='append',
+            dest='extra_special_args', default=[])
+
+        self.pass_arg_through('--runner')
+
+        self.add_file_arg('--foo-config', dest='foo_config', default=None)
+        self.add_file_arg('--accordian-file', dest='accordian_files',
+                          action='append', default=[])
+
+
+# used to test old options() hooks
+class MRDeprecatedCustomJobLauncher(MRJobLauncher):
+
     def configure_options(self):
-        super(MRCustomJobLauncher, self).configure_options()
+        super(MRDeprecatedCustomJobLauncher, self).configure_options()
 
         self.add_passthrough_option(
             '--foo-size', '-F', type='int', dest='foo_size', default=5)
         self.add_passthrough_option(
-            '--bar-name', '-B', type='string', dest='bar_name', default=None)
-        self.add_passthrough_option(
-            '--enable-baz-mode', '-M', action='store_true', dest='baz_mode',
-            default=False)
-        self.add_passthrough_option(
-            '--disable-quuxing', '-Q', action='store_false', dest='quuxing',
-            default=True)
-        self.add_passthrough_option(
             '--pill-type', '-T', type='choice', choices=(['red', 'blue']),
             default='blue')
-        self.add_passthrough_option(
-            '--planck-constant', '-C', type='float', default=6.626068e-34)
-        self.add_passthrough_option(
-            '--extra-special-arg', '-S', action='append',
-            dest='extra_special_args', default=[])
 
         self.pass_through_option('--runner')
 
-        self.add_file_option('--foo-config', dest='foo_config', default=None)
         self.add_file_option('--accordian-file', dest='accordian_files',
                              action='append', default=[])
+
+    def load_options(self, args):
+        super(MRDeprecatedCustomJobLauncher, self).load_options(args)
+
+        self._load_options_args = args
 
 
 ### Test cases ###
@@ -270,10 +294,10 @@ class CommandLineArgsTestCase(TestCase):
     def test_bad_option_types(self):
         mr_job = MRJobLauncher(args=[''])
         self.assertRaises(
-            ValueError, mr_job.add_passthrough_option,
+            ValueError, mr_job.add_passthru_arg,
             '--stop-words', dest='stop_words', type='set', default=None)
         self.assertRaises(
-            ValueError, mr_job.add_passthrough_option,
+            ValueError, mr_job.add_passthru_arg,
             '--leave-a-msg', dest='leave_a_msg', action='callback',
             default=None)
 
@@ -394,3 +418,55 @@ class StdStreamTestCase(TestCase):
         self.assertEqual(launcher.stdin, mock_stdin.buffer)
         self.assertEqual(launcher.stdout, mock_stdout)
         self.assertEqual(launcher.stderr, mock_stderr)
+
+
+class DeprecatedOptionHooksTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(DeprecatedOptionHooksTestCase, self).setUp()
+
+        self.start(patch('mrjob.launch.log'))
+
+    def test_load_options(self):
+        mr_job = MRDeprecatedCustomJobLauncher(args=['', '-r', 'local'])
+
+        self.assertEqual(mr_job._load_options_args, ['', '-r', 'local'])
+
+    def test_add_passthrough_option(self):
+        mr_job = MRDeprecatedCustomJobLauncher(
+            args=['', '-F', '6', '-T', 'red'])
+
+        self.assertEqual(mr_job.options.foo_size, 6)
+        self.assertEqual(mr_job.options.pill_type, 'red')
+
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'],
+                         ['-F', '6', '-T', 'red'])
+
+    def test_add_file_option(self):
+        mr_job = MRDeprecatedCustomJobLauncher(
+            args=['',
+                  '--accordian-file', 'WeirdAl.mp3',
+                  '--accordian-file', '/home/dave/JohnLinnell.ogg'])
+
+        self.assertEqual(
+            mr_job.options.accordian_files, [
+            'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
+
+        self.assertEqual(mr_job._non_option_kwargs()['file_upload_args'], [
+            ('--accordian-file', 'WeirdAl.mp3'),
+            ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
+
+    def test_pass_through_option_method(self):
+        mr_job = MRDeprecatedCustomJobLauncher(
+            args=['', '-r', 'local'])
+
+        self.assertEqual(mr_job.options.runner, 'local')
+
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'],
+                         ['-r', 'local'])
+
+    def test_args_property(self):
+        # argparse expects all positional args to be together
+        mr_job = MRDeprecatedCustomJobLauncher(
+            args=['-F', '6', '', 'input1.txt', 'input2.txt'])
+        self.assertEqual(mr_job.args, ['input1.txt', 'input2.txt'])

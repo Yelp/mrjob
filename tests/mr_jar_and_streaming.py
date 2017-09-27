@@ -21,10 +21,10 @@ from mrjob.step import OUTPUT
 
 class MRJarAndStreaming(MRJob):
 
-    def configure_options(self):
-        super(MRJarAndStreaming, self).configure_options()
+    def configure_args(self):
+        super(MRJarAndStreaming, self).configure_args()
 
-        self.add_passthrough_option('--jar')
+        self.add_passthru_arg('--jar')
 
     def steps(self):
         return [

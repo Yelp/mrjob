@@ -499,9 +499,9 @@ instance. Here's an example that sneaks a peek at :ref:`writing-cl-opts`::
 
     class CommandLineProtocolJob(MRJob):
 
-        def configure_options(self):
-            super(CommandLineProtocolJob, self).configure_options()
-            self.add_passthrough_option(
+        def configure_args(self):
+            super(CommandLineProtocolJob, self).configure_args()
+            self.add_passthrough_arg(
                 '--output-format', default='raw', choices=['raw', 'json'],
                 help="Specify the output format of the job")
 
@@ -619,8 +619,8 @@ Recall from :ref:`how-your-program-is-run` that your script is executed in
 several contexts: once for the initial invocation, and once for each task. If
 you just add an option to your job's option parser, that option's value won't
 be propagated to other runs of your script. Instead, you can use mrjob's option
-API: :py:meth:`~mrjob.job.MRJob.add_passthrough_option` and
-:py:meth:`~mrjob.job.MRJob.add_file_option`.
+API: :py:meth:`~mrjob.job.MRJob.add_passthru_arg` and
+:py:meth:`~mrjob.job.MRJob.add_file_arg`.
 
 .. _passthrough-opts:
 
@@ -634,9 +634,9 @@ command line-switchable protocol example from before uses this feature::
 
     class CommandLineProtocolJob(MRJob):
 
-        def configure_options(self):
-            super(CommandLineProtocolJob, self).configure_options()
-            self.add_passthrough_option(
+        def configure_args(self):
+            super(CommandLineProtocolJob, self).configure_args()
+            self.add_passthru_arg(
                 '--output-format', default='raw', choices=['raw', 'json'],
                 help="Specify the output format of the job")
 
@@ -651,7 +651,7 @@ passed ``--output-format`` on the command line. When your script is run in any
 other context, such as on Hadoop, it adds ``--output-format=json`` to its
 command string.
 
-:py:meth:`~mrjob.job.MRJob.add_passthrough_option` takes the same arguments as
+:py:meth:`~mrjob.job.MRJob.add_passthru_arg` takes the same arguments as
 :py:meth:`optparse.OptionParser.add_option`. For more information, see the
 `optparse docs`_.
 
@@ -668,7 +668,7 @@ Passing through existing options
 
 Occasionally, it'll be useful for mappers, reducers, etc. to be able to see
 the value of other command-line options. For this, use
-:py:meth:`~mrjob.job.MRJob.pass_through_option` with the corresponding
+:py:meth:`~mrjob.job.MRJob.pass_arg_through` with the corresponding
 command-line switch.
 
 For example, you might wish to fetch supporting data for your job from
@@ -677,10 +677,10 @@ locally::
 
     class MRRunnerAwareJob(MRJob):
 
-        def configure_options(self):
-            super(MRRunnerAwareJob, self).configure_options()
+        def configure_args(self):
+            super(MRRunnerAwareJob, self).configure_args()
 
-            self.pass_through_option('--runner')
+            self.pass_arg_through('--runner')
 
         def mapper_init(self):
             if self.options.runner == 'emr':
@@ -712,9 +712,9 @@ you could do this::
 
     class SqliteJob(MRJob):
 
-        def configure_options(self):
-            super(SqliteJob, self).configure_options()
-            self.add_file_option('--database')
+        def configure_args(self):
+            super(SqliteJob, self).configure_args()
+            self.add_file_arg('--database')
 
         def mapper_init(self):
             # make sqlite3 database available to mapper

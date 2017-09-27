@@ -48,16 +48,16 @@ class MRPageRank(MRJob):
 
     INPUT_PROTOCOL = JSONProtocol  # read the same format we write
 
-    def configure_options(self):
-        super(MRPageRank, self).configure_options()
+    def configure_args(self):
+        super(MRPageRank, self).configure_args()
 
-        self.add_passthrough_option(
-            '--iterations', dest='iterations', default=10, type='int',
+        self.add_passthrough_arg(
+            '--iterations', dest='iterations', default=10, type=int,
             help='number of iterations to run')
 
-        self.add_passthrough_option(
+        self.add_passthrough_arg(
             '--damping-factor', dest='damping_factor', default=0.85,
-            type='float',
+            type=float,
             help='probability a web surfer will continue clicking on links')
 
     def send_score(self, node_id, node):

@@ -312,9 +312,9 @@ class MRJobLauncher(object):
         """Add a command-line option that sends an external file
         (e.g. a SQLite DB) to Hadoop::
 
-             def configure_options(self):
-                super(MRYourJob, self).configure_options()
-                self.add_file_option('--scoring-db', help=...)
+             def configure_args(self):
+                super(MRYourJob, self).configure_args()
+                self.add_file_arg('--scoring-db', help=...)
 
         This does the right thing: the file will be uploaded to the working
         dir of the script on Hadoop, and the script will be passed the same
@@ -349,7 +349,7 @@ class MRJobLauncher(object):
             def configure_args(self):
                 super(MRYourJob, self).configure_args()
                 self.add_passthru_arg(
-                    '--max-ngram-size', type='int', default=4, help='...')
+                    '--max-ngram-size', type=int, default=4, help='...')
 
         If you want to pass files through to the mapper/reducer, use
         :py:meth:`add_file_arg` instead.
@@ -389,7 +389,7 @@ class MRJobLauncher(object):
         log.warning(
             '%s.args is a deprecated alias for %s.options.args, and will'
             ' be removed in v0.7.0' % (class_name, class_name))
-        return self.options
+        return self.options.args
 
     def configure_options(self):
         """.. deprecated:: 0.6.0

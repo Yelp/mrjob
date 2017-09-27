@@ -25,11 +25,11 @@ class MRFilterJob(MRJob):
 
     OUTPUT_PROTOCOL = RawValueProtocol
 
-    def configure_options(self):
-        super(MRFilterJob, self).configure_options()
-        self.add_passthrough_option('--mapper-filter', default=None)
-        self.add_passthrough_option('--combiner-filter', default=None)
-        self.add_passthrough_option('--reducer-filter', default=None)
+    def configure_args(self):
+        super(MRFilterJob, self).configure_args()
+        self.add_passthru_arg('--mapper-filter', default=None)
+        self.add_passthru_arg('--combiner-filter', default=None)
+        self.add_passthru_arg('--reducer-filter', default=None)
 
     def steps(self):
         kwargs = {}

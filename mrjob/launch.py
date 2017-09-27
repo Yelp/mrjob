@@ -389,7 +389,7 @@ class MRJobLauncher(object):
         log.warning(
             '%s.args is a deprecated alias for %s.options.args, and will'
             ' be removed in v0.7.0' % (class_name, class_name))
-        return self.options
+        return self.options.args
 
     def configure_options(self):
         """.. deprecated:: 0.6.0

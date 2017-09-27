@@ -490,7 +490,7 @@ class MRJobLauncher(object):
         """
         # build extra_args and file_upload_args
         #
-        # TODO: deprecate file_upload_args, represent paths to upload
+        # TODO v0.6.0: deprecate file_upload_args, represent paths to upload
         # as dictionaries in extra_args
         raw_args = _parse_raw_args(self.arg_parser, self._cl_args)
 

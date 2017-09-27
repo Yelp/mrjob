@@ -386,7 +386,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._output_dir = self._cloud_tmp_dir + 'output/'
 
         # check AMI version
-        # TODO: warn about AMIs that only have Python 2.6
+        # TODO v0.6.0: warn about AMIs that only have Python 2.6
         if self._opts['image_version'].startswith('1.'):
             log.warning('1.x AMIs will probably not work because they use'
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
@@ -1560,7 +1560,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return _PRE_4_X_STREAMING_JAR, []
 
     def _get_spark_jar_and_step_arg_prefix(self):
-        # TODO: add spark_submit_bin option
+        # TODO v0.6.0: add spark_submit_bin option
 
         if version_gte(self.get_image_version(), '4'):
             return (_4_X_COMMAND_RUNNER_JAR, ['spark-submit'])

@@ -1121,8 +1121,8 @@ class MRJob(MRJobLauncher):
                 else:
                     filtered_val = 'false'
 
-            # TODO: why would a jobconf variable be named 'hadoop_version'?
-            # hadoop_version should be a string
+            # TODO v0.6.0: why would a jobconf variable be named
+            # 'hadoop_version'? hadoop_version should be a string
             elif (key == 'hadoop_version' and
                     isinstance(unfiltered_val, float)):
                 log.warning('hadoop_version should be a string, not %s' %

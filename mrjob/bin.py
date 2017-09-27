@@ -507,7 +507,7 @@ class MRJobBinRunner(MRJobRunner):
         step = self._get_step(step_num)
 
         if step['type'] == 'spark':
-            # TODO: add in passthrough options
+            # TODO v0.6.0: add in passthrough options
             args = (
                 [
                     '--step-num=%d' % step_num,

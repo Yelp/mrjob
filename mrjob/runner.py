@@ -252,14 +252,22 @@ class MRJobRunner(object):
 
         # extra args to our job
         self._extra_args = list(extra_args) if extra_args else []
+        for extra_arg in self._extra_args:
+            if isinstance(extra_arg, dict):
+                if extra_arg.get('type') != 'file':
+                    raise NotImplementedError
+                self._working_dir_mgr.add(**extra_arg)
+                self._spark_files.append(
+                    (extra_arg['name'], extra_arg['path']))
 
         # extra file arguments to our job
-        self._file_upload_args = []
         if file_upload_args:
+            log.warning('file_upload_args is deprecated and will be removed'
+                        ' in v0.6.0. Pass dicts to extra_args instead.')
             for arg, path in file_upload_args:
                 arg_file = parse_legacy_hash_path('file', path)
                 self._working_dir_mgr.add(**arg_file)
-                self._file_upload_args.append((arg, arg_file))
+                self._extra_args.extend([arg, arg_file])
                 self._spark_files.append((arg_file['name'], arg_file['path']))
 
         # set up uploading
@@ -806,25 +814,18 @@ class MRJobRunner(object):
         :param local: if this is True, use files' local paths rather than
             the path they'll have inside Hadoop streaming
         """
-        return (self._get_file_upload_args(local=local) +
-                self._extra_args)
+        result = []
 
-    def _get_file_upload_args(self, local=False):
-        """Arguments used to pass through config files, etc from the job
-        runner through to the local directory where the script is run.
-
-        :type local: boolean
-        :param local: if this is True, use files' local paths rather than
-            the path they'll have inside Hadoop streaming
-        """
-        args = []
-        for arg, path_dict in self._file_upload_args:
-            args.append(arg)
-            if local:
-                args.append(path_dict['path'])
+        for extra_arg in self._extra_args:
+            if isinstance(extra_arg, dict):
+                if local:
+                    result.append(extra_arg['path'])
+                else:
+                    result.append(self._working_dir_mgr.name(**extra_arg))
             else:
-                args.append(self._working_dir_mgr.name(**path_dict))
-        return args
+                result.append(extra_arg)
+
+        return result
 
     def _dir_archive_path(self, dir_path):
         """Assign a path for the archive of *dir_path* but don't

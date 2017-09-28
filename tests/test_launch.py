@@ -310,23 +310,28 @@ class CommandLineArgsTestCase(TestCase):
         mr_job = MRCustomJobLauncher(args=[''])
         self.assertEqual(mr_job.options.foo_config, None)
         self.assertEqual(mr_job.options.accordian_files, [])
-        self.assertEqual(mr_job._non_option_kwargs()['file_upload_args'], [])
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [])
 
     def test_explicit_file_options(self):
         mr_job = MRCustomJobLauncher(args=[
             '',
-            '--foo-config', '/tmp/.fooconf',
+            '--foo-config', '/tmp/.fooconf#dot-fooconf',
             '--foo-config', '/etc/fooconf',
             '--accordian-file', 'WeirdAl.mp3',
             '--accordian-file', '/home/dave/JohnLinnell.ogg'])
         self.assertEqual(mr_job.options.foo_config, '/etc/fooconf')
         self.assertEqual(mr_job.options.accordian_files, [
             'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
-        self.assertEqual(mr_job._non_option_kwargs()['file_upload_args'], [
-            ('--foo-config', '/tmp/.fooconf'),
-            ('--foo-config', '/etc/fooconf'),
-            ('--accordian-file', 'WeirdAl.mp3'),
-            ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
+            '--foo-config', dict(
+                path='/tmp/.fooconf', name='dot-fooconf', type='file'),
+            '--foo-config', dict(
+                path='/etc/fooconf', name=None, type='file'),
+            '--accordian-file', dict(
+                path='WeirdAl.mp3', name=None, type='file'),
+            '--accordian-file', dict(
+                path='/home/dave/JohnLinnell.ogg', name=None, type='file')
+        ])
 
     def test_no_conf_overrides(self):
         mr_job = MRCustomJobLauncher(args=['', '-c', 'blah.conf', '--no-conf'])
@@ -452,9 +457,12 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
             mr_job.options.accordian_files, [
             'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
 
-        self.assertEqual(mr_job._non_option_kwargs()['file_upload_args'], [
-            ('--accordian-file', 'WeirdAl.mp3'),
-            ('--accordian-file', '/home/dave/JohnLinnell.ogg')])
+        self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
+            '--accordian-file', dict(
+                path='WeirdAl.mp3', name=None, type='file'),
+            '--accordian-file', dict(
+                path='/home/dave/JohnLinnell.ogg', name=None, type='file'),
+        ])
 
     def test_pass_through_option_method(self):
         mr_job = MRDeprecatedCustomJobLauncher(

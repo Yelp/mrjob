@@ -1071,3 +1071,26 @@ class OptDebugPrintoutTestCase(ConfigFilesTestCase):
 
         self.assertIn("'owner'", stderr.getvalue())
         self.assertIn("'dave'", stderr.getvalue())
+
+
+class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(DeprecatedFileUploadArgsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.runner.log'))
+
+    def test_deprecated_file_upload_args(self):
+        old_runner = InlineMRJobRunner(
+            file_upload_args=[('--foo-config', '/tmp/.fooconf#dot-fooconf')])
+
+        new_runner = InlineMRJobRunner(
+            extra_args=['--foo-config', dict(
+                path='/tmp/.fooconf', name='dot-fooconf', type='file')])
+
+        self.assertEqual(old_runner._extra_args, new_runner._extra_args)
+        self.assertEqual(old_runner._spark_files, new_runner._spark_files)
+        self.assertEqual(old_runner._working_dir_mgr._name_to_typed_path,
+                         new_runner._working_dir_mgr._name_to_typed_path)
+
+        self.assertTrue(self.log.warning.called)

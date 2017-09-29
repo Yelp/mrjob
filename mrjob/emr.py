@@ -354,6 +354,19 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'visible_to_all_users',
     }
 
+    # these override instance_fleets and instance_groups
+    _FINE_GRAINED_INSTANCE_OPTS = {
+        'core_instance_bid_price',
+        'core_instance_type',
+        'instance_type',
+        'master_instance_bid_price',
+        'master_instance_type',
+        'num_core_instances',
+        'num_task_instances',
+        'task_instance_bid_price',
+        'task_instance_type',
+    }
+
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options

@@ -145,6 +145,8 @@ def _gcp_instance_group_config(
 
 
 def _wait_for(msg, sleep_secs):
+    if not isinstance(sleep_secs, float):
+        sleep_secs = float(sleep_secs)
     log.info("Waiting for %s - sleeping %.1f second(s)", msg, sleep_secs)
     time.sleep(sleep_secs)
 

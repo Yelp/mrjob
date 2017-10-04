@@ -92,8 +92,8 @@ def log_to_stream(name=None, stream=None, format=None, level=None,
 
     :type name: str
     :param name: name of the logger, or ``None`` for the root logger
-    :type stderr: file object
-    :param stderr:  stream to log to (default is ``sys.stderr``)
+    :type stream: file object
+    :param stream:  stream to log to (default is ``sys.stderr``)
     :type format: str
     :param format: log message format (default is '%(message)s')
     :param level: log level to use

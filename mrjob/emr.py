@@ -355,7 +355,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     }
 
     # everything that controls instances number, type, or price
-    _INSTANCE_OPTS = {
+    _INSTANCE_OPT_NAMES = {
         name for name in OPT_NAMES
         if 'instance' in name and 'iam' not in name
     }
@@ -500,7 +500,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if blank_out:
                 opts['instance_fleets'] = None
                 opts['instance_groups'] = None
-            elif any(opts.get(k) is not None for k in self._INSTANCE_OPTS):
+            elif any(opts.get(k) is not None
+                     for k in self._INSTANCE_OPT_NAMES):
                 blank_out = True
 
         # now combine opts, with instance_groups/fleets blanked out

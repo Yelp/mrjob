@@ -293,10 +293,7 @@ Cluster creation and configuration
 
     A list of instance fleet definitions to pass to the EMR API. Pass a JSON
     string on the command line or use data structures in the config file
-    (which is itself basically JSON).
-
-    *instance_fleets* overrides :mrjob-opt:`instance_groups` and other
-    instance configuration options.
+    (which is itself basically JSON). For example:
 
     .. code-block:: yaml
 
@@ -321,6 +318,19 @@ Cluster creation and configuration
               - InstanceType: m1.large
                 BidPriceAsPercentageOfOnDemandPrice: 50
                 WeightedCapacity: 2
+
+    There are three ways to configure instances: `instance_fleets`,
+    :mrjob-opt:`instance_groups`, and individual instance options
+    (:mrjob-opt:`core_instance_bid_price`, :mrjob-opt:`core_instance_type`,
+    :mrjob-opt:`instance_type`, :mrjob-opt:`master_instance_bid_price`,
+    :mrjob-opt:`master_instance_type`, :mrjob-opt:`num_core_instances`,
+    :mrjob-opt:`num_task_instances`, :mrjob-opt:`task_instance_bid_price`,
+    :mrjob-opt:`task_instance_type`).
+
+    If there is a conflict, whichever comes later in the config
+    files takes precedence, and the command line beats config files. In
+    the case of a tie, `instance_fleets` beats `instance_groups` beats
+    other instance options.
 
 .. mrjob-opt::
     :config: instance_groups
@@ -351,6 +361,10 @@ Cluster creation and configuration
                 - VolumeSpecification:
                     SizeInGB: 100
                     VolumeType: gp2
+
+    `instance_groups` is incompatible with :mrjob-opt:`instance_fleets`
+    and other instance options. See :mrjob-opt:`instance_fleets` for
+    details.
 
 .. mrjob-opt::
     :config: max_hours_idle

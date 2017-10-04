@@ -852,7 +852,8 @@ class TmpBucketTestCase(MockBoto3TestCase):
         self.assertEqual(runner._opts['region'], 'us-west-1')
 
 
-class EC2InstanceGroupTestCase(MockBoto3TestCase):
+# TODO: some of this should be moved to tests/test_cloud.py
+class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
 
     maxDiff = None
 
@@ -897,6 +898,14 @@ class EC2InstanceGroupTestCase(MockBoto3TestCase):
             role_to_expected[role.upper()] = expected
 
         self.assertEqual(role_to_actual, role_to_expected)
+
+    def _test_uses_instance_fleets(self, opts):
+        runner = EMRJobRunner(**opts)
+        cluster_id = runner.make_persistent_cluster()
+
+        emr_client = runner.make_emr_client()
+        cluster = emr_client.describe_cluster(ClusterId=cluster_id)['Cluster']
+        self.assertEqual(cluster['InstanceCollectionType'], 'INSTANCE_FLEET')
 
     def set_in_mrjob_conf(self, **kwargs):
         emr_opts = copy.deepcopy(self.MRJOB_CONF_CONTENTS)
@@ -1154,6 +1163,94 @@ class EC2InstanceGroupTestCase(MockBoto3TestCase):
             core=(5, 'c1.medium', None),
             master=(1, 'm1.medium', None),
             task=(20, 'c1.medium', None))
+
+    def test_explicit_instance_groups(self):
+        self._test_instance_groups(
+            dict(
+                instance_groups=[dict(
+                    InstanceRole='MASTER',
+                    InstanceCount=1,
+                    InstanceType='c1.medium',
+                )],
+            ),
+            master=(1, 'c1.medium', None))
+
+    def test_explicit_instance_groups_beats_implicit(self):
+        # instance_groups overrides specific instance group configs
+
+        self._test_instance_groups(
+            dict(
+                instance_groups=[dict(
+                    InstanceRole='MASTER',
+                    InstanceCount=1,
+                    InstanceType='c1.medium',
+                )],
+                master_instance_type='m1.large',
+                num_core_instances=3,
+            ),
+            master=(1, 'c1.medium', None))
+
+    def test_explicit_instance_fleets(self):
+        self._test_uses_instance_fleets(
+            dict(
+                instance_fleets=[dict(
+                    InstanceFleetType='MASTER',
+                    InstanceTypeConfigs=[dict(InstanceType='m1.medium')],
+                    TargetOnDemandCapacity=1)]
+            )
+        )
+
+    def test_explicit_instance_fleets_beats_instance_groups(self):
+        self._test_uses_instance_fleets(
+            dict(
+                instance_fleets=[dict(
+                    InstanceFleetType='MASTER',
+                    InstanceTypeConfigs=[dict(InstanceType='m1.medium')],
+                    TargetOnDemandCapacity=1)],
+                instance_groups=[dict(
+                    InstanceRole='MASTER',
+                    InstanceCount=1,
+                    InstanceType='c1.medium',
+                )],
+                master_instance_type='m1.large',
+                num_core_instances=3,
+            ),
+        )
+
+    def test_command_line_beats_instance_groups_in_config_file(self):
+        self.set_in_mrjob_conf(
+            instance_fleets=[dict(
+                    InstanceFleetType='MASTER',
+                    InstanceTypeConfigs=[dict(InstanceType='m1.medium')],
+                    TargetOnDemandCapacity=1)])
+
+        self._test_uses_instance_fleets({})
+
+        self._test_instance_groups(
+            dict(num_core_instances=3),
+            master=(1, 'm1.medium', None),
+            core=(3, 'm1.medium', None)
+        )
+
+    def test_command_line_beats_instance_fleets_in_config_file(self):
+        self.set_in_mrjob_conf(
+            instance_groups=[dict(
+                    InstanceRole='MASTER',
+                    InstanceCount=1,
+                    InstanceType='c1.medium')])
+
+        self._test_instance_groups(
+            {},
+            master=(1, 'c1.medium', None)
+        )
+
+        self._test_instance_groups(
+            dict(num_core_instances=3),
+            master=(1, 'm1.medium', None),
+            core=(3, 'm1.medium', None)
+        )
+
+
 
 
 ### tests for error parsing ###

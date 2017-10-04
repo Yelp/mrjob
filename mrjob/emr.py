@@ -354,6 +354,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'visible_to_all_users',
     }
 
+    # everything that controls instances number, type, or price
+    _INSTANCE_OPT_NAMES = {
+        name for name in OPT_NAMES
+        if 'instance' in name and 'iam' not in name
+    }
+
     def __init__(self, **kwargs):
         """:py:class:`~mrjob.emr.EMRJobRunner` takes the same arguments as
         :py:class:`~mrjob.runner.MRJobRunner`, plus some additional options
@@ -481,9 +487,27 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         )
 
     def _combine_opts(self, opt_list):
-        """Convert image_version of 4.x and later to release_label."""
+        """Blank out overriden *instance_fleets* and *instance_groups*
+
+        Convert image_version of 4.x and later to release_label."""
+        # copy opt_list so we can modify it
+        opt_list = [dict(opts) for opts in opt_list]
+
+        # blank out any instance_fleets/groups before the last config
+        # where they are set
+        blank_out = False
+        for opts in reversed(opt_list):
+            if blank_out:
+                opts['instance_fleets'] = None
+                opts['instance_groups'] = None
+            elif any(opts.get(k) is not None
+                     for k in self._INSTANCE_OPT_NAMES):
+                blank_out = True
+
+        # now combine opts, with instance_groups/fleets blanked out
         opts = super(EMRJobRunner, self)._combine_opts(opt_list)
 
+        # set release_label based on image_version
         if (version_gte(opts['image_version'], '4') and
                 not opts['release_label']):
             opts['release_label'] = 'emr-' + opts['image_version']

@@ -64,8 +64,8 @@ These options can be set by overriding your job's
 ====================== ======================== ========
 Option                 Method                   Default
 ====================== ======================== ========
-*extra_args*           |add_passthru_arg| ``[]``
-*file_upload_args*     |add_file_arg|        ``[]``
+*extra_args*           |add_passthru_arg|       ``[]``
+*file_upload_args*     |add_file_arg|           ``[]``
 ====================== ======================== ========
 
 All of the above can be passed as keyword arguments to

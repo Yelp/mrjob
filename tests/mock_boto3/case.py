@@ -66,6 +66,7 @@ class MockBoto3TestCase(SandboxedTestCase):
         self.mock_iam_roles = {}
         self.mock_s3_fs = {}
 
+        self.emr_client = None  # used by simulate_emr_progress()
         self.emr_client_counter = itertools.repeat(
             None, self.MAX_EMR_CLIENTS)
 
@@ -103,7 +104,10 @@ class MockBoto3TestCase(SandboxedTestCase):
         self.mock_emr_clusters[cluster['Id']] = cluster
 
     def simulate_emr_progress(self, cluster_id):
-        self.client('emr')._simulate_progress(cluster_id)
+        if not self.emr_client:
+            self.emr_client = self.client('emr')
+
+        self.emr_client._simulate_progress(cluster_id)
 
     def prepare_runner_for_ssh(self, runner, num_workers=0):
         # TODO: Refactor this abomination of a test harness

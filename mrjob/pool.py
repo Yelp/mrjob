@@ -216,13 +216,13 @@ def _igs_satisfy_cpu(actual_igs, requested_ig):
         # the previous job finished while some task instances were
         # still being provisioned.)
         actual_cu = sum(
-            ig['RequestedInstanceCount'] *
+            ig['RunningInstanceCount'] *
             EC2_INSTANCE_TYPE_TO_COMPUTE_UNITS.get(ig['InstanceType'], 0.0)
             for ig in actual_igs)
     else:
         # unknown instance type, just count # of matching instances
         requested_cu = num_requested
-        actual_cu = sum(ig['RequestedInstanceCount'] for ig in actual_igs
+        actual_cu = sum(ig['RunningInstanceCount'] for ig in actual_igs
                          if ig['InstanceType'] == requested_type)
 
     if actual_cu >= requested_cu:

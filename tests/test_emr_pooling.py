@@ -65,7 +65,8 @@ class PoolWaitMinutesOptionTestCase(MockBoto3TestCase):
 
 class PoolMatchingTestCase(MockBoto3TestCase):
 
-    def make_pooled_cluster(self, name=None, minutes_ago=0, **kwargs):
+    def make_pooled_cluster(self, name=None, minutes_ago=0,
+                            provision=True, **kwargs):
         """Returns ``(runner, cluster_id)``. Set minutes_ago to set
         ``cluster.startdatetime`` to seconds before
         ``datetime.datetime.now()``."""
@@ -82,12 +83,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         mock_cluster['MasterPublicDnsName'] = 'mockmaster'
 
         # instance fleets cares about provisioned instances
-        if mock_cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
-            for fleet in mock_cluster['_InstanceFleets']:
-                fleet['ProvisionedOnDemandCapacity'] = fleet[
-                    'TargetOnDemandCapacity']
-                fleet['ProvisionedSpotCapacity'] = fleet[
-                    'TargetSpotCapacity']
+        if provision:
+            if mock_cluster['InstanceCollectionType'] == 'INSTANCE_GROUP':
+                for ig in mock_cluster['_InstanceGroups']:
+                    ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
+            elif mock_cluster['InstanceCollectionType'] == 'INSTANCE_FLEET':
+                for fleet in mock_cluster['_InstanceFleets']:
+                    fleet['ProvisionedOnDemandCapacity'] = fleet[
+                        'TargetOnDemandCapacity']
+                    fleet['ProvisionedSpotCapacity'] = fleet[
+                        'TargetSpotCapacity']
 
         return runner, cluster_id
 
@@ -1863,6 +1868,24 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             ['-r', 'emr', '--pool-clusters', '--image-version', '3.11.0'],
             job_class=MRNullSpark)
 
+    def test_dont_join_pool_without_provisioned_instances(self):
+        # test #1633
+        _, cluster_id = self.make_pooled_cluster(provision=False)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters'])
+
+    def test_dont_join_fleet_pool_without_provisioned_capacity(self):
+        # make sure that we only join fleets with provisioned capacity
+        fleets = [self._fleet_config()]
+
+        _, cluster_id = self.make_pooled_cluster(provision=False,
+                                                 instance_fleets=fleets)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-fleets', json.dumps(fleets)])
+
 
 class PoolingRecoveryTestCase(MockBoto3TestCase):
 
@@ -1874,9 +1897,12 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
     def make_pooled_cluster(self, **kwargs):
         cluster_id = EMRJobRunner(**kwargs).make_persistent_cluster()
 
+        # simulate that instances are provisioned
         mock_cluster = self.mock_emr_clusters[cluster_id]
         mock_cluster['Status']['State'] = 'WAITING'
         mock_cluster['MasterPublicDnsName'] = 'mockmaster'
+        for ig in mock_cluster['_InstanceGroups']:
+            ig['RunningInstanceCount'] = ig['RequestedInstanceCount']
 
         return cluster_id
 

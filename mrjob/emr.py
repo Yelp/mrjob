@@ -1583,14 +1583,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # 2.x and 3.x AMIs just use a regular old streaming jar
             return _PRE_4_X_STREAMING_JAR, []
 
-    def _get_spark_jar_and_step_arg_prefix(self):
-        # TODO v0.6.0: add spark_submit_bin option
-
-        if version_gte(self.get_image_version(), '4'):
-            return (_4_X_COMMAND_RUNNER_JAR, ['spark-submit'])
-        else:
-            return (self._script_runner_jar_uri(), [_3_X_SPARK_SUBMIT])
-
     def _launch_emr_job(self):
         """Create an empty cluster on EMR, and set self._cluster_id to
         its ID.

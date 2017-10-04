@@ -489,10 +489,7 @@ class MRJobLauncher(object):
         These should match the (named) arguments to
         :py:meth:`~mrjob.runner.MRJobRunner.__init__`.
         """
-        # build extra_args and file_upload_args
-        #
-        # TODO v0.6.0: deprecate file_upload_args, represent paths to upload
-        # as dictionaries in extra_args
+        # build extra_args
         raw_args = _parse_raw_args(self.arg_parser, self._cl_args)
 
         extra_args = []

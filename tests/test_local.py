@@ -472,7 +472,7 @@ class LocalBootstrapMrjobTestCase(TestCase):
 
             with mr_job.make_runner() as runner:
                 # sanity check
-                self.assertEqual(runner.get_opts()['bootstrap_mrjob'], False)
+                self.assertEqual(runner._opts['bootstrap_mrjob'], False)
                 local_tmp_dir = os.path.realpath(runner._get_local_tmp_dir())
                 try:
                     with no_handlers_for_logger():

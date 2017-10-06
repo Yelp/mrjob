@@ -198,9 +198,14 @@ class MockGoogleAPITestCase(SandboxedTestCase):
         super(MockGoogleAPITestCase, self).setUp()
 
         # patch slow things
-        def fake_create_mrjob_zip(mocked_self, *args, **kwargs):
-            mocked_self._mrjob_zip_path = self.fake_mrjob_zip_path
-            return self.fake_mrjob_zip_path
+        self.mrjob_zip_path = None
+
+        def fake_create_mrjob_zip(runner, *args, **kwargs):
+            if not self.mrjob_zip_path:
+                self.mrjob_zip_path = self.makefile('fake_mrjob.zip')
+
+            runner._mrjob_zip_path = self.mrjob_zip_path
+            return self.mrjob_zip_path
 
         self.start(patch.object(
             DataprocJobRunner, '_create_mrjob_zip',

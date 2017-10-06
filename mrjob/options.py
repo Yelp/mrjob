@@ -1321,7 +1321,7 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
     """
     help_parser = ArgumentParser(usage=usage, add_help=False)
 
-    for action in option_parser._get_optional_actions():
+    for action in option_parser._actions:
         if action.dest in _RUNNER_OPTS:
             continue
 
@@ -1332,10 +1332,10 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
                 not include_deprecated):
             continue
 
-        help_parser.add_argument(
-            *(action.option_strings),
-            dest=action.dest,
-            help=action.help)
+        if not action.option_strings:
+            continue
+
+        help_parser._add_action(action)
 
     help_parser.print_help()
 
@@ -1370,9 +1370,7 @@ def _parse_raw_args(parser, args):
     raw_parser = ArgumentParser(add_help=False)
     raw_parser.error = error
 
-    actions = parser._get_optional_actions() + parser._get_positional_actions()
-
-    for action in actions:
+    for action in parser._actions:
         # single args become single item lists
         nargs = 1 if action.nargs is None else action.nargs
 

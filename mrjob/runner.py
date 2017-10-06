@@ -687,6 +687,7 @@ class MRJobRunner(object):
 
     def get_opts(self):
         """Get options set for this runner, as a dict."""
+        log.warning('get_opts() is deprecated and will be removed in v0.7.0')
         return copy.deepcopy(self._opts)
 
     def get_job_key(self):

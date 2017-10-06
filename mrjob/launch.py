@@ -148,7 +148,7 @@ class MRJobLauncher(object):
     def _usage(cls):
         """Command line usage string for this class"""
         return ("usage: mrjob run [script path|executable path|--help]"
-                " [options]")
+                " [options] [input files]")
 
     def _print_help(self, options):
         """Print help for this job. This will either print runner
@@ -365,9 +365,9 @@ class MRJobLauncher(object):
     def pass_arg_through(self, opt_str):
         """Pass the given argument through to the job."""
 
-        # _get_optional_actions() is hidden but the interface appears
-        # to be stable, and theres no non-hidden interface
-        for action in self.arg_parser._get_optional_actions():
+        # _actions is hidden but the interface appears to be stable,
+        # and there's no non-hidden interface we can use
+        for action in self.arg_parser._actions:
             if opt_str in action.option_strings or opt_str == action.dest:
                 self._passthru_arg_dests.add(action.dest)
                 break

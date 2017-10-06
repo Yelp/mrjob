@@ -1103,7 +1103,7 @@ class MRJob(MRJobLauncher):
         # turn booleans into the Java equivalent ("false", not "False")
         return {
             k: json.dumps(v) if not isinstance(v, string_types) else v
-            for k, v in unfiltered_jobconf.items()
+            for k, v in unfiltered_jobconf.items() if v is not None
         }
 
     ### Secondary Sort ###

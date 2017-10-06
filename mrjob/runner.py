@@ -1718,8 +1718,11 @@ class MRJobRunner(object):
 
 def _fix_env(env):
     """Convert environment dictionary to strings (Python 2.7 on Windows
-    doesn't allow unicode)"""
+    doesn't allow unicode)."""
     def _to_str(s):
-        return s if isinstance(s, str) else s.encode('utf_8')
+        if isinstance(s, string_types) and not isinstance(s, str):
+            return s.encode('utf_8')
+        else:
+            return s
 
     return dict((_to_str(k), _to_str(v)) for k, v in env.items())

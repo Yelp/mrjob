@@ -728,8 +728,8 @@ class MRJobRunner(object):
                         self._mr_job_extra_args(local=True))
                 log.debug('> %s' % cmd_line(args))
                 # add . to PYTHONPATH (in case mrjob isn't actually installed)
-                env = combine_local_envs(os.environ,
-                                         {'PYTHONPATH': os.path.abspath('.')})
+                env = _fix_env(combine_local_envs(
+                    os.environ, {'PYTHONPATH': os.path.abspath('.')}))
                 steps_proc = Popen(args, stdout=PIPE, stderr=PIPE, env=env)
                 stdout, stderr = steps_proc.communicate()
 
@@ -1661,9 +1661,11 @@ class MRJobRunner(object):
         # Make sure that the tmp dir environment variables are changed if
         # the default is changed. (Make sure unicode is converted to str
         # for Windows)
-        env['TMP'] = str(self._opts['local_tmp_dir'])
-        env['TMPDIR'] = str(self._opts['local_tmp_dir'])
-        env['TEMP'] = str(self._opts['local_tmp_dir'])
+        env['TMP'] = self._opts['local_tmp_dir']
+        env['TMPDIR'] = self._opts['local_tmp_dir']
+        env['TEMP'] = self._opts['local_tmp_dir']
+
+        env = _fix_env(env)
 
         log.debug('Writing to %s' % output_path)
 
@@ -1712,3 +1714,12 @@ class MRJobRunner(object):
             for line in err:
                 log.error('STDERR: %s' % line.rstrip('\r\n'))
         raise CalledProcessError(proc.returncode, args)
+
+
+def _fix_env(env):
+    """Convert environment dictionary to strings (Python 2.7 on Windows
+    doesn't allow unicode)"""
+    def _to_str(s):
+        return s if isinstance(s, str) else s.encode('utf_8')
+
+    return dict((_to_str(k), _to_str(v)) for k, v in env.items())

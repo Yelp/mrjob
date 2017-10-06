@@ -162,18 +162,6 @@ def _dict_deep_update(d, u):
     "googleapiclient doesn't work with PyPy 3")
 class MockGoogleAPITestCase(SandboxedTestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        # we don't care what's in this file, just want mrjob to stop creating
-        # and deleting a complicated archive.
-        cls.fake_mrjob_zip_path = tempfile.mkstemp(
-            prefix='fake_mrjob_', suffix='.zip')[1]
-
-    @classmethod
-    def tearDownClass(cls):
-        if os.path.exists(cls.fake_mrjob_zip_path):
-            os.remove(cls.fake_mrjob_zip_path)
-
     def setUp(self):
         self._dataproc_client = MockDataprocClient(self)
         self._gcs_client = MockGCSClient(self)

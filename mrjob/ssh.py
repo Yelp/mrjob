@@ -48,10 +48,10 @@ def _check_output(out, err):
         if (b'No such file or directory' in err or
             b'Warning: Permanently added' not in err):  # noqa
 
-            raise IOError(err)
+            raise IOError(err.rstrip())
 
     if b'Permission denied' in out:
-        raise IOError(out)
+        raise IOError(out.rstrip())
 
     return out
 

@@ -1659,10 +1659,11 @@ class MRJobRunner(object):
         env['LC_ALL'] = 'C'
 
         # Make sure that the tmp dir environment variables are changed if
-        # the default is changed.
-        env['TMP'] = self._opts['local_tmp_dir']
-        env['TMPDIR'] = self._opts['local_tmp_dir']
-        env['TEMP'] = self._opts['local_tmp_dir']
+        # the default is changed. (Make sure unicode is converted to str
+        # for Windows)
+        env['TMP'] = str(self._opts['local_tmp_dir'])
+        env['TMPDIR'] = str(self._opts['local_tmp_dir'])
+        env['TEMP'] = str(self._opts['local_tmp_dir'])
 
         log.debug('Writing to %s' % output_path)
 

@@ -18,7 +18,6 @@
 import getpass
 import os
 import os.path
-import pty
 from io import BytesIO
 from subprocess import check_call
 from subprocess import PIPE
@@ -53,6 +52,13 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.test_bin import PYTHON_BIN
 from tests.test_local import _bash_wrap
+
+# pty isn't available on Windows
+try:
+    import pty
+    pty
+except ImportError:
+    pty = Mock()
 
 
 class MockHadoopTestCase(SandboxedTestCase):
@@ -1134,8 +1140,8 @@ class RunJobInHadoopUsesEnvTestCase(MockHadoopTestCase):
             'mrjob.hadoop.HadoopJobRunner._env_for_step',
             return_value=dict(FOO='bar', BAZ='qux')))
 
-        self.mock_pty_fork = self.start(patch(
-            'pty.fork', return_value=(0, None)))
+        self.mock_pty_fork = self.start(patch.object(
+            pty, 'fork', return_value=(0, None)))
 
         # end test once we invoke Popen or execvpe()
         self.mock_Popen = self.start(patch(

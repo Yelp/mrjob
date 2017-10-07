@@ -35,6 +35,7 @@ from mrjob.conf import combine_local_envs
 from mrjob.logs.counters import _format_counters
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.runner import MRJobRunner
+from mrjob.runner import _fix_env
 from mrjob.util import unarchive
 
 log = logging.getLogger(__name__)
@@ -167,7 +168,8 @@ class SimMRJobRunner(MRJobRunner):
         stderr_path = self._task_stderr_path(task_type, step_num, task_num)
         output_path = self._task_output_path(task_type, step_num, task_num)
         wd = self._setup_working_dir(task_type, step_num, task_num)
-        env = self._env_for_task(task_type, step_num, task_num, map_split)
+        env = _fix_env(
+            self._env_for_task(task_type, step_num, task_num, map_split))
 
         return partial(
             _run_task,

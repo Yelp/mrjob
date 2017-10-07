@@ -41,6 +41,7 @@ from mrjob.logs.step import _is_counter_log4j_record
 from mrjob.logs.wrap import _logs_exist
 from mrjob.parse import is_uri
 from mrjob.py2 import to_unicode
+from mrjob.runner import _fix_env
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
@@ -403,7 +404,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             self._warn_about_spark_archives(step)
 
             step_args = self._args_for_step(step_num)
-            env = self._env_for_step(step_num)
+            env = _fix_env(self._env_for_step(step_num))
 
             # log this *after* _args_for_step(), which can start a search
             # for the Hadoop streaming jar

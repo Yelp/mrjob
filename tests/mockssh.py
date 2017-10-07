@@ -95,13 +95,6 @@ def path_for_host(host, environ=None):
                    (host, environ['MOCK_SSH_ROOTS']))
 
 
-def rel_posix_to_rel_local(path, environ=None):
-    """Convert a POSIX path to the current system's format"""
-    if environ is None:
-        environ = os.environ
-    return os.path.join(*path.split('/'))
-
-
 def rel_posix_to_abs_local(host, path, environ=None):
     """Convert a POSIX path to the current system's format and prepend the
     tmp directory the host's files are in

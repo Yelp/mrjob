@@ -26,6 +26,7 @@ from mrjob.logs.counters import _format_counters
 from mrjob.parse import _find_python_traceback
 from mrjob.parse import parse_mr_job_stderr
 from mrjob.py2 import string_types
+from mrjob.runner import _fix_env
 from mrjob.sim import SimMRJobRunner
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
@@ -68,6 +69,8 @@ def _chain_procs(procs_args, **kwargs):
         # other procs should have stdout sent to next proc
         if i < len(procs_args) - 1:
             proc_kwargs['stdout'] = PIPE
+
+        proc_kwargs['env'] = _fix_env(proc_kwargs['env'])
 
         proc = Popen(args, **proc_kwargs)
         last_stdout = proc.stdout

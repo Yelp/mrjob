@@ -142,18 +142,6 @@ class MockBotoTestCase(SandboxedTestCase):
     # times, there's probably a problem with simulating progress
     MAX_EMR_CONNECTIONS = 100
 
-    @classmethod
-    def setUpClass(cls):
-        # we don't care what's in this file, just want mrjob to stop creating
-        # and deleting a complicated archive.
-        cls.fake_mrjob_zip_path = tempfile.mkstemp(
-            prefix='fake_mrjob_', suffix='.zip')[1]
-
-    @classmethod
-    def tearDownClass(cls):
-        if os.path.exists(cls.fake_mrjob_zip_path):
-            os.remove(cls.fake_mrjob_zip_path)
-
     def setUp(self):
         # patch boto
         self.mock_emr_failures = set()
@@ -176,9 +164,14 @@ class MockBotoTestCase(SandboxedTestCase):
         super(MockBotoTestCase, self).setUp()
 
         # patch slow things
-        def fake_create_mrjob_zip(mocked_self, *args, **kwargs):
-            mocked_self._mrjob_zip_path = self.fake_mrjob_zip_path
-            return self.fake_mrjob_zip_path
+        self.mrjob_zip_path = None
+
+        def fake_create_mrjob_zip(runner, *args, **kwargs):
+            if not self.mrjob_zip_path:
+                self.mrjob_zip_path = self.makefile('fake_mrjob.zip')
+
+            runner._mrjob_zip_path = self.mrjob_zip_path
+            return self.mrjob_zip_path
 
         self.start(patch.object(
             EMRJobRunner, '_create_mrjob_zip',

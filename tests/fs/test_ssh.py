@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import bz2
-import os
+import os.path
 import shutil
 
 from mrjob.fs.ssh import SSHFilesystem
@@ -252,11 +252,11 @@ class SSHFSTestCase(MockSubprocessTestCase):
         self.add_slave()
         self.add_slave()
 
-        self.assertEquals(self.fs.ssh_slave_hosts('testmaster'),
-                          ['testslave1', 'testslave2'])
+        self.assertEqual(self.fs.ssh_slave_hosts('testmaster'),
+                         ['testslave1', 'testslave2'])
 
     def test_ssh_no_slave_hosts(self):
-        self.assertEquals(self.fs.ssh_slave_hosts('testmaster'), [])
+        self.assertEqual(self.fs.ssh_slave_hosts('testmaster'), [])
 
     def test_ssh_slave_hosts_doesnt_care_about_sudo(self):
         self.require_sudo()

@@ -80,7 +80,7 @@ class MRJob(MRJobLauncher):
 
     @classmethod
     def _usage(cls):
-        return "usage: %(prog)s [options]"
+        return "usage: %(prog)s [options] [input files]"
 
     ### Defining one-step streaming jobs ###
 
@@ -1097,40 +1097,14 @@ class MRJob(MRJobLauncher):
 
                 return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
         """
-
-        # deal with various forms of bad behavior by users
+        # combine job and runner jobconf
         unfiltered_jobconf = combine_dicts(self.JOBCONF, self.options.jobconf)
-        filtered_jobconf = {}
 
-        def format_hadoop_version(v_float):
-            if v_float >= 1.0:
-                # e.g. 1.0
-                return '%.1f' % v_float
-            else:
-                # e.g. 0.20
-                return '%.2f' % v_float
-
-        for key in unfiltered_jobconf:
-            unfiltered_val = unfiltered_jobconf[key]
-            filtered_val = unfiltered_val
-
-            # boolean values need to be lowercased
-            if isinstance(unfiltered_val, bool):
-                if unfiltered_val:
-                    filtered_val = 'true'
-                else:
-                    filtered_val = 'false'
-
-            # TODO v0.6.0: why would a jobconf variable be named
-            # 'hadoop_version'? hadoop_version should be a string
-            elif (key == 'hadoop_version' and
-                    isinstance(unfiltered_val, float)):
-                log.warning('hadoop_version should be a string, not %s' %
-                            unfiltered_val)
-                filtered_val = format_hadoop_version(unfiltered_val)
-            filtered_jobconf[key] = filtered_val
-
-        return filtered_jobconf
+        # turn booleans into the Java equivalent ("false", not "False")
+        return {
+            k: json.dumps(v) if not isinstance(v, string_types) else v
+            for k, v in unfiltered_jobconf.items() if v is not None
+        }
 
     ### Secondary Sort ###
 

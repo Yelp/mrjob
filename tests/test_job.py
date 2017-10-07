@@ -613,12 +613,6 @@ class JobConfTestCase(TestCase):
         JOBCONF = {'true_value': True,
                    'false_value': False}
 
-    class MRHadoopVersionJobConfJob1(MRJob):
-        JOBCONF = {'hadoop_version': 1.0}
-
-    class MRHadoopVersionJobConfJob2(MRJob):
-        JOBCONF = {'hadoop_version': 0.20}
-
     def test_empty(self):
         mr_job = MRJob()
 
@@ -639,21 +633,6 @@ class JobConfTestCase(TestCase):
         mr_job = self.MRBoolJobConfJob()
         self.assertEqual(mr_job.jobconf()['true_value'], 'true')
         self.assertEqual(mr_job.jobconf()['false_value'], 'false')
-
-    def assert_hadoop_version(self, JobClass, version_string):
-        mr_job = JobClass()
-        mock_log = StringIO()
-        with no_handlers_for_logger('mrjob.job'):
-            log_to_stream('mrjob.job', mock_log)
-            self.assertEqual(mr_job.jobconf()['hadoop_version'],
-                             version_string)
-            self.assertIn('should be a string', mock_log.getvalue())
-
-    def test_float_options(self):
-        self.assert_hadoop_version(self.MRHadoopVersionJobConfJob1, '1.0')
-
-    def test_float_options_2(self):
-        self.assert_hadoop_version(self.MRHadoopVersionJobConfJob2, '0.20')
 
     def test_jobconf_method(self):
         mr_job = self.MRJobConfJob()
@@ -1250,7 +1229,7 @@ class PrintHelpTestCase(SandboxedTestCase):
         # currently there are no deprecated options to test against
         #self.assertIn('--partitioner', output)
         self.assertNotIn('add --deprecated', output)
-        self.assertIn('--deprecated DEPRECATED', output)
+        self.assertIn('--deprecated', output)
 
     def test_runner_help(self):
         MRJob(['--help', '-r', 'emr'])

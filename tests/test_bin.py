@@ -911,7 +911,7 @@ class SortValuesTestCase(SandboxedTestCase):
                 runner._jobconf_for_step(0), {
                     'mapreduce.partition.keycomparator.options': '-k1 -k2nr',
                     'mapreduce.partition.keypartitioner.options': '-k1,1',
-                    'stream.num.map.output.key.fields': 3,
+                    'stream.num.map.output.key.fields': '3',
                 }
             )
 
@@ -927,7 +927,7 @@ class SortValuesTestCase(SandboxedTestCase):
                     'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
                     'mapreduce.partition.keycomparator.options': '-k1 -k2nr',
                     'mapreduce.partition.keypartitioner.options': '-k1,1',
-                    'stream.num.map.output.key.fields': 3,
+                    'stream.num.map.output.key.fields': '3',
                 }
             )
 

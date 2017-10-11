@@ -414,6 +414,7 @@ _RUNNER_OPTS = dict(
             (['--check-cluster-every'], dict(
                 help=('How often (in seconds) to check status of your'
                       ' job/cluster'),
+                type=float,
             )),
         ],
     ),

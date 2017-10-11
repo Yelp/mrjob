@@ -5444,7 +5444,7 @@ class CheckClusterEveryTestCase(MockBoto3TestCase):
 
     def test_command_line_option(self):
         # regression test for #1664
-        job = MRTwoStepJob(['-r', 'emr', '--check-cluster-every', '5'])
+        job = MRTwoStepJob(['-r', 'emr', '--check-cluster-every', '5.0'])
         job.sandbox()
 
         with job.make_runner() as runner:

@@ -5438,3 +5438,14 @@ class CheckInputPathsTestCase(MockBoto3TestCase):
         # no way to check hdfs://, ignore
         with job.make_runner() as runner:
             self.assertRaises(StopIteration, runner.run)
+
+
+class CheckClusterEveryTestCase(MockBoto3TestCase):
+
+    def test_command_line_option(self):
+        # regression test for #1664
+        job = MRTwoStepJob(['-r', 'emr', '--check-cluster-every', '5'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()

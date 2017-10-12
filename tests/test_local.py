@@ -303,24 +303,27 @@ class TestsToPort:
 
 
 class LocalMRJobRunnerNoSymlinksTestCase(LocalMRJobRunnerEndToEndTestCase):
-    """Test systems without os.symlink (e.g. Windows). See Issue #46"""
+    """Test systems without os.symlink() (e.g. Python 2 on Windows).
+    See Issue #46"""
 
     def setUp(self):
         super(LocalMRJobRunnerNoSymlinksTestCase, self).setUp()
-        self.remove_os_symlink()
-
-    def tearDown(self):
-        self.restore_os_symlink()
-        super(LocalMRJobRunnerNoSymlinksTestCase, self).tearDown()
-
-    def remove_os_symlink(self):
         if hasattr(os, 'symlink'):
             self._real_os_symlink = os.symlink
-            del os.symlink  # sorry, were you using that? :)
+            del os.symlink
 
-    def restore_os_symlink(self):
+    def tearDown(self):
         if hasattr(self, '_real_os_symlink'):
             os.symlink = self._real_os_symlink
+        super(LocalMRJobRunnerNoSymlinksTestCase, self).tearDown()
+
+
+class LocalMRJobRunnerBadOSSymlinkTestCase(LocalMRJobRunnerEndToEndTestCase):
+    """Test systems with unfriendly os.symlink() (e.g. Python 3 on Windows).
+    See Issue #1649."""
+    def setUp(self):
+        super(LocalMRJobRunnerEndToEndTestCase, self).setUp()
+        self.start(patch('os.symlink', side_effect=OSError))
 
 
 class TimeoutException(Exception):

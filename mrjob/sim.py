@@ -732,10 +732,14 @@ def _symlink_or_copy(path, dest):
     """
     if hasattr(os, 'symlink'):
         log.debug('creating symlink %s <- %s' % (path, dest))
-        os.symlink(relpath(path, dirname(dest)), dest)
+        try:
+            os.symlink(relpath(path, dirname(dest)), dest)
+            return
+        except OSError as ex:
+            log.debug('  %s' % ex)
+
+    log.debug('copying %s -> %s' % (dest, path))
+    if isdir(path):
+        copytree(path, dest)
     else:
-        log.debug('copying %s -> %s' % (dest, path))
-        if isdir(path):
-            copytree(path, dest)
-        else:
-            copy2(path, dest)
+        copy2(path, dest)

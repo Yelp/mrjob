@@ -1832,22 +1832,21 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
         # idle timeout script should not even be uploaded
         self.assertNotIn(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH,
                          runner._upload_mgr.path_to_uri())
-
     def test_default(self):
         mr_job = MRWordCount(['-r', 'emr'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '300'])
+            self.assertDidNotUseIdleTimeoutScript(runner)
 
-    def test_non_pooled_cluster(self):
-        mr_job = MRWordCount(['-r', 'emr', '--no-pool-clusters'])
+    def test_pooling(self):
+        mr_job = MRWordCount(['-r', 'emr', '--pool-clusters'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertDidNotUseIdleTimeoutScript(runner)
+            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '300'])
 
     def test_custom_max_hours_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '0.01'])
@@ -2781,17 +2780,17 @@ class ActionOnFailureTestCase(MockBoto3TestCase):
     def test_default(self):
         runner = EMRJobRunner()
         self.assertEqual(runner._action_on_failure(),
+                         'TERMINATE_CLUSTER')
+
+    def test_default_with_pooling(self):
+        runner = EMRJobRunner(pool_clusters=True)
+        self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
 
     def test_default_with_cluster_id(self):
         runner = EMRJobRunner(cluster_id='j-CLUSTER')
         self.assertEqual(runner._action_on_failure(),
                          'CANCEL_AND_WAIT')
-
-    def test_default_without_pooling(self):
-        runner = EMRJobRunner(pool_clusters=False)
-        self.assertEqual(runner._action_on_failure(),
-                         'TERMINATE_CLUSTER')
 
     def test_option(self):
         runner = EMRJobRunner(emr_action_on_failure='CONTINUE')
@@ -3164,18 +3163,18 @@ class EMRTagsTestCase(MockBoto3TestCase):
 
         tags = _extract_tags(cluster)
 
-        self.assertEqual(tags['__mrjob_pool_name'], 'default')
-        self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
-        self.assertIn('__mrjob_pool_hash', tags)
-
-    def test_no_pooling(self):
-        cluster = self.run_and_get_cluster('--no-pool-clusters')
-
-        tags = _extract_tags(cluster)
-
         self.assertNotIn('__mrjob_pool_hash', tags)
         self.assertNotIn('__mrjob_pool_name', tags)
         self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
+
+    def test_pooling(self):
+        cluster = self.run_and_get_cluster('--pool-clusters')
+
+        tags = _extract_tags(cluster)
+
+        self.assertEqual(tags['__mrjob_pool_name'], 'default')
+        self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
+        self.assertIn('__mrjob_pool_hash', tags)
 
     def test_tags_option_dict(self):
         job = MRWordCount([

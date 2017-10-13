@@ -474,7 +474,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 mins_to_end_of_hour=5.0,
                 num_core_instances=0,
                 num_task_instances=0,
-                pool_clusters=True,
+                pool_clusters=False,
                 pool_name='default',
                 pool_wait_minutes=0,
                 region=_DEFAULT_EMR_REGION,

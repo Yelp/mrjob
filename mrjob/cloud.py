@@ -18,6 +18,7 @@ import pipes
 from os.path import basename
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.conf import combine_dicts
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line

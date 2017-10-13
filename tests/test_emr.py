@@ -43,7 +43,7 @@ from mrjob.emr import _4_X_COMMAND_RUNNER_JAR
 from mrjob.emr import _BAD_BASH_IMAGE_VERSION
 from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _HUGE_PART_THRESHOLD
-from mrjob.emr import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.emr import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
@@ -1821,7 +1821,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
         self.assertEqual(action['Name'], 'idle timeout')
         self.assertEqual(
             action['ScriptPath'],
-            runner._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+            runner._upload_mgr.uri(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
         self.assertEqual(action['Args'], args)
 
     def assertDidNotUseIdleTimeoutScript(self, runner):
@@ -1830,7 +1830,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
         self.assertNotIn('idle timeout', action_names)
         # idle timeout script should not even be uploaded
-        self.assertNotIn(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH,
+        self.assertNotIn(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH,
                          runner._upload_mgr.path_to_uri())
     def test_default(self):
         mr_job = MRWordCount(['-r', 'emr'])
@@ -1889,7 +1889,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
 
     def test_bootstrap_script_is_actually_installed(self):
-        self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+        self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
 
 
 class TestCatFallback(MockBoto3TestCase):

@@ -794,19 +794,30 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    max_hours_idle=dict(
+    max_mins_idle=dict(
         cloud_role='launch',
         switches=[
-            (['--max-hours-idle'], dict(
+            (['--max-mins-idle'], dict(
                 help=("If we create a cluster, have it automatically"
                       " terminate itself after it's been idle this many"
-                      " hours"),
+                      " minutes"),
+                type=float,
+            )),
+        ],
+    ),
+    max_hours_idle=dict(
+        cloud_role='launch',
+        deprecated=True,
+        switches=[
+            (['--max-hours-idle'], dict(
+                help='Please use --max-mins-idle instead',
                 type=float,
             )),
         ],
     ),
     mins_to_end_of_hour=dict(
         cloud_role='launch',
+        deprecated=True,
         switches=[
             (['--mins-to-end-of-hour'], dict(
                 help=("If --max-hours-idle is set, control how close to the"

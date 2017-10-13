@@ -1575,7 +1575,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertTrue(actions[3]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[3]['ScriptPath'].endswith(
             'terminate_idle_cluster.sh'))
-        self.assertEqual(actions[3]['Args'], ['1800', '300'])
+        self.assertEqual(actions[3]['Args'], ['300', '300'])
         self.assertEqual(actions[3]['Name'], 'idle timeout')
 
         # make sure master bootstrap script is on S3
@@ -1630,7 +1630,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[2]['ScriptPath'].endswith(
             'terminate_idle_cluster.sh'))
-        self.assertEqual(actions[2]['Args'], ['1800', '300'])
+        self.assertEqual(actions[2]['Args'], ['300', '300'])
         self.assertEqual(actions[2]['Name'], 'idle timeout')
 
         # make sure scripts are on S3
@@ -1846,7 +1846,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '300'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['300', '300'])
 
     def test_custom_max_hours_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '0.01'])
@@ -1871,7 +1871,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['1800', '600'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['300', '600'])
 
     def test_too_small_mins_to_end_of_hour(self):
         mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '0.1'])

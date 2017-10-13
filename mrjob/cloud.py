@@ -109,8 +109,8 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
             opts, source=source)
 
-        if (opts['max_mins_idle'] is None
-            and opts['max_hours_idle'] is not None):
+        if (opts.get('max_mins_idle') is None and
+                opts.get('max_hours_idle') is not None):
 
             opts['max_mins_idle'] = opts['max_hours_idle'] * 60
 

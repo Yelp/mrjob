@@ -24,6 +24,7 @@ from mrjob.fs.s3 import S3Filesystem
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
+from mrjob.tools.emr.terminate_idle_clusters import main
 from mrjob.tools.emr.terminate_idle_clusters import _maybe_terminate_clusters
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_bootstrapping
 from mrjob.tools.emr.terminate_idle_clusters import _is_cluster_done
@@ -33,6 +34,8 @@ from mrjob.tools.emr.terminate_idle_clusters import _cluster_has_pending_steps
 from mrjob.tools.emr.terminate_idle_clusters import _time_last_active
 
 from tests.mock_boto3 import MockBoto3TestCase
+from tests.py2 import patch
+from tests.sandbox import SandboxedTestCase
 
 
 class ClusterTerminationTestCase(MockBoto3TestCase):
@@ -728,3 +731,26 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
         # shouldn't *actually* terminate clusters
         self.assertEqual(self.ids_of_terminated_clusters(), [])
+
+
+class DeprecatedMaxHoursIdleTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(DeprecatedMaxHoursIdleTestCase, self).setUp()
+
+        self._maybe_terminate_clusters = self.start(patch(
+            'mrjob.tools.emr.terminate_idle_clusters.'
+            '_maybe_terminate_clusters'))
+
+        self.log = self.start(
+            patch('mrjob.tools.emr.terminate_idle_clusters.log'))
+
+
+    def test_max_hours_idle(self):
+        main(['--max-hours-idle', '2'])
+
+        self.assertEqual(
+            self._maybe_terminate_clusters.call_args[1]['max_mins_idle'],
+            120)
+
+        self.assertTrue(self.log.warning.called)

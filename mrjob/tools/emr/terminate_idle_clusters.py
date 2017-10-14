@@ -96,7 +96,7 @@ def main(cl_args=None):
     if max_mins_idle is None and options.max_hours_idle is not None:
         log.warning('--max-hours-idle is deprecated and will be removed'
                     ' in v0.7.0. Please use --max-mins-idle instead.')
-        max_hours_idle = options.max_hours_idle * 60
+        max_mins_idle = options.max_hours_idle * 60
 
     _maybe_terminate_clusters(
         dry_run=options.dry_run,

@@ -74,7 +74,6 @@ from mrjob.job import MRJob
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
 from mrjob.options import _filter_by_role
-from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.util import strip_microseconds
 
@@ -185,7 +184,6 @@ def _maybe_terminate_clusters(dry_run=False,
 
         # cluster is idle
         time_idle = now - _time_last_active(cluster_summary, steps)
-        time_to_end_of_hour = _est_time_to_hour(cluster_summary, now=now)
         is_pending = _cluster_has_pending_steps(steps)
 
         # need to get actual cluster to see tags
@@ -199,11 +197,10 @@ def _maybe_terminate_clusters(dry_run=False,
             num_idle += 1
 
         log.debug(
-            'cluster %s %s for %s, %s to end of hour, %s (%s)' %
+            'cluster %s %s for %s, %s (%s)' %
             (cluster_id,
              'pending' if is_pending else 'idle',
              strip_microseconds(time_idle),
-             strip_microseconds(time_to_end_of_hour),
              ('unpooled' if pool is None else 'in %s pool' % pool),
              cluster_summary['Name']))
 
@@ -229,7 +226,6 @@ def _maybe_terminate_clusters(dry_run=False,
             num_steps=len(steps),
             is_pending=is_pending,
             time_idle=time_idle,
-            time_to_end_of_hour=time_to_end_of_hour,
             dry_run=dry_run,
             max_mins_locked=max_mins_locked,
             quiet=quiet)
@@ -305,15 +301,14 @@ def _time_last_active(cluster_summary, steps):
 
 
 def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
-                          is_pending, time_idle, time_to_end_of_hour,
+                          is_pending, time_idle,
                           dry_run=False, max_mins_locked=None, quiet=False):
 
-    fmt = ('Terminated cluster %s (%s); was %s for %s, %s to end of hour')
+    fmt = ('Terminated cluster %s (%s); was %s for %s')
     msg = fmt % (
         cluster_id, cluster_name,
         'pending' if is_pending else 'idle',
-        strip_microseconds(time_idle),
-        strip_microseconds(time_to_end_of_hour))
+        strip_microseconds(time_idle))
 
     did_terminate = False
     if dry_run:

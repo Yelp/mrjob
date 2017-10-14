@@ -21,7 +21,6 @@ from datetime import timedelta
 
 from mrjob.aws import _boto3_now
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.terminate_idle_clusters import main

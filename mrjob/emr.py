@@ -85,7 +85,6 @@ from mrjob.parse import is_s3_uri
 from mrjob.parse import is_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _instance_fleets_satisfy
 from mrjob.pool import _instance_groups_satisfy
 from mrjob.pool import _pool_hash_and_name
@@ -2654,12 +2653,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if not instance_sort_key:
                 return
 
-            # prioritize "best" clusters, with time as tiebreaker
-            sort_key = (instance_sort_key, _est_time_to_hour(cluster))
-
             log.debug('    OK')
             key_cluster_steps_list.append(
-                (sort_key, cluster['Id'], len(steps)))
+                (instance_sort_key, cluster['Id'], len(steps)))
 
         for cluster_summary in _boto3_paginate(
                 'Clusters', emr_client, 'list_clusters',

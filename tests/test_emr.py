@@ -1846,7 +1846,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, ['300', '300'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['300'])
 
     def test_custom_max_mins_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '0.6'])
@@ -1854,7 +1854,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['36'])
 
     def test_deprecated_max_hours_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '0.6'])
@@ -1862,39 +1862,23 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['36'])
 
-    def test_mins_to_end_of_hour(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '60',
-                              '--mins-to-end-of-hour', '10'])
-        mr_job.sandbox()
-
-        with mr_job.make_runner() as runner:
-            runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
-
-    def test_mins_to_end_of_hour_does_without_max_mins_idle(self):
+    def test_deprecated_mins_to_end_of_hour_does_nothing(self):
         mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['300', '600'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['300'])
 
-    def test_too_small_mins_to_end_of_hour(self):
-        mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '0.1'])
-        mr_job.sandbox()
-
-        self.assertRaises(ValueError, mr_job.make_runner)
-
-    def test_use_integers(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '60.00006',
-                              '--mins-to-end-of-hour', '10.000001'])
+    def test_use_integer(self):
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '60.00006'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['3600'])
 
     def test_bootstrap_script_is_actually_installed(self):
         self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))

@@ -225,11 +225,6 @@ _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 # use to disable multipart uploading
 _HUGE_PART_THRESHOLD = 2 ** 256
 
-# don't make mins_to_end_of_hour less than this, or it'll break
-# idle termination
-_MIN_MINS_TO_END_OF_HOUR = 1
-
-
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
     pass
@@ -470,7 +465,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cloud_fs_sync_secs=5.0,
                 cloud_upload_part_size=100,  # 100 MB
                 image_version=_DEFAULT_IMAGE_VERSION,
-                mins_to_end_of_hour=5.0,
                 num_core_instances=0,
                 num_task_instances=0,
                 pool_clusters=False,
@@ -542,15 +536,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # emr_configurations
         elif opt_key == 'emr_configurations':
             return [_fix_configuration_opt(c) for c in opt_value]
-
-        # mins_to_end_of_hour
-        elif opt_key == 'mins_to_end_of_hour':
-            if not opt_value >= _MIN_MINS_TO_END_OF_HOUR:
-                raise ValueError(
-                    'mins_to_end_of_hour (from %s) must be at least %.1f' % (
-                        source, _MIN_MINS_TO_END_OF_HOUR))
-
-            return opt_value
 
         # region
         elif opt_key == 'region':
@@ -1354,9 +1339,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # add it last, so that we don't count bootstrapping as idle time
             uri = self._upload_mgr.uri(
                 _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
+
             # script takes args in (integer) seconds
-            ba_args = [str(int(self._opts['max_mins_idle'] * 60)),
-                       str(int(self._opts['mins_to_end_of_hour'] * 60))]
+            ba_args = [str(int(self._opts['max_mins_idle'] * 60))]
             BootstrapActions.append(dict(
                 Name='idle timeout',
                 ScriptBootstrapAction=dict(

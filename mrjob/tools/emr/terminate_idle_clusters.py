@@ -80,7 +80,7 @@ from mrjob.util import strip_microseconds
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_MAX_HOURS_IDLE = 1
+_DEFAULT_MAX_MINS_IDLE = 60
 _DEFAULT_MAX_MINUTES_LOCKED = 1
 
 
@@ -91,9 +91,16 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet,
                          verbose=options.verbose)
 
+    # support
+    max_mins_idle = options.max_mins_idle
+    if max_mins_idle is None and options.max_hours_idle is not None:
+        log.warning('--max-hours-idle is deprecated and will be removed'
+                    ' in v0.7.0. Please use --max-mins-idle instead.')
+        max_hours_idle = options.max_hours_idle * 60
+
     _maybe_terminate_clusters(
         dry_run=options.dry_run,
-        max_hours_idle=options.max_hours_idle,
+        max_mins_idle=max_mins_idle,
         mins_to_end_of_hour=options.mins_to_end_of_hour,
         unpooled_only=options.unpooled_only,
         now=_boto3_now(),
@@ -107,7 +114,7 @@ def main(cl_args=None):
 
 def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
-    for unused_arg in ('quiet', 'verbose', 'max_hours_idle',
+    for unused_arg in ('quiet', 'verbose', 'max_mins_idle', 'max_hours_idle',
                        'max_mins_locked',
                        'mins_to_end_of_hour', 'unpooled_only',
                        'pooled_only', 'pool_name', 'dry_run'):
@@ -117,7 +124,7 @@ def _runner_kwargs(options):
 
 
 def _maybe_terminate_clusters(dry_run=False,
-                              max_hours_idle=None,
+                              max_mins_idle=None,
                               mins_to_end_of_hour=None,
                               now=None,
                               pool_name=None,
@@ -130,8 +137,8 @@ def _maybe_terminate_clusters(dry_run=False,
         now = _boto3_now()
 
     # old default behavior
-    if max_hours_idle is None and mins_to_end_of_hour is None:
-        max_hours_idle = _DEFAULT_MAX_HOURS_IDLE
+    if max_mins_idle is None and mins_to_end_of_hour is None:
+        max_mins_idle = _DEFAULT_MAX_MINS_IDLE
 
     runner = EMRJobRunner(**kwargs)
     emr_client = runner.make_emr_client()
@@ -199,8 +206,8 @@ def _maybe_terminate_clusters(dry_run=False,
              cluster_summary['Name']))
 
         # filter out clusters that don't meet our criteria
-        if (max_hours_idle is not None and
-                time_idle <= timedelta(hours=max_hours_idle)):
+        if (max_mins_idle is not None and
+                time_idle <= timedelta(minutes=max_mins_idle)):
             continue
 
         # mins_to_end_of_hour doesn't apply to jobs with pending steps
@@ -348,7 +355,11 @@ def _make_arg_parser():
     arg_parser.add_argument(
         '--max-hours-idle', dest='max_hours_idle',
         default=None, type=float,
-        help=('Max number of hours a cluster can go without bootstrapping,'
+        help=('Please use --max-mins-idle instead.'))
+    arg_parser.add_argument(
+        '--max-mins-idle', dest='max_mins_idle',
+        default=None, type=float,
+        help=('Max number of minutes a cluster can go without bootstrapping,'
               ' running a step, or having a new step created. This will fire'
               ' even if there are pending steps which EMR has failed to'
               ' start. Make sure you set this higher than the amount of time'

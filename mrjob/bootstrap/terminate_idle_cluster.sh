@@ -42,15 +42,12 @@
 
 # full usage:
 #
-# ./terminate_idle_cluster.sh [ max_hours_idle [ min_secs_to_end_of_hour ] ]
+# ./terminate_idle_cluster.sh [ max_secs_idle  ]
 #
 # Both arguments must be integers
 
 MAX_SECS_IDLE=$1
-if [ -z "$MAX_SECS_IDLE" ]; then MAX_SECS_IDLE=1800; fi
-
-MIN_SECS_TO_END_OF_HOUR=$2
-if [ -z "$MIN_SECS_TO_END_OF_HOUR" ]; then MIN_SECS_TO_END_OF_HOUR=300; fi
+if [ -z "$MAX_SECS_IDLE" ]; then MAX_SECS_IDLE=300; fi
 
 # exit if this isn't the master node
 grep -q 'isMaster.*false' /mnt/var/lib/info/instance.json && exit 0
@@ -60,7 +57,6 @@ while true  # the only way out is to SHUT DOWN THE MACHINE
 do
     # get the uptime as an integer (expr can't handle decimals)
     UPTIME=$(cat /proc/uptime | cut -f 1 -d .)
-    SECS_TO_END_OF_HOUR=$(expr 3600 - $UPTIME % 3600)
 
     # if LAST_ACTIVE hasn't been initialized, hadoop hasn't been installed
     # yet (this happens on 4.x AMIs), or there are jobs running, just set
@@ -78,8 +74,7 @@ do
 	# the cluster is idle! how long has this been going on?
         SECS_IDLE=$(expr $UPTIME - $LAST_ACTIVE)
 
-        if expr $SECS_IDLE '>' $MAX_SECS_IDLE '&' \
-            $SECS_TO_END_OF_HOUR '<' $MIN_SECS_TO_END_OF_HOUR > /dev/null
+        if expr $SECS_IDLE '>' $MAX_SECS_IDLE > /dev/null
         then
             sudo shutdown -h now
             exit

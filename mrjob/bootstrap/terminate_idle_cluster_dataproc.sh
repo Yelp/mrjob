@@ -40,7 +40,7 @@
 # ./terminate_idle_cluster_dataproc.sh
 
 MAX_SECS_IDLE=$(/usr/share/google/get_metadata_value attributes/mrjob-max-secs-idle)
-if [ -z "${MAX_SECS_IDLE}" ]; then MAX_SECS_IDLE=600; fi
+if [ -z "${MAX_SECS_IDLE}" ]; then MAX_SECS_IDLE=300; fi
 
 (
 while true  # the only way out is to SHUT DOWN THE MACHINE

@@ -896,7 +896,7 @@ class MaxMinsIdleTestCase(MockGoogleAPITestCase):
             })
 
     def test_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '0.01'])
+        mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '0.6'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:

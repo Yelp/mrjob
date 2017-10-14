@@ -746,7 +746,7 @@ class DeprecatedMaxHoursIdleTestCase(SandboxedTestCase):
             patch('mrjob.tools.emr.terminate_idle_clusters.log'))
 
 
-    def test_max_hours_idle(self):
+    def test_deprecated_max_hours_idle(self):
         main(['--max-hours-idle', '2'])
 
         self.assertEqual(

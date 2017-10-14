@@ -820,7 +820,7 @@ _RUNNER_OPTS = dict(
         deprecated=True,
         switches=[
             (['--mins-to-end-of-hour'], dict(
-                help=("If --max-hours-idle is set, control how close to the"
+                help=("If --max-mins-idle is set, control how close to the"
                       " end of an hour the cluster can automatically"
                       " terminate itself (default is 5 minutes)"),
                 type=float,
@@ -859,10 +859,7 @@ _RUNNER_OPTS = dict(
             (['--pool-clusters'], dict(
                 action='store_true',
                 help=('Add to an existing cluster or create a new one that'
-                      ' does not terminate when the job completes.\n'
-                      'WARNING: do not run this without --max-hours-idle or '
-                      ' with mrjob terminate-idle-clusters in your crontab;'
-                      ' clusters left idle can quickly become expensive!'),
+                      ' does not terminate when the job completes.'),
             )),
             (['--no-pool-clusters'], dict(
                 action='store_false',

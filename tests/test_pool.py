@@ -166,8 +166,8 @@ class TestLegacyPoolHashAndName(TestCase):
         self.assertEqual(_legacy_pool_hash_and_name(actions),
                          ('0123456789abcdef0123456789abcdef', 'reflecting'))
 
-    def test_pooled_cluster_with_max_hours_idle(self):
-        # max hours idle is added AFTER the master bootstrap script,
+    def test_pooled_cluster_with_max_mins_idle(self):
+        # max-mins-idle script is added AFTER the master bootstrap script,
         # which was a problem when we just look at the last action
         actions = [
             dict(

@@ -807,7 +807,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for bootstrap_action in self._bootstrap_actions():
             self._upload_mgr.add(bootstrap_action['path'])
 
-        # Add max-hours-idle script if we need it
+        # Add max-mins-idle script if we need it
         if persistent or self._opts['pool_clusters']:
             self._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 

@@ -1848,8 +1848,16 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
             runner.run()
             self.assertRanIdleTimeoutScriptWith(runner, ['300', '300'])
 
-    def test_custom_max_hours_idle(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '0.01'])
+    def test_custom_max_mins_idle(self):
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '0.6'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.make_persistent_cluster()
+            self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
+
+    def test_deprecated_max_hours_idle(self):
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '0.6'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -1857,7 +1865,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
             self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
 
     def test_mins_to_end_of_hour(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1',
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '60',
                               '--mins-to-end-of-hour', '10'])
         mr_job.sandbox()
 
@@ -1865,7 +1873,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
             runner.make_persistent_cluster()
             self.assertRanIdleTimeoutScriptWith(runner, ['3600', '600'])
 
-    def test_mins_to_end_of_hour_does_without_max_hours_idle(self):
+    def test_mins_to_end_of_hour_does_without_max_mins_idle(self):
         mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])
         mr_job.sandbox()
 
@@ -1880,7 +1888,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
         self.assertRaises(ValueError, mr_job.make_runner)
 
     def test_use_integers(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1.000001',
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '60.00006',
                               '--mins-to-end-of-hour', '10.000001'])
         mr_job.sandbox()
 

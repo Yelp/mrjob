@@ -366,32 +366,48 @@ Cluster creation and configuration
     and other instance options. See :mrjob-opt:`instance_fleets` for
     details.
 
+
 .. mrjob-opt::
-    :config: max_hours_idle
-    :switch: --max-hours-idle
-    :type: :ref:`string <data-type-string>`
+    :config: max_mins_idle
+    :switch: --max-mins-idle
+    :type: float
     :set: emr
-    :default: 0.5
+    :default: 5
 
     Automatically terminate persistent/pooled clusters that have been idle at
-    least this many hours, if we're within :mrjob-opt:`mins_to_end_of_hour` of
-    an EC2 billing hour.
+    least this many minutes.
 
     .. versionchanged:: 0.6.0
 
        All clusters launched by mrjob now auto-terminate when idle. In previous
-       versions, you needed to set this option explicitly, or use
-       :ref:`terminate-idle-clusters`.
+       versions, you needed to set :mrjob-opt:`max_hours_idle`, set this
+       option explicitly, or use :ref:`terminate-idle-clusters`.
+
+
+.. mrjob-opt::
+    :config: max_hours_idle
+    :switch: --max-hours-idle
+    :type: float
+    :set: emr
+    :default: None
+
+    .. deprecated:: 0.6.0
+
+        Starting with v0.6.0, you should use :mrjob-opt:`max_mins_idle`
+        instead.
 
 .. mrjob-opt::
     :config: mins_to_end_of_hour
     :switch: --mins-to-end-of-hour
-    :type: :ref:`string <data-type-string>`
+    :type: float
     :set: emr
     :default: 5.0
 
-    If :mrjob-opt:`max_hours_idle` is set, controls how close to the end of an
-    EC2 billing hour the cluster can automatically terminate itself.
+    .. deprecated:: 0.6.0
+
+        This option was created back when EMR billed by the full hour, and
+        does nothing as of v0.6.0. If using versions prior to v0.6.0, it's
+        recommended you set this to 60.0 to effectively disable this feature.
 
 .. mrjob-opt::
     :config: region

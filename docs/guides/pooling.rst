@@ -3,22 +3,20 @@
 Cluster Pooling
 ===============
 
-Clusters on EMR take several minutes to spin up. Also, EMR bills by the full
-hour, so if you run, say, a 10-minute job and then shut down the cluster, the
-other 50 minutes are wasted.
+Clusters on EMR take several minutes to spin up, which can make development
+painfully slow.
 
-To mitigate these problems, :py:mod:`mrjob` provides **cluster pools.** By
-default, once your job completes, the cluster will stay open to accept
+To get around this, :py:mod:`mrjob` provides
+**cluster pooling.**. If you set :mrjob-opt:`pool_clusters` to true,
+once your job completes, the cluster will stay open to accept
 additional jobs, and eventually shut itself down after it has been idle
-for a certain amount of time (see :mrjob-opt:`max_hours_idle` and
-:mrjob-opt:`mins_to_end_of_hour`).
+for a certain amount of time (by default, ten minutes; see
+:mrjob-opt:`max_mins_idle`).
 
 .. note::
 
-   Cluster pooling was not turned on by default in versions prior to 0.6.0.
-   To get the same behavior in previous versions :mrjob-opt:`pool_clusters` to
-   ``True`` and :mrjob-opt:`max_hours_idle` to 0.5 (don't forget to set
-   `max_hours_idle`, or your clusters will never shut down).
+   When using cluster pooling prior to v0.6.0, make sure to set
+   :mrjob-opt:`max_hours_idle`, or your cluster will never shut down.
 
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
 share the same clusters. This means that the version of :py:mod:`mrjob` and
@@ -41,8 +39,7 @@ separate pools.
 Pooling is flexible about instance type and number of instances; it will
 attempt to select the most powerful cluster available as long as the
 cluster's instances provide at least as much memory and at least as much CPU as
-your job requests. If there is a tie, it picks clusters that are closest to
-the end of a full hour, to minimize wasted instance hours.
+your job requests.
 
 Pooling is also somewhat flexible about EBS volumes (see
 :mrjob-opt:`instance_groups`). Each volume must have the same volume type,

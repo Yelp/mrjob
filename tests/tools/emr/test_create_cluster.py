@@ -61,6 +61,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'label': None,
                 'master_instance_bid_price': None,
                 'master_instance_type': None,
+                'max_mins_idle': None,
                 'max_hours_idle': None,
                 'mins_to_end_of_hour': None,
                 'num_core_instances': None,

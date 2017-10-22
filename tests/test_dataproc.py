@@ -29,7 +29,7 @@ from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _DATAPROC_API_REGION
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
-from mrjob.dataproc import _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
@@ -518,7 +518,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
         fake_bootstrap_script = 'gs://fake-bucket/fake-script.sh'
         runner._master_bootstrap_script_path = fake_bootstrap_script
         runner._upload_mgr.add(fake_bootstrap_script)
-        runner._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+        runner._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
         cluster_id = runner._launch_cluster()
 
@@ -858,7 +858,7 @@ class DataprocNoMapperTestCase(MockGoogleAPITestCase):
                           (4, ['fish'])])
 
 
-class MaxHoursIdleTestCase(MockGoogleAPITestCase):
+class MaxMinsIdleTestCase(MockGoogleAPITestCase):
 
     def assertRanIdleTimeoutScriptWith(self, runner, expected_metadata):
         cluster_metadata, last_init_exec = (
@@ -869,7 +869,7 @@ class MaxHoursIdleTestCase(MockGoogleAPITestCase):
             self.assertEqual(cluster_metadata[key], expected_metadata[key])
 
         expected_uri = runner._upload_mgr.uri(
-            _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+            _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
         self.assertEqual(last_init_exec, expected_uri)
 
     def _cluster_metadata_and_last_init_exec(self, runner):
@@ -892,11 +892,11 @@ class MaxHoursIdleTestCase(MockGoogleAPITestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             self.assertRanIdleTimeoutScriptWith(runner, {
-                'mrjob-max-secs-idle': '360',
+                'mrjob-max-secs-idle': '300',
             })
 
     def test_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'dataproc', '--max-hours-idle', '0.01'])
+        mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '0.6'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -906,7 +906,7 @@ class MaxHoursIdleTestCase(MockGoogleAPITestCase):
             })
 
     def test_bootstrap_script_is_actually_installed(self):
-        self.assertTrue(os.path.exists(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+        self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
 
 
 class TestCatFallback(MockGoogleAPITestCase):

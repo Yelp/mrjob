@@ -152,7 +152,7 @@ _WAIT_FOR_SSH_TO_FAIL = 1.0
 _POOLING_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 
 # bootstrap action which automatically terminates idle clusters
-_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
+_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     os.path.dirname(mrjob.__file__),
     'bootstrap',
     'terminate_idle_cluster.sh')
@@ -470,11 +470,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 cloud_fs_sync_secs=5.0,
                 cloud_upload_part_size=100,  # 100 MB
                 image_version=_DEFAULT_IMAGE_VERSION,
-                max_hours_idle=0.5,
                 mins_to_end_of_hour=5.0,
                 num_core_instances=0,
                 num_task_instances=0,
-                pool_clusters=True,
+                pool_clusters=False,
                 pool_name='default',
                 pool_wait_minutes=0,
                 region=_DEFAULT_EMR_REGION,
@@ -808,9 +807,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for bootstrap_action in self._bootstrap_actions():
             self._upload_mgr.add(bootstrap_action['path'])
 
-        # Add max-hours-idle script if we need it
+        # Add max-mins-idle script if we need it
         if persistent or self._opts['pool_clusters']:
-            self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+            self._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_master_node_setup_files_for_upload(self):
         """Add files necesary for the master node setup script to
@@ -1354,9 +1353,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # use idle termination script on persistent clusters
             # add it last, so that we don't count bootstrapping as idle time
             uri = self._upload_mgr.uri(
-                _MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+                _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
             # script takes args in (integer) seconds
-            ba_args = [str(int(self._opts['max_hours_idle'] * 3600)),
+            ba_args = [str(int(self._opts['max_mins_idle'] * 60)),
                        str(int(self._opts['mins_to_end_of_hour'] * 60))]
             BootstrapActions.append(dict(
                 Name='idle timeout',
@@ -1924,8 +1923,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._created_cluster:
             return
 
-        # don't check for max_hours_idle because it's possible to
-        # join a self-terminating cluster without having max_hours_idle set
+        # don't check for max_mins_idle because it's possible to
+        # join a self-terminating cluster without having max_mins_idle set
         # on this runner (pooling only cares about the master bootstrap script,
         # not other bootstrap actions)
 

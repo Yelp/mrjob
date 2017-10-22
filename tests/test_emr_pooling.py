@@ -1778,16 +1778,16 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         cluster = runner._describe_cluster()
         self.assertEqual(cluster['Status']['State'], 'WAITING')
 
-    def test_max_hours_idle_doesnt_affect_pool_hash(self):
-        # max_hours_idle uses a bootstrap action, but it's not included
+    def test_max_mins_idle_doesnt_affect_pool_hash(self):
+        # max_mins_idle uses a bootstrap action, but it's not included
         # in the pool hash
         _, cluster_id = self.make_pooled_cluster()
 
         self.assertJoins(cluster_id, [
-            '-r', 'emr', '--pool-clusters', '--max-hours-idle', '1'])
+            '-r', 'emr', '--pool-clusters', '--max-mins-idle', '60'])
 
-    def test_can_join_cluster_started_with_max_hours_idle(self):
-        _, cluster_id = self.make_pooled_cluster(max_hours_idle=1)
+    def test_can_join_cluster_started_with_max_mins_idle(self):
+        _, cluster_id = self.make_pooled_cluster(max_mins_idle=60)
 
         self.assertJoins(cluster_id, ['-r', 'emr', '--pool-clusters'])
 

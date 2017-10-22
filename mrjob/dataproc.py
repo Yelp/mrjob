@@ -69,7 +69,6 @@ _DEFAULT_INSTANCE_TYPE = 'n1-standard-1'
 # version of mrjob
 _DEFAULT_IMAGE_VERSION = '1.0'
 _DEFAULT_CHECK_CLUSTER_EVERY = 10.0
-_DEFAULT_MAX_HOURS_IDLE = 0.1
 _DEFAULT_CLOUD_FS_SYNC_SECS = 5.0
 _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS = 90
 
@@ -108,7 +107,7 @@ _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
 }
 
 # bootstrap action which automatically terminates idle clusters
-_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
+_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     os.path.dirname(mrjob.__file__),
     'bootstrap',
     'terminate_idle_cluster_dataproc.sh')
@@ -299,7 +298,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                  image_version=_DEFAULT_IMAGE_VERSION,
                  instance_type=_DEFAULT_INSTANCE_TYPE,
                  master_instance_type=_DEFAULT_INSTANCE_TYPE,
-                 max_hours_idle=_DEFAULT_MAX_HOURS_IDLE,
                  num_core_instances=_DATAPROC_MIN_WORKERS,
                  num_task_instances=0,
                  sh_bin=['/bin/sh', '-ex'],
@@ -417,7 +415,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._create_master_bootstrap_script_if_needed()
         if self._master_bootstrap_script_path:
             self._upload_mgr.add(self._master_bootstrap_script_path)
-            self._upload_mgr.add(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH)
+            self._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -793,7 +791,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             # always add idle termination script
             # add it last, so that we don't count bootstrapping as idle time
             gcs_init_script_uris.append(
-                self._upload_mgr.uri(_MAX_HOURS_IDLE_BOOTSTRAP_ACTION_PATH))
+                self._upload_mgr.uri(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
 
         # NOTE - Cluster initializationActions can only take scripts with no
         # script args, so the auto-term script receives 'mrjob-max-secs-idle'
@@ -801,7 +799,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
         cluster_metadata['mrjob-max-secs-idle'] = str(int(
-            self._opts['max_hours_idle'] * 3600))
+            self._opts['max_mins_idle'] * 60))
 
         cluster_config = dict(
             gceClusterConfig=dict(

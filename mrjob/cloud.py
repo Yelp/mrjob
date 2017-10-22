@@ -18,6 +18,7 @@ import pipes
 from os.path import basename
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.conf import combine_dicts
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
@@ -52,6 +53,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'image_version',
         'instance_type',
         'master_instance_type',
+        'max_mins_idle',
         'max_hours_idle',
         'num_core_instances',
         'num_task_instances',
@@ -65,6 +67,10 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
     def __init__(self, **kwargs):
         super(HadoopInTheCloudJobRunner, self).__init__(**kwargs)
+
+        if self._opts.get('max_hours_idle'):
+            log.warning('max_hours_idle is deprecated and will be removed'
+                        ' in v0.7.0. Please use max_mins_idle instead')
 
         # if *cluster_id* is not set, ``self._cluster_id`` will be
         # set when we create or join a cluster
@@ -91,6 +97,24 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
 
     ### Options ###
+
+    def _default_opts(self):
+        return combine_dicts(
+            super(HadoopInTheCloudJobRunner, self)._default_opts(),
+            dict(max_mins_idle=5.0),
+        )
+
+    def _fix_opts(self, opts, source=None):
+        # patch max_hours_idle into max_mins_idle (see #1663)
+        opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
+            opts, source=source)
+
+        if (opts.get('max_mins_idle') is None and
+                opts.get('max_hours_idle') is not None):
+
+            opts['max_mins_idle'] = opts['max_hours_idle'] * 60
+
+        return opts
 
     def _combine_opts(self, opt_list):
         """Propagate *instance_type* to other instance type opts, if not

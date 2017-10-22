@@ -269,11 +269,7 @@ def _cluster_to_full_summary(cluster, now=None):
         cluster, basic_summary=cs, now=now)
 
     # add up billing info
-    if cs['end']:
-        # avoid rounding errors if the job is done
-        cs['nih_billed'] = cs['nih']
-    else:
-        cs['nih_billed'] = float(sum(u['nih_billed'] for u in cs['usage']))
+    cs['nih_billed'] = float(sum(u['nih_billed'] for u in cs['usage']))
 
     for nih_type in ('nih_used', 'nih_bbnu'):
         cs[nih_type] = float(sum(u[nih_type] for u in cs['usage']))
@@ -299,7 +295,8 @@ def _cluster_to_basic_summary(cluster, now=None):
       :py:class:`~mrjob.job.MRJob` script that started it), or
       ``None`` for non-:py:mod:`mrjob` clusters.
     * *name*: cluster name, or ``None`` (this should never happen)
-    * *nih*: number of normalized instance hours used by the cluster.
+    * *nih*: number of normalized instance hours cluster *would* use if it
+      ran to the end of the next full hour (
     * *num_steps*: Number of steps in the cluster.
     * *owner*: The owner for the cluster (usually the user that started it),
       or ``None`` for non-:py:mod:`mrjob` clusters.
@@ -347,7 +344,7 @@ def _cluster_to_basic_summary(cluster, now=None):
     else:
         bcs['label'], bcs['owner'] = None, None
 
-    bcs['nih'] = cluster.get('NormalizedInstanceHours', 0)
+    bcs['nih'] = float(cluster.get('NormalizedInstanceHours', 0))
 
     return bcs
 
@@ -399,20 +396,14 @@ def _cluster_to_usage_data(cluster, basic_summary=None, now=None):
     if not bcs['created']:
         return []
 
-    # Figure out billing rate per second for the job, given that
-    # normalizedinstancehours is how much we're charged up until
-    # the next full hour.
+    # EMR no longer bills by the full hour, but NormalizedInstanceHours
+    # still works that way
     full_hours = math.ceil(timedelta.total_seconds(bcs['ran']) / 60.0 / 60.0)
     nih_per_sec = bcs['nih'] / (full_hours * 3600.0)
 
-    # Don't actually count a step as billed for the full hour until
-    # the cluster finishes. This means that our total "nih_billed"
-    # will be less than normalizedinstancehours in the cluster, but it
-    # also keeps stats stable for steps that have already finished.
-    if bcs['end']:
-        cluster_end_billing = bcs['created'] + timedelta(hours=full_hours)
-    else:
-        cluster_end_billing = now
+    # EMR bills by the full second, and at least one minute per cluster
+    cluster_end_billing = bcs['created'] + max(
+        _round_up_to_next_second(bcs['ran']), timedelta(minutes=1))
 
     intervals = []
 
@@ -814,6 +805,13 @@ def _percent(x, total, default=0.0):
         return 100.0 * x / total
     else:
         return default
+
+def _round_up_to_next_second(td):
+    """Round up to the next second because that's how EMR bills."""
+    if td.microseconds:
+        return strip_microseconds(td) + timedelta(seconds=1)
+    else:
+        return td
 
 
 if __name__ == '__main__':

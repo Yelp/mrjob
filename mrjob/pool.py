@@ -31,31 +31,7 @@ from mrjob.aws import EC2_INSTANCE_TYPE_TO_MEMORY
 log = getLogger(__name__)
 
 
-### current versions of these functions, using "cluster" API calls ###
-
-# these are "hidden" because there's no need to access them directly
-
-def _est_time_to_hour(cluster_summary, now=None):
-    """How long before job reaches the end of the next full hour since it
-    began. This is important for billing purposes.
-
-    If it happens to be exactly a whole number of hours, we return
-    one hour, not zero.
-    """
-    if now is None:
-        now = _boto3_now()
-
-    timeline = cluster_summary.get('Status', {}).get('Timeline', {})
-
-    creationdatetime = timeline.get('CreationDateTime')
-
-    if not creationdatetime:
-        # do something reasonable if creationdatetime isn't set
-        return timedelta(minutes=60)
-
-    run_time = now - creationdatetime
-    return timedelta(seconds=((-run_time).seconds % 3600.0 or 3600.0))
-
+### identifying pooled clusters ###
 
 def _pool_tags(hash, name):
     """Return a dict with "hidden" tags to add to the given cluster."""

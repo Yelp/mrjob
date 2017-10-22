@@ -21,7 +21,6 @@ from datetime import timedelta
 
 from mrjob.aws import _boto3_now
 from mrjob.fs.s3 import S3Filesystem
-from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.terminate_idle_clusters import main
@@ -377,7 +376,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
             starting=False,
             bootstrapping=False,
             done=False,
-            from_end_of_hour=timedelta(hours=1),
             has_pending_steps=False,
             idle_for=timedelta(0),
             pool_hash=None,
@@ -390,8 +388,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
                          _is_cluster_bootstrapping(mock_cluster))
         self.assertEqual(done,
                          _is_cluster_done(mock_cluster))
-        self.assertEqual(from_end_of_hour,
-                         _est_time_to_hour(mock_cluster, self.now))
         self.assertEqual(has_pending_steps,
                          _cluster_has_pending_steps(mock_cluster['_Steps']))
         self.assertEqual(idle_for,
@@ -437,7 +433,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
     def test_currently_running(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-CURRENTLY_RUNNING'],
-            from_end_of_hour=timedelta(minutes=45),
             running=True,
         )
 
@@ -486,7 +481,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
     def test_pooled(self):
         self.assert_mock_cluster_is(
             self.mock_emr_clusters['j-POOLED'],
-            from_end_of_hour=timedelta(minutes=5),
             idle_for=timedelta(minutes=50),
             pool_hash='0123456789abcdef0123456789abcdef',
             pool_name='reflecting',
@@ -584,39 +578,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
                           'j-IDLE_AND_FAILED', 'j-PENDING_BUT_IDLE',
                           'j-POOLED'])
 
-    def test_mins_to_end_of_hour(self):
-
-        self.maybe_terminate_quietly(mins_to_end_of_hour=2)
-
-        self.assertEqual(self.ids_of_terminated_clusters(), [])
-
-        # edge case: it's exactly 5 minutes to end of hour
-        self.maybe_terminate_quietly(mins_to_end_of_hour=5)
-
-        self.assertEqual(self.ids_of_terminated_clusters(), [])
-
-        self.maybe_terminate_quietly(mins_to_end_of_hour=6)
-
-        self.assert_terminated_clusters_locked_by_terminate()
-
-        # j-PENDING_BUT_IDLE is also 5 mins from end of hour, but
-        # is skipped because it has pending jobs.
-        self.assertEqual(self.ids_of_terminated_clusters(), ['j-POOLED'])
-
-    def test_mins_to_end_of_hour_excludes_pending(self):
-        # the filters are ANDed togther, and mins_to_end_of_hour excludes
-        # jobs with pending steps.
-        self.maybe_terminate_quietly(mins_to_end_of_hour=61, max_mins_idle=0.6)
-
-        self.assert_terminated_clusters_locked_by_terminate()
-
-        self.assertEqual(self.ids_of_terminated_clusters(),
-                         ['j-CUSTOM_DONE_AND_IDLE',
-                          'j-DEBUG_ONLY',
-                          'j-DONE_AND_IDLE', 'j-DONE_AND_IDLE_4_X',
-                          'j-HADOOP_DEBUGGING', 'j-IDLE_AND_EXPIRED',
-                          'j-IDLE_AND_FAILED', 'j-POOLED'])
-
     def test_terminate_pooled_only(self):
         self.assertEqual(self.ids_of_terminated_clusters(), [])
 
@@ -677,23 +638,23 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
     EXPECTED_STDOUT_LINES = [
         'Terminated cluster j-POOLED (POOLED);'
-        ' was idle for 0:50:00, 0:05:00 to end of hour',
+        ' was idle for 0:50:00',
         'Terminated cluster j-PENDING_BUT_IDLE (PENDING_BUT_IDLE);'
-        ' was pending for 2:50:00, 1:00:00 to end of hour',
+        ' was pending for 2:50:00',
         'Terminated cluster j-DEBUG_ONLY (DEBUG_ONLY);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-DONE_AND_IDLE (DONE_AND_IDLE);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-DONE_AND_IDLE_4_X (DONE_AND_IDLE_4_X);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-IDLE_AND_EXPIRED (IDLE_AND_EXPIRED);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-IDLE_AND_FAILED (IDLE_AND_FAILED);'
-        ' was idle for 3:00:00, 1:00:00 to end of hour',
+        ' was idle for 3:00:00',
         'Terminated cluster j-HADOOP_DEBUGGING (HADOOP_DEBUGGING);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-CUSTOM_DONE_AND_IDLE (CUSTOM_DONE_AND_IDLE);'
-        ' was idle for 4:00:00, 1:00:00 to end of hour',
+        ' was idle for 4:00:00',
     ]
 
     def test_its_not_very_quiet(self):
@@ -724,7 +685,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # dry_run doesn't actually try to lock
         expected_stdout_lines = self.EXPECTED_STDOUT_LINES + [
             'Terminated cluster j-IDLE_AND_LOCKED (IDLE_AND_LOCKED);'
-            ' was idle for 2:00:00, 1:00:00 to end of hour']
+            ' was idle for 2:00:00']
 
         self.assertEqual(set(stdout.getvalue().splitlines()),
                          set(expected_stdout_lines))
@@ -733,10 +694,10 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.assertEqual(self.ids_of_terminated_clusters(), [])
 
 
-class DeprecatedMaxHoursIdleTestCase(SandboxedTestCase):
+class DeprecatedSwitchesTestCase(SandboxedTestCase):
 
     def setUp(self):
-        super(DeprecatedMaxHoursIdleTestCase, self).setUp()
+        super(DeprecatedSwitchesTestCase, self).setUp()
 
         self._maybe_terminate_clusters = self.start(patch(
             'mrjob.tools.emr.terminate_idle_clusters.'
@@ -752,5 +713,14 @@ class DeprecatedMaxHoursIdleTestCase(SandboxedTestCase):
         self.assertEqual(
             self._maybe_terminate_clusters.call_args[1]['max_mins_idle'],
             120)
+
+        self.assertTrue(self.log.warning.called)
+
+    def test_deprecated_mins_to_end_of_hour(self):
+        main(['--mins-to-end-of-hour', '5'])
+
+        self.assertNotIn(
+            'mins_to_end_of_hour',
+            self._maybe_terminate_clusters.call_args[1])
 
         self.assertTrue(self.log.warning.called)

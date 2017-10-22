@@ -74,7 +74,6 @@ from mrjob.job import MRJob
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
 from mrjob.options import _filter_by_role
-from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 from mrjob.util import strip_microseconds
 
@@ -91,17 +90,20 @@ def main(cl_args=None):
     MRJob.set_up_logging(quiet=options.quiet,
                          verbose=options.verbose)
 
-    # support
+    # max_hours_idle -> max_mins_idle
     max_mins_idle = options.max_mins_idle
     if max_mins_idle is None and options.max_hours_idle is not None:
         log.warning('--max-hours-idle is deprecated and will be removed'
                     ' in v0.7.0. Please use --max-mins-idle instead.')
         max_mins_idle = options.max_hours_idle * 60
 
+    if options.mins_to_end_of_hour is not None:
+        log.warning('--mins-to-end-of-hour is deprecated as of v0.6.0'
+                    ' and does nothing')
+
     _maybe_terminate_clusters(
         dry_run=options.dry_run,
         max_mins_idle=max_mins_idle,
-        mins_to_end_of_hour=options.mins_to_end_of_hour,
         unpooled_only=options.unpooled_only,
         now=_boto3_now(),
         pool_name=options.pool_name,
@@ -115,8 +117,8 @@ def main(cl_args=None):
 def _runner_kwargs(options):
     kwargs = options.__dict__.copy()
     for unused_arg in ('quiet', 'verbose', 'max_mins_idle', 'max_hours_idle',
-                       'max_mins_locked',
-                       'mins_to_end_of_hour', 'unpooled_only',
+                       'mins_to_end_of_hour',
+                       'max_mins_locked', 'unpooled_only',
                        'pooled_only', 'pool_name', 'dry_run'):
         del kwargs[unused_arg]
 
@@ -125,7 +127,6 @@ def _runner_kwargs(options):
 
 def _maybe_terminate_clusters(dry_run=False,
                               max_mins_idle=None,
-                              mins_to_end_of_hour=None,
                               now=None,
                               pool_name=None,
                               pooled_only=False,
@@ -137,7 +138,7 @@ def _maybe_terminate_clusters(dry_run=False,
         now = _boto3_now()
 
     # old default behavior
-    if max_mins_idle is None and mins_to_end_of_hour is None:
+    if max_mins_idle is None:
         max_mins_idle = _DEFAULT_MAX_MINS_IDLE
 
     runner = EMRJobRunner(**kwargs)
@@ -183,7 +184,6 @@ def _maybe_terminate_clusters(dry_run=False,
 
         # cluster is idle
         time_idle = now - _time_last_active(cluster_summary, steps)
-        time_to_end_of_hour = _est_time_to_hour(cluster_summary, now=now)
         is_pending = _cluster_has_pending_steps(steps)
 
         # need to get actual cluster to see tags
@@ -197,24 +197,16 @@ def _maybe_terminate_clusters(dry_run=False,
             num_idle += 1
 
         log.debug(
-            'cluster %s %s for %s, %s to end of hour, %s (%s)' %
+            'cluster %s %s for %s, %s (%s)' %
             (cluster_id,
              'pending' if is_pending else 'idle',
              strip_microseconds(time_idle),
-             strip_microseconds(time_to_end_of_hour),
              ('unpooled' if pool is None else 'in %s pool' % pool),
              cluster_summary['Name']))
 
         # filter out clusters that don't meet our criteria
         if (max_mins_idle is not None and
                 time_idle <= timedelta(minutes=max_mins_idle)):
-            continue
-
-        # mins_to_end_of_hour doesn't apply to jobs with pending steps
-        if (mins_to_end_of_hour is not None and
-            (is_pending or
-             time_to_end_of_hour >= timedelta(
-                minutes=mins_to_end_of_hour))):
             continue
 
         if (pooled_only and pool is None):
@@ -234,7 +226,6 @@ def _maybe_terminate_clusters(dry_run=False,
             num_steps=len(steps),
             is_pending=is_pending,
             time_idle=time_idle,
-            time_to_end_of_hour=time_to_end_of_hour,
             dry_run=dry_run,
             max_mins_locked=max_mins_locked,
             quiet=quiet)
@@ -310,15 +301,14 @@ def _time_last_active(cluster_summary, steps):
 
 
 def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
-                          is_pending, time_idle, time_to_end_of_hour,
+                          is_pending, time_idle,
                           dry_run=False, max_mins_locked=None, quiet=False):
 
-    fmt = ('Terminated cluster %s (%s); was %s for %s, %s to end of hour')
+    fmt = ('Terminated cluster %s (%s); was %s for %s')
     msg = fmt % (
         cluster_id, cluster_name,
         'pending' if is_pending else 'idle',
-        strip_microseconds(time_idle),
-        strip_microseconds(time_to_end_of_hour))
+        strip_microseconds(time_idle))
 
     did_terminate = False
     if dry_run:
@@ -371,9 +361,7 @@ def _make_arg_parser():
     arg_parser.add_argument(
         '--mins-to-end-of-hour', dest='mins_to_end_of_hour',
         default=None, type=float,
-        help=('Terminate clusters that are within this many minutes of'
-              ' the end of a full hour since the job started running'
-              ' AND have no pending steps.'))
+        help=('Deprecated, does nothing.'))
     arg_parser.add_argument(
         '--unpooled-only', dest='unpooled_only', action='store_true',
         default=False,

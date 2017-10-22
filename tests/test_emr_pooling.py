@@ -1692,16 +1692,6 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         self.assertEqual(runner_1._find_cluster(), cluster_id)
         self.assertEqual(runner_2._find_cluster(), None)
 
-    def test_sorting_by_time(self):
-        _, cluster_id_1 = self.make_pooled_cluster('pool1', minutes_ago=20)
-        _, cluster_id_2 = self.make_pooled_cluster('pool1', minutes_ago=40)
-
-        runner_1 = self.make_simple_runner('pool1')
-        runner_2 = self.make_simple_runner('pool1')
-
-        self.assertEqual(runner_1._find_cluster(), cluster_id_1)
-        self.assertEqual(runner_2._find_cluster(), cluster_id_2)
-
     def test_sorting_by_cpu_hours(self):
         _, cluster_id_1 = self.make_pooled_cluster('pool1',
                                                    minutes_ago=40,

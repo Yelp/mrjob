@@ -269,11 +269,7 @@ def _cluster_to_full_summary(cluster, now=None):
         cluster, basic_summary=cs, now=now)
 
     # add up billing info
-    if cs['end']:
-        # avoid rounding errors if the job is done
-        cs['nih_billed'] = cs['nih']
-    else:
-        cs['nih_billed'] = float(sum(u['nih_billed'] for u in cs['usage']))
+    cs['nih_billed'] = float(sum(u['nih_billed'] for u in cs['usage']))
 
     for nih_type in ('nih_used', 'nih_bbnu'):
         cs[nih_type] = float(sum(u[nih_type] for u in cs['usage']))
@@ -299,7 +295,8 @@ def _cluster_to_basic_summary(cluster, now=None):
       :py:class:`~mrjob.job.MRJob` script that started it), or
       ``None`` for non-:py:mod:`mrjob` clusters.
     * *name*: cluster name, or ``None`` (this should never happen)
-    * *nih*: number of normalized instance hours used by the cluster.
+    * *nih*: number of normalized instance hours cluster *would* use if it
+      ran to the end of the next full hour (
     * *num_steps*: Number of steps in the cluster.
     * *owner*: The owner for the cluster (usually the user that started it),
       or ``None`` for non-:py:mod:`mrjob` clusters.

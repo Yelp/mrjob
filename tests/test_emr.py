@@ -1575,7 +1575,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertTrue(actions[3]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[3]['ScriptPath'].endswith(
             'terminate_idle_cluster.sh'))
-        self.assertEqual(actions[3]['Args'], ['300', '300'])
+        self.assertEqual(actions[3]['Args'], ['300'])
         self.assertEqual(actions[3]['Name'], 'idle timeout')
 
         # make sure master bootstrap script is on S3
@@ -1630,7 +1630,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[2]['ScriptPath'].endswith(
             'terminate_idle_cluster.sh'))
-        self.assertEqual(actions[2]['Args'], ['300', '300'])
+        self.assertEqual(actions[2]['Args'], ['300'])
         self.assertEqual(actions[2]['Name'], 'idle timeout')
 
         # make sure scripts are on S3

@@ -88,7 +88,8 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
         super(MRDeprecatedCustomJobLauncher, self).configure_options()
 
         self.add_passthrough_option(
-            '--foo-size', '-F', type='int', dest='foo_size', default=5)
+            '--foo-size', '-F', type='int', dest='foo_size', default=5,
+            help='default is %default')
         self.add_passthrough_option(
             '--pill-type', '-T', type='choice', choices=(['red', 'blue']),
             default='blue')
@@ -478,3 +479,8 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
         mr_job = MRDeprecatedCustomJobLauncher(
             args=['-F', '6', '', 'input1.txt', 'input2.txt'])
         self.assertEqual(mr_job.args, ['input1.txt', 'input2.txt'])
+
+    def test_help_compatibility(self):
+        mr_job = MRDeprecatedCustomJobLauncher(args=[''])
+
+        self.assertIn('default is 5', mr_job.arg_parser.format_help())

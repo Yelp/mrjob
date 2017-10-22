@@ -81,6 +81,9 @@ _OPTPARSE_TYPES = dict(
 # use to identify malformed JSON
 _PROBABLY_JSON_RE = re.compile(r'^\s*[\{\[\"].*$')
 
+# use to match %prog and %default
+_OPTPARSE_HELP_RE = re.compile(r'%(\w+)')
+
 
 ### custom actions ###
 
@@ -1418,6 +1421,10 @@ def _optparse_kwargs_to_argparse(**kwargs):
             'ignoring opt_group keyword arg (mrjob no longer supports'
             ' opt groups')
         kwargs.pop('opt_group')
+
+    # convert %default -> %(default)s, etc.
+    if kwargs.get('help'):
+        kwargs['help'] = _OPTPARSE_HELP_RE.sub(r'%(\1)s', kwargs['help'])
 
     # pretty much everything else is the same. if people want to pass argparse
     # kwargs through the old optparse interface (e.g. *action* or *required*)

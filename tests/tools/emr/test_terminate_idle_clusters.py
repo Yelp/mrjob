@@ -638,23 +638,23 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
 
     EXPECTED_STDOUT_LINES = [
         'Terminated cluster j-POOLED (POOLED);'
-        ' was idle for 0:50:00, 0:05:00 to end of hour',
+        ' was idle for 0:50:00',
         'Terminated cluster j-PENDING_BUT_IDLE (PENDING_BUT_IDLE);'
-        ' was pending for 2:50:00, 1:00:00 to end of hour',
+        ' was pending for 2:50:00',
         'Terminated cluster j-DEBUG_ONLY (DEBUG_ONLY);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-DONE_AND_IDLE (DONE_AND_IDLE);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-DONE_AND_IDLE_4_X (DONE_AND_IDLE_4_X);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-IDLE_AND_EXPIRED (IDLE_AND_EXPIRED);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-IDLE_AND_FAILED (IDLE_AND_FAILED);'
-        ' was idle for 3:00:00, 1:00:00 to end of hour',
+        ' was idle for 3:00:00',
         'Terminated cluster j-HADOOP_DEBUGGING (HADOOP_DEBUGGING);'
-        ' was idle for 2:00:00, 1:00:00 to end of hour',
+        ' was idle for 2:00:00',
         'Terminated cluster j-CUSTOM_DONE_AND_IDLE (CUSTOM_DONE_AND_IDLE);'
-        ' was idle for 4:00:00, 1:00:00 to end of hour',
+        ' was idle for 4:00:00',
     ]
 
     def test_its_not_very_quiet(self):
@@ -685,7 +685,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # dry_run doesn't actually try to lock
         expected_stdout_lines = self.EXPECTED_STDOUT_LINES + [
             'Terminated cluster j-IDLE_AND_LOCKED (IDLE_AND_LOCKED);'
-            ' was idle for 2:00:00, 1:00:00 to end of hour']
+            ' was idle for 2:00:00']
 
         self.assertEqual(set(stdout.getvalue().splitlines()),
                          set(expected_stdout_lines))

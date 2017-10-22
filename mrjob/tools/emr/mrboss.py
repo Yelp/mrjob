@@ -21,26 +21,26 @@ Usage::
 
 Options::
 
-  -h, --help            show this help message and exit
-  -c CONF_PATHS, --conf-path=CONF_PATHS
+  -c CONF_PATHS, --conf-path CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
-  --ec2-key-pair-file=EC2_KEY_PAIR_FILE
+  --ec2-key-pair-file EC2_KEY_PAIR_FILE
                         Path to file containing SSH key for EMR
-  --emr-endpoint=EMR_ENDPOINT
+  --emr-endpoint EMR_ENDPOINT
                         Force mrjob to connect to EMR on this endpoint (e.g.
                         us-west-1.elasticmapreduce.amazonaws.com). Default is
                         to infer this from region.
-  -o OUTPUT_DIR, --output-dir=OUTPUT_DIR
+  -h, --help            show this help message and exit
+  -o OUTPUT_DIR, --output-dir OUTPUT_DIR
                         Specify an output directory (default: CLUSTER_ID)
   -q, --quiet           Don't print anything to stderr
-  --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
-  --s3-endpoint=S3_ENDPOINT
+  --region REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --s3-endpoint S3_ENDPOINT
                         Force mrjob to connect to S3 on this endpoint (e.g. s3
                         -us-west-1.amazonaws.com). You usually shouldn't set
                         this; by default mrjob will choose the correct
                         endpoint for each S3 bucket based on its location.
-  --ssh-bin=SSH_BIN     Name/path of ssh binary. Arguments are allowed (e.g.
+  --ssh-bin SSH_BIN     Name/path of ssh binary. Arguments are allowed (e.g.
                         --ssh-bin 'ssh -v')
   -v, --verbose         print more messages to stderr
 """
@@ -53,6 +53,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
+from mrjob.options import _alphabetize_actions
 from mrjob.options import _filter_by_role
 from mrjob.py2 import to_unicode
 from mrjob.util import shlex_split
@@ -80,6 +81,8 @@ def main(cl_args=None):
         {'ec2_key_pair_file', 'ssh_bin'} | _filter_by_role(
             EMRJobRunner.OPT_NAMES, 'connect')
     )
+
+    _alphabetize_actions(arg_parser)
 
     options = arg_parser.parse_args(cl_args)
 

@@ -23,27 +23,27 @@ Suggested usage: run this as a daily cron job with the ``-q`` option::
 
 Options::
 
-  -h, --help            show this help message and exit
-  -c CONF_PATHS, --conf-path=CONF_PATHS
+  -c CONF_PATHS, --conf-path CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
-  --emr-endpoint=EMR_ENDPOINT
+  --emr-endpoint EMR_ENDPOINT
                         Force mrjob to connect to EMR on this endpoint (e.g.
                         us-west-1.elasticmapreduce.amazonaws.com). Default is
                         to infer this from region.
-  --min-hours=MIN_HOURS
+  -x EXCLUDE, --exclude EXCLUDE
+                        Exclude clusters that match the specified tags.
+                        Specifed in the form TAG_KEY,TAG_VALUE.
+  -h, --help            show this help message and exit
+  --min-hours MIN_HOURS
                         Minimum number of hours a job can run before we report
                         it. Default: 24.0
   -q, --quiet           Don't print anything to stderr
-  --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
-  --s3-endpoint=S3_ENDPOINT
+  --region REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --s3-endpoint S3_ENDPOINT
                         Force mrjob to connect to S3 on this endpoint (e.g. s3
                         -us-west-1.amazonaws.com). You usually shouldn't set
                         this; by default mrjob will choose the correct
                         endpoint for each S3 bucket based on its location.
-  -x, --exclude=TAG_KEY,TAG_VALUE
-                        Exclude clusters that have the specified tag key/value
-                        pair
   -v, --verbose         print more messages to stderr
 """
 from __future__ import print_function
@@ -58,6 +58,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
+from mrjob.options import _alphabetize_actions
 from mrjob.options import _filter_by_role
 from mrjob.util import strip_microseconds
 
@@ -254,7 +255,7 @@ def _make_arg_parser():
         '--min-hours', dest='min_hours', type=float,
         default=DEFAULT_MIN_HOURS,
         help=('Minimum number of hours a job can run before we report it.'
-              ' Default: %default'))
+              ' Default: %(default)s'))
 
     arg_parser.add_argument(
         '-x', '--exclude', action='append',
@@ -267,6 +268,8 @@ def _make_arg_parser():
         arg_parser,
         _filter_by_role(EMRJobRunner.OPT_NAMES, 'connect')
     )
+
+    _alphabetize_actions(arg_parser)
 
     return arg_parser
 

@@ -344,7 +344,7 @@ def _cluster_to_basic_summary(cluster, now=None):
     else:
         bcs['label'], bcs['owner'] = None, None
 
-    bcs['nih'] = cluster.get('NormalizedInstanceHours', 0)
+    bcs['nih'] = float(cluster.get('NormalizedInstanceHours', 0))
 
     return bcs
 

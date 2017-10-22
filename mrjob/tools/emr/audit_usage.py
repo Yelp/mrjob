@@ -20,21 +20,21 @@ Usage::
 
 Options::
 
-  -h, --help            show this help message and exit
-  -c CONF_PATHS, --conf-path=CONF_PATHS
+  -c CONF_PATHS, --conf-path CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
-  --emr-endpoint=EMR_ENDPOINT
+  --emr-endpoint EMR_ENDPOINT
                         Force mrjob to connect to EMR on this endpoint (e.g.
                         us-west-1.elasticmapreduce.amazonaws.com). Default is
                         to infer this from region.
-  --max-days-ago=MAX_DAYS_AGO
+  -h, --help            show this help message and exit
+  --max-days-ago MAX_DAYS_AGO
                         Max number of days ago to look at jobs. By default, we
                         go back as far as EMR supports (currently about 2
                         months)
   -q, --quiet           Don't print anything to stderr
-  --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
-  --s3-endpoint=S3_ENDPOINT
+  --region REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --s3-endpoint S3_ENDPOINT
                         Force mrjob to connect to S3 on this endpoint (e.g. s3
                         -us-west-1.amazonaws.com). You usually shouldn't set
                         this; by default mrjob will choose the correct
@@ -60,6 +60,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
+from mrjob.options import _alphabetize_actions
 from mrjob.options import _filter_by_role
 from mrjob.pool import _legacy_pool_hash_and_name
 from mrjob.pool import _pool_hash_and_name
@@ -81,6 +82,7 @@ log = logging.getLogger(__name__)
 def main(args=None):
     # parse command-line args
     arg_parser = _make_arg_parser()
+
     options = arg_parser.parse_args(args)
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
@@ -112,6 +114,8 @@ def _make_arg_parser():
     _add_runner_args(
         arg_parser,
         _filter_by_role(EMRJobRunner.OPT_NAMES, 'connect'))
+
+    _alphabetize_actions(arg_parser)
 
     return arg_parser
 

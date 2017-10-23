@@ -1419,7 +1419,18 @@ def _optparse_kwargs_to_argparse(**kwargs):
             ' opt groups')
         kwargs.pop('opt_group')
 
+    # convert %default -> %(default)s
+    if kwargs.get('help'):
+        kwargs['help'] = kwargs['help'].replace('%default', '%(default)s')
+
     # pretty much everything else is the same. if people want to pass argparse
     # kwargs through the old optparse interface (e.g. *action* or *required*)
     # more power to 'em.
     return kwargs
+
+
+def _alphabetize_actions(arg_parser):
+    """Alphabetize arg parser actions for the sake of nicer help printouts."""
+    # based on https://stackoverflow.com/questions/12268602/sort-argparse-help-alphabetically  # noqa
+    for g in arg_parser._action_groups:
+        g._group_actions.sort(key=lambda opt: opt.dest)

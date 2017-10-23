@@ -21,7 +21,7 @@ class MRGrepJob(MRJob):
     def configure_args(self):
         super(MRGrepJob, self).configure_args()
 
-        self.add_passthrough_arg(
+        self.add_passthru_arg(
             '-e', '--expression',
             help=( 'Expression to search for. Required.'))
 

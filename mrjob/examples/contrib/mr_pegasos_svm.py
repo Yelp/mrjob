@@ -54,10 +54,10 @@ class MRsvm(MRJob):
 
     def configure_args(self):
         super(MRsvm, self).configure_args()
-        self.add_passthrough_arg(
+        self.add_passthru_arg(
             '--iterations', dest='iterations', default=2, type=int,
             help='T: number of iterations to run')
-        self.add_passthrough_arg(
+        self.add_passthru_arg(
             '--batchsize', dest='batchsize', default=100, type=int,
             help='k: number of data points in a batch')
 

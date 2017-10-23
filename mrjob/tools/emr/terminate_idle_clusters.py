@@ -24,35 +24,35 @@ Suggested usage: run this as a cron job with the ``-q`` option::
 
 Options::
 
-  -h, --help            show this help message and exit
-  -c CONF_PATHS, --conf-path=CONF_PATHS
+  -c CONF_PATHS, --conf-path CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
   --dry-run             Don't actually kill idle jobs; just log that we would
-  --emr-endpoint=EMR_ENDPOINT
+  --emr-endpoint EMR_ENDPOINT
                         Force mrjob to connect to EMR on this endpoint (e.g.
                         us-west-1.elasticmapreduce.amazonaws.com). Default is
                         to infer this from region.
-  --max-hours-idle=MAX_HOURS_IDLE
-                        Max number of hours a cluster can go without
+  -h, --help            show this help message and exit
+  --max-hours-idle MAX_HOURS_IDLE
+                        Please use --max-mins-idle instead.
+  --max-mins-idle MAX_MINS_IDLE
+                        Max number of minutes a cluster can go without
                         bootstrapping, running a step, or having a new step
                         created. This will fire even if there are pending
                         steps which EMR has failed to start. Make sure you set
                         this higher than the amount of time your jobs can take
                         to start instances and bootstrap.
-  --max-mins-locked=MAX_MINS_LOCKED
+  --max-mins-locked MAX_MINS_LOCKED
                         Max number of minutes a cluster can be locked while
                         idle.
-  --mins-to-end-of-hour=MINS_TO_END_OF_HOUR
-                        Terminate clusters that are within this many minutes
-                        of the end of a full hour since the job started
-                        running AND have no pending steps.
-  --pool-name=POOL_NAME
+  --mins-to-end-of-hour MINS_TO_END_OF_HOUR
+                        Deprecated, does nothing.
+  --pool-name POOL_NAME
                         Only terminate clusters in the given named pool.
   --pooled-only         Only terminate pooled clusters
   -q, --quiet           Don't print anything to stderr
-  --region=REGION       GCE/AWS region to run Dataproc/EMR jobs in.
-  --s3-endpoint=S3_ENDPOINT
+  --region REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --s3-endpoint S3_ENDPOINT
                         Force mrjob to connect to S3 on this endpoint (e.g. s3
                         -us-west-1.amazonaws.com). You usually shouldn't set
                         this; by default mrjob will choose the correct
@@ -73,6 +73,7 @@ from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_runner_args
+from mrjob.options import _alphabetize_actions
 from mrjob.options import _filter_by_role
 from mrjob.pool import _pool_hash_and_name
 from mrjob.util import strip_microseconds
@@ -382,6 +383,8 @@ def _make_arg_parser():
     _add_runner_args(
         arg_parser,
         _filter_by_role(EMRJobRunner.OPT_NAMES, 'connect'))
+
+    _alphabetize_actions(arg_parser)
 
     return arg_parser
 

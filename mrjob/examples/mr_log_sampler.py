@@ -42,12 +42,12 @@ class MRLogSampler(MRJob):
 
     def configure_args(self):
         super(MRLogSampler, self).configure_args()
-        self.add_passthrough_arg(
+        self.add_passthru_arg(
             '--sample-size',
             type=int,
             help='Number of entries to sample.'
         )
-        self.add_passthrough_arg(
+        self.add_passthru_arg(
             '--expected-length',
             type=int,
             help=("Number of entries you expect in the log. If not specified,"

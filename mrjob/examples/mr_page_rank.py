@@ -51,11 +51,11 @@ class MRPageRank(MRJob):
     def configure_args(self):
         super(MRPageRank, self).configure_args()
 
-        self.add_passthrough_arg(
+        self.add_passthru_arg(
             '--iterations', dest='iterations', default=10, type=int,
             help='number of iterations to run')
 
-        self.add_passthrough_arg(
+        self.add_passthru_arg(
             '--damping-factor', dest='damping_factor', default=0.85,
             type=float,
             help='probability a web surfer will continue clicking on links')

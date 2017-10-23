@@ -501,7 +501,7 @@ instance. Here's an example that sneaks a peek at :ref:`writing-cl-opts`::
 
         def configure_args(self):
             super(CommandLineProtocolJob, self).configure_args()
-            self.add_passthrough_arg(
+            self.add_passthru_arg(
                 '--output-format', default='raw', choices=['raw', 'json'],
                 help="Specify the output format of the job")
 

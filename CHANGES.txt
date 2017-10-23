@@ -1,44 +1,90 @@
 v0.6.0, 2017-10-25 -- please acknowledge deprecation warnings
- * enable_emr_debugging works with 4.x AMIs and later
+ * dropped support for Python 2.7
  * use boto3 instead of boto (#1304)
-   * removed some unnecessary utility functions from mrjob.aws (see below)
-   * changes to EMRJobRunner methods:
-     * added make_emr_client()
-     * added make_iam_client()
-     * removed make_*_conn() methods (see below)
-   * changes to S3FileSystem methods:
-     * added get_all_bucket_names()
-     * added make_s3_client()
-     * added make_s3_resource()
-     * removed methods that return boto 2 objects (see below)
-     * create_bucket()'s second arg is now named region, not location
-   * 'EU' alias for EMR region 'us-west-1' no longer works
-   * region names are case-sensitive; we no longer convert to lowercase
-   * replaced optparse with argparse
-     * renamed attributes/methods (old name is a deprecated alias)
-       * add_file_option() -> add_file_arg()
-       * add_passthrough_option() -> add_passthru_arg()
-       * configure_options() -> configure_args()
-       * load_options() -> load_args()
-       * pass_through_option -> pass_arg_through()
-       * args -> options.args
-     * duplicate file upload args are passed through to job
+ * job output is now byte-based, not line-based:
+   * runner.fs.cat() now yields chunks of bytes, not lines (#1533)
+   * runner.cat_output() yields chunks of bytes (#1604)
+     * runner.stream_output() is deprecated
+   * job.parse_output() translates chunks of bytes to records (#1604)
+     * job.parse_output_line() is deprecated
+ * replaced optparse with argparse (#1587)
+   * renamed attributes/methods (old name is a deprecated alias)
+     * add_file_option() -> add_file_arg()
+     * add_passthrough_option() -> add_passthru_arg()
+     * configure_options() -> configure_args()
+     * load_options() -> load_args()
+     * pass_through_option -> pass_arg_through()
+     * args -> options.args
+   * duplicate file upload args are passed through to job
+ * runners:
+   * all runners:
+     * file_upload_args kwarg is deprecated (#1656)
+       * pass path dicts to extra_args instead (see mrjob.setup)
+   * sim runners (inline and local):
+     * input passed to jobs as stdin, not as arguments
+     * input decompressed by runner, not mrjob.cat utility
+     * don't crash if os.symlink doesnt work on Windows (#1649)
+   * cloud runners (Dataproc and EMR):
+     * bootstrap can take archives and dirs as well as files (#1530)
+     * bootstrap files are now only made executable by current user (#1602)
+     * extra_cluster_params for unsupported API params (#1648)
+   * EMRJobRunner:
+     * persistent clusters will always idle-time-out
+     * default AMI is 5.8.0 (#1594)
+     * instance_fleets option (#1569)
+     * instance_groups option (use for EBS volumes) (#1357)
+     * region names are now case-sensitive
+     * 'EU' alias for EMR region 'eu-west-1' no longer works (#1538)
+     * __mrjob_pool_hash and __mrjob_pool_name EMR tags on cluster (#1086)
+     * __mrjob_version tag on cluster (#1600)
+     * jobs no longer add tags to cluster (#1565)
+     * enable_emr_debugging now also works AMI 4.x and later
+     * SSH filesystem no longer dumps file contents to memory (#1544)
+     * bootstrapping errors no longer logged as JSON (#1580)
+     * "latest" AMI alias no longer works (#1595)
+       * implicitly dropped support for AMI 2.4.2 and earlier (no Python 2.7)
+     * deprecated visible_to_all_users option
+     * max_mins_idle option (#1686)
+       * max_hours_idle is deprecated
+     * mins_to_end_of_hour no longer works (EMR now bills by the second)
+     * pooling changes:
+       * ensure that extra instance roles (e.g. "task") can run job (#1630)
+       * only running instances are counted (#1633)
+     * boto -> boto3 changes:
+       * added make_emr_client()
+       * added make_iam_client()
+       * removed make_*_conn() methods (see below)
+       * emr_api_params no longer works (#1574) (use extra_cluster_params)
+       * boto3 reads $AWS_SESSION_TOKEN, not $AWS_SECURITY_TOKEN
+       * added fs methods:
+         * added get_all_bucket_names()
+         * added make_s3_client()
+         * added make_s3_resource()
+         * removed methods that return boto 2 objects (see below)
+         * create_bucket()'s second arg is now named region, not location
+ * mrjob tools:
+   * updated billing cacluations in audit-emr-usage (#1688)
+ * mrjob.util
+   * deprecated read_file() (#1605) (use mrjob.cat.decompress())
+   * deprecated read_input()
  * removed code (mostly due to deprecation)
-   * see mrjob.conf and mrjob.options for changes to runners
+   * (for runner changes, see  mrjob.conf, mrjob.options, and mrjob.runner)
    * mrjob.aws:
      * removed emr_endpoint_for_region()
      * removed emr_ssl_host_for_region()
      * removed s3_endpoint_for_region()
      * removed s3_location_constraint_for_region()
+   * mrjob.cat:
+     * this module is no longer executable
    * mrjob.cmd:
      * removed deprecated mrjob command aliases:
        * create-job-flow
        * terminate-idle-job-flows
        * terminate-job-flow
    * mrjob.conf:
-     * removed OptionStore class and subclasses (now handled by runners)
+     * removed OptionStore class and subclasses (#1615)
    * mrjob.emr:
-     * removed s3_key_to_uri()
+      * removed s3_key_to_uri()
      * EMRJobRunner:
        * removed make_emr_conn() (use make_emr_client())
        * removed make_iam_conn() (use make_iam_client())
@@ -63,18 +109,20 @@ v0.6.0, 2017-10-25 -- please acknowledge deprecation warnings
    * mrjob.job:
      * MRJob:
        * see mrjob.launch.MRJobLauncher
+       * removed loose protocols (#1021)
    * mrjob.launch
      * MRJobLauncher:
-       * removed all_option_groups()
        * removed generate_file_upload_args()
        * removed generate_passthough_arguments()
        * removed is_mapper_or_reducer() (use is_task())
        * removed mr() (use mrjob.step.MRStep)
-       * removed *_opt_group attributes
        * removed *job_runner_kwargs()
        * removed --partitioner switch
+       * removed OutputGroups (#1611):
+         * removed all_option_groups()
+         * removed *_opt_group attributes
    * mrjob.options:
-     * removed deprecated options:
+     * removed deprecated options (#1022):
        * bootstrap_cmds
        * bootstrap_files
        * bootstrap_scripts

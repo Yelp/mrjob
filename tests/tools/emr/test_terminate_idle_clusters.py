@@ -16,7 +16,6 @@
 # limitations under the License.
 """Test the idle cluster terminator"""
 import sys
-from datetime import datetime
 from datetime import timedelta
 
 from mrjob.aws import _boto3_now

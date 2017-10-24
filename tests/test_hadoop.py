@@ -28,7 +28,6 @@ from mrjob.conf import combine_dicts
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
-from mrjob.py2 import PY2
 from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters

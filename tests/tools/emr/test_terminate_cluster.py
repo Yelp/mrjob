@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the cluster termination tool"""
-from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.terminate_cluster import main as terminate_main
 from mrjob.tools.emr.terminate_cluster import _make_arg_parser
 

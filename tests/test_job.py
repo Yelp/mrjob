@@ -37,8 +37,6 @@ from mrjob.protocol import ReprProtocol
 from mrjob.protocol import ReprValueProtocol
 from mrjob.protocol import StandardJSONProtocol
 from mrjob.py2 import StringIO
-from mrjob.step import _IDENTITY_MAPPER
-from mrjob.step import _IDENTITY_REDUCER
 from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import SparkStep

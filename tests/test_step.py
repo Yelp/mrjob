@@ -17,10 +17,8 @@
 from unittest import TestCase
 
 from mrjob.step import _IDENTITY_MAPPER
-from mrjob.step import INPUT
 from mrjob.step import JarStep
 from mrjob.step import MRStep
-from mrjob.step import OUTPUT
 from mrjob.step import SparkJarStep
 from mrjob.step import SparkStep
 from mrjob.step import SparkScriptStep

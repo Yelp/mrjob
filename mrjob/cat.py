@@ -97,6 +97,7 @@ def decompress(readable, path, bufsize=1024):
         # not a real readable (e.g. boto3 StreamingBody)
         return to_chunks(readable, bufsize=bufsize)
 
+
 def is_compressed(path):
     return path.endswith('.bz2') or path.endswith('.gz')
 

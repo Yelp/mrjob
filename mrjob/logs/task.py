@@ -413,6 +413,7 @@ def _parse_task_syslog(lines):
 
     return result
 
+
 # TODO: allow filtering of bad lines to happen elsewhere, pass this
 # function numbered lines
 def _parse_task_stderr(lines):

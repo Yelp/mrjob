@@ -289,18 +289,18 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     def _default_opts(self):
         return combine_dicts(
-             super(DataprocJobRunner, self)._default_opts(),
-             dict(
-                 bootstrap_python=True,
-                 check_cluster_every=_DEFAULT_CHECK_CLUSTER_EVERY,
-                 cleanup=['CLUSTER', 'JOB', 'LOCAL_TMP'],
-                 cloud_fs_sync_secs=_DEFAULT_CLOUD_FS_SYNC_SECS,
-                 image_version=_DEFAULT_IMAGE_VERSION,
-                 instance_type=_DEFAULT_INSTANCE_TYPE,
-                 master_instance_type=_DEFAULT_INSTANCE_TYPE,
-                 num_core_instances=_DATAPROC_MIN_WORKERS,
-                 num_task_instances=0,
-                 sh_bin=['/bin/sh', '-ex'],
+            super(DataprocJobRunner, self)._default_opts(),
+            dict(
+                bootstrap_python=True,
+                check_cluster_every=_DEFAULT_CHECK_CLUSTER_EVERY,
+                cleanup=['CLUSTER', 'JOB', 'LOCAL_TMP'],
+                cloud_fs_sync_secs=_DEFAULT_CLOUD_FS_SYNC_SECS,
+                image_version=_DEFAULT_IMAGE_VERSION,
+                instance_type=_DEFAULT_INSTANCE_TYPE,
+                master_instance_type=_DEFAULT_INSTANCE_TYPE,
+                num_core_instances=_DATAPROC_MIN_WORKERS,
+                num_task_instances=0,
+                sh_bin=['/bin/sh', '-ex'],
             )
         )
 
@@ -846,8 +846,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 imageVersion=self._opts['image_version'])
 
         kwargs = dict(projectId=self._gcp_project,
-                    clusterName=self._cluster_id,
-                    config=cluster_config)
+                      clusterName=self._cluster_id,
+                      config=cluster_config)
 
         return self._add_extra_cluster_params(kwargs)
 

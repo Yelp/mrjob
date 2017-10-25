@@ -681,8 +681,8 @@ def _run_task(invoke_task,
             open(output_path, 'wb') as stdout, \
             open(stderr_path, 'wb') as stderr:
 
-      invoke_task(
-          stdin, stdout, stderr, wd, env)
+        invoke_task(
+            stdin, stdout, stderr, wd, env)
 
 
 def _sort_lines_in_memory(input_paths, output_path, sort_values=False):

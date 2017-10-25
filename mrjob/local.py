@@ -180,9 +180,7 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             return ['sort', '-t', '\t', '-k', '1,1', '-s']
 
 
-
 # pickle utilities, to protect multiprocessing from itself
-
 
 def _invoke_task_in_subprocess(
         task_type, step_num, task_num,

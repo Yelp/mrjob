@@ -224,6 +224,7 @@ _INSTANCE_ROLES = ('MASTER', 'CORE', 'TASK')
 # use to disable multipart uploading
 _HUGE_PART_THRESHOLD = 2 ** 256
 
+
 # used to bail out and retry when a pooled cluster self-terminates
 class _PooledClusterSelfTerminatedException(Exception):
     pass
@@ -1627,7 +1628,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         def yield_step_ids():
             emr_client = self.make_emr_client()
             for step in _boto3_paginate('Steps', emr_client, 'list_steps',
-                                  ClusterId=self._cluster_id):
+                                        ClusterId=self._cluster_id):
                 if step['Name'].startswith(self._job_key):
                     yield step['Id']
 
@@ -1720,7 +1721,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if step['Status']['State'] == 'PENDING':
                 cluster = self._describe_cluster()
 
-                reason =_get_reason(cluster)
+                reason = _get_reason(cluster)
                 reason_desc = (': %s' % reason) if reason else ''
 
                 # we can open the ssh tunnel if cluster is ready (see #1115)
@@ -2909,7 +2910,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.debug('creating IAM client')
 
         raw_iam_client = boto3.client(
-             'iam',
+            'iam',
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             aws_session_token=self._opts['aws_session_token'],

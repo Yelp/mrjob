@@ -95,7 +95,6 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         # we'll create this script later, as needed
         self._master_bootstrap_script_path = None
 
-
     ### Options ###
 
     def _default_opts(self):
@@ -278,7 +277,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             uri = self._upload_mgr.uri(path)
             out.append('')
             out.append('  %s %s $__mrjob_PWD/%s' %
-                    (cp_to_local, pipes.quote(uri), pipes.quote(name)))
+                       (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # imitate Hadoop Distributed Cache (see #1602)
             out.append('  chmod u+rx $__mrjob_PWD/%s' % pipes.quote(name))
         out.append('')

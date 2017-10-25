@@ -65,7 +65,6 @@ def _bash_wrap(cmd_str):
     return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
 
 
-
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
@@ -375,7 +374,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
 
                 with open(runner._task_stderr_path('mapper', 0, 0)) as lines:
                     self.assertTrue(any(
-                        'import mrjob' in line or # Python 2
+                        'import mrjob' in line or  # Python 2
                         "import 'mrjob'" in line
                         for line in lines))
 

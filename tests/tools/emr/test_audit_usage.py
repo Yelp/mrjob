@@ -33,10 +33,10 @@ from mrjob.tools.emr.audit_usage import main
 from tests.py2 import patch
 from tests.tools.emr import ToolTestCase
 
+
 # this test used to use naive datetimes
 def utc(*args):
     return datetime(*args, tzinfo=tzutc())
-
 
 
 class AuditUsageTestCase(ToolTestCase):
@@ -306,8 +306,8 @@ class ClusterToFullSummaryTestCase(TestCase):
                 State='TERMINATED',
                 Timeline=dict(
                     CreationDateTime=parse('2010-06-05T23:30:00Z'),
-                    EndDateTime=parse('2010-06-06T01:15:00Z'),  # 1:45 billed
-                    ReadyDateTime=parse('2010-06-05T23:45:00Z'),  # 0:15 "used"
+                    EndDateTime=parse('2010-06-06T01:15:00Z'),
+                    ReadyDateTime=parse('2010-06-05T23:45:00Z'),
                 ),
             ),
             Steps=[],
@@ -533,7 +533,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 State='TERMINATED',
                 Timeline=dict(
                     CreationDateTime=parse('2010-06-05T23:30:00Z'),
-                    EndDateTime=parse('2010-06-06T01:15:00Z'),  # 2 hours are billed
+                    EndDateTime=parse('2010-06-06T01:15:00Z'),
                     ReadyDateTime=parse('2010-06-05T23:45:00Z'),
                 ),
             ),
@@ -672,7 +672,8 @@ class ClusterToFullSummaryTestCase(TestCase):
 
     def test_legacy_pooled_cluster(self):
         # audit clusters from previous versions of mrjob
-        self._test_new_or_legacy_pooled_cluster(BootstrapActions=[
+        self._test_new_or_legacy_pooled_cluster(
+            BootstrapActions=[
                 dict(Args=[], Name='empty'),
                 dict(Args=['pool-0123456789abcdef0123456789abcdef',
                            'reflecting'], Name='master'),
@@ -690,7 +691,7 @@ class ClusterToFullSummaryTestCase(TestCase):
                 State='TERMINATED',
                 Timeline=dict(
                     CreationDateTime=parse('2010-06-05T23:30:00Z'),
-                    EndDateTime=parse('2010-06-06T01:15:00Z'),  # 2 hrs billed
+                    EndDateTime=parse('2010-06-06T01:15:00Z'),
                     ReadyDateTime=parse('2010-06-05T23:45:00Z'),
                 ),
             ),

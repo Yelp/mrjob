@@ -90,7 +90,6 @@ class ToLinesTestCase(TestCase):
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
 
 
-
 class CmdLineTestCase(TestCase):
 
     def test_cmd_line(self):

@@ -21,6 +21,7 @@ from mrjob.fs.local import LocalFilesystem
 
 from tests.sandbox import SandboxedTestCase
 
+
 class CatTestCase(SandboxedTestCase):
 
     def setUp(self):
@@ -59,6 +60,7 @@ class CatTestCase(SandboxedTestCase):
         self.assertEqual(
             b''.join(self.fs._cat_file(input_bz2_path)),
             b'bar\nbar\nfoo\n')
+
 
 class LocalFSTestCase(SandboxedTestCase):
 

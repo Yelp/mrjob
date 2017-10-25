@@ -615,7 +615,9 @@ class ExtraClusterParamsTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['AutoScalingRole'], 'HankPym')
 
     def test_bad_json_param_is_not_a_string(self):
-        self.assertRaises(ValueError, self.run_and_get_cluster,
+        self.assertRaises(
+            ValueError,
+            self.run_and_get_cluster,
             '--image-version', '3.7.0',
             '--extra-cluster-param', 'SupportedProducts=[mapr-m3]')
 
@@ -1218,9 +1220,9 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
     def test_command_line_beats_instance_groups_in_config_file(self):
         self.set_in_mrjob_conf(
             instance_fleets=[dict(
-                    InstanceFleetType='MASTER',
-                    InstanceTypeConfigs=[dict(InstanceType='m1.medium')],
-                    TargetOnDemandCapacity=1)])
+                InstanceFleetType='MASTER',
+                InstanceTypeConfigs=[dict(InstanceType='m1.medium')],
+                TargetOnDemandCapacity=1)])
 
         self._test_uses_instance_fleets({})
 
@@ -1233,9 +1235,9 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
     def test_command_line_beats_instance_fleets_in_config_file(self):
         self.set_in_mrjob_conf(
             instance_groups=[dict(
-                    InstanceRole='MASTER',
-                    InstanceCount=1,
-                    InstanceType='c1.medium')])
+                InstanceRole='MASTER',
+                InstanceCount=1,
+                InstanceType='c1.medium')])
 
         self._test_instance_groups(
             {},
@@ -1247,8 +1249,6 @@ class InstanceGroupAndFleetTestCase(MockBoto3TestCase):
             master=(1, 'm1.medium', None),
             core=(3, 'm1.medium', None)
         )
-
-
 
 
 ### tests for error parsing ###
@@ -1830,6 +1830,7 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
         # idle timeout script should not even be uploaded
         self.assertNotIn(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH,
                          runner._upload_mgr.path_to_uri())
+
     def test_default(self):
         mr_job = MRWordCount(['-r', 'emr'])
         mr_job.sandbox()
@@ -3238,7 +3239,7 @@ class EMRTagsTestCase(MockBoto3TestCase):
 
 
 # this isn't actually enough to support GovCloud; see:
-# http://docs.aws.amazon.com/govcloud-us/latest/UserGuide/using-govcloud-arns.html
+# http://docs.aws.amazon.com/govcloud-us/latest/UserGuide/using-govcloud-arns.html  # noqa
 class IAMEndpointTestCase(MockBoto3TestCase):
 
     def test_default(self):
@@ -3323,7 +3324,8 @@ class WaitForLogsOnS3TestCase(MockBoto3TestCase):
 
         self.assertFalse(self.mock_log.info.called)
         self.assertEqual(waited, self.runner._waited_for_logs_on_s3)
-        self.assertEqual(self.runner._describe_cluster()['Status']['State'], state)
+        self.assertEqual(self.runner._describe_cluster()['Status']['State'],
+                         state)
 
     def test_starting(self):
         self.cluster['Status']['State'] = 'STARTING'

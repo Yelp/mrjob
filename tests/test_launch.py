@@ -213,7 +213,7 @@ class CommandLineArgsTestCase(TestCase):
             '-v',
             '--foo-size=9',
             '--bar-name', 'Alembic',
-           '--enable-baz-mode', '--disable-quuxing',
+            '--enable-baz-mode', '--disable-quuxing',
             '--pill-type', 'red',
             '--planck-constant', '1',
             '--planck-constant', '42',
@@ -449,7 +449,7 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
 
         self.assertEqual(
             mr_job.options.accordian_files, [
-            'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
+                'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
             '--accordian-file', dict(

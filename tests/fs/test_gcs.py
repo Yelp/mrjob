@@ -82,7 +82,6 @@ class CatTestCase(MockGoogleAPITestCase):
             1)
 
 
-
 class GCSFSTestCase(MockGoogleAPITestCase):
 
     def setUp(self):

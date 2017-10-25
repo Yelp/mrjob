@@ -392,8 +392,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.assertEqual(idle_for,
                          self.time_mock_cluster_idle(mock_cluster))
         self.assertEqual((pool_hash, pool_name),
-                         _pool_hash_and_name(mock_cluster)
-        )
+                         _pool_hash_and_name(mock_cluster))
         self.assertEqual(running,
                          _is_cluster_running(mock_cluster['_Steps']))
 
@@ -704,7 +703,6 @@ class DeprecatedSwitchesTestCase(SandboxedTestCase):
 
         self.log = self.start(
             patch('mrjob.tools.emr.terminate_idle_clusters.log'))
-
 
     def test_deprecated_max_hours_idle(self):
         main(['--max-hours-idle', '2'])

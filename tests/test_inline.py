@@ -262,7 +262,6 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
             input_gz.write(b'foo\n')
         input_gz_size = os.stat(input_gz_path)[stat.ST_SIZE]
 
-
         upload_path = os.path.join(self.tmp_dir, 'upload')
         with open(upload_path, 'wb') as upload_file:
             upload_file.write(b'PAYLOAD')

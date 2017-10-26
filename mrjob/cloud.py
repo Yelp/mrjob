@@ -68,10 +68,6 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
     def __init__(self, **kwargs):
         super(HadoopInTheCloudJobRunner, self).__init__(**kwargs)
 
-        if self._opts.get('max_hours_idle'):
-            log.warning('max_hours_idle is deprecated and will be removed'
-                        ' in v0.7.0. Please use max_mins_idle instead')
-
         # if *cluster_id* is not set, ``self._cluster_id`` will be
         # set when we create or join a cluster
         self._cluster_id = self._opts['cluster_id']
@@ -104,14 +100,17 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         )
 
     def _fix_opts(self, opts, source=None):
-        # patch max_hours_idle into max_mins_idle (see #1663)
         opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
             opts, source=source)
 
-        if (opts.get('max_mins_idle') is None and
-                opts.get('max_hours_idle') is not None):
+        # patch max_hours_idle into max_mins_idle (see #1663)
+        if opts.get('max_hours_idle') is not None:
+            log.warning(
+                'max_hours_idle is deprecated and will be removed in v0.7.0.')
 
-            opts['max_mins_idle'] = opts['max_hours_idle'] * 60
+            if opts.get('max_mins_idle') is None:
+                log.warning('Please use max_mins_idle instead')
+                opts['max_mins_idle'] = opts['max_hours_idle'] * 60
 
         return opts
 

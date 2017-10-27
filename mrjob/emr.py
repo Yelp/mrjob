@@ -1255,7 +1255,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
          # keep track of when we started our job
         self._emr_job_start = time.time()
 
-        log.debug('Cluster created with ID: %s' % cluster_id)
+        log.info('Created new cluster %s' % cluster_id)
 
         # set EMR tags for the cluster
         tags = dict(self._opts['tags'])
@@ -1279,13 +1279,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return
 
         tags_items = sorted(tags.items())
-        log.info('Add EMR tags to cluster %s: %s' % (
-            cluster_id,
-            ', '.join('%s=%s' % (tag, value) for tag, value in tags_items)))
 
         self.make_emr_client().add_tags(
             ResourceId=cluster_id,
             Tags=[dict(Key=k, Value=v) for k, v in tags_items])
+
+        log.info('Added EMR tags to cluster %s: %s' % (
+            cluster_id,
+            ', '.join('%s=%s' % (tag, value) for tag, value in tags_items)))
 
     # TODO: could break this into sub-methods for clarity
     def _cluster_kwargs(self, persistent=False):
@@ -1594,7 +1595,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._cluster_id = self._create_cluster(
                 persistent=False)
             self._created_cluster = True
-            log.info('Created new cluster %s' % self._cluster_id)
         else:
             log.info('Adding our job to existing cluster %s' %
                      self._cluster_id)

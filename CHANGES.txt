@@ -28,6 +28,9 @@ v0.6.0, 2017-10-25 -- please acknowledge deprecation warnings
      * bootstrap can take archives and dirs as well as files (#1530)
      * bootstrap files are now only made executable by current user (#1602)
      * extra_cluster_params for unsupported API params (#1648)
+   * max_mins_idle option (#1686)
+     * default is 10 minutes -- less may not work (see #1693)
+     * max_hours_idle is deprecated
    * EMRJobRunner:
      * persistent clusters will always idle-time-out
      * default AMI is 5.8.0 (#1594)
@@ -44,8 +47,6 @@ v0.6.0, 2017-10-25 -- please acknowledge deprecation warnings
      * "latest" AMI alias no longer works (#1595)
        * implicitly dropped support for AMI 2.4.2 and earlier (no Python 2.7)
      * deprecated visible_to_all_users option
-     * max_mins_idle option (#1686)
-       * max_hours_idle is deprecated
      * mins_to_end_of_hour no longer works (EMR now bills by the second)
      * pooling changes:
        * ensure that extra instance roles (e.g. "task") can run job (#1630)

@@ -94,7 +94,6 @@ def main(args=None):
     job_info = _find_long_running_jobs(
         emr_client, filtered_cluster_summaries, min_time, now=now)
 
-
     _print_report(job_info)
 
 

@@ -2,6 +2,7 @@
 # Copyright 2013 Lyft
 # Copyright 2014 Marc Abramowitz
 # Copyright 2015-2016 Yelp
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +17,6 @@
 # limitations under the License.
 """Test the idle cluster terminator"""
 import sys
-from datetime import datetime
 from datetime import timedelta
 
 from mrjob.aws import _boto3_now
@@ -393,8 +393,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.assertEqual(idle_for,
                          self.time_mock_cluster_idle(mock_cluster))
         self.assertEqual((pool_hash, pool_name),
-                         _pool_hash_and_name(mock_cluster)
-        )
+                         _pool_hash_and_name(mock_cluster))
         self.assertEqual(running,
                          _is_cluster_running(mock_cluster['_Steps']))
 
@@ -705,7 +704,6 @@ class DeprecatedSwitchesTestCase(SandboxedTestCase):
 
         self.log = self.start(
             patch('mrjob.tools.emr.terminate_idle_clusters.log'))
-
 
     def test_deprecated_max_hours_idle(self):
         main(['--max-hours-idle', '2'])

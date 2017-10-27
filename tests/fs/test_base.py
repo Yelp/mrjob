@@ -1,4 +1,5 @@
 # Copyright 2009-2015 Yelp and Contributors
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +13,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import os.path
-from unittest import TestCase
 
 from mrjob.fs.base import Filesystem
 
 from tests.py2 import Mock
-from tests.py2 import patch
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 
 

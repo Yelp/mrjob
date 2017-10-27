@@ -25,7 +25,6 @@ from io import BytesIO
 from unittest import TestCase
 
 from mrjob import conf
-from mrjob.fs.base import Filesystem
 from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
@@ -36,7 +35,6 @@ from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
-from tests.py2 import mock
 from tests.py2 import patch
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
@@ -263,7 +261,6 @@ class InlineMRJobRunnerJobConfTestCase(SandboxedTestCase):
         with gzip.GzipFile(input_gz_path, 'wb') as input_gz:
             input_gz.write(b'foo\n')
         input_gz_size = os.stat(input_gz_path)[stat.ST_SIZE]
-
 
         upload_path = os.path.join(self.tmp_dir, 'upload')
         with open(upload_path, 'wb') as upload_file:

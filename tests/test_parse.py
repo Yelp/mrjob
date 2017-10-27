@@ -3,6 +3,7 @@
 # Copyright 2013 Steve Johnson
 # Copyright 2014 Phil Swanson and Marc Abramowitz
 # Copyright 2015-2016 Yelp
+# Copyright 2017 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,10 +16,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import sys
 from io import BytesIO
-from subprocess import PIPE
-from subprocess import Popen
 from unittest import TestCase
 
 from mrjob.parse import _parse_port_range_list

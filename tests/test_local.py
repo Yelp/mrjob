@@ -17,15 +17,12 @@
 import gzip
 import os
 import shutil
-import signal
 import stat
 import sys
 import tempfile
 from io import BytesIO
-from os.path import dirname
 from os.path import exists
 from os.path import join
-from os.path import realpath
 from unittest import TestCase
 from unittest import skipIf
 
@@ -42,7 +39,6 @@ from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_filter_job import MRFilterJob
 from tests.mr_job_where_are_you import MRJobWhereAreYou
 from tests.mr_two_step_job import MRTwoStepJob
-from tests.mr_verbose_job import MRVerboseJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
 from tests.py2 import patch
@@ -67,7 +63,6 @@ def _bash_wrap(cmd_str):
     .. deprecated:: 0.5.8
     """
     return "bash -c '%s'" % cmd_str.replace("'", "'\\''")
-
 
 
 class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
@@ -379,7 +374,7 @@ class PythonBinTestCase(EmptyMrjobConfTestCase):
 
                 with open(runner._task_stderr_path('mapper', 0, 0)) as lines:
                     self.assertTrue(any(
-                        'import mrjob' in line or # Python 2
+                        'import mrjob' in line or  # Python 2
                         "import 'mrjob'" in line
                         for line in lines))
 

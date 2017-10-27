@@ -1,37 +1,13 @@
-v0.6.0, 2017-09-?? -- ???
- * enable_emr_debugging works with 4.x AMIs and later
- * use boto3 instead of boto
-   * removed make_*_conn() from EMRJobRunner (use make_*_client())
-   * removed s3_key_to_uri() functions
-   * changes to S3FileSystem:
-     * removed make_s3_conn() (use make_s3_client() or make_s3_resource())
-     * removed get_all_buckets() (use get_all_bucket_names())
-     * removed get_s3_key()
-     * removed get_s3_keys()
-     * create_bucket()'s second arg is now named region, not location
-   * mrjob.fs.s3.wrap_aws_conn() removed
-   * removed utility functions from mrjob.aws:
-     * emr_endpoint_for_region()
-     * emr_ssl_host_for_region()
-     * s3_endpoint_for_region()
-     * s3_location_constraint_for_region()
-   * 'EU' alias for region 'us-west-1' no longer works
-   * region names are case-sensitive; we no longer convert to lowercase
- * removed deprecated INPUT, OUTPUT attributes from JarStep
- * removed deprecated filesystem methods:
-   * path_exists()
-   * path_join()
-   * SSHFilesystem.ssh_slave_hosts()
- * removed deprecated mrjob command aliases:
-   * create-job-flow
-   * terminate-idle-job-flows
-   * terminate-job-flow
- * removed deprecated MRJob/MRJobLauncher methods:
-   * all_option_groups()
-   * is_mapper_or_reducer()
-   * mr()
- * removed option groups (deprecated) from MRJobLauncher
- * replaced optparse with argparse
+v0.6.0, 2017-10-25 -- please acknowledge deprecation warnings
+ * dropped support for Python 2.7
+ * use boto3 instead of boto (#1304)
+ * job output is now byte-based, not line-based:
+   * runner.fs.cat() now yields chunks of bytes, not lines (#1533)
+   * runner.cat_output() yields chunks of bytes (#1604)
+     * runner.stream_output() is deprecated
+   * job.parse_output() translates chunks of bytes to records (#1604)
+     * job.parse_output_line() is deprecated
+ * replaced optparse with argparse (#1587)
    * renamed attributes/methods (old name is a deprecated alias)
      * add_file_option() -> add_file_arg()
      * add_passthrough_option() -> add_passthru_arg()
@@ -39,80 +15,179 @@ v0.6.0, 2017-09-?? -- ???
      * load_options() -> load_args()
      * pass_through_option -> pass_arg_through()
      * args -> options.args
-   * removed generate_passthough_arguments()
-   * removed generate_file_upload_args()
    * duplicate file upload args are passed through to job
- * removed deprecated functions:
-   * mrjob.parse:
-     * is_windows_path()
-     * iso8601_to_timestamp()
-     * iso8601_to_datetime()
-     * parse_key_value_list()
-     * parse_port_range_list()
-   * mrjob.util:
-     * args_for_opt_dest_subset()
-     * bash_wrap()
-     * buffer_iterator_to_line_iterator()
-     * bunzip2_stream() (now in mrjob.cat)
-     * gunzip_stream() (now in mrjob.cat)
-     * populate_option_groups_with_options()
-     * scrape_options_and_index_by_dest()
-     * scrape_options_into_new_groups()
- * removed mrjob.retry.RetryGoRound
- * removed mrjob.setup.BootstrapWorkingDirManager
- * removed mrjob.ssh
- * removed deprecated options:
-   * bootstrap_cmds
-   * bootstrap_files
-   * bootstrap_scripts
-   * hadoop_home
-   * hadoop_streaming_jar_on_emr
-   * num_ec2_instances
-   * python_archives
-   * setup_cmds
-   * setup_scripts
-   * strict_protocols
- * removed deprecated option aliases:
-   * ami_version
-   * aws_availability_zone
-   * aws_region
-   * aws_security_token
-   * base_tmp_dir
-   * check_emr_status_every
-   * ec2_core_instance_bid_price
-   * ec2_core_instance_type
-   * ec2_instance_type
-   * ec2_master_instance_bid_price
-   * ec2_master_instance_type
-   * ec2_slave_instance_type
-   * ec2_task_instance_bid_price
-   * ec2_task_instance_type
-   * emr_job_flow_id
-   * emr_job_flow_pool_name
-   * emr_tags
-   * hdfs_scratch_dir
-   * num_ec2_core_instances
-   * num_ec2_task_instances
-   * pool_emr_job_flows
-   * s3_log_uri
-   * s3_scratch_uri
-   * s3_tmp_dir
-   * s3_sync_wait_time
-   * s3_upload_part_size
-   * ssh_tunnel_to_job_tracker
- * removed deprecated runner methods:
-   * get_job_name()
+ * runners:
+   * all runners:
+     * file_upload_args kwarg is deprecated (#1656)
+       * pass path dicts to extra_args instead (see mrjob.setup)
+   * sim runners (inline and local):
+     * input passed to jobs as stdin, not as arguments
+     * input decompressed by runner, not mrjob.cat utility
+     * don't crash if os.symlink doesnt work on Windows (#1649)
+   * cloud runners (Dataproc and EMR):
+     * bootstrap can take archives and dirs as well as files (#1530)
+     * bootstrap files are now only made executable by current user (#1602)
+     * extra_cluster_params for unsupported API params (#1648)
+   * max_mins_idle option (#1686)
+     * default is 10 minutes -- less may not work (see #1693)
+     * max_hours_idle is deprecated
    * EMRJobRunner:
-     * get_ami_version()
-     * get_emr_job_flow_id()
-     * make_persistent_job_flow()
- * removed *job_runner_kwargs() runner methods
- * removed OptionStore classes and MRJobRunner.OPTION_STORE_CLASS
- * removed deprecated passthrough to runner.fs
- * removed deprecated switches:
-   * --partitioner
- * removed deprecated JOB_FLOW and *SCRATCH cleanup types
- * mrjob.cat is no longer executable
+     * persistent clusters will always idle-time-out
+     * default AMI is 5.8.0 (#1594)
+     * instance_fleets option (#1569)
+     * instance_groups option (use for EBS volumes) (#1357)
+     * region names are now case-sensitive
+     * 'EU' alias for EMR region 'eu-west-1' no longer works (#1538)
+     * __mrjob_pool_hash and __mrjob_pool_name EMR tags on cluster (#1086)
+     * __mrjob_version tag on cluster (#1600)
+     * jobs no longer add tags to cluster (#1565)
+     * enable_emr_debugging now also works AMI 4.x and later
+     * SSH filesystem no longer dumps file contents to memory (#1544)
+     * bootstrapping errors no longer logged as JSON (#1580)
+     * "latest" AMI alias no longer works (#1595)
+       * implicitly dropped support for AMI 2.4.2 and earlier (no Python 2.7)
+     * deprecated visible_to_all_users option
+     * mins_to_end_of_hour no longer works (EMR now bills by the second)
+     * pooling changes:
+       * ensure that extra instance roles (e.g. "task") can run job (#1630)
+       * only running instances are counted (#1633)
+     * boto -> boto3 changes:
+       * added make_emr_client()
+       * added make_iam_client()
+       * removed make_*_conn() methods (see below)
+       * emr_api_params no longer works (#1574) (use extra_cluster_params)
+       * boto3 reads $AWS_SESSION_TOKEN, not $AWS_SECURITY_TOKEN
+       * added fs methods:
+         * added get_all_bucket_names()
+         * added make_s3_client()
+         * added make_s3_resource()
+         * removed methods that return boto 2 objects (see below)
+         * create_bucket()'s second arg is now named region, not location
+ * mrjob tools:
+   * updated billing cacluations in audit-emr-usage (#1688)
+ * mrjob.util
+   * deprecated read_file() (#1605) (use mrjob.cat.decompress())
+   * deprecated read_input()
+ * removed code (mostly due to deprecation)
+   * (for runner changes, see  mrjob.conf, mrjob.options, and mrjob.runner)
+   * mrjob.aws:
+     * removed emr_endpoint_for_region()
+     * removed emr_ssl_host_for_region()
+     * removed s3_endpoint_for_region()
+     * removed s3_location_constraint_for_region()
+   * mrjob.cat:
+     * this module is no longer executable
+   * mrjob.cmd:
+     * removed deprecated mrjob command aliases:
+       * create-job-flow
+       * terminate-idle-job-flows
+       * terminate-job-flow
+   * mrjob.conf:
+     * removed OptionStore class and subclasses (#1615)
+   * mrjob.emr:
+      * removed s3_key_to_uri()
+     * EMRJobRunner:
+       * removed make_emr_conn() (use make_emr_client())
+       * removed make_iam_conn() (use make_iam_client())
+       * removed get_ami_version() (use get_image_version())
+       * removed get_emr_job_flow_id() (use get_cluster_id())
+       * make_persistent_job_flow() (use make_persistent_cluster())
+     * see also mrjob.fs.s3.S3Filesystem
+   * mrjob.fs.base:
+     * base filesystem methods:
+       * removed path_exists() (use exists())
+       * removed path_join() (use join())
+   * mrjob.fs.s3:
+     * removed wrap_aws_conn()
+     * S3Filesystem
+       * removed make_s3_conn() (use make_s3_client() or make_s3_resource())
+       * removed get_all_buckets() (use get_all_bucket_names())
+       * removed get_s3_key()
+       * removed get_s3_keys()
+   * mrjob.fs.ssh:
+     * SSHFilesystem
+       * removed ssh_slave_hosts()
+   * mrjob.job:
+     * MRJob:
+       * see mrjob.launch.MRJobLauncher
+       * removed loose protocols (#1021)
+   * mrjob.launch
+     * MRJobLauncher:
+       * removed generate_file_upload_args()
+       * removed generate_passthough_arguments()
+       * removed is_mapper_or_reducer() (use is_task())
+       * removed mr() (use mrjob.step.MRStep)
+       * removed *job_runner_kwargs()
+       * removed --partitioner switch
+       * removed OutputGroups (#1611):
+         * removed all_option_groups()
+         * removed *_opt_group attributes
+   * mrjob.options:
+     * removed deprecated options (#1022):
+       * bootstrap_cmds
+       * bootstrap_files
+       * bootstrap_scripts
+       * hadoop_home
+       * hadoop_streaming_jar_on_emr
+       * num_ec2_instances
+       * python_archives
+       * setup_cmds
+       * setup_scripts
+       * strict_protocols
+     * removed deprecated option aliases:
+       * ami_version
+       * aws_availability_zone
+       * aws_region
+       * aws_security_token
+       * base_tmp_dir
+       * check_emr_status_every
+       * ec2_core_instance_bid_price
+       * ec2_core_instance_type
+       * ec2_instance_type
+       * ec2_master_instance_bid_price
+       * ec2_master_instance_type
+       * ec2_slave_instance_type
+       * ec2_task_instance_bid_price
+       * ec2_task_instance_type
+       * emr_job_flow_id
+       * emr_job_flow_pool_name
+       * emr_tags
+       * hdfs_scratch_dir
+       * num_ec2_core_instances
+       * num_ec2_task_instances
+       * pool_emr_job_flows
+       * s3_log_uri
+       * s3_scratch_uri
+       * s3_tmp_dir
+       * s3_sync_wait_time
+       * s3_upload_part_size
+       * ssh_tunnel_to_job_tracker
+   * mrjob.parse:
+     * removed is_windows_path()
+     * removed iso8601_to_timestamp()
+     * removed iso8601_to_datetime()
+     * removed parse_key_value_list()
+     * removed parse_port_range_list()
+   * mrjob.retry:
+     * removed RetryGoRound
+   * mrjob.runner:
+     * MRJobRunner:
+       * removed get_job_name()
+       * removed OPTION_STORE_CLASS attribute
+       * removed deprecated passthrough to runner.fs
+       * removed deprecated JOB_FLOW and *SCRATCH cleanup types
+   * mrjob.setup:
+     * removed BootstrapWorkingDirManager
+   * mrjob.ssh (removed entirely)
+   * mrjob.util:
+     * removed args_for_opt_dest_subset()
+     * removed bash_wrap()
+     * removed buffer_iterator_to_line_iterator()
+     * removed bunzip2_stream() (now in mrjob.cat)
+     * removed gunzip_stream() (now in mrjob.cat)
+     * removed populate_option_groups_with_options()
+     * removed scrape_options_and_index_by_dest()
+     * removed scrape_options_into_new_groups()
 
 v0.5.11, 2017-08-28 -- tweak report-long-jobs
  * report-long-jobs tool can exclude jobs based on tag (#1636)

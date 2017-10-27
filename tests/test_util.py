@@ -19,7 +19,6 @@ import optparse
 import os
 import shutil
 import sys
-import tarfile
 import tempfile
 from io import BytesIO
 from subprocess import PIPE
@@ -27,10 +26,8 @@ from subprocess import Popen
 from unittest import TestCase
 
 from mrjob.py2 import PY2
-from mrjob.py2 import StringIO
 from mrjob.util import cmd_line
 from mrjob.util import file_ext
-from mrjob.util import log_to_stream
 from mrjob.util import parse_and_save_options
 from mrjob.util import random_identifier
 from mrjob.util import read_file
@@ -42,7 +39,6 @@ from mrjob.util import unique
 from mrjob.util import which
 
 from tests.py2 import patch
-from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import random_seed
 
@@ -92,7 +88,6 @@ class ToLinesTestCase(TestCase):
                 for i in range(0, len(super_long_line), 1024)
             )),
             [b'a' * 10000 + b'\n', b'b' * 1000 + b'\n', b'last\n'])
-
 
 
 class CmdLineTestCase(TestCase):

@@ -18,20 +18,13 @@ import inspect
 import logging
 import os
 import sys
-from collections import defaultdict
-from optparse import OptionError
 from subprocess import Popen
 from subprocess import PIPE
 from unittest import TestCase
 
 from mrjob.conf import combine_envs
-from mrjob.dataproc import DataprocJobRunner
-from mrjob.emr import EMRJobRunner
-from mrjob.hadoop import HadoopJobRunner
-from mrjob.inline import InlineMRJobRunner
 from mrjob.job import MRJob
 from mrjob.launch import MRJobLauncher
-from mrjob.local import LocalMRJobRunner
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
@@ -220,7 +213,7 @@ class CommandLineArgsTestCase(TestCase):
             '-v',
             '--foo-size=9',
             '--bar-name', 'Alembic',
-           '--enable-baz-mode', '--disable-quuxing',
+            '--enable-baz-mode', '--disable-quuxing',
             '--pill-type', 'red',
             '--planck-constant', '1',
             '--planck-constant', '42',
@@ -456,7 +449,7 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
 
         self.assertEqual(
             mr_job.options.accordian_files, [
-            'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
+                'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
             '--accordian-file', dict(

@@ -569,7 +569,8 @@ def _subdivide_interval_by_hour(start, end):
         # fill in dates in the middle
         cur_hour = start_hour + timedelta(hours=1)
         while cur_hour < end_hour:
-            hour_to_secs[cur_hour] = timedelta.total_seconds(timedelta(hours=1))
+            hour_to_secs[cur_hour] = timedelta.total_seconds(
+                timedelta(hours=1))
             cur_hour += timedelta(hours=1)
 
     # remove zeros
@@ -809,6 +810,7 @@ def _percent(x, total, default=0.0):
         return 100.0 * x / total
     else:
         return default
+
 
 def _round_up_to_next_second(td):
     """Round up to the next second because that's how EMR bills."""

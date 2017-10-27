@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2015-2016 Yelp
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -412,6 +413,7 @@ def _parse_task_syslog(lines):
                 break  # nothing else to do once we've found the error
 
     return result
+
 
 # TODO: allow filtering of bad lines to happen elsewhere, pass this
 # function numbered lines

@@ -1,5 +1,6 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2015-2016 Yelp
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +14,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the cluster termination tool"""
-from mrjob.emr import EMRJobRunner
 from mrjob.tools.emr.terminate_cluster import main as terminate_main
 from mrjob.tools.emr.terminate_cluster import _make_arg_parser
 

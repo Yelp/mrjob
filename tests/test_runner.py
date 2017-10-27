@@ -496,7 +496,6 @@ class CheckInputPathsTestCase(SandboxedTestCase):
                 self.assertFalse(runner._opts['check_input_paths'])
 
 
-
 class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
 
     def test_job_closed_on_cleanup(self):

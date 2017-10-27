@@ -23,9 +23,9 @@ shared by all processing nodes. The framework takes care of scheduling tasks,
 monitoring them, and re-executing the failed tasks.
 
 The MapReduce framework consists of a single master "job tracker" (Hadoop 1)
-or "resource manager" (Hadoop 2) and a number of worker nodes. The master is 
-responsible for scheduling the jobs' component tasks on the worker nodes and 
-re-executing the failed tasks. The worker nodes execute the tasks as directed 
+or "resource manager" (Hadoop 2) and a number of worker nodes. The master is
+responsible for scheduling the jobs' component tasks on the worker nodes and
+re-executing the failed tasks. The worker nodes execute the tasks as directed
 by the master.
 
 As the job author, you write :term:`map <mapper>`, :term:`combine <combiner>`,

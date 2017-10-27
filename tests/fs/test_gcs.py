@@ -1,4 +1,5 @@
 # Copyright 2016 Google Inc.
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -80,7 +81,6 @@ class CatTestCase(MockGoogleAPITestCase):
         self.assertGreater(
             len(list(self.fs._cat_file('gs://walrus/data/foo'))),
             1)
-
 
 
 class GCSFSTestCase(MockGoogleAPITestCase):

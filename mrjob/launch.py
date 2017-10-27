@@ -102,8 +102,8 @@ class MRJobLauncher(object):
         if (_im_func(self.configure_options) !=
                 _im_func(MRJobLauncher.configure_options)):
             log.warning('configure_options() is deprecated and will be'
-                         ' removed in v0.7.0; please use configure_args()'
-                         ' instead.')
+                        ' removed in v0.7.0; please use configure_args()'
+                        ' instead.')
             self.configure_options()
 
         # don't pass None to parse_args unless we're actually running
@@ -127,8 +127,8 @@ class MRJobLauncher(object):
         if (_im_func(self.load_options) !=
                 _im_func(MRJobLauncher.load_options)):
             log.warning('load_options() is deprecated and will be'
-                         ' removed in v0.7.0; please use load_args()'
-                         ' instead.')
+                        ' removed in v0.7.0; please use load_args()'
+                        ' instead.')
             self.load_options(self._cl_args)
 
         # Make it possible to redirect stdin, stdout, and stderr, for testing

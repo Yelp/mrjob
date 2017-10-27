@@ -2,6 +2,7 @@
 # Copyright 2013 Lyft
 # Copyright 2014 Brett Gibson
 # Copyright 2015-2016 Yelp
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -66,12 +67,12 @@ def _legacy_pool_hash_and_name(bootstrap_actions):
 def _instance_groups_satisfy(actual_igs, requested_igs):
     """Do the actual instance groups from a cluster satisfy the requested
     ones, for the purpose of pooling?
-
-    The formats are slightly different; the format of *requested_igs* is here:
-    http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_InstanceGroup.html
-    and the format of *actual_igs* is here:
-    http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_ListInstanceGroups.html
     """
+    # the format of *requested_igs* is here:
+    #     http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_InstanceGroup.html  # noqa
+    # and the format of *actual_igs* is here:
+    #     http://docs.aws.amazon.com/ElasticMapReduce/latest/API/API_ListInstanceGroups.html  # noqa
+
     # a is a map from role to actual instance groups
     a = defaultdict(list)
     for ig in actual_igs:
@@ -199,14 +200,13 @@ def _igs_satisfy_cpu(actual_igs, requested_ig):
         # unknown instance type, just count # of matching instances
         requested_cu = num_requested
         actual_cu = sum(ig['RunningInstanceCount'] for ig in actual_igs
-                         if ig['InstanceType'] == requested_type)
+                        if ig['InstanceType'] == requested_type)
 
     if actual_cu >= requested_cu:
         return actual_cu
     else:
         log.debug('    not enough compute units')
         return None
-
 
 
 ### instance fleets ###
@@ -293,15 +293,15 @@ def _fleet_for_same_role_satisfies(actual_fleet, req_fleet):
 def _get_timeout_action(fleet):
     return fleet.get(
         'LaunchSpecifications', {}).get(
-            'SpotSpecification', {}).get(
-                'TimeoutAction')
+        'SpotSpecification', {}).get(
+        'TimeoutAction')
 
 
 def _get_timeout_duration(fleet):
     return fleet.get(
         'LaunchSpecifications', {}).get(
-            'SpotSpecification', {}).get(
-                'TimeoutDurationMinutes', 0.0)
+        'SpotSpecification', {}).get(
+        'TimeoutDurationMinutes', 0.0)
 
 
 def _fleet_spec_satsifies(actual_spec, req_spec):

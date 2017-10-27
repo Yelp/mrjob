@@ -37,6 +37,7 @@ from .s3 import MockS3Client
 from .s3 import MockS3Resource
 from .s3 import add_mock_s3_data
 
+
 class MockBoto3TestCase(SandboxedTestCase):
 
     # if a test needs to create an EMR client more than this many
@@ -145,8 +146,8 @@ class MockBoto3TestCase(SandboxedTestCase):
 
     # TODO: this should be replaced
     def add_worker(self):
-        """Add a mocked worker to the cluster. Caller is responsible for setting
-        runner._opts['num_ec2_instances'] to the correct number.
+        """Add a mocked worker to the cluster. Caller is responsible for
+        setting runner._opts['num_ec2_instances'] to the correct number.
         """
         worker_num = len(self.worker_ssh_roots)
         new_dir = tempfile.mkdtemp(prefix='worker_%d_ssh_root.' % worker_num)

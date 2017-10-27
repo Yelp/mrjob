@@ -1,7 +1,8 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
 # Copyright 2014 Shusen Liu
-# Copyright 2015-2017 Yelp
+# Copyright 2015-2016 Yelp
+# Copyright 2017 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,7 +29,6 @@ from mrjob.conf import combine_dicts
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.hadoop import HadoopJobRunner
 from mrjob.hadoop import fully_qualify_hdfs_path
-from mrjob.py2 import PY2
 from mrjob.util import which
 
 from tests.mockhadoop import add_mock_hadoop_counters

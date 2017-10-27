@@ -567,8 +567,8 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             num_task_instances=2)
 
         self.assertDoesNotJoin(cluster_id, [
-                '-r', 'emr', '-v', '--pool-clusters',
-                '--master-instance-type', 'c1.xlarge'])
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--master-instance-type', 'c1.xlarge'])
 
     def test_accept_extra_task_instances(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -580,9 +580,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         # just has to be big enough to run tasks
 
         self.assertJoins(cluster_id, [
-             '-r', 'emr', '-v', '--pool-clusters',
-             '--instance-type', 'c1.xlarge',
-             '--num-core-instances', '3'])
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-type', 'c1.xlarge',
+            '--num-core-instances', '3'])
 
     def test_reject_too_small_extra_task_instances(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -595,9 +595,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         # just has to be big enough to run tasks
 
         self.assertDoesNotJoin(cluster_id, [
-             '-r', 'emr', '-v', '--pool-clusters',
-             '--instance-type', 'c1.xlarge',
-             '--num-core-instances', '3'])
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-type', 'c1.xlarge',
+            '--num-core-instances', '3'])
 
     def test_extra_task_instances_dont_count_in_total_cpu(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -608,9 +608,9 @@ class PoolMatchingTestCase(MockBoto3TestCase):
         # 4 instance total, but only core instances count
 
         self.assertDoesNotJoin(cluster_id, [
-             '-r', 'emr', '-v', '--pool-clusters',
-             '--instance-type', 'c1.xlarge',
-             '--num-core-instances', '3'])
+            '-r', 'emr', '-v', '--pool-clusters',
+            '--instance-type', 'c1.xlarge',
+            '--num-core-instances', '3'])
 
     def test_unknown_instance_type_against_matching_pool(self):
         _, cluster_id = self.make_pooled_cluster(
@@ -674,7 +674,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             if num_volumes:
                 volume_spec['VolumesPerInstance'] = num_volumes
 
-            device_configs=[dict(VolumeSpecification=volume_spec)]
+            device_configs = [dict(VolumeSpecification=volume_spec)]
 
         ebs_config = dict(EbsBlockDeviceConfigs=device_configs)
         if optimized is not None:
@@ -872,7 +872,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
              dict(VolumeSpecification=extra_spec)])]
 
         _, cluster_id = self.make_pooled_cluster(
-            instance_groups = actual_igs)
+            instance_groups=actual_igs)
 
         self.assertJoins(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -892,7 +892,7 @@ class PoolMatchingTestCase(MockBoto3TestCase):
              dict(VolumeSpecification=shared_spec)])]
 
         _, cluster_id = self.make_pooled_cluster(
-            instance_groups = actual_igs)
+            instance_groups=actual_igs)
 
         self.assertDoesNotJoin(cluster_id, [
             '-r', 'emr', '-v', '--pool-clusters',
@@ -1432,7 +1432,6 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '-r', 'emr', '-v', '--pool-clusters',
             '--instance-fleets', json.dumps(req_fleets)
         ])
-
 
     def test_dont_join_full_cluster(self):
         dummy_runner, cluster_id = self.make_pooled_cluster()

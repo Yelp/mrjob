@@ -1,5 +1,6 @@
 # Copyright 2009-2013 Yelp
 # Copyright 2015 Yelp
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,6 +21,7 @@ from os.path import join
 from mrjob.fs.local import LocalFilesystem
 
 from tests.sandbox import SandboxedTestCase
+
 
 class CatTestCase(SandboxedTestCase):
 
@@ -59,6 +61,7 @@ class CatTestCase(SandboxedTestCase):
         self.assertEqual(
             b''.join(self.fs._cat_file(input_bz2_path)),
             b'bar\nbar\nfoo\n')
+
 
 class LocalFSTestCase(SandboxedTestCase):
 

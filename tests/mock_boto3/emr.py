@@ -106,7 +106,6 @@ DEFAULT_MAX_STEPS_RETURNED = 50
 DUMMY_APPLICATION_VERSION = '0.0.0'
 
 
-
 # TODO: raise InvalidRequest: Missing required header for this
 # request: x-amz-content-sha256 when region name is clearly invalid
 
@@ -349,20 +348,20 @@ class MockEMRClient(object):
                 cluster['Applications'].append(
                     dict(Name=app_name, Version=version))
         else:
-             if kwargs.get('Applications'):
+            if kwargs.get('Applications'):
                 raise _error(
                     'Cannot specify applications when AMI version is used.'
                     ' Specify supported products or new supported products'
                     ' instead.')
 
-             # 'hadoop' is lowercase if AmiVersion specified
-             cluster['Applications'].append(
-                 dict(Name='hadoop', Version=hadoop_version))
+            # 'hadoop' is lowercase if AmiVersion specified
+            cluster['Applications'].append(
+                dict(Name='hadoop', Version=hadoop_version))
 
-             if kwargs.get('SupportedProducts'):
-                 _validate_param(kwargs, 'SupportedProducts', (list, tuple))
-                 for product in kwargs.pop('SupportedProducts'):
-                     cluster['Applications'].append(dict(Name=product))
+            if kwargs.get('SupportedProducts'):
+                _validate_param(kwargs, 'SupportedProducts', (list, tuple))
+                for product in kwargs.pop('SupportedProducts'):
+                    cluster['Applications'].append(dict(Name=product))
 
         # Configurations
         if 'Configurations' in kwargs:
@@ -518,9 +517,9 @@ class MockEMRClient(object):
                 {'InstanceCount', 'MasterInstanceType', 'SlaveInstanceType'}])
         if num_config_types > 1:
             raise _error(
-                    'Please configure instances using one and only one of the'
-                    ' following: instance groups; instance fleets; instance'
-                    ' count, master and slave instance type.')
+                'Please configure instances using one and only one of the'
+                ' following: instance groups; instance fleets; instance'
+                ' count, master and slave instance type.')
 
         if 'InstanceGroups' in Instances:
             self._add_instance_groups(
@@ -764,7 +763,7 @@ class MockEMRClient(object):
                 raise _error('Specify at most one of bidPrice or'
                              ' bidPriceAsPercentageOfOnDemandPrice value for'
                              ' the Spot Instance fleet : %s request.' % (
-                                 Name or null))
+                                 Name or 'null'))
 
             _validate_param(InstanceTypeConfig, 'BidPrice', string_types)
             BidPrice = InstanceTypeConfig.pop('BidPrice')
@@ -975,11 +974,11 @@ class MockEMRClient(object):
                 _validate_param(InstanceGroup, 'Market', string_types)
                 if InstanceGroup['Market'] not in ('ON_DEMAND', 'SPOT'):
                     raise _error(
-                    "1 validation error detected: value '%s' at"
-                    " 'instances.instanceGroups.%d.member.market' failed"
-                    " to satify constraint: Member must satisfy enum value"
-                    " set: [SPOT, ON_DEMAND]" % (
-                        InstanceGroup['Market'], i + 1))
+                        "1 validation error detected: value '%s' at"
+                        " 'instances.instanceGroups.%d.member.market' failed"
+                        " to satify constraint: Member must satisfy enum value"
+                        " set: [SPOT, ON_DEMAND]" % (
+                            InstanceGroup['Market'], i + 1))
                 ig['Market'] = InstanceGroup.pop('Market')
 
             # BidPrice
@@ -1073,7 +1072,8 @@ class MockEMRClient(object):
             num_active_steps = sum(
                 1 for step in cluster['_Steps']
                 if step['Status']['State'] in (
-                        'PENDING', 'PENDING_CANCELLED', 'RUNNING'))
+                    'PENDING', 'PENDING_CANCELLED', 'RUNNING'))
+
             if num_active_steps + len(Steps) > STEP_ADD_LIMIT:
                 raise _ValidationException(
                     operation_name,
@@ -1136,7 +1136,8 @@ class MockEMRClient(object):
             # we don't currently support Properties
             if HadoopJarStep:
                 raise NotImplementedError(
-                    "mock_boto3 doesn't support these HadoopJarStep params: %s" %
+                    "mock_boto3 doesn't support"
+                    " these HadoopJarStep params: %s" %
                     ', '.join(sorted(HadoopJarStep)))
 
             if Step:

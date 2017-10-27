@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2009-2016 Yelp and Contributors
+# Copyright 2009-2017 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -95,6 +95,7 @@ __credits__ = [
     'Santeri Paavolainen <santtu@iki.fi>',
     'Matt Perry <matt@unshift.net>',
     'Kien Pham <kien@sendgrid.com>',
+    'Adam Phillabaum <adam@phillabaum.us>',
     'Andrew Price <andrew.price@ensighten.com>',
     'Wahbeh Qardaji <wahbeh.qardaji@gmail.com>',
     'Anusha Rajan <anusha@yelp.com>',
@@ -118,6 +119,7 @@ __credits__ = [
     'Matthew Tai <taim@google.com>',
     'Diogo Terror <me@diogoterror.com>',
     'William Vambenepe <vbp@google.com>',
+    'Daniel Vetter <lord_fright@yahoo.com>',
     'Paul Wais <pwais@yelp.com>',
     'Derek Wilson <jderekwilson@gmail.com>',
     'Tao Yu <taoyu@yelp.com>',

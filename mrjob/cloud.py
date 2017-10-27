@@ -18,7 +18,6 @@ import pipes
 from os.path import basename
 
 from mrjob.bin import MRJobBinRunner
-from mrjob.conf import combine_dicts
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
@@ -34,6 +33,9 @@ _EXT_TO_UNARCHIVE_CMD = {
     '.tar.gz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
     '.tgz': 'mkdir %(dir)s; tar xfz %(file)s -C %(dir)s',
 }
+
+# issue a warning if max_mins_idle is set to less than this
+_DEFAULT_MAX_MINS_IDLE = 10.0
 
 
 class HadoopInTheCloudJobRunner(MRJobBinRunner):
@@ -68,10 +70,6 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
     def __init__(self, **kwargs):
         super(HadoopInTheCloudJobRunner, self).__init__(**kwargs)
 
-        if self._opts.get('max_hours_idle'):
-            log.warning('max_hours_idle is deprecated and will be removed'
-                        ' in v0.7.0. Please use max_mins_idle instead')
-
         # if *cluster_id* is not set, ``self._cluster_id`` will be
         # set when we create or join a cluster
         self._cluster_id = self._opts['cluster_id']
@@ -95,24 +93,30 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         # we'll create this script later, as needed
         self._master_bootstrap_script_path = None
 
-
     ### Options ###
 
-    def _default_opts(self):
-        return combine_dicts(
-            super(HadoopInTheCloudJobRunner, self)._default_opts(),
-            dict(max_mins_idle=5.0),
-        )
-
     def _fix_opts(self, opts, source=None):
-        # patch max_hours_idle into max_mins_idle (see #1663)
         opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
             opts, source=source)
 
-        if (opts.get('max_mins_idle') is None and
-                opts.get('max_hours_idle') is not None):
+        # patch max_hours_idle into max_mins_idle (see #1663)
+        if opts.get('max_hours_idle') is not None:
+            log.warning(
+                'max_hours_idle is deprecated and will be removed in v0.7.0.' +
+                (' Please use max_mins_idle instead'
+                 if opts.get('max_mins_idle') is None else ''))
 
-            opts['max_mins_idle'] = opts['max_hours_idle'] * 60
+        if opts.get('max_mins_idle') is None:
+            if opts.get('max_hours_idle') is not None:
+                opts['max_mins_idle'] = opts['max_hours_idle'] * 60
+            else:
+                opts['max_mins_idle'] = _DEFAULT_MAX_MINS_IDLE
+
+        # warn about issues with
+        if opts['max_mins_idle'] < _DEFAULT_MAX_MINS_IDLE:
+            log.warning('Setting max_mins_idle to less than %.1f may result'
+                        ' in cluster shutting down before job can run' %
+                        _DEFAULT_MAX_MINS_IDLE)
 
         return opts
 
@@ -278,7 +282,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             uri = self._upload_mgr.uri(path)
             out.append('')
             out.append('  %s %s $__mrjob_PWD/%s' %
-                    (cp_to_local, pipes.quote(uri), pipes.quote(name)))
+                       (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # imitate Hadoop Distributed Cache (see #1602)
             out.append('  chmod u+rx $__mrjob_PWD/%s' % pipes.quote(name))
         out.append('')

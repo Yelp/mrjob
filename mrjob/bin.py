@@ -61,7 +61,6 @@ class MRJobBinRunner(MRJobRunner):
         # we'll create the wrapper script later
         self._setup_wrapper_script_path = None
 
-
     def _default_opts(self):
         return combine_dicts(
             super(MRJobBinRunner, self)._default_opts(),
@@ -75,8 +74,9 @@ class MRJobBinRunner(MRJobRunner):
             return []
 
         args = (self._executable(True) + ['--steps'] +
-        self._mr_job_extra_args(local=True))
+                self._mr_job_extra_args(local=True))
         log.debug('> %s' % cmd_line(args))
+
         # add . to PYTHONPATH (in case mrjob isn't actually installed)
         env = combine_local_envs(os.environ,
                                  {'PYTHONPATH': os.path.abspath('.')})
@@ -639,7 +639,6 @@ class MRJobBinRunner(MRJobRunner):
             py_files.append(self._create_mrjob_zip())
 
         return py_files
-
 
 
 # these don't need to be methods

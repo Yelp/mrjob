@@ -300,19 +300,19 @@ class InterpreterTestCase(TestCase):
     def test_steps_interpreter(self):
         # including whether steps_interpreter overrides interpreter
         runner = MRJobBinRunner(interpreter=['ruby', '-v'],
-                                  steps_interpreter=['ruby'])
+                                steps_interpreter=['ruby'])
         self.assertEqual(runner._interpreter(), ['ruby', '-v'])
         self.assertEqual(runner._interpreter(steps=True), ['ruby'])
 
     def test_interpreter_overrides_python_bin(self):
         runner = MRJobBinRunner(interpreter=['ruby'],
-                                  python_bin=['python', '-v'])
+                                python_bin=['python', '-v'])
         self.assertEqual(runner._interpreter(), ['ruby'])
         self.assertEqual(runner._interpreter(steps=True), ['ruby'])
 
     def test_interpreter_overrides_steps_python_bin(self):
         runner = MRJobBinRunner(interpreter=['ruby'],
-                                  steps_python_bin=['python', '-v'])
+                                steps_python_bin=['python', '-v'])
         self.assertEqual(runner._interpreter(), ['ruby'])
         self.assertEqual(runner._interpreter(steps=True), ['ruby'])
 

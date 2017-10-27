@@ -1,7 +1,7 @@
-
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 Lyft
 # Copyright 2015-2016 Yelp
+# Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,13 +14,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from datetime import datetime
-from datetime import timedelta
 from unittest import TestCase
 
-from dateutil.tz import tzutc
-
-from mrjob.aws import _boto3_now
 from mrjob.pool import _legacy_pool_hash_and_name
 from mrjob.pool import _pool_hash_and_name
 
@@ -28,8 +23,6 @@ from mrjob.pool import _pool_hash_and_name
 class TestPoolHashAndName(TestCase):
 
     def test_empty(self):
-        cluster = {}
-
         self.assertEqual(_pool_hash_and_name({}), (None, None))
 
     def test_pooled_cluster(self):

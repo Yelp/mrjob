@@ -90,7 +90,6 @@ def _default_to(namespace, dest, value):
         setattr(namespace, dest, value)
 
 
-
 # these actions are only used by _add_runner_args(), so we can assume *value*
 # is a string
 
@@ -132,7 +131,8 @@ class _CleanupAction(Action):
 
         if 'NONE' in result and len(set(result)) > 1:
             parser.error(
-                '%s: Cannot clean up both nothing and something!' % option_string)
+                '%s: Cannot clean up both nothing and something!' %
+                option_string)
 
         setattr(namespace, self.dest, result)
 
@@ -959,7 +959,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--sort-bin'], dict(
                 help=('Alternate shell command for the external sort binary.'
-                     'You may include arguments, e.g. --sort-bin "sort -r"')
+                      'You may include arguments, e.g. --sort-bin "sort -r"')
             )),
         ],
     ),

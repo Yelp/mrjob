@@ -1812,7 +1812,7 @@ class EMRNoMapperTestCase(MockBoto3TestCase):
                           (4, ['fish'])])
 
 
-class MaxHoursIdleTestCase(MockBoto3TestCase):
+class MaxMinsIdleTestCase(MockBoto3TestCase):
 
     def assertRanIdleTimeoutScriptWith(self, runner, args):
         actions = _list_all_bootstrap_actions(runner)
@@ -1883,6 +1883,14 @@ class MaxHoursIdleTestCase(MockBoto3TestCase):
 
     def test_bootstrap_script_is_actually_installed(self):
         self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
+
+    def test_deprecated_max_hours_idle_works(self):
+        mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.make_persistent_cluster()
+            self.assertRanIdleTimeoutScriptWith(runner, ['3600'])
 
 
 class TestCatFallback(MockBoto3TestCase):

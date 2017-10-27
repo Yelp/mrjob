@@ -9,11 +9,104 @@ For a complete list of changes, see `CHANGES.txt
 0.6.0
 -----
 
-Note that because :py:mod:`argparse` has different parsing rules than
-:py:mod:`optparse`, you have to use equal signs when passing an argument
-starting with a hyphen to another argument. For
-example, you now *must* use the form ``--hadoop-arg=-verbose``, not
-``--hadoop-arg -verbose``.
+Dropped Python 2.6
+^^^^^^^^^^^^^^^^^^
+
+mrjob now supports Python 2.7 and Python 3.3+ (some versions of PyPy may
+also work but are not officially supported).
+
+This means that on EMR, AMI 2.4.2 and earlier are no longer supported.
+
+boto3, not boto
+^^^^^^^^^^^^^^^
+
+mrjob now uses :py:mod:`boto3` rather than :py:mod:`boto` to talk to AWS.
+This makes it much simpler to pass user-defined data structures directly
+to the API, enabling a number of features.
+
+At least version 1.4.6 of :py:mod:`boto3` is required.
+
+It is now possible to fully configure instances (including EBS volumes).
+See :py:mod:`instance_groups` for an example.
+
+mrjob also now supports Instance Fleets, which may be fully configured
+(including EBS volumes) through the :py:mod:`instance_fleets` option.
+
+Methods that took or returned :py:mod:`boto` objects (for example,
+`make_emr_conn()`) have been completely removed as there as no way
+to make a deprecated shim for them without keeping :py:mod:`boto` as a
+dependency. See :py:class:`~mrjob.emr.EMRJobRunner` and
+:py:class:`~mrjob.fs.s3.S3Filesystem` for new method names.
+
+Note that boto3 reads temporary credentials from :envvar:`$AWS_SESSION_TOKEN`,
+not :envvar:`$AWS_SECURITY_TOKEN` as in boto 2 (see
+:mrjob-opt:`aws_session_token` for details).
+
+argparse, not optparse
+^^^^^^^^^^^^^^^^^^^^^^
+
+mrjob now uses :py:mod:`argparse` to parse options, rather than
+:py:mod:`optparse`, which has been deprecated since Python 2.7
+
+:py:mod:`argparse` has slightly different option-parsing logic. A couple
+of things you should be aware of:
+
+ * everything that starts with ``-`` is assumed to be a switch. For
+   example, you now *must* use the form ``--hadoop-arg=-verbose``, not
+   ``--hadoop-arg -verbose``.
+ * positional arguments may not be split. Something like
+   ``mr_wc.py CHANGES.txt LICENSE.txt -r local`` will work, but
+   ``mr_wc.py CHANGES.txt -r local LICENSE.txt`` will not.
+
+Passthrough options, file options, etc. are now handled with
+:py:meth:`~mrjob.launch.MRJobLauncher.add_file_arg`,
+:py:meth:`~mrjob.launch.MRJobLauncher.add_passthru_arg`,
+:py:meth:`~mrjob.launch.MRJobLauncher.configure_args`,
+:py:meth:`~mrjob.launch.MRJobLauncher.load_args`, and
+:py:meth:`~mrjob.launch.MRJobLauncher.pass_arg_through`. The old
+methods with "option" in their name are deprecated but still work.
+
+chunks of bytes, not lines
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+mrjob no longer assumes that job output will be line-based. If you
+:ref:`run your job programmatically <runners-programmatically>`, you should
+read your job output with :py:meth:`~mrjob.runner.MRJobRunner.cat_output`,
+which yields chunks of bytes, and run these through
+:py:meth:`~mrjob.job.MRJob.parse_output`, which will convert them into
+key/value pairs.
+
+``runner.fs.cat()`` also now yields chunks of bytes, not lines. When it
+yields from multiple files, it will yield an empty bytestring (``b''``)
+between the chunks from each file.
+
+:py:func:`~mrjob.util.read_file` and :py:func:`~mrjob.util.read_input` are
+now deprecated because they yield lines and not chunks. Try
+:py:func:`~mrjob.cat.decompress`, :py:func:`~mrjob.cat.to_chunks`, and
+:py:func:`~mrjob.cat.to_lines`.
+
+There is not currently a way to define non-line-based
+:ref:`job-protocols`, but there should be soon.
+
+EMR now bills by the second, not the hour
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Elastic MapReduce recently stopped billing by the full hour, and now
+bills by the second. This means that :ref:`cluster-pooling` is no longer
+a cost-saving strategy, though developers might find it handy to reduce
+wait times when testing.
+
+The :mrjob-opt:`mins_to_end_of_hour` option no longer makes sense, and
+has been deprecated and disabled.
+
+:mrjob-opt:`max_hours_idle` has been deprecated; you should use
+:mrjob-opt:`max_mins_idle` instead. The default is 10 minutes (for EMR
+and Dataproc). Currently there is a bug that can cause clusters to
+terminate prematurely if you use a lower value.
+
+:ref:`audit-emr-usage` has been updated to use billing by the second
+when approximating time billed and waste.
+
 
 .. _v0.5.11:
 

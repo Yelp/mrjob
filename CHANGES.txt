@@ -29,7 +29,8 @@ v0.6.0, 2017-10-25 -- please acknowledge deprecation warnings
      * bootstrap files are now only made executable by current user (#1602)
      * extra_cluster_params for unsupported API params (#1648)
    * max_mins_idle option (#1686)
-     * default is 10 minutes -- less may not work (see #1693)
+     * default is 10 minutes
+       * <10 minutes may result in premature cluster shutdown (see #1693)
      * max_hours_idle is deprecated
    * EMRJobRunner:
      * persistent clusters will always idle-time-out

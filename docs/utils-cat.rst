@@ -1,5 +1,5 @@
-mrjob.cat - auto-decompress files based on extension
-====================================================
+mrjob.cat - decompress files based on extension
+===============================================
 
 .. automodule:: mrjob.cat
     :members:

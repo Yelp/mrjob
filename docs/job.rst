@@ -45,6 +45,7 @@ Running the job
 Parsing output
 --------------
 
+.. automethod:: MRJob.parse_output
 .. automethod:: MRJob.parse_output_line
 
 Counters and status messages

@@ -1547,6 +1547,8 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
                               bootstrap_actions=bootstrap_actions,
                               cloud_fs_sync_secs=0.00)
 
+        runner.make_persistent_cluster()
+
         actions = _list_all_bootstrap_actions(runner)
 
         self.assertEqual(len(actions), 4)

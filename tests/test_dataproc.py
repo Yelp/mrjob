@@ -892,7 +892,7 @@ class MaxMinsIdleTestCase(MockGoogleAPITestCase):
         with mr_job.make_runner() as runner:
             runner.run()
             self.assertRanIdleTimeoutScriptWith(runner, {
-                'mrjob-max-secs-idle': '300',
+                'mrjob-max-secs-idle': '600',
             })
 
     def test_persistent_cluster(self):

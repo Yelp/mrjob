@@ -11,21 +11,21 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Job to test if runners respect SORT_VALUES.
-
-Confusingly, this doesn't actually sort, as it has no reducer. See
-mr_sort_and_group for one that does.
-"""
+"""For each key, return a sorted list of values corresponding to that key."""
 from mrjob.job import MRJob
 
 
-class MRSortValues(MRJob):
+class MRSortAndGroup(MRJob):
+
     SORT_VALUES = True
 
-    # need to define a mapper or reducer
-    def mapper_init(self):
-        pass
+    def mapper(self, _, line):
+        line = line.rstrip()
+        yield line[:1], line
+
+    def reducer(self, key, values):
+        yield key, list(values)
 
 
 if __name__ == '__main__':
-    MRSortValues.run()
+    MRGroup.run()

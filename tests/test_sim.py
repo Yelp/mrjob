@@ -22,13 +22,14 @@ from tests.sandbox import SandboxedTestCase
 
 
 class SortValuesTestCase(SandboxedTestCase):
-
     # inline runner doesn't have its own sorting logic
     RUNNER = 'inline'
 
     _INPUT = b'alligator\nactuary\nbowling\nartichoke\nballoon\nbaby\n'
 
     def test_no_sort_values(self):
+        # don't sort values if not requested (#660)
+
         job = MRGroup(['-r', self.RUNNER])
         job.sandbox(stdin=BytesIO(self._INPUT))
 

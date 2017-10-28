@@ -50,6 +50,7 @@ from tests.sandbox import mrjob_conf_patcher
 from tests.test_inline import InlineMRJobRunnerFSTestCase
 from tests.test_inline import InlineMRJobRunnerJobConfTestCase
 from tests.test_inline import InlineMRJobRunnerNoMapperTestCase
+from tests.test_sim import SortValuesTestCase
 
 
 def _bash_wrap(cmd_str):
@@ -772,3 +773,7 @@ class SetupLineEncodingTestCase(TestCase):
                     self.assertIn(
                         call(runner._setup_wrapper_script_path, 'w'),
                         m_open.mock_calls)
+
+
+class LocalModeSortValuesTestCase(SortValuesTestCase):
+    RUNNER = 'local'

@@ -28,4 +28,4 @@ class MRSortAndGroup(MRJob):
 
 
 if __name__ == '__main__':
-    MRGroup.run()
+    MRSortAndGroup.run()

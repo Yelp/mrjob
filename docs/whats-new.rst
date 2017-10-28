@@ -22,7 +22,7 @@ mrjob now uses :py:mod:`boto3` rather than :py:mod:`boto` to talk to AWS.
 This makes it much simpler to pass user-defined data structures directly
 to the API, enabling a number of features.
 
-At least version 1.4.6 of :py:mod:`boto3` is required.
+At least version 1.4.6 of :py:mod:`boto3` is required to use EMR.
 
 It is now possible to fully configure instances (including EBS volumes).
 See :py:mod:`instance_groups` for an example.
@@ -63,6 +63,9 @@ Passthrough options, file options, etc. are now handled with
 :py:meth:`~mrjob.launch.MRJobLauncher.pass_arg_through`. The old
 methods with "option" in their name are deprecated but still work.
 
+As part of this refactor, `OptionStore` and its subclasses have been removed;
+options are now handled by runners directly.
+
 Chunks, not lines
 ^^^^^^^^^^^^^^^^^
 
@@ -80,7 +83,7 @@ between the chunks from each file.
 :py:func:`~mrjob.util.read_file` and :py:func:`~mrjob.util.read_input` are
 now deprecated because they are line-based. Try
 :py:func:`~mrjob.cat.decompress`, :py:func:`~mrjob.cat.to_chunks`, and
-:py:func:`~mrjob.cat.to_lines`.
+:py:func:`~mrjob.util.to_lines`.
 
 There is not currently a way to define non-line-based
 :ref:`job-protocols`, but there should be soon.
@@ -193,9 +196,9 @@ Errors in bootstrapping scripts are no longer dumped as JSON.
 Massive purge of deprecated code
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-About 100 things that were deprecated in v0.5.x have been removed from
-mrjob. See `CHANGES.txt
-<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_.
+About a hundred functions, methods, options, and more that were deprecated in
+v0.5.x have been removed. See `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_ for details.
 
 
 .. _v0.5.11:

@@ -21,9 +21,13 @@ v0.6.0, 2017-10-25 -- please acknowledge deprecation warnings
      * file_upload_args kwarg is deprecated (#1656)
        * pass path dicts to extra_args instead (see mrjob.setup)
    * sim runners (inline and local):
-     * input passed to jobs as stdin, not as arguments
-     * input decompressed by runner, not mrjob.cat utility
+     * local mode runs one mapper/reducer per CPU (#1083)
+     * step_output_dir works (#1515)
+     * only sort by reducer key unless SORT_VALUES is set (#660)
+     * files in working dir are marked user-executable (#1619)
      * don't crash if os.symlink doesnt work on Windows (#1649)
+     * input passed to jobs as stdin, not as arguments (#567)
+     * input decompressed by runner, not mrjob.cat utility
    * cloud runners (Dataproc and EMR):
      * bootstrap can take archives and dirs as well as files (#1530)
      * bootstrap files are now only made executable by current user (#1602)

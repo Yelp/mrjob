@@ -15,8 +15,6 @@ Dropped Python 2.6
 mrjob now supports Python 2.7 and Python 3.3+ (some versions of PyPy may
 also work but are not officially supported).
 
-This means that on EMR, AMI 2.4.2 and earlier are no longer supported.
-
 boto3, not boto
 ^^^^^^^^^^^^^^^
 
@@ -46,15 +44,14 @@ argparse, not optparse
 ^^^^^^^^^^^^^^^^^^^^^^
 
 mrjob now uses :py:mod:`argparse` to parse options, rather than
-:py:mod:`optparse`, which has been deprecated since Python 2.7
+:py:mod:`optparse`, which has been deprecated since Python 2.7.
 
 :py:mod:`argparse` has slightly different option-parsing logic. A couple
 of things you should be aware of:
 
- * everything that starts with ``-`` is assumed to be a switch. For
-   example, you now *must* use the form ``--hadoop-arg=-verbose``, not
-   ``--hadoop-arg -verbose``.
- * positional arguments may not be split. Something like
+ * everything that starts with ``-`` is assumed to be a switch.
+   ``--hadoop-arg=-verbose`` works, but ``--hadoop-arg -verbose`` does not.
+ * positional arguments may not be split.
    ``mr_wc.py CHANGES.txt LICENSE.txt -r local`` will work, but
    ``mr_wc.py CHANGES.txt -r local LICENSE.txt`` will not.
 
@@ -66,27 +63,76 @@ Passthrough options, file options, etc. are now handled with
 :py:meth:`~mrjob.launch.MRJobLauncher.pass_arg_through`. The old
 methods with "option" in their name are deprecated but still work.
 
-chunks of bytes, not lines
-^^^^^^^^^^^^^^^^^^^^^^^^^^
+Chunks, not lines
+^^^^^^^^^^^^^^^^^
 
 mrjob no longer assumes that job output will be line-based. If you
 :ref:`run your job programmatically <runners-programmatically>`, you should
 read your job output with :py:meth:`~mrjob.runner.MRJobRunner.cat_output`,
-which yields chunks of bytes, and run these through
-:py:meth:`~mrjob.job.MRJob.parse_output`, which will convert them into
-key/value pairs.
+which yields bytestrings which don't necessarily correspond to lines, and run
+these through :py:meth:`~mrjob.job.MRJob.parse_output`, which will convert
+them into key/value pairs.
 
-``runner.fs.cat()`` also now yields chunks of bytes, not lines. When it
+``runner.fs.cat()`` also now yields arbitrary bytestrings, not lines. When it
 yields from multiple files, it will yield an empty bytestring (``b''``)
 between the chunks from each file.
 
 :py:func:`~mrjob.util.read_file` and :py:func:`~mrjob.util.read_input` are
-now deprecated because they yield lines and not chunks. Try
+now deprecated because they are line-based. Try
 :py:func:`~mrjob.cat.decompress`, :py:func:`~mrjob.cat.to_chunks`, and
 :py:func:`~mrjob.cat.to_lines`.
 
 There is not currently a way to define non-line-based
 :ref:`job-protocols`, but there should be soon.
+
+Better local/inline mode
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+The sim runners (``inline`` and ``local`` mode) have been completely
+rewritten, making it possible to fix a number of outstanding issues.
+
+Local mode now runs one mapper/reducer per CPU, using
+:py:mod:`multiprocesssing`, for faster results.
+
+We only sort by reducer key (not the full line) unless
+:py:attr:`~mrjob.job.SORT_VALUES` is set, exposing bad assumptions sooner.
+
+:mrjob-opt:`step_output_dir` is now supported, making it easier to debug
+issues in intermediate steps.
+
+Files in tasks' (e.g. mappers') working directories are marked user-executable,
+to better imitate Hadoop Distributed Cache. When possible, we also symlink
+to a copy of each file/archive in the "cache," rather than copying them.
+
+If :py:func:`os.symlink` raises an exception, we fall back to copying (this
+can be an issue in Python 3 on Windows).
+
+Tasks are run more like they are in Hadoop; input is passed through stdin,
+rather than as script arguments. :py:mod:`mrjob.cat` is no longer executable
+because local mode no longer needs it.
+
+Cloud runner improvements
+^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Much of the common code for the "cloud" runners (Dataproc and EMR) has been
+merged, so that new features can be rolled out in parallel.
+
+The :mrjob-opt:`bootstrap` option (for both Dataproc and EMR) can now take
+archives and directories as well as files, like the :mrjob-opt:`setup`
+option has since version :ref:`v0.5.8`.
+
+The :mrjob-opt:`extra_cluster_params` option allows you to pass arbitrary
+JSON to the API at cluster create time (in Dataproc and EMR). The old
+`emr_api_params` option is deprecated and disabled.
+
+:mrjob-opt:`max_hours_idle` has been replaced with :mrjob-opt:`max_mins_idle`
+(the old option is deprecated but still works). The default is 10 minutes
+(due to a bug, less might cause the cluster to terminate before the job runs).
+
+It is no longer possible for mrjob to launch a cluster that sits idle
+indefinitely (except by setting :mrjob-opt:`max_mins_idle` to an unreasonably
+high value). It is still a good idea to run :ref:`report-long-jobs` because
+mrjob can't tell if a running job is doing useful work or has stalled.
 
 EMR now bills by the second, not the hour
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -99,13 +145,57 @@ wait times when testing.
 The :mrjob-opt:`mins_to_end_of_hour` option no longer makes sense, and
 has been deprecated and disabled.
 
-:mrjob-opt:`max_hours_idle` has been deprecated; you should use
-:mrjob-opt:`max_mins_idle` instead. The default is 10 minutes (for EMR
-and Dataproc). Currently there is a bug that can cause clusters to
-terminate prematurely if you use a lower value.
-
 :ref:`audit-emr-usage` has been updated to use billing by the second
 when approximating time billed and waste.
+
+.. note::
+
+   Pooling was enabled by default for some development versions of v0.6.0.
+   This did not make it into the release; you must still explicitly turn on
+   :ref:`cluster pooling <cluster-pooling>`.
+
+Other EMR changes
+^^^^^^^^^^^^^^^^^
+
+The default AMI is now 5.8.0. Note that this means you get Spark 2 by default.
+
+Regions are now case-sensitive, and the ``EU`` alias for ``eu-west-1`` no
+longer works.
+
+Pooling no longer adds dummy arguments to the master bootstrap script, instead
+setting the ``__mrjob_pool_hash`` and ``__mrjob_pool_name`` tags on the
+cluster.
+
+mrjob automatically adds the ``__mrjob_version`` tag to clusters it creates.
+
+Jobs will not add tags to clusters they join rather than create.
+
+:mrjob-opt:`enable_emr_debugging` now works on AMI 4.x and later.
+
+AMI 2.4.2 and earlier are no longer supported (no Python 2.7). There is
+no longer any special logic for the "latest" AMI alias (which the API no
+longer supports).
+
+The SSH filesystem no longer dumps file contents to memory.
+
+Pooling will only join a cluster with enough *running* instances to meet its
+specifications; *requested* instances no longer count.
+
+Pooling is now aware of EBS (disk) setup.
+
+Pooling won't join a cluster that has extra instance types that don't have
+enough memory or disk space to run your job.
+
+Errors in bootstrapping scripts are no longer dumped as JSON.
+
+:mrjob-opt:`visible_to_all_users` is deprecated.
+
+Massive purge of deprecated code
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+About 100 things that were deprecated in v0.5.x have been removed from
+mrjob. See `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_.
 
 
 .. _v0.5.11:

@@ -18,9 +18,7 @@ EMR Utilities
 S3 Utilities
 ------------
 
-.. :py:module:: mrjob.fs.s3
-
-.. autoclass:: S3Filesystem
+.. autoclass:: mrjob.fs.s3.S3Filesystem
 
 .. automethod:: S3Filesystem.create_bucket
 .. automethod:: S3Filesystem.get_all_bucket_names

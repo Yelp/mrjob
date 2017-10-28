@@ -318,7 +318,8 @@ class S3Filesystem(Filesystem):
         )
 
     def get_bucket(self, bucket_name):
-        """Get the bucket, connecting through the appropriate endpoint."""
+        """Get the (:py:mod:`boto3`) bucket, connecting through the
+        appropriate endpoint."""
         client = self.make_s3_client()
 
         try:

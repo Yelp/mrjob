@@ -23,12 +23,15 @@ import tempfile
 from io import BytesIO
 from os.path import exists
 from os.path import join
+from subprocess import CalledProcessError
+from subprocess import check_call
 from unittest import TestCase
 from unittest import skipIf
 
 import mrjob
 from mrjob.cat import decompress
 from mrjob.local import LocalMRJobRunner
+from mrjob.local import _sort_lines_in_memory
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import to_lines
@@ -37,7 +40,9 @@ from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
 from tests.mr_filter_job import MRFilterJob
+from tests.mr_group import MRGroup
 from tests.mr_job_where_are_you import MRJobWhereAreYou
+from tests.mr_sort_and_group import MRSortAndGroup
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import call
@@ -777,3 +782,149 @@ class SetupLineEncodingTestCase(TestCase):
 
 class LocalModeSortValuesTestCase(SortValuesTestCase):
     RUNNER = 'local'
+
+
+class SortBinTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(SortBinTestCase, self).setUp()
+
+        self.check_call = self.start(patch(
+            'mrjob.local.check_call', wraps=check_call))
+
+        self._sort_lines_in_memory = self.start(patch(
+            'mrjob.local._sort_lines_in_memory',
+            wraps=_sort_lines_in_memory))
+
+    def test_default_sort_bin(self):
+        job = MRGroup(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbuffaloes\nbears'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']), ('b', ['buffaloes', 'bears'])])
+
+        self.assertTrue(self.check_call.called)
+        self.assertFalse(self._sort_lines_in_memory.called)
+
+        sort_args = self.check_call.call_args[0][0]
+        self.assertEqual(sort_args[:6],
+                         ['sort', '-t', '\t', '-k', '1,1', '-s'])
+
+    def test_default_sort_bin_sort_values(self):
+        job = MRSortAndGroup(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbuffaloes\nbears'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']), ('b', ['bears', 'buffaloes'])])
+
+        self.assertTrue(self.check_call.called)
+        self.assertFalse(self._sort_lines_in_memory.called)
+
+        sort_args = self.check_call.call_args[0][0]
+
+        self.assertEqual(sort_args[:1], ['sort'])
+        self.assertNotEqual(sort_args[:6],
+                         ['sort', '-t', '\t', '-k', '1,1', '-s'])
+
+    def test_custom_sort_bin(self):
+        job = MRGroup(['-r', 'local', '--sort-bin', 'sort -r'])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbabies\nbuffaloes\nbears\nbicycles'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']),
+                 ('b', ['buffaloes', 'bicycles', 'bears', 'babies'])])
+
+        self.assertTrue(self.check_call.called)
+        sort_args = self.check_call.call_args[0][0]
+
+        self.assertEqual(sort_args[:2], ['sort', '-r'])
+
+    def test_custom_sort_bin_overrides_sort_values(self):
+        # this breaks SORT_VALUES; see #1699 for a fix
+        job = MRSortAndGroup(['-r', 'local', '--sort-bin', 'sort -r'])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbabies\nbuffaloes\nbears\nbicycles'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']),
+                 ('b', ['buffaloes', 'bicycles', 'bears', 'babies'])])
+
+        self.assertTrue(self.check_call.called)
+        self.assertFalse(self._sort_lines_in_memory.called)
+
+        sort_args = self.check_call.call_args[0][0]
+
+        self.assertEqual(sort_args[:2], ['sort', '-r'])
+
+    def test_sort_in_memory_on_windows(self):
+        self.start(patch('platform.system', return_value='Windows'))
+
+        job = MRGroup(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbuffaloes\nbears'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']), ('b', ['buffaloes', 'bears'])])
+
+        self.assertFalse(self.check_call.called)
+        # checking that _sort_lines_in_memory() was called gets messy.
+        # we can assume it got called because check_call() didn't
+
+    def test_bad_sort_bin(self):
+        # fortunately, only sorting uses check_call()
+        self.check_call.side_effect = CalledProcessError
+
+        job = MRGroup(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbuffaloes\nbears'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']), ('b', ['buffaloes', 'bears'])])
+
+        self.assertTrue(self.check_call.called)
+        self.assertTrue(self._sort_lines_in_memory.called)
+
+    def test_missing_sort_bin(self):
+        # fortunately, only sorting uses check_call()
+        self.check_call.side_effect = OSError
+
+        job = MRGroup(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbuffaloes\nbears'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertEqual(
+                sorted(job.parse_output(runner.cat_output())),
+                [('a', ['apples']), ('b', ['buffaloes', 'bears'])])
+
+        self.assertTrue(self.check_call.called)
+        self.assertTrue(self._sort_lines_in_memory.called)

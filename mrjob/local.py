@@ -164,7 +164,7 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
             return partial(
                 _sort_lines_with_sort_bin,
                 sort_bin=self._sort_bin(),
-                tmp_dir=self._opts['local_tmp_dir'])
+                tmp_dir=self._get_local_tmp_dir())
 
     def _sort_bin(self):
         """The binary to use to sort input.

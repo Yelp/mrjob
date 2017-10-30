@@ -928,3 +928,29 @@ class SortBinTestCase(SandboxedTestCase):
 
         self.assertTrue(self.check_call.called)
         self.assertTrue(self._sort_lines_in_memory.called)
+
+    def _test_environment_variables(self, *args):
+        job = MRGroup(['-r', 'local'])
+        job.sandbox(stdin=BytesIO(
+            b'apples\nbuffaloes\nbears'))
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # don't bother with output; already tested this above
+
+            self.assertTrue(self.check_call.called)
+            env = self.check_call.call_args[1]['env']
+
+            self.assertEqual(env['LC_ALL'], 'C')
+            self.assertEqual(env['TMP'], runner._get_local_tmp_dir())
+            self.assertEqual(env['TMPDIR'], runner._get_local_tmp_dir())
+
+            self.assertNotIn('TEMP', env)  # this was for Windows sort
+
+    def test_default_environment_variables(self):
+        self._test_environment_variables()
+
+    def test_custom_local_tmp_dir(self):
+        tmp_dir = self.makedirs('ephemera')
+        self._test_environment_variables('--local-tmp-dir', tmp_dir)

@@ -23,7 +23,6 @@ import tempfile
 from io import BytesIO
 from os.path import exists
 from os.path import join
-from subprocess import CalledProcessError
 from subprocess import check_call
 from unittest import TestCase
 from unittest import skipIf
@@ -52,9 +51,9 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
-from tests.test_inline import InlineMRJobRunnerFSTestCase
-from tests.test_inline import InlineMRJobRunnerJobConfTestCase
-from tests.test_inline import InlineMRJobRunnerNoMapperTestCase
+from tests.test_sim import LocalFSTestCase
+from tests.test_sim import SimRunnerJobConfTestCase
+from tests.test_sim import SimRunnerNoMapperTestCase
 from tests.test_sim import SortValuesTestCase
 
 
@@ -496,18 +495,15 @@ class LocalBootstrapMrjobTestCase(TestCase):
                 self.assertFalse(script_mrjob_dir.startswith(local_tmp_dir))
 
 
-class LocalMRJobRunnerJobConfTestCase(InlineMRJobRunnerJobConfTestCase):
-
+class LocalMRJobRunnerJobConfTestCase(SimRunnerJobConfTestCase):
     RUNNER = 'local'
 
 
-class LocalMRJobRunnerNoMapperTestCase(InlineMRJobRunnerNoMapperTestCase):
-
+class LocalMRJobRunnerNoMapperTestCase(SimRunnerNoMapperTestCase):
     RUNNER = 'local'
 
 
-class LocalMRJobRunnerFSTestCase(InlineMRJobRunnerFSTestCase):
-
+class LocalMRJobRunnerFSTestCase(LocalFSTestCase):
     RUNNER_CLASS = LocalMRJobRunner
 
 

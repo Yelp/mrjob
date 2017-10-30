@@ -789,6 +789,8 @@ class SortBinTestCase(SandboxedTestCase):
     def setUp(self):
         super(SortBinTestCase, self).setUp()
 
+        # these patches are only okay if they don't raise an exception;
+        # otherwise that hands an un-pickleable stacktrace to multiprocessing
         self.check_call = self.start(patch(
             'mrjob.local.check_call', wraps=check_call))
 
@@ -894,10 +896,9 @@ class SortBinTestCase(SandboxedTestCase):
         # we can assume it got called because check_call() didn't
 
     def test_bad_sort_bin(self):
-        # fortunately, only sorting uses check_call()
-        self.check_call.side_effect = CalledProcessError
-
-        job = MRGroup(['-r', 'local'])
+        # patching check_call to raise an exception causes pickling issues in
+        # multiprocessing, so just use the false command
+        job = MRGroup(['-r', 'local', '--sort-bin', 'false'])
         job.sandbox(stdin=BytesIO(
             b'apples\nbuffaloes\nbears'))
 
@@ -912,10 +913,9 @@ class SortBinTestCase(SandboxedTestCase):
         self.assertTrue(self._sort_lines_in_memory.called)
 
     def test_missing_sort_bin(self):
-        # fortunately, only sorting uses check_call()
-        self.check_call.side_effect = OSError
-
-        job = MRGroup(['-r', 'local'])
+        # patching check_call to raise an exception causes pickling issues in
+        # multiprocessing, so just use a binary that doesn't exist
+        job = MRGroup(['-r', 'local', '--sort-bin', 'bort-xslkjfsasdf'])
         job.sandbox(stdin=BytesIO(
             b'apples\nbuffaloes\nbears'))
 

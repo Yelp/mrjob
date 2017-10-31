@@ -34,7 +34,8 @@ from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
 
-# this doesn't need to be in its own file because it'll be run inline
+# these jobs don't need to be in their own file because they'll be run inline
+
 class MRIncrementerJob(MRJob):
     """A terribly silly way to add a positive integer to values."""
 
@@ -52,6 +53,19 @@ class MRIncrementerJob(MRJob):
     def steps(self):
         return [MRStep(mapper=self.mapper)] * self.options.times
 
+
+class MRFilePermissionsJob(MRJob):
+    """A way to check file permissions."""
+
+    def mapper(self, _, value):
+        pass
+
+    def mapper_final(self):
+        yield None, None
+
+    def reducer(self, _, __):
+        for path in os.listdir('.'):
+            yield path, os.stat(path).st_mode
 
 
 class SortValuesTestCase(SandboxedTestCase):
@@ -297,7 +311,7 @@ class SimRunnerNoMapperTestCase(SandboxedTestCase):
 
     RUNNER = 'inline'
 
-    # tests #1141. Also used by local mapper
+     # tests #1141. Also used by local mapper
 
     def test_step_with_no_mapper(self):
         mr_job = MRNoMapper(['-r', self.RUNNER])
@@ -326,3 +340,25 @@ class LocalFSTestCase(SandboxedTestCase):
 
     def test_cant_handle_uris(self):
         self.assertRaises(IOError, self.runner.fs.ls, 's3://walrus/foo')
+
+
+class DistributedCachePermissionsTestCase(SandboxedTestCase):
+    # test #1619
+
+    def test_file_permissions(self):
+        data_path = self.makefile('data')
+
+        job = MRFilePermissionsJob(['--file', data_path])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            perms = dict(job.parse_output(runner.cat_output()))
+
+        self.assertIn('data', perms)
+        data_perms = perms['data']
+
+        self.assertTrue(data_perms & stat.S_IXUSR)
+        self.assertFalse(data_perms & stat.S_IXGRP)
+        self.assertFalse(data_perms & stat.S_IXOTH)

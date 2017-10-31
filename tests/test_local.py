@@ -29,12 +29,14 @@ from unittest import skipIf
 
 import mrjob
 from mrjob.cat import decompress
+from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.local import _sort_lines_in_memory
 from mrjob.step import StepFailedException
 from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
+import tests.sr_wc
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
@@ -950,3 +952,23 @@ class SortBinTestCase(SandboxedTestCase):
     def test_custom_local_tmp_dir(self):
         tmp_dir = self.makedirs('ephemera')
         self._test_environment_variables('--local-tmp-dir', tmp_dir)
+
+
+class InputFileArgsTestCase(SandboxedTestCase):
+    # test for #567: ensure that local runner doesn't need to pass
+    # file args to jobs
+
+    def test_no_file_args_required(self):
+        words1 = self.makefile('words1', b'kit and caboodle\n')
+        words2 = self.makefile('words2', b'baubles\nbangles and beads\n')
+
+        job = MRJobLauncher(
+            args=['-r', 'local', tests.sr_wc.__file__, words1, words2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            lines = list(to_lines(runner.cat_output()))
+            self.assertEqual(len(lines), 1)
+            self.assertEqual(int(lines[0]), 7)

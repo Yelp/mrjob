@@ -1,4 +1,4 @@
-v0.6.0, 2017-10-25 -- please acknowledge deprecation warnings
+v0.6.0, 2017-11-01 -- please acknowledge deprecation warnings
  * dropped support for Python 2.7
  * use boto3 instead of boto (#1304)
  * job output is now byte-based, not line-based:

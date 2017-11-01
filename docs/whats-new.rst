@@ -12,8 +12,8 @@ For a complete list of changes, see `CHANGES.txt
 Dropped Python 2.6
 ^^^^^^^^^^^^^^^^^^
 
-mrjob now supports Python 2.7 and Python 3.3+ (some versions of PyPy may
-also work but are not officially supported).
+mrjob now supports Python 2.7 and Python 3.3+. (Some versions of PyPy
+also work but are not officially supported.)
 
 boto3, not boto
 ^^^^^^^^^^^^^^^
@@ -22,22 +22,23 @@ mrjob now uses :py:mod:`boto3` rather than :py:mod:`boto` to talk to AWS.
 This makes it much simpler to pass user-defined data structures directly
 to the API, enabling a number of features.
 
-At least version 1.4.6 of :py:mod:`boto3` is required to use EMR.
+At least version 1.4.6 of :py:mod:`boto3` is required to run jobs on EMR.
 
 It is now possible to fully configure instances (including EBS volumes).
-See :py:mod:`instance_groups` for an example.
+See :mrjob-opt:`instance_groups` for an example.
 
 mrjob also now supports Instance Fleets, which may be fully configured
-(including EBS volumes) through the :py:mod:`instance_fleets` option.
+(including EBS volumes) through the :mrjob-opt:`instance_fleets` option.
 
 Methods that took or returned :py:mod:`boto` objects (for example,
-`make_emr_conn()`) have been completely removed as there as no way
+``make_emr_conn()``) have been completely removed as there as no way
 to make a deprecated shim for them without keeping :py:mod:`boto` as a
 dependency. See :py:class:`~mrjob.emr.EMRJobRunner` and
 :py:class:`~mrjob.fs.s3.S3Filesystem` for new method names.
 
-Note that boto3 reads temporary credentials from :envvar:`$AWS_SESSION_TOKEN`,
-not :envvar:`$AWS_SECURITY_TOKEN` as in boto 2 (see
+Note that :py:mod:`boto3` reads temporary credentials from
+:envvar:`$AWS_SESSION_TOKEN`,
+not :envvar:`$AWS_SECURITY_TOKEN` as in :py:mod:`boto` (see
 :mrjob-opt:`aws_session_token` for details).
 
 argparse, not optparse
@@ -56,11 +57,11 @@ of things you should be aware of:
    ``mr_wc.py CHANGES.txt -r local LICENSE.txt`` will not.
 
 Passthrough options, file options, etc. are now handled with
-:py:meth:`~mrjob.launch.MRJobLauncher.add_file_arg`,
-:py:meth:`~mrjob.launch.MRJobLauncher.add_passthru_arg`,
-:py:meth:`~mrjob.launch.MRJobLauncher.configure_args`,
-:py:meth:`~mrjob.launch.MRJobLauncher.load_args`, and
-:py:meth:`~mrjob.launch.MRJobLauncher.pass_arg_through`. The old
+:py:meth:`~mrjob.job.MRJob.add_file_arg`,
+:py:meth:`~mrjob.job.MRJob.add_passthru_arg`,
+:py:meth:`~mrjob.job.MRJob.configure_args`,
+:py:meth:`~mrjob.job.MRJob.load_args`, and
+:py:meth:`~mrjob.job.MRJob.pass_arg_through`. The old
 methods with "option" in their name are deprecated but still work.
 
 As part of this refactor, `OptionStore` and its subclasses have been removed;
@@ -85,9 +86,6 @@ now deprecated because they are line-based. Try
 :py:func:`~mrjob.cat.decompress`, :py:func:`~mrjob.cat.to_chunks`, and
 :py:func:`~mrjob.util.to_lines`.
 
-There is not currently a way to define non-line-based
-:ref:`job-protocols`, but there should be soon.
-
 Better local/inline mode
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -100,8 +98,8 @@ Local mode now runs one mapper/reducer per CPU, using
 We only sort by reducer key (not the full line) unless
 :py:attr:`~mrjob.job.SORT_VALUES` is set, exposing bad assumptions sooner.
 
-:mrjob-opt:`step_output_dir` is now supported, making it easier to debug
-issues in intermediate steps.
+The :mrjob-opt:`step_output_dir` option is now supported, making it easier to
+debug issues in intermediate steps.
 
 Files in tasks' (e.g. mappers') working directories are marked user-executable,
 to better imitate Hadoop Distributed Cache. When possible, we also symlink
@@ -129,8 +127,9 @@ JSON to the API at cluster create time (in Dataproc and EMR). The old
 `emr_api_params` option is deprecated and disabled.
 
 :mrjob-opt:`max_hours_idle` has been replaced with :mrjob-opt:`max_mins_idle`
-(the old option is deprecated but still works). The default is 10 minutes
-(due to a bug, less might cause the cluster to terminate before the job runs).
+(the old option is deprecated but still works). The default is 10 minutes.
+Due to a bug, smaller numbers of minutes might cause the cluster to terminate
+before the job runs.
 
 It is no longer possible for mrjob to launch a cluster that sits idle
 indefinitely (except by setting :mrjob-opt:`max_mins_idle` to an unreasonably
@@ -153,8 +152,9 @@ when approximating time billed and waste.
 
 .. note::
 
-   Pooling was enabled by default for some development versions of v0.6.0.
-   This did not make it into the release; you must still explicitly turn on
+   Pooling was enabled by default for some development versions of v0.6.0,
+   prior to the billing change. This did not make it into the release; you
+   must still explicitly turn on
    :ref:`cluster pooling <cluster-pooling>`.
 
 Other EMR changes

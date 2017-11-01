@@ -18,14 +18,9 @@ import getpass
 import os
 import os.path
 import shutil
-import stat
-import sys
 import tarfile
-import tempfile
-from subprocess import CalledProcessError
 from time import sleep
 from unittest import TestCase
-from unittest import skip
 from unittest import skipIf
 from zipfile import ZipFile
 
@@ -35,7 +30,6 @@ from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
 from mrjob.inline import InlineMRJobRunner
 from mrjob.py2 import StringIO
-from mrjob.runner import MRJobRunner
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 from mrjob.util import to_lines

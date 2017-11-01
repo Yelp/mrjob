@@ -82,7 +82,6 @@ from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _ls_emr_step_stderr_logs
 from mrjob.logs.step import _ls_emr_step_syslogs
 from mrjob.parse import is_s3_uri
-from mrjob.parse import is_uri
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
 from mrjob.pool import _instance_fleets_satisfy

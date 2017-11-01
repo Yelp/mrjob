@@ -18,8 +18,6 @@ This module also functions as a :command:`cat` substitute that can handle
 compressed files. It it used by :py:mod:`local <mrjob.local>` mode and can
 function without the rest of the mrjob library.
 """
-import gzip
-import sys
 import zlib
 
 try:

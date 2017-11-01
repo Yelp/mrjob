@@ -24,7 +24,6 @@ from io import BytesIO
 
 from mrjob.inline import InlineMRJobRunner
 from tests.mr_test_cmdenv import MRTestCmdenv
-from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase

@@ -49,7 +49,6 @@ from mrjob.fs.gcs import GCSFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.gcs import is_gcs_uri
-from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException

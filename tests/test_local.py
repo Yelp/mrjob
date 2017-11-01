@@ -834,7 +834,7 @@ class SortBinTestCase(SandboxedTestCase):
 
         self.assertEqual(sort_args[:1], ['sort'])
         self.assertNotEqual(sort_args[:6],
-                         ['sort', '-t', '\t', '-k', '1,1', '-s'])
+                            ['sort', '-t', '\t', '-k', '1,1', '-s'])
 
     def test_custom_sort_bin(self):
         job = MRGroup(['-r', 'local', '--sort-bin', 'sort -r'])

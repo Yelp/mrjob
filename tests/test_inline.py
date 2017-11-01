@@ -29,6 +29,7 @@ from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.test_sim import MRIncrementerJob
 
+
 # the inline runner is extensively used in test_sim.py, so there are not
 # many inline-specific tests
 

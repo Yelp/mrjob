@@ -80,7 +80,7 @@ def _instance_groups_satisfy(actual_igs, requested_igs):
     # verify format of requested_igs
     if not (isinstance(requested_igs, (list, tuple)) and
             all(isinstance(req_ig, dict) and 'InstanceRole' in req_ig
-            for req_ig in requested_igs)):
+                for req_ig in requested_igs)):
         log.debug('    bad instance_groups config')
         return None
 
@@ -234,7 +234,7 @@ def _instance_fleets_satisfy(actual_fleets, req_fleets):
     # verify format of requested_igs
     if not (isinstance(req_fleets, (list, tuple)) and
             all(isinstance(req_ft, dict) and 'InstanceFleetType' in req_ft
-            for req_ft in req_fleets)):
+                for req_ft in req_fleets)):
         log.debug('    bad instance_fleets config')
         return None
 

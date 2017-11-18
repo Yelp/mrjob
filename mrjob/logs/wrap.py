@@ -17,6 +17,7 @@
 from logging import getLogger
 
 from mrjob.py2 import to_unicode
+from mrjob.util import to_lines
 
 from .ids import _sort_by_recency
 
@@ -24,12 +25,14 @@ log = getLogger(__name__)
 
 
 def _cat_log(fs, path):
-    """fs.cat() the given log, converting lines to strings, and logging
-    errors."""
+    """Yield lines from the given log.
+
+    Log errors rather than raising them.
+    """
     try:
         if not fs.exists(path):
             return
-        for line in fs.cat(path):
+        for line in to_lines(fs.cat(path)):
             yield to_unicode(line)
     except (IOError, OSError) as e:
         log.warning("couldn't cat() %s: %r" % (path, e))

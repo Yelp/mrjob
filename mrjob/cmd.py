@@ -86,6 +86,12 @@ def _create_cluster(args):
     main(args)
 
 
+@_command('diagnose', 'Diagnose cause of job failure')
+def _diagnose(args):
+    from mrjob.tools.diagnose import main
+    main(args)
+
+
 @_command('boss', 'Run a command on every node of a cluster.')
 def _mrboss(args):
     from mrjob.tools.emr.mrboss import main

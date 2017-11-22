@@ -118,7 +118,7 @@ _parse_*_log(lines):
     Pull important information from a log file. This generally follows the same
     format as _interpret_<type>_logs(), above.
 
-    Log lines are always strings (see mrjob.logs.wrap._cat_log()).
+    Log lines are always strings (see mrjob.logs.wrap._cat_log_lines()).
 
     _parse_*_log() methods generally return a part of the _interpret_*_logs()
     format, but are *not* responsible for including implied job/task IDs.

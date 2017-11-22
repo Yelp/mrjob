@@ -24,7 +24,7 @@ from .ids import _sort_by_recency
 log = getLogger(__name__)
 
 
-def _cat_log(fs, path):
+def _cat_log_lines(fs, path):
     """Yield lines from the given log.
 
     Log errors rather than raising them.

@@ -15,7 +15,7 @@
 # limitations under the License.
 from unittest import TestCase
 
-from mrjob.logs.wrap import _cat_log
+from mrjob.logs.wrap import _cat_log_lines
 from mrjob.logs.wrap import _ls_logs
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
@@ -41,7 +41,7 @@ class CatLogsTestCase(PatcherTestCase):
 
     # wrapper for cat_log() that uses self.mock_fs and turns result into list
     def cat_log(self, path):
-        return list(_cat_log(self.mock_fs, path))
+        return list(_cat_log_lines(self.mock_fs, path))
 
     def test_yields_lines(self):
         self.mock_fs.cat.return_value = (

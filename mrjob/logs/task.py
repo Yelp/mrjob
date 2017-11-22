@@ -20,7 +20,7 @@ import re
 from .ids import _add_implied_task_id
 from .ids import _to_job_id
 from .log4j import _parse_hadoop_log4j_records
-from .wrap import _cat_log
+from .wrap import _cat_log_lines
 from .wrap import _ls_logs
 from mrjob import parse
 
@@ -235,7 +235,7 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
         if stderr_path:
             if log_callback:
                 log_callback(stderr_path)
-            task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
+            task_error = _parse_task_stderr(_cat_log_lines(fs, stderr_path))
 
             if task_error:
                 task_error['path'] = stderr_path
@@ -249,7 +249,7 @@ def _interpret_task_logs(fs, matches, partial=True, log_callback=None):
 
         if log_callback:
             log_callback(syslog_path)
-        syslog_error = _parse_task_syslog(_cat_log(fs, syslog_path))
+        syslog_error = _parse_task_syslog(_cat_log_lines(fs, syslog_path))
         syslogs_parsed.add(syslog_path)
 
         if not syslog_error.get('hadoop_error'):
@@ -319,7 +319,7 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
         if log_callback:
             log_callback(stderr_path)
         # stderr is Spark's syslog
-        stderr_error = _parse_task_syslog(_cat_log(fs, stderr_path))
+        stderr_error = _parse_task_syslog(_cat_log_lines(fs, stderr_path))
 
         if stderr_error.get('hadoop_error'):
             stderr_error['hadoop_error']['path'] = stderr_path
@@ -334,7 +334,7 @@ def _interpret_spark_task_logs(fs, matches, partial=True, log_callback=None):
             if log_callback:
                 log_callback(stdout_path)
             # the stderr of the application master ends up in "stdout"
-            task_error = _parse_task_stderr(_cat_log(fs, stdout_path))
+            task_error = _parse_task_stderr(_cat_log_lines(fs, stdout_path))
 
             if task_error:
                 task_error['path'] = stdout_path

@@ -122,7 +122,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
             patch('mrjob.logs.history._parse_pre_yarn_history_log',
                   return_value=mock_return_value))
 
-        self.mock_cat_log = self.start(patch('mrjob.logs.history._cat_log'))
+        self.mock_cat_log_lines = self.start(patch('mrjob.logs.history._cat_log_lines'))
 
     def interpret_history_log(self, matches):
         """Wrap _interpret_history_log(), since fs doesn't matter."""
@@ -137,7 +137,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
                 [dict(path='/path/to/pre-yarn-history.jar', yarn=False)]),
             self.mock_parse_pre_yarn_history_log.return_value)
 
-        self.mock_cat_log.called_once_with(
+        self.mock_cat_log_lines.called_once_with(
             self.mock_fs, '/path/to/pre-yarn-history.jar')
 
         self.assertEqual(self.mock_parse_pre_yarn_history_log.call_count, 1)
@@ -148,7 +148,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
                 [dict(path='/path/to/yarn-history.jhist', yarn=True)]),
             self.mock_parse_yarn_history_log.return_value)
 
-        self.mock_cat_log.called_once_with(
+        self.mock_cat_log_lines.called_once_with(
             self.mock_fs, '/path/to/yarn-history.jhist')
 
         self.assertEqual(self.mock_parse_yarn_history_log.call_count, 1)
@@ -163,7 +163,7 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
                  dict(path='/path/to/yarn-history-2.jhist', yarn=True)]),
             self.mock_parse_yarn_history_log.return_value)
 
-        self.mock_cat_log.called_once_with(
+        self.mock_cat_log_lines.called_once_with(
             self.mock_fs, '/path/to/yarn-history-1.jhist')
 
         self.assertEqual(self.mock_parse_yarn_history_log.call_count, 1)

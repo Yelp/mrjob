@@ -25,7 +25,7 @@ from .ids import _add_implied_job_id
 from .ids import _add_implied_task_id
 from .log4j import _parse_hadoop_log4j_records
 from .task import _parse_task_stderr
-from .wrap import _cat_log
+from .wrap import _cat_log_lines
 from .wrap import _ls_logs
 
 
@@ -154,7 +154,7 @@ def _interpret_emr_step_syslog(fs, matches):
     for match in matches:
         path = match['path']
 
-        interpretation = _parse_step_syslog(_cat_log(fs, path))
+        interpretation = _parse_step_syslog(_cat_log_lines(fs, path))
 
         result.update(interpretation)
         for error in result.get('errors') or ():
@@ -177,7 +177,7 @@ def _interpret_emr_step_stderr(fs, matches):
     for match in matches:
         path = match['path']
 
-        error = _parse_task_stderr(_cat_log(fs, path))
+        error = _parse_task_stderr(_cat_log_lines(fs, path))
 
         if error:
             error['path'] = path

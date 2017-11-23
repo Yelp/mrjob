@@ -84,10 +84,15 @@ class LogInterpretationMixin(object):
         # dir and depend on regexes to find the right subdir.
         return ()
 
-    def _get_step_log_interpretation(self, log_interpretation, step_type):
+    def _get_step_log_interpretation(
+            self, log_interpretation, is_spark_step=False):
         """Return interpretation of the step log. Either implement
         this, or fill ``'step'`` yourself (e.g. from Hadoop binary's
-        output."""
+        output).
+
+        Please set *is_spark_step* to true when parsing logs from spark
+        steps (at least on EMR, the logs have different names).
+        """
         return None
 
     ### stuff to call ###
@@ -158,7 +163,7 @@ class LogInterpretationMixin(object):
             return
 
         step_interpretation = self._get_step_log_interpretation(
-            log_interpretation, step_type)
+            log_interpretation, is_spark_step=_is_spark_step_type(step_type))
         if step_interpretation:
             log_interpretation['step'] = step_interpretation
 

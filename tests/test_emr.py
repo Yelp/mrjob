@@ -3749,7 +3749,7 @@ class GetStepLogInterpretationTestCase(MockBoto3TestCase):
 
         self.assertEqual(
             runner._get_step_log_interpretation(
-                log_interpretation, 'streaming'),
+                log_interpretation, is_spark_step=False),
             self._interpret_emr_step_syslog.return_value)
 
         self.assertFalse(self.log.warning.called)
@@ -3788,7 +3788,7 @@ class GetStepLogInterpretationTestCase(MockBoto3TestCase):
 
         self.assertEqual(
             runner._get_step_log_interpretation(
-                log_interpretation, 'streaming'),
+                log_interpretation, is_spark_step=False),
             self._interpret_emr_step_stderr.return_value)
 
         self.assertFalse(self.log.warning.called)

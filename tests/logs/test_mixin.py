@@ -134,7 +134,7 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
             dict(step=dict(job_id='job_1')))
 
         self.runner._get_step_log_interpretation.assert_called_once_with(
-            log_interpretation, 'streaming')
+            log_interpretation, is_spark_step=False)
 
     def test_spark_step_interpretation(self):
         self.runner._get_step_log_interpretation.return_value = dict(
@@ -149,7 +149,7 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
             dict(step=dict(job_id='job_1')))
 
         self.runner._get_step_log_interpretation.assert_called_once_with(
-            log_interpretation, 'spark')
+            log_interpretation, is_spark_step=True)
 
     def test_no_step_interpretation(self):
         self.runner._get_step_log_interpretation.return_value = None
@@ -161,7 +161,7 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
         self.assertEqual(log_interpretation, {})
 
         self.runner._get_step_log_interpretation.assert_called_once_with(
-            log_interpretation, 'streaming')
+            log_interpretation, is_spark_step=False)
 
 
 class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):

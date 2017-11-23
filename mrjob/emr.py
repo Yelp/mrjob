@@ -2055,14 +2055,15 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             s3_dir_name=s3_dir_name,
             ssh_to_workers=True)  # TODO: does this make sense on YARN?
 
-    def _get_step_log_interpretation(self, log_interpretation, step_type):
+    def _get_step_log_interpretation(
+            self, log_interpretation, is_spark_step=False):
         """Fetch and interpret the step log."""
         step_id = log_interpretation.get('step_id')
         if not step_id:
             log.warning("Can't fetch step log; missing step ID")
             return
 
-        if _is_spark_step_type(step_type):
+        if is_spark_step:
             # Spark also has a "controller" log4j log, but it doesn't
             # contain errors or anything else we need
             return _interpret_emr_step_syslog(

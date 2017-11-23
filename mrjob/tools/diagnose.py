@@ -15,6 +15,7 @@
 from argparse import ArgumentParser
 from logging import getLogger
 
+from mrjob.emr import _EMR_SPARK_ARGS
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.logs.errors import _format_error
@@ -45,8 +46,9 @@ def main(cl_args=None):
 
     log_interpretation = dict(step_id=step['Id'])
 
-    # TODO: infer step type
-    error = runner._pick_error(log_interpretation, step_type='streaming')
+    step_type = _infer_step_type(step)
+
+    error = runner._pick_error(log_interpretation, step_type)
 
     if error:
         log.error('Probable cause of failure:\n\n%s\n\n' %
@@ -79,6 +81,25 @@ def get_last_failed_step(emr_client, cluster_id):
         raise ValueError('Cluster %s has no FAILED steps' % cluster_id)
 
     return steps[0]
+
+
+def _infer_step_type(step):
+    args = step['Config']['Args']
+
+    # all that matters for log parsing is picking out Spark steps
+    # (doesn't matter if it's spark or spark_jar or spark_script)
+    #
+    # and of course we don't know the logging habits of jar steps,
+    # so we might as well use streaming's logic
+    for i in range(len(_EMR_SPARK_ARGS)):
+        if list(args[i:i + len(_EMR_SPARK_ARGS)]) == _EMR_SPARK_ARGS:
+            return 'spark'
+    else:
+        return 'streaming'
+
+    # every spark step on EMR must include these args
+    return any(args[i:i+len(_EMR_SPARK_ARGS)] == _EMR_SPARK_ARGS
+               for i in range(len(_EMR_SPARK_ARGS)))
 
 
 def _make_arg_parser():

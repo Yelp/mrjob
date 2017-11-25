@@ -39,10 +39,16 @@ def main(cl_args=None):
     runner = EMRJobRunner(**runner_kwargs)
     emr_client = runner.make_emr_client()
 
+    # TODO: put step picking and error handling in a single method
     if options.step_id:
         step = get_step(emr_client, options.cluster_id, options.step_id)
     else:
         step = get_last_failed_step(emr_client, options.cluster_id)
+
+    if not step:
+        raise SystemExit(1)
+
+    log.info('Diagnosing step %s (%s)' % (step['Id'], step['Name']))
 
     log_interpretation = dict(step_id=step['Id'])
 
@@ -59,11 +65,13 @@ def main(cl_args=None):
 
 def get_step(emr_client, cluster_id, step_id):
     steps = emr_client.list_steps(
-        ClusterId=cluster_id, StepIDs=[step_id])['Steps']
+        ClusterId=cluster_id, StepIds=[step_id])['Steps']
 
+    # list_steps() will actually error if the step ID isn't valid
     if not steps:
-        raise ValueError('Step %s not found in cluster %s' %
-                         step_id, cluster_id)
+        log.error('Step %s not found in cluster %s' %
+                  (step_id, cluster_id))
+        return None
 
     step = steps[0]
     state = step['Status']['State']
@@ -78,7 +86,8 @@ def get_last_failed_step(emr_client, cluster_id):
         ClusterId=cluster_id, StepStates=['FAILED'])['Steps']
 
     if not steps:
-        raise ValueError('Cluster %s has no FAILED steps' % cluster_id)
+        log.error('Cluster %s has no FAILED steps' % cluster_id)
+        return None
 
     return steps[0]
 
@@ -124,7 +133,6 @@ def _make_arg_parser():
     _alphabetize_actions(arg_parser)
 
     return arg_parser
-
 
 
 if __name__ == '__main__':

@@ -11,7 +11,34 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Print probable cause of error for a failed step."""
+"""Print probable cause of error for a failed step.
+
+Currently this only works on EMR.
+
+Usage::
+
+    mrjob diagnose [opts] j-CLUSTERID
+
+Options::
+
+  -c CONF_PATHS, --conf-path CONF_PATHS
+                        Path to alternate mrjob.conf file to read from
+  --no-conf             Don't load mrjob.conf even if it's available
+  --emr-endpoint EMR_ENDPOINT
+                        Force mrjob to connect to EMR on this endpoint (e.g.
+                        us-west-1.elasticmapreduce.amazonaws.com). Default is
+                        to infer this from region.
+  -h, --help            show this help message and exit
+  -q, --quiet           Don't print anything to stderr
+  --region REGION       GCE/AWS region to run Dataproc/EMR jobs in.
+  --s3-endpoint S3_ENDPOINT
+                        Force mrjob to connect to S3 on this endpoint (e.g. s3
+                        -us-west-1.amazonaws.com). You usually shouldn't set
+                        this; by default mrjob will choose the correct
+                        endpoint for each S3 bucket based on its location.
+  --step-id STEP_ID     ID of a particular failed step to diagnose
+  -v, --verbose         print more messages to stderr
+"""
 from argparse import ArgumentParser
 from logging import getLogger
 

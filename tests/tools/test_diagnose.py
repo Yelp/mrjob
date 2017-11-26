@@ -13,7 +13,7 @@
 # limitations under the License.
 """Test the diagnose script"""
 
-from mrjob.tools.diagnose import diagnose_main
+from mrjob.tools.diagnose import main as diagnose_main
 
 from tests.mock_boto3 import MockBoto3TestCase
 from tests.py2 import patch
@@ -160,3 +160,49 @@ class StepPickingTestCase(MockBoto3TestCase):
 
         self.pick_error.assert_called_once_with(
             dict(step_id='s-MOCKSTEP0'), 'streaming')
+
+
+    def test_pick_completed_step(self):
+        self.mock_emr_clusters['j-MOCKCLUSTER0'] = dict(
+            _Steps=[
+                dict(
+                    Config=dict(Args=['python', 'mr_failure.py', '--mapper']),
+                    Id='s-MOCKSTEP0',
+                    Name='mr_failure',
+                    Status=dict(State='FAILED'),
+                ),
+                dict(
+                    Config=dict(Args=['python', 'mr_success.py', '--mapper']),
+                    Id='s-MOCKSTEP1',
+                    Name='mr_success',
+                    Status=dict(State='COMPLETED'),
+                ),
+            ]
+        )
+
+        self.assertRaises(StopIteration, diagnose_main,
+                          ['j-MOCKCLUSTER0', '--step-id', 's-MOCKSTEP1'])
+
+        self.pick_error.assert_called_once_with(
+            dict(step_id='s-MOCKSTEP1'), 'streaming')
+
+        self.assertTrue(self.log.warning.called)
+
+    def test_bad_step_id(self):
+        self.mock_emr_clusters['j-MOCKCLUSTER0'] = dict(
+            _Steps=[
+                dict(
+                    Config=dict(Args=['python', 'mr_failure.py', '--mapper']),
+                    Id='s-MOCKSTEP0',
+                    Name='mr_failure',
+                    Status=dict(State='FAILED'),
+                )
+            ]
+        )
+
+        # shouldn't trigger an error from the EMR API
+        self.assertRaises(SystemExit, diagnose_main,
+                          ['j-MOCKCLUSTER0', '--step-id', 's-ILLY'])
+
+        self.assertTrue(self.log.error.called)
+        self.assertFalse(self.pick_error.called)

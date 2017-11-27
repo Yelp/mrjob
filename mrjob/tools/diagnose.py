@@ -38,6 +38,8 @@ Options::
                         endpoint for each S3 bucket based on its location.
   --step-id STEP_ID     ID of a particular failed step to diagnose
   -v, --verbose         print more messages to stderr
+
+.. versionadded:: 0.6.1
 """
 from argparse import ArgumentParser
 from logging import getLogger

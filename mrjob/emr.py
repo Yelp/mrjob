@@ -1610,7 +1610,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._ssh_fs.use_sudo_over_ssh()
 
     def get_job_steps(self):
-        """Efficiently fetch the steps for this mrjob run from the EMR API."""
+        """Fetch the steps submitted by this runner from the EMR API.
+
+        .. versionadded:: 0.6.1
+        """
         return _get_job_steps(
             self.make_emr_client(), self.get_cluster_id(), self.get_job_key())
 

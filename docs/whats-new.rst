@@ -4,6 +4,21 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.1:
+
+0.6.1
+-----
+
+Added the :ref:`diagnose-tool` tool (run
+:command:`mrjob diagnose j-CLUSTERID`), which determines why a previously run
+job failed.
+
+Fixed a serious bug that made mrjob unable to properly parse error logs
+in some cases.
+
+Added the :py:meth:`~mrjob.emr.EMRJobRunner.get_job_steps` method to
+:py:class:`~mrjob.emr.EMRJobRunner`.
+
 .. _v0.6.0:
 
 0.6.0

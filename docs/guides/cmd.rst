@@ -34,6 +34,8 @@ create-cluster
    .. automodule:: mrjob.tools.emr.create_cluster
 
 
+.. _diagnose-tool:
+
 diagnose
 ^^^^^^^^
 

@@ -132,7 +132,8 @@ class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
             patch('mrjob.logs.bootstrap._parse_task_stderr',
                   return_value=dict(message='BOOM!\n')))
 
-        self.mock_cat_log_lines = self.start(patch('mrjob.logs.bootstrap._cat_log_lines'))
+        self.mock_cat_log_lines = self.start(
+            patch('mrjob.logs.bootstrap._cat_log_lines'))
 
     def interpret_bootstrap_stderr(self, matches, **kwargs):
         """Wrap _interpret_emr_bootstrap_stderr(), since fs doesn't matter"""

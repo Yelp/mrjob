@@ -61,7 +61,7 @@ def main(cl_args=None):
 
     MRJob.set_up_logging(quiet=options.quiet, verbose=options.verbose)
 
-    runner_kwargs = {k:v for k, v in options.__dict__.items()
+    runner_kwargs = {k: v for k, v in options.__dict__.items()
                      if k not in ('quiet', 'verbose', 'step_id')}
 
     runner = EMRJobRunner(**runner_kwargs)
@@ -89,7 +89,7 @@ def main(cl_args=None):
     # print error
     if error:
         log.error('Probable cause of failure:\n\n%s\n\n' %
-                              _format_error(error))
+                  _format_error(error))
     else:
         log.warning('No error detected')
 
@@ -134,7 +134,7 @@ def _infer_step_type(step):
         return 'streaming'
 
     # every spark step on EMR must include these args
-    return any(args[i:i+len(_EMR_SPARK_ARGS)] == _EMR_SPARK_ARGS
+    return any(args[i:i + len(_EMR_SPARK_ARGS)] == _EMR_SPARK_ARGS
                for i in range(len(_EMR_SPARK_ARGS)))
 
 

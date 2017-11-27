@@ -122,7 +122,8 @@ class InterpretHistoryLogTestCase(PatcherTestCase):
             patch('mrjob.logs.history._parse_pre_yarn_history_log',
                   return_value=mock_return_value))
 
-        self.mock_cat_log_lines = self.start(patch('mrjob.logs.history._cat_log_lines'))
+        self.mock_cat_log_lines = self.start(
+            patch('mrjob.logs.history._cat_log_lines'))
 
     def interpret_history_log(self, matches):
         """Wrap _interpret_history_log(), since fs doesn't matter."""

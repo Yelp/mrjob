@@ -153,7 +153,8 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         # (the actual log-parsing functions take lines from the log)
         def mock_parse_task_syslog(path_from_mock_cat_log_lines):
             # default is {}
-            return self.path_to_mock_result.get(path_from_mock_cat_log_lines, {})
+            return self.path_to_mock_result.get(
+                path_from_mock_cat_log_lines, {})
 
         def mock_parse_task_stderr(path_from_mock_cat_log_lines):
             # default is None
@@ -171,7 +172,8 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.mock_fs.ls = Mock(side_effect=mock_ls)
 
         self.mock_cat_log_lines = self.start(
-            patch('mrjob.logs.task._cat_log_lines', side_effect=mock_cat_log_lines))
+            patch('mrjob.logs.task._cat_log_lines',
+                  side_effect=mock_cat_log_lines))
 
         self.start(patch('mrjob.logs.task._parse_task_syslog',
                          side_effect=mock_parse_task_syslog))
@@ -554,7 +556,8 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         # (the actual log-parsing functions take lines from the log)
         def mock_parse_task_syslog(path_from_mock_cat_log_lines):
             # default is {}
-            return self.path_to_mock_result.get(path_from_mock_cat_log_lines, {})
+            return self.path_to_mock_result.get(
+                path_from_mock_cat_log_lines, {})
 
         def mock_parse_task_stderr(path_from_mock_cat_log_lines):
             # default is None
@@ -572,7 +575,8 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         self.mock_fs.ls = Mock(side_effect=mock_ls)
 
         self.mock_cat_log_lines = self.start(
-            patch('mrjob.logs.task._cat_log_lines', side_effect=mock_cat_log_lines))
+            patch('mrjob.logs.task._cat_log_lines',
+                  side_effect=mock_cat_log_lines))
 
         self.start(patch('mrjob.logs.task._parse_task_syslog',
                          side_effect=mock_parse_task_syslog))

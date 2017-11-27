@@ -161,7 +161,6 @@ class StepPickingTestCase(MockBoto3TestCase):
         self.pick_error.assert_called_once_with(
             dict(step_id='s-MOCKSTEP0'), 'streaming')
 
-
     def test_pick_completed_step(self):
         self.mock_emr_clusters['j-MOCKCLUSTER0'] = dict(
             _Steps=[

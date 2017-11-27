@@ -275,12 +275,6 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
     return (key_value == job_key.encode('utf_8'))
 
 
-def _get_reason(cluster_or_step):
-    """Get state change reason message."""
-    # StateChangeReason is {} before the first state change
-    return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
-
-
 class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Amazon Elastic MapReduce.
     Invoked when you run your job with ``-r emr``.
@@ -3006,6 +3000,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     return (too_small_msg % ig['InstanceType'])
 
         return None
+
+
+def _get_reason(cluster_or_step):
+    """Get state change reason message."""
+    # StateChangeReason is {} before the first state change
+    return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
 def _fix_configuration_opt(c):

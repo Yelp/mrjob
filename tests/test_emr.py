@@ -45,7 +45,6 @@ from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _HUGE_PART_THRESHOLD
 from mrjob.emr import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
-from mrjob.emr import get_job_steps
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _extract_tags
@@ -4029,21 +4028,13 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
                               HADOOP_ENV_EMR_CONFIGURATION])
 
 
-class GetJobStepIdsTestCase(MockBoto3TestCase):
-    # tests get_job_steps()
-
-    def get_job_step_ids(self, runner):
-        steps = get_job_steps(
-            runner.make_emr_client(), runner.get_cluster_id(),
-            runner.get_job_key())
-
-        return [step['Id'] for step in steps]
+class GetJobStepsTestCase(MockBoto3TestCase):
 
     def test_empty(self):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
 
-        self.assertEqual(self.get_job_step_ids(runner), [])
+        self.assertEqual(runner.get_job_steps(), [])
 
     def test_own_cluster(self):
         job = MRTwoStepJob(['-r', 'emr']).sandbox()
@@ -4051,15 +4042,13 @@ class GetJobStepIdsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner._launch()
 
-            steps = _list_all_steps(runner)
+            all_steps = _list_all_steps(runner)
 
             # ensure that steps appear in correct order (see #1316)
-            self.assertIn('Step 1', steps[0]['Name'])
-            self.assertIn('Step 2', steps[1]['Name'])
+            self.assertIn('Step 1', all_steps[0]['Name'])
+            self.assertIn('Step 2', all_steps[1]['Name'])
 
-            job_step_ids = self.get_job_step_ids(runner)
-            self.assertEqual(job_step_ids,
-                             [steps[0]['Id'], steps[1]['Id']])
+            self.assertEqual(runner.get_job_steps(), all_steps[:2])
 
     def test_shared_cluster(self):
         cluster_id = EMRJobRunner().make_persistent_cluster()
@@ -4079,19 +4068,16 @@ class GetJobStepIdsTestCase(MockBoto3TestCase):
             runner._launch()
             add_other_steps(runner, 3)
 
-            steps = _list_all_steps(runner)
+            all_steps = _list_all_steps(runner)
 
             # make sure these are our steps, and they are in the right order
             # (see #1316)
-            self.assertIn(runner._job_key, steps[50]['Name'])
-            self.assertIn('Step 1', steps[50]['Name'])
-            self.assertIn(runner._job_key, steps[51]['Name'])
-            self.assertIn('Step 2', steps[51]['Name'])
+            self.assertIn(runner._job_key, all_steps[50]['Name'])
+            self.assertIn('Step 1', all_steps[50]['Name'])
+            self.assertIn(runner._job_key, all_steps[51]['Name'])
+            self.assertIn('Step 2', all_steps[51]['Name'])
 
-            job_step_ids = self.get_job_step_ids(runner)
-
-            self.assertEqual(job_step_ids,
-                             [steps[50]['Id'], steps[51]['Id']])
+            self.assertEqual(runner.get_job_steps(), all_steps[50:52])
 
 
 class WaitForStepsToCompleteTestCase(MockBoto3TestCase):

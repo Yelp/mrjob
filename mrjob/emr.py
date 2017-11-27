@@ -1609,18 +1609,22 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
-    def _wait_for_steps_to_complete(self):
-        """Wait for every step of the job to complete, one by one."""
-        # get info about steps on cluster
-        steps = get_job_steps(
+    def get_job_steps(self):
+        """Efficiently fetch the steps for this mrjob run from the EMR API."""
+        return _get_job_steps(
             self.make_emr_client(), self.get_cluster_id(), self.get_job_key())
 
+    def _wait_for_steps_to_complete(self):
+        """Wait for every step of the job to complete, one by one."""
         # get info about expected number of steps
         num_steps = len(self._get_steps())
 
         expected_num_steps = num_steps
         if self._master_node_setup_script_path:
             expected_num_steps += 1
+
+        # get info about steps submitted to cluster
+        steps = self.get_job_steps()
 
         if len(steps) < expected_num_steps:
             log.warning('Expected to find %d steps on cluster, found %d' %
@@ -2984,16 +2988,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return None
 
 
-# intentionally exposed; see #1625 for use case
-def get_job_steps(emr_client, cluster_id, job_key):
-    """Efficiently get the steps mrjob submitted for a particular
-    job in chronological order, ignoring steps from other jobs.
+def _get_job_steps(emr_client, cluster_id, job_key):
+    """Efficiently fetch steps for a particular mrjob run from the EMR API.
 
     :param emr_client: a boto3 EMR client. See
                        :py:meth:`~mrjob.emr.EMRJobRunner.make_emr_client`
     :param cluster_id: ID of EMR cluster to fetch steps from. See
                        :py:meth:`~mrjob.emr.EMRJobRunner.get_cluster_id`
-    :param job_key: Unique key for a mrjob job. See
+    :param job_key: Unique key for a mrjob run. See
                     :py:meth:`~mrjob.runner.MRJobRunner.get_job_key`
     """
     steps = []

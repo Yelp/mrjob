@@ -27,7 +27,6 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
-from itertools import islice
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -1610,36 +1609,22 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
-    def get_step_ids(self):
-        """Get the IDs of the steps we submitted for this job
-         in chronological order, ignoring steps from other jobs.
-        """
-        step_ids = []
-
-        emr_client = self.make_emr_client()
-        for step in _boto3_paginate('Steps', emr_client, 'list_steps',
-                                    ClusterId=self._cluster_id):
-            if step['Name'].startswith(self._job_key):
-                step_ids.append(step['Id'])
-            elif step_ids:
-                # all steps for job will be together, so stop
-                # when we find a non-job step
-                break
-
-        return list(reversed(list(step_ids)))
-
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
+        # get info about steps on cluster
+        steps = get_job_steps(
+            self.make_emr_client(), self.get_cluster_id(), self.get_job_key())
+
+        # get info about expected number of steps
         num_steps = len(self._get_steps())
 
-        expected_num_step_ids = num_steps
+        expected_num_steps = num_steps
         if self._master_node_setup_script_path:
-            expected_num_step_ids += 1
+            expected_num_steps += 1
 
-        step_ids = self.get_step_ids()
-
-        if len(step_ids) < expected_num_step_ids:
-            raise AssertionError("Can't find our steps in the cluster!")
+        if len(steps) < expected_num_steps:
+            log.warning('Expected to find %d steps on cluster, found %d' %
+                        (expected_num_steps, len(steps)))
 
         # clear out log interpretations if they were filled somehow
         self._log_interpretations = []
@@ -1652,20 +1637,17 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._set_up_ssh_tunnel()
 
         # treat master node setup as step -1
+        start = 0
         if self._master_node_setup_script_path:
-            start = -1
-        else:
-            start = 0
+            start -= 1
 
-        for step_num, step_id in enumerate(step_ids, start=start):
-            # this will raise an exception if a step fails
-            if step_num == -1:
-                log.info(
-                    'Waiting for master node setup step (%s) to complete...' %
-                    step_id)
-            else:
-                log.info('Waiting for step %d of %d (%s) to complete...' % (
-                    step_num + 1, num_steps, step_id))
+        for step_num, step in enumerate(steps, start=start):
+            step_id = step['Id']
+            # don't include job_key in logging messages
+            step_name = step['Name'].split(': ')[-1]
+
+            log.info('Waiting for %s (%s) to complete...' %
+                     (step_name, step_id))
 
             self._wait_for_step_to_complete(step_id, step_num, num_steps)
 
@@ -3000,6 +2982,31 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     return (too_small_msg % ig['InstanceType'])
 
         return None
+
+
+def get_job_steps(emr_client, cluster_id, job_key):
+    """Efficiently get the steps mrjob submitted for a particular
+    job in chronological order, ignoring steps from other jobs.
+
+    :param emr_client: a boto3 EMR client. See
+                       :py:meth:`~mrjob.emr.EMRJobRunner.get_emr_client`
+    :param cluster_id: ID of EMR cluster to fetch steps from. See
+                       :py:meth:`~mrjob.emr.EMRJobRunner.get_cluster_id`
+    :param job_key: Unique key for a mrjob job. See
+                    :py:meth:`~mrjob.runner.MRJobRunner.get_job_key`
+    """
+    steps = []
+
+    for step in _boto3_paginate('Steps', emr_client, 'list_steps',
+                                ClusterId=cluster_id):
+        if step['Name'].startswith(job_key):
+            steps.append(step)
+        elif steps:
+            # all steps for job will be together, so stop
+            # when we find a non-job step
+            break
+
+    return list(reversed(list(steps)))
 
 
 def _get_reason(cluster_or_step):

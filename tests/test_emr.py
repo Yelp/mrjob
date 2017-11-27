@@ -45,6 +45,7 @@ from mrjob.emr import _DEFAULT_IMAGE_VERSION
 from mrjob.emr import _HUGE_PART_THRESHOLD
 from mrjob.emr import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.emr import _PRE_4_X_STREAMING_JAR
+from mrjob.emr import get_job_steps
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _extract_tags
@@ -61,7 +62,6 @@ import tests.mock_boto3
 import tests.mock_boto3.emr
 import tests.mock_boto3.s3
 from tests.mock_boto3 import MockBoto3TestCase
-from tests.mock_boto3.emr import MockEMRClient
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
@@ -4029,19 +4029,21 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
                               HADOOP_ENV_EMR_CONFIGURATION])
 
 
-class GetStepIdsTestCase(MockBoto3TestCase):
+class GetJobStepIdsTestCase(MockBoto3TestCase):
+    # tests get_job_steps()
 
-    def setUp(self):
-        super(GetStepIdsTestCase, self).setUp()
-        self.start(patch.object(MockEMRClient, 'list_steps',
-                                side_effect=MockEMRClient.list_steps,
-                                autospec=True))
+    def get_job_step_ids(self, runner):
+        steps = get_job_steps(
+            runner.make_emr_client(), runner.get_cluster_id(),
+            runner.get_job_key())
+
+        return [step['Id'] for step in steps]
 
     def test_empty(self):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
 
-        self.assertEqual(runner.get_step_ids(), [])
+        self.assertEqual(self.get_job_step_ids(runner), [])
 
     def test_own_cluster(self):
         job = MRTwoStepJob(['-r', 'emr']).sandbox()
@@ -4055,7 +4057,7 @@ class GetStepIdsTestCase(MockBoto3TestCase):
             self.assertIn('Step 1', steps[0]['Name'])
             self.assertIn('Step 2', steps[1]['Name'])
 
-            job_step_ids = runner.get_step_ids()
+            job_step_ids = self.get_job_step_ids(runner)
             self.assertEqual(job_step_ids,
                              [steps[0]['Id'], steps[1]['Id']])
 
@@ -4086,7 +4088,7 @@ class GetStepIdsTestCase(MockBoto3TestCase):
             self.assertIn(runner._job_key, steps[51]['Name'])
             self.assertIn('Step 2', steps[51]['Name'])
 
-            job_step_ids = runner.get_step_ids()
+            job_step_ids = self.get_job_step_ids(runner)
 
             self.assertEqual(job_step_ids,
                              [steps[50]['Id'], steps[51]['Id']])

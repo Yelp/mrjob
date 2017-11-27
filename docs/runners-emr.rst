@@ -14,6 +14,7 @@ EMR Utilities
 .. automethod:: EMRJobRunner.get_cluster_id
 .. automethod:: EMRJobRunner.get_image_version
 .. automethod:: EMRJobRunner.make_emr_client
+.. autofunction:: get_job_steps
 
 S3 Utilities
 ------------

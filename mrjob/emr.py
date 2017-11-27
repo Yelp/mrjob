@@ -2984,12 +2984,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return None
 
 
+# intentionally exposed; see #1625 for use case
 def get_job_steps(emr_client, cluster_id, job_key):
     """Efficiently get the steps mrjob submitted for a particular
     job in chronological order, ignoring steps from other jobs.
 
     :param emr_client: a boto3 EMR client. See
-                       :py:meth:`~mrjob.emr.EMRJobRunner.get_emr_client`
+                       :py:meth:`~mrjob.emr.EMRJobRunner.make_emr_client`
     :param cluster_id: ID of EMR cluster to fetch steps from. See
                        :py:meth:`~mrjob.emr.EMRJobRunner.get_cluster_id`
     :param job_key: Unique key for a mrjob job. See

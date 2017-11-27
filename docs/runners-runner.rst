@@ -21,6 +21,7 @@ Run Information
 
 .. automethod:: MRJobRunner.counters
 .. automethod:: MRJobRunner.get_hadoop_version
+.. automethod:: MRJobRunner.get_job_key
 
 Configuration
 -------------

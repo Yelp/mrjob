@@ -1,3 +1,8 @@
+v0.6.1, 2017-11-27 -- mrjob diagnose
+ * fixed serious error log parsing issue (#1708)
+ * added mrjob diagnose utility to find why previously run jobs failed (#1707)
+ * exposed EMRJobRunner.get_job_steps() (#1625)
+
 v0.6.0, 2017-11-01 -- wave of deprecation
  * dropped support for Python 2.7
  * use boto3 instead of boto (#1304)

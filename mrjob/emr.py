@@ -1616,40 +1616,35 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
-    def get_step_ids(self, max_steps=None):
+    def get_step_ids(self):
         """Get the IDs of the steps we submitted for this job
          in chronological order, ignoring steps from other jobs.
-
-        Generally, you want to set *max_steps*, so we can make as few API
-        calls as possible.
         """
-        # yield all steps whose name matches our job key
-        def yield_step_ids():
-            emr_client = self.make_emr_client()
-            for step in _boto3_paginate('Steps', emr_client, 'list_steps',
-                                        ClusterId=self._cluster_id):
-                if step['Name'].startswith(self._job_key):
-                    yield step['Id']
+        step_ids = []
 
-        # list_steps() returns steps in reverse chronological order.
-        # put them in forward chronological order, only keeping the
-        # last *max_steps* steps.
-        return list(reversed(list(islice(yield_step_ids(), max_steps))))
+        emr_client = self.make_emr_client()
+        for step in _boto3_paginate('Steps', emr_client, 'list_steps',
+                                    ClusterId=self._cluster_id):
+            if step['Name'].startswith(self._job_key):
+                step_ids.append(step['Id'])
+            elif step_ids:
+                # all steps for job will be together, so stop
+                # when we find a non-job step
+                break
+
+        return list(reversed(list(step_ids)))
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
         num_steps = len(self._get_steps())
 
-        # if there's a master node setup script, we'll treat that as
-        # step -1
+        expected_num_step_ids = num_steps
         if self._master_node_setup_script_path:
-            max_steps = num_steps + 1
-        else:
-            max_steps = num_steps
+            expected_num_step_ids += 1
 
-        step_ids = self.get_step_ids(max_steps=max_steps)
+        step_ids = self.get_step_ids()
 
-        if len(step_ids) < max_steps:
+        if len(step_ids) < expected_num_step_ids:
             raise AssertionError("Can't find our steps in the cluster!")
 
         # clear out log interpretations if they were filled somehow

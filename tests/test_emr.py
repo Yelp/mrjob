@@ -61,7 +61,6 @@ import tests.mock_boto3
 import tests.mock_boto3.emr
 import tests.mock_boto3.s3
 from tests.mock_boto3 import MockBoto3TestCase
-from tests.mock_boto3.emr import MockEMRClient
 from tests.mockssh import mock_ssh_dir
 from tests.mockssh import mock_ssh_file
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
@@ -4029,20 +4028,13 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
                               HADOOP_ENV_EMR_CONFIGURATION])
 
 
-class JobStepIdsTestCase(MockBoto3TestCase):
-
-    def setUp(self):
-        super(JobStepIdsTestCase, self).setUp()
-        self.start(patch.object(MockEMRClient, 'list_steps',
-                                side_effect=MockEMRClient.list_steps,
-                                autospec=True))
+class GetJobStepsTestCase(MockBoto3TestCase):
 
     def test_empty(self):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
 
-        self.assertEqual(runner._job_step_ids(max_steps=0), [])
-        self.assertEqual(MockEMRClient.list_steps.call_count, 0)
+        self.assertEqual(runner.get_job_steps(), [])
 
     def test_own_cluster(self):
         job = MRTwoStepJob(['-r', 'emr']).sandbox()
@@ -4050,15 +4042,13 @@ class JobStepIdsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             runner._launch()
 
-            steps = _list_all_steps(runner)
+            all_steps = _list_all_steps(runner)
 
             # ensure that steps appear in correct order (see #1316)
-            self.assertIn('Step 1', steps[0]['Name'])
-            self.assertIn('Step 2', steps[1]['Name'])
+            self.assertIn('Step 1', all_steps[0]['Name'])
+            self.assertIn('Step 2', all_steps[1]['Name'])
 
-            job_step_ids = runner._job_step_ids(max_steps=2)
-            self.assertEqual(job_step_ids,
-                             [steps[0]['Id'], steps[1]['Id']])
+            self.assertEqual(runner.get_job_steps(), all_steps[:2])
 
     def test_shared_cluster(self):
         cluster_id = EMRJobRunner().make_persistent_cluster()
@@ -4078,19 +4068,16 @@ class JobStepIdsTestCase(MockBoto3TestCase):
             runner._launch()
             add_other_steps(runner, 3)
 
-            steps = _list_all_steps(runner)
+            all_steps = _list_all_steps(runner)
 
             # make sure these are our steps, and they are in the right order
             # (see #1316)
-            self.assertIn(runner._job_key, steps[50]['Name'])
-            self.assertIn('Step 1', steps[50]['Name'])
-            self.assertIn(runner._job_key, steps[51]['Name'])
-            self.assertIn('Step 2', steps[51]['Name'])
+            self.assertIn(runner._job_key, all_steps[50]['Name'])
+            self.assertIn('Step 1', all_steps[50]['Name'])
+            self.assertIn(runner._job_key, all_steps[51]['Name'])
+            self.assertIn('Step 2', all_steps[51]['Name'])
 
-            job_step_ids = runner._job_step_ids(max_steps=2)
-
-            self.assertEqual(job_step_ids,
-                             [steps[50]['Id'], steps[51]['Id']])
+            self.assertEqual(runner.get_job_steps(), all_steps[50:52])
 
 
 class WaitForStepsToCompleteTestCase(MockBoto3TestCase):

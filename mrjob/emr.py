@@ -27,7 +27,6 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
-from itertools import islice
 from subprocess import Popen
 from subprocess import PIPE
 
@@ -273,12 +272,6 @@ def _attempt_to_acquire_lock(s3_fs, lock_uri, sync_wait_time, job_key,
     # make sure it's still our key there, not someone else's
     key_value = s3_key.get()['Body'].read()
     return (key_value == job_key.encode('utf_8'))
-
-
-def _get_reason(cluster_or_step):
-    """Get state change reason message."""
-    # StateChangeReason is {} before the first state change
-    return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
 class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
@@ -1616,41 +1609,26 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
-    def _job_step_ids(self, max_steps=None):
-        """Get the IDs of the steps we submitted for this job
-         in chronological order, ignoring steps from other jobs.
-
-        Generally, you want to set *max_steps*, so we can make as few API
-        calls as possible.
-        """
-        # yield all steps whose name matches our job key
-        def yield_step_ids():
-            emr_client = self.make_emr_client()
-            for step in _boto3_paginate('Steps', emr_client, 'list_steps',
-                                        ClusterId=self._cluster_id):
-                if step['Name'].startswith(self._job_key):
-                    yield step['Id']
-
-        # list_steps() returns steps in reverse chronological order.
-        # put them in forward chronological order, only keeping the
-        # last *max_steps* steps.
-        return list(reversed(list(islice(yield_step_ids(), max_steps))))
+    def get_job_steps(self):
+        """Efficiently fetch the steps for this mrjob run from the EMR API."""
+        return _get_job_steps(
+            self.make_emr_client(), self.get_cluster_id(), self.get_job_key())
 
     def _wait_for_steps_to_complete(self):
         """Wait for every step of the job to complete, one by one."""
+        # get info about expected number of steps
         num_steps = len(self._get_steps())
 
-        # if there's a master node setup script, we'll treat that as
-        # step -1
+        expected_num_steps = num_steps
         if self._master_node_setup_script_path:
-            max_steps = num_steps + 1
-        else:
-            max_steps = num_steps
+            expected_num_steps += 1
 
-        step_ids = self._job_step_ids(max_steps=max_steps)
+        # get info about steps submitted to cluster
+        steps = self.get_job_steps()
 
-        if len(step_ids) < max_steps:
-            raise AssertionError("Can't find our steps in the cluster!")
+        if len(steps) < expected_num_steps:
+            log.warning('Expected to find %d steps on cluster, found %d' %
+                        (expected_num_steps, len(steps)))
 
         # clear out log interpretations if they were filled somehow
         self._log_interpretations = []
@@ -1663,20 +1641,17 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._set_up_ssh_tunnel()
 
         # treat master node setup as step -1
+        start = 0
         if self._master_node_setup_script_path:
-            start = -1
-        else:
-            start = 0
+            start -= 1
 
-        for step_num, step_id in enumerate(step_ids, start=start):
-            # this will raise an exception if a step fails
-            if step_num == -1:
-                log.info(
-                    'Waiting for master node setup step (%s) to complete...' %
-                    step_id)
-            else:
-                log.info('Waiting for step %d of %d (%s) to complete...' % (
-                    step_num + 1, num_steps, step_id))
+        for step_num, step in enumerate(steps, start=start):
+            step_id = step['Id']
+            # don't include job_key in logging messages
+            step_name = step['Name'].split(': ')[-1]
+
+            log.info('Waiting for %s (%s) to complete...' %
+                     (step_name, step_id))
 
             self._wait_for_step_to_complete(step_id, step_num, num_steps)
 
@@ -3011,6 +2986,36 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                     return (too_small_msg % ig['InstanceType'])
 
         return None
+
+
+def _get_job_steps(emr_client, cluster_id, job_key):
+    """Efficiently fetch steps for a particular mrjob run from the EMR API.
+
+    :param emr_client: a boto3 EMR client. See
+                       :py:meth:`~mrjob.emr.EMRJobRunner.make_emr_client`
+    :param cluster_id: ID of EMR cluster to fetch steps from. See
+                       :py:meth:`~mrjob.emr.EMRJobRunner.get_cluster_id`
+    :param job_key: Unique key for a mrjob run. See
+                    :py:meth:`~mrjob.runner.MRJobRunner.get_job_key`
+    """
+    steps = []
+
+    for step in _boto3_paginate('Steps', emr_client, 'list_steps',
+                                ClusterId=cluster_id):
+        if step['Name'].startswith(job_key):
+            steps.append(step)
+        elif steps:
+            # all steps for job will be together, so stop
+            # when we find a non-job step
+            break
+
+    return list(reversed(list(steps)))
+
+
+def _get_reason(cluster_or_step):
+    """Get state change reason message."""
+    # StateChangeReason is {} before the first state change
+    return cluster_or_step['Status']['StateChangeReason'].get('Message', '')
 
 
 def _fix_configuration_opt(c):

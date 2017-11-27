@@ -4029,7 +4029,7 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
                               HADOOP_ENV_EMR_CONFIGURATION])
 
 
-class JobStepIdsTestCase(MockBoto3TestCase):
+class GetStepIdsTestCase(MockBoto3TestCase):
 
     def setUp(self):
         super(JobStepIdsTestCase, self).setUp()
@@ -4041,7 +4041,7 @@ class JobStepIdsTestCase(MockBoto3TestCase):
         runner = EMRJobRunner()
         runner.make_persistent_cluster()
 
-        self.assertEqual(runner._job_step_ids(max_steps=0), [])
+        self.assertEqual(runner.get_step_ids(max_steps=0), [])
         self.assertEqual(MockEMRClient.list_steps.call_count, 0)
 
     def test_own_cluster(self):
@@ -4056,7 +4056,7 @@ class JobStepIdsTestCase(MockBoto3TestCase):
             self.assertIn('Step 1', steps[0]['Name'])
             self.assertIn('Step 2', steps[1]['Name'])
 
-            job_step_ids = runner._job_step_ids(max_steps=2)
+            job_step_ids = runner.get_step_ids(max_steps=2)
             self.assertEqual(job_step_ids,
                              [steps[0]['Id'], steps[1]['Id']])
 
@@ -4087,7 +4087,7 @@ class JobStepIdsTestCase(MockBoto3TestCase):
             self.assertIn(runner._job_key, steps[51]['Name'])
             self.assertIn('Step 2', steps[51]['Name'])
 
-            job_step_ids = runner._job_step_ids(max_steps=2)
+            job_step_ids = runner.get_step_ids(max_steps=2)
 
             self.assertEqual(job_step_ids,
                              [steps[50]['Id'], steps[51]['Id']])

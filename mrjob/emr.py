@@ -1616,7 +1616,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if self._ssh_fs and version_gte(self.get_image_version(), '4.3.0'):
             self._ssh_fs.use_sudo_over_ssh()
 
-    def _job_step_ids(self, max_steps=None):
+    def get_step_ids(self, max_steps=None):
         """Get the IDs of the steps we submitted for this job
          in chronological order, ignoring steps from other jobs.
 
@@ -1647,7 +1647,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             max_steps = num_steps
 
-        step_ids = self._job_step_ids(max_steps=max_steps)
+        step_ids = self.get_step_ids(max_steps=max_steps)
 
         if len(step_ids) < max_steps:
             raise AssertionError("Can't find our steps in the cluster!")

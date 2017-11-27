@@ -16,7 +16,7 @@ initialization actions)."""
 import re
 
 from .task import _parse_task_stderr
-from .wrap import _cat_log
+from .wrap import _cat_log_lines
 from .wrap import _ls_logs
 
 # match cause of failure when there's a problem with bootstrap script. Example:
@@ -121,7 +121,7 @@ def _interpret_emr_bootstrap_stderr(fs, matches, partial=True):
     for match in matches:
         stderr_path = match['path']
 
-        task_error = _parse_task_stderr(_cat_log(fs, stderr_path))
+        task_error = _parse_task_stderr(_cat_log_lines(fs, stderr_path))
         if task_error:
             task_error = dict(task_error)  # make a copy
             task_error['path'] = stderr_path

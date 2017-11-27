@@ -456,20 +456,20 @@ class InterpretEMRStepSyslogTestCase(PatcherTestCase):
 
         # instead of mocking out contents of files, just mock out
         # what _parse_step_log() should return, and have
-        # _cat_log() just pass through the path
+        # _cat_log_lines() just pass through the path
         self.mock_paths = []
         self.path_to_mock_result = {}
 
         self.mock_paths_catted = []
 
-        def mock_cat_log(fs, path):
+        def mock_cat_log_lines(fs, path):
             if path in self.mock_paths:
                 self.mock_paths_catted.append(path)
             return path
 
         # (the real _parse_step_log() expects lines, not paths)
-        def mock_parse_step_syslog(path_from_mock_cat_log):
-            return self.path_to_mock_result.get(path_from_mock_cat_log, {})
+        def mock_parse_step_syslog(path_from_mock_cat_log_lines):
+            return self.path_to_mock_result.get(path_from_mock_cat_log_lines, {})
 
         # need to mock ls so that _ls_task_syslogs() can work
         def mock_exists(path):
@@ -481,8 +481,8 @@ class InterpretEMRStepSyslogTestCase(PatcherTestCase):
         self.mock_fs = Mock()
         self.mock_fs.ls = Mock(side_effect=mock_ls)
 
-        self.mock_cat_log = self.start(
-            patch('mrjob.logs.step._cat_log', side_effect=mock_cat_log))
+        self.mock_cat_log_lines = self.start(
+            patch('mrjob.logs.step._cat_log_lines', side_effect=mock_cat_log_lines))
 
         self.start(patch('mrjob.logs.step._parse_step_syslog',
                          side_effect=mock_parse_step_syslog))
@@ -611,19 +611,19 @@ class InterpretEMRStepStderrTestCase(PatcherTestCase):
 
         # instead of mocking out contents of files, just mock out
         # what _parse_step_syslog() should return, and have
-        # _cat_log() just pass through the path
+        # _cat_log_lines() just pass through the path
         self.mock_paths = []
         self.path_to_mock_result = {}
 
         self.mock_paths_catted = []
 
-        def mock_cat_log(fs, path):
+        def mock_cat_log_lines(fs, path):
             if path in self.mock_paths:
                 self.mock_paths_catted.append(path)
             return path
 
-        def mock_parse_task_stderr(path_from_mock_cat_log):
-            return self.path_to_mock_result.get(path_from_mock_cat_log)
+        def mock_parse_task_stderr(path_from_mock_cat_log_lines):
+            return self.path_to_mock_result.get(path_from_mock_cat_log_lines)
 
         # need to mock ls so that _ls_task_syslogs() can work
         def mock_exists(path):
@@ -635,8 +635,8 @@ class InterpretEMRStepStderrTestCase(PatcherTestCase):
         self.mock_fs = Mock()
         self.mock_fs.ls = Mock(side_effect=mock_ls)
 
-        self.mock_cat_log = self.start(
-            patch('mrjob.logs.step._cat_log', side_effect=mock_cat_log))
+        self.mock_cat_log_lines = self.start(
+            patch('mrjob.logs.step._cat_log_lines', side_effect=mock_cat_log_lines))
 
         self.start(patch('mrjob.logs.step._parse_task_stderr',
                          side_effect=mock_parse_task_stderr))

@@ -137,7 +137,7 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
 
         # instead of mocking out contents of files, just mock out
         # what _parse_task_{syslog,stderr}() should return, and have
-        # _cat_log() just pass through the path
+        # _cat_log_lines() just pass through the path
         self.mock_paths = []
         self.path_to_mock_result = {}
 
@@ -145,19 +145,19 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
 
         self.mock_paths_catted = []
 
-        def mock_cat_log(fs, path):
+        def mock_cat_log_lines(fs, path):
             if path in self.mock_paths:
                 self.mock_paths_catted.append(path)
             return path
 
         # (the actual log-parsing functions take lines from the log)
-        def mock_parse_task_syslog(path_from_mock_cat_log):
+        def mock_parse_task_syslog(path_from_mock_cat_log_lines):
             # default is {}
-            return self.path_to_mock_result.get(path_from_mock_cat_log, {})
+            return self.path_to_mock_result.get(path_from_mock_cat_log_lines, {})
 
-        def mock_parse_task_stderr(path_from_mock_cat_log):
+        def mock_parse_task_stderr(path_from_mock_cat_log_lines):
             # default is None
-            return self.path_to_mock_result.get(path_from_mock_cat_log)
+            return self.path_to_mock_result.get(path_from_mock_cat_log_lines)
 
         def mock_exists(path):
             return path in self.mock_paths or path == 'MOCK_LOG_DIR'
@@ -170,8 +170,8 @@ class InterpretTaskLogsTestCase(PatcherTestCase):
         self.mock_fs.exists = Mock(side_effect=mock_exists)
         self.mock_fs.ls = Mock(side_effect=mock_ls)
 
-        self.mock_cat_log = self.start(
-            patch('mrjob.logs.task._cat_log', side_effect=mock_cat_log))
+        self.mock_cat_log_lines = self.start(
+            patch('mrjob.logs.task._cat_log_lines', side_effect=mock_cat_log_lines))
 
         self.start(patch('mrjob.logs.task._parse_task_syslog',
                          side_effect=mock_parse_task_syslog))
@@ -541,24 +541,24 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
 
         # instead of mocking out contents of files, just mock out
         # what _parse_task_{syslog,stderr}() should return, and have
-        # _cat_log() just pass through the path
+        # _cat_log_lines() just pass through the path
         self.mock_paths = []
         self.path_to_mock_result = {}
 
         self.mock_log_callback = Mock()
 
-        def mock_cat_log(fs, path):
+        def mock_cat_log_lines(fs, path):
             if path in self.mock_paths:
                 return path
 
         # (the actual log-parsing functions take lines from the log)
-        def mock_parse_task_syslog(path_from_mock_cat_log):
+        def mock_parse_task_syslog(path_from_mock_cat_log_lines):
             # default is {}
-            return self.path_to_mock_result.get(path_from_mock_cat_log, {})
+            return self.path_to_mock_result.get(path_from_mock_cat_log_lines, {})
 
-        def mock_parse_task_stderr(path_from_mock_cat_log):
+        def mock_parse_task_stderr(path_from_mock_cat_log_lines):
             # default is None
-            return self.path_to_mock_result.get(path_from_mock_cat_log)
+            return self.path_to_mock_result.get(path_from_mock_cat_log_lines)
 
         def mock_exists(path):
             return path in self.mock_paths or path == 'MOCK_LOG_DIR'
@@ -571,8 +571,8 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         self.mock_fs.exists = Mock(side_effect=mock_exists)
         self.mock_fs.ls = Mock(side_effect=mock_ls)
 
-        self.mock_cat_log = self.start(
-            patch('mrjob.logs.task._cat_log', side_effect=mock_cat_log))
+        self.mock_cat_log_lines = self.start(
+            patch('mrjob.logs.task._cat_log_lines', side_effect=mock_cat_log_lines))
 
         self.start(patch('mrjob.logs.task._parse_task_syslog',
                          side_effect=mock_parse_task_syslog))

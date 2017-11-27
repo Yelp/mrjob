@@ -13,10 +13,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-from io import BytesIO
 from unittest import TestCase
 
-from mrjob.logs.wrap import _cat_log
+from mrjob.logs.wrap import _cat_log_lines
 from mrjob.logs.wrap import _ls_logs
 from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
@@ -42,10 +41,11 @@ class CatLogsTestCase(PatcherTestCase):
 
     # wrapper for cat_log() that uses self.mock_fs and turns result into list
     def cat_log(self, path):
-        return list(_cat_log(self.mock_fs, path))
+        return list(_cat_log_lines(self.mock_fs, path))
 
-    def test_basic(self):
-        self.mock_fs.cat.return_value = BytesIO(b'bar\nbaz')
+    def test_yields_lines(self):
+        self.mock_fs.cat.return_value = (
+            chunk for chunk in [b'ba', b'r\nb', b'az'])
 
         self.assertEqual(self.cat_log('foo'), ['bar\n', 'baz'])
 

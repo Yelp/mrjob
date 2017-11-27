@@ -23,7 +23,7 @@ from mrjob.py2 import string_types
 from .counters import _sum_counters
 from .ids import _add_implied_task_id
 from .wrap import _ls_logs
-from .wrap import _cat_log
+from .wrap import _cat_log_lines
 
 
 log = getLogger(__name__)
@@ -124,9 +124,9 @@ def _interpret_history_log(fs, matches):
 
         if match['yarn']:
             # not yet implemented
-            result = _parse_yarn_history_log(_cat_log(fs, path))
+            result = _parse_yarn_history_log(_cat_log_lines(fs, path))
         else:
-            result = _parse_pre_yarn_history_log(_cat_log(fs, path))
+            result = _parse_pre_yarn_history_log(_cat_log_lines(fs, path))
 
         # patch path, task_id, etc. into errors
         for error in result.get('errors') or ():

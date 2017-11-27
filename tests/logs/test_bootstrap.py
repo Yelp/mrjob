@@ -132,7 +132,7 @@ class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
             patch('mrjob.logs.bootstrap._parse_task_stderr',
                   return_value=dict(message='BOOM!\n')))
 
-        self.mock_cat_log = self.start(patch('mrjob.logs.bootstrap._cat_log'))
+        self.mock_cat_log_lines = self.start(patch('mrjob.logs.bootstrap._cat_log_lines'))
 
     def interpret_bootstrap_stderr(self, matches, **kwargs):
         """Wrap _interpret_emr_bootstrap_stderr(), since fs doesn't matter"""
@@ -198,7 +198,7 @@ class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
             )
         )
 
-        self.mock_cat_log.called_once_with(
+        self.mock_cat_log_lines.called_once_with(
             self.mock_fs, ('s3://bucket/tmp/logs/j-1EE0CL1O7FDXU/node/'
                            'i-b659f519/bootstrap-actions/1/stderr.gz'))
 
@@ -285,4 +285,4 @@ class InterpretEMRBootstrapStderrTestCase(PatcherTestCase):
             )
         )
 
-        self.assertEqual(self.mock_cat_log.call_count, 2)
+        self.assertEqual(self.mock_cat_log_lines.call_count, 2)

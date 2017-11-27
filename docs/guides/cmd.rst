@@ -33,6 +33,12 @@ create-cluster
 
    .. automodule:: mrjob.tools.emr.create_cluster
 
+
+diagnose
+^^^^^^^^
+
+   .. automodule:: mrjob.tools.diagnose
+
 .. _report-long-jobs:
 
 report-long-jobs

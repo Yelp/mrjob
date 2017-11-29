@@ -15,7 +15,7 @@
 """Merging errors, picking the best one, and displaying it."""
 import json
 
-from .ids import _make_time_sort_key
+from .ids import _time_sort_key
 
 
 def _pick_error(log_interpretation):
@@ -48,7 +48,7 @@ def _merge_and_sort_errors(errors, container_to_attempt_id=None):
 
     We allow None in place of an error list.
     """
-    sort_key = _make_time_sort_key(container_to_attempt_id)
+    sort_key = _time_sort_key(container_to_attempt_id)
 
     key_to_error = {}
 

@@ -22,11 +22,11 @@ def _sort_by_recency(ds, container_to_attempt_id=None):
     most recent ones come first (e.g. to find the best error, or the best
     log file to look for an error in).
     """
-    sort_key = _make_time_sort_key(container_to_attempt_id)
+    sort_key = _time_sort_key(container_to_attempt_id)
     return sorted(ds, key=sort_key, reverse=True)
 
 
-def _make_time_sort_key(container_to_attempt_id=None):
+def _time_sort_key(container_to_attempt_id=None):
     """Sort key to sort the given dictionaries containing IDs roughly by time
     (earliest first).
 

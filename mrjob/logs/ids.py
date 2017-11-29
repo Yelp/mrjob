@@ -17,16 +17,17 @@
 
 # TODO: test these!
 
-def _sort_by_recency(ds):
+def _sort_by_recency(ds, container_to_attempt_id=None):
     """Sort the given list/sequence of dicts containing IDs so that the
     most recent ones come first (e.g. to find the best error, or the best
     log file to look for an error in).
     """
-    return sorted(ds, key=_time_sort_key, reverse=True)
+    sort_key = _make_time_sort_key(container_to_attempt_id)
+    return sorted(ds, key=sort_key, reverse=True)
 
 
-def _time_sort_key(d):
-    """Sort key to sort the dictionaries containing IDs roughly by time
+def _make_time_sort_key(container_to_attempt_id=None):
+    """Sort key to sort the given dictionaries containing IDs roughly by time
     (earliest first).
 
     We consider higher attempt_nums "later" than higher task_nums (of the
@@ -37,51 +38,55 @@ def _time_sort_key(d):
     container IDs are considered more "recent" than any task/attempt ID
     (these usually come from task logs).
     """
-    container_id = d.get('container_id') or ''
+    container_to_attempt_id = container_to_attempt_id or {}
 
-    # when parsing task syslogs on YARN, we may end up with
-    # container_id and nothing else. container IDs match with job ID
-    # but aren't directly comparable to task and attempt IDs
+    def sort_key(d):
+        container_id = d.get('container_id') or ''
 
-    # But if we couldn't parse the history file (for example because
-    # we're using YARN on EMR and the only way to get it is SSHing in and
-    # finding it on HDFS), we can use the container ID to infer the
-    # job ID. After that, we just assume that errors with a container
-    # ID must be better (they usually include the task error, after all),
-    # so we treat them as more recent.
+        # when parsing task syslogs on YARN, we may end up with
+        # container_id and nothing else. container IDs match with job ID
+        # but aren't directly comparable to task and attempt IDs
 
-    # break ID like
-    # {application,attempt,task,job}_201601081945_0005[_m[_000005[_0]]]
-    # into its component parts
-    #
-    # in practice, errors don't have job or application ID attached to
-    # them (and we're only sorting errors from the same job/application)
-    attempt_parts = (d.get('attempt_id') or
-                     d.get('task_id') or d.get('job_id') or
-                     d.get('application_id') or
-                     _to_job_id(container_id) or '').split('_')
+        # if we've parsed the history file, we should be able to
+        # map every container_id to an attempt ID
+        inferred_attempt_id = container_to_attempt_id.get(container_id) or ''
+        if inferred_attempt_id:
+            container_id = ''
 
-    # a container ID like container_1450486922681_0005_01_00000 implies:
-    # timestamp and step: 1450486922681_0005
-    # attempt num: 01
-    # task num: 00000
-    container_parts = container_id.split('_')
+        # But if we couldn't parse the history file (for example because
+        # we're using YARN on EMR and the only way to get it is SSHing in and
+        # finding it on HDFS), we can use the container ID to infer the
+        # job ID. After that, we just assume that errors with a container
+        # ID must be better (they usually include the task error, after all),
+        # so we treat them as more recent.
 
-    timestamp_and_step = '_'.join(attempt_parts[1:3])
-    task_type = '_'.join(attempt_parts[3:4])
-    task_num = '_'.join(attempt_parts[4:5]) or '_'.join(container_parts[-1:])
-    attempt_num = (
-        '_'.join(attempt_parts[5:6]) or '_'.join(container_parts[-2:-1]))
+        # break ID like
+        # {application,attempt,task,job}_201601081945_0005[_m[_000005[_0]]]
+        # into its component parts
+        #
+        # in practice, errors don't have job or application ID attached to
+        # them (and we're only sorting errors from the same job/application)
+        attempt_parts = (d.get('attempt_id') or inferred_attempt_id or
+                         d.get('task_id') or d.get('job_id') or
+                         d.get('application_id') or
+                         _to_job_id(container_id) or '').split('_')
 
-    # numbers are 0-padded, so no need to convert anything to int
-    # also, 'm' (task type in attempt ID) sorts before 'r', which is
-    # what we want
-    return (
-        timestamp_and_step,
-        container_id,
-        task_type,
-        attempt_num,
-        task_num)
+        timestamp_and_step = '_'.join(attempt_parts[1:3])
+        task_type = '_'.join(attempt_parts[3:4])
+        task_num = '_'.join(attempt_parts[4:5])
+        attempt_num = '_'.join(attempt_parts[5:6])
+
+        # numbers are 0-padded, so no need to convert anything to int
+        # also, 'm' (task type in attempt ID) sorts before 'r', which is
+        # what we want
+        return (
+            timestamp_and_step,
+            container_id,
+            task_type,
+            attempt_num,
+            task_num)
+
+    return sort_key
 
 
 def _add_implied_task_id(d):

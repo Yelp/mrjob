@@ -325,6 +325,38 @@ class ParseYARNHistoryLogTestCase(TestCase):
                     ),
                 ]))
 
+    def test_container_to_attempt_mapping(self):
+        lines = [
+            '{"type":"MAP_ATTEMPT_STARTED","event":{'
+            '"org.apache.hadoop.mapreduce.jobhistory.TaskAttemptStarted":{'
+            '"taskid":"task_1449525218032_0005_m_000000","taskType":"MAP",'
+            '"attemptId":"attempt_1449525218032_0005_m_000000_3","startTime":'
+            '1449532586958,"trackerName":"0a7802e19139","httpPort":8042,'
+            '"shufflePort":13562,"containerId":'
+            '"container_1449525218032_0005_01_000010","locality":{"string":'
+            '"NODE_LOCAL"},"avataar":{"string":"VIRGIN"}}}}\n',
+            '{"type":"MAP_ATTEMPT_STARTED","event":{'
+            '"org.apache.hadoop.mapreduce.jobhistory.TaskAttemptStarted":{'
+            '"taskid":"task_1449525218032_0005_m_000001","taskType":"MAP",'
+            '"attemptId":"attempt_1449525218032_0005_m_000001_3","startTime":'
+            '1449532587976,"trackerName":"0a7802e19139","httpPort":8042,'
+            '"shufflePort":13562,"containerId":'
+            '"container_1449525218032_0005_01_000011","locality":{"string":'
+            '"NODE_LOCAL"},"avataar":{"string":"VIRGIN"}}}}\n',
+        ]
+
+        self.assertEqual(
+            _parse_yarn_history_log(lines),
+            dict(
+                container_to_attempt_id={
+                    'container_1449525218032_0005_01_000010':
+                    'attempt_1449525218032_0005_m_000000_3',
+                    'container_1449525218032_0005_01_000011':
+                    'attempt_1449525218032_0005_m_000001_3',
+                }
+            )
+        )
+
 
 class ParsePreYARNHistoryLogTestCase(TestCase):
     JOB_COUNTER_LINES = [

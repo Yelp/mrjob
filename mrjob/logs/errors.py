@@ -15,7 +15,7 @@
 """Merging errors, picking the best one, and displaying it."""
 import json
 
-from .ids import _time_sort_key
+from .ids import _make_time_sort_key
 
 
 def _pick_error(log_interpretation):
@@ -29,23 +29,31 @@ def _pick_error(log_interpretation):
             for error in errors or ():
                 yield error
 
-    errors = _merge_and_sort_errors(yield_errors())
+    # looks like this is only available from history logs
+    container_to_attempt_id = log_interpretation.get(
+        'history', {}).get('container_to_attempt_id')
+
+    errors = _merge_and_sort_errors(yield_errors(), container_to_attempt_id)
     if errors:
         return errors[0]
     else:
         return None
 
 
-def _merge_and_sort_errors(errors):
+def _merge_and_sort_errors(errors, container_to_attempt_id=None):
     """Merge errors from one or more lists of errors and then return
     them, sorted by recency.
 
+    Optionally pass in *container_to_attempt_id
+
     We allow None in place of an error list.
     """
+    sort_key = _make_time_sort_key(container_to_attempt_id)
+
     key_to_error = {}
 
     for error in errors:
-        key = _time_sort_key(error)
+        key = sort_key(error)
         key_to_error.setdefault(key, {})
         key_to_error[key].update(error)
 

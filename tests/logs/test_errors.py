@@ -17,6 +17,7 @@ from unittest import TestCase
 from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _merge_and_sort_errors
 from mrjob.logs.errors import _pick_error
+from mrjob.logs.ids import _attempt_id_to_task_id
 
 
 class PickErrorTestCase(TestCase):

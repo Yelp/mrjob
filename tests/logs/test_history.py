@@ -325,7 +325,7 @@ class ParseYARNHistoryLogTestCase(TestCase):
                     ),
                 ]))
 
-    def test_container_to_attempt_mapping(self):
+    def test_attempt_to_container_mapping(self):
         lines = [
             '{"type":"MAP_ATTEMPT_STARTED","event":{'
             '"org.apache.hadoop.mapreduce.jobhistory.TaskAttemptStarted":{'
@@ -348,11 +348,11 @@ class ParseYARNHistoryLogTestCase(TestCase):
         self.assertEqual(
             _parse_yarn_history_log(lines),
             dict(
-                container_to_attempt_id={
-                    'container_1449525218032_0005_01_000010':
-                    'attempt_1449525218032_0005_m_000000_3',
-                    'container_1449525218032_0005_01_000011':
-                    'attempt_1449525218032_0005_m_000001_3',
+                attempt_to_container_id={
+                    'attempt_1449525218032_0005_m_000000_3':
+                    'container_1449525218032_0005_01_000010',
+                    'attempt_1449525218032_0005_m_000001_3':
+                    'container_1449525218032_0005_01_000011',
                 }
             )
         )

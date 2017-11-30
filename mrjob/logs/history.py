@@ -146,8 +146,8 @@ def _parse_yarn_history_log(lines):
 
     This returns a dictionary which may contain the following keys:
 
-    container_to_attempt_id: map from container_id to attempt_id (useful
-        for matching with task errors where we don't know attempt ID)
+    attempt_to_container_id: map from attempt_id to container_id (used
+        to find task logs corresponding to failed attempts)
     counters: map from group to counter to amount. If job failed, we sum
         counters for succesful tasks
     errors: a list of dictionaries with the keys:
@@ -185,9 +185,9 @@ def _parse_yarn_history_log(lines):
         # update container_id -> attempt_id mapping
         for event in events:
             if 'attemptId' in event and 'containerId' in event:
-                result.setdefault('container_to_attempt_id', {})
-                result['container_to_attempt_id'][
-                    event['containerId']] = event['attemptId']
+                result.setdefault('attempt_to_container_id', {})
+                result['attempt_to_container_id'][
+                    event['attemptId']] = event['containerId']
 
         if record_type.endswith('_ATTEMPT_FAILED'):
             for event in events:

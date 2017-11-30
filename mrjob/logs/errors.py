@@ -15,7 +15,9 @@
 """Merging errors, picking the best one, and displaying it."""
 import json
 
+from mrjob.util import unique
 from .ids import _time_sort_key
+
 
 
 def _pick_error(log_interpretation):
@@ -23,6 +25,16 @@ def _pick_error(log_interpretation):
     step, history, and task interpretations. Returns None if there
     are no errors.
     """
+    errors = _pick_errors(log_interpretation)
+    if errors:
+        return errors[0]
+    else:
+        return None
+
+
+def _pick_errors(log_interpretation):
+    """Yield all errors from the given log interpretation, sorted
+    by recency."""
     def yield_errors():
         for log_type in ('step', 'history', 'task'):
             errors = log_interpretation.get(log_type, {}).get('errors')
@@ -33,11 +45,24 @@ def _pick_error(log_interpretation):
     container_to_attempt_id = log_interpretation.get(
         'history', {}).get('container_to_attempt_id')
 
-    errors = _merge_and_sort_errors(yield_errors(), container_to_attempt_id)
-    if errors:
-        return errors[0]
-    else:
-        return None
+    return _merge_and_sort_errors(yield_errors(), container_to_attempt_id)
+
+
+def _pick_error_attempt_ids(log_interpretation):
+    """Pick error attempt IDs, so we know which task logs to look at."""
+    errors = _pick_errors(log_interpretation)
+
+    errors.sort(key=_is_probably_task_error, reverse=True)
+
+    return list(unique(
+        error['attempt_id'] for error in errors
+        if error.get('attempt_id')))
+
+
+def _is_probably_task_error(error):
+    """Used to identify task errors."""
+    return ('subprocess failed' in
+            error.get('hadoop_error', {}).get('message', ''))
 
 
 def _merge_and_sort_errors(errors, container_to_attempt_id=None):

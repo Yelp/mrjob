@@ -30,6 +30,7 @@ from logging import getLogger
 from mrjob.compat import uses_yarn
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _pick_error
+from mrjob.logs.errors import _pick_error_attempt_ids
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.task import _interpret_task_logs
@@ -111,6 +112,7 @@ class LogInterpretationMixin(object):
 
         return counters
 
+
     def _pick_error(self, log_interpretation, step_type):
         """Pick probable cause of failure (only call this if job fails)."""
         if not all(log_type in log_interpretation for
@@ -118,7 +120,11 @@ class LogInterpretationMixin(object):
             log.info('Scanning logs for probable cause of failure...')
             self._interpret_step_logs(log_interpretation, step_type)
             self._interpret_history_log(log_interpretation)
-            self._interpret_task_logs(log_interpretation, step_type)
+
+            attempt_ids = _pick_error_attempt_ids(log_interpretation)
+
+            self._interpret_task_logs(log_interpretation, step_type,
+                                      attempt_ids=attempt_ids)
 
         return _pick_error(log_interpretation)
 
@@ -163,11 +169,13 @@ class LogInterpretationMixin(object):
             log_interpretation['step'] = step_interpretation
 
     def _interpret_task_logs(
-            self, log_interpretation, step_type, partial=True):
+            self, log_interpretation, step_type, attempt_ids=(), partial=True):
         """Fetch task syslogs and stderr, and add 'task' to interpretation."""
         if 'task' in log_interpretation and (
                 partial or not log_interpretation['task'].get('partial')):
             return   # already interpreted
+
+        # TODO: make use of attempt_ids
 
         step_interpretation = log_interpretation.get('step') or {}
 

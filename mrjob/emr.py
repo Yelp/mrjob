@@ -2002,8 +2002,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             s3_dir_name = 'hadoop-mapreduce/history'
         elif version_gte(self.get_image_version(), '3'):
             # on the 3.x AMIs, the history log lives inside HDFS and isn't
-            # copied to S3. We don't need it anyway; everything relevant
-            # is in the step log
+            # copied to S3.
             return iter([])
         else:
             dir_name = 'hadoop/history'

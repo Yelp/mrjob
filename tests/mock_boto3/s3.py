@@ -112,8 +112,6 @@ def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
             bucket['location'] = location
 
 
-
-
 # used for bucket CreationDate
 def _boto3_today():
     now = _boto3_now()

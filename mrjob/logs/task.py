@@ -15,6 +15,7 @@
 # limitations under the License.
 """Parse "task" logs, which are the syslog and stderr for each individual
 task and typically appear in the userlogs/ directory."""
+from logging import getLogger
 import re
 
 from .ids import _add_implied_task_id
@@ -24,12 +25,7 @@ from .wrap import _cat_log_lines
 from .wrap import _ls_logs
 from mrjob import parse
 
-
-# TODO: will need to construct these paths as well, to access specific logs
-#
-# on YARN, logs have paths like: s3://yelp-emr-dev-us-west-2/logs/j-29EP1LS8TB6EH/containers/application_1507334835084_0001/container_1507334835084_0001_01_076339/stderr.gz
-
-
+log = getLogger(__name__)
 
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
 # use this with search()
@@ -96,7 +92,8 @@ _YARN_TASK_LOG_PATH_RE = re.compile(
     r'(?P<log_type>stderr|stdout|syslog)(?P<suffix>\.\w{1,3})?$')
 
 
-def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
+def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
+                  error_attempt_ids=None, attempt_to_container_id=None):
     """Yield matching logs, optionally filtering by application_id
     or job_id.
 
@@ -105,13 +102,47 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
     corresponding syslog (stderr logs without a corresponding syslog won't be
     included).
     """
+    stderr_logs_yielded = set()
+
     stderr_logs = []
     syslogs = []
 
-    for match in _ls_logs(fs, log_dir_stream, _match_task_log_path,
+    log_dirs_list = list(log_dir_stream)
+
+    for error_attempt_id in (error_attempt_ids or ()):
+        if attempt_to_container_id:
+            container_id = attempt_to_container_id.get(error_attempt_id)
+            if container_id:
+                # YARN
+                subdir = container_id
+            else:
+                continue
+        else:
+            # pre-YARN
+            subdir = error_attempt_id
+
+        attempt_log_dirs_list = [
+            [fs.join(log_dir, subdir) for log_dir in log_dirs]
+            for log_dirs in log_dirs_list]
+
+        log.info('looking for logs relevant to %s in %r' %
+                 (error_attempt_id, attempt_log_dirs_list))
+
+        for match in _ls_logs(fs, attempt_log_dirs_list, _match_task_log_path,
+                              application_id=application_id,
+                              job_id=job_id):
+            # only care about stderr, since we already have a hadoop error
+            # from history log, etc.
+            if match['log_type'] == 'stderr':
+                yield match
+                stderr_logs_yielded.add(match['path'])
+
+    for match in _ls_logs(fs, log_dirs_list, _match_task_log_path,
                           application_id=application_id,
                           job_id=job_id):
         if match['log_type'] == 'stderr':
+            if match['path'] in stderr_logs_yielded:
+                continue
             stderr_logs.append(match)
         elif match['log_type'] == 'syslog':
             syslogs.append(match)
@@ -124,10 +155,15 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
     # exclude stderr logs with no syslog
     stderr_logs_with_syslog = [m for m in stderr_logs if m['syslog']]
 
-    return stderr_logs_with_syslog + syslogs
+    for stderr_log in stderr_logs_with_syslog:
+        yield stderr_log
+
+    for syslog in syslogs:
+        yield syslog
 
 
-def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None):
+def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
+        error_attempt_ids=None, attempt_to_container_id=None):
     """Yield matching Spark logs, optionally filtering by application_id
     or job_id.
 

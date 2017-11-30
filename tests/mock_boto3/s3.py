@@ -13,6 +13,7 @@
 # limitations under the License.
 """Mock boto3 S3 support."""
 import hashlib
+from datetime import datetime
 from datetime import timedelta
 
 from botocore.exceptions import ClientError
@@ -65,7 +66,9 @@ class MockS3Client(object):
         if Bucket not in self.mock_s3_fs:
             location = (CreateBucketConfiguration or {}).get(
                 'LocationConstraint', '')
-            self.mock_s3_fs[Bucket] = dict(keys={}, location=location)
+
+            self.mock_s3_fs[Bucket] = dict(
+                creation_date=_boto3_today(), keys={}, location=location)
 
         # "Location" here actually refers to the bucket name
         return dict(Location=('/' + Bucket))
@@ -76,6 +79,14 @@ class MockS3Client(object):
         location_constraint = self.mock_s3_fs[Bucket].get('location') or None
 
         return dict(LocationConstraint=location_constraint)
+
+    def list_buckets(self):
+        buckets = [
+            dict(CreationDate=b['creation_date'], Name=name)
+            for name, b in sorted(self.mock_s3_fs.items())
+        ]
+
+        return dict(Buckets=buckets)
 
 
 def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
@@ -88,8 +99,9 @@ def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
     time_modified = _boto3_now() - age
 
     for bucket_name, key_name_to_bytes in data.items():
-        bucket = mock_s3_fs.setdefault(bucket_name,
-                                       {'keys': {}, 'location': ''})
+        bucket = mock_s3_fs.setdefault(
+            bucket_name,
+            dict(creation_date=_boto3_today(), keys={}, location=''))
 
         for key_name, key_data in key_name_to_bytes.items():
             if not isinstance(key_data, bytes):
@@ -98,6 +110,14 @@ def add_mock_s3_data(mock_s3_fs, data, age=None, location=None):
 
         if location is not None:
             bucket['location'] = location
+
+
+
+
+# used for bucket CreationDate
+def _boto3_today():
+    now = _boto3_now()
+    return datetime(now.year, now.month, now.day, tzinfo=now.tzinfo)
 
 
 class MockS3Resource(object):

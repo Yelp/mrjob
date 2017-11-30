@@ -25,6 +25,12 @@ from .wrap import _ls_logs
 from mrjob import parse
 
 
+# TODO: will need to construct these paths as well, to access specific logs
+#
+# on YARN, logs have paths like: s3://yelp-emr-dev-us-west-2/logs/j-29EP1LS8TB6EH/containers/application_1507334835084_0001/container_1507334835084_0001_01_076339/stderr.gz
+
+
+
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
 # use this with search()
 _JAVA_TRACEBACK_RE = re.compile(

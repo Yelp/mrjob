@@ -123,8 +123,6 @@ class LogInterpretationMixin(object):
 
             error_attempt_ids = _pick_error_attempt_ids(log_interpretation)
 
-            log.info('error_attempt_ids: %r' % (error_attempt_ids,))
-
             self._interpret_task_logs(
                 log_interpretation, step_type, error_attempt_ids)
 
@@ -188,8 +186,6 @@ class LogInterpretationMixin(object):
 
         attempt_to_container_id = log_interpretation.get('history', {}).get(
             'attempt_to_container_id', {})
-
-        log.info('attempt_to_container_id: %r' % (attempt_to_container_id,))
 
         if yarn:
             if not application_id:

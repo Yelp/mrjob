@@ -102,64 +102,72 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
     corresponding syslog (stderr logs without a corresponding syslog won't be
     included).
     """
-    stderr_logs_yielded = set()
-
-    stderr_logs = []
-    syslogs = []
-
+    # going to use this several times
     log_dirs_list = list(log_dir_stream)
 
-    for error_attempt_id in (error_attempt_ids or ()):
-        if attempt_to_container_id:
-            container_id = attempt_to_container_id.get(error_attempt_id)
-            if container_id:
-                # YARN
-                subdir = container_id
-            else:
-                continue
-        else:
-            # pre-YARN
-            subdir = error_attempt_id
+    paths_yielded = set()
 
+    # first try every attempt ID matching an error, then search all attempts
+    attempt_ids = list(error_attempt_ids or ()) + [None]
+
+    for attempt_id in attempt_ids:
+        stderr_logs = []
+        syslogs = []
+
+        if attempt_id:
+            if attempt_to_container_id:
+                # YARN
+                container_id = attempt_to_container_id.get(attempt_id)
+                if container_id:
+                    subdirs = [container_id]
+                else:
+                    continue
+            else:
+                # pre-YARN
+                subdirs = [attempt_id]
+        else:
+            # scanning all directories
+            subdirs = []
+
+        # pick subdirectories to look in
         attempt_log_dirs_list = [
-            [fs.join(log_dir, subdir) for log_dir in log_dirs]
+            [fs.join(log_dir, *subdirs) for log_dir in log_dirs]
             for log_dirs in log_dirs_list]
 
-        log.info('looking for logs relevant to %s in %r' %
-                 (error_attempt_id, attempt_log_dirs_list))
+        # DEBUG (rework)
+        log.info('looking for task logs for %s in %r' % (
+            attempt_id or 'any attempt', attempt_log_dirs_list))
 
         for match in _ls_logs(fs, attempt_log_dirs_list, _match_task_log_path,
                               application_id=application_id,
                               job_id=job_id):
-            # only care about stderr, since we already have a hadoop error
-            # from history log, etc.
-            if match['log_type'] == 'stderr':
-                yield match
-                stderr_logs_yielded.add(match['path'])
 
-    for match in _ls_logs(fs, log_dirs_list, _match_task_log_path,
-                          application_id=application_id,
-                          job_id=job_id):
-        if match['log_type'] == 'stderr':
-            if match['path'] in stderr_logs_yielded:
+            if match['path'] in paths_yielded:
                 continue
-            stderr_logs.append(match)
-        elif match['log_type'] == 'syslog':
-            syslogs.append(match)
 
-    key_to_syslog = dict((_log_key(match), match) for match in syslogs)
+            if match['log_type'] == 'stderr':
+                stderr_logs.append(match)
+            elif match['log_type'] == 'syslog':
+                syslogs.append(match)
 
-    for stderr_log in stderr_logs:
-        stderr_log['syslog'] = key_to_syslog.get(_log_key(stderr_log))
 
-    # exclude stderr logs with no syslog
-    stderr_logs_with_syslog = [m for m in stderr_logs if m['syslog']]
+        key_to_syslog = dict((_log_key(match), match) for match in syslogs)
 
-    for stderr_log in stderr_logs_with_syslog:
-        yield stderr_log
+        for stderr_log in stderr_logs:
+            stderr_log['syslog'] = key_to_syslog.get(_log_key(stderr_log))
 
-    for syslog in syslogs:
-        yield syslog
+        # exclude stderr logs with no syslog
+        stderr_logs_with_syslog = [m for m in stderr_logs if m['syslog']]
+
+        for stderr_log in stderr_logs_with_syslog:
+            paths_yielded.add(stderr_log['path'])
+            yield stderr_log
+
+        # don't bother with lone syslogs until we've gone through
+        # all the error attempt IDs
+        if not attempt_id:
+            for syslog in syslogs:
+                yield syslog
 
 
 def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None,

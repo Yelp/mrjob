@@ -61,6 +61,7 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
     # wrapper for fs.ls() that turns IOErrors into warnings
     def _fs_ls(path):
         try:
+            log.debug('    listing %s' % log_dir)
             if fs.exists(log_dir):
                 for path in fs.ls(log_dir):
                     yield path
@@ -71,19 +72,25 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
         if isinstance(log_dirs, str):
             raise TypeError
 
-        matches = []
+        matched = False
 
         for log_dir in log_dirs:
+            matches = []
+
             for path in _fs_ls(log_dir):
-                m = matcher(path, **kwargs)
-                if m is not None:
-                    m['path'] = path
-                    matches.append(m)
+                match = matcher(path, **kwargs)
+                if match is not None:
+                    match['path'] = path
+                    matches.append(match)
 
-        if matches:
-            return _sort_by_recency(matches)
+                if matches:
+                    matched = True
+                    _sort_by_recency(matches)
+                    for match in matches:
+                        yield match
 
-    return []
+        if matched:
+            return  # e.g. don't check S3 if we can get logs via SSH
 
 
 def _logs_exist(fs, path):

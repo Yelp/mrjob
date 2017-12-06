@@ -112,21 +112,20 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
     else:
         subdirs = list(error_attempt_ids)
 
-    subdirs.append(None)
-
-    # take every log dir list, and prepend subdirs for each error_attempt_id
-    def get_log_subdir_stream():
-        for log_dir_list in log_dir_stream:
-            yield [
-                fs.join(log_dir, subdir) if subdir else log_dir
-                for log_dir in log_dir_list
-                for subdir in subdirs
-            ]
+    # only look in subdirs corresponding to failed attempts
+    if subdirs:
+        log_subdir_stream = ([
+            fs.join(log_dir, subdir)
+            for subdir in subdirs
+            for log_dir in log_dir_list
+        ] for log_dir_list in log_dir_stream)
+    else:
+        log_subdir_stream = log_dir_stream
 
     key_to_type_to_match = defaultdict(dict)
     syslogs = []
 
-    for match in _ls_logs(fs, get_log_subdir_stream(), _match_task_log_path,
+    for match in _ls_logs(fs, log_subdir_stream, _match_task_log_path,
                           application_id=application_id,
                           job_id=job_id):
 

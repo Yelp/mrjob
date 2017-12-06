@@ -61,7 +61,7 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
     # wrapper for fs.ls() that turns IOErrors into warnings
     def _fs_ls(path):
         try:
-            log.debug('    listing %s' % log_dir)
+            log.debug('    listing logs in %s' % log_dir)
             if fs.exists(log_dir):
                 for path in fs.ls(log_dir):
                     yield path

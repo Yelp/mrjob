@@ -103,6 +103,8 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
     corresponding syslog (stderr logs without a corresponding syslog won't be
     included).
     """
+    error_attempt_ids = error_attempt_ids or ()
+
     # figure out subdirs to look for logs in
     if attempt_to_container_id:
         # YARN
@@ -160,6 +162,7 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
         yield syslog
 
 
+# TODO: update to match _ls_task_logs()
 def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
         error_attempt_ids=None, attempt_to_container_id=None):
     """Yield matching Spark logs, optionally filtering by application_id

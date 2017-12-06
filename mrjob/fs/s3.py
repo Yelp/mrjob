@@ -320,7 +320,7 @@ class S3Filesystem(Filesystem):
     def get_bucket(self, bucket_name):
         """Get the (:py:mod:`boto3`) bucket, connecting through the
         appropriate endpoint."""
-        client = self.make_s3_client('us-east-1')
+        client = self.make_s3_client()
 
         try:
             region_name = _get_bucket_region(client, bucket_name)
@@ -352,7 +352,7 @@ class S3Filesystem(Filesystem):
 
         .. versionadded:: 0.6.0
         """
-        c = self.make_s3_client(region_name='us-east-1')
+        c = self.make_s3_client()
         return [b['Name'] for b in c.list_buckets()['Buckets']]
 
     def create_bucket(self, bucket_name, region=None):

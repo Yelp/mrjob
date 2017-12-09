@@ -176,6 +176,8 @@ def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
     stderr_logs = []
     key_to_stdout_log = {}
 
+    matches = []
+
     for match in _ls_logs(fs, log_dir_stream, _match_task_log_path,
                           application_id=application_id,
                           job_id=job_id):
@@ -186,6 +188,7 @@ def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
 
     for stderr_log in stderr_logs:
         stdout_log = key_to_stdout_log.get(_log_key(stderr_log))
+
         if stdout_log:
             stderr_log['stdout'] = stdout_log
 

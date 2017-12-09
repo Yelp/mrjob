@@ -83,11 +83,11 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
                     match['path'] = path
                     matches.append(match)
 
-                if matches:
-                    matched = True
-                    _sort_by_recency(matches)
-                    for match in matches:
-                        yield match
+            if matches:
+                matched = True
+                _sort_by_recency(matches)
+                for match in matches:
+                    yield match
 
         if matched:
             return  # e.g. don't check S3 if we can get logs via SSH

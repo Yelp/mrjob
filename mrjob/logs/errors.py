@@ -41,7 +41,10 @@ def _pick_errors(log_interpretation):
             for error in errors or ():
                 yield error
 
-    return _merge_and_sort_errors(yield_errors())
+    attempt_to_container_id = log_interpretation.get('history', {}).get(
+            'attempt_to_container_id', {})
+
+    return _merge_and_sort_errors(yield_errors(), attempt_to_container_id)
 
 
 def _pick_error_attempt_ids(log_interpretation):
@@ -61,17 +64,28 @@ def _is_probably_task_error(error):
             error.get('hadoop_error', {}).get('message', ''))
 
 
-def _merge_and_sort_errors(errors):
+def _merge_and_sort_errors(errors, attempt_to_container_id=None):
     """Merge errors from one or more lists of errors and then return
     them, sorted by recency.
 
     We allow None in place of an error list.
     """
+    attempt_to_container_id = attempt_to_container_id or {}
+
     key_to_error = {}
 
     for error in errors:
-        key = _time_sort_key(error)
+        # merge by container_id if we know it
+        container_id = error.get('container_id') or (
+            attempt_to_container_id.get(error.get('attempt_to_container_id')))
+
+        if container_id:
+            key = ('container_id', container_id)
+        else:
+            key = ('time_key', _time_sort_key(error))
+
         key_to_error.setdefault(key, {})
+        # assume redundant fields will match
         key_to_error[key].update(error)
 
     # wrap sort key to prioritize task errors. See #1429
@@ -81,8 +95,7 @@ def _merge_and_sort_errors(errors):
         # key[0] is step number
         return (key[0], bool(error.get('task_error')), key[1:])
 
-    return [error for key, error in
-            sorted(key_to_error.items(), key=sort_key, reverse=True)]
+    return sorted(key_to_error.itervalues(), key=sort_key, reverse=True)
 
 
 def _format_error(error):

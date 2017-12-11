@@ -85,7 +85,7 @@ def _ls_logs(fs, log_dir_stream, matcher, **kwargs):
 
             if matches:
                 matched = True
-                _sort_by_recency(matches)
+                matches = _sort_by_recency(matches)
                 for match in matches:
                     yield match
 

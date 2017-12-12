@@ -77,7 +77,7 @@ class PickErrorTestCase(TestCase):
             )
         )
 
-    def test_timestamp_beats_task_error(self):
+    def test_task_error_beats_timestamp(self):
         log_interpretation = dict(
             history=dict(
                 errors=[
@@ -97,9 +97,10 @@ class PickErrorTestCase(TestCase):
         self.assertEqual(
             _pick_error(log_interpretation),
             dict(
-                container_id='container_1450489999999_0005_01_000004',
-                hadoop_error=dict(message='elephant problems'),
-            )
+                container_id='container_1450486922681_0005_01_000003',
+                hadoop_error=dict(message='BOOM'),
+                task_error=dict(message='things exploding'),
+            ),
         )
 
     def test_merge_order(self):

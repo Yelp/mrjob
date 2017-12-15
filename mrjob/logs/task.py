@@ -103,6 +103,50 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
     corresponding syslog (stderr logs without a corresponding syslog won't be
     included).
     """
+    return _ls_task_logs_helper(
+        fs, log_dir_stream, is_spark=False,
+        application_id=application_id, job_id=job_id,
+        error_attempt_ids=error_attempt_ids,
+        attempt_to_container_id=attempt_to_container_id)
+
+
+def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
+        error_attempt_ids=None, attempt_to_container_id=None):
+    """Yield matching Spark logs, optionally filtering by application_id
+    or job_id.
+
+    This will yield matches for stderr logs only. stderr
+    logs will have a 'stdout' field pointing to the match for the
+    corresponding stdout file; whether we process this depends on the content
+    of the stderr file.
+    """
+    return _ls_task_logs_helper(
+        fs, log_dir_stream, is_spark=True,
+        application_id=application_id, job_id=job_id,
+        error_attempt_ids=error_attempt_ids,
+        attempt_to_container_id=attempt_to_container_id)
+
+
+def _ls_task_logs_helper(fs, log_dir_stream, is_spark,
+                         application_id=None, job_id=None,
+                         error_attempt_ids=None, attempt_to_container_id=None):
+    """Helper for _ls_task_logs() and _ls_spark_task_logs().
+
+    *syslog_type* is the type of the log to pair with stderr logs.
+
+    This is actually a bit weird; on Spark, 'stderr' is the equivalent
+    of syslog in Streaming, and 'stdout' is the equivlend of Streaming's
+    stderr.
+
+    For Streaming, we want stderr logs with corresponding syslogs, and if after
+    listing all task logs we don't find any, syslogs.
+
+    For Spark, we want stderr logs (which are equivalent to Streaming syslogs)
+    with corresponding stdouts, and if after listing all task logs we don't
+    find any, stderr logs without corresponding stdouts.
+    """
+    syslog_type = 'stdout' if is_spark else 'syslog'
+
     error_attempt_ids = error_attempt_ids or ()
 
     # figure out subdirs to look for logs in
@@ -125,7 +169,9 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
         log_subdir_stream = log_dir_stream
 
     key_to_type_to_match = defaultdict(dict)
-    syslogs = []
+
+    # less desirable errors to yield if we don't find the ones we want
+    other_matches = []
 
     for match in _ls_logs(fs, log_subdir_stream, _match_task_log_path,
                           application_id=application_id,
@@ -134,7 +180,7 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
         log_key = _log_key(match)
         log_type = match['log_type']
 
-        if log_type not in ('stderr', 'syslog'):
+        if log_type not in ('stderr', syslog_type):
             continue  # don't care
 
         type_to_match = key_to_type_to_match[log_key]
@@ -145,54 +191,21 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
         type_to_match[log_type] = match
 
         # yield stderrs with syslogs as we find them
-        if 'stderr' in type_to_match and 'syslog' in type_to_match:
+        if 'stderr' in type_to_match and syslog_type in type_to_match:
             stderr_match = type_to_match['stderr']
-            syslog_match = type_to_match['syslog']
+            syslog_match = type_to_match[syslog_type]
 
-            stderr_match['syslog'] = syslog_match
+            stderr_match[syslog_type] = syslog_match
 
             yield stderr_match
 
-        if log_type == 'syslog':
-            syslogs.append(match)
+        if log_type == ('stderr' if is_spark else syslog_type):
+            other_matches.append(match)
 
-    # after the stderr logs, yield syslogs
-    # stderr logs with no matching syslog are ignored
-    for syslog in syslogs:
-        yield syslog
-
-
-# TODO: update to match _ls_task_logs()
-def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
-        error_attempt_ids=None, attempt_to_container_id=None):
-    """Yield matching Spark logs, optionally filtering by application_id
-    or job_id.
-
-    This will yield matches for stderr logs only. stderr
-    logs will have a 'stdout' field pointing to the match for the
-    corresponding stdout file; whether we process this depends on the content
-    of the stderr file.
-    """
-    stderr_logs = []
-    key_to_stdout_log = {}
-
-    matches = []
-
-    for match in _ls_logs(fs, log_dir_stream, _match_task_log_path,
-                          application_id=application_id,
-                          job_id=job_id):
-        if match['log_type'] == 'stderr':
-            stderr_logs.append(match)
-        elif match['log_type'] == 'stdout':
-            key_to_stdout_log[_log_key(match)] = match
-
-    for stderr_log in stderr_logs:
-        stdout_log = key_to_stdout_log.get(_log_key(stderr_log))
-
-        if stdout_log:
-            stderr_log['stdout'] = stdout_log
-
-    return stderr_logs
+    # yield logs that don't have both syslog and stderr
+    for other_match in other_matches:
+        if not syslog_type in other_match:  # already yielded
+            yield other_match
 
 
 def _log_key(match):

@@ -830,23 +830,30 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
             # no errors for stdout1_path, stdout3_path, or stderr4_path
         }
 
-        # we should read from stderr4_path first (later task number)
+        # we should yield from stderr2_path first (latest task number that
+        # has a corresponding stdout)
         self.assertEqual(self.interpret_spark_task_logs(), dict(
             errors=[
                 dict(
-                    container_id='container_1450486922681_0005_01_000004',
+                    container_id='container_1450486922681_0005_01_000002',
                     hadoop_error=dict(
-                        message='exited with status 4',
-                        path=stderr4_path,
+                        message='exited with status 2',
+                        path=stderr2_path,
+                    ),
+                    task_error=dict(
+                        message='BoomException',
+                        path=stdout2_path,
                     ),
                 ),
             ],
             partial=True,
         ))
 
-        self.assertEqual(
-            self.mock_log_callback.call_args_list,
-            [call(stderr4_path)])
+        self.assertEqual(self.mock_log_callback.call_args_list, [
+            call(stderr3_path),
+            call(stderr2_path),
+            call(stdout2_path),
+        ])
 
         # try again, with partial=False
         self.mock_log_callback.reset_mock()
@@ -854,13 +861,6 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
         # paths still get sorted by _ls_logs()
         self.assertEqual(self.interpret_spark_task_logs(partial=False), dict(
             errors=[
-                dict(
-                    container_id='container_1450486922681_0005_01_000004',
-                    hadoop_error=dict(
-                        message='exited with status 4',
-                        path=stderr4_path,
-                    ),
-                ),
                 dict(
                     container_id='container_1450486922681_0005_01_000002',
                     hadoop_error=dict(
@@ -879,17 +879,24 @@ class InterpretSparkTaskLogsTestCase(PatcherTestCase):
                         path=stderr1_path,
                     ),
                 ),
+                dict(
+                    container_id='container_1450486922681_0005_01_000004',
+                    hadoop_error=dict(
+                        message='exited with status 4',
+                        path=stderr4_path,
+                    ),
+                ),
             ],
         ))
 
         self.assertEqual(
             self.mock_log_callback.call_args_list,
             [
-                call(stderr4_path),
                 call(stderr3_path),
                 call(stderr2_path),
                 call(stdout2_path),
                 call(stderr1_path),
+                call(stderr4_path),
             ]
         )
 

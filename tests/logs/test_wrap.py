@@ -15,6 +15,7 @@
 # limitations under the License.
 from unittest import TestCase
 
+from mrjob.logs.task import _match_task_log_path
 from mrjob.logs.wrap import _cat_log_lines
 from mrjob.logs.wrap import _ls_logs
 from mrjob.py2 import StringIO
@@ -196,6 +197,32 @@ class LsLogsTestCase(TestCase):
                 ['ssh://node1/logs/', 'ssh://node2/logs/']]),
             [dict(path='s3://bucket/logs/node1/syslog'),
              dict(path='s3://bucket/logs/node2/syslog')])
+
+    def test_sort_within_directories(self):
+        self.mock_paths = [
+            '/log/dir/userlogs/application_1450486922681_0004/'
+            'container_1450486922681_0005_01_000003/stderr',
+            '/log/dir/userlogs/application_1450486922681_0004/'
+            'container_1450486922681_0005_01_000004/stderr',
+            '/log/dir/userlogs2/application_1450486922681_0004/'
+            'container_1450486922681_0005_01_000005/stderr',
+            's3://bucket/logs/application_1450486922681_0004/'
+            'container_1450486922681_0005_01_000003/stderr',
+        ]
+
+        self.mock_matcher = _match_task_log_path
+
+        def _match(path_num):
+            path = self.mock_paths[path_num]
+            return dict(path=path, **_match_task_log_path(path))
+
+        # self.mock_paths[2] is actually more recent, but it's in
+        # the second directory
+        self.assertEqual(
+            self._ls_logs([
+                ['/log/dir/userlogs', '/log/dir/userlogs2'],
+                ['s3://bucket/logs']]),
+            [_match(1), _match(0), _match(2)])
 
     def test_matcher_can_filter(self):
         def matcher(path):

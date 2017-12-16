@@ -112,7 +112,6 @@ class LogInterpretationMixin(object):
 
         return counters
 
-
     def _pick_error(self, log_interpretation, step_type):
         """Pick probable cause of failure (only call this if job fails)."""
         if not all(log_type in log_interpretation for

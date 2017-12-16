@@ -254,6 +254,43 @@ class MergeAndSortErrorsTestCase(TestCase):
             ]
         )
 
+    def test_attempt_to_container_id(self):
+        errors = [
+            dict(
+                attempt_id='attempt_201512232143_0008_r_000000_0',
+                hadoop_error=dict(message='BOOM'),
+            ),
+            dict(
+                attempt_id='attempt_201512232143_0008_r_000000_1',
+                hadoop_error=dict(message='BOOM again'),
+            ),
+            dict(
+                container_id='container_1450486922681_0005_01_000003',
+                task_error=dict(message='it was probably snakes'),
+            ),
+        ]
+
+        attempt_to_container_id = {
+            'attempt_201512232143_0008_r_000000_1':
+            'container_1450486922681_0005_01_000003',
+        }
+
+        self.assertEqual(
+            _merge_and_sort_errors(errors, attempt_to_container_id),
+            [
+                dict(
+                    attempt_id='attempt_201512232143_0008_r_000000_0',
+                    hadoop_error=dict(message='BOOM'),
+                ),
+                dict(
+                    attempt_id='attempt_201512232143_0008_r_000000_1',
+                    container_id='container_1450486922681_0005_01_000003',
+                    hadoop_error=dict(message='BOOM again'),
+                    task_error=dict(message='it was probably snakes'),
+                ),
+            ],
+        )
+
 
 class FormatErrorTestCase(TestCase):
 

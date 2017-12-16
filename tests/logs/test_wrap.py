@@ -217,7 +217,10 @@ class LsLogsTestCase(TestCase):
             return dict(path=path, **_match_task_log_path(path))
 
         # self.mock_paths[2] is actually more recent, but it's in
-        # the second directory
+        # the second directory.
+
+        # shouldn't look at s3 at all, since that's in the second batch
+        # of paths, and we already found our path in the first batch
         self.assertEqual(
             self._ls_logs([
                 ['/log/dir/userlogs', '/log/dir/userlogs2'],

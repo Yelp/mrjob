@@ -77,7 +77,7 @@ def _merge_and_sort_errors(errors, attempt_to_container_id=None):
     for error in errors:
         # merge by container_id if we know it
         container_id = error.get('container_id') or (
-            attempt_to_container_id.get(error.get('attempt_to_container_id')))
+            attempt_to_container_id.get(error.get('attempt_id')))
 
         if container_id:
             key = ('container_id', container_id)

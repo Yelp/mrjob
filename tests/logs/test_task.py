@@ -128,6 +128,113 @@ class MatchTaskLogPathTestCase(TestCase):
             None)
 
 
+# test how _ls_task_logs() and _ls_spark_task_logs() filter by
+# error_attempt_id
+class LsTaskLogsTestCase(PatcherTestCase):
+
+    def setUp(self):
+        super(LsTaskLogsTestCase, self).setUp()
+
+        self.mock_paths = []
+
+        def mock_ls(log_dir):
+            return [p for p in self.mock_paths if p.startswith(log_dir + '/')]
+
+        def mock_join(path, *paths):
+            return '/'.join([path] + list(paths))
+
+        self.mock_fs = Mock()
+        self.mock_fs.exists = Mock(return_value=True)
+        self.mock_fs.join = Mock(side_effect=mock_join)
+        self.mock_fs.ls = Mock(side_effect=mock_ls)
+
+    def _ls_paths(self, log_dir_stream, **kwargs):
+        return [m['path'] for m in
+                _ls_task_logs(self.mock_fs, log_dir_stream, **kwargs)]
+
+    def _ls_spark_paths(self, log_dir_stream, **kwargs):
+        return [m['path'] for m in
+                _ls_spark_task_logs(self.mock_fs, log_dir_stream, **kwargs)]
+
+    def test_empty(self):
+        self.assertEqual(
+            self._ls_paths([['/logs']]),
+            [])
+
+    def test_basic(self):
+        self.mock_paths = [
+            '/logs/attempt_201512232143_0008_m_000001_3/syslog',
+            '/logs/attempt_201512232143_0008_m_000001_4/syslog',
+            '/logs/attempt_201512232143_0008_m_000001_5/syslog',
+        ]
+
+        self.assertEqual(
+            self._ls_paths([['/logs']]),
+            [self.mock_paths[2], self.mock_paths[1], self.mock_paths[0]])
+
+    def test_basic_spark(self):
+        # _ls_spark_task_logs() shares code with _ls_task_logs()
+        # the differences are tested below
+        self.mock_paths = [
+            '/logs/attempt_201512232143_0008_m_000001_3/stderr',
+            '/logs/attempt_201512232143_0008_m_000001_4/stderr',
+            '/logs/attempt_201512232143_0008_m_000001_5/stderr',
+        ]
+
+        self.assertEqual(
+            self._ls_spark_paths([['/logs']]),
+            [self.mock_paths[2], self.mock_paths[1], self.mock_paths[0]])
+
+    def test_filter_by_attempt_id(self):
+        self.mock_paths = [
+            '/logs/attempt_201512232143_0008_m_000001_3/syslog',
+            '/logs/attempt_201512232143_0008_m_000001_4/syslog',
+            '/logs/attempt_201512232143_0008_m_000001_5/syslog',
+        ]
+
+        # missing attempts are fine, don't list attempts not related to errors
+        error_attempt_ids = [
+            'attempt_201512232143_0008_m_000001_2',
+            'attempt_201512232143_0008_m_000001_3',
+            'attempt_201512232143_0008_m_000001_5',
+        ]
+
+        self.assertEqual(
+            self._ls_paths([['/logs']], error_attempt_ids=error_attempt_ids),
+            [self.mock_paths[0], self.mock_paths[2]])
+
+    def test_map_to_container_id(self):
+        self.mock_paths = [
+            '/logs/application_1450486922681_0004'
+            '/container_1450486922681_0005_01_000013/syslog',
+            '/logs/application_1450486922681_0004'
+            '/container_1450486922681_0005_01_000014/syslog',
+            '/logs/application_1450486922681_0004'
+            '/container_1450486922681_0005_01_000015/syslog',
+        ]
+
+        error_attempt_ids = [
+            'attempt_201512232143_0008_m_000001_2',
+            'attempt_201512232143_0008_m_000001_3',
+            'attempt_201512232143_0008_m_000001_5',
+        ]
+
+        attempt_to_container_id = {
+            'attempt_201512232143_0008_m_000001_2':
+            'container_1450486922681_0005_01_000008',
+            'attempt_201512232143_0008_m_000001_4':
+            'container_1450486922681_0005_01_000014',
+            'attempt_201512232143_0008_m_000001_5':
+            'container_1450486922681_0005_01_000015',
+        }
+
+        self.assertEqual(
+            self._ls_paths([['/logs/application_1450486922681_0004']],
+                           error_attempt_ids=error_attempt_ids,
+                           attempt_to_container_id=attempt_to_container_id),
+            [self.mock_paths[2]])
+
+
 class InterpretTaskLogsTestCase(PatcherTestCase):
 
     maxDiff = None

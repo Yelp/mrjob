@@ -1995,14 +1995,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # Unlike on 3.x, the history logs *are* available on S3, but they're
         # not useful enough to justify the wait when SSH is set up
 
-        # if version_gte(self.get_image_version(), '4'):
-        #     # denied access on some 4.x AMIs by the yarn user, see #1244
-        #     dir_name = 'hadoop-mapreduce/history'
-        #     s3_dir_name = 'hadoop-mapreduce/history'
-        if version_gte(self.get_image_version(), '3'):
+        if version_gte(self.get_image_version(), '4'):
+            # on 4.0.0 (and possibly other versions before 4.3.0)
+            # history logs aren't on the filesystem. See #1253
+            dir_name = 'hadoop-mapreduce/history'
+            s3_dir_name = 'hadoop-mapreduce/history'
+        elif version_gte(self.get_image_version(), '3'):
             # on the 3.x AMIs, the history log lives inside HDFS and isn't
-            # copied to S3. We don't need it anyway; everything relevant
-            # is in the step log
+            # copied to S3.
             return iter([])
         else:
             dir_name = 'hadoop/history'

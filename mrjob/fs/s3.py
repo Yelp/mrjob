@@ -347,17 +347,13 @@ class S3Filesystem(Filesystem):
         return self.get_bucket(bucket_name).Object(key_name)
 
     def get_all_bucket_names(self):
-        """Get a stream of the names of all buckets owned by this user
+        """Get a list of the names of all buckets owned by this user
         on S3.
 
         .. versionadded:: 0.6.0
         """
-        # we don't actually want to return these Bucket objects to
-        # the user because their client might connect to the wrong region
-        # endpoint
-        r = self.make_s3_resource()
-        for b in r.buckets.all():
-            yield b.name
+        c = self.make_s3_client()
+        return [b['Name'] for b in c.list_buckets()['Buckets']]
 
     def create_bucket(self, bucket_name, region=None):
         """Create a bucket on S3 with a location constraint

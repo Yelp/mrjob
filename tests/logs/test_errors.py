@@ -17,6 +17,7 @@ from unittest import TestCase
 from mrjob.logs.errors import _format_error
 from mrjob.logs.errors import _merge_and_sort_errors
 from mrjob.logs.errors import _pick_error
+from mrjob.logs.ids import _attempt_id_to_task_id
 
 
 class PickErrorTestCase(TestCase):
@@ -76,7 +77,7 @@ class PickErrorTestCase(TestCase):
             )
         )
 
-    def test_timestamp_beats_task_error(self):
+    def test_task_error_beats_timestamp(self):
         log_interpretation = dict(
             history=dict(
                 errors=[
@@ -96,9 +97,10 @@ class PickErrorTestCase(TestCase):
         self.assertEqual(
             _pick_error(log_interpretation),
             dict(
-                container_id='container_1450489999999_0005_01_000004',
-                hadoop_error=dict(message='elephant problems'),
-            )
+                container_id='container_1450486922681_0005_01_000003',
+                hadoop_error=dict(message='BOOM'),
+                task_error=dict(message='things exploding'),
+            ),
         )
 
     def test_merge_order(self):
@@ -250,6 +252,43 @@ class MergeAndSortErrorsTestCase(TestCase):
                     task_id='task_201512232143_0008_r_000000',
                 ),
             ]
+        )
+
+    def test_attempt_to_container_id(self):
+        errors = [
+            dict(
+                attempt_id='attempt_201512232143_0008_r_000000_0',
+                hadoop_error=dict(message='BOOM'),
+            ),
+            dict(
+                attempt_id='attempt_201512232143_0008_r_000000_1',
+                hadoop_error=dict(message='BOOM again'),
+            ),
+            dict(
+                container_id='container_1450486922681_0005_01_000003',
+                task_error=dict(message='it was probably snakes'),
+            ),
+        ]
+
+        attempt_to_container_id = {
+            'attempt_201512232143_0008_r_000000_1':
+            'container_1450486922681_0005_01_000003',
+        }
+
+        self.assertEqual(
+            _merge_and_sort_errors(errors, attempt_to_container_id),
+            [
+                dict(
+                    attempt_id='attempt_201512232143_0008_r_000000_0',
+                    hadoop_error=dict(message='BOOM'),
+                ),
+                dict(
+                    attempt_id='attempt_201512232143_0008_r_000000_1',
+                    container_id='container_1450486922681_0005_01_000003',
+                    hadoop_error=dict(message='BOOM again'),
+                    task_error=dict(message='it was probably snakes'),
+                ),
+            ],
         )
 
 

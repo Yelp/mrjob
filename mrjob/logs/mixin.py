@@ -30,6 +30,7 @@ from logging import getLogger
 from mrjob.compat import uses_yarn
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _pick_error
+from mrjob.logs.errors import _pick_error_attempt_ids
 from mrjob.logs.history import _interpret_history_log
 from mrjob.logs.history import _ls_history_logs
 from mrjob.logs.task import _interpret_task_logs
@@ -118,7 +119,11 @@ class LogInterpretationMixin(object):
             log.info('Scanning logs for probable cause of failure...')
             self._interpret_step_logs(log_interpretation, step_type)
             self._interpret_history_log(log_interpretation)
-            self._interpret_task_logs(log_interpretation, step_type)
+
+            error_attempt_ids = _pick_error_attempt_ids(log_interpretation)
+
+            self._interpret_task_logs(
+                log_interpretation, step_type, error_attempt_ids)
 
         return _pick_error(log_interpretation)
 
@@ -163,7 +168,8 @@ class LogInterpretationMixin(object):
             log_interpretation['step'] = step_interpretation
 
     def _interpret_task_logs(
-            self, log_interpretation, step_type, partial=True):
+            self, log_interpretation, step_type, error_attempt_ids=(),
+            partial=True):
         """Fetch task syslogs and stderr, and add 'task' to interpretation."""
         if 'task' in log_interpretation and (
                 partial or not log_interpretation['task'].get('partial')):
@@ -176,6 +182,9 @@ class LogInterpretationMixin(object):
         output_dir = step_interpretation.get('output_dir')
 
         yarn = uses_yarn(self.get_hadoop_version())
+
+        attempt_to_container_id = log_interpretation.get('history', {}).get(
+            'attempt_to_container_id', {})
 
         if yarn:
             if not application_id:
@@ -200,12 +209,16 @@ class LogInterpretationMixin(object):
                 step_type,
                 application_id=application_id,
                 job_id=job_id,
-                output_dir=output_dir),
+                output_dir=output_dir,
+                error_attempt_ids=error_attempt_ids,
+                attempt_to_container_id=attempt_to_container_id,
+            ),
             partial=partial,
             log_callback=_log_parsing_task_log)
 
     def _ls_task_logs(self, step_type,
-                      application_id=None, job_id=None, output_dir=None):
+                      application_id=None, job_id=None, output_dir=None,
+                      error_attempt_ids=None, attempt_to_container_id=None):
         """Yield task log matches."""
         if _is_spark_step_type(step_type):
             ls_func = _ls_spark_task_logs
@@ -218,5 +231,8 @@ class LogInterpretationMixin(object):
                 self._stream_task_log_dirs(
                     application_id=application_id, output_dir=output_dir),
                 application_id=application_id,
-                job_id=job_id):
+                job_id=job_id,
+                error_attempt_ids=error_attempt_ids,
+                attempt_to_container_id=attempt_to_container_id,
+                ):
             yield match

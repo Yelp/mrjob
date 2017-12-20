@@ -240,6 +240,8 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self.log.warning.called)
         self.runner._ls_task_logs.assert_called_once_with(
             'streaming',
+            attempt_to_container_id={},
+            error_attempt_ids=(),
             application_id='app_1',
             job_id=None,
             output_dir=None)
@@ -267,6 +269,8 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self.log.warning.called)
         self.runner._ls_task_logs.assert_called_once_with(
             'spark',
+            attempt_to_container_id={},
+            error_attempt_ids=(),
             application_id='app_1',
             job_id=None,
             output_dir=None)
@@ -294,6 +298,8 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self.log.warning.called)
         self.runner._ls_task_logs.assert_called_once_with(
             'streaming',
+            attempt_to_container_id={},
+            error_attempt_ids=(),
             application_id=None,
             job_id='job_1',
             output_dir=None)
@@ -320,6 +326,8 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self.log.warning.called)
         self.runner._ls_task_logs.assert_called_once_with(
             'streaming',
+            attempt_to_container_id={},
+            error_attempt_ids=(),
             application_id='app_1',
             job_id=None,
             output_dir='hdfs:///path/')
@@ -508,6 +516,8 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
         self._ls_task_logs.assert_called_once_with(
             self.runner.fs,
             self.runner._stream_task_log_dirs.return_value,
+            attempt_to_container_id=None,
+            error_attempt_ids=None,
             application_id='app_1',
             job_id='job_1')
         self.assertFalse(self._ls_spark_task_logs.called)
@@ -547,6 +557,8 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
         self._ls_spark_task_logs.assert_called_once_with(
             self.runner.fs,
             self.runner._stream_task_log_dirs.return_value,
+            attempt_to_container_id=None,
+            error_attempt_ids=None,
             application_id='app_1',
             job_id='job_1')
         self.assertFalse(self._ls_task_logs.called)

@@ -26,7 +26,7 @@ def _sort_by_recency(ds):
 
 
 def _time_sort_key(d):
-    """Sort key to sort the dictionaries containing IDs roughly by time
+    """Sort key to sort the given dictionaries containing IDs roughly by time
     (earliest first).
 
     We consider higher attempt_nums "later" than higher task_nums (of the
@@ -61,17 +61,10 @@ def _time_sort_key(d):
                      d.get('application_id') or
                      _to_job_id(container_id) or '').split('_')
 
-    # a container ID like container_1450486922681_0005_01_00000 implies:
-    # timestamp and step: 1450486922681_0005
-    # attempt num: 01
-    # task num: 00000
-    container_parts = container_id.split('_')
-
     timestamp_and_step = '_'.join(attempt_parts[1:3])
     task_type = '_'.join(attempt_parts[3:4])
-    task_num = '_'.join(attempt_parts[4:5]) or '_'.join(container_parts[-1:])
-    attempt_num = (
-        '_'.join(attempt_parts[5:6]) or '_'.join(container_parts[-2:-1]))
+    task_num = '_'.join(attempt_parts[4:5])
+    attempt_num = '_'.join(attempt_parts[5:6])
 
     # numbers are 0-padded, so no need to convert anything to int
     # also, 'm' (task type in attempt ID) sorts before 'r', which is
@@ -82,6 +75,8 @@ def _time_sort_key(d):
         task_type,
         attempt_num,
         task_num)
+
+    return sort_key
 
 
 def _add_implied_task_id(d):

@@ -1,4 +1,37 @@
-# -*- coding: utf-8 -*-
+# Copyright 2015 Yelp
+# Copyright 2017 Yelp
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+"""An example of how to parse non-line-based data.
+
+Map +1 (U.S. and Canadian) phone numbers to the most plausible
+URL for their webpage.
+
+This is similar to the article "Analyzing the Web for the Price of a Sandwich"
+(https://engineeringblog.yelp.com/2015/03/analyzing-the-web-for-the-price-of-a-sandwich.html)
+except that it doesn't include Yelp biz IDs, and it doesn't need to access
+S3 because it can read the input files directly.
+
+Sample command line:
+
+.. code-block:: sh
+
+   python mr_phone_to_url.py -r emr --bootstrap 'sudo pip install warc' s3://commoncrawl/crawl-data/CC-MAIN-2017-51/segments/*/wet/*.wet.gz
+
+To find the latest crawl:
+
+``aws s3 ls s3://commoncrawl/crawl-data | grep CC-MAIN``
+"""
 import re
 from itertools import islice
 
@@ -9,9 +42,9 @@ from mrjob.step import MRStep
 import warc
 
 
-PHONE_SEP_RE = re.compile(r'[\-. ()+]')
-US_PHONE_RE = re.compile(
+PHONE_RE = re.compile(
     r'[\D\b](1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})[\D\b]')
+PHONE_SEP_RE = re.compile(r'[\-. ()+]')
 
 # hosts with more than this many phone numbers are assumed to be directories
 MAX_PHONES_PER_HOST = 1000
@@ -57,7 +90,7 @@ class MRPhoneToURL(MRJob):
             host = urlparse(url).netloc
 
             payload = record.payload.read()
-            for phone in US_PHONE_RE.findall(payload):
+            for phone in PHONE_RE.findall(payload):
                 phone = standardize_phone_number(phone)
                 yield host, (phone, url)
 

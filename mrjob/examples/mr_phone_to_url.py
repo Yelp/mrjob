@@ -41,8 +41,6 @@ from mrjob.step import MRStep
 
 import warc
 
-JAVA_MAX_INT = 2 ** 31 - 1
-
 PHONE_RE = re.compile(
     r'[\D\b](1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})[\D\b]')
 PHONE_SEP_RE = re.compile(r'[\-. ()+]')
@@ -71,7 +69,7 @@ class MRPhoneToURL(MRJob):
 
     HADOOP_INPUT_FORMAT = 'org.apache.hadoop.mapred.FixedLengthInputFormat'
     JOBCONF = {
-        'fixedlengthinputformat.record.length': str(JAVA_MAX_INT),
+        'fixedlengthinputformat.record.length': '4096',
     }
 
     def steps(self):

@@ -32,12 +32,20 @@ To find the latest crawl:
 
 ``aws s3 ls s3://commoncrawl/crawl-data | grep CC-MAIN``
 """
+import os
 import re
+from bz2 import BZ2File
+from contextlib import contextmanager
+from gzip import GzipFile
 from itertools import islice
+from subprocess import check_call
 
 from mrjob.job import MRJob
+from mrjob.parse import is_uri
+from mrjob.protocol import RawProtocol
 from mrjob.py2 import urlparse
 from mrjob.step import MRStep
+from mrjob.util import random_identifier
 
 import warc
 
@@ -67,36 +75,36 @@ class MRPhoneToURL(MRJob):
     """Use Common Crawl .wet files to map from phone number to the most
     likely URL."""
 
-    HADOOP_INPUT_FORMAT = 'org.apache.hadoop.mapred.FixedLengthInputFormat'
-    JOBCONF = {
-        'fixedlengthinputformat.record.length': '4096',
-    }
+    HADOOP_INPUT_FORMAT = 'org.apache.hadoop.mapred.lib.NLineInputFormat'
+    INPUT_PROTOCOL = RawProtocol
 
     def steps(self):
         return [
-            MRStep(mapper_init=self.extract_phone_and_url_mapper_init,
+            MRStep(mapper=self.extract_phone_and_url_mapper,
                    reducer=self.count_by_host_reducer),
             MRStep(reducer=self.pick_best_url_reducer),
         ]
 
-    def extract_phone_and_url_mapper_init(self):
+    def extract_phone_and_url_mapper(self, record_num, uri):
         """Read .wet from ``self.stdin`` (so we can read multi-line records).
 
         Yield ``host, (phone, url)``
         """
-        wet_file = warc.WARCFile(fileobj=self.stdin)
+        with download_input(uri) as path:
+            with open_input(path) as f:
+                wet_file = warc.WARCFile(fileobj=f)
 
-        for record in wet_file:
-            if record['content-type'] != 'text/plain':
-                continue
+                for record in wet_file:
+                    if record['content-type'] != 'text/plain':
+                        continue
 
-            url = record.header['warc-target-uri']
-            host = urlparse(url).netloc
+                    url = record.header['warc-target-uri']
+                    host = urlparse(url).netloc
 
-            payload = record.payload.read()
-            for phone in PHONE_RE.findall(payload):
-                phone = standardize_phone_number(phone)
-                yield host, (phone, url)
+                    payload = record.payload.read()
+                    for phone in PHONE_RE.findall(payload):
+                        phone = standardize_phone_number(phone)
+                        yield host, (phone, url)
 
     def count_by_host_reducer(self, host, phone_urls):
         phone_urls = list(islice(phone_urls, MAX_PHONES_PER_HOST + 1))
@@ -117,6 +125,35 @@ class MRPhoneToURL(MRJob):
             urls_with_count, key=lambda uc: (-uc[1], -len(uc[0]), uc[0]))
 
         yield phone, urls_with_count[0][0]
+
+
+@contextmanager
+def download_input(self, uri):
+    if not is_uri(uri):
+        yield uri
+        return
+
+    path = '%s-%s' % (random_identifier(), uri.split('/')[-1])
+
+    try:
+        check_call(['hadoop', 'fs', '-copyToLocal', uri, path])
+        yield path
+    finally:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
+def open_input(self, path):
+    if path.endswith('.gz'):
+        return GzipFile(path, 'rb')
+    elif path.endswith('.bz2'):
+        return BZ2File(path, 'rb')
+    else:
+        return open(path, 'rb')
+
+
 
 
 if __name__ == '__main__':

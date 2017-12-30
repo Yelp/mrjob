@@ -41,6 +41,7 @@ from mrjob.step import MRStep
 
 import warc
 
+JAVA_MAX_INT = 2 ** 31 - 1
 
 PHONE_RE = re.compile(
     r'[\D\b](1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})[\D\b]')
@@ -67,6 +68,11 @@ def standardize_phone_number(number):
 class MRPhoneToURL(MRJob):
     """Use Common Crawl .wet files to map from phone number to the most
     likely URL."""
+
+    HADOOP_INPUT_FORMAT = 'org.apache.hadoop.mapred.FixedLengthInputFormat'
+    JOBCONF = {
+        'fixedlengthinputformat.record.length': str(JAVA_MAX_INT),
+    }
 
     def steps(self):
         return [

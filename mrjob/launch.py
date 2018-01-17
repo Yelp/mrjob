@@ -530,12 +530,14 @@ class MRJobLauncher(object):
     def _job_kwargs(self):
         """Keyword arguments to the runner class that can be specified
         by the job/launcher itself."""
+        # TODO: this method should take more responsibility for options that
+        # can be specified on the command line and by the job
         return dict(
             jobconf=self.jobconf(),
             libjars=self.libjars(),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),
-            upload_files=self.files(),
+            upload_files=self.options.upload_files + list(self.files()),
         )
 
     ### Hooks for options defined by the job ###

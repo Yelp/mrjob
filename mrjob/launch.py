@@ -535,9 +535,22 @@ class MRJobLauncher(object):
             libjars=self.libjars(),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),
+            upload_files=self.files(),
         )
 
     ### Hooks for options defined by the job ###
+
+    def archives(self):
+        """See :py:meth:`mrjob.job.MRJob.files`."""
+        return []
+
+    def dirs(self):
+        """See :py:meth:`mrjob.job.MRJob.dirs`."""
+        return []
+
+    def files(self):
+        """See :py:meth:`mrjob.job.MRJob.files`."""
+        return []
 
     def hadoop_input_format(self):
         """See :py:meth:`mrjob.job.MRJob.hadoop_input_format`."""

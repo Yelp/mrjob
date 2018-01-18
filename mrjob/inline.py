@@ -83,9 +83,10 @@ class InlineMRJobRunner(SimMRJobRunner):
         # Don't care about pickleability since this runs in the same process
         def invoke_task(stdin, stdout, stderr, wd, env):
             with save_current_environment(), save_cwd(), save_sys_path():
+                # pretend we're running the script in the working dir
                 os.environ.update(env)
                 os.chdir(wd)
-                sys.path = [''] + sys.path  # pretend we're running the script
+                sys.path = [os.getcwd()] + sys.path
 
                 try:
                     task = self._mrjob_cls(

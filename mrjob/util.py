@@ -341,7 +341,7 @@ def save_cwd():
 @contextmanager
 def save_sys_path():
     """Context manager that saves sys.path and restores it after execution."""
-    original_sys_path = sys.path.copy()
+    original_sys_path = list(sys.path)
 
     try:
         yield

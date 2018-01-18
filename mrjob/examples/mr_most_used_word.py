@@ -14,7 +14,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""Determine the most used word in the input, ignoring common "stop" words."""
+"""Determine the most used word in the input, ignoring common "stop" words.
+
+Shows how to do a multi-step job, and how to load a support file
+from the same directory.
+"""
 from mrjob.job import MRJob
 from mrjob.protocol import JSONValueProtocol
 from mrjob.step import MRStep

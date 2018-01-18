@@ -537,6 +537,9 @@ class MRJobLauncher(object):
             libjars=self.libjars(),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),
+            upload_archives=self.options.upload_archives + list(
+                self.archives()),
+            upload_dirs=self.options.upload_dirs + list(self.dirs()),
             upload_files=self.options.upload_files + list(self.files()),
         )
 

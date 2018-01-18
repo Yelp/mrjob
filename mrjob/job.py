@@ -1051,6 +1051,35 @@ class MRJob(MRJobLauncher):
 
     ### Uploading support files ###
 
+    #: Optional list of archives to upload to the job's working directory
+    #: and uncompress.
+    #:
+    #: ``~`` and environment variables in paths be expanded, and relative
+    #: paths will be interpreted as relative to the directory containing the
+    #: script (not the current working directory). If you want an archive to be
+    #: unpacked to a filename other than it's own, append ``#<name>``
+    #: (for example ``data/foo.tar.gz#foo/``).
+    #:
+    #: If you require more sophisticated behavior, try overriding
+    #: :py:meth:`archives`.
+    #:
+    #: .. versionadded:: 0.6.2
+    ARCHIVES = []
+
+    #: Optional list of directories to upload to the job's working directory.
+    #:
+    #: ``~`` and environment variables in paths be expanded, and relative
+    #: paths will be interpreted as relative to the directory containing the
+    #: script (not the current working directory). If you want an archive to be
+    #: unpacked to a filename other than it's own, append ``#<name>``
+    #: (for example ``data/foo#foo/``).
+    #:
+    #: If you require more sophisticated behavior, try overriding
+    #: :py:meth:`dirs`.
+    #:
+    #: .. versionadded:: 0.6.2
+    DIRS = []
+
     #: Optional list of files to upload to the job's working directory.
     #:
     #: ``~`` and environment variables in paths be expanded, and relative
@@ -1065,7 +1094,88 @@ class MRJob(MRJobLauncher):
     #: .. versionadded:: 0.6.2
     FILES = []
 
+    def archives(self):
+        """Optional list of paths of archives upload to the job's working
+        directory and uncompress.
+
+        By default, this returns :py:attr:`ARCHIVES`, with paths interpreted
+        as relative to the directory containing the script.
+
+        (You do not have to worry about archived passed in by the ``--archive``
+        option; the runner handles those separately.)
+
+        Note that ``~`` and environment variables in paths will always be
+        expanded by the job runner (see :mrjob-opt:`libjars`).
+
+        .. versionadded:: 0.6.2
+        """
+        return self._upload_attr('ARCHIVES')
+
+    def dirs(self):
+        """Optional list of paths of directories upload to the job's working
+        directory
+
+        By default, this returns :py:attr:`ARCHIV`, with paths interpreted
+        as relative to the directory containing the script.
+
+        (You do not have to worry about directories passed in by the ``--dir``
+        option; the runner handles those separately.)
+
+        Note that ``~`` and environment variables in paths will always be
+        expanded by the job runner (see :mrjob-opt:`libjars`).
+
+        .. versionadded:: 0.6.2
+        """
+        return self._upload_attr('DIRS')
+
     def files(self):
+        """Optional list of paths of files to upload to the job's working
+        directory.
+
+        By default, this returns :py:attr:`FILES`, with paths interpreted
+        as relative to the directory containing the script.
+
+        (You do not have to worry about files passed in by the ``--file``
+        option; the runner handles those separately.)
+
+        Note that ``~`` and environment variables in paths will always be
+        expanded by the job runner (see :mrjob-opt:`libjars`).
+
+        .. versionadded:: 0.6.2
+        """
+        return self._upload_attr('FILES')
+
+    def _upload_attr(self, attr_name):
+        """Helper for :py:meth:`archives`, :py:meth:`dirs`, and
+        :py:meth:`files`"""
+        attr_value = getattr(self, attr_name)
+
+        # catch path instead of a list of paths
+        if isinstance(attr_value, string_types):
+            raise TypeError('%s must be a list or other sequence.' % attr_name)
+
+        script_dir = os.path.dirname(self.mr_job_script())
+        paths = []
+
+        for path in attr_value:
+            expanded_path = expand_path(path)
+
+            if os.path.isabs(expanded_path):
+                paths.append(path)
+            else:
+                # relative subdirs are confusing; people will expect them
+                # to appear in a subdir, not the same directory as the script,
+                # but Hadoop doesn't work that way
+                if os.sep in path.rstrip(os.sep) and '#' not in path:
+                    log.warning(
+                        '%s: %s will appear in same directory as job script,'
+                        ' not a subdirectory' % (attr_name, path))
+
+                paths.append(os.path.join(script_dir, path))
+
+        return paths
+
+    def _upload_from_attr(self):
         """Optional list of paths of files to upload to the job's working
         directory.
 
@@ -1102,6 +1212,7 @@ class MRJob(MRJobLauncher):
                 paths.append(os.path.join(script_dir, path))
 
         return paths
+
 
     ### Jobconf ###
 

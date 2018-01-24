@@ -671,14 +671,26 @@ class MRJob(MRJobLauncher):
         """
         paths = self.options.args or ['-']
 
-        for path in paths:
+        def read_input(path):
             if path == '-':
                 for line in self.stdin:
                     yield line
+
+            elif os.path.isdir(path):
+                for dirname, _, filenames in os.walk(path, followlinks=True):
+                    for filename in filenames:
+                        for line in read_input(os.path.join(dirname,
+                                                            filename)):
+                            yield line
+
             else:
                 with open(path, 'rb') as f:
                     for line in to_lines(decompress(f, path)):
                         yield line
+
+        for path in paths:
+            for line in read_input(path):
+                yield line
 
     def _wrap_protocols(self, step_num, step_type):
         """Pick the protocol classes to use for reading and writing

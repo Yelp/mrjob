@@ -18,6 +18,7 @@ import pipes
 from os.path import basename
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.conf import combine_dicts
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
@@ -95,6 +96,12 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
     ### Options ###
 
+    def _default_opts(self):
+        return combine_dicts(
+            super(HadoopInTheCloudJobRunner, self)._default_opts(),
+            dict(max_mins_idle=_DEFAULT_MAX_MINS_IDLE)
+        )
+
     def _fix_opts(self, opts, source=None):
         opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
             opts, source=source)
@@ -106,14 +113,12 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 (' Please use max_mins_idle instead'
                  if opts.get('max_mins_idle') is None else ''))
 
-        if opts.get('max_mins_idle') is None:
-            if opts.get('max_hours_idle') is not None:
+            if opts.get('max_mins_idle') is None:
                 opts['max_mins_idle'] = opts['max_hours_idle'] * 60
-            else:
-                opts['max_mins_idle'] = _DEFAULT_MAX_MINS_IDLE
 
         # warn about issues with
-        if opts['max_mins_idle'] < _DEFAULT_MAX_MINS_IDLE:
+        if (opts.get('max_mins_idle') is not None and
+                opts['max_mins_idle'] < _DEFAULT_MAX_MINS_IDLE):
             log.warning('Setting max_mins_idle to less than %.1f may result'
                         ' in cluster shutting down before job can run' %
                         _DEFAULT_MAX_MINS_IDLE)

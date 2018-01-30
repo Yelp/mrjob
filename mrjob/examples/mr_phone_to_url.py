@@ -1,5 +1,6 @@
 # Copyright 2015 Yelp
 # Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -47,8 +48,6 @@ from mrjob.py2 import urlparse
 from mrjob.step import MRStep
 from mrjob.util import random_identifier
 
-import warc
-
 PHONE_RE = re.compile(
     r'[\D\b](1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})[\D\b]')
 PHONE_SEP_RE = re.compile(r'[\-. ()+]')
@@ -85,11 +84,20 @@ class MRPhoneToURL(MRJob):
             MRStep(reducer=self.pick_best_url_reducer),
         ]
 
-    def extract_phone_and_url_mapper(self, record_num, uri):
+    def extract_phone_and_url_mapper(self, record_num, path):
         """Read .wet from ``self.stdin`` (so we can read multi-line records).
 
         Yield ``host, (phone, url)``
         """
+        import warc
+
+        uri = 's3://commoncrawl/' + path
+
+        # misconfigured hadoop environment on EMR
+        for k in sorted(os.environ):
+            if k.startswith('BASH_FUNC_run_prestart'):
+                del os.environ[k]
+
         with download_input(uri) as path:
             with open_input(path) as f:
                 wet_file = warc.WARCFile(fileobj=f)
@@ -128,7 +136,7 @@ class MRPhoneToURL(MRJob):
 
 
 @contextmanager
-def download_input(self, uri):
+def download_input(uri):
     if not is_uri(uri):
         yield uri
         return
@@ -136,7 +144,7 @@ def download_input(self, uri):
     path = '%s-%s' % (random_identifier(), uri.split('/')[-1])
 
     try:
-        check_call(['hadoop', 'fs', '-copyToLocal', uri, path])
+        check_call(['/usr/lib/hadoop/bin/hadoop', 'fs', '-copyToLocal', uri, path])
         yield path
     finally:
         try:
@@ -145,7 +153,7 @@ def download_input(self, uri):
             pass
 
 
-def open_input(self, path):
+def open_input(path):
     if path.endswith('.gz'):
         return GzipFile(path, 'rb')
     elif path.endswith('.bz2'):

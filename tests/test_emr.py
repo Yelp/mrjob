@@ -1849,20 +1849,32 @@ class MaxMinsIdleTestCase(MockBoto3TestCase):
             self.assertRanIdleTimeoutScriptWith(runner, ['600'])
 
     def test_custom_max_mins_idle(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '0.6'])
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '16.5'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['36'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['990'])
+
+    def test_custom_max_mins_idle_in_mrjob_conf(self):
+        # regression test for #1726
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(emr=dict(max_mins_idle=15)))))
+
+        mr_job = MRWordCount(['-r', 'emr'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.make_persistent_cluster()
+            self.assertRanIdleTimeoutScriptWith(runner, ['900'])
 
     def test_deprecated_max_hours_idle(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '0.6'])
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '16.5'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['36'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['990'])
 
     def test_deprecated_mins_to_end_of_hour_does_nothing(self):
         mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])

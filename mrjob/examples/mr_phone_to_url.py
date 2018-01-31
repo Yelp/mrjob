@@ -35,17 +35,20 @@ To find the latest crawl:
 """
 import os
 import re
+import sys
 from bz2 import BZ2File
 from contextlib import contextmanager
 from gzip import GzipFile
 from itertools import islice
-from subprocess import check_call
+from subprocess import Popen
+from subprocess import PIPE
 
 from mrjob.job import MRJob
 from mrjob.parse import is_uri
 from mrjob.protocol import RawProtocol
 from mrjob.py2 import urlparse
 from mrjob.step import MRStep
+from mrjob.util import cmd_line
 from mrjob.util import random_identifier
 
 PHONE_RE = re.compile(
@@ -94,9 +97,8 @@ class MRPhoneToURL(MRJob):
         uri = 's3://commoncrawl/' + path
 
         # misconfigured hadoop environment on EMR
-        for k in sorted(os.environ):
-            if k.startswith('BASH_FUNC_run_prestart'):
-                del os.environ[k]
+        for k, v in sorted(os.environ.items()):
+            sys.stderr.write('%s=%s\n' % (k, v))
 
         with download_input(uri) as path:
             with open_input(path) as f:
@@ -143,14 +145,42 @@ def download_input(uri):
 
     path = '%s-%s' % (random_identifier(), uri.split('/')[-1])
 
+    #cp_args = ['hadoop', 'fs', '-copyToLocal', uri, path]
+    cp_args = ['true']
+    env = {
+        k: v for k, v in os.environ.items()
+        if not k.startswith('BASH_FUNC_')
+    }
+
     try:
-        check_call(['/usr/lib/hadoop/bin/hadoop', 'fs', '-copyToLocal', uri, path])
-        yield path
+        sys.stderr.write('> ' + cmd_line(cp_args) + '\n')
+
+        cp_proc = Popen(cp_args, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
+
+        sys.stderr.write('Popened\n')
+
+        stdout, stderr = cp_proc.communicate()
+
+        sys.stderr.write('communicated\n')
+
+        if stderr:
+            stderr_buffer = getattr(sys.stderr, 'buffer', sys.stderr)
+            stderr_buffer.write(stderr + b'\n')
+
+        if cp_proc.returncode != 0:
+            sys.stderr.write(
+                'returned nonzero error status: %d' % cp_proc.returncode)
+        else:
+            sys.stderr.write('copied to %s\n' % path)
+
     finally:
         try:
             os.remove(path)
         except OSError:
             pass
+
+    yield path
+
 
 
 def open_input(path):

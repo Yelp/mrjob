@@ -409,7 +409,7 @@ class MRJobRunner(object):
         if not isinstance(opts, dict):
             raise TypeError(
                 'options for %s (from %s) must be a dict' %
-                self.runner_alias, source)
+                (self.alias, source))
 
         deprecated_aliases = _deprecated_aliases(self.OPT_NAMES)
 

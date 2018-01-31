@@ -44,6 +44,7 @@ __credits__ = [
     'Tomer Elmalem <telmalem@gmail.com>',
     'Pedro Emanuel de Castro Faria Salgado <steenzout@ymail.com>',
     'Buck Evan <buck@yelp.com>',
+    'Cesar Gonzalez Fernandez <cesar.gon.fer@gmail.com>',
     'Dan Frank <danielhfrank@gmail.com>',
     'Sudarshan Gaikaiwari <sudarshan@acm.org>',
     'Alex Gaynor <alex.gaynor@gmail.com>',

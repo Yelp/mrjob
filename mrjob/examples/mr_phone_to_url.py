@@ -101,6 +101,8 @@ class MRPhoneToURL(MRJob):
             sys.stderr.write('%s=%s\n' % (k, v))
 
         with download_input(uri) as path:
+            sys.stderr.write('%r\n' % os.listdir('.'))
+
             with open_input(path) as f:
                 wet_file = warc.WARCFile(fileobj=f)
 
@@ -145,8 +147,7 @@ def download_input(uri):
 
     path = '%s-%s' % (random_identifier(), uri.split('/')[-1])
 
-    #cp_args = ['hadoop', 'fs', '-copyToLocal', uri, path]
-    cp_args = ['true']
+    cp_args = ['hadoop', 'fs', '-copyToLocal', uri, path]
     env = {
         k: v for k, v in os.environ.items()
         if not k.startswith('BASH_FUNC_')
@@ -161,11 +162,8 @@ def download_input(uri):
 
         stdout, stderr = cp_proc.communicate()
 
-        sys.stderr.write('communicated\n')
-
-        if stderr:
-            stderr_buffer = getattr(sys.stderr, 'buffer', sys.stderr)
-            stderr_buffer.write(stderr + b'\n')
+        sys.stderr.write('  stdout: %r\n' % stdout)
+        sys.stderr.write('  stderr: %r\n' % stderr)
 
         if cp_proc.returncode != 0:
             sys.stderr.write(
@@ -173,14 +171,13 @@ def download_input(uri):
         else:
             sys.stderr.write('copied to %s\n' % path)
 
+        yield path
+
     finally:
         try:
             os.remove(path)
         except OSError:
             pass
-
-    yield path
-
 
 
 def open_input(path):

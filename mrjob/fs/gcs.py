@@ -36,6 +36,13 @@ except ImportError:
     google_errors = None
     google_http = None
 
+# TODO: loading credentials
+try:
+    from google.cloud.storage.client import Client as StorageClient
+except ImportError:
+    StorageClient = None
+
+
 import io
 import os
 import tempfile
@@ -91,7 +98,15 @@ class GCSFilesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
     def __init__(self):
-        self._api_client = None
+        self._api_client = None  # old API client
+        self._client = None
+
+    @property
+    def client(self):
+        if not self._client:
+            self._client = StorageClient()
+
+        return self._client
 
     @property
     def api_client(self):
@@ -225,6 +240,17 @@ class GCSFilesystem(Filesystem):
             return self._upload_io(io_obj, dest_uri)
 
     def put(self, src_path, dest_uri):
+        """Uploads a local file to a specific destination."""
+        bucket_name, blob_name = parse_gcs_uri(dest_uri)
+        if self.exists(dest_uri):
+            raise IOError('File already exists: %s' % dest_uri)
+
+        bucket = self.client.get_bucket(bucket_name)
+        blob = bucket.blob(blob_name)
+
+        blob.upload_from_filename(src_path)
+
+    def _old_put(self, src_path, dest_uri):
         """Uploads a local file to a specific destination."""
         with io.FileIO(src_path) as io_obj:
             return self._upload_io(io_obj, dest_uri)

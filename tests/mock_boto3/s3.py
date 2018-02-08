@@ -44,7 +44,7 @@ class MockS3Client(object):
                  region_name=None,
                  mock_s3_fs=None):
 
-        self.mock_s3_fs = mock_s3_fs
+        self.mock_s3_fs = mock_s3_fs or {}
 
         region_name = region_name or _DEFAULT_AWS_REGION
         if not endpoint_url:

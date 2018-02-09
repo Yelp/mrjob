@@ -53,6 +53,16 @@ class MockGoogleStorageBlob(object):
         self.bucket = bucket
         self.chunk_size = chunk_size
 
+    def download_to_file(self, file_obj):
+        fs = self.bucket.client.mock_gcs_fs
+        if (self.bucket.name not in fs or
+                self.name not in fs[self.bucket.name]['objects']):
+            raise NotFound('GET https://www.googleapis.com/download/storage'
+                           '/v1/b/%s/o/%s?alt=media: Not Found' %
+                           self.bucket.name, self.name)
+
+        file_obj.write(fs[self.bucket.name]['objects'][self.name]['data'])
+
     def upload_from_filename(self, filename):
         with open(filename, 'rb') as f:
             data = f.read()

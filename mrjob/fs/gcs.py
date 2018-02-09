@@ -194,7 +194,6 @@ class GCSFilesystem(Filesystem):
         item = object_list[0]
         return _base64_to_hex(item['md5Hash'])
 
-    # TODO: try on 0-sized file, then delete _download_io()
     def _cat_file(self, gcs_uri):
         bucket_name, blob_name = parse_gcs_uri(gcs_uri)
         bucket = self.client.get_bucket(bucket_name)
@@ -256,33 +255,6 @@ class GCSFilesystem(Filesystem):
         blob = bucket.blob(blob_name)
 
         blob.upload_from_filename(src_path)
-
-    # TODO: delete this after updating _cat_file()
-    def _download_io(self, src_uri, io_obj):
-        bucket_name, object_name = parse_gcs_uri(src_uri)
-
-        # Chunked file download
-        req = self.api_client.objects().get_media(
-            bucket=bucket_name, object=object_name)
-        downloader = google_http.MediaIoBaseDownload(io_obj, req)
-
-        done = False
-        while not done:
-            try:
-                status, done = downloader.next_chunk()
-            except google_errors.HttpError as e:
-                # Error code 416 (request range not satisfiable)
-                # implies we're trying to download a file of size 0
-                if e.resp.status == 416:
-                    break
-
-                raise
-
-            if status:
-                log.debug("Download %d%%." % int(status.progress() * 100))
-
-        log.debug("Download Complete for %s", src_uri)
-        return io_obj
 
     # TODO: this returns a JSON; need to make a backwards-compatible version
     #

@@ -13,9 +13,12 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
+import binascii
 import fnmatch
+import io
 import logging
-import mimetypes
+from tempfile import TemporaryFile
 
 from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
@@ -42,12 +45,6 @@ try:
 except ImportError:
     StorageClient = None
 
-
-import io
-import os
-import tempfile
-import base64
-import binascii
 
 log = logging.getLogger(__name__)
 
@@ -97,9 +94,10 @@ class GCSFilesystem(Filesystem):
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
-    def __init__(self):
-        self._api_client = None  # old API client
+    def __init__(self, local_tmp_dir=None):
+        self._api_client = None  # TODO: remove this when done porting
         self._client = None
+        self._local_tmp_dir = local_tmp_dir
 
     @property
     def client(self):
@@ -196,16 +194,19 @@ class GCSFilesystem(Filesystem):
         item = object_list[0]
         return _base64_to_hex(item['md5Hash'])
 
-    # TODO: use google-cloud-sdk
+    # TODO: try on 0-sized file, then delete _download_io()
     def _cat_file(self, gcs_uri):
-        tmp_fd, tmp_path = tempfile.mkstemp()
+        bucket_name, blob_name = parse_gcs_uri(gcs_uri)
+        bucket = self.client.get_bucket(bucket_name)
+        blob = bucket.blob(blob_name)
 
-        with os.fdopen(tmp_fd, 'w+b') as tmp_fileobj:
-            self._download_io(gcs_uri, tmp_fileobj)
+        with TemporaryFile(dir=self._local_tmp_dir) as temp:
+            blob.download_to_file(temp)
 
-            tmp_fileobj.seek(0)
+            # now read from that file
+            temp.seek(0)
 
-            for chunk in decompress(tmp_fileobj, gcs_uri):
+            for chunk in decompress(temp, gcs_uri):
                 yield chunk
 
     def mkdir(self, dest):

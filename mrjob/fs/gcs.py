@@ -271,10 +271,10 @@ class GCSFilesystem(Filesystem):
         buckets_to_return = resp.get('items') or []
         return buckets_to_return
 
-    # this will need to return a google-cloud-sdk bucket
-    def get_bucket(self, bucket):
-        req = self.api_client.buckets().get(bucket=bucket)
-        return req.execute()
+    def get_bucket(self, bucket_name):
+        """Return a :py:class:`google.cloud.storage.bucket.Bucket`
+        Raises an exception if the bucket does not exist."""
+        return self.client.get_bucket(bucket_name)
 
     # TODO: implement with google-cloud-sdk
     def create_bucket(self, project, name,

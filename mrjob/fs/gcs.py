@@ -128,6 +128,7 @@ class GCSFilesystem(Filesystem):
         for item in self._ls_detailed(path_glob):
             yield item['_uri']
 
+    # TODO: need to use google cloud sdk
     def _ls_detailed(self, path_glob):
         """Recursively list files on GCS and includes some metadata about them:
         - object name
@@ -185,6 +186,7 @@ class GCSFilesystem(Filesystem):
             list_request = self.api_client.objects().list_next(
                 list_request, resp)
 
+    # TODO: use google-cloud-sdk
     def md5sum(self, path):
         object_list = list(self._ls_detailed(path))
         if len(object_list) != 1:
@@ -194,6 +196,7 @@ class GCSFilesystem(Filesystem):
         item = object_list[0]
         return _base64_to_hex(item['md5Hash'])
 
+    # TODO: use google-cloud-sdk
     def _cat_file(self, gcs_uri):
         tmp_fd, tmp_path = tempfile.mkstemp()
 
@@ -225,6 +228,7 @@ class GCSFilesystem(Filesystem):
             paths = []
         return any(paths)
 
+    # TODO: use google-cloud-sdk
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
         bucket_name, base_name = _path_glob_to_parsed_gcs_uri(path_glob)
@@ -235,6 +239,8 @@ class GCSFilesystem(Filesystem):
             log.debug("deleting " + item['_uri'])
             req.execute()
 
+    # TODO: use google-cloud-sdk
+    # TODO: raise an error if file already exists!
     def touchz(self, dest_uri):
         with io.BytesIO() as io_obj:
             return self._upload_io(io_obj, dest_uri)
@@ -250,11 +256,7 @@ class GCSFilesystem(Filesystem):
 
         blob.upload_from_filename(src_path)
 
-    def _old_put(self, src_path, dest_uri):
-        """Uploads a local file to a specific destination."""
-        with io.FileIO(src_path) as io_obj:
-            return self._upload_io(io_obj, dest_uri)
-
+    # TODO: delete this after updating _cat_file()
     def _download_io(self, src_uri, io_obj):
         bucket_name, object_name = parse_gcs_uri(src_uri)
 
@@ -281,31 +283,9 @@ class GCSFilesystem(Filesystem):
         log.debug("Download Complete for %s", src_uri)
         return io_obj
 
-    def _upload_io(self, io_obj, dest_uri, metadata=False):
-        bucket, name = parse_gcs_uri(dest_uri)
-        if self.exists(dest_uri):
-            raise Exception("File already exists: " + dest_uri)
-
-        mimetype, _ = mimetypes.guess_type(dest_uri)
-        mimetype = mimetype or _BINARY_MIMETYPE
-
-        # Chunked file upload
-        media = google_http.MediaIoBaseUpload(io_obj, mimetype, resumable=True)
-        upload_req = self.api_client.objects().insert(
-            bucket=bucket, name=name, media_body=media)
-
-        upload_resp = None
-        while upload_resp is None:
-            status, upload_resp = upload_req.next_chunk()
-            if status:
-                log.debug("Uploaded %d%%." % int(status.progress() * 100))
-
-        log.debug('Upload Complete! %s', dest_uri)
-
-        if metadata:
-            return self.api_client.objects().get(
-                bucket=bucket, object=name).execute()
-
+    # TODO: this returns a JSON; need to make a backwards-compatible version
+    #
+    # should implement get_all_bucket_names()
     def list_buckets(self, project, prefix=None):
         """List buckets on GCS."""
         list_kwargs = dict(project=project)
@@ -318,10 +298,12 @@ class GCSFilesystem(Filesystem):
         buckets_to_return = resp.get('items') or []
         return buckets_to_return
 
+    # this will need to return a google-cloud-sdk bucket
     def get_bucket(self, bucket):
         req = self.api_client.buckets().get(bucket=bucket)
         return req.execute()
 
+    # TODO: implement with google-cloud-sdk
     def create_bucket(self, project, name,
                       location=None, object_ttl_days=None):
         """Create a bucket on GCS, optionally setting location constraint."""
@@ -342,6 +324,8 @@ class GCSFilesystem(Filesystem):
         req = self.api_client.buckets().insert(project=project, body=body)
         return req.execute()
 
+    # TODO: implement with google-cloud-sdk, deprecate
+    # Why is this even here?
     def delete_bucket(self, bucket):
         req = self.api_client.buckets().delete(bucket=bucket)
         return req.execute()

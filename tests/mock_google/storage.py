@@ -67,6 +67,9 @@ class MockGoogleStorageBlob(object):
         with open(filename, 'rb') as f:
             data = f.read()
 
+        self.upload_from_string(data)
+
+    def upload_from_string(self, data):
         fs = self.bucket.client.mock_gcs_fs
         if self.bucket.name not in fs:
             raise NotFound('POST https://www.googleapis.com/upload/storage'

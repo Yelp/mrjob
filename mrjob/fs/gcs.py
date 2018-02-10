@@ -101,6 +101,7 @@ class GCSFilesystem(Filesystem):
 
     @property
     def client(self):
+        # TODO: push credentials from Dataproc Runner
         if not self._client:
             self._client = StorageClient()
 
@@ -242,8 +243,16 @@ class GCSFilesystem(Filesystem):
     # TODO: use google-cloud-sdk
     # TODO: raise an error if file already exists!
     def touchz(self, dest_uri):
-        with io.BytesIO() as io_obj:
-            return self._upload_io(io_obj, dest_uri)
+        bucket_name, blob_name = parse_gcs_uri(dest_uri)
+
+        bucket = self.client.get_bucket(bucket_name)
+
+        # check if already exists
+        old_blob = bucket.get_blob(blob_name)
+        if old_blob:
+            raise IOError('Non-empty file %r already exists!' % (dest_uri,))
+
+        bucket.blob(blob_name).upload_from_string(b'')
 
     def put(self, src_path, dest_uri):
         """Uploads a local file to a specific destination."""
@@ -277,7 +286,6 @@ class GCSFilesystem(Filesystem):
         Raises an exception if the bucket does not exist."""
         return self.client.get_bucket(bucket_name)
 
-    # TODO: implement with google-cloud-sdk
     # NOTE: function signature has changed
     def create_bucket(self, name,
                       location=None, object_ttl_days=None):

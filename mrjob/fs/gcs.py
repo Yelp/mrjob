@@ -271,31 +271,34 @@ class GCSFilesystem(Filesystem):
         buckets_to_return = resp.get('items') or []
         return buckets_to_return
 
+    # NOTE: returns a google-cloud-sdk bucket
     def get_bucket(self, bucket_name):
         """Return a :py:class:`google.cloud.storage.bucket.Bucket`
         Raises an exception if the bucket does not exist."""
         return self.client.get_bucket(bucket_name)
 
     # TODO: implement with google-cloud-sdk
-    def create_bucket(self, project, name,
+    # NOTE: function signature has changed
+    def create_bucket(self, name,
                       location=None, object_ttl_days=None):
-        """Create a bucket on GCS, optionally setting location constraint."""
-        # https://cloud.google.com/storage/docs/lifecycle
-        body = dict(name=name)
+        """Create a bucket on GCS, optionally setting location constraint.
+        and time-to-live."""
+        bucket = self.client.bucket(name)
 
+        # TODO: google-cloud-sdk currently doesn't provide access to
+        # the "location" field; patch it manually
         if location:
-            body['location'] = location
+            bucket._changes.add('location')
+            bucket._properties['location'] = location
 
-        # Lifecycle management
-        if object_ttl_days is not None:
-            lifecycle_rule = dict(
+        bucket.create()
+
+        bucket.lifecycle_rules = [
+            dict(
                 action=dict(type='Delete'),
                 condition=dict(age=object_ttl_days)
             )
-            body['lifecycle'] = dict(rule=[lifecycle_rule])
-
-        req = self.api_client.buckets().insert(project=project, body=body)
-        return req.execute()
+        ]
 
     # TODO: implement with google-cloud-sdk, deprecate
     # Why is this even here?

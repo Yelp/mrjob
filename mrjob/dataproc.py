@@ -32,6 +32,12 @@ except ImportError:
     discovery = None
     google_errors = None
 
+
+try:
+    from google.api_core.exceptions import NotFound
+except:
+    NotFound = None
+
 try:
     # Python 2
     import ConfigParser as configparser
@@ -459,9 +465,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         try:
             self.fs.get_bucket(bucket_name)
             return
-        except google_errors.HttpError as e:
-            if not e.resp.status == 404:
-                raise
+        except NotFound:
+            pass
 
         log.info('creating FS bucket %r' % bucket_name)
 
@@ -471,7 +476,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # job (tmp buckets ONLY)
         # https://cloud.google.com/storage/docs/bucket-locations
         self.fs.create_bucket(
-            self._gcp_project, bucket_name, location=location,
+            bucket_name, location=location,
             object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
 
         self._wait_for_fs_sync()

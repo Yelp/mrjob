@@ -128,6 +128,7 @@ class GCSFilesystem(Filesystem):
             yield item['_uri']
 
     # TODO: need to use google cloud sdk
+    # TODO: just yield uri, obj
     def _ls_detailed(self, path_glob):
         """Recursively list files on GCS and includes some metadata about them:
         - object name
@@ -185,20 +186,16 @@ class GCSFilesystem(Filesystem):
             list_request = self.api_client.objects().list_next(
                 list_request, resp)
 
-    # TODO: use google-cloud-sdk
     def md5sum(self, path):
-        object_list = list(self._ls_detailed(path))
-        if len(object_list) != 1:
-            raise Exception(
-                "path for md5 sum doesn't resolve to single object" + path)
-
-        item = object_list[0]
-        return _base64_to_hex(item['md5Hash'])
+        blob = self._get_blob(path)
+        if not blob:
+            raise IOError('Object %r does not exist' % (path,))
+        return _base64_to_hex(blob.md5_hash)
 
     def _cat_file(self, gcs_uri):
-        bucket_name, blob_name = parse_gcs_uri(gcs_uri)
-        bucket = self.client.get_bucket(bucket_name)
-        blob = bucket.blob(blob_name)
+        blob = self._blob(gcs_uri)
+        if not blob:
+            return  # don't cat nonexistent files
 
         with TemporaryFile(dir=self._local_tmp_dir) as temp:
             blob.download_to_file(temp)
@@ -243,27 +240,20 @@ class GCSFilesystem(Filesystem):
     # TODO: use google-cloud-sdk
     # TODO: raise an error if file already exists!
     def touchz(self, dest_uri):
-        bucket_name, blob_name = parse_gcs_uri(dest_uri)
-
-        bucket = self.client.get_bucket(bucket_name)
-
         # check if already exists
-        old_blob = bucket.get_blob(blob_name)
+        old_blob = self._get_blob(dest_uri)
         if old_blob:
             raise IOError('Non-empty file %r already exists!' % (dest_uri,))
 
-        bucket.blob(blob_name).upload_from_string(b'')
+        self._blob(dest_uri).upload_from_string(b'')
 
     def put(self, src_path, dest_uri):
         """Uploads a local file to a specific destination."""
-        bucket_name, blob_name = parse_gcs_uri(dest_uri)
-        if self.exists(dest_uri):
+        old_blob = self._get_blob(dest_uri)
+        if old_blob:
             raise IOError('File already exists: %s' % dest_uri)
 
-        bucket = self.client.get_bucket(bucket_name)
-        blob = bucket.blob(blob_name)
-
-        blob.upload_from_filename(src_path)
+        self._blob(dest_uri).upload_from_filename(src_path)
 
     # TODO: this returns a JSON; need to make a backwards-compatible version
     #
@@ -313,6 +303,16 @@ class GCSFilesystem(Filesystem):
     def delete_bucket(self, bucket):
         req = self.api_client.buckets().delete(bucket=bucket)
         return req.execute()
+
+    def _get_blob(self, uri):
+        bucket_name, blob_name = parse_gcs_uri(uri)
+        bucket = self.client.get_bucket(bucket_name)
+        return bucket.get_blob(blob_name)
+
+    def _blob(self, uri):
+        bucket_name, blob_name = parse_gcs_uri(uri)
+        bucket = self.client.get_bucket(bucket_name)
+        return bucket.blob(blob_name)
 
 
 # The equivalent S3 methods are in parse.py but it's cleaner to keep them

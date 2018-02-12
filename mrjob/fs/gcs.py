@@ -16,7 +16,6 @@
 import base64
 import binascii
 import fnmatch
-import io
 import logging
 from tempfile import TemporaryFile
 
@@ -41,8 +40,10 @@ except ImportError:
 
 # TODO: loading credentials
 try:
+    from google.api_core.exceptions import NotFound
     from google.cloud.storage.client import Client as StorageClient
 except ImportError:
+    NotFound = None
     StorageClient = None
 
 
@@ -126,6 +127,44 @@ class GCSFilesystem(Filesystem):
     def ls(self, path_glob):
         for item in self._ls_detailed(path_glob):
             yield item['_uri']
+
+    def _ls(self, path_glob):
+        """Helper method for :py:meth:`ls`; yields tuples of
+        ``(uri, blob)`` where *blob* is the corresponding
+        :py:class:`google.cloud.storage.blob.Blob`.
+        """
+        # support globs
+        glob_match = GLOB_RE.match(path_glob)
+
+        # we're going to search for all keys starting with base_uri
+        if glob_match:
+            # cut it off at first wildcard
+            base_uri = glob_match.group(1)
+        else:
+            base_uri = path_glob
+
+        bucket_name, base_name = parse_gcs_uri(base_uri)
+
+        # allow subdirectories of the path/glob
+        if path_glob and not path_glob.endswith('/'):
+            dir_glob = path_glob + '/*'
+        else:
+            dir_glob = path_glob + '*'
+
+        try:
+            bucket = self.get_bucket(bucket_name)
+        except NotFound:
+            return  # treat nonexistent buckets as empty
+
+        for blob in bucket.list_blobs(prefix=base_name):
+            uri = "gs://%s/%s" % (bucket_name, blob.name)
+
+            # enforce globbing
+            if not (fnmatch.fnmatchcase(uri, path_glob) or
+                    fnmatch.fnmatchcase(uri, dir_glob)):
+                continue
+
+            yield uri, blob
 
     # TODO: need to use google cloud sdk
     # TODO: just yield uri, obj

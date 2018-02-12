@@ -346,22 +346,20 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         if given_tmpdir:
             return given_tmpdir
 
-        mrjob_buckets = self.fs.list_buckets(
-            self._gcp_project, prefix='mrjob-')
-
         # Loop over buckets until we find one that matches region
         # NOTE - because this is a tmpdir, we look for a GCS bucket in the
         # same GCE region
         chosen_bucket_name = None
-        gce_lower_location = self._gce_region.lower()
-        for tmp_bucket in mrjob_buckets:
-            tmp_bucket_name = tmp_bucket['name']
+
+        for tmp_bucket_name in self.fs.get_all_bucket_names(prefix='mrjob-'):
+            tmp_bucket = self.fs.get_bucket(tmp_bucket)
 
             # NOTE - GCP ambiguous Behavior - Bucket location is being
             # returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs
-            # suggest lowercase
-            lower_location = tmp_bucket['location'].lower()
-            if lower_location == gce_lower_location:
+            # suggest lowercase. (As of Feb. 12, 2018, this is still true,
+            # observed on google-cloud-sdk)
+
+            if tmp_bucket.location.lower() == self._gce_region.lower():
                 # Regions are both specified and match
                 log.info("using existing temp bucket %s" % tmp_bucket_name)
                 chosen_bucket_name = tmp_bucket_name

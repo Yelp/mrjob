@@ -122,11 +122,11 @@ class GCSFilesystem(Filesystem):
 
     def du(self, path_glob):
         """Get the size of all files matching path_glob."""
-        return sum(item['size'] for item in self._ls_detailed(path_glob))
+        return sum(blob.size for uri, blob in self._ls(path_glob))
 
     def ls(self, path_glob):
-        for item in self._ls_detailed(path_glob):
-            yield item['_uri']
+        for uri, blob in self._ls(path_glob):
+            yield uri
 
     def _ls(self, path_glob):
         """Helper method for :py:meth:`ls`; yields tuples of
@@ -159,71 +159,16 @@ class GCSFilesystem(Filesystem):
         for blob in bucket.list_blobs(prefix=base_name):
             uri = "gs://%s/%s" % (bucket_name, blob.name)
 
+            # don't return directory "blobs"
+            if uri.endswith('/'):
+                continue
+
             # enforce globbing
             if not (fnmatch.fnmatchcase(uri, path_glob) or
                     fnmatch.fnmatchcase(uri, dir_glob)):
                 continue
 
             yield uri, blob
-
-    # TODO: need to use google cloud sdk
-    # TODO: just yield uri, obj
-    def _ls_detailed(self, path_glob):
-        """Recursively list files on GCS and includes some metadata about them:
-        - object name
-        - size
-        - md5 hash
-        - _uri
-
-        *path_glob* can include ``?`` to match single characters or
-        ``*`` to match 0 or more characters. Both ``?`` and ``*`` can match
-        ``/``.
-        """
-
-        scheme = urlparse(path_glob).scheme
-
-        bucket_name, base_name = _path_glob_to_parsed_gcs_uri(path_glob)
-
-        # allow subdirectories of the path/glob
-        if path_glob and not path_glob.endswith('/'):
-            dir_glob = path_glob + '/*'
-        else:
-            dir_glob = path_glob + '*'
-
-        list_request = self.api_client.objects().list(
-            bucket=bucket_name, prefix=base_name, fields=_LS_FIELDS_TO_RETURN)
-
-        uri_prefix = '%s://%s' % (scheme, bucket_name)
-        while list_request:
-            try:
-                resp = list_request.execute()
-            except google_errors.HttpError as e:
-                if e.resp.status == 404:
-                    return
-
-                raise
-
-            resp_items = resp.get('items') or []
-            for item in resp_items:
-                # We generate the item URI by adding the "gs://" prefix
-                uri = "%s/%s" % (uri_prefix, item['name'])
-
-                # enforce globbing
-                if not (fnmatch.fnmatchcase(uri, path_glob) or
-                        fnmatch.fnmatchcase(uri, dir_glob)):
-                    continue
-
-                # filter out folders
-                if uri.endswith('/'):
-                    continue
-
-                item['_uri'] = uri
-                item['bucket'] = bucket_name
-                item['size'] = int(item['size'])
-                yield item
-
-            list_request = self.api_client.objects().list_next(
-                list_request, resp)
 
     def md5sum(self, path):
         blob = self._get_blob(path)
@@ -268,16 +213,9 @@ class GCSFilesystem(Filesystem):
     # TODO: use google-cloud-sdk
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
-        bucket_name, base_name = _path_glob_to_parsed_gcs_uri(path_glob)
+        for uri, blob in self._ls(path_glob):
+            blob.delete()
 
-        for item in self._ls_detailed(path_glob):
-            req = self.api_client.objects().delete(
-                bucket=bucket_name, object=item['name'])
-            log.debug("deleting " + item['_uri'])
-            req.execute()
-
-    # TODO: use google-cloud-sdk
-    # TODO: raise an error if file already exists!
     def touchz(self, dest_uri):
         # check if already exists
         old_blob = self._get_blob(dest_uri)

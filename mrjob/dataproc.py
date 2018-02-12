@@ -352,7 +352,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         chosen_bucket_name = None
 
         for tmp_bucket_name in self.fs.get_all_bucket_names(prefix='mrjob-'):
-            tmp_bucket = self.fs.get_bucket(tmp_bucket)
+            tmp_bucket = self.fs.get_bucket(tmp_bucket_name)
 
             # NOTE - GCP ambiguous Behavior - Bucket location is being
             # returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs
@@ -368,7 +368,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # Example default - "mrjob-us-central1-RANDOMHEX"
         if not chosen_bucket_name:
             chosen_bucket_name = '-'.join(
-                ['mrjob', gce_lower_location, random_identifier()])
+                ['mrjob', self._gce_region.lower(), random_identifier()])
 
         return 'gs://%s/tmp/' % chosen_bucket_name
 

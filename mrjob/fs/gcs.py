@@ -13,10 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import base64
-import binascii
 import fnmatch
 import logging
+from base64 import b64decode
+from binascii import hexlify
 from tempfile import TemporaryFile
 
 from mrjob.cat import decompress
@@ -24,19 +24,6 @@ from mrjob.fs.base import Filesystem
 from mrjob.parse import urlparse
 from mrjob.py2 import PY2
 from mrjob.runner import GLOB_RE
-
-try:
-    from oauth2client.client import GoogleCredentials
-    from googleapiclient import discovery
-    from googleapiclient import errors as google_errors
-    from googleapiclient import http as google_http
-except ImportError:
-    # don't require googleapiclient; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    GoogleCredentials = None
-    discovery = None
-    google_errors = None
-    google_http = None
 
 # TODO: loading credentials
 try:
@@ -48,29 +35,6 @@ except ImportError:
 
 
 log = logging.getLogger(__name__)
-
-_GCS_API_ENDPOINT = 'storage'
-_GCS_API_VERSION = 'v1'
-
-_BINARY_MIMETYPE = 'application/octet-stream'
-_LS_FIELDS_TO_RETURN = 'nextPageToken,items(name,size,timeCreated,md5Hash)'
-
-if PY2:
-    base64_decode = base64.decodestring
-    base64_encode = base64.encodestring
-else:
-    base64_decode = base64.decodebytes
-    base64_encode = base64.encodebytes
-
-
-def _base64_to_hex(base64_encoded):
-    base64_decoded = base64_decode(base64_encoded)
-    return binascii.hexlify(base64_decoded)
-
-
-def _hex_to_base64(hex_encoded):
-    hex_decoded = binascii.unhexlify(hex_encoded)
-    return base64_encode(hex_decoded)
 
 
 def _path_glob_to_parsed_gcs_uri(path_glob):
@@ -96,7 +60,6 @@ class GCSFilesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
     def __init__(self, local_tmp_dir=None):
-        self._api_client = None  # TODO: remove this when done porting
         self._client = None
         self._local_tmp_dir = local_tmp_dir
 
@@ -110,12 +73,8 @@ class GCSFilesystem(Filesystem):
 
     @property
     def api_client(self):
-        if not self._api_client:
-            credentials = GoogleCredentials.get_application_default()
-            self._api_client = discovery.build(
-                _GCS_API_ENDPOINT, _GCS_API_VERSION, credentials=credentials)
-
-        return self._api_client
+        raise NotImplementedError(
+            '"api_client" was disabled in v0.6.2. use "client" instead')
 
     def can_handle_path(self, path):
         return is_gcs_uri(path)
@@ -174,7 +133,7 @@ class GCSFilesystem(Filesystem):
         blob = self._get_blob(path)
         if not blob:
             raise IOError('Object %r does not exist' % (path,))
-        return _base64_to_hex(blob.md5_hash)
+        return hexlify(b64decode(blob.md5_hash))
 
     def _cat_file(self, gcs_uri):
         blob = self._blob(gcs_uri)
@@ -232,20 +191,22 @@ class GCSFilesystem(Filesystem):
 
         self._blob(dest_uri).upload_from_filename(src_path)
 
-    # TODO: this returns a JSON; need to make a backwards-compatible version
-    #
-    # should implement get_all_bucket_names()
+    def get_all_bucket_names(self, prefix=None):
+        """Yield the names of all buckets associated with this client.
+
+        :param prefix: optional prefix to search under (e.g. ``'mrjob-'``)
+
+        .. versionadded:: 0.6.2
+        """
+        for b in self.client.list_buckets(prefix=prefix):
+            yield b.name
+
+    # NOTE: disabled this
     def list_buckets(self, project, prefix=None):
         """List buckets on GCS."""
-        list_kwargs = dict(project=project)
-        if prefix:
-            list_kwargs['prefix'] = prefix
-
-        req = self.api_client.buckets().list(**list_kwargs)
-        resp = req.execute()
-
-        buckets_to_return = resp.get('items') or []
-        return buckets_to_return
+        raise NotImplementedError(
+            'list_buckets() was disabled in v0.6.2. Use'
+            'get_all_bucket_names() and get_bucket()')
 
     # NOTE: returns a google-cloud-sdk bucket
     def get_bucket(self, bucket_name):
@@ -260,8 +221,7 @@ class GCSFilesystem(Filesystem):
         and time-to-live."""
         bucket = self.client.bucket(name)
 
-        # TODO: google-cloud-sdk currently doesn't provide access to
-        # the "location" field; patch it manually
+        # as of google-cloud 0.32.0, there isn't a direct way to set location
         if location:
             bucket._changes.add('location')
             bucket._properties['location'] = location
@@ -275,11 +235,11 @@ class GCSFilesystem(Filesystem):
             )
         ]
 
-    # TODO: implement with google-cloud-sdk, deprecate
-    # Why is this even here?
+    # NOTE: disabled this
     def delete_bucket(self, bucket):
-        req = self.api_client.buckets().delete(bucket=bucket)
-        return req.execute()
+        raise NotImplementedError(
+            'delete_bucket() was disabled in v0.6.2. Use'
+            'fs.bucket(name).delete()')
 
     def _get_blob(self, uri):
         bucket_name, blob_name = parse_gcs_uri(uri)

@@ -1,4 +1,4 @@
-# Copyright 2018 Google
+# Copyright 2018 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Limited mock of google.cloud.storage."""
-from google.cloud.storage.exceptions import NotFound
+from google.api_core.exceptions import NotFound
 
 
 class MockGoogleStorageClient(object):
     """Mock out google.cloud.storage.client.Client
 
     :param mock_s3_fs: Maps bucket name to a dictionary with the key
-                       *objects*. *objects* maps object name to
+                       *blobs*. *blobs* maps object name to
                        a dictionary with the key *data*, which is
                        a bytestring.
     """
@@ -56,12 +56,12 @@ class MockGoogleStorageBlob(object):
     def download_to_file(self, file_obj):
         fs = self.bucket.client.mock_gcs_fs
         if (self.bucket.name not in fs or
-                self.name not in fs[self.bucket.name]['objects']):
+                self.name not in fs[self.bucket.name]['blobs']):
             raise NotFound('GET https://www.googleapis.com/download/storage'
                            '/v1/b/%s/o/%s?alt=media: Not Found' %
                            self.bucket.name, self.name)
 
-        file_obj.write(fs[self.bucket.name]['objects'][self.name]['data'])
+        file_obj.write(fs[self.bucket.name]['blobs'][self.name]['data'])
 
     def upload_from_filename(self, filename):
         with open(filename, 'rb') as f:
@@ -76,6 +76,6 @@ class MockGoogleStorageBlob(object):
                            '/v1/b/%s/o?uploadType=multipart: Not Found' %
                            self.bucket.name)
 
-        fs_objs = fs[self.bucket.name]['objects']
+        fs_objs = fs[self.bucket.name]['blobs']
         fs_obj = fs_objs.setdefault(self.name, dict(data=b''))
         fs_obj['data'] = data

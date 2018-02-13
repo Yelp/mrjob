@@ -1,5 +1,6 @@
 # Copyright 2016 Google Inc.
 # Copyright 2017 Yelp
+# Copyright 2018 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,27 +21,14 @@ from unittest import skipIf
 from tests.py2 import patch
 from tests.py2 import mock
 
-try:
-    from oauth2client.client import GoogleCredentials
-    from googleapiclient import discovery
-    from googleapiclient import errors as google_errors
-    from googleapiclient import http as google_http
-except ImportError:
-    # don't require googleapiclient; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    GoogleCredentials = None
-    discovery = None
-    google_errors = None
-    google_http = None
-
 from mrjob.fs.gcs import GCSFilesystem
 
 from tests.compress import gzip_compress
-from tests.mockgoogleapiclient import MockGoogleAPITestCase
+from tests.mock_google import MockGoogleTestCase
 from tests.sandbox import PatcherTestCase
 
 
-class CatTestCase(MockGoogleAPITestCase):
+class CatTestCase(MockGoogleTestCase):
 
     def setUp(self):
         super(CatTestCase, self).setUp()
@@ -83,7 +71,7 @@ class CatTestCase(MockGoogleAPITestCase):
             1)
 
 
-class GCSFSTestCase(MockGoogleAPITestCase):
+class GCSFSTestCase(MockGoogleTestCase):
 
     def setUp(self):
         super(GCSFSTestCase, self).setUp()
@@ -96,6 +84,9 @@ class GCSFSTestCase(MockGoogleAPITestCase):
 
         self.assertEqual(list(self.fs.ls('gs://walrus/data/foo')),
                          ['gs://walrus/data/foo'])
+
+    def test_ls_missing(self):
+        self.assertEqual(list(self.fs.ls('gs://nope/not/here')), [])
 
     def test_ls_recursively(self):
         self.put_gcs_multi({
@@ -182,63 +173,3 @@ class GCSFSTestCase(MockGoogleAPITestCase):
         self.fs.rm('gs://walrus/data')
         self.assertEqual(self.fs.exists('gs://walrus/data/foo'), False)
         self.assertEqual(self.fs.exists('gs://walrus/data/bar/baz'), False)
-
-
-def _http_exception(status_code):
-    mock_resp = mock.Mock()
-    mock_resp.status = status_code
-
-    return google_errors.HttpError(mock_resp, b'')
-
-
-@skipIf(
-    hasattr(sys, 'pypy_version_info') and (3, 0) <= sys.version_info < (3, 3),
-    "googleapiclient doesn't work with PyPy 3")
-class GCSFSHTTPErrorTestCase(PatcherTestCase):
-
-    def setUp(self):
-        self.fs = GCSFilesystem()
-        self.gcs_path = 'gs://walrus/data'
-
-        self.list_req_mock = mock.MagicMock()
-
-        objects_ret = mock.MagicMock()
-        objects_ret.list.return_value = self.list_req_mock
-        objects_ret.get_media.return_value = google_http.HttpRequest(
-            None, None, self.gcs_path)
-
-        api_client = mock.MagicMock()
-        api_client.objects.return_value = objects_ret
-
-        self.fs._api_client = api_client
-        self.next_chunk_patch = patch.object(
-            google_http.MediaIoBaseDownload, 'next_chunk')
-
-    def test_list_missing(self):
-        self.list_req_mock.execute.side_effect = _http_exception(404)
-
-        list(self.fs._ls_detailed(self.gcs_path))
-
-    def test_list_actual_error(self):
-        self.list_req_mock.execute.side_effect = _http_exception(500)
-
-        with self.assertRaises(google_http.HttpError):
-            list(self.fs._ls_detailed(self.gcs_path))
-
-    def test_download_io_empty_file(self):
-        io_obj = io.BytesIO()
-
-        with self.next_chunk_patch as media_io_next_chunk:
-            media_io_next_chunk.side_effect = _http_exception(416)
-
-            self.fs._download_io(self.gcs_path, io_obj)
-            self.assertEqual(len(io_obj.getvalue()), 0)
-
-    def test_download_io_actual_error(self):
-        io_obj = io.BytesIO()
-
-        with self.next_chunk_patch as media_io_next_chunk:
-            media_io_next_chunk.side_effect = _http_exception(500)
-
-            with self.assertRaises(google_http.HttpError):
-                self.fs._download_io(self.gcs_path, io_obj)

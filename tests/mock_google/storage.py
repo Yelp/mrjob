@@ -65,6 +65,17 @@ class MockGoogleStorageBlob(object):
         self.bucket = bucket
         self.chunk_size = chunk_size
 
+    def delete(self):
+        fs = self.bucket.client.mock_gcs_fs
+
+        if (self.bucket.name not in fs or
+                self.name not in fs[self.bucket.name]['blobs']):
+            raise NotFound('DELETE https://www.googleapis.com/storage/v1/b'
+                           '/%s/o/%s: Not Found' %
+                           (self.bucket.name, self.name))
+
+        del fs[self.bucket.name]['blobs'][self.name]
+
     def download_to_file(self, file_obj):
         fs = self.bucket.client.mock_gcs_fs
 
@@ -73,7 +84,7 @@ class MockGoogleStorageBlob(object):
         except KeyError:
             raise NotFound('GET https://www.googleapis.com/download/storage'
                            '/v1/b/%s/o/%s?alt=media: Not Found' %
-                           self.bucket.name, self.name)
+                           (self.bucket.name, self.name))
 
         file_obj.write(data)
 

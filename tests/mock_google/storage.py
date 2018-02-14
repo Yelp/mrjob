@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Limited mock of google.cloud.storage."""
+from copy import deepcopy
+
+from google.api_core.exceptions import Conflict
 from google.api_core.exceptions import NotFound
 
 
@@ -26,13 +29,16 @@ class MockGoogleStorageClient(object):
     def __init__(self, mock_gcs_fs=None):
         self.mock_gcs_fs = mock_gcs_fs or {}
 
+    def bucket(self, bucket_name):
+        return MockGoogleStorageBucket(self, bucket_name)
+
     def get_bucket(self, bucket_name):
         if bucket_name not in self.mock_gcs_fs:
             raise NotFound(
                 'GET https://www.googleapis.com/storage/v1/b/%s'
                 '?projection=noAcl: Not Found' % bucket_name)
 
-        return MockGoogleStorageBucket(self, bucket_name)
+        return self.bucket(bucket_name)
 
     def list_buckets(self, prefix=None):
         for bucket_name in sorted(self.mock_gcs_fs):
@@ -47,6 +53,46 @@ class MockGoogleStorageBucket(object):
     def __init__(self, client, name):
         self.client = client
         self.name = name
+
+        # for setting location manually
+        self._changes = set()
+        self._properties = {}
+
+    def create(self):
+        if self.exists():
+            raise Conflict(
+                'POST https://www.googleapis.com/storage/v1'
+                '/b?project=%s: Sorry, that name is not available.'
+                ' Please try a different one.')
+
+        if 'location' in self._changes and 'location' in self._properties:
+            location = self._properties['location'].upper()
+        else:
+            location = 'US'
+
+        self.client.mock_gcs_fs[self.name] = dict(
+            blobs={}, lifecycle_rules=[], location=location)
+
+    def exists(self):
+        return self.name in self.client.mock_gcs_fs
+
+    @property
+    def lifecycle_rules(self):
+        fs = self.client.mock_gcs_fs
+
+        if self.name in fs:
+            return deepcopy(fs[self.name]['lifecycle_rules'])
+        else:
+            # google-cloud-sdk silently ignores missing buckets
+            return []
+
+    @lifecycle_rules.setter
+    def lifecycle_rules(self, rules):
+        fs = self.client.mock_gcs_fs
+
+        if self.name in fs:
+            fs[self.name]['lifecycle_rules'] = deepcopy(rules)
+        # google-cloud-sdk silently ignores buckets that don't exist
 
     def list_blobs(self, prefix=None):
         fs = self.client.mock_gcs_fs

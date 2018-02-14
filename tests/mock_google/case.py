@@ -40,10 +40,14 @@ class MockGoogleTestCase(SandboxedTestCase):
         return MockGoogleStorageClient(mock_gcs_fs=self.mock_gcs_fs)
 
     def put_gcs_multi(self, gcs_uri_to_data_map):
+        client = self.storage_client()
+
         for uri, data in gcs_uri_to_data_map.items():
-            bucket_name, path = parse_gcs_uri(uri)
+            bucket_name, blob_name = parse_gcs_uri(uri)
 
-            mock_bucket = self.mock_gcs_fs.setdefault(
-                bucket_name, dict(blobs={}))
+            bucket = client.bucket(bucket_name)
+            if not bucket.exists():
+                bucket.create()
 
-            mock_bucket['blobs'][path] = dict(data=data)
+            blob = bucket.blob(blob_name)
+            blob.upload_from_string(data)

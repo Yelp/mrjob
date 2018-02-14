@@ -34,6 +34,13 @@ class MockGoogleStorageClient(object):
 
         return MockGoogleStorageBucket(self, bucket_name)
 
+    def list_buckets(self, prefix=None):
+        for bucket_name in sorted(self.mock_gcs_fs):
+            if prefix and not bucket_name.startswith(prefix):
+                continue
+
+            yield self.get_bucket(bucket_name)
+
 
 class MockGoogleStorageBucket(object):
     """Mock out google.cloud.storage.client.Bucket"""

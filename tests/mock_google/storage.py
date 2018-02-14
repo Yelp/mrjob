@@ -58,6 +58,10 @@ class MockGoogleStorageBucket(object):
         self._changes = set()
         self._properties = {}
 
+    def blob(self, blob_name, chunk_size=None):
+        # always returns something whether it exists or not
+        return MockGoogleStorageBlob(blob_name, self, chunk_size=chunk_size)
+
     def create(self):
         if self.exists():
             raise Conflict(
@@ -75,6 +79,12 @@ class MockGoogleStorageBucket(object):
 
     def exists(self):
         return self.name in self.client.mock_gcs_fs
+
+    def get_blob(self, blob_name):
+        fs = self.client.mock_gcs_fs
+
+        if self.name in fs and blob_name in fs[self.name]['blobs']:
+            return self.blob(blob_name)
 
     @property
     def lifecycle_rules(self):
@@ -96,6 +106,7 @@ class MockGoogleStorageBucket(object):
 
     def list_blobs(self, prefix=None):
         fs = self.client.mock_gcs_fs
+
         if self.name not in fs:
             raise NotFound('GET https://www.googleapis.com/storage/v1/b'
                            '/%s/o?projection=noAcl: Not Found' % self.name)
@@ -106,9 +117,15 @@ class MockGoogleStorageBucket(object):
 
             yield self.blob(blob_name)
 
-    def blob(self, blob_name, chunk_size=None):
-        # always returns something whether it exists or not
-        return MockGoogleStorageBlob(blob_name, self, chunk_size=chunk_size)
+    @property
+    def location(self):
+        fs = self.client.mock_gcs_fs
+
+        if self.name in fs:
+            return fs[self.name]['location']
+        else:
+            # google-cloud-sdk silently ignores missing buckets
+            return []
 
 
 class MockGoogleStorageBlob(object):

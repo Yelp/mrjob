@@ -25,6 +25,8 @@ from .storage import MockGoogleStorageClient
 class MockGoogleTestCase(SandboxedTestCase):
 
     def setUp(self):
+        super(MockGoogleTestCase, self).setUp()
+
         # Maps bucket name to a dictionary with the key
         # *blobs*. *blobs* maps object name to
         # a dictionary with the key *data*, which is

@@ -156,6 +156,8 @@ def _dict_deep_update(d, u):
 class MockGoogleAPITestCase(MockGoogleTestCase):
 
     def setUp(self):
+        super(MockGoogleAPITestCase, self).setUp()
+
         self._dataproc_client = MockDataprocClient(self)
 
         self.start(patch.object(
@@ -163,8 +165,6 @@ class MockGoogleAPITestCase(MockGoogleTestCase):
 
         self.start(patch('mrjob.dataproc._read_gcloud_config',
                          lambda: _GCLOUD_CONFIG))
-
-        super(MockGoogleAPITestCase, self).setUp()
 
         # patch slow things
         self.mrjob_zip_path = None

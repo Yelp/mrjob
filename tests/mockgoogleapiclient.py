@@ -12,12 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import re
 import collections
 import copy
-import time
-import hashlib
 import sys
+import time
 from datetime import datetime
 from httplib2 import Response
 from io import BytesIO
@@ -38,15 +36,11 @@ except ImportError:
 
 from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _DATAPROC_API_REGION
-from mrjob.fs.gcs import GCSFilesystem
-from mrjob.fs.gcs import parse_gcs_uri
-from mrjob.fs.gcs import _hex_to_base64
-from mrjob.fs.gcs import _LS_FIELDS_TO_RETURN
 
+from tests.mock_google import MockGoogleTestCase
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import patch
 from tests.py2 import mock
-from tests.sandbox import SandboxedTestCase
 
 # list_clusters() only returns this many results at a time
 DEFAULT_MAX_CLUSTERS_RETURNED = 50
@@ -159,25 +153,13 @@ def _dict_deep_update(d, u):
 @skipIf(
     hasattr(sys, 'pypy_version_info') and (3, 0) <= sys.version_info < (3, 3),
     "googleapiclient doesn't work with PyPy 3")
-class MockGoogleAPITestCase(SandboxedTestCase):
+class MockGoogleAPITestCase(MockGoogleTestCase):
 
     def setUp(self):
         self._dataproc_client = MockDataprocClient(self)
-        self._gcs_client = MockGCSClient(self)
-        self._gcs_fs = self._gcs_client._fs
 
         self.start(patch.object(
             DataprocJobRunner, 'api_client', self._dataproc_client))
-
-        self.gcs_patch_api_client = patch.object(
-            GCSFilesystem, 'api_client', self._gcs_client)
-        self.gcs_patch_download_io = patch.object(
-            GCSFilesystem, '_download_io', self._gcs_client.download_io)
-        self.gcs_patch_upload_io = patch.object(
-            GCSFilesystem, '_upload_io', self._gcs_client.upload_io)
-        self.start(self.gcs_patch_api_client)
-        self.start(self.gcs_patch_download_io)
-        self.start(self.gcs_patch_upload_io)
 
         self.start(patch('mrjob.dataproc._read_gcloud_config',
                          lambda: _GCLOUD_CONFIG))
@@ -213,10 +195,6 @@ class MockGoogleAPITestCase(SandboxedTestCase):
 
         return mr_job.make_runner()
 
-    def put_gcs_multi(self, gcs_uri_to_data_map):
-        """Convenience method"""
-        self._gcs_client.put_gcs_multi(gcs_uri_to_data_map)
-
     def put_job_output_parts(self, dataproc_runner, raw_parts):
         assert type(raw_parts) is list
 
@@ -240,229 +218,6 @@ class MockGoogleAPITestCase(SandboxedTestCase):
 ########################### GCS Client - OVERALL ##############################
 ############################# BEGIN BEGIN BEGIN ###############################
 
-
-class MockGCSClient(object):
-    """Mock out GCSClient...
-
-    TARGET API VERSION - Storage API v1
-
-    Emulates GCS metadata and stores raw bytes
-    Contains convenience functions for initializing items in GCS
-    """
-
-    def __init__(self, test_case):
-        assert isinstance(test_case, MockGoogleAPITestCase)
-        self._test_case = test_case
-        self._fs = GCSFilesystem()
-
-        self._cache_objects = dict()
-        self._cache_buckets = dict()
-
-        self._client_objects = MockGCSClientObjects(self)
-        self._client_buckets = MockGCSClientBuckets(self)
-
-    def objects(self):
-        return self._client_objects
-
-    def buckets(self):
-        return self._client_buckets
-
-    def put_gcs(self, gcs_uri, data):
-        """Put data at gcs_uri, creating a bucket if necessary"""
-        bucket, name = parse_gcs_uri(gcs_uri)
-
-        try:
-            self._fs.get_bucket(bucket)
-        except google_errors.HttpError:
-            self._fs.create_bucket(project=_TEST_PROJECT, name=bucket)
-
-        bytes_io_obj = BytesIO(data)
-        self.upload_io(bytes_io_obj, gcs_uri)
-
-    def put_gcs_multi(self, gcs_uri_to_data_map):
-        """Bulk put data at gcs_uris"""
-        for gcs_uri, data in gcs_uri_to_data_map.items():
-            self.put_gcs(gcs_uri, data)
-
-    def download_io(self, src_uri, io_obj):
-        """
-        Clobber GCSFilesystem._download_io
-        """
-        bucket, name = parse_gcs_uri(src_uri)
-
-        object_dict = _get_deep(self._cache_objects, [bucket, name])
-
-        if not object_dict:
-            raise Exception
-
-        object_data = object_dict['_data']
-        io_obj.write(object_data)
-        return io_obj
-
-    def upload_io(self, io_obj, dest_uri):
-        """
-        Clobber GCSFilesystem._upload_io
-        """
-        bucket, name = parse_gcs_uri(dest_uri)
-
-        assert bucket in self._cache_buckets
-
-        io_obj.seek(0)
-
-        data = io_obj.read()
-
-        # TODO - io_obj.close() ?  Not sure if callers of this function would
-        # expect their io_objs to be closed
-
-        object_resp = _insert_object_resp(bucket=bucket, name=name, data=data)
-
-        _set_deep(self._cache_objects, [bucket, name], object_resp)
-
-        return object_resp
-
-
-class MockGCSClientObjects(object):
-    def __init__(self, client):
-        assert isinstance(client, MockGCSClient)
-        self._client = client
-        self._objects = self._client._cache_objects
-
-    @mock_api
-    def list(self, **kwargs):
-        """Emulate objects().list - fields supported - bucket, prefix, fields
-        """
-        bucket = kwargs.get('bucket')
-        prefix = kwargs.get('prefix') or ''
-        fields = kwargs.get('fields') or _LS_FIELDS_TO_RETURN
-        assert bucket is not None
-
-        # Return only the fields that were requested
-        field_match = re.findall('items\((.*?)\)', fields)[0]
-        actual_fields = set(field_match.split(','))
-
-        object_map = _get_deep(self._objects, [bucket], dict())
-
-        item_list = []
-        for object_name, current_object in object_map.items():
-            # Filter out on prefix match
-            if not object_name.startswith(prefix):
-                continue
-
-            # Copy output fields for the requestor
-            output_item = dict()
-            for current_field in actual_fields:
-                output_item[current_field] = current_object[current_field]
-
-            item_list.append(output_item)
-
-        return dict(items=item_list, kwargs=kwargs)
-
-    def list_next(self, list_request, resp):
-        """list always returns all results in a single shot"""
-        return None
-
-    @mock_api
-    def delete(self, bucket=None, object=None):
-        bucket_dict = self._objects[bucket]
-        del bucket_dict[object]
-
-    @mock_api
-    def get_media(self, bucket=None, object=None):
-        raise NotImplementedError('See MockGCSClient.download_io')
-
-    @mock_api
-    def insert(self, bucket=None, name=None, media_body=None):
-        raise NotImplementedError('See MockGCSClient.upload_io')
-
-
-class MockGCSClientBuckets(object):
-    def __init__(self, client):
-        assert isinstance(client, MockGCSClient)
-        self._client = client
-        self._buckets = self._client._cache_buckets
-
-    @mock_api
-    def list(self, **kwargs):
-        """Emulate buckets().list - fields supported - project, prefix"""
-        project = kwargs.get('project')
-        prefix = kwargs.get('prefix') or ''
-
-        item_list = []
-        for bucket_name, current_bucket in self._buckets.items():
-            if not bucket_name.startswith(prefix):
-                continue
-
-            if project and project != current_bucket['_projectName']:
-                continue
-
-            item_list.append(current_bucket)
-
-        return dict(items=item_list, kwargs=kwargs)
-
-    @mock_api
-    def get(self, bucket=None):
-        try:
-            return self._buckets[bucket]
-        except KeyError:
-            raise mock_google_error(404)
-
-    @mock_api
-    def delete(self, bucket=None):
-        del self._buckets[bucket]
-
-    @mock_api
-    def insert(self, project=None, body=None):
-        assert project is not None
-        body = body or dict()
-
-        bucket_name = body['name']
-        assert bucket_name not in self._buckets
-
-        # Create an empty cluster
-        bucket = _make_bucket_resp(project=project)
-
-        # Then do a deep-update as to what was requested
-        bucket = _dict_deep_update(bucket, body)
-
-        self._buckets[bucket_name] = bucket
-
-        return bucket
-
-
-def _insert_object_resp(bucket=None, name=None, data=None):
-    """Fake GCS object metadata"""
-    assert type(data) is bytes
-
-    hasher = hashlib.md5()
-    hasher.update(data)
-    md5_hex_hash = hasher.hexdigest()
-
-    return {
-        u'bucket': bucket,
-        u'name': name,
-        u'md5Hash': _hex_to_base64(md5_hex_hash),
-        u'timeCreated': _datetime_to_gcptime(),
-        u'size': str(len(data)),
-        u'_data': data
-    }
-
-
-def _make_bucket_resp(project=None, now=None):
-    """Fake GCS bucket metadata"""
-    now_time = _datetime_to_gcptime(now)
-
-    return {
-        u'etag': u'CAE=',
-        u'kind': u'storage#bucket',
-        u'location': u'US',
-        u'metageneration': u'1',
-        u'owner': {u'entity': u'project-owners-1234567890'},
-        u'projectNumber': u'1234567890',
-        u'storageClass': u'STANDARD',
-        u'timeCreated': now_time,
-        u'updated': now_time,
-        u'_projectName': project
-    }
 
 #############################  END   END   END  ###############################
 ########################### GCS Client - OVERALL ##############################

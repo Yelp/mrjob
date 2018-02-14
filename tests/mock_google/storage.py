@@ -76,17 +76,26 @@ class MockGoogleStorageBlob(object):
 
         del fs[self.bucket.name]['blobs'][self.name]
 
-    def download_to_file(self, file_obj):
+    def download_as_string(self):
         fs = self.bucket.client.mock_gcs_fs
 
         try:
-            data = fs[self.bucket.name]['blobs'][self.name]['data']
+            return fs[self.bucket.name]['blobs'][self.name]['data']
         except KeyError:
             raise NotFound('GET https://www.googleapis.com/download/storage'
                            '/v1/b/%s/o/%s?alt=media: Not Found' %
                            (self.bucket.name, self.name))
 
+    def download_to_file(self, file_obj):
+        data = self.download_as_string()
         file_obj.write(data)
+
+    @property
+    def size(self):
+        try:
+            return len(self.download_as_string())
+        except NotFound:
+            return None
 
     def upload_from_filename(self, filename):
         with open(filename, 'rb') as f:

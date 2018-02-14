@@ -41,6 +41,18 @@ class MockGoogleStorageBucket(object):
         self.client = client
         self.name = name
 
+    def list_blobs(self, prefix=None):
+        fs = self.client.mock_gcs_fs
+        if self.name not in fs:
+            raise NotFound('GET https://www.googleapis.com/storage/v1/b'
+                           '/%s/o?projection=noAcl: Not Found' % self.name)
+
+        for blob_name in sorted(fs[self.name]['blobs']):
+            if prefix and not blob_name.startswith(prefix):
+                continue
+
+            yield self.blob(blob_name)
+
     def blob(self, blob_name, chunk_size=None):
         # always returns something whether it exists or not
         return MockGoogleStorageBlob(blob_name, self, chunk_size=chunk_size)
@@ -55,13 +67,15 @@ class MockGoogleStorageBlob(object):
 
     def download_to_file(self, file_obj):
         fs = self.bucket.client.mock_gcs_fs
-        if (self.bucket.name not in fs or
-                self.name not in fs[self.bucket.name]['blobs']):
+
+        try:
+            data = fs[self.bucket.name]['blobs'][self.name]['data']
+        except KeyError:
             raise NotFound('GET https://www.googleapis.com/download/storage'
                            '/v1/b/%s/o/%s?alt=media: Not Found' %
                            self.bucket.name, self.name)
 
-        file_obj.write(fs[self.bucket.name]['blobs'][self.name]['data'])
+        file_obj.write(data)
 
     def upload_from_filename(self, filename):
         with open(filename, 'rb') as f:
@@ -71,6 +85,7 @@ class MockGoogleStorageBlob(object):
 
     def upload_from_string(self, data):
         fs = self.bucket.client.mock_gcs_fs
+
         if self.bucket.name not in fs:
             raise NotFound('POST https://www.googleapis.com/upload/storage'
                            '/v1/b/%s/o?uploadType=multipart: Not Found' %

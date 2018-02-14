@@ -77,7 +77,7 @@ class GCSFSTestCase(MockGoogleTestCase):
         super(GCSFSTestCase, self).setUp()
         self.fs = GCSFilesystem()
 
-    def test_ls_key(self):
+    def test_ls_blob(self):
         self.put_gcs_multi({
             'gs://walrus/data/foo': b''
         })
@@ -87,6 +87,17 @@ class GCSFSTestCase(MockGoogleTestCase):
 
     def test_ls_missing(self):
         self.assertEqual(list(self.fs.ls('gs://nope/not/here')), [])
+
+    def test_ls_ignores_dirs(self):
+        # Dataproc (i.e. Hadoop) will create empty blobs whose names end
+        # in '/'
+        self.put_gcs_multi({
+            'gs://walrus/data/foo/': b'',
+            'gs://walrus/data/foo/bar': b'baz',
+        })
+
+        self.assertEqual(list(self.fs.ls('gs://walrus/data')),
+                         ['gs://walrus/data/foo/bar'])
 
     def test_ls_recursively(self):
         self.put_gcs_multi({

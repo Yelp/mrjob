@@ -34,7 +34,6 @@ class MockGoogleTestCase(SandboxedTestCase):
         self.start(patch('mrjob.fs.gcs.StorageClient',
                          self.client))
 
-
     def client(self):
         return MockGoogleStorageClient(mock_gcs_fs=self.mock_gcs_fs)
 

@@ -37,14 +37,14 @@ class MockS3Client(object):
                         (a region name).
     """
     def __init__(self,
+                 mock_s3_fs,
                  aws_access_key_id=None,
                  aws_secret_access_key=None,
                  aws_session_token=None,
                  endpoint_url=None,
-                 region_name=None,
-                 mock_s3_fs=None):
+                 region_name=None):
 
-        self.mock_s3_fs = mock_s3_fs or {}
+        self.mock_s3_fs = mock_s3_fs
 
         region_name = region_name or _DEFAULT_AWS_REGION
         if not endpoint_url:
@@ -132,12 +132,12 @@ class MockS3Resource(object):
 
         self.meta = MockClientMeta(
             client=MockS3Client(
+                mock_s3_fs,
                 aws_access_key_id=aws_access_key_id,
                 aws_secret_access_key=aws_secret_access_key,
                 aws_session_token=aws_session_token,
                 endpoint_url=endpoint_url,
                 region_name=region_name,
-                mock_s3_fs=mock_s3_fs
             )
         )
 

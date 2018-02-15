@@ -28,10 +28,7 @@ class MockGoogleStorageClient(object):
                        a dictionary with the key *data*, which is
                        a bytestring.
     """
-    def __init__(self, mock_gcs_fs=None):
-        if mock_gcs_fs is None:
-            mock_gcs_fs = {}
-
+    def __init__(self, mock_gcs_fs):
         self.mock_gcs_fs = mock_gcs_fs
 
     def bucket(self, bucket_name):

@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Limited mock of google.cloud.storage."""
+import md5
+from base64 import b64encode
 from copy import deepcopy
 
 from google.api_core.exceptions import Conflict
@@ -87,7 +89,9 @@ class MockGoogleStorageBucket(object):
         fs = self.client.mock_gcs_fs
 
         if self.name in fs and blob_name in fs[self.name]['blobs']:
-            return self.blob(blob_name)
+            blob = self.blob(blob_name)
+            blob._set_md5_hash()
+            return blob
 
     @property
     def lifecycle_rules(self):
@@ -138,6 +142,9 @@ class MockGoogleStorageBlob(object):
         self.bucket = bucket
         self.chunk_size = chunk_size
 
+        # this is only set when we call self.get_blob() or upload new data
+        self.md5_hash = None
+
     def delete(self):
         fs = self.bucket.client.mock_gcs_fs
 
@@ -163,6 +170,14 @@ class MockGoogleStorageBlob(object):
         data = self.download_as_string()
         file_obj.write(data)
 
+    def _set_md5_hash(self):
+        # call this when we upload data, or when we _get_blob
+        try:
+            self.md5_hash = b64encode(
+                md5.new(self.download_as_string()).digest())
+        except NotFound:
+            pass
+
     @property
     def size(self):
         try:
@@ -187,3 +202,5 @@ class MockGoogleStorageBlob(object):
         fs_objs = fs[self.bucket.name]['blobs']
         fs_obj = fs_objs.setdefault(self.name, dict(data=b''))
         fs_obj['data'] = data
+
+        self._set_md5_hash()

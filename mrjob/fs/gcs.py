@@ -13,10 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import binascii
 import fnmatch
 import logging
 from base64 import b64decode
-from binascii import hexlify
 from tempfile import TemporaryFile
 
 from mrjob.cat import decompress
@@ -135,7 +135,7 @@ class GCSFilesystem(Filesystem):
         blob = self._get_blob(path)
         if not blob:
             raise IOError('Object %r does not exist' % (path,))
-        return hexlify(b64decode(blob.md5_hash))
+        return binascii.hexlify(b64decode(blob.md5_hash))
 
     def _cat_file(self, gcs_uri):
         blob = self._get_blob(gcs_uri)

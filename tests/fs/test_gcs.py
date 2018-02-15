@@ -13,8 +13,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import binascii
 import bz2
 import io
+import md5
 import sys
 from unittest import skipIf
 
@@ -26,9 +28,6 @@ from mrjob.fs.gcs import GCSFilesystem
 from tests.compress import gzip_compress
 from tests.mock_google import MockGoogleTestCase
 from tests.sandbox import PatcherTestCase
-
-
-# TODO: test md5sum() (will require a mock)
 
 
 class CatTestCase(MockGoogleTestCase):
@@ -166,6 +165,14 @@ class GCSFSTestCase(MockGoogleTestCase):
         })
         self.assertEqual(self.fs.exists('gs://walrus/data/foo'), True)
         self.assertEqual(self.fs.exists('gs://walrus/data/bar'), False)
+
+    def test_md5sum(self):
+        self.put_gcs_multi({
+            'gs://walrus/data/foo': b'abcd'
+        })
+
+        self.assertEqual(self.fs.md5sum('gs://walrus/data/foo'),
+                         binascii.hexlify(md5.new(b'abcd').digest()))
 
     def test_rm(self):
         self.put_gcs_multi({

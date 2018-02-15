@@ -174,6 +174,13 @@ class GCSFSTestCase(MockGoogleTestCase):
         self.assertEqual(self.fs.md5sum('gs://walrus/data/foo'),
                          binascii.hexlify(md5.new(b'abcd').digest()))
 
+    def test_md5sum_of_missing_blob(self):
+        self.put_gcs_multi({
+            'gs://walrus/data/foo': b'abcd'
+        })
+
+        self.assertRaises(IOError, self.fs.md5sum, 'gs://walrus/data/bar')
+
     def test_rm(self):
         self.put_gcs_multi({
             'gs://walrus/foo': b''

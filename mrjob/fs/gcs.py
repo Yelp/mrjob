@@ -85,12 +85,18 @@ class GCSFilesystem(Filesystem):
 
     def ls(self, path_glob):
         for uri, blob in self._ls(path_glob):
+            # don't return directory "blobs"
+            if uri.endswith('/'):
+                continue
+
             yield uri
 
     def _ls(self, path_glob):
         """Helper method for :py:meth:`ls`; yields tuples of
         ``(uri, blob)`` where *blob* is the corresponding
         :py:class:`google.cloud.storage.blob.Blob`.
+
+        This *will* return empty "directory" globs.
         """
         # support globs
         glob_match = GLOB_RE.match(path_glob)
@@ -118,10 +124,6 @@ class GCSFilesystem(Filesystem):
         for blob in bucket.list_blobs(prefix=base_name):
             uri = "gs://%s/%s" % (bucket_name, blob.name)
 
-            # don't return directory "blobs"
-            if uri.endswith('/'):
-                continue
-
             # enforce globbing
             if not (fnmatch.fnmatchcase(uri, path_glob) or
                     fnmatch.fnmatchcase(uri, dir_glob)):
@@ -136,7 +138,7 @@ class GCSFilesystem(Filesystem):
         return hexlify(b64decode(blob.md5_hash))
 
     def _cat_file(self, gcs_uri):
-        blob = self._blob(gcs_uri)
+        blob = self._get_blob(gcs_uri)
 
         if not blob:
             return  # don't cat nonexistent files
@@ -170,7 +172,6 @@ class GCSFilesystem(Filesystem):
             paths = []
         return any(paths)
 
-    # TODO: use google-cloud-sdk
     def rm(self, path_glob):
         """Remove all files matching the given glob."""
         for uri, blob in self._ls(path_glob):

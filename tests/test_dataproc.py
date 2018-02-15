@@ -220,9 +220,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             # this is set and unset before we can get at it unless we do this
             list(runner.cat_output())
 
-            self.assertEqual(
-                len(list(runner.fs.client.bucket(tmp_bucket).list_blobs())),
-                tmp_len)
+            fs = runner.fs
+
+        # with statement finishes, cleanup runs
+
+        self.assertEqual(
+            len(list(fs.client.bucket(tmp_bucket).list_blobs())),
+            tmp_len)
 
     def test_cleanup_all(self):
         self._test_cloud_tmp_cleanup('ALL', 0)
@@ -908,6 +912,7 @@ class MaxMinsIdleTestCase(MockGoogleAPITestCase):
 class TestCatFallback(MockGoogleAPITestCase):
 
     def test_gcs_cat(self):
+
         self.put_gcs_multi({
             'gs://walrus/one': b'one_text',
             'gs://walrus/two': b'two_text',

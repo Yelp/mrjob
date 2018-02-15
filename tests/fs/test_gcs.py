@@ -28,6 +28,9 @@ from tests.mock_google import MockGoogleTestCase
 from tests.sandbox import PatcherTestCase
 
 
+# TODO: test md5sum() (will require a mock)
+
+
 class CatTestCase(MockGoogleTestCase):
 
     def setUp(self):

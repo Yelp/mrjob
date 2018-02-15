@@ -137,6 +137,7 @@ class GCSFilesystem(Filesystem):
 
     def _cat_file(self, gcs_uri):
         blob = self._blob(gcs_uri)
+
         if not blob:
             return  # don't cat nonexistent files
 

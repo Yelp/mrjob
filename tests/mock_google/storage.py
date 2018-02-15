@@ -27,7 +27,10 @@ class MockGoogleStorageClient(object):
                        a bytestring.
     """
     def __init__(self, mock_gcs_fs=None):
-        self.mock_gcs_fs = mock_gcs_fs or {}
+        if mock_gcs_fs is None:
+            mock_gcs_fs = {}
+
+        self.mock_gcs_fs = mock_gcs_fs
 
     def bucket(self, bucket_name):
         return MockGoogleStorageBucket(self, bucket_name)

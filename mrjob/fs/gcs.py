@@ -164,8 +164,6 @@ class GCSFilesystem(Filesystem):
         If dest is a directory (ends with a "/"), we check if there are
         any files starting with that path.
         """
-        # TODO - mtai @ davidmarin - catch specific Exceptions, not sure what
-        # types of exceptions this can throw
         try:
             paths = self.ls(path_glob)
         except:
@@ -203,20 +201,17 @@ class GCSFilesystem(Filesystem):
         for b in self.client.list_buckets(prefix=prefix):
             yield b.name
 
-    # NOTE: disabled this
     def list_buckets(self, project, prefix=None):
         """List buckets on GCS."""
         raise NotImplementedError(
             'list_buckets() was disabled in v0.6.2. Use'
             'get_all_bucket_names() and get_bucket()')
 
-    # NOTE: returns a google-cloud-sdk bucket
     def get_bucket(self, bucket_name):
         """Return a :py:class:`google.cloud.storage.bucket.Bucket`
         Raises an exception if the bucket does not exist."""
         return self.client.get_bucket(bucket_name)
 
-    # NOTE: function signature has changed
     def create_bucket(self, name,
                       location=None, object_ttl_days=None):
         """Create a bucket on GCS, optionally setting location constraint.
@@ -237,7 +232,6 @@ class GCSFilesystem(Filesystem):
             )
         ]
 
-    # NOTE: disabled this
     def delete_bucket(self, bucket):
         raise NotImplementedError(
             'delete_bucket() was disabled in v0.6.2. Use'

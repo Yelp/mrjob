@@ -134,7 +134,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             # make sure our input and output formats are attached to
             # the correct steps
             jobs_list = runner.api_client.jobs().list(
-                projectId=runner._gcp_project,
+                projectId=runner._project_id,
                 region=_DATAPROC_API_REGION).execute()
             jobs = jobs_list['items']
 

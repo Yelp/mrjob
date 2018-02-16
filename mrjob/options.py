@@ -602,13 +602,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    gcp_project=dict(
-        switches=[
-            (['--gcp-project'], dict(
-                help='Project to run Dataproc jobs in'
-            )),
-        ],
-    ),
     hadoop_bin=dict(
         combiner=combine_cmds,
         switches=[
@@ -891,6 +884,15 @@ _RUNNER_OPTS = dict(
                       ' if a job finishes, run job on its cluster. Otherwise'
                       " create a new one. (0, the default, means don't wait)"),
                 type=int,
+            )),
+        ],
+    ),
+    project_id=dict(
+        deprecated_aliases=['gcp_project'],
+        switches=[
+            (['--project_id'], dict(
+                deprecated_aliases=['--gcp-project'],
+                help='Project to run Dataproc jobs in'
             )),
         ],
     ),

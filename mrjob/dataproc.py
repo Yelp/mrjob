@@ -34,8 +34,10 @@ except ImportError:
 
 
 try:
+    import google.auth
     from google.api_core.exceptions import NotFound
 except:
+    google = None
     NotFound = None
 
 try:
@@ -214,7 +216,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     alias = 'dataproc'
 
     OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
-        'gcp_project',
+        'project_id',
     }
 
     def __init__(self, **kwargs):
@@ -239,14 +241,21 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             raise DataprocException(
                 'Dataproc v1 expects core/task instance types to be identical')
 
+        # load credentials and project ID
+        self._credentials, auth_project_id = google.auth.default()
+
+        self._project_id = self._opts['project_id'] or auth_project_id
+
+        if not self._project_id:
+            raise Exception('project_id must be set. Use --project_id or'
+                            ' set $GOOGLE_CLOUD_PROJECT')
+
         # Lazy-load gcloud config as needed - invocations fail in PyCharm
         # debugging
         self._gcloud_config = None
 
-        # Google Cloud Platform - project
-        self._gcp_project = (
-            self._opts['gcp_project'] or self.gcloud_config()['core.project'])
-
+        # TODO: these can only be loaded by running gcloud config, but gcloud
+        # should be optional
         # Google Compute Engine - Region / Zone
         self._gce_region = (
             self._opts['region'] or self.gcloud_config()['compute.region'])
@@ -644,7 +653,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # Poll until cluster is ready
         while cluster_state not in _DATAPROC_CLUSTER_STATES_READY:
             result_describe = self.api_client.clusters().get(
-                projectId=self._gcp_project,
+                projectId=self._project_id,
                 region=_DATAPROC_API_REGION,
                 clusterName=cluster_id).execute()
 
@@ -806,7 +815,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         cluster_config = dict(
             gceClusterConfig=dict(
                 zoneUri=_gcp_zone_uri(
-                    project=self._gcp_project, zone=self._gce_zone),
+                    project=self._project_id, zone=self._gce_zone),
                 serviceAccountScopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
                 metadata=cluster_metadata
             ),
@@ -818,20 +827,20 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         # Task tracker
         master_conf = _gcp_instance_group_config(
-            project=self._gcp_project, zone=self._gce_zone,
+            project=self._project_id, zone=self._gce_zone,
             count=1, instance_type=self._opts['master_instance_type']
         )
 
         # Compute + storage
         worker_conf = _gcp_instance_group_config(
-            project=self._gcp_project, zone=self._gce_zone,
+            project=self._project_id, zone=self._gce_zone,
             count=self._opts['num_core_instances'],
             instance_type=self._opts['core_instance_type']
         )
 
         # Compute ONLY
         secondary_worker_conf = _gcp_instance_group_config(
-            project=self._gcp_project, zone=self._gce_zone,
+            project=self._project_id, zone=self._gce_zone,
             count=self._opts['num_task_instances'],
             instance_type=self._opts['task_instance_type'],
             is_preemptible=True
@@ -847,7 +856,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             cluster_config['softwareConfig'] = dict(
                 imageVersion=self._opts['image_version'])
 
-        kwargs = dict(projectId=self._gcp_project,
+        kwargs = dict(projectId=self._project_id,
                       clusterName=self._cluster_id,
                       config=cluster_config)
 
@@ -857,7 +866,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     def _api_cluster_get(self, cluster_id):
         return self.api_client.clusters().get(
-            projectId=self._gcp_project,
+            projectId=self._project_id,
             region=_DATAPROC_API_REGION,
             clusterName=cluster_id
         ).execute()
@@ -866,14 +875,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get  # noqa
         return self.api_client.clusters().create(
-            projectId=self._gcp_project,
+            projectId=self._project_id,
             region=_DATAPROC_API_REGION,
             body=cluster_data
         ).execute()
 
     def _api_cluster_delete(self, cluster_id):
         return self.api_client.clusters().delete(
-            projectId=self._gcp_project,
+            projectId=self._project_id,
             region=_DATAPROC_API_REGION,
             clusterName=cluster_id
         ).execute()
@@ -881,7 +890,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     def _api_job_list(self, cluster_name=None, state_matcher=None):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/list#JobStateMatcher  # noqa
         list_kwargs = dict(
-            projectId=self._gcp_project,
+            projectId=self._project_id,
             region=_DATAPROC_API_REGION,
         )
         if cluster_name:
@@ -906,21 +915,21 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     def _api_job_get(self, job_id):
         return self.api_client.jobs().get(
-            projectId=self._gcp_project,
+            projectId=self._project_id,
             region=_DATAPROC_API_REGION,
             jobId=job_id
         ).execute()
 
     def _api_job_cancel(self, job_id):
         return self.api_client.jobs().cancel(
-            projectId=self._gcp_project,
+            projectId=self._project_id,
             region=_DATAPROC_API_REGION,
             jobId=job_id
         ).execute()
 
     def _api_job_delete(self, job_id):
         return self.api_client.jobs().delete(
-            projectId=self._gcp_project,
+            projectId=self._project_id,
             region=_DATAPROC_API_REGION,
             jobId=job_id
         ).execute()
@@ -930,13 +939,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobReference  # noqa
         job_data = dict(
-            reference=dict(projectId=self._gcp_project, jobId=step_name),
+            reference=dict(projectId=self._project_id, jobId=step_name),
             placement=dict(clusterName=self._cluster_id),
             hadoopJob=hadoop_job
         )
 
         jobs_submit_kwargs = dict(
-            projectId=self._gcp_project,
+            projectId=self._project_id,
             region=_DATAPROC_API_REGION,
             body=dict(job=job_data)
         )

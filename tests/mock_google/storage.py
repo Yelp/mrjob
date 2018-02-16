@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Limited mock of google.cloud.storage."""
-import md5
 from base64 import b64encode
 from copy import deepcopy
+from hashlib import md5
 
 from google.api_core.exceptions import Conflict
 from google.api_core.exceptions import NotFound
@@ -171,7 +171,7 @@ class MockGoogleStorageBlob(object):
         # call this when we upload data, or when we _get_blob
         try:
             self.md5_hash = b64encode(
-                md5.new(self.download_as_string()).digest())
+                md5(self.download_as_string()).digest())
         except NotFound:
             pass
 

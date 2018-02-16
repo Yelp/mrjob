@@ -135,7 +135,7 @@ class GCSFilesystem(Filesystem):
         blob = self._get_blob(path)
         if not blob:
             raise IOError('Object %r does not exist' % (path,))
-        return binascii.hexlify(b64decode(blob.md5_hash))
+        return binascii.hexlify(b64decode(blob.md5_hash)).decode('ascii')
 
     def _cat_file(self, gcs_uri):
         blob = self._get_blob(gcs_uri)

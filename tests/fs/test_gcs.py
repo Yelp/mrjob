@@ -16,8 +16,8 @@
 import binascii
 import bz2
 import io
-import md5
 import sys
+from hashlib import md5
 from unittest import skipIf
 
 from tests.py2 import patch
@@ -172,7 +172,7 @@ class GCSFSTestCase(MockGoogleTestCase):
         })
 
         self.assertEqual(self.fs.md5sum('gs://walrus/data/foo'),
-                         binascii.hexlify(md5.new(b'abcd').digest()))
+                         md5(b'abcd').hexdigest())
 
     def test_md5sum_of_missing_blob(self):
         self.put_gcs_multi({

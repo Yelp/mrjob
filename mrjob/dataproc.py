@@ -326,6 +326,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         return self._gcloud_config
 
     @property
+    def cluster_client(self):
+        return ClusterControllerClient(credentials=self._credentials)
+
+    @property
+    def job_client(self):
+        return JobControllerClient(credentials=self._credentials)
+
+    @property
     def api_client(self):
         if not self._api_client:
             credentials = GoogleCredentials.get_application_default()
@@ -345,7 +353,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         if self._fs is not None:
             return self._fs
 
-        self._gcs_fs = GCSFilesystem()
+        self._gcs_fs = GCSFilesystem(
+            credentials = self._credentials,
+            local_tmp_dir=self._get_local_tmp_dir(),
+            project_id=self._project_id,
+        )
 
         self._fs = CompositeFilesystem(self._gcs_fs, LocalFilesystem())
         return self._fs

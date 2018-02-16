@@ -27,11 +27,11 @@ from mrjob.runner import GLOB_RE
 
 # TODO: loading credentials
 try:
+    import google.cloud.storage.client
     from google.api_core.exceptions import NotFound
-    from google.cloud.storage.client import Client as StorageClient
 except ImportError:
     NotFound = None
-    StorageClient = None
+    google = None
 
 
 log = logging.getLogger(__name__)
@@ -59,17 +59,15 @@ class GCSFilesystem(Filesystem):
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
-    def __init__(self, local_tmp_dir=None):
-        self._client = None
+    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None):
         self._local_tmp_dir = local_tmp_dir
+        self._credentials = credentials
+        self._project_id = project_id
 
     @property
     def client(self):
-        # TODO: push credentials from Dataproc Runner
-        if not self._client:
-            self._client = StorageClient()
-
-        return self._client
+        return google.cloud.storage.client.Client(
+            project=self._project_id, credentials=self._credentials)
 
     @property
     def api_client(self):

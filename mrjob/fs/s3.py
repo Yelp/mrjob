@@ -204,6 +204,8 @@ class S3Filesystem(Filesystem):
 
     def md5sum(self, path):
         k = self._get_s3_key(path)
+        if not k:
+            raise IOError('Key %r does not exist' % (path,))
         return k.e_tag.strip('"')
 
     def _cat_file(self, filename):

@@ -1,3 +1,14 @@
+v0.6.2, 2018-03-?? -- farewell google-api-python-client
+ * runners:
+   * dataproc:
+     * replaced google-api-python-client with google-cloud-sdk
+       * GCSFilesystem method changes:
+         * api_client attr has been replaced with client
+         * create_bucket() no longer takes a project ID
+         * delete_bucket() is disabled (use get_bucket(...).delete())
+         * get_bucket() returns a google.cloud.storage.bucket.Bucket
+         * list_buckets() is disabled (use get_all_bucket_names())
+
 v0.6.1, 2017-11-27 -- mrjob diagnose
  * fixed serious error log parsing issue (#1708)
  * added mrjob diagnose utility to find why previously run jobs failed (#1707)

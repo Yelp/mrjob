@@ -32,6 +32,12 @@ except ImportError:
     discovery = None
     google_errors = None
 
+
+try:
+    from google.api_core.exceptions import NotFound
+except:
+    NotFound = None
+
 try:
     # Python 2
     import ConfigParser as configparser
@@ -340,22 +346,20 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         if given_tmpdir:
             return given_tmpdir
 
-        mrjob_buckets = self.fs.list_buckets(
-            self._gcp_project, prefix='mrjob-')
-
         # Loop over buckets until we find one that matches region
         # NOTE - because this is a tmpdir, we look for a GCS bucket in the
         # same GCE region
         chosen_bucket_name = None
-        gce_lower_location = self._gce_region.lower()
-        for tmp_bucket in mrjob_buckets:
-            tmp_bucket_name = tmp_bucket['name']
+
+        for tmp_bucket_name in self.fs.get_all_bucket_names(prefix='mrjob-'):
+            tmp_bucket = self.fs.get_bucket(tmp_bucket_name)
 
             # NOTE - GCP ambiguous Behavior - Bucket location is being
             # returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs
-            # suggest lowercase
-            lower_location = tmp_bucket['location'].lower()
-            if lower_location == gce_lower_location:
+            # suggest lowercase. (As of Feb. 12, 2018, this is still true,
+            # observed on google-cloud-sdk)
+
+            if tmp_bucket.location.lower() == self._gce_region.lower():
                 # Regions are both specified and match
                 log.info("using existing temp bucket %s" % tmp_bucket_name)
                 chosen_bucket_name = tmp_bucket_name
@@ -364,7 +368,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # Example default - "mrjob-us-central1-RANDOMHEX"
         if not chosen_bucket_name:
             chosen_bucket_name = '-'.join(
-                ['mrjob', gce_lower_location, random_identifier()])
+                ['mrjob', self._gce_region.lower(), random_identifier()])
 
         return 'gs://%s/tmp/' % chosen_bucket_name
 
@@ -459,9 +463,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         try:
             self.fs.get_bucket(bucket_name)
             return
-        except google_errors.HttpError as e:
-            if not e.resp.status == 404:
-                raise
+        except NotFound:
+            pass
 
         log.info('creating FS bucket %r' % bucket_name)
 
@@ -471,7 +474,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # job (tmp buckets ONLY)
         # https://cloud.google.com/storage/docs/bucket-locations
         self.fs.create_bucket(
-            self._gcp_project, bucket_name, location=location,
+            bucket_name, location=location,
             object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
 
         self._wait_for_fs_sync()

@@ -14,12 +14,11 @@
 # limitations under the License.
 """Tests for DataprocJobRunner"""
 import collections
-import copy
 import getpass
 import os
 import os.path
-
 from contextlib import contextmanager
+from copy import deepcopy
 from io import BytesIO
 
 import mrjob
@@ -30,6 +29,7 @@ from mrjob.dataproc import _DATAPROC_API_REGION
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
@@ -101,8 +101,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
         results = []
 
-        gcs_buckets_snapshot = copy.deepcopy(self._gcs_client._cache_buckets)
-        gcs_objects_snapshot = copy.deepcopy(self._gcs_client._cache_objects)
+        mock_gcs_fs_snapshot = deepcopy(self.mock_gcs_fs)
 
         fake_gcs_output = [
             b'1\t"qux"\n2\t"bar"\n',
@@ -114,10 +113,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
             # make sure that initializing the runner doesn't affect GCS
             # (Issue #50)
-            self.assertEqual(gcs_buckets_snapshot,
-                             self._gcs_client._cache_buckets)
-            self.assertEqual(gcs_objects_snapshot,
-                             self._gcs_client._cache_objects)
+            self.assertEqual(self.mock_gcs_fs, mock_gcs_fs_snapshot)
 
             runner.run()
 
@@ -224,8 +220,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             # this is set and unset before we can get at it unless we do this
             list(runner.cat_output())
 
-        objects_in_bucket = self._gcs_fs.api_client._cache_objects[tmp_bucket]
-        self.assertEqual(len(objects_in_bucket), tmp_len)
+            fs = runner.fs
+
+        # with statement finishes, cleanup runs
+
+        self.assertEqual(
+            len(list(fs.client.bucket(tmp_bucket).list_blobs())),
+            tmp_len)
 
     def test_cleanup_all(self):
         self._test_cloud_tmp_cleanup('ALL', 0)
@@ -418,9 +419,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         args, it'll create a new tmp bucket with the given location
         constraint.
         """
-        bucket_cache = self._gcs_client._cache_buckets
-
-        existing_buckets = set(bucket_cache.keys())
+        existing_buckets = set(self.mock_gcs_fs)
 
         runner = DataprocJobRunner(conf_paths=[], **runner_kwargs)
 
@@ -431,18 +430,19 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         self.assertNotIn(bucket_name, existing_buckets)
         self.assertEqual(path, 'tmp/')
 
-        current_bucket = bucket_cache[bucket_name]
-        self.assertEqual(current_bucket['location'], location)
+        current_bucket = runner.fs.get_bucket(bucket_name)
+
+        self.assertEqual(current_bucket.location, location.upper())
 
         # Verify that we setup bucket lifecycle rules of 28-day retention
-        first_lifecycle_rule = current_bucket['lifecycle']['rule'][0]
+        first_lifecycle_rule = current_bucket.lifecycle_rules[0]
         self.assertEqual(first_lifecycle_rule['action'], dict(type='Delete'))
         self.assertEqual(first_lifecycle_rule['condition'],
                          dict(age=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS))
 
     def _make_bucket(self, name, location=None):
-        self._gcs_fs.create_bucket(
-            project=_TEST_PROJECT, name=name, location=location)
+        fs = GCSFilesystem()
+        fs.create_bucket(name, location=location)
 
     def test_default(self):
         self.assert_new_tmp_bucket(DEFAULT_GCE_REGION)
@@ -541,7 +541,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
         self.assertEqual(role_to_actual, role_to_expected)
 
     def set_in_mrjob_conf(self, **kwargs):
-        dataproc_opts = copy.deepcopy(self.MRJOB_CONF_CONTENTS)
+        dataproc_opts = deepcopy(self.MRJOB_CONF_CONTENTS)
         dataproc_opts['runners']['dataproc'].update(kwargs)
         patcher = mrjob_conf_patcher(dataproc_opts)
         patcher.start()
@@ -912,6 +912,7 @@ class MaxMinsIdleTestCase(MockGoogleAPITestCase):
 class TestCatFallback(MockGoogleAPITestCase):
 
     def test_gcs_cat(self):
+
         self.put_gcs_multi({
             'gs://walrus/one': b'one_text',
             'gs://walrus/two': b'two_text',

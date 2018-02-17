@@ -35,6 +35,7 @@ except ImportError:
 
 try:
     import google.auth
+    import google.cloud.dataproc_v1
     from google.api_core.exceptions import NotFound
 except:
     google = None
@@ -143,9 +144,9 @@ def _gcp_instance_group_config(
         zone_uri=zone_uri, machine_type=instance_type)
 
     return dict(
-        numInstances=count,
-        machineTypeUri=machine_uri,
-        isPreemptible=is_preemptible
+        num_instances=count,
+        machine_type_uri=machine_uri,
+        is_preemptible=is_preemptible
     )
 ########## END -  Helper fxns for _cluster_create_kwargs ###########
 
@@ -327,11 +328,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     @property
     def cluster_client(self):
-        return ClusterControllerClient(credentials=self._credentials)
+        return google.cloud.dataproc_v1.ClusterControllerClient(
+            credentials=self._credentials)
 
     @property
     def job_client(self):
-        return JobControllerClient(credentials=self._credentials)
+        return google.cloud.dataproc_v1.JobControllerClient(
+            credentials=self._credentials)
 
     @property
     def api_client(self):
@@ -580,7 +583,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             'Bad step type: %r' % (step['type'],))
 
         # TODO - mtai @ davidmarin - Might be trivial to support jar running,
-        # see "mainJarFileUri" of variable "output_hadoop_job" in this function
+        # see "main_jar_file_uri" of variable "output_hadoop_job" in
         #         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
 
         assert step['type'] == 'streaming', 'Jar not implemented'
@@ -649,8 +652,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 'Creating Dataproc Hadoop cluster - %s' % self._cluster_id)
 
             cluster_data = self._cluster_create_kwargs()
-
-            self._api_cluster_create(cluster_data)
+            self._create_cluster(cluster_data)
 
             self._wait_for_cluster_ready(self._cluster_id)
 
@@ -816,7 +818,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             gcs_init_script_uris.append(
                 self._upload_mgr.uri(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
 
-        # NOTE - Cluster initializationActions can only take scripts with no
+        # NOTE - Cluster initialization_actions can only take scripts with no
         # script args, so the auto-term script receives 'mrjob-max-secs-idle'
         # via metadata instead of as an arg
         cluster_metadata = dict()
@@ -825,14 +827,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             self._opts['max_mins_idle'] * 60))
 
         cluster_config = dict(
-            gceClusterConfig=dict(
-                zoneUri=_gcp_zone_uri(
+            gce_cluster_config=dict(
+                zone_uri=_gcp_zone_uri(
                     project=self._project_id, zone=self._gce_zone),
-                serviceAccountScopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
+                service_account_scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
                 metadata=cluster_metadata
             ),
-            initializationActions=[
-                dict(executableFile=init_script_uri)
+            initialization_actions=[
+                dict(executable_file=init_script_uri)
                 for init_script_uri in gcs_init_script_uris
             ]
         )
@@ -858,18 +860,18 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             is_preemptible=True
         )
 
-        cluster_config['masterConfig'] = master_conf
-        cluster_config['workerConfig'] = worker_conf
+        cluster_config['master_config'] = master_conf
+        cluster_config['worker_config'] = worker_conf
         if self._opts['num_task_instances']:
-            cluster_config['secondaryWorkerConfig'] = secondary_worker_conf
+            cluster_config['secondary_worker_config'] = secondary_worker_conf
 
         # See - https://cloud.google.com/dataproc/dataproc-versions
         if self._opts['image_version']:
-            cluster_config['softwareConfig'] = dict(
-                imageVersion=self._opts['image_version'])
+            cluster_config['software_config'] = dict(
+                image_version=self._opts['image_version'])
 
-        kwargs = dict(projectId=self._project_id,
-                      clusterName=self._cluster_id,
+        kwargs = dict(project_id=self._project_id,
+                      cluster_name=self._cluster_id,
                       config=cluster_config)
 
         return self._add_extra_cluster_params(kwargs)
@@ -883,14 +885,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             clusterName=cluster_id
         ).execute()
 
-    def _api_cluster_create(self, cluster_data):
+    def _create_cluster(self, cluster_data):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get  # noqa
-        return self.api_client.clusters().create(
-            projectId=self._project_id,
+        self.cluster_client.create_cluster(
+            project_id=self._project_id,
             region=_DATAPROC_API_REGION,
-            body=cluster_data
-        ).execute()
+            cluster=cluster_data,
+        )
 
     def _api_cluster_delete(self, cluster_id):
         return self.api_client.clusters().delete(

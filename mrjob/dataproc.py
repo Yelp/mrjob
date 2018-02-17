@@ -93,8 +93,15 @@ _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
     'https://www.googleapis.com/auth/cloud-platform',
 ]
 
-_DATAPROC_CLUSTER_STATES_READY = frozenset(['UPDATING', 'RUNNING'])
-_DATAPROC_CLUSTER_STATES_ERROR = frozenset(['ERROR', 'DELETING'])
+# cluster states (an enum)
+_CLUSTER_STATES = [
+    'UNKNOWN',
+    'CREATING',
+    'RUNNING',
+    'ERROR',
+    'DELETING',
+    'UPDATING',
+]
 
 _DATAPROC_JOB_STATES_ACTIVE = frozenset(
     ['PENDING', 'RUNNING', 'SETUP_DONE', 'CANCEL_PENDING'])
@@ -663,17 +670,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         cluster_state = None
 
         # Poll until cluster is ready
-        while cluster_state not in _DATAPROC_CLUSTER_STATES_READY:
+        while cluster_state not in ('RUNNING', 'UPDATING'):
             cluster = self._get_cluster(cluster_id)
-            cluster_state = cluster.status.state
+            cluster_state = _CLUSTER_STATES[cluster.status.state]
 
-            if cluster_state in _DATAPROC_CLUSTER_STATES_ERROR:
+            log.debug('  cluster state is %s' % cluster_state)
+
+            if cluster_state in ('ERROR', 'DELETING'):
                 raise DataprocException(cluster)
 
             self._wait_for_api('cluster to accept jobs')
-
-        assert cluster_state in _DATAPROC_CLUSTER_STATES_READY
-        log.info("Cluster %s ready", cluster_id)
 
         return cluster_id
 
@@ -775,7 +781,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         cluster = self._get_cluster(self._cluster_id)
         self._image_version = (
-            cluster.config.software_config.imageVersion)
+            cluster.config.software_config.image_version)
         # protect against new versions, including patch versions
         # we didn't explicitly request. See #1428
         self._hadoop_version = map_version(

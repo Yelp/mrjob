@@ -248,8 +248,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._project_id = self._opts['project_id'] or auth_project_id
 
         if not self._project_id:
-            raise Exception('project_id must be set. Use --project_id or'
-                            ' set $GOOGLE_CLOUD_PROJECT')
+            raise DataprocException(
+                'project_id must be set. Use --project_id or'
+                ' set $GOOGLE_CLOUD_PROJECT')
 
         # Lazy-load gcloud config as needed - invocations fail in PyCharm
         # debugging
@@ -666,18 +667,18 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         # Poll until cluster is ready
         while cluster_state not in _DATAPROC_CLUSTER_STATES_READY:
-            result_describe = self.api_client.clusters().get(
-                projectId=self._project_id,
+            cluster = self.cluster_client.get_cluster(
+                project_id=self._project_id,
                 region=_DATAPROC_API_REGION,
-                clusterName=cluster_id).execute()
+                cluster_name=cluster_id
+            )
 
-            cluster_state = result_describe['status']['state']
-            if cluster_state in _DATAPROC_CLUSTER_STATES_ERROR:
-                raise DataprocException(result_describe)
+            if cluster.status.state in _DATAPROC_CLUSTER_STATES_ERROR:
+                raise DataprocException(cluster)
 
             self._wait_for_api('cluster to accept jobs')
 
-        assert cluster_state in _DATAPROC_CLUSTER_STATES_READY
+        assert cluster.status.state in _DATAPROC_CLUSTER_STATES_READY
         log.info("Cluster %s ready", cluster_id)
 
         return cluster_id

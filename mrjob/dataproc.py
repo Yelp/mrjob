@@ -643,12 +643,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         # Create the cluster if it's missing, otherwise join an existing one
         try:
-            self._api_cluster_get(self._cluster_id)
+            self._get_cluster(self._cluster_id)
             log.info('Adding job to existing cluster - %s' % self._cluster_id)
-        except google_errors.HttpError as e:
-            if not e.resp.status == 404:
-                raise
-
+        except NotFound:
             log.info(
                 'Creating Dataproc Hadoop cluster - %s' % self._cluster_id)
 
@@ -667,18 +664,15 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         # Poll until cluster is ready
         while cluster_state not in _DATAPROC_CLUSTER_STATES_READY:
-            cluster = self.cluster_client.get_cluster(
-                project_id=self._project_id,
-                region=_DATAPROC_API_REGION,
-                cluster_name=cluster_id
-            )
+            cluster = self._get_cluster(cluster_id)
+            cluster_state = cluster.status.state
 
-            if cluster.status.state in _DATAPROC_CLUSTER_STATES_ERROR:
+            if cluster_state in _DATAPROC_CLUSTER_STATES_ERROR:
                 raise DataprocException(cluster)
 
             self._wait_for_api('cluster to accept jobs')
 
-        assert cluster.status.state in _DATAPROC_CLUSTER_STATES_READY
+        assert cluster_state in _DATAPROC_CLUSTER_STATES_READY
         log.info("Cluster %s ready", cluster_id)
 
         return cluster_id
@@ -779,9 +773,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         if not self._cluster_id:
             raise AssertionError('cluster has not yet been created')
 
-        cluster = self._api_cluster_get(self._cluster_id)
+        cluster = self._get_cluster(self._cluster_id)
         self._image_version = (
-            cluster['config']['softwareConfig']['imageVersion'])
+            cluster.config.software_config.imageVersion)
         # protect against new versions, including patch versions
         # we didn't explicitly request. See #1428
         self._hadoop_version = map_version(
@@ -879,12 +873,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     ### Dataproc-specific Stuff ###
 
-    def _api_cluster_get(self, cluster_id):
-        return self.api_client.clusters().get(
-            projectId=self._project_id,
+    def _get_cluster(self, cluster_id):
+        return self.cluster_client.get_cluster(
+            project_id=self._project_id,
             region=_DATAPROC_API_REGION,
-            clusterName=cluster_id
-        ).execute()
+            cluster_name=cluster_id
+        )
 
     def _create_cluster(self, cluster_data):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create  # noqa

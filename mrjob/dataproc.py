@@ -556,7 +556,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         try:
             log.info("Attempting to terminate cluster")
-            self._api_cluster_delete(self._cluster_id)
+            self._delete_cluster(self._cluster_id)
         except Exception as e:
             log.exception(e)
             return
@@ -573,7 +573,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     def _build_dataproc_hadoop_job(self, step_num):
         """This function creates a "HadoopJob" to be passed to
-        self._api_job_submit_hadoop
+        self._submit_hadoop_job
 
         :param step_num:
         :return: output_hadoop_job
@@ -624,13 +624,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         args += ['-output', self._step_output_uri(step_num)]
 
         # TODO - mtai @ davidmarin - Add back support to specify a different
-        # mainJarFileURI
+        # main_jar_file_uri
         output_hadoop_job = dict(
             args=args,
-            fileUris=file_uris,
-            archiveUris=archive_uris,
+            file_uris=file_uris,
+            archive_uris=archive_uris,
             properties=properties,
-            mainJarFileUri=main_jar_uri
+            main_jar_file_uri=main_jar_uri
         )
         return output_hadoop_job
 
@@ -712,10 +712,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         # Submit it
         log.info('Submitting Dataproc Hadoop Job - %s', step_name)
-        result = self._api_job_submit_hadoop(step_name, hadoop_job)
+        result = self._submit_hadoop_job(step_name, hadoop_job)
         log.info('Submitted Dataproc Hadoop Job - %s', step_name)
 
-        job_id = result['reference']['jobId']
+        job_id = result.reference.job_id
         assert job_id == step_name
 
         return job_id
@@ -895,12 +895,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             cluster=cluster_data,
         )
 
-    def _api_cluster_delete(self, cluster_id):
-        return self.api_client.clusters().delete(
-            projectId=self._project_id,
+    def _delete_cluster(self, cluster_id):
+        return self.cluster_client.delete_cluster(
+            project_id=self._project_id,
             region=_DATAPROC_API_REGION,
-            clusterName=cluster_id
-        ).execute()
+            cluster_name=cluster_id
+        )
 
     def _api_job_list(self, cluster_name=None, state_matcher=None):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/list#JobStateMatcher  # noqa
@@ -949,19 +949,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             jobId=job_id
         ).execute()
 
-    def _api_job_submit_hadoop(self, step_name, hadoop_job):
+    def _submit_hadoop_job(self, step_name, hadoop_job):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/submit  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobReference  # noqa
-        job_data = dict(
-            reference=dict(projectId=self._project_id, jobId=step_name),
-            placement=dict(clusterName=self._cluster_id),
-            hadoopJob=hadoop_job
-        )
-
-        jobs_submit_kwargs = dict(
-            projectId=self._project_id,
+        return self.job_client.submit_job(
+            project_id=self._project_id,
             region=_DATAPROC_API_REGION,
-            body=dict(job=job_data)
+            job=dict(
+                reference=dict(project_id=self._project_id, job_id=step_name),
+                placement=dict(cluster_name=self._cluster_id),
+                hadoop_job=hadoop_job,
+            ),
         )
-        return self.api_client.jobs().submit(**jobs_submit_kwargs).execute()

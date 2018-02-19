@@ -93,20 +93,49 @@ _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
     'https://www.googleapis.com/auth/cloud-platform',
 ]
 
-# cluster states (an enum)
-_CLUSTER_STATES = [
-    'UNKNOWN',
-    'CREATING',
-    'RUNNING',
-    'ERROR',
-    'DELETING',
-    'UPDATING',
-]
+# cluster states enum
+_CLUSTER_STATE_UNKNOWN = 0
+_CLUSTER_STATE_CREATING = 1
+_CLUSTER_STATE_RUNNING = 2
+_CLUSTER_STATE_ERROR = 3
+_CLUSTER_STATE_DELETING = 4
+_CLUSTER_STATE_UPDATING = 5
 
-_DATAPROC_JOB_STATES_ACTIVE = frozenset(
-    ['PENDING', 'RUNNING', 'SETUP_DONE', 'CANCEL_PENDING'])
+_CLUSTER_READY_STATES = (_CLUSTER_STATE_RUNNING, _CLUSTER_STATE_UPDATING)
 
-_DATAPROC_JOB_STATES_INACTIVE = frozenset(['CANCELLED', 'DONE', 'ERROR'])
+_CLUSTER_ERROR_STATES = (_CLUSTER_STATE_ERROR, _CLUSTER_STATE_DELETING)
+
+# job states enum
+
+# this is wrong. looks like 2 is RUNNING, 5 is DONE
+# need to check google-api-python-client
+
+_JOB_STATE_UNSPECIFIED = 0
+_JOB_STATE_PENDING = 1
+_JOB_STATE_SETUP_DONE = 2
+_JOB_STATE_RUNNING = 3
+_JOB_STATE_CANCEL_PENDING = 4
+_JOB_STATE_CANCEL_STARTED = 5
+_JOB_STATE_CANCELLED = 6
+_JOB_STATE_DONE = 7
+_JOB_STATE_ERROR = 8
+_JOB_STATE_ATTEMPT_FAILURE = 9
+
+_JOB_STATES_ACTIVE = (_JOB_STATE_PENDING,
+                      _JOB_STATE_SETUP_DONE,
+                      _JOB_STATE_RUNNING,
+                      _JOB_STATE_CANCEL_PENDING,
+                      _JOB_STATE_CANCEL_STARTED)
+
+_JOB_STATES_INACTIVE = (_JOB_STATE_CANCELLED,
+                        _JOB_STATE_DONE,
+                        _JOB_STATE_ERROR,
+                        _JOB_STATE_ATTEMPT_FAILURE)
+
+# job state matcher enum
+_STATE_MATCHER_ALL = 0
+_STATE_MATCHER_ACTIVE = 1
+_STATE_MATCHER_NON_ACTIVE = 2
 
 # Dataproc images where Hadoop version changed (we use map_version() on this)
 #
@@ -538,15 +567,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     def _cleanup_job(self):
         job_prefix = self._dataproc_job_prefix()
-        for current_job in self._api_job_list(
-                cluster_name=self._cluster_id, state_matcher='ACTIVE'):
+        for job in self._list_jobs(
+                cluster_name=self._cluster_id,
+                state_matcher=_STATE_MATCHER_ACTIVE):
             # Kill all active jobs with the same job_prefix as this job
-            current_job_id = current_job['reference']['jobId']
+            job_id = job.reference.job_id
 
-            if not current_job_id.startswith(job_prefix):
+            if not job_id.startswith(job_prefix):
                 continue
 
-            self._api_job_cancel(current_job_id)
+            self._cancel_job(job_id)
             self._wait_for_api('job cancellation')
 
     def _cleanup_cluster(self):
@@ -670,13 +700,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         cluster_state = None
 
         # Poll until cluster is ready
-        while cluster_state not in ('RUNNING', 'UPDATING'):
+        while cluster_state not in _CLUSTER_READY_STATES:
             cluster = self._get_cluster(cluster_id)
-            cluster_state = _CLUSTER_STATES[cluster.status.state]
+            cluster_state = cluster.status.state
 
-            log.debug('  cluster state is %s' % cluster_state)
-
-            if cluster_state in ('ERROR', 'DELETING'):
+            if cluster_state in _CLUSTER_ERROR_STATES:
                 raise DataprocException(cluster)
 
             self._wait_for_api('cluster to accept jobs')
@@ -734,18 +762,18 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         while True:
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus  # noqa
-            job_result = self._api_job_get(job_id)
-            job_state = job_result['status']['state']
+            job_result = self._get_job(job_id)
+            job_state = job_result.status.state
 
             log.info('%s => %s' % (job_id, job_state))
 
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State  # noqa
-            if job_state in _DATAPROC_JOB_STATES_ACTIVE:
+            if job_state in _JOB_STATES_ACTIVE:
                 self._wait_for_api('job completion')
                 continue
 
             # we're done, will return at the end of this
-            elif job_state == 'DONE':
+            elif job_state == _JOB_STATE_DONE:
                 break
 
             raise StepFailedException(step_num=step_num, num_steps=num_steps)
@@ -902,52 +930,33 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             cluster_name=cluster_id
         )
 
-    def _api_job_list(self, cluster_name=None, state_matcher=None):
+    def _list_jobs(self, cluster_name=None, state_matcher=None):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/list#JobStateMatcher  # noqa
         list_kwargs = dict(
-            projectId=self._project_id,
+            project_id=self._project_id,
             region=_DATAPROC_API_REGION,
         )
         if cluster_name:
-            list_kwargs['clusterName'] = cluster_name
+            list_kwargs['cluster_name'] = cluster_name
 
         if state_matcher:
-            list_kwargs['jobStateMatcher'] = state_matcher
+            list_kwargs['job_state_matcher'] = state_matcher
 
-        list_request = self.api_client.jobs().list(**list_kwargs)
-        while list_request:
-            try:
-                resp = list_request.execute()
-            except google_errors.HttpError as e:
-                if e.resp.status == 404:
-                    return
-                raise
+        return self.job_client.list_jobs(**list_kwargs)
 
-            for current_item in resp['items']:
-                yield current_item
-
-            list_request = self.api_client.jobs().list_next(list_request, resp)
-
-    def _api_job_get(self, job_id):
-        return self.api_client.jobs().get(
-            projectId=self._project_id,
+    def _get_job(self, job_id):
+        return self.job_client.get_job(
+            project_id=self._project_id,
             region=_DATAPROC_API_REGION,
-            jobId=job_id
-        ).execute()
+            job_id=job_id,
+        )
 
-    def _api_job_cancel(self, job_id):
-        return self.api_client.jobs().cancel(
-            projectId=self._project_id,
+    def _cancel_job(self, job_id):
+        return self.job_client.cancel_job(
+            project_id=self._project_id,
             region=_DATAPROC_API_REGION,
-            jobId=job_id
-        ).execute()
-
-    def _api_job_delete(self, job_id):
-        return self.api_client.jobs().delete(
-            projectId=self._project_id,
-            region=_DATAPROC_API_REGION,
-            jobId=job_id
-        ).execute()
+            job_id=job_id,
+        )
 
     def _submit_hadoop_job(self, step_name, hadoop_job):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/submit  # noqa

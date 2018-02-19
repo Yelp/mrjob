@@ -107,18 +107,18 @@ _CLUSTER_ERROR_STATES = (_CLUSTER_STATE_ERROR, _CLUSTER_STATE_DELETING)
 
 # job states enum
 
-# this is wrong. looks like 2 is RUNNING, 5 is DONE
+# this is wrong. looks like 2 is RUNNING, 5 is DONE, 8 is ERROR
 # need to check google-api-python-client
 
 _JOB_STATE_UNSPECIFIED = 0
 _JOB_STATE_PENDING = 1
-_JOB_STATE_SETUP_DONE = 2
-_JOB_STATE_RUNNING = 3
-_JOB_STATE_CANCEL_PENDING = 4
-_JOB_STATE_CANCEL_STARTED = 5
-_JOB_STATE_CANCELLED = 6
-_JOB_STATE_DONE = 7
-_JOB_STATE_ERROR = 8
+_JOB_STATE_RUNNING = 2
+_JOB_STATE_CANCEL_PENDING = 3
+_JOB_STATE_CANCELLED = 4
+_JOB_STATE_DONE = 5
+_JOB_STATE_ERROR = 6
+_JOB_STATE_CANCEL_STARTED = 7
+_JOB_STATE_SETUP_DONE = 8
 _JOB_STATE_ATTEMPT_FAILURE = 9
 
 _JOB_STATES_ACTIVE = (_JOB_STATE_PENDING,
@@ -755,15 +755,17 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         If it fails, attempt to diagnose the error, and raise an
         exception.
 
-        This also adds an item to self._log_interpretations
+        This also adds an item to self._lo_ginterpretations
         """
         log_interpretation = dict(job_id=job_id)
         self._log_interpretations.append(log_interpretation)
 
         while True:
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus  # noqa
-            job_result = self._get_job(job_id)
-            job_state = job_result.status.state
+            job = self._get_job(job_id)
+
+            # use job.status.State.Name(job.status.state) to get 'DONE', etc.
+            job_state = job.status.state
 
             log.info('%s => %s' % (job_id, job_state))
 

@@ -93,49 +93,9 @@ _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
     'https://www.googleapis.com/auth/cloud-platform',
 ]
 
-# cluster states enum
-_CLUSTER_STATE_UNKNOWN = 0
-_CLUSTER_STATE_CREATING = 1
-_CLUSTER_STATE_RUNNING = 2
-_CLUSTER_STATE_ERROR = 3
-_CLUSTER_STATE_DELETING = 4
-_CLUSTER_STATE_UPDATING = 5
-
-_CLUSTER_READY_STATES = (_CLUSTER_STATE_RUNNING, _CLUSTER_STATE_UPDATING)
-
-_CLUSTER_ERROR_STATES = (_CLUSTER_STATE_ERROR, _CLUSTER_STATE_DELETING)
-
-# job states enum
-
-# this is wrong. looks like 2 is RUNNING, 5 is DONE, 8 is ERROR
-# need to check google-api-python-client
-
-_JOB_STATE_UNSPECIFIED = 0
-_JOB_STATE_PENDING = 1
-_JOB_STATE_RUNNING = 2
-_JOB_STATE_CANCEL_PENDING = 3
-_JOB_STATE_CANCELLED = 4
-_JOB_STATE_DONE = 5
-_JOB_STATE_ERROR = 6
-_JOB_STATE_CANCEL_STARTED = 7
-_JOB_STATE_SETUP_DONE = 8
-_JOB_STATE_ATTEMPT_FAILURE = 9
-
-_JOB_STATES_ACTIVE = (_JOB_STATE_PENDING,
-                      _JOB_STATE_SETUP_DONE,
-                      _JOB_STATE_RUNNING,
-                      _JOB_STATE_CANCEL_PENDING,
-                      _JOB_STATE_CANCEL_STARTED)
-
-_JOB_STATES_INACTIVE = (_JOB_STATE_CANCELLED,
-                        _JOB_STATE_DONE,
-                        _JOB_STATE_ERROR,
-                        _JOB_STATE_ATTEMPT_FAILURE)
-
 # job state matcher enum
-_STATE_MATCHER_ALL = 0
+# use this to only find active jobs. (2 for NON_ACTIVE, but we don't use that)
 _STATE_MATCHER_ACTIVE = 1
-_STATE_MATCHER_NON_ACTIVE = 2
 
 # Dataproc images where Hadoop version changed (we use map_version() on this)
 #
@@ -700,11 +660,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         cluster_state = None
 
         # Poll until cluster is ready
-        while cluster_state not in _CLUSTER_READY_STATES:
+        while cluster_state not in ('RUNNING', 'UPDATING'):
             cluster = self._get_cluster(cluster_id)
-            cluster_state = cluster.status.state
+            cluster_state = cluster.status.State.Name(cluster.status.state)
 
-            if cluster_state in _CLUSTER_ERROR_STATES:
+            if cluster_state in ('ERROR', 'DELETING'):
                 raise DataprocException(cluster)
 
             self._wait_for_api('cluster to accept jobs')
@@ -764,18 +724,20 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus  # noqa
             job = self._get_job(job_id)
 
-            # use job.status.State.Name(job.status.state) to get 'DONE', etc.
-            job_state = job.status.state
+            job_state = job.status.State.Name(job.status.state)
 
             log.info('%s => %s' % (job_id, job_state))
 
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State  # noqa
-            if job_state in _JOB_STATES_ACTIVE:
+            # these are the states covered by the ACTIVE job state matcher,
+            # plus SETUP_DONE
+            if job_state in ('PENDING', 'RUNNING',
+                             'CANCEL_PENDING', 'SETUP_DONE'):
                 self._wait_for_api('job completion')
                 continue
 
             # we're done, will return at the end of this
-            elif job_state == _JOB_STATE_DONE:
+            elif job_state == 'DONE':
                 break
 
             raise StepFailedException(step_num=step_num, num_steps=num_steps)

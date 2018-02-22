@@ -135,13 +135,16 @@ def _gcp_zone_uri(project, zone):
 
 def _gcp_instance_group_config(
         project, zone, count, instance_type, is_preemptible=False):
-    zone_uri = _gcp_zone_uri(project, zone)
-    machine_uri = "%(zone_uri)s/machineTypes/%(machine_type)s" % dict(
-        zone_uri=zone_uri, machine_type=instance_type)
+    if zone:
+        zone_uri = _gcp_zone_uri(project, zone)
+        machine_type = "%(zone_uri)s/machineTypes/%(machine_type)s" % dict(
+            zone_uri=zone_uri, machine_type=instance_type)
+    else:
+        machine_type = instance_type
 
     return dict(
         num_instances=count,
-        machine_type_uri=machine_uri,
+        machine_type_uri=machine_type,
         is_preemptible=is_preemptible
     )
 ########## END -  Helper fxns for _cluster_create_kwargs ###########
@@ -380,7 +383,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             # suggest lowercase. (As of Feb. 12, 2018, this is still true,
             # observed on google-cloud-sdk)
 
-            if tmp_bucket.location.lower() == self._gce_region.lower():
+            if (tmp_bucket.location.lower() == self._gce_region or
+                    (not self._gce_region and '-' not in tmp_bucket.location)):
                 # Regions are both specified and match
                 log.info("using existing temp bucket %s" % tmp_bucket_name)
                 chosen_bucket_name = tmp_bucket_name
@@ -389,7 +393,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # Example default - "mrjob-us-central1-RANDOMHEX"
         if not chosen_bucket_name:
             chosen_bucket_name = '-'.join(
-                ['mrjob', self._gce_region.lower(), random_identifier()])
+                ['mrjob', self._gce_region or 'multi', random_identifier()])
 
         return 'gs://%s/tmp/' % chosen_bucket_name
 
@@ -636,7 +640,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # (not currently documented in the Dataproc docs)
         if not self._cluster_id:
             self._cluster_id = '-'.join(
-                ['mrjob', self._gce_zone.lower(), random_identifier()])
+                ['mrjob', self._gce_zone or 'global', random_identifier()])
 
         # Create the cluster if it's missing, otherwise join an existing one
         try:
@@ -819,13 +823,17 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         cluster_metadata['mrjob-max-secs-idle'] = str(int(
             self._opts['max_mins_idle'] * 60))
 
+        gce_cluster_config=dict(
+            service_account_scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
+            metadata=cluster_metadata
+        )
+
+        if self._gce_zone:
+            gce_cluster_config['zone_uri'] = _gcp_zone_uri(
+                project=self._project_id, zone=self._gce_zone)
+
         cluster_config = dict(
-            gce_cluster_config=dict(
-                zone_uri=_gcp_zone_uri(
-                    project=self._project_id, zone=self._gce_zone),
-                service_account_scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
-                metadata=cluster_metadata
-            ),
+            gce_cluster_config=gce_cluster_config,
             initialization_actions=[
                 dict(executable_file=init_script_uri)
                 for init_script_uri in gcs_init_script_uris
@@ -835,7 +843,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # Task tracker
         master_conf = _gcp_instance_group_config(
             project=self._project_id, zone=self._gce_zone,
-            count=1, instance_type=self._opts['master_instance_type']
+            count=1, instance_type=self._opts['master_instance_type'],
         )
 
         # Compute + storage
@@ -881,6 +889,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     def _create_cluster(self, cluster_data):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/create  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get  # noqa
+
         self.cluster_client.create_cluster(
             project_id=self._project_id,
             region=_DATAPROC_API_REGION,

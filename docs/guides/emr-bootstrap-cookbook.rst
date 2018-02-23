@@ -15,10 +15,9 @@ part of your general production environment, and :mrjob-opt:`setup`
 for things that are specific to your particular job. This makes things
 work as expected if you are using :ref:`cluster-pooling`.
 
-All these examples use :mrjob-opt:`bootstrap`. Not saying it's a good idea, but
-all these examples will work with :mrjob-opt:`setup` as well (yes, Hadoop
-tasks on EMR apparently have access to :command:`sudo`).
-
+EMR will generally not allow you to use :command:`sudo` in
+:mrjob-opt:`setup` commands. See :doc:`setup-cookbook` for how to install
+libraries, etc. without using :command:`sudo`.
 
 .. _using-pip:
 

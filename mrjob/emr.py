@@ -152,7 +152,7 @@ _POOLING_SLEEP_INTERVAL = 30.01  # Add .1 seconds so minutes arent spot on.
 _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
     os.path.dirname(mrjob.__file__),
     'bootstrap',
-    'terminate_idle_cluster.sh')
+    'terminate_idle_cluster_emr.sh')
 
 # default AWS region to use for EMR. Using us-west-2 because it is the default
 # for new (since October 10, 2012) accounts (see #1025)

@@ -43,7 +43,7 @@
 
 # full usage:
 #
-# ./terminate_idle_cluster.sh [ max_secs_idle  ]
+# ./terminate_idle_cluster_emr.sh [ max_secs_idle  ]
 #
 # Both arguments must be integers
 

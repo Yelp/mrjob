@@ -3,8 +3,8 @@
 # Copyright 2013 Lyft
 # Copyright 2014 Alex Konradi
 # Copyright 2015 Yelp and Contributors
-# Copyright 2016 Yelp
-# Copyright 2017 Yelp
+# Copyright 2016-2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,8 +28,8 @@
 # enough AND we're close enough to the end of an EC2 billing hour, we
 # shut down the master node, which kills the cluster.
 
-# By default, we allow an idle time of 15 minutes, and shut down within
-# the last 5 minutes of the hour.
+# By default, we allow an idle time of 5 minutes. Also, be default, we
+# won't terminate the cluster in the first 10 minutes this script runs.
 
 # Caveats:
 
@@ -50,6 +50,9 @@
 MAX_SECS_IDLE=$1
 if [ -z "$MAX_SECS_IDLE" ]; then MAX_SECS_IDLE=300; fi
 
+GRACE_PERIOD_SECS=$2
+if [ -z "$GRACE_PERIOD_SECS" ]; then GRACE_PERIOD_SECS=600; fi
+
 # exit if this isn't the master node
 grep -q 'isMaster.*false' /mnt/var/lib/info/instance.json && exit 0
 
@@ -58,6 +61,11 @@ while true  # the only way out is to SHUT DOWN THE MACHINE
 do
     # get the uptime as an integer (expr can't handle decimals)
     UPTIME=$(cat /proc/uptime | cut -f 1 -d .)
+
+    if [ -z "$START" ]
+    then
+        START=$UPTIME
+    fi
 
     # if LAST_ACTIVE hasn't been initialized, hadoop hasn't been installed
     # yet (this happens on 4.x AMIs), or there are jobs running, just set
@@ -72,13 +80,18 @@ do
     then
         LAST_ACTIVE=$UPTIME
     else
-	# the cluster is idle! how long has this been going on?
-        SECS_IDLE=$(expr $UPTIME - $LAST_ACTIVE)
+        SECS_RUN=$(expr $UPTIME - $START)
+        if expr $SECS_RUN '>' $GRACE_PERIOD_SECS > /dev/null
+            then
 
-        if expr $SECS_IDLE '>' $MAX_SECS_IDLE > /dev/null
-        then
-            sudo shutdown -h now
-            exit
+            # the cluster is idle! how long has this been going on?
+            SECS_IDLE=$(expr $UPTIME - $LAST_ACTIVE)
+
+            if expr $SECS_IDLE '>' $MAX_SECS_IDLE > /dev/null
+            then
+                sudo shutdown -h now
+                exit
+            fi
         fi
     fi
 done

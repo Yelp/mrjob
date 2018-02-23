@@ -372,7 +372,7 @@ Cluster creation and configuration
     :switch: --max-mins-idle
     :type: float
     :set: emr
-    :default: 5
+    :default: 10.0
 
     Automatically terminate persistent/pooled clusters that have been idle at
     least this many minutes.
@@ -383,6 +383,12 @@ Cluster creation and configuration
        versions, you needed to set :mrjob-opt:`max_hours_idle`, set this
        option explicitly, or use :ref:`terminate-idle-clusters`.
 
+    .. versionchanged:: 0.6.2
+
+       No matter how small a value you set this to, there is a grace period
+       of 10 minutes between when the idle termination daemon launches
+       and when it may first terminate the cluster, to allow Hadoop to
+       accept your first job.
 
 .. mrjob-opt::
     :config: max_hours_idle

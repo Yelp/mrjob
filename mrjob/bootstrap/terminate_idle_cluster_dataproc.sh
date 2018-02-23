@@ -43,11 +43,20 @@
 MAX_SECS_IDLE=$(/usr/share/google/get_metadata_value attributes/mrjob-max-secs-idle)
 if [ -z "${MAX_SECS_IDLE}" ]; then MAX_SECS_IDLE=300; fi
 
+GRACE_PERIOD_SECS=$(/usr/share/google/get_metadata_value attributes/mrjob-grace-period-secs)
+if [ -z "${GRACE_PERIOD_SECS}" ]; then GRACE_PERIOD_SECS=600; fi
+
+
 (
 while true  # the only way out is to SHUT DOWN THE MACHINE
 do
     # get the uptime as an integer (expr can't handle decimals)
     UPTIME=$(cat /proc/uptime | cut -f 1 -d .)
+
+    if [ -z "$START" ]
+    then
+        START=${UPTIME}
+    fi
 
     if [ -z "${LAST_ACTIVE}" ] || \
         (which yarn > /dev/null && \
@@ -56,12 +65,16 @@ do
     then
         LAST_ACTIVE=${UPTIME}
     else
-	# the cluster is idle! how long has this been going on?
-        SECS_IDLE=$(expr ${UPTIME} - ${LAST_ACTIVE})
-        if expr ${SECS_IDLE} '>' ${MAX_SECS_IDLE} > /dev/null
+        SECS_RUN=$(expr ${UPTIME} - ${START})
+        if expr ${SECS_RUN} '>' ${GRACE_PERIOD_SECS} > /dev/null
         then
-            yes | gcloud dataproc clusters delete $(/usr/share/google/get_metadata_value attributes/dataproc-cluster-name) --async
-            exit
+            # the cluster is idle! how long has this been going on?
+            SECS_IDLE=$(expr ${UPTIME} - ${LAST_ACTIVE})
+            if expr ${SECS_IDLE} '>' ${MAX_SECS_IDLE} > /dev/null
+            then
+                yes | gcloud dataproc clusters delete $(/usr/share/google/get_metadata_value attributes/dataproc-cluster-name) --async
+                exit
+            fi
         fi
     fi
 

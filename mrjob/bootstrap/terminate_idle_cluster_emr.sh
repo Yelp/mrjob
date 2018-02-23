@@ -82,7 +82,7 @@ do
     else
         SECS_RUN=$(expr $UPTIME - $START)
         if expr $SECS_RUN '>' $GRACE_PERIOD_SECS > /dev/null
-            then
+        then
 
             # the cluster is idle! how long has this been going on?
             SECS_IDLE=$(expr $UPTIME - $LAST_ACTIVE)
@@ -94,6 +94,9 @@ do
             fi
         fi
     fi
+
+    # sleep so we don't peg the CPU
+    sleep 5
 done
 # close file handles to daemonize the script; otherwise bootstrapping
 # never finishes

@@ -1573,7 +1573,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check for idle timeout script
         self.assertTrue(actions[3]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[3]['ScriptPath'].endswith(
-            'terminate_idle_cluster.sh'))
+            'terminate_idle_cluster_emr.sh'))
         self.assertEqual(actions[3]['Args'], ['600'])
         self.assertEqual(actions[3]['Name'], 'idle timeout')
 
@@ -1628,7 +1628,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check for idle timeout script
         self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[2]['ScriptPath'].endswith(
-            'terminate_idle_cluster.sh'))
+            'terminate_idle_cluster_emr.sh'))
         self.assertEqual(actions[2]['Args'], ['600'])
         self.assertEqual(actions[2]['Name'], 'idle timeout')
 

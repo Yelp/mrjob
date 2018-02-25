@@ -1,5 +1,6 @@
 # Copyright 2009-2015 Yelp and Contributors
 # Copyright 2016-2017 Yelp
+# Copyright 2018 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -31,7 +32,6 @@ try:
             'google-cloud>=0.32.0',
             # this is in Alpha, so not assuming future versions will work
             'google-cloud-dataproc==0.1.0',
-            #'google-api-python-client>=1.5.0'  # see below
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],
@@ -39,20 +39,6 @@ try:
         'tests_require': ['simplejson'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
-
-    # mrjob doesn't actually support Python 3.2, but it tries to support
-    # PyPy3, which is currently Python 3.2 with some key 3.3 features
-    if (hasattr(sys, 'pypy_version_info') and
-            (3, 0) <= sys.version_info < (3, 3)):
-        # httplib2 is a dependency of google-api-python-client, used
-        # to run tests
-        setuptools_kwargs['install_requires'].append('httplib2>=0.8,<1')
-    elif sys.version_info < (2, 7):
-        setuptools_kwargs['install_requires'].append(
-            'google-api-python-client==1.5.0')
-    else:
-        setuptools_kwargs['install_requires'].append(
-            'google-api-python-client>=1.5.0')
 
     if sys.version_info >= (3, 0):
         setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']

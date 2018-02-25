@@ -24,31 +24,12 @@ from os.path import dirname
 from os.path import join
 
 try:
-    from oauth2client.client import GoogleCredentials
-    from googleapiclient import discovery
-    from googleapiclient import errors as google_errors
-except ImportError:
-    # don't require googleapiclient; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    GoogleCredentials = None
-    discovery = None
-    google_errors = None
-
-
-try:
     import google.auth
     import google.cloud.dataproc_v1
     from google.api_core.exceptions import NotFound
 except:
     google = None
     NotFound = None
-
-try:
-    # Python 2
-    import ConfigParser as configparser
-except ImportError:
-    # Python 3
-    import configparser
 
 import mrjob
 from mrjob.cloud import HadoopInTheCloudJobRunner
@@ -69,8 +50,6 @@ log = logging.getLogger(__name__)
 
 _DEFAULT_ZONE = 'us-west1-a'
 
-_DATAPROC_API_ENDPOINT = 'dataproc'
-_DATAPROC_API_VERSION = 'v1'
 _DATAPROC_API_REGION = 'global'
 _DATAPROC_MIN_WORKERS = 2
 _GCE_API_VERSION = 'v1'
@@ -212,6 +191,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         """
         super(DataprocJobRunner, self).__init__(**kwargs)
 
+        # check for library support
+        if google is None:
+            raise ImportError(
+                'You must install google-cloud and google-cloud-dataproc'
+                ' to connect to Dataproc')
+
         # Dataproc requires a master and >= 2 core instances
         # num_core_instances refers ONLY to number of CORE instances and does
         # NOT include the required 1 instance for master
@@ -306,6 +291,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     @property
     def cluster_client(self):
+
         return google.cloud.dataproc_v1.ClusterControllerClient(
             credentials=self._credentials)
 
@@ -316,15 +302,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     @property
     def api_client(self):
-        if not self._api_client:
-            credentials = GoogleCredentials.get_application_default()
-
-            api_client = discovery.build(
-                _DATAPROC_API_ENDPOINT, _DATAPROC_API_VERSION,
-                credentials=credentials)
-            self._api_client = api_client.projects().regions()
-
-        return self._api_client
+        raise NotImplementedError(
+            '"api_client" was disabled in v0.6.2. Use "cluster_client"'
+            ' or "job_client" instead.')
 
     @property
     def fs(self):

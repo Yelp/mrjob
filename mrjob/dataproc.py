@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Google Inc. and Yelp
 # Copyright 2017 Yelp
+# Copyright 2018 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,11 +16,12 @@
 # limitations under the License.
 import io
 import logging
-import os
-import os.path
 import time
 import re
 import subprocess
+from os import environ
+from os.path import dirname
+from os.path import join
 
 try:
     from oauth2client.client import GoogleCredentials
@@ -64,6 +66,8 @@ from mrjob.step import StepFailedException
 from mrjob.util import random_identifier
 
 log = logging.getLogger(__name__)
+
+_DEFAULT_ZONE = 'us-west1-a'
 
 _DATAPROC_API_ENDPOINT = 'dataproc'
 _DATAPROC_API_VERSION = 'v1'
@@ -111,8 +115,8 @@ _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
 }
 
 # bootstrap action which automatically terminates idle clusters
-_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
-    os.path.dirname(mrjob.__file__),
+_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = join(
+    dirname(mrjob.__file__),
     'bootstrap',
     'terminate_idle_cluster_dataproc.sh')
 
@@ -170,27 +174,8 @@ def _check_and_fix_fs_dir(gcs_uri):
     return gcs_uri
 
 
-def _read_gcloud_config():
-    """
-    Read in gcloud SDK config defaults
-    """
-    gcloud_output = subprocess.check_output('gcloud config list', shell=True)
-    gcloud_output_as_unicode = gcloud_output.decode('utf-8')
-
-    cloud_cfg = configparser.RawConfigParser(allow_no_value=True)
-    cloud_cfg.readfp(io.StringIO(gcloud_output_as_unicode))
-
-    return _cfg_to_dot_path_dict(cloud_cfg)
-
-
-def _cfg_to_dot_path_dict(cfg_parser):
-    config_dict = dict()
-    for current_section in cfg_parser.sections():
-        for current_option, current_value in cfg_parser.items(current_section):
-            varname = '{}.{}'.format(current_section, current_option)
-            config_dict[varname] = current_value
-
-    return config_dict
+def _zone_to_region(zone):
+    return '-'.join(zone.split('-')[:-1])
 
 
 class DataprocException(Exception):
@@ -251,17 +236,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 'project_id must be set. Use --project_id or'
                 ' set $GOOGLE_CLOUD_PROJECT')
 
-        # Lazy-load gcloud config as needed - invocations fail in PyCharm
-        # debugging
-        self._gcloud_config = None
-
-        # TODO: these can only be loaded by running gcloud config, but gcloud
-        # should be optional
-        # Google Compute Engine - Region / Zone
-        self._gce_region = (
-            self._opts['region'] or self.gcloud_config()['compute.region'])
-        self._gce_zone = (
-            self._opts['zone'] or self.gcloud_config()['compute.zone'])
+        self._fix_zone_and_region_opts()
 
         # cluster_id can be None here
         self._cluster_id = self._opts['cluster_id']
@@ -302,6 +277,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # parse task logs
         self._log_interpretations = []
 
+    def _fix_zone_and_region_opts(self):
+        if not self._opts['zone']:
+            self._opts['zone'] = (environ.get('CLOUDSDK_COMPUTE_ZONE') or
+                                  _DEFAULT_ZONE)
+
+        if self._opts['region']:
+            log.warning(
+                'region opt is currently ignored. please set'
+                '--zone instead')
+
     def _default_opts(self):
         return combine_dicts(
             super(DataprocJobRunner, self)._default_opts(),
@@ -318,13 +303,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 sh_bin=['/bin/sh', '-ex'],
             )
         )
-
-    def gcloud_config(self):
-        """Lazy load gcloud SDK configs"""
-        if not self._gcloud_config:
-            self._gcloud_config = _read_gcloud_config()
-
-        return self._gcloud_config
 
     @property
     def cluster_client(self):
@@ -375,6 +353,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # same GCE region
         chosen_bucket_name = None
 
+        region = _zone_to_region(self._opts['zone'])
+
         for tmp_bucket_name in self.fs.get_all_bucket_names(prefix='mrjob-'):
             tmp_bucket = self.fs.get_bucket(tmp_bucket_name)
 
@@ -382,9 +362,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             # returned as UPPERCASE, ticket filed as of Apr 23, 2016 as docs
             # suggest lowercase. (As of Feb. 12, 2018, this is still true,
             # observed on google-cloud-sdk)
-
-            if (tmp_bucket.location.lower() == self._gce_region or
-                    (not self._gce_region and '-' not in tmp_bucket.location)):
+            if tmp_bucket.location.lower() == region:
                 # Regions are both specified and match
                 log.info("using existing temp bucket %s" % tmp_bucket_name)
                 chosen_bucket_name = tmp_bucket_name
@@ -393,7 +371,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # Example default - "mrjob-us-central1-RANDOMHEX"
         if not chosen_bucket_name:
             chosen_bucket_name = '-'.join(
-                ['mrjob', self._gce_region or 'multi', random_identifier()])
+                ['mrjob', region, random_identifier()])
 
         return 'gs://%s/tmp/' % chosen_bucket_name
 
@@ -493,7 +471,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         log.info('creating FS bucket %r' % bucket_name)
 
-        location = location or self._gce_region
+        location = location or _zone_to_region(self._opts['zone'])
 
         # NOTE - By default, we create a bucket in the same GCE region as our
         # job (tmp buckets ONLY)
@@ -640,7 +618,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # (not currently documented in the Dataproc docs)
         if not self._cluster_id:
             self._cluster_id = '-'.join(
-                ['mrjob', self._gce_zone or 'global', random_identifier()])
+                ['mrjob', self._opts['zone'] or 'global', random_identifier()])
 
         # Create the cluster if it's missing, otherwise join an existing one
         try:
@@ -828,9 +806,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             metadata=cluster_metadata
         )
 
-        if self._gce_zone:
+        if self._opts['zone']:
             gce_cluster_config['zone_uri'] = _gcp_zone_uri(
-                project=self._project_id, zone=self._gce_zone)
+                project=self._project_id, zone=self._opts['zone'])
 
         cluster_config = dict(
             gce_cluster_config=gce_cluster_config,
@@ -842,20 +820,20 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         # Task tracker
         master_conf = _gcp_instance_group_config(
-            project=self._project_id, zone=self._gce_zone,
+            project=self._project_id, zone=self._opts['zone'],
             count=1, instance_type=self._opts['master_instance_type'],
         )
 
         # Compute + storage
         worker_conf = _gcp_instance_group_config(
-            project=self._project_id, zone=self._gce_zone,
+            project=self._project_id, zone=self._opts['zone'],
             count=self._opts['num_core_instances'],
             instance_type=self._opts['core_instance_type']
         )
 
         # Compute ONLY
         secondary_worker_conf = _gcp_instance_group_config(
-            project=self._project_id, zone=self._gce_zone,
+            project=self._project_id, zone=self._opts['zone'],
             count=self._opts['num_task_instances'],
             instance_type=self._opts['task_instance_type'],
             is_preemptible=True

@@ -37,6 +37,7 @@ from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 
+from tests.mock_google import MockGoogleTestCase
 from tests.mockgoogleapiclient import MockGoogleAPITestCase
 from tests.mockgoogleapiclient import _TEST_PROJECT
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
@@ -74,7 +75,7 @@ HIGHCPU_GCE_INSTANCE = 'n1-highcpu-2'
 MICRO_GCE_INSTANCE = 'f1-micro'
 
 
-class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
+class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
         'check_cluster_every': 0.00,
@@ -256,7 +257,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
                           'GARBAGE', 0)
 
 
-class ExistingClusterTestCase(MockGoogleAPITestCase):
+class ExistingClusterTestCase(MockGoogleTestCase):
 
     def test_attach_to_existing_cluster(self):
         runner = DataprocJobRunner(conf_paths=[])
@@ -319,7 +320,7 @@ class ExistingClusterTestCase(MockGoogleAPITestCase):
         self.assertEqual(cluster_state, 'RUNNING')
 
 
-class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
+class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
 
     def test_default(self):
         with self.make_runner() as runner:
@@ -362,7 +363,7 @@ class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
 EXPECTED_ZONE = 'PUPPYLAND'
 
 
-class ZoneTestCase(MockGoogleAPITestCase):
+class ZoneTestCase(MockGoogleTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
         'check_cluster_every': 0.00,
@@ -383,7 +384,7 @@ class ZoneTestCase(MockGoogleAPITestCase):
                           cluster['config']['workerConfig']['machineTypeUri'])
 
 
-class ExtraClusterParamsTestCase(MockGoogleAPITestCase):
+class ExtraClusterParamsTestCase(MockGoogleTestCase):
 
     # just a basic test to make extra_cluster_params is respected.
     # more extensive tests are found in tests.test_emr
@@ -398,7 +399,7 @@ class ExtraClusterParamsTestCase(MockGoogleAPITestCase):
             self.assertEqual(cluster['labels']['name'], 'wrench')
 
 
-class RegionTestCase(MockGoogleAPITestCase):
+class RegionTestCase(MockGoogleTestCase):
 
     def test_default(self):
         runner = DataprocJobRunner()
@@ -413,7 +414,7 @@ class RegionTestCase(MockGoogleAPITestCase):
         self.assertEqual(runner._gce_region, 'us-central1')
 
 
-class TmpBucketTestCase(MockGoogleAPITestCase):
+class TmpBucketTestCase(MockGoogleTestCase):
     def assert_new_tmp_bucket(self, location, **runner_kwargs):
         """Assert that if we create an DataprocJobRunner with the given keyword
         args, it'll create a new tmp bucket with the given location
@@ -492,7 +493,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         self.assertEqual(runner._gce_region, US_EAST_GCE_REGION)
 
 
-class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
+class GCEInstanceGroupTestCase(MockGoogleTestCase):
 
     maxDiff = None
 
@@ -677,7 +678,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             task=(20, HIGHCPU_GCE_INSTANCE))
 
 
-class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
+class MasterBootstrapScriptTestCase(MockGoogleTestCase):
 
     def test_usr_bin_env(self):
         runner = DataprocJobRunner(conf_paths=[],
@@ -822,7 +823,7 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
                          ['garply', 'quux'])
 
 
-class DataprocNoMapperTestCase(MockGoogleAPITestCase):
+class DataprocNoMapperTestCase(MockGoogleTestCase):
 
     def test_no_mapper(self):
         # read from STDIN, a local file, and a remote file
@@ -858,7 +859,7 @@ class DataprocNoMapperTestCase(MockGoogleAPITestCase):
                           (4, ['fish'])])
 
 
-class MaxMinsIdleTestCase(MockGoogleAPITestCase):
+class MaxMinsIdleTestCase(MockGoogleTestCase):
 
     def assertRanIdleTimeoutScriptWith(self, runner, expected_metadata):
         cluster_metadata, last_init_exec = (
@@ -909,7 +910,7 @@ class MaxMinsIdleTestCase(MockGoogleAPITestCase):
         self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
 
 
-class TestCatFallback(MockGoogleAPITestCase):
+class TestCatFallback(MockGoogleTestCase):
 
     def test_gcs_cat(self):
 
@@ -925,7 +926,7 @@ class TestCatFallback(MockGoogleAPITestCase):
         self.assertEqual(list(runner.fs.cat('gs://walrus/one')), [b'one_text'])
 
 
-class CleanUpJobTestCase(MockGoogleAPITestCase):
+class CleanUpJobTestCase(MockGoogleTestCase):
 
     @contextmanager
     def _test_mode(self, mode):
@@ -998,7 +999,7 @@ class CleanUpJobTestCase(MockGoogleAPITestCase):
                 self.assertTrue(m.called)
 
 
-class BootstrapPythonTestCase(MockGoogleAPITestCase):
+class BootstrapPythonTestCase(MockGoogleTestCase):
 
     if PY2:
         EXPECTED_BOOTSTRAP = [

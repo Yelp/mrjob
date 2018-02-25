@@ -21,11 +21,16 @@ from tests.sandbox import SandboxedTestCase
 
 from .storage import MockGoogleStorageClient
 
+_TEST_PROJECT = 'test-mrjob:test-project'
+
 
 class MockGoogleTestCase(SandboxedTestCase):
 
     def setUp(self):
         super(MockGoogleTestCase, self).setUp()
+
+        # Maps cluster name to ???
+        self.mock_clusters = {}
 
         # Maps bucket name to a dictionary with the key
         # *blobs*. *blobs* maps object name to
@@ -33,8 +38,27 @@ class MockGoogleTestCase(SandboxedTestCase):
         # a bytestring.
         self.mock_gcs_fs = {}
 
+        self.start(patch('google.auth.default',
+                   return_value=(None, _TEST_PROJECT)))
+
+        self.start(patch('google.cloud.dataproc_v1.ClusterControllerClient',
+                         self.cluster_client))
+
+        self.start(patch('google.cloud.dataproc_v1.JobControllerClient',
+                         self.job_client))
+
         self.start(patch('google.cloud.storage.client.Client',
                          self.storage_client))
+
+    def cluster_client(self, credentials=None):
+        return MockGoogleDataprocClusterClient(
+            mock_clusters=self.mock_clusters,
+            mock_gcs_fs=self.mock_gcs_fs)
+
+    def job_client(self, credentials=None):
+        return MockGoogleDataprocJobClient(
+            mock_clusters=self.mock_clusters,
+            mock_gcs_fs=self.mock_gcs_fs)
 
     def storage_client(self, project=None, credentials=None):
         return MockGoogleStorageClient(mock_gcs_fs=self.mock_gcs_fs)

@@ -13,13 +13,15 @@
 # limitations under the License.
 """Limited mock of google-cloud-sdk for tests
 """
+from google.oauth2.credentials import Credentials
+
 from mrjob.fs.gcs import parse_gcs_uri
 
+from .dataproc import MockGoogleDataprocClusterClient
+from .dataproc import MockGoogleDataprocJobClient
+from .storage import MockGoogleStorageClient
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
-
-
-from .storage import MockGoogleStorageClient
 
 _TEST_PROJECT = 'test-mrjob:test-project'
 
@@ -32,14 +34,17 @@ class MockGoogleTestCase(SandboxedTestCase):
         # Maps cluster name to ???
         self.mock_clusters = {}
 
+        self.mock_credentials = Credentials('mock_token')
+
         # Maps bucket name to a dictionary with the key
         # *blobs*. *blobs* maps object name to
         # a dictionary with the key *data*, which is
         # a bytestring.
         self.mock_gcs_fs = {}
 
-        self.start(patch('google.auth.default',
-                   return_value=(None, _TEST_PROJECT)))
+        self.mock_project_id = 'mock-project-12345'
+
+        self.start(patch('google.auth.default', self.auth_default))
 
         self.start(patch('google.cloud.dataproc_v1.ClusterControllerClient',
                          self.cluster_client))
@@ -49,6 +54,9 @@ class MockGoogleTestCase(SandboxedTestCase):
 
         self.start(patch('google.cloud.storage.client.Client',
                          self.storage_client))
+
+    def auth_default(self):
+        return (self.mock_credentials, self.mock_project_id)
 
     def cluster_client(self, credentials=None):
         return MockGoogleDataprocClusterClient(

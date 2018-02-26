@@ -36,6 +36,7 @@ from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
+from mrjob.util import save_current_environment
 
 from tests.mock_google import MockGoogleTestCase
 from tests.mockgoogleapiclient import MockGoogleAPITestCase
@@ -399,19 +400,46 @@ class ExtraClusterParamsTestCase(MockGoogleTestCase):
             self.assertEqual(cluster['labels']['name'], 'wrench')
 
 
-class RegionTestCase(MockGoogleTestCase):
+class RegionAndZoneTestCase(MockGoogleTestCase):
+
+    def setUp(self):
+        super(RegionAndZoneTestCase, self).setUp()
+        self.log = self.start(patch('mrjob.dataproc.log'))
 
     def test_default(self):
         runner = DataprocJobRunner()
-        self.assertEqual(runner._gce_region, 'us-central1')
+        self.assertEqual(runner._opts['region'], None)
+        self.assertEqual(runner._opts['zone'], 'us-west1-a')
+        self.assertFalse(self.log.warning.called)
 
-    def test_explicit_region(self):
-        runner = DataprocJobRunner(region='europe-west1')
-        self.assertEqual(runner._gce_region, 'europe-west1')
+    def test_explicit_zone(self):
+        runner = DataprocJobRunner(zone='europe-west1-a')
+        self.assertEqual(runner._opts['zone'], 'europe-west1-a')
 
-    def test_cannot_be_empty(self):
-        runner = DataprocJobRunner(region='')
-        self.assertEqual(runner._gce_region, 'us-central1')
+    def test_zone_from_environment(self):
+        with save_current_environment():
+            os.environ['CLOUD_SDK_ZONE'] = 'us-west1-b'
+            runner = DataprocJobRunner()
+
+        self.assertEqual(runner._opts['zone'], 'us-west1-a')
+
+    def test_explicit_zone_beats_environment(self):
+        with save_current_environment():
+            os.environ['CLOUD_SDK_ZONE'] = 'us-west1-b'
+            runner = DataprocJobRunner(zone='europe-west1-a')
+
+        self.assertEqual(runner._opts['zone'], 'europe-west1-a')
+
+    def test_zone_cannot_be_empty(self):
+        runner = DataprocJobRunner(zone='')
+        self.assertEqual(runner._opts['zone'], 'us-west1-a')
+
+    def test_setting_region_triggers_warning(self):
+        runner = DataprocJobRunner(region='europe-west1-a')
+
+        self.assertEqual(runner._opts['region'], 'europe-west1-a')
+        self.assertTrue(self.log.warning.called)
+        self.assertEqual(runner._opts['zone'], 'us-west1-a')
 
 
 class TmpBucketTestCase(MockGoogleTestCase):

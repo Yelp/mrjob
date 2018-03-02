@@ -13,6 +13,8 @@
 # limitations under the License.
 """Limited mock of google-cloud-sdk for tests
 """
+from io import BytesIO
+
 from google.oauth2.credentials import Credentials
 
 from mrjob.fs.gcs import parse_gcs_uri
@@ -20,6 +22,7 @@ from mrjob.fs.gcs import parse_gcs_uri
 from .dataproc import MockGoogleDataprocClusterClient
 from .dataproc import MockGoogleDataprocJobClient
 from .storage import MockGoogleStorageClient
+from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
@@ -70,6 +73,19 @@ class MockGoogleTestCase(SandboxedTestCase):
 
     def storage_client(self, project=None, credentials=None):
         return MockGoogleStorageClient(mock_gcs_fs=self.mock_gcs_fs)
+
+    def make_runner(self, *args):
+        """create a dummy job, and call make_runner() on it.
+        Use this in a with block:
+
+        with self.make_runner() as runner:
+            ...
+        """
+        stdin = BytesIO(b'foo\nbar\n')
+        mr_job = MRTwoStepJob(['-r', 'dataproc'] + list(args))
+        mr_job.sandbox(stdin=stdin)
+
+        return mr_job.make_runner()
 
     def put_gcs_multi(self, gcs_uri_to_data_map):
         client = self.storage_client()

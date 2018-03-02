@@ -361,27 +361,26 @@ class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
                 self.assertEqual(runner.get_hadoop_version(), '2.7.2')
 
 
-EXPECTED_ZONE = 'PUPPYLAND'
+class AvailabilityZoneConfigTestCase(MockGoogleTestCase):
 
-
-class ZoneTestCase(MockGoogleTestCase):
+    ZONE = 'puppy-land-1a'
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
         'check_cluster_every': 0.00,
         'cloud_fs_sync_secs': 0.00,
-        'zone': EXPECTED_ZONE,
+        'zone': ZONE,
     }}}
 
     def test_availability_zone_config(self):
-        with self.make_runner() as runner:
+        with self.make_runner('--zone', self.ZONE) as runner:
             runner.run()
 
-            cluster = runner._api_cluster_get(runner._cluster_id)
-            self.assertIn(EXPECTED_ZONE,
+            cluster = runner._get_cluster(runner._cluster_id)
+            self.assertIn(self.ZONE,
                           cluster['config']['gceClusterConfig']['zoneUri'])
-            self.assertIn(EXPECTED_ZONE,
+            self.assertIn(self.ZONE,
                           cluster['config']['masterConfig']['machineTypeUri'])
-            self.assertIn(EXPECTED_ZONE,
+            self.assertIn(self.ZONE,
                           cluster['config']['workerConfig']['machineTypeUri'])
 
 
@@ -400,10 +399,10 @@ class ExtraClusterParamsTestCase(MockGoogleTestCase):
             self.assertEqual(cluster['labels']['name'], 'wrench')
 
 
-class RegionAndZoneTestCase(MockGoogleTestCase):
+class RegionAndZoneOptsTestCase(MockGoogleTestCase):
 
     def setUp(self):
-        super(RegionAndZoneTestCase, self).setUp()
+        super(RegionAndZoneOptsTestCase, self).setUp()
         self.log = self.start(patch('mrjob.dataproc.log'))
 
     def test_default(self):

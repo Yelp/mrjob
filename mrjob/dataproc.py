@@ -14,11 +14,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import io
 import logging
 import time
 import re
-import subprocess
 from os import environ
 from os.path import dirname
 from os.path import join
@@ -27,20 +25,22 @@ try:
     import google.auth
     import google.cloud.dataproc_v1
     from google.api_core.exceptions import NotFound
+    from google.api_core.grpc_helpers import create_channel
 except:
     google = None
     NotFound = None
+    create_channel = None
 
 import mrjob
 from mrjob.cloud import HadoopInTheCloudJobRunner
 from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
-from mrjob.fs.local import LocalFilesystem
 from mrjob.fs.gcs import GCSFilesystem
-from mrjob.logs.counters import _pick_counters
-from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.gcs import is_gcs_uri
+from mrjob.fs.gcs import parse_gcs_uri
+from mrjob.fs.local import LocalFilesystem
+from mrjob.logs.counters import _pick_counters
 from mrjob.py2 import PY2
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
@@ -48,7 +48,9 @@ from mrjob.util import random_identifier
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_ZONE = 'us-west1-a'
+_DEFAULT_REGION = 'us-west1'
+
+_DEFAULT_ENDPOINT = 'dataproc.googleapis.com:443'
 
 _DATAPROC_API_REGION = 'global'
 _DATAPROC_MIN_WORKERS = 2
@@ -263,14 +265,19 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._log_interpretations = []
 
     def _fix_zone_and_region_opts(self):
-        if not self._opts['zone']:
-            self._opts['zone'] = (environ.get('CLOUDSDK_COMPUTE_ZONE') or
-                                  _DEFAULT_ZONE)
+        """Ensure that exactly one of region and zone is set."""
+        if self._opts['region'] and self._opts['zone']:
+            log.warning('you do not need to set region if you set zone')
+            self._opts['region'] = None
+            return
 
-        if self._opts['region']:
-            log.warning(
-                'region opt is currently ignored. please set'
-                '--zone instead')
+        if not (self._opts['region'] or self._opts['zone']):
+            if environ.get('CLOUDSDK_COMPUTE_ZONE'):
+                self._opts['zone'] = environ['CLOUDSDK_COMPUTE_ZONE']
+            elif environ.get('CLOUDSDK_COMPUTE_REGION'):
+                self._opts['region'] = environ['CLOUDSDK_COMPUTE_REGION']
+            else:
+                self._opts['region'] = _DEFAULT_REGION
 
     def _default_opts(self):
         return combine_dicts(
@@ -289,16 +296,42 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             )
         )
 
+    def _combine_opts(self, opt_list):
+        """Blank out overridden *zone* and *region* opts."""
+        # copy opt_list so we can modify it
+        opt_list = [dict(opts) for opts in opt_list]
+
+        # blank out any instance_fleets/groups before the last config
+        # where they are set
+        blank_out = False
+        for opts in reversed(opt_list):
+            if blank_out:
+                opts['region'] = None
+                opts['zone'] = None
+            elif any(opts.get(k) is not None
+                     for k in ('region', 'zone')):
+                blank_out = True
+
+        # now combine opts, with region/zone blanked out
+        return super(DataprocJobRunner, self)._combine_opts(opt_list)
+
     @property
     def cluster_client(self):
-
         return google.cloud.dataproc_v1.ClusterControllerClient(
-            credentials=self._credentials)
+            **self._client_create_kwargs())
 
     @property
     def job_client(self):
         return google.cloud.dataproc_v1.JobControllerClient(
-            credentials=self._credentials)
+            **self._client_create_kwargs())
+
+    def _client_create_kwargs(self):
+        if self._opts['region']:
+            endpoint = '%s-%s' % (self._opts['region'], _DEFAULT_ENDPOINT)
+            return dict(channel=create_channel(
+                endpoint, credentials=self._credentials))
+        else:
+            return dict(credentials=self._credentials)
 
     @property
     def api_client(self):
@@ -333,7 +366,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # same GCE region
         chosen_bucket_name = None
 
-        region = _zone_to_region(self._opts['zone'])
+        # determine region for bucket
+        region = self._opts['region'] or _zone_to_region(self._opts['zone'])
 
         for tmp_bucket_name in self.fs.get_all_bucket_names(prefix='mrjob-'):
             tmp_bucket = self.fs.get_bucket(tmp_bucket_name)
@@ -451,7 +485,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         log.info('creating FS bucket %r' % bucket_name)
 
-        location = location or _zone_to_region(self._opts['zone'])
+        location = location or self._opts['region'] or _zone_to_region(
+            self._opts['zone'])
 
         # NOTE - By default, we create a bucket in the same GCE region as our
         # job (tmp buckets ONLY)
@@ -461,6 +496,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             object_ttl_days=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS)
 
         self._wait_for_fs_sync()
+
+    def _bucket_region(self):
+        if self._opts['region']:
+            return self._opts['region']
+        else:
+            return '-'.join(self._opts['zone'].split('-')[:-1])
+
 
     ### Running the job ###
     def cleanup(self, mode=None):
@@ -839,9 +881,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     def _get_cluster(self, cluster_id):
         return self.cluster_client.get_cluster(
-            project_id=self._project_id,
-            region=_DATAPROC_API_REGION,
-            cluster_name=cluster_id
+            cluster_name=cluster_id,
+            **self._project_id_and_region()
         )
 
     def _create_cluster(self, cluster_data):
@@ -849,24 +890,20 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters/get  # noqa
 
         self.cluster_client.create_cluster(
-            project_id=self._project_id,
-            region=_DATAPROC_API_REGION,
             cluster=cluster_data,
+            **self._project_id_and_region()
         )
 
     def _delete_cluster(self, cluster_id):
         return self.cluster_client.delete_cluster(
-            project_id=self._project_id,
-            region=_DATAPROC_API_REGION,
-            cluster_name=cluster_id
+            cluster_name=cluster_id,
+            **self._project_id_and_region()
         )
 
     def _list_jobs(self, cluster_name=None, state_matcher=None):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/list#JobStateMatcher  # noqa
-        list_kwargs = dict(
-            project_id=self._project_id,
-            region=_DATAPROC_API_REGION,
-        )
+        list_kwargs = self._project_id_and_region()
+
         if cluster_name:
             list_kwargs['cluster_name'] = cluster_name
 
@@ -877,16 +914,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     def _get_job(self, job_id):
         return self.job_client.get_job(
-            project_id=self._project_id,
-            region=_DATAPROC_API_REGION,
             job_id=job_id,
+            **self._project_id_and_region()
         )
 
     def _cancel_job(self, job_id):
         return self.job_client.cancel_job(
-            project_id=self._project_id,
-            region=_DATAPROC_API_REGION,
             job_id=job_id,
+            **self._project_id_and_region()
         )
 
     def _submit_hadoop_job(self, step_name, hadoop_job):
@@ -894,11 +929,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobReference  # noqa
         return self.job_client.submit_job(
-            project_id=self._project_id,
-            region=_DATAPROC_API_REGION,
             job=dict(
                 reference=dict(project_id=self._project_id, job_id=step_name),
                 placement=dict(cluster_name=self._cluster_id),
                 hadoop_job=hadoop_job,
             ),
+            **self._project_id_and_region()
+        )
+
+    def _project_id_and_region(self):
+        return dict(
+            project_id=self._project_id,
+            region=(self._opts['region'] or 'global'),
         )

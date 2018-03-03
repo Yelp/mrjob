@@ -62,6 +62,7 @@ class SimMRJobRunner(MRJobRunner):
 
     OPT_NAMES = MRJobRunner.OPT_NAMES | {
         'hadoop_version',
+        'num_cores'
     }
 
     def __init__(self, **kwargs):

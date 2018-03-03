@@ -845,6 +845,15 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    num_cores=dict(
+        cloud_role='launch',
+        switches=[
+            (['--num-cores'], dict(
+                help='Total number of core to use while running in local mode',
+                type=int,
+            )),
+        ],
+    ),
     owner=dict(
         cloud_role='launch',
         switches=[

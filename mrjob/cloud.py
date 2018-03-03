@@ -116,13 +116,6 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             if opts.get('max_mins_idle') is None:
                 opts['max_mins_idle'] = opts['max_hours_idle'] * 60
 
-        # warn about issues with
-        if (opts.get('max_mins_idle') is not None and
-                opts['max_mins_idle'] < _DEFAULT_MAX_MINS_IDLE):
-            log.warning('Setting max_mins_idle to less than %.1f may result'
-                        ' in cluster shutting down before job can run' %
-                        _DEFAULT_MAX_MINS_IDLE)
-
         return opts
 
     def _combine_opts(self, opt_list):

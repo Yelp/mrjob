@@ -721,7 +721,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _prepare_for_launch(self):
         """Set up files needed for the job."""
         self._check_output_not_exists()
-        self._create_setup_wrapper_script()
+        self._create_setup_wrapper_scripts()
         self._add_bootstrap_files_for_upload()
         self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()

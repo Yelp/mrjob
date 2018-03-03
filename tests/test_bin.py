@@ -421,7 +421,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._create_setup_wrapper_script()
+            runner._create_setup_wrapper_scripts()
 
             # note that local mode uses sys.executable, not python/python3
             self.assertEqual(
@@ -436,7 +436,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._create_setup_wrapper_script()
+            runner._create_setup_wrapper_scripts()
 
             # note that local mode uses sys.executable, not python/python3
             self.assertEqual(
@@ -453,7 +453,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
                          return_value=['bash']))
 
         with job.make_runner() as runner:
-            runner._create_setup_wrapper_script()
+            runner._create_setup_wrapper_scripts()
 
             self.assertEqual(
                 runner._render_substep(0, 'mapper'),

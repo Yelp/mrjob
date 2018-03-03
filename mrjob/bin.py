@@ -61,8 +61,9 @@ class MRJobBinRunner(MRJobRunner):
         # where a zip file of the mrjob library is stored locally
         self._mrjob_zip_path = None
 
-        # we'll create the wrapper script later
+        # we'll create the setup wrapper scripts later
         self._setup_wrapper_script_path = None
+        self._manifest_setup_script_path = None
 
     def _default_opts(self):
         return combine_dicts(
@@ -102,11 +103,6 @@ class MRJobBinRunner(MRJobRunner):
         # verify that this is a proper step description
         if not steps or not stdout:
             raise ValueError('step description is empty!')
-        for step in steps:
-            if step['type'] not in STEP_TYPES:
-                raise ValueError(
-                    'unexpected step type %r in steps %r' % (
-                        step['type'], stdout))
 
         return steps
 
@@ -343,10 +339,10 @@ class MRJobBinRunner(MRJobRunner):
 
     ### setup scripts ###
 
-    def _create_setup_wrapper_script(
-            self, dest='setup-wrapper.sh', local=False):
-        """Create the wrapper script, and write it into our local temp
-        directory (by default, to a file named wrapper.sh).
+    # TODO: rename to _setup_wrapper_scripts()
+    def _create_setup_wrapper_scripts(self, local=False):
+        """Create the setup wrapper script, and write it into our local temp
+        directory (by default, to a file named setup-wrapper.sh).
 
         This will set ``self._setup_wrapper_script_path``, and add it to
         ``self._working_dir_mgr``
@@ -357,9 +353,6 @@ class MRJobBinRunner(MRJobRunner):
         If *local* is true, use local line endings (e.g. Windows). Otherwise,
         use UNIX line endings (see #1071).
         """
-        if self._setup_wrapper_script_path:
-            return
-
         setup = self._setup
 
         if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_SETUP:
@@ -371,35 +364,47 @@ class MRJobBinRunner(MRJobRunner):
             self._working_dir_mgr.add(**path_dict)
             setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
 
-        if not setup:
-            return
+        def _write(contents, path, description):
+            log.debug('Writing %s to %s' % (description, path))
+            for line in contents:
+                log.debug('  ' + line.rstrip('\n'))
 
-        path = os.path.join(self._get_local_tmp_dir(), dest)
-        log.debug('Writing wrapper script to %s' % path)
+            if local:
+                with open(path, 'w') as f:
+                    for line in contents:
+                        f.write(line)
+            else:
+                with open(path, 'wb') as f:
+                    for line in contents:
+                        f.write(line.encode('utf-8'))
 
-        contents = self._setup_wrapper_script_content(setup)
-        for line in contents:
-            log.debug('WRAPPER: ' + line.rstrip('\n'))
+        if setup and not self._setup_wrapper_script_path:
 
-        if local:
-            with open(path, 'w') as f:
-                for line in contents:
-                    f.write(line)
-        else:
-            with open(path, 'wb') as f:
-                for line in contents:
-                    f.write(line.encode('utf-8'))
+            contents = self._setup_wrapper_script_content(setup)
+            path = os.path.join(self._get_local_tmp_dir(), 'setup-wrapper.sh')
 
-        self._setup_wrapper_script_path = path
-        self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
+            _write(contents, path, 'setup wrapper script')
 
+            self._setup_wrapper_script_path = path
+            self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
+
+        if (self._needs_input_manifest() and not
+                self._manifest_setup_script_path):
+
+            contents = self._setup_wrapper_script_content(setup, manifest=True)
+            path = os.path.join(self._get_local_tmp_dir(), 'manifest-setup.sh')
+
+            _write(contents, path, 'manifest setup script')
+
+            self._manifest_setup_script_path = path
+            self._working_dir_mgr.add('file', self._manifest_setup_script_path)
 
     def _create_mrjob_zip(self):
         """Make a zip of the mrjob library, without .pyc or .pyo files,
         This will also set ``self._mrjob_zip_path`` and return it.
 
         Typically called from
-        :py:meth:`_create_setup_wrapper_script`.
+        :py:meth:`_create_setup_wrapper_scripts`.
 
         It's safe to call this method multiple times (we'll only create
         the zip file once.)
@@ -436,7 +441,7 @@ class MRJobBinRunner(MRJobRunner):
 
         return self._mrjob_zip_path
 
-    def _setup_wrapper_script_content(self, setup, mrjob_zip_name=None):
+    def _setup_wrapper_script_content(self, setup, manifest=False):
         """Return a (Bourne) shell script that runs the setup commands and then
         executes whatever is passed to it (this will be our mapper/reducer),
         as a list of strings (one for each line, including newlines).
@@ -445,6 +450,10 @@ class MRJobBinRunner(MRJobRunner):
         cannot run simultaneously on the same machine (this helps for running
         :command:`make` on a shared source code archive, for example).
         """
+        # TODO: implement this
+        if manifest:
+            raise NotImplementedError
+
         out = []
 
         def writeln(line=''):

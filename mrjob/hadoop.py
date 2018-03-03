@@ -344,7 +344,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
     def _run(self):
         self._find_binaries_and_jars()
-        self._create_setup_wrapper_script()
+        self._create_setup_wrapper_scripts()
         self._add_job_files_for_upload()
         self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()

@@ -809,6 +809,12 @@ class MRJobRunner(object):
         return any(step['type'] == 'streaming'
                    for step in self._get_steps())
 
+    def _needs_input_manifest(self):
+        """Does the first step take an input manifest?"""
+        first_step = self._get_step(0)
+        return (first_step['type'] == 'streaming' and
+                first_step['mapper']['type'] == 'manifest')
+
     def _has_spark_steps(self):
         """Are any of our steps Spark steps (either spark or spark_script)"""
         return any(_is_spark_step_type(step['type'])

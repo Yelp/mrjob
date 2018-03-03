@@ -125,8 +125,8 @@ class SimMRJobRunner(MRJobRunner):
         pass
 
     def _run(self):
-        if hasattr(self, '_create_setup_wrapper_script'):  # inline doesn't
-            self._create_setup_wrapper_script(local=True)
+        if hasattr(self, '_create_setup_wrapper_scripts'):  # inline doesn't
+            self._create_setup_wrapper_scripts(local=True)
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):

@@ -1,7 +1,10 @@
-#!/bin/sh
+#!/bin/sh -ex
 INPUT_URI=$(cut -f 2)
+
 FILE_EXT=$(basename $INPUT_URI | sed -e 's/^[^.]*//')
+
 INPUT_PATH=$(mktemp ./input-XXXXXXXXXX$FILE_EXT)
+rm $INPUT_PATH
 
 # use
 case $INPUT_URI in
@@ -28,7 +31,15 @@ case $INPUT_PATH in
 esac
 
 set +e
-cat $INPUT_PATH
-RETURNCODE=$?
+#cat $INPUT_PATH
+python -c '1/0'
+{ RETURNCODE=$?; set +x; } 2> /dev/null
+
+if [ $RETURNCODE -ne 0 ]
+then
+    echo 2>&1
+    echo "while reading input from $INPUT_URI" 2>&1
+fi
+
 rm $INPUT_PATH
 exit $RETURNCODE

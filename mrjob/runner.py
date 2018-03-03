@@ -317,9 +317,6 @@ class MRJobRunner(object):
             self._stdin = stdin or sys.stdin.buffer
         self._stdin_path = None  # temp file containing dump from stdin
 
-        # where a zip file of the mrjob library is stored locally
-        self._mrjob_zip_path = None
-
         # store output_dir
         self._output_dir = output_dir
 
@@ -997,48 +994,6 @@ class MRJobRunner(object):
                 return arg
 
         return [interpolate(arg) for arg in args]
-
-    def _create_mrjob_zip(self):
-        """Make a zip of the mrjob library, without .pyc or .pyo files,
-        This will also set ``self._mrjob_zip_path`` and return it.
-
-        Typically called from
-        :py:meth:`_create_setup_wrapper_script`.
-
-        It's safe to call this method multiple times (we'll only create
-        the zip file once.)
-        """
-        if not self._mrjob_zip_path:
-            # find mrjob library
-            import mrjob
-
-            if not os.path.basename(mrjob.__file__).startswith('__init__.'):
-                raise Exception(
-                    "Bad path for mrjob library: %s; can't bootstrap mrjob",
-                    mrjob.__file__)
-
-            mrjob_dir = os.path.dirname(mrjob.__file__) or '.'
-
-            zip_path = os.path.join(self._get_local_tmp_dir(), 'mrjob.zip')
-
-            def filter_path(path):
-                filename = os.path.basename(path)
-                return not(filename.lower().endswith('.pyc') or
-                           filename.lower().endswith('.pyo') or
-                           # filter out emacs backup files
-                           filename.endswith('~') or
-                           # filter out emacs lock files
-                           filename.startswith('.#') or
-                           # filter out MacFuse resource forks
-                           filename.startswith('._'))
-
-            log.debug('archiving %s -> %s as %s' % (
-                mrjob_dir, zip_path, os.path.join('mrjob', '')))
-            zip_dir(mrjob_dir, zip_path, filter=filter_path, prefix='mrjob')
-
-            self._mrjob_zip_path = zip_path
-
-        return self._mrjob_zip_path
 
     def _jobconf_for_step(self, step_num):
         """Get the jobconf dictionary, optionally including step-specific

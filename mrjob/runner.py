@@ -769,7 +769,9 @@ class MRJobRunner(object):
         Results are cached, so call this as many times as you want.
         """
         if self._steps is None:
-            self._steps = self._load_steps()
+            steps = self._load_steps()
+            self._check_steps(steps)
+            self._steps = steps
 
         return self._steps
 
@@ -780,6 +782,19 @@ class MRJobRunner(object):
         Returns output as described in :ref:`steps-format`.
         """
         raise NotImplementedError
+
+    def _check_steps(self):
+        """Raise an exception if there's something wrong with the step
+        definition."""
+        for step_num, steps in steps:
+            if step['type'] not in STEP_TYPES:
+                raise ValueError(
+                    'unexpected step type %r in steps %r' % (
+                        step['type'], stdout))
+
+            if (step_num > 0 and step['type'] == 'streaming' and
+                    'mapper' in step and step['mapper']['type'] == 'manifest'):
+                raise ValueError('only first step may take an input manifest')
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""

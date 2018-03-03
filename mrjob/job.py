@@ -189,6 +189,11 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
+    def mapper_raw(self, path, uri):
+        """Re-define this to make Hadoop pass one input file to each
+        mapper."""
+        raise NotImplementedError
+
     def reducer_init(self):
         """Re-define this to define an action to run before the reducer
         processes any input.

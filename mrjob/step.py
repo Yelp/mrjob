@@ -162,7 +162,7 @@ class MRStep(object):
 
         steps.update(kwargs)
 
-        def _check_conflict(func, other_funcs)
+        def _check_conflict(func, other_funcs):
             if steps[func]:
                 for other_func in other_funcs:
                     if steps[other_func] and other_func != func:
@@ -215,7 +215,7 @@ class MRStep(object):
             return {'type': 'command', 'command': cmd}
         elif manifest_key and self._steps[manifest_key]:
             return {'type': 'manifest'}
-        elif:
+        else:
             substep = {'type': 'script'}
             if (pre_filter_key and
                     self._steps[pre_filter_key]):
@@ -224,7 +224,7 @@ class MRStep(object):
 
     def render_mapper(self):
         return self._render_substep(
-            'mapper_cmd', 'mapper_pre_filter', 'mapper_raw'))
+            'mapper_cmd', 'mapper_pre_filter', 'mapper_raw')
 
     def render_combiner(self):
         return self._render_substep('combiner_cmd', 'combiner_pre_filter')

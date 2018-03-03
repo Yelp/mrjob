@@ -76,8 +76,6 @@ def _time_sort_key(d):
         attempt_num,
         task_num)
 
-    return sort_key
-
 
 def _add_implied_task_id(d):
     """If *d* (a dictionary) has *attempt_id* but not *task_id*, add it.

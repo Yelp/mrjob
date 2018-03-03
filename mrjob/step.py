@@ -162,20 +162,17 @@ class MRStep(object):
 
         steps.update(kwargs)
 
-        steps_set = {k for k in steps if steps[k]}
-
-        # can't set both mapper_cmd and mapper*
-        for x in 'mapper', 'combiner', 'reducer':
-            x_cmd = x + '_cmd'
-            if x_cmd in steps_set:
-                for k in sorted(steps_set):
-                    if k.startswith(x) and k != x_cmd:
+        def _check_conflict(func, other_funcs)
+            if steps[func]:
+                for other_func in other_funcs:
+                    if steps[other_func] and other_func != func:
                         raise ValueError("Can't specify both %s and %s" % (
-                            x_cmd, k))
+                            func, other_func))
 
-        # can't set both mapper and mapper_raw (mapper_init etc. is okay)
-        if 'mapper' in steps_set and 'mapper_raw' in steps_set:
-            raise ValueError("Can't specify both mapper and mapper_raw")
+        _check_conflict('mapper_cmd', _MAPPER_FUNCS)
+        _check_conflict('mapper_raw', ('mapper', 'mapper_pre_filter'))
+        _check_conflict('combiner_cmd', _COMBINER_FUNCS)
+        _check_conflict('reducer_cmd', _REDUCER_FUNCS)
 
         self._steps = steps
 
@@ -207,7 +204,7 @@ class MRStep(object):
             return _IDENTITY_REDUCER
         return self._steps[key]
 
-    def _render_substep(self, cmd_key, pre_filter_key=None):
+    def _render_substep(self, cmd_key, pre_filter_key, manifest_key):
         if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, string_types):
@@ -216,7 +213,9 @@ class MRStep(object):
                 raise ValueError('Cannot specify both %s and %s' % (
                     cmd_key, pre_filter_key))
             return {'type': 'command', 'command': cmd}
-        else:
+        elif manifest_key and self._steps[manifest_key]:
+            return {'type': 'manifest'}
+        elif:
             substep = {'type': 'script'}
             if (pre_filter_key and
                     self._steps[pre_filter_key]):
@@ -224,7 +223,8 @@ class MRStep(object):
             return substep
 
     def render_mapper(self):
-        return self._render_substep('mapper_cmd', 'mapper_pre_filter')
+        return self._render_substep(
+            'mapper_cmd', 'mapper_pre_filter', 'mapper_raw'))
 
     def render_combiner(self):
         return self._render_substep('combiner_cmd', 'combiner_pre_filter')

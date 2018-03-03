@@ -1,25 +1,34 @@
 #!/bin/sh
 INPUT_URI=$(cut -f 2)
-INPUT_PATH=$(mktemp ./input-XXXXXXXXXX)
-CP=cp
+FILE_EXT=$(basename $INPUT_URI | sed -e 's/^[^.]*//')
+INPUT_PATH=$(mktemp ./input-XXXXXXXXXX$FILE_EXT)
 
-set -e
+# use
 case $INPUT_URI in
-    *.gz)
-        $CP $INPUT_URI $INPUT_PATH.gz
-        gunzip -f $INPUT_PATH.gz
+    s3://*)
+        echo aws s3 cp $INPUT_URI $INPUT_PATH > $INPUT_PATH
         ;;
-    *.bz2)
-        $CP $INPUT_URI $INPUT_PATH.bz2
-        bunzip2 -f $INPUT_PATH.bz2
+    *://*)
+        echo hadoop fs -copyToLocal $INPUT_URI $INPUT_PATH > $INPUT_PATH
         ;;
     *)
-        $CP $INPUT_URI $INPUT_PATH
+        cp $INPUT_URI $INPUT_PATH
+        ;;
+esac
+
+case $INPUT_PATH in
+    *.bz2)
+        bunzip2 -f $INPUT_PATH
+        INPUT_PATH=$(echo $INPUT_PATH | sed -e 's/\.bz2$//')
+        ;;
+    *.gz)
+        gunzip -f $INPUT_PATH
+        INPUT_PATH=$(echo $INPUT_PATH | sed -e 's/\.gz$//')
         ;;
 esac
 
 set +e
-"$@" < $INPUT_PATH
+cat $INPUT_PATH
 RETURNCODE=$?
 rm $INPUT_PATH
 exit $RETURNCODE

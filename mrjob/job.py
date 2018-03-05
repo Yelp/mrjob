@@ -193,8 +193,8 @@ class MRJob(MRJobLauncher):
         """Re-define this to make Hadoop pass one input file to each
         mapper.
 
-        :param input_path: a local path to read the input file from
-        :param input_uri: the URI of the input path on HDFS, S3, etc.
+        :param input_path: a local path that the input file has been copied to
+        :param input_uri: the URI of the input file on HDFS, S3, etc
         """
         raise NotImplementedError
 

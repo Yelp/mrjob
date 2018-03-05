@@ -189,7 +189,10 @@ class MRJobBinRunner(MRJobRunner):
                 return shlex_split(cmd)
             else:
                 return cmd
-
+        elif step[mrc]['type'] == 'manifest':
+            return (self._sh_bin() + [
+                self._working_dir_mgr.name(
+                    'file', self._manifest_setup_script_path)] + args)
         elif step[mrc]['type'] == 'script':
             script_args = self._script_args_for_step(step_num, mrc)
 
@@ -388,7 +391,7 @@ class MRJobBinRunner(MRJobRunner):
             self._setup_wrapper_script_path = path
             self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
 
-        if (self._needs_input_manifest() and not
+        if (self._uses_input_manifest() and not
                 self._manifest_setup_script_path):
 
             contents = self._setup_wrapper_script_content(setup, manifest=True)

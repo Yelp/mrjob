@@ -792,9 +792,12 @@ class MRJobRunner(object):
                     'unexpected step type %r in steps %r' % (
                         step['type'], steps))
 
-            if (step_num > 0 and step['type'] == 'streaming' and
-                    'mapper' in step and step['mapper']['type'] == 'manifest'):
-                raise ValueError('only first step may take an input manifest')
+            if step['type'] == 'streaming':
+                for mrc in ('mapper', 'combiner', 'reducer'):
+                    if step[mrc]['type'] == 'manifest' and not (
+                            mrc == 'mapper' and step_num == 0):
+                        raise ValueError("only first step's mapper may take an"
+                                         "input manifest")
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""
@@ -809,7 +812,7 @@ class MRJobRunner(object):
         return any(step['type'] == 'streaming'
                    for step in self._get_steps())
 
-    def _needs_input_manifest(self):
+    def _uses_input_manifest(self):
         """Does the first step take an input manifest?"""
         first_step = self._get_step(0)
         return (first_step['type'] == 'streaming' and

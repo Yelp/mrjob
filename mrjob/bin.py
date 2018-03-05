@@ -41,6 +41,9 @@ log = logging.getLogger(__name__)
 # no need to escape arguments that only include these characters
 _HADOOP_SAFE_ARG_RE = re.compile(r'^[\w\./=-]*$')
 
+# used to handle manifest files
+_MANIFEST_INPUT_FORMAT = 'org.apache.hadoop.mapred.lib.NLineInputFormat'
+
 
 class MRJobBinRunner(MRJobRunner):
 
@@ -251,8 +254,11 @@ class MRJobBinRunner(MRJobRunner):
             args.append('%s=%s' % (key, value))
 
         # hadoop_input_format
-        if (step_num == 0 and self._hadoop_input_format):
-            args.extend(['-inputformat', self._hadoop_input_format])
+        if step_num == 0:
+            if self._uses_input_manifest():
+                args.extend(['-inputformat', _MANIFEST_INPUT_FORMAT])
+            elif self._hadoop_input_format:
+                args.extend(['-inputformat', self._hadoop_input_format])
 
         # hadoop_output_format
         if (step_num == self._num_steps() - 1 and self._hadoop_output_format):

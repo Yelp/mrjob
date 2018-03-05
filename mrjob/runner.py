@@ -786,7 +786,7 @@ class MRJobRunner(object):
     def _check_steps(self, steps):
         """Raise an exception if there's something wrong with the step
         definition."""
-        for step_num, step in steps:
+        for step_num, step in enumerate(steps):
             if step['type'] not in STEP_TYPES:
                 raise ValueError(
                     'unexpected step type %r in steps %r' % (
@@ -794,8 +794,8 @@ class MRJobRunner(object):
 
             if step['type'] == 'streaming':
                 for mrc in ('mapper', 'combiner', 'reducer'):
-                    if step[mrc]['type'] == 'manifest' and not (
-                            mrc == 'mapper' and step_num == 0):
+                    if (mrc in step and step[mrc]['type'] == 'manifest' and
+                            not (mrc == 'mapper' and step_num == 0)):
                         raise ValueError("only first step's mapper may take an"
                                          "input manifest")
 

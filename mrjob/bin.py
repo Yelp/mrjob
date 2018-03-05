@@ -32,9 +32,9 @@ from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
 from mrjob.step import _is_spark_step_type
-from mrjob.step import STEP_TYPES
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
+from mrjob.util import zip_dir
 
 log = logging.getLogger(__name__)
 

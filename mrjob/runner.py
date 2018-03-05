@@ -46,9 +46,9 @@ from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
+from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import to_lines
-from mrjob.util import zip_dir
 
 
 log = logging.getLogger(__name__)
@@ -783,14 +783,14 @@ class MRJobRunner(object):
         """
         raise NotImplementedError
 
-    def _check_steps(self):
+    def _check_steps(self, steps):
         """Raise an exception if there's something wrong with the step
         definition."""
-        for step_num, steps in steps:
+        for step_num, step in steps:
             if step['type'] not in STEP_TYPES:
                 raise ValueError(
                     'unexpected step type %r in steps %r' % (
-                        step['type'], stdout))
+                        step['type'], steps))
 
             if (step_num > 0 and step['type'] == 'streaming' and
                     'mapper' in step and step['mapper']['type'] == 'manifest'):

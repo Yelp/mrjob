@@ -462,9 +462,22 @@ class MRJobBinRunner(MRJobRunner):
                 writeln(cmd)
             writeln()
 
+        if setup:
+            self._write_setup_cmd_content(setup, writeln)
+
         # we're always going to execute this script as an argument to
         # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
+        if manifest:
+            self._write_manifest_download_content(writeln)
+        else:
+            writeln('"$@"')
 
+        return out
+
+    def _write_setup_cmd_content(self, setup, writeln):
+        """Write setup script content to obtain a file lock, run setup
+        commands in a way that doesn't perturb the script, and then
+        release the lock and return to the original working directory."""
         writeln('# store $PWD')
         writeln('__mrjob_PWD=$PWD')
         writeln()
@@ -511,14 +524,7 @@ class MRJobBinRunner(MRJobRunner):
         writeln('# run task from the original working directory')
         writeln('cd $__mrjob_PWD')
 
-        if manifest:
-            self._write_manifest_download_content(writeln)
-        else:
-            writeln('"$@"')
-
-        return out
-
-    def _manifest_download_content(self, writeln):
+    def _write_manifest_download_content(self, writeln):
         """write the part of the manifest setup script after setup, that
         downloads the input file, runs the script, and then deletes
         the file."""

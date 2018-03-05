@@ -450,10 +450,6 @@ class MRJobBinRunner(MRJobRunner):
         cannot run simultaneously on the same machine (this helps for running
         :command:`make` on a shared source code archive, for example).
         """
-        # TODO: implement this
-        if manifest:
-            raise NotImplementedError
-
         out = []
 
         def writeln(line=''):
@@ -514,9 +510,93 @@ class MRJobBinRunner(MRJobRunner):
 
         writeln('# run task from the original working directory')
         writeln('cd $__mrjob_PWD')
-        writeln('"$@"')
+
+        if manifest:
+            self._write_manifest_download_content(writeln)
+        else:
+            writeln('"$@"')
 
         return out
+
+    def _manifest_download_content(self, writeln):
+        """write the part of the manifest setup script after setup, that
+        downloads the input file, runs the script, and then deletes
+        the file."""
+        writeln()
+
+        # read URI from input
+        writeln('INPUT_URI=$(cut -f 2)')
+        writeln()
+
+        # pick file extension (e.g. ".warc.gz")
+        writeln("FILE_EXT=$(basename $INPUT_URI | sed -e 's/^[^.]*//')")
+        writeln()
+
+        # pick a unique name in the current directory to download the file to
+        writeln('INPUT_PATH=$(mktemp ./input-XXXXXXXXXX$FILE_EXT)')
+        writeln('rm $INPUT_PATH')
+        writeln()
+
+        # download the file (using different commands depending on the path)
+        writeln('case $INPUT_URI in')
+        for glob, cmd in self._manifest_download_content:
+            writeln('    %s)' % glob)
+            writeln('        %s $INPUT_URI $INPUT_PATH')
+            writeln('        ;;')
+        writeln('esac')
+        writeln()
+
+        # unpack .bz2 and .gz files
+        writeln('case $INPUT_PATH in')
+        for ext, cmd in self._manifest_uncompress_commands():
+            writeln('    *.%s)' % ext)
+            writeln('        %s $INPUT_PATH')
+            writeln("        INPUT_PATH="
+                    "$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
+            writeln('        ;;')
+        writeln('esac')
+        writeln()
+
+        # don't exit if script fails
+        writeln('set +e')
+        # pass input path and URI to script
+        writeln('"$@" $INPUT_PATH $INPUT_URI')
+        writeln()
+
+        # save return code, turn off echo
+        writeln('{ RETURNCODE=$?; set +x; } 2> /dev/null')
+        writeln()
+
+        # handle errors
+        writeln('if [ $RETURNCODE -ne 0 ]')
+        writeln('then')
+        writeln('    echo 2>&1')
+        writeln('    echo "while reading input from $INPUT_URI" 2>&1')
+        writeln('fi')
+        writeln()
+
+        # clean up input and exit
+        writeln('rm $INPUT_PATH')
+        writeln('exit $RETURNCODE')
+
+    def _manifest_download_commands(self):
+        """Return a list of ``(glob, cmd)``, where *glob*
+        matches a path or URI to download, and download command is a command
+        to download it (e.g. ``cp``, ``hadoop fs -copyToLocal``), as a
+        string.
+
+        Redefine this in your subclass. More specific blobs should come first.
+        """
+        return [('*', 'cp')]
+
+    def _manifest_uncompress_commands(self):
+        """Return a list of ``(ext, cmd)`` where ``ext`` is a file extension
+        (e.g. ``gz``) and ``cmd`` is a command to uncompress it (e.g.
+        ``gunzip``)."""
+        return [
+            ('bz2', 'bunzip2'),
+            ('gz', 'gunzip'),
+        ]
 
     def _sh_bin(self):
         """The sh binary and any arguments, as a list. Override this

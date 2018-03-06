@@ -368,9 +368,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._get_input_paths():
-            self._upload_mgr.add(path)
-
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 

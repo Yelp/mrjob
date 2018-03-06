@@ -126,7 +126,7 @@ class SimMRJobRunner(MRJobRunner):
 
     def _run(self):
         if hasattr(self, '_create_setup_wrapper_scripts'):  # inline doesn't
-            self._create_setup_wrapper_scripts(local=True)
+            self._create_setup_wrapper_scripts()
 
         # run mapper, combiner, sort, reducer for each step
         for step_num, step in enumerate(self._get_steps()):
@@ -203,6 +203,12 @@ class SimMRJobRunner(MRJobRunner):
 
     def get_hadoop_version(self):
         return self._opts['hadoop_version']
+
+    def _write_lines(self, lines, path):
+        """Write text to the given file, using local line endings."""
+        with open(path, 'w') as f:
+            for line in lines:
+                f.write(line + '\n')
 
     def _run_mapper_and_combiner_func(self, step_num, task_num, map_split):
         """Returns a no-args function that runs one mapper, plus the

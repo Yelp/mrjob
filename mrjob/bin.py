@@ -193,9 +193,12 @@ class MRJobBinRunner(MRJobRunner):
             else:
                 return cmd
         elif step[mrc]['type'] == 'manifest':
+            args = self._executable() + self._args_for_task(step_num, mrc)
+
             return (self._sh_bin() + [
                 self._working_dir_mgr.name(
                     'file', self._manifest_setup_script_path)] + args)
+
         elif step[mrc]['type'] == 'script':
             script_args = self._script_args_for_step(step_num, mrc)
 
@@ -349,7 +352,7 @@ class MRJobBinRunner(MRJobRunner):
     ### setup scripts ###
 
     # TODO: rename to _setup_wrapper_scripts()
-    def _create_setup_wrapper_scripts(self, local=False):
+    def _create_setup_wrapper_scripts(self):
         """Create the setup wrapper script, and write it into our local temp
         directory (by default, to a file named setup-wrapper.sh).
 
@@ -373,26 +376,12 @@ class MRJobBinRunner(MRJobRunner):
             self._working_dir_mgr.add(**path_dict)
             setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
 
-        def _write(contents, path, description):
-            log.debug('Writing %s to %s' % (description, path))
-            for line in contents:
-                log.debug('  ' + line.rstrip('\n'))
-
-            if local:
-                with open(path, 'w') as f:
-                    for line in contents:
-                        f.write(line)
-            else:
-                with open(path, 'wb') as f:
-                    for line in contents:
-                        f.write(line.encode('utf-8'))
-
         if setup and not self._setup_wrapper_script_path:
 
             contents = self._setup_wrapper_script_content(setup)
             path = os.path.join(self._get_local_tmp_dir(), 'setup-wrapper.sh')
 
-            _write(contents, path, 'setup wrapper script')
+            self._write_script(contents, path, 'setup wrapper script')
 
             self._setup_wrapper_script_path = path
             self._working_dir_mgr.add('file', self._setup_wrapper_script_path)
@@ -403,7 +392,7 @@ class MRJobBinRunner(MRJobRunner):
             contents = self._setup_wrapper_script_content(setup, manifest=True)
             path = os.path.join(self._get_local_tmp_dir(), 'manifest-setup.sh')
 
-            _write(contents, path, 'manifest setup script')
+            self._write_script(contents, path, 'manifest setup script')
 
             self._manifest_setup_script_path = path
             self._working_dir_mgr.add('file', self._manifest_setup_script_path)
@@ -459,55 +448,54 @@ class MRJobBinRunner(MRJobRunner):
         cannot run simultaneously on the same machine (this helps for running
         :command:`make` on a shared source code archive, for example).
         """
-        out = []
-
-        def writeln(line=''):
-            out.append(line + '\n')
+        lines = []
 
         # hook for 'set -e', etc.
         pre_commands = self._sh_pre_commands()
         if pre_commands:
             for cmd in pre_commands:
-                writeln(cmd)
-            writeln()
+                lines.append(cmd)
+            lines.append('')
 
         if setup:
-            self._write_setup_cmd_content(setup, writeln)
+            lines.extend(self._setup_cmd_content(setup))
 
         # we're always going to execute this script as an argument to
         # sh, so there's no need to add a shebang (e.g. #!/bin/sh)
         if manifest:
-            self._write_manifest_download_content(writeln)
+            lines.extend(self._manifest_download_content())
         else:
-            writeln('"$@"')
+            lines.append('"$@"')
 
-        return out
+        return lines
 
-    def _write_setup_cmd_content(self, setup, writeln):
+    def _setup_cmd_content(self, setup):
         """Write setup script content to obtain a file lock, run setup
         commands in a way that doesn't perturb the script, and then
         release the lock and return to the original working directory."""
-        writeln('# store $PWD')
-        writeln('__mrjob_PWD=$PWD')
-        writeln()
+        lines = []
 
-        writeln('# obtain exclusive file lock')
+        lines.append('# store $PWD')
+        lines.append('__mrjob_PWD=$PWD')
+        lines.append('')
+
+        lines.append('# obtain exclusive file lock')
         # Basically, we're going to tie file descriptor 9 to our lockfile,
         # use a subprocess to obtain a lock (which we somehow inherit too),
         # and then release the lock by closing the file descriptor.
         # File descriptors 10 and higher are used internally by the shell,
         # so 9 is as out-of-the-way as we can get.
-        writeln('exec 9>/tmp/wrapper.lock.%s' % self._job_key)
+        lines.append('exec 9>/tmp/wrapper.lock.%s' % self._job_key)
         # would use flock(1), but it's not always available
-        writeln("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
+        lines.append("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
                 cmd_line(self._python_bin()))
-        writeln()
+        lines.append('')
 
-        writeln('# setup commands')
+        lines.append('# setup commands')
         # group setup commands so we can redirect their input/output (see
         # below). Don't use parens; this would invoke a subshell, which would
         # keep us from exporting environment variables to the task.
-        writeln('{')
+        lines.append('{')
         for cmd in setup:
             # reconstruct the command line, substituting $__mrjob_PWD/<name>
             # for path dicts
@@ -520,79 +508,85 @@ class MRJobBinRunner(MRJobRunner):
                 else:
                     # it's raw script
                     line += token
-            writeln(line)
+            lines.append(line)
         # redirect setup commands' input/output so they don't interfere
         # with the task (see Issue #803).
-        writeln('} 0</dev/null 1>&2')
-        writeln()
+        lines.append('} 0</dev/null 1>&2')
+        lines.append('')
 
-        writeln('# release exclusive file lock')
-        writeln('exec 9>&-')
-        writeln()
+        lines.append('# release exclusive file lock')
+        lines.append('exec 9>&-')
+        lines.append('')
 
-        writeln('# run task from the original working directory')
-        writeln('cd $__mrjob_PWD')
+        lines.append('# run task from the original working directory')
+        lines.append('cd $__mrjob_PWD')
 
-    def _write_manifest_download_content(self, writeln):
+        return lines
+
+    def _manifest_download_content(self):
         """write the part of the manifest setup script after setup, that
         downloads the input file, runs the script, and then deletes
         the file."""
-        writeln()
+        lines = []
+
+        lines.append('')
 
         # read URI from input
-        writeln('INPUT_URI=$(cut -f 2)')
-        writeln()
+        lines.append('INPUT_URI=$(cut -f 2)')
+        lines.append('')
 
         # pick file extension (e.g. ".warc.gz")
-        writeln("FILE_EXT=$(basename $INPUT_URI | sed -e 's/^[^.]*//')")
-        writeln()
+        lines.append("FILE_EXT=$(basename $INPUT_URI | sed -e 's/^[^.]*//')")
+        lines.append('')
 
         # pick a unique name in the current directory to download the file to
-        writeln('INPUT_PATH=$(mktemp ./input-XXXXXXXXXX$FILE_EXT)')
-        writeln('rm $INPUT_PATH')
-        writeln()
+        lines.append('INPUT_PATH=$(mktemp ./input-XXXXXXXXXX$FILE_EXT)')
+        lines.append('rm $INPUT_PATH')
+        lines.append('')
 
         # download the file (using different commands depending on the path)
-        writeln('case $INPUT_URI in')
+        lines.append('case $INPUT_URI in')
         for glob, cmd in self._manifest_download_content:
-            writeln('    %s)' % glob)
-            writeln('        %s $INPUT_URI $INPUT_PATH')
-            writeln('        ;;')
-        writeln('esac')
-        writeln()
+            lines.append('    %s)' % glob)
+            lines.append('        %s $INPUT_URI $INPUT_PATH')
+            lines.append('        ;;')
+        lines.append('esac')
+        lines.append('')
 
         # unpack .bz2 and .gz files
-        writeln('case $INPUT_PATH in')
+        lines.append('case $INPUT_PATH in')
         for ext, cmd in self._manifest_uncompress_commands():
-            writeln('    *.%s)' % ext)
-            writeln('        %s $INPUT_PATH')
-            writeln("        INPUT_PATH="
+            lines.append('    *.%s)' % ext)
+            lines.append('        %s $INPUT_PATH')
+            lines.append("        INPUT_PATH="
                     "$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
-            writeln('        ;;')
-        writeln('esac')
-        writeln()
+            lines.append('        ;;')
+        lines.append('esac')
+        lines.append('')
 
         # don't exit if script fails
-        writeln('set +e')
+        lines.append('set +e')
         # pass input path and URI to script
-        writeln('"$@" $INPUT_PATH $INPUT_URI')
-        writeln()
+        lines.append('"$@" $INPUT_PATH $INPUT_URI')
+        lines.append('')
 
         # save return code, turn off echo
-        writeln('{ RETURNCODE=$?; set +x; } 2> /dev/null')
-        writeln()
+        lines.append('{ RETURNCODE=$?; set +x; } 2> /dev/null')
+        lines.append('')
 
         # handle errors
-        writeln('if [ $RETURNCODE -ne 0 ]')
-        writeln('then')
-        writeln('    echo 2>&1')
-        writeln('    echo "while reading input from $INPUT_URI" 2>&1')
-        writeln('fi')
-        writeln()
+        lines.append('if [ $RETURNCODE -ne 0 ]')
+        lines.append('then')
+        lines.append('    echo 2>&1')
+        lines.append('    echo "while reading input from $INPUT_URI" 2>&1')
+        lines.append('fi')
+        lines.append('')
 
         # clean up input and exit
-        writeln('rm $INPUT_PATH')
-        writeln('exit $RETURNCODE')
+        lines.append('rm $INPUT_PATH')
+        lines.append('exit $RETURNCODE')
+
+        return lines
 
     def _manifest_download_commands(self):
         """Return a list of ``(glob, cmd)``, where *glob*

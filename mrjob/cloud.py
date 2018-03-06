@@ -234,12 +234,8 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap)
-        for line in contents:
-            log.debug('BOOTSTRAP: ' + line)
 
-        with open(path, 'wb') as f:
-            for line in contents:
-                f.write(line.encode('utf-8') + b'\n')
+        self._write_script(contents, path, 'master bootstrap script')
 
         self._master_bootstrap_script_path = path
 

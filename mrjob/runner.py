@@ -240,7 +240,9 @@ class MRJobRunner(object):
         self._spark_files = []
         self._spark_archives = []
 
-        self._upload_mgr = None  # define in subclasses that use this
+        # set this to an :py:class:`~mrjob.setup.UploadDirManager` in
+        # runners that upload files to HDFS, S3, etc.
+        self._upload_mgr = None
 
         self._script_path = mr_job_script
         if self._script_path:
@@ -316,6 +318,9 @@ class MRJobRunner(object):
         else:
             self._stdin = stdin or sys.stdin.buffer
         self._stdin_path = None  # temp file containing dump from stdin
+
+        # where to keep the input manifest
+        self._input_manifest_path = None
 
         # store output_dir
         self._output_dir = output_dir
@@ -505,6 +510,8 @@ class MRJobRunner(object):
 
         self._create_dir_archives()
         self._check_input_paths()
+        self._add_input_files_for_upload()
+        self._create_input_manifest_if_needed()
         self._run()
         self._ran_job = True
 
@@ -929,6 +936,9 @@ class MRJobRunner(object):
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local
         file if need be."""
+        if self._input_manifest_path:
+            return [self._input_manifest_path]
+
         if '-' in self._input_paths:
             if self._stdin_path is None:
                 # prompt user, so they don't think the process has stalled
@@ -947,6 +957,31 @@ class MRJobRunner(object):
 
         return [self._stdin_path if p == '-' else p for p in self._input_paths]
 
+    def _create_input_manifest_if_needed(self):
+        """Create a file with a list of URIs of input files."""
+        if self._input_manifest_path or not self._uses_input_manifest():
+            return
+
+        paths = []
+
+        for path in self._get_input_paths():
+            if is_uri(path):
+                for uri in self.fs.ls(uri):
+                    paths.append(uri)
+            else:
+                # local paths are expected to be single files
+                if self._upload_mgr:
+                    paths.append(self._upload_mgr.uri(path))
+                else:
+                    # just make sure job can find files from it's working dir
+                    paths.append(os.path.abspath(path))
+
+        path = os.path.join(self._get_local_tmp_dir(), 'input-manifest.txt')
+        self._write_script(paths, path, 'input manifest')
+
+        self._input_manifest_path = path
+        self._upload_mgr.add(self._input_manifest_path)
+
     def _check_input_paths(self):
         """Check that input exists prior to running the job, if the
         `check_input_paths` option is true."""
@@ -963,6 +998,12 @@ class MRJobRunner(object):
             if not self.fs.exists(path):
                 raise IOError(
                     'Input path %s does not exist!' % (path,))
+
+    def _add_input_files_for_upload(self):
+        """If there is an upload manager, add input files to it."""
+        if self._upload_mgr:
+            for path in self._get_input_paths():
+                self._upload_mgr.add(path)
 
     def _intermediate_output_uri(self, step_num, local=False):
         """A URI for intermediate output for the given step number."""
@@ -1123,6 +1164,30 @@ class MRJobRunner(object):
                 name = self._working_dir_mgr.name(type, path)
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
+
+    def _write_script(self, lines, path, description):
+        """Write text of a setup script, input manifest, etc. to the given
+        file.
+
+        By default, this writes binary data. Redefine :py:meth:`write_lines`
+        to use other line endings.
+
+        :param lines: a list of lines as ``str``
+        :param path: path of file to write to
+        :param description: what we're writing to, for debug messages
+        """
+        log.debug('Writing %s to %s' % (description, path))
+        for line in lines:
+            log.debug('  ' + line)
+
+        self._write_lines_helper(lines, path)
+
+    def _write_lines(self, lines, path):
+        """Write text to the given file. By default, this writes
+        binary data, but can be redefined to use local line endings."""
+        with open(path, 'wb') as f:
+            for line in lines:
+                f.write((line + '\n').encode('utf-8'))
 
 
 def _fix_env(env):

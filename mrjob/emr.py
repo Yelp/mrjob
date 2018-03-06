@@ -811,9 +811,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._get_input_paths():
-            self._upload_mgr.add(path)
-
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
@@ -2311,15 +2308,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # create script
         path = os.path.join(self._get_local_tmp_dir(), 'mns.sh')
-        log.debug('writing master node setup script to %s' % path)
-
         contents = self._master_node_setup_script_content()
-        for line in contents:
-            log.debug('MASTER NODE SETUP: ' + line.rstrip('\r\n'))
 
-        with open(path, 'wb') as f:
-            for line in contents:
-                f.write(line.encode('utf-8'))
+        self._write_script(contents, path, 'master node setup script')
 
         # the script itself doesn't need to be on the master node, just S3
         self._master_node_setup_script_path = path
@@ -2335,23 +2326,20 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # merge common code
         out = []
 
-        def writeln(line=''):
-            out.append(line + '\n')
-
         # shebang, etc.
         for line in self._start_of_sh_script():
-            writeln(line)
-        writeln()
+            out.append(line)
+        out.append('')
 
         # run commands in a block so we can redirect stdout to stderr
         # (e.g. to catch errors from compileall). See #370
-        writeln('{')
+        out.append('{')
 
         # make working dir
         working_dir = self._master_node_setup_working_dir()
-        writeln('  mkdir -p %s' % pipes.quote(working_dir))
-        writeln('  cd %s' % pipes.quote(working_dir))
-        writeln()
+        out.append('  mkdir -p %s' % pipes.quote(working_dir))
+        out.append('  cd %s' % pipes.quote(working_dir))
+        out.append('')
 
         # download files
         if self._opts['release_label']:
@@ -2364,14 +2352,14 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for name, path in sorted(
                 self._master_node_setup_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            writeln('  %s %s %s' % (
+            out.append('  %s %s %s' % (
                 cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # imitate Hadoop Distributed Cache
-            writeln('  chmod u+rx %s' % pipes.quote(name))
+            out.append('  chmod u+rx %s' % pipes.quote(name))
 
         # at some point we will probably run commands as well (see #1336)
 
-        writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
+        out.append('} 1>&2')  # stdout -> stderr for ease of error log parsing
 
         return out
 

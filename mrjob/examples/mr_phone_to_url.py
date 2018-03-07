@@ -31,7 +31,7 @@ Sample command line:
 
 To find the latest crawl:
 
-``aws s3 ls s3://commoncrawl/crawl-data | grep CC-MAIN``
+``aws s3 ls s3://commoncrawl/crawl-data/ | grep CC-MAIN``
 """
 import os
 import re
@@ -82,41 +82,29 @@ class MRPhoneToURL(MRJob):
 
     def steps(self):
         return [
-            MRStep(mapper=self.extract_phone_and_url_mapper,
+            MRStep(mapper_raw=self.extract_phone_and_url_mapper,
                    reducer=self.count_by_host_reducer),
             MRStep(reducer=self.pick_best_url_reducer),
         ]
 
-    def extract_phone_and_url_mapper(self, record_num, path):
-        """Read .wet from ``self.stdin`` (so we can read multi-line records).
-
-        Yield ``host, (phone, url)``
+    def extract_phone_and_url_mapper(self, wet_path, wet_uri):
+        """Read in .wet file, and extract phone ant URL
         """
         import warc
 
-        uri = 's3://commoncrawl/' + path
+        wet_file = warc.WARCFile(wet_path)
 
-        # misconfigured hadoop environment on EMR
-        for k, v in sorted(os.environ.items()):
-            sys.stderr.write('%s=%s\n' % (k, v))
+        for record in wet_file:
+            if record['content-type'] != 'text/plain':
+                continue
 
-        with download_input(uri) as path:
-            sys.stderr.write('%r\n' % os.listdir('.'))
+            url = record.header['warc-target-uri']
+            host = urlparse(url).netloc
 
-            with open_input(path) as f:
-                wet_file = warc.WARCFile(fileobj=f)
-
-                for record in wet_file:
-                    if record['content-type'] != 'text/plain':
-                        continue
-
-                    url = record.header['warc-target-uri']
-                    host = urlparse(url).netloc
-
-                    payload = record.payload.read()
-                    for phone in PHONE_RE.findall(payload):
-                        phone = standardize_phone_number(phone)
-                        yield host, (phone, url)
+            payload = record.payload.read()
+            for phone in PHONE_RE.findall(payload):
+                phone = standardize_phone_number(phone)
+                yield host, (phone, url)
 
     def count_by_host_reducer(self, host, phone_urls):
         phone_urls = list(islice(phone_urls, MAX_PHONES_PER_HOST + 1))
@@ -137,58 +125,6 @@ class MRPhoneToURL(MRJob):
             urls_with_count, key=lambda uc: (-uc[1], -len(uc[0]), uc[0]))
 
         yield phone, urls_with_count[0][0]
-
-
-@contextmanager
-def download_input(uri):
-    if not is_uri(uri):
-        yield uri
-        return
-
-    path = '%s-%s' % (random_identifier(), uri.split('/')[-1])
-
-    cp_args = ['hadoop', 'fs', '-copyToLocal', uri, path]
-    env = {
-        k: v for k, v in os.environ.items()
-        if not k.startswith('BASH_FUNC_')
-    }
-
-    try:
-        sys.stderr.write('> ' + cmd_line(cp_args) + '\n')
-
-        cp_proc = Popen(cp_args, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
-
-        sys.stderr.write('Popened\n')
-
-        stdout, stderr = cp_proc.communicate()
-
-        sys.stderr.write('  stdout: %r\n' % stdout)
-        sys.stderr.write('  stderr: %r\n' % stderr)
-
-        if cp_proc.returncode != 0:
-            sys.stderr.write(
-                'returned nonzero error status: %d' % cp_proc.returncode)
-        else:
-            sys.stderr.write('copied to %s\n' % path)
-
-        yield path
-
-    finally:
-        try:
-            os.remove(path)
-        except OSError:
-            pass
-
-
-def open_input(path):
-    if path.endswith('.gz'):
-        return GzipFile(path, 'rb')
-    elif path.endswith('.bz2'):
-        return BZ2File(path, 'rb')
-    else:
-        return open(path, 'rb')
-
-
 
 
 if __name__ == '__main__':

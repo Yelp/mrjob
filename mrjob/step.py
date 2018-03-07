@@ -204,7 +204,7 @@ class MRStep(object):
             return _IDENTITY_REDUCER
         return self._steps[key]
 
-    def _render_substep(self, cmd_key, pre_filter_key, manifest_key):
+    def _render_substep(self, cmd_key, pre_filter_key, manifest_key=None):
         if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, string_types):

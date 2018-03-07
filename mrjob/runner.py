@@ -509,6 +509,8 @@ class MRJobRunner(object):
             raise AssertionError("Job already ran!")
 
         self._create_dir_archives()
+        # TODO: no point in checking input paths if we're going to
+        # make a manifest out of them
         self._check_input_paths()
         self._add_input_files_for_upload()
         self._create_input_manifest_if_needed()
@@ -962,22 +964,29 @@ class MRJobRunner(object):
         if self._input_manifest_path or not self._uses_input_manifest():
             return
 
-        paths = []
+        uris = []
+
+        log.info('finding input files to write to input manifest')
 
         for path in self._get_input_paths():
+            log.debug('  in %s' % path)
             if is_uri(path):
-                for uri in self.fs.ls(uri):
-                    paths.append(uri)
+                # URIs might be globs
+                for uri in self.fs.ls(path):
+                    uris.append(uri)
             else:
                 # local paths are expected to be single files
+                # (shell would resolve globs)
                 if self._upload_mgr:
-                    paths.append(self._upload_mgr.uri(path))
+                    uris.append(self._upload_mgr.uri(path))
                 else:
                     # just make sure job can find files from it's working dir
-                    paths.append(os.path.abspath(path))
+                    uris.append(os.path.abspath(path))
+
+        log.info('found %d input files' % len(uris))
 
         path = os.path.join(self._get_local_tmp_dir(), 'input-manifest.txt')
-        self._write_script(paths, path, 'input manifest')
+        self._write_script(uris, path, 'input manifest')
 
         self._input_manifest_path = path
         self._upload_mgr.add(self._input_manifest_path)
@@ -1176,11 +1185,11 @@ class MRJobRunner(object):
         :param path: path of file to write to
         :param description: what we're writing to, for debug messages
         """
-        log.debug('Writing %s to %s' % (description, path))
+        log.debug('Writing %s to %s:' % (description, path))
         for line in lines:
             log.debug('  ' + line)
 
-        self._write_lines_helper(lines, path)
+        self._write_lines(lines, path)
 
     def _write_lines(self, lines, path):
         """Write text to the given file. By default, this writes

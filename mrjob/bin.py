@@ -546,7 +546,9 @@ class MRJobBinRunner(MRJobRunner):
 
         # download the file (using different commands depending on the path)
         lines.append('case $INPUT_URI in')
-        for glob, cmd in self._manifest_download_content:
+        download_cmds = (
+            list(self._manifest_download_commands()) + [('*', 'cp')])
+        for glob, cmd in download_cmds:
             lines.append('    %s)' % glob)
             lines.append('        %s $INPUT_URI $INPUT_PATH')
             lines.append('        ;;')
@@ -591,12 +593,12 @@ class MRJobBinRunner(MRJobRunner):
     def _manifest_download_commands(self):
         """Return a list of ``(glob, cmd)``, where *glob*
         matches a path or URI to download, and download command is a command
-        to download it (e.g. ``cp``, ``hadoop fs -copyToLocal``), as a
+        to download it (e.g. ```hadoop fs -copyToLocal``), as a
         string.
 
         Redefine this in your subclass. More specific blobs should come first.
         """
-        return [('*', 'cp')]
+        return []
 
     def _manifest_uncompress_commands(self):
         """Return a list of ``(ext, cmd)`` where ``ext`` is a file extension

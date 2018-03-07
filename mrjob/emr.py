@@ -2290,6 +2290,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # on the 2.x and 3.x AMIs, use hadoop
             return 'hadoop fs -copyToLocal'
 
+    def _manifest_download_commands(self):
+        return [
+            ('s3://*', 'aws s3 cp'),
+            ('*://*', 'hadoop fs -copyToLocal'),
+        ]
+
     ### master node setup script ###
 
     def _create_master_node_setup_script_if_needed(self):

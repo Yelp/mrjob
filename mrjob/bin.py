@@ -529,41 +529,42 @@ class MRJobBinRunner(MRJobRunner):
         the file."""
         lines = []
 
-        lines.append('')
+        lines.append('{')
 
         # read URI from input
-        lines.append('INPUT_URI=$(cut -f 2)')
+        lines.append('  INPUT_URI=$(cut -f 2)')
         lines.append('')
 
         # pick file extension (e.g. ".warc.gz")
-        lines.append("FILE_EXT=$(basename $INPUT_URI | sed -e 's/^[^.]*//')")
+        lines.append("  FILE_EXT=$(basename $INPUT_URI | sed -e 's/^[^.]*//')")
         lines.append('')
 
         # pick a unique name in the current directory to download the file to
-        lines.append('INPUT_PATH=$(mktemp ./input-XXXXXXXXXX$FILE_EXT)')
-        lines.append('rm $INPUT_PATH')
+        lines.append('  INPUT_PATH=$(mktemp ./input-XXXXXXXXXX$FILE_EXT)')
+        lines.append('  rm $INPUT_PATH')
         lines.append('')
 
         # download the file (using different commands depending on the path)
-        lines.append('case $INPUT_URI in')
+        lines.append('  case $INPUT_URI in')
         download_cmds = (
             list(self._manifest_download_commands()) + [('*', 'cp')])
         for glob, cmd in download_cmds:
             lines.append('    %s)' % glob)
-            lines.append('        %s $INPUT_URI $INPUT_PATH' % cmd)
-            lines.append('        ;;')
-        lines.append('esac')
+            lines.append('      %s $INPUT_URI $INPUT_PATH' % cmd)
+            lines.append('      ;;')
+        lines.append('  esac')
         lines.append('')
 
         # unpack .bz2 and .gz files
-        lines.append('case $INPUT_PATH in')
+        lines.append('  case $INPUT_PATH in')
         for ext, cmd in self._manifest_uncompress_commands():
             lines.append('    *.%s)' % ext)
-            lines.append('        %s $INPUT_PATH' % cmd)
-            lines.append("        INPUT_PATH="
+            lines.append('      %s $INPUT_PATH' % cmd)
+            lines.append("      INPUT_PATH="
                     "$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
-            lines.append('        ;;')
-        lines.append('esac')
+            lines.append('      ;;')
+        lines.append('  esac')
+        lines.append('} 1>&2')
         lines.append('')
 
         # don't exit if script fails
@@ -573,19 +574,25 @@ class MRJobBinRunner(MRJobRunner):
         lines.append('')
 
         # save return code, turn off echo
-        lines.append('{ RETURNCODE=$?; set +x; } 2> /dev/null')
+        lines.append('{ RETURNCODE=$?; set +x; } &> /dev/null')
         lines.append('')
+
+        lines.append('{')
 
         # handle errors
-        lines.append('if [ $RETURNCODE -ne 0 ]')
-        lines.append('then')
-        lines.append('    echo 2>&1')
-        lines.append('    echo "while reading input from $INPUT_URI" 2>&1')
-        lines.append('fi')
+        lines.append('  if [ $RETURNCODE -ne 0 ]')
+        lines.append('  then')
+        lines.append('    echo')
+        lines.append('    echo "while reading input from $INPUT_URI"')
+        lines.append('  fi')
         lines.append('')
 
-        # clean up input and exit
-        lines.append('rm $INPUT_PATH')
+        # clean up input
+        lines.append('  rm $INPUT_PATH')
+        lines.append('} 1>&2')
+        lines.append('')
+
+        # exit with correct status
         lines.append('exit $RETURNCODE')
 
         return lines

@@ -550,7 +550,7 @@ class MRJobBinRunner(MRJobRunner):
             list(self._manifest_download_commands()) + [('*', 'cp')])
         for glob, cmd in download_cmds:
             lines.append('    %s)' % glob)
-            lines.append('        %s $INPUT_URI $INPUT_PATH')
+            lines.append('        %s $INPUT_URI $INPUT_PATH' % cmd)
             lines.append('        ;;')
         lines.append('esac')
         lines.append('')
@@ -559,7 +559,7 @@ class MRJobBinRunner(MRJobRunner):
         lines.append('case $INPUT_PATH in')
         for ext, cmd in self._manifest_uncompress_commands():
             lines.append('    *.%s)' % ext)
-            lines.append('        %s $INPUT_PATH')
+            lines.append('        %s $INPUT_PATH' % cmd)
             lines.append("        INPUT_PATH="
                     "$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
             lines.append('        ;;')

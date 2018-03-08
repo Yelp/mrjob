@@ -966,7 +966,7 @@ class MRJobRunner(object):
 
         uris = []
 
-        log.info('finding input files to write to input manifest')
+        log.info('finding input files to add to manifest...')
 
         for path in self._get_input_paths():
             log.debug('  in %s' % path)

@@ -29,6 +29,8 @@ Sample command line:
 
    python mr_phone_to_url.py -r emr --bootstrap 'sudo pip install warc' s3://commoncrawl/crawl-data/CC-MAIN-2017-51/segments/*/wet/*.wet.gz
 
+(for Python 3, use ``sudo pip install warc3``)
+
 To find the latest crawl:
 
 ``aws s3 ls s3://commoncrawl/crawl-data/ | grep CC-MAIN``
@@ -52,16 +54,18 @@ from mrjob.util import cmd_line
 from mrjob.util import random_identifier
 
 PHONE_RE = re.compile(
-    r'[\D\b](1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})[\D\b]')
-PHONE_SEP_RE = re.compile(r'[\-. ()+]')
+    br'[\D\b](1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})[\D\b]')
+PHONE_SEP_RE = re.compile(br'[\-. ()+]')
 
 # hosts with more than this many phone numbers are assumed to be directories
 MAX_PHONES_PER_HOST = 1000
 
 
 def standardize_phone_number(number):
+    """put *number* in a standard format, and convert it to a :py:class:`str`.
+    """
     number_sep = PHONE_SEP_RE.split(number)
-    number = "".join(number_sep)
+    number = b''.join(number_sep).decode('ascii')
     if len(number) > 7:
         if number[-1] not in '0123456789':
             number = number[:-1]
@@ -77,9 +81,6 @@ class MRPhoneToURL(MRJob):
     """Use Common Crawl .wet files to map from phone number to the most
     likely URL."""
 
-    HADOOP_INPUT_FORMAT = 'org.apache.hadoop.mapred.lib.NLineInputFormat'
-    INPUT_PROTOCOL = RawProtocol
-
     def steps(self):
         return [
             MRStep(mapper_raw=self.extract_phone_and_url_mapper,
@@ -92,7 +93,7 @@ class MRPhoneToURL(MRJob):
         """
         import warc
 
-        wet_file = warc.WARCFile(wet_path)
+        wet_file = warc.open(wet_path)
 
         for record in wet_file:
             if record['content-type'] != 'text/plain':

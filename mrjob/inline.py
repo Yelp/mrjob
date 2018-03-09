@@ -75,13 +75,10 @@ class InlineMRJobRunner(SimMRJobRunner):
         if self._opts['setup']:
             log.warning("inline runner can't run setup commands")
 
-        if self._uses_input_manifest():
-            # "downloading" files from an input manifest is handled
-            # by a shell script
-            raise Exception("inline runner can't handle input manifests")
-
     def _invoke_task_func(self, task_type, step_num, task_num):
         """Just run tasks in the same process."""
+        manifest = (step_num == 0 and task_type == 'mapper' and
+                    self._uses_input_manifest())
 
         # Don't care about pickleability since this runs in the same process
         def invoke_task(stdin, stdout, stderr, wd, env):
@@ -89,9 +86,17 @@ class InlineMRJobRunner(SimMRJobRunner):
                 os.environ.update(env)
                 os.chdir(wd)
 
+                input_path = None
                 try:
-                    task = self._mrjob_cls(
-                        args=self._args_for_task(step_num, task_type))
+                    args = self._args_for_task(step_num, task_type)
+
+                    if manifest:
+                        # read (absolute) input path from stdin, add to args
+                        line = stdin.readline().decode('utf_8')
+                        input_path = line.split('\t')[-1].rstrip()
+                        args = list(args) + [input_path, input_path]
+
+                    task = self._mrjob_cls(args)
                     task.sandbox(stdin=stdin, stdout=stdout, stderr=stderr)
 
                     task.execute()
@@ -101,9 +106,12 @@ class InlineMRJobRunner(SimMRJobRunner):
                     # because then we lose the stacktrace (which is the whole
                     # point of the inline runner)
 
-                    # TODO: could write this to a file instead
-                    self._error_while_reading_from = self._task_input_path(
-                        task_type, step_num, task_num)
+                    if input_path:  # from manifest
+                        self._error_while_reading_from = input_path
+                    else:
+                        self._error_while_reading_from = self._task_input_path(
+                            task_type, step_num, task_num)
+
                     raise
 
         return invoke_task
@@ -112,7 +120,7 @@ class InlineMRJobRunner(SimMRJobRunner):
         """Just tell what file we were reading from (since they'll see
         the stacktrace from the actual exception)"""
         if self._error_while_reading_from:
-            log.error('Error while reading from %s:\n' %
+            log.error('\nError while reading from %s:\n' %
                       self._error_while_reading_from)
 
     def _load_steps(self):

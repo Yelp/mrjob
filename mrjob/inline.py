@@ -75,6 +75,11 @@ class InlineMRJobRunner(SimMRJobRunner):
         if self._opts['setup']:
             log.warning("inline runner can't run setup commands")
 
+        if self._uses_input_manifest():
+            # "downloading" files from an input manifest is handled
+            # by a shell script
+            raise Exception("inline runner can't handle input manifests")
+
     def _invoke_task_func(self, task_type, step_num, task_num):
         """Just run tasks in the same process."""
 

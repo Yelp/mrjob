@@ -387,9 +387,13 @@ class SimMRJobRunner(MRJobRunner):
         twice as many input files as there are mappers.
         """
         input_paths = list(input_paths)
+        manifest = (step_num == 0 and self._uses_input_manifest())
 
         # determine split size
-        split_size = self._pick_mapper_split_size(input_paths, step_num)
+        if manifest:
+            split_size = 1  # one line per mapper
+        else:
+            split_size = self._pick_mapper_split_size(input_paths, step_num)
 
         # yield output fileobjs as needed
         split_fileobj_gen = self._yield_split_fileobjs('mapper', step_num)
@@ -399,6 +403,10 @@ class SimMRJobRunner(MRJobRunner):
         for path in input_paths:
             with open(path, 'rb') as src:
                 if is_compressed(path):
+                    if manifest:
+                        raise Exception('input manifest %s should not be'
+                                        ' compressed!' % path)
+
                     # if file is compressed, uncompress it into a single split
 
                     # Hadoop tracks the compressed file's size
@@ -421,6 +429,11 @@ class SimMRJobRunner(MRJobRunner):
                     for lines in _split_records(src, split_size):
                         with next(split_fileobj_gen) as dest:
                             for line in lines:
+                                # simulate NLinesInputFormat by prefixing
+                                # each line with byte number
+                                if manifest:
+                                    i = start + length
+                                    dest.write(('%d\t' % i).encode('ascii'))
                                 dest.write(line)
                                 length += len(line)
 
@@ -724,10 +737,13 @@ def _split_records(record_gen, split_size, reducer_key=None):
     grouped_record_gen = _group_records_for_split(
         record_gen, split_size, reducer_key)
 
+    num_records = 0
     for group_id, grouped_records in itertools.groupby(
             grouped_record_gen, key=lambda gr: gr[0]):
         yield (record for _, record in grouped_records)
-    else:
+        num_records += 1
+
+    if num_records == 0:
         # special case for empty files
         yield ()
 

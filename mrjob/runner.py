@@ -986,7 +986,8 @@ class MRJobRunner(object):
         self._write_script(uris, path, 'input manifest')
 
         self._input_manifest_path = path
-        self._upload_mgr.add(self._input_manifest_path)
+        if self._upload_mgr:
+            self._upload_mgr.add(self._input_manifest_path)
 
     def _check_input_paths(self):
         """Check that input exists prior to running the job, if the

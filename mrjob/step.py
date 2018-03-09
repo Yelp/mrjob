@@ -204,7 +204,7 @@ class MRStep(object):
             return _IDENTITY_REDUCER
         return self._steps[key]
 
-    def _render_substep(self, cmd_key, pre_filter_key, manifest_key=None):
+    def _render_substep(self, cmd_key, pre_filter_key):
         if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, string_types):
@@ -213,8 +213,6 @@ class MRStep(object):
                 raise ValueError('Cannot specify both %s and %s' % (
                     cmd_key, pre_filter_key))
             return {'type': 'command', 'command': cmd}
-        elif manifest_key and self._steps[manifest_key]:
-            return {'type': 'manifest'}
         else:
             substep = {'type': 'script'}
             if (pre_filter_key and
@@ -223,8 +221,7 @@ class MRStep(object):
             return substep
 
     def render_mapper(self):
-        return self._render_substep(
-            'mapper_cmd', 'mapper_pre_filter', 'mapper_raw')
+        return self._render_substep('mapper_cmd', 'mapper_pre_filter')
 
     def render_combiner(self):
         return self._render_substep('combiner_cmd', 'combiner_pre_filter')
@@ -269,7 +266,7 @@ class MRStep(object):
 
         See :ref:`steps-format` for examples.
         """
-        substep_descs = {'type': 'streaming'}
+        desc = {'type': 'streaming'}
         # Use a mapper if:
         #   - the user writes one
         #   - it is the first step and we don't want to mess up protocols
@@ -277,15 +274,18 @@ class MRStep(object):
         if (step_num == 0 or
                 self.has_explicit_mapper or
                 self.has_explicit_combiner):
-            substep_descs['mapper'] = self.render_mapper()
+            desc['mapper'] = self.render_mapper()
         if self.has_explicit_combiner:
-            substep_descs['combiner'] = self.render_combiner()
+            desc['combiner'] = self.render_combiner()
         if self.has_explicit_reducer:
-            substep_descs['reducer'] = self.render_reducer()
+            desc['reducer'] = self.render_reducer()
+        if self._steps['mapper_raw']:
+            desc['input_manifest'] = True
         # TODO: verify this is a dict, convert booleans to strings
         if self._steps['jobconf']:
-            substep_descs['jobconf'] = self._steps['jobconf']
-        return substep_descs
+            desc['jobconf'] = self._steps['jobconf']
+
+        return desc
 
 
 class _Step(object):

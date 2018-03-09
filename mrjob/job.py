@@ -741,18 +741,16 @@ class MRJob(MRJobLauncher):
         mapping = {}
         script_step_num = 0
         for i, step in enumerate(steps_desc):
-            if 'mapper' in step:
-                # TODO: temporary patch. mapper_raw() doesn't need a
-                # protocol to read, but it does need one to write
-                if step['mapper']['type'] in ('script', 'manifest'):
-                    k = self._step_key(i, 'mapper')
-                    mapping[k] = script_step_num
-                    script_step_num += 1
-            if 'reducer' in step:
-                if step['reducer']['type'] == 'script':
-                    k = self._step_key(i, 'reducer')
-                    mapping[k] = script_step_num
-                    script_step_num += 1
+
+            if 'mapper' in step and step['mapper']['type'] == 'script':
+                k = self._step_key(i, 'mapper')
+                mapping[k] = script_step_num
+                script_step_num += 1
+
+            if 'reducer' in step and step['reducer']['type'] == 'script':
+                k = self._step_key(i, 'reducer')
+                mapping[k] = script_step_num
+                script_step_num += 1
 
         return mapping
 

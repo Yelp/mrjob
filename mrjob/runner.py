@@ -515,8 +515,9 @@ class MRJobRunner(object):
         self._add_input_files_for_upload()
         self._create_input_manifest_if_needed()
         self._run()
-        log.info('job output is in %s' % self.get_output_dir())
         self._ran_job = True
+
+        log.info('job output is in %s' % self._output_dir)
 
     def cat_output(self):
         """Stream the jobs output, as a stream of ``bytes``. If there are
@@ -802,12 +803,9 @@ class MRJobRunner(object):
                     'unexpected step type %r in steps %r' % (
                         step['type'], steps))
 
-            if step['type'] == 'streaming':
-                for mrc in ('mapper', 'combiner', 'reducer'):
-                    if (mrc in step and step[mrc]['type'] == 'manifest' and
-                            not (mrc == 'mapper' and step_num == 0)):
-                        raise ValueError("only first step's mapper may take an"
-                                         "input manifest")
+            if step.get('input_manifest') and step_num != 0:
+                raise ValueError(
+                    'only first step may take an input manifest')
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""
@@ -824,9 +822,7 @@ class MRJobRunner(object):
 
     def _uses_input_manifest(self):
         """Does the first step take an input manifest?"""
-        first_step = self._get_step(0)
-        return (first_step['type'] == 'streaming' and
-                first_step['mapper']['type'] == 'manifest')
+        return bool(self._get_step(0).get('input_manifest'))
 
     def _has_spark_steps(self):
         """Are any of our steps Spark steps (either spark or spark_script)"""

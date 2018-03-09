@@ -170,16 +170,18 @@ class MRJobBinRunner(MRJobRunner):
 
     ### running MRJob scripts ###
 
-    def _script_args_for_step(self, step_num, mrc):
+    def _script_args_for_step(self, step_num, mrc, input_manifest=False):
         args = self._executable() + self._args_for_task(step_num, mrc)
 
-        if self._setup_wrapper_script_path:
-            return (self._sh_bin() +
-                    [self._working_dir_mgr.name(
-                        'file', self._setup_wrapper_script_path)] +
-                    args)
+        if input_manifest and mrc == 'mapper':
+            wrapper = self._manifest_setup_script_path
+        elif self._setup_wrapper_script_path:
+            wrapper = self._setup_wrapper_script_path
         else:
             return args
+
+        return (self._sh_bin() + [
+            self._working_dir_mgr.name('file', wrapper)] + args)
 
     def _substep_args(self, step_num, mrc):
         step = self._get_step(step_num)
@@ -192,15 +194,10 @@ class MRJobBinRunner(MRJobRunner):
                 return shlex_split(cmd)
             else:
                 return cmd
-        elif step[mrc]['type'] == 'manifest':
-            args = self._executable() + self._args_for_task(step_num, mrc)
-
-            return (self._sh_bin() + [
-                self._working_dir_mgr.name(
-                    'file', self._manifest_setup_script_path)] + args)
 
         elif step[mrc]['type'] == 'script':
-            script_args = self._script_args_for_step(step_num, mrc)
+            script_args = self._script_args_for_step(
+                step_num, mrc, input_manifest=step.get('input_manifest'))
 
             if 'pre_filter' in step[mrc]:
                 return self._sh_wrap(

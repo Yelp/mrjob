@@ -515,6 +515,7 @@ class MRJobRunner(object):
         self._add_input_files_for_upload()
         self._create_input_manifest_if_needed()
         self._run()
+        log.info('job output is in %s' % self.get_output_dir())
         self._ran_job = True
 
     def cat_output(self):

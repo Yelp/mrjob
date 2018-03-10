@@ -27,9 +27,8 @@ Sample command line:
 
 .. code-block:: sh
 
-   python mr_phone_to_url.py -r emr --bootstrap 'sudo pip install warc' s3://commoncrawl/crawl-data/CC-MAIN-2017-51/segments/*/wet/*.wet.gz
+   python mr_phone_to_url.py -r emr --bootstrap 'sudo pip install warcio' --output-dir s3://your-bucket/path/ --no-output s3://commoncrawl/crawl-data/CC-MAIN-2018-09/segments/*/wet/*.wet.gz
 
-(for Python 3, use ``sudo pip install warc3``)
 
 To find the latest crawl:
 
@@ -91,21 +90,27 @@ class MRPhoneToURL(MRJob):
     def extract_phone_and_url_mapper(self, wet_path, wet_uri):
         """Read in .wet file, and extract phone ant URL
         """
-        import warc
+        from warcio.archiveiterator import ArchiveIterator
 
-        wet_file = warc.open(wet_path)
+        with open(wet_path, 'rb') as f:
+            for record in ArchiveIterator(f):
+                if record.rec_type != 'conversion':
+                    continue
 
-        for record in wet_file:
-            if record['content-type'] != 'text/plain':
-                continue
+                headers = record.rec_headers
+                if headers.get_header('Content-Type') != 'text/plain':
+                    continue
 
-            url = record.header['warc-target-uri']
-            host = urlparse(url).netloc
+                url = headers.get_header('WARC-Target-URI')
+                if not url:
+                    continue
 
-            payload = record.payload.read()
-            for phone in PHONE_RE.findall(payload):
-                phone = standardize_phone_number(phone)
-                yield host, (phone, url)
+                host = urlparse(url).netloc
+
+                payload = record.content_stream().read()
+                for phone in PHONE_RE.findall(payload):
+                    phone = standardize_phone_number(phone)
+                    yield host, (phone, url)
 
     def count_by_host_reducer(self, host, phone_urls):
         phone_urls = list(islice(phone_urls, MAX_PHONES_PER_HOST + 1))

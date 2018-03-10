@@ -528,20 +528,24 @@ class MRJobBinRunner(MRJobRunner):
 
         lines.append('{')
 
-        # read URI from input
+        # read URI from stdin
+        lines.append('  # read URI of input file from stdin')
         lines.append('  INPUT_URI=$(cut -f 2)')
         lines.append('')
 
         # pick file extension (e.g. ".warc.gz")
+        lines.append('  # pick file extension')
         lines.append("  FILE_EXT=$(basename $INPUT_URI | sed -e 's/^[^.]*//')")
         lines.append('')
 
         # pick a unique name in the current directory to download the file to
+        lines.append('  # pick filename to download to')
         lines.append('  INPUT_PATH=$(mktemp ./input-XXXXXXXXXX$FILE_EXT)')
         lines.append('  rm $INPUT_PATH')
         lines.append('')
 
         # download the file (using different commands depending on the path)
+        lines.append('  # download the input file')
         lines.append('  case $INPUT_URI in')
         download_cmds = (
             list(self._manifest_download_commands()) + [('*', 'cp')])
@@ -553,6 +557,7 @@ class MRJobBinRunner(MRJobRunner):
         lines.append('')
 
         # unpack .bz2 and .gz files
+        lines.append('  # if input file is compressed, unpack it')
         lines.append('  case $INPUT_PATH in')
         for ext, cmd in self._manifest_uncompress_commands():
             lines.append('    *.%s)' % ext)
@@ -565,12 +570,14 @@ class MRJobBinRunner(MRJobRunner):
         lines.append('')
 
         # don't exit if script fails
+        lines.append('# run our mrjob script')
         lines.append('set +e')
         # pass input path and URI to script
         lines.append('"$@" $INPUT_PATH $INPUT_URI')
         lines.append('')
 
         # save return code, turn off echo
+        lines.append('# if script fails, print input URI before exiting')
         lines.append('{ RETURNCODE=$?; set +x; } &> /dev/null')
         lines.append('')
 

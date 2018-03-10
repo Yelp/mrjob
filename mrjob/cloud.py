@@ -274,12 +274,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            out.append('')
             out.append('  %s %s $__mrjob_PWD/%s' %
                        (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # imitate Hadoop Distributed Cache (see #1602)
             out.append('  chmod u+rx $__mrjob_PWD/%s' % pipes.quote(name))
-        out.append('')
+            out.append('')
 
         # download and unarchive archives
         archive_names_and_paths = sorted(

@@ -798,7 +798,7 @@ class SetupWrapperScriptContentTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             out = runner._setup_wrapper_script_content([])
 
-            self.assertEqual(out[:2], ['set -e\n', 'set -v\n'])
+            self.assertEqual(out[:2], ['set -e', 'set -v'])
 
 
 class SparkPyFilesTestCase(SandboxedTestCase):

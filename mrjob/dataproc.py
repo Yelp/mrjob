@@ -382,7 +382,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
     def _prepare_for_launch(self):
         self._check_output_not_exists()
-        self._create_setup_wrapper_script()
+        self._create_setup_wrapper_scripts()
         self._add_bootstrap_files_for_upload()
         self._add_job_files_for_upload()
         self._upload_local_files_to_fs()
@@ -423,9 +423,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._get_input_paths():
-            self._upload_mgr.add(path)
-
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 

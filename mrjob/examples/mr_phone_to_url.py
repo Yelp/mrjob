@@ -53,7 +53,7 @@ from mrjob.util import cmd_line
 from mrjob.util import random_identifier
 
 PHONE_RE = re.compile(
-    br'[\D\b](1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})[\D\b]')
+    br'(?:[\D\b]|^)(1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})(?:[\D\b]|$)')
 PHONE_SEP_RE = re.compile(br'[\-. ()+]')
 
 # hosts with more than this many phone numbers are assumed to be directories
@@ -128,7 +128,7 @@ class MRPhoneToURL(MRJob):
         # phone numbers, breaking ties by choosing the shortest URL
         # and the one that comes first alphabetically
         urls_with_count = sorted(
-            urls_with_count, key=lambda uc: (-uc[1], -len(uc[0]), uc[0]))
+            urls_with_count, key=lambda uc: (uc[1], -len(uc[0]), uc[0]))
 
         yield phone, urls_with_count[0][0]
 

@@ -61,12 +61,12 @@ class MockGoogleTestCase(SandboxedTestCase):
     def auth_default(self):
         return (self.mock_credentials, self.mock_project_id)
 
-    def cluster_client(self, credentials=None):
+    def cluster_client(self, channel=None, credentials=None):
         return MockGoogleDataprocClusterClient(
             mock_clusters=self.mock_clusters,
             mock_gcs_fs=self.mock_gcs_fs)
 
-    def job_client(self, credentials=None):
+    def job_client(self, channel=None, credentials=None):
         return MockGoogleDataprocJobClient(
             mock_clusters=self.mock_clusters,
             mock_gcs_fs=self.mock_gcs_fs)

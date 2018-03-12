@@ -1022,6 +1022,11 @@ class SparkStepArgsTestCase(SandboxedTestCase):
             'mrjob.bin.MRJobBinRunner._spark_submit_args',
             return_value=['<spark submit args>']))
 
+    def add_files_for_upload(self, runner):
+        # _args_for_step() needs both of these
+        runner._add_input_files_for_upload()
+        runner._add_job_files_for_upload()
+
     def test_spark_step(self):
         job = MRNullSpark([
             '-r', 'hadoop',
@@ -1029,7 +1034,7 @@ class SparkStepArgsTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
 
             self.assertEqual(runner._args_for_step(0), [
                 'spark-submit',
@@ -1052,7 +1057,7 @@ class SparkStepArgsTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
 
             self.assertEqual(runner._args_for_step(0), [
                 'spark-submit',
@@ -1319,12 +1324,17 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
 
 class LibjarsTestCase(MockHadoopTestCase):
 
+    def add_files_for_upload(self, runner):
+        # need both of these for _args_for_streaming_step() to work
+        runner._add_input_files_for_upload()
+        runner._add_job_files_for_upload()
+
     def test_empty(self):
         job = MRWordCount(['-r', 'hadoop'])
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
             args = runner._args_for_streaming_step(0)
 
             self.assertNotIn('-libjars', args)
@@ -1337,7 +1347,7 @@ class LibjarsTestCase(MockHadoopTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
             args = runner._args_for_streaming_step(0)
 
             self.assertIn('-libjars', args)
@@ -1352,7 +1362,7 @@ class LibjarsTestCase(MockHadoopTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
             args = runner._args_for_streaming_step(0)
 
             self.assertIn('-libjars', args)

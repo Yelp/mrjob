@@ -674,7 +674,7 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
 
     def test_ami_version_1_0_no_longer_supported(self):
         with self.make_runner('--image-version', '1.0') as runner:
-            self.assertRaises(ClientError, runner._launch)
+            self.assertRaises(ClientError, self.launch, runner)
 
     def test_ami_version_2_0(self):
         with self.make_runner('--image-version', '2.0') as runner:
@@ -2360,7 +2360,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBoto3TestCase):
         """make and launch runner, so cluster is created and files
         are uploaded."""
         runner = self.make_runner(*args)
-        runner._launch()
+        self.launch(runner)
         return runner
 
     def test_default(self):
@@ -3316,7 +3316,7 @@ class WaitForLogsOnS3TestCase(MockBoto3TestCase):
         job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
 
         self.runner = job.make_runner()
-        self.runner._launch()
+        self.launch(self.runner)
 
         self.cluster = self.mock_emr_clusters[self.runner._cluster_id]
 
@@ -3874,7 +3874,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._applications(), set())
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             applications = set(a['Name'] for a in cluster['Applications'])
@@ -3887,7 +3887,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._applications(), set())
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             applications = set(a['Name'] for a in cluster['Applications'])
@@ -3902,7 +3902,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertRaises(ClientError, runner._launch)
+            self.assertRaises(ClientError, self.launch, runner)
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
@@ -3915,7 +3915,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
             self.assertEqual(runner._applications(),
                              set(['Hadoop', 'Mahout']))
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             applications = set(a['Name'] for a in cluster['Applications'])
@@ -3934,7 +3934,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
             self.assertEqual(runner._applications(),
                              set(['Hadoop', 'Mahout']))
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             applications = set(a['Name'] for a in cluster['Applications'])
@@ -3952,7 +3952,7 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             self.assertFalse(hasattr(cluster, 'configurations'))
@@ -3965,7 +3965,7 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertRaises(ClientError, runner._launch)
+            self.assertRaises(ClientError, self.launch, runner)
 
     def _test_normalized_emr_configurations(self, emr_configurations):
 
@@ -3980,7 +3980,7 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
             self.assertEqual(runner._opts['emr_configurations'],
                              emr_configurations)
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             self.assertEqual(cluster['Configurations'], emr_configurations)
@@ -4050,7 +4050,7 @@ class GetJobStepsTestCase(MockBoto3TestCase):
         job = MRTwoStepJob(['-r', 'emr']).sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             all_steps = _list_all_steps(runner)
 
@@ -4075,7 +4075,7 @@ class GetJobStepsTestCase(MockBoto3TestCase):
 
         with job.make_runner() as runner:
             add_other_steps(runner, 50)
-            runner._launch()
+            self.launch(runner)
             add_other_steps(runner, 3)
 
             all_steps = _list_all_steps(runner)
@@ -4121,7 +4121,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         """Make a runner for a two step job and launch it."""
         job = MRTwoStepJob(['-r', 'emr'] + list(extra_args)).sandbox()
         runner = job.make_runner()
-        runner._launch()
+        self.launch(runner)
         return runner
 
     def test_basic(self):
@@ -4419,7 +4419,7 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
             self.assertIsNotNone(runner._ssh_fs)
             self.assertFalse(runner._ssh_fs._sudo)
 
-            runner._launch()
+            self.launch(runner)
 
             self.assertTrue(runner._ssh_fs._sudo)
 
@@ -4433,7 +4433,7 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
             self.assertIsNotNone(runner._ssh_fs)
             self.assertFalse(runner._ssh_fs._sudo)
 
-            runner._launch()
+            self.launch(runner)
 
             self.assertFalse(runner._ssh_fs._sudo)
 
@@ -4446,7 +4446,7 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertIsNone(runner._ssh_fs)
 
-            runner._launch()
+            self.launch(runner)
 
             self.assertIsNone(runner._ssh_fs)
 
@@ -4463,7 +4463,7 @@ class MasterPrivateIPTestCase(MockBoto3TestCase):
             # no cluster yet
             self.assertRaises(AssertionError, runner._master_private_ip)
 
-            runner._launch()
+            self.launch(runner)
 
             self.assertIsNone(runner._master_private_ip())
 
@@ -4494,7 +4494,7 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             cluster_id = runner.get_cluster_id()
 
@@ -4797,7 +4797,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
@@ -4807,7 +4807,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4824,7 +4824,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4843,7 +4843,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4857,7 +4857,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4873,7 +4873,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4886,7 +4886,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4900,7 +4900,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
@@ -4916,7 +4916,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
@@ -4932,7 +4932,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4958,7 +4958,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4980,7 +4980,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -5006,7 +5006,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
@@ -5147,7 +5147,7 @@ class LogProgressTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
             self.log.info.reset_mock()
 
             runner._log_step_progress()
@@ -5228,7 +5228,7 @@ class ProgressHtmlFromTunnelTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
             if ssh_tunnel:
                 runner._ssh_tunnel_url = self.MOCK_TUNNEL_URL
 
@@ -5300,7 +5300,7 @@ class ProgressHtmlOverSshTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
             return runner._progress_html_over_ssh()
 
     def test_default(self):

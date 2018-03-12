@@ -1210,7 +1210,7 @@ class SparkPyFilesTestCase(MockHadoopTestCase):
 
 class SetupLineEncodingTestCase(MockHadoopTestCase):
 
-    def test_setup_wrapper_script_uses_local_line_endings(self):
+    def test_setup_wrapper_script_uses_unix_line_endings(self):
         job = MRTwoStepJob(['-r', 'hadoop', '--setup', 'true'])
         job.sandbox()
 
@@ -1220,7 +1220,7 @@ class SetupLineEncodingTestCase(MockHadoopTestCase):
         # tests #1071. Unfortunately, we mostly run these tests on machines
         # that use unix line endings anyway. So monitor open() instead
         with patch(
-                'mrjob.bin.open', create=True, side_effect=open) as m_open:
+                'mrjob.runner.open', create=True, side_effect=open) as m_open:
             with logger_disabled('mrjob.hadoop'):
                 with job.make_runner() as runner:
                     runner.run()

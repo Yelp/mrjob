@@ -204,7 +204,7 @@ class SimMRJobRunner(MRJobRunner):
     def get_hadoop_version(self):
         return self._opts['hadoop_version']
 
-    def _write_lines(self, lines, path):
+    def _write_script_lines(self, lines, path):
         """Write text to the given file, using local line endings."""
         with open(path, 'w') as f:
             for line in lines:

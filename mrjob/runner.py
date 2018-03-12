@@ -1187,9 +1187,9 @@ class MRJobRunner(object):
         for line in lines:
             log.debug('  ' + line)
 
-        self._write_lines(lines, path)
+        self._write_script_lines(lines, path)
 
-    def _write_lines(self, lines, path):
+    def _write_script_lines(self, lines, path):
         """Write text to the given file. By default, this writes
         binary data, but can be redefined to use local line endings."""
         with open(path, 'wb') as f:

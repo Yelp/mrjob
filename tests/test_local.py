@@ -37,6 +37,7 @@ from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
 import tests.sr_wc
+from tests.examples.test_mr_phone_to_url import MRPhoneToURLTestCase
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
@@ -972,3 +973,8 @@ class InputFileArgsTestCase(SandboxedTestCase):
             lines = list(to_lines(runner.cat_output()))
             self.assertEqual(len(lines), 1)
             self.assertEqual(int(lines[0]), 7)
+
+
+class TestInputManifest(MRPhoneToURLTestCase):
+
+    RUNNER = 'local'

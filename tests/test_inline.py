@@ -30,6 +30,7 @@ from tests.sandbox import SandboxedTestCase
 from tests.test_sim import MRIncrementerJob
 
 
+
 # the inline runner is extensively used in test_sim.py, so there are not
 # many inline-specific tests
 
@@ -134,3 +135,6 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
                 v for k, v in mr_job.parse_output(runner.cat_output()))
 
             self.assertEqual(output, [2, 3, 4])
+
+
+# manifest files are already tested by mrjob.examples.test_mr_phone_to_url

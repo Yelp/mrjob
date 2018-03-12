@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the runner base class MRJobRunner"""
-import compileall
 import datetime
 import getpass
 import os
@@ -22,7 +21,6 @@ import tarfile
 from time import sleep
 from unittest import TestCase
 from unittest import skipIf
-from zipfile import ZipFile
 
 import mrjob.conf
 from mrjob.conf import ClearedValue
@@ -189,35 +187,6 @@ class TestJobName(TestCase):
         self.assertEqual(match.group(2), 'ads')
 
 
-class CreateMrjobZipTestCase(SandboxedTestCase):
-
-    def test_create_mrjob_zip(self):
-        with no_handlers_for_logger('mrjob.runner'):
-            with InlineMRJobRunner(conf_paths=[]) as runner:
-                mrjob_zip_path = runner._create_mrjob_zip()
-                mrjob_zip = ZipFile(mrjob_zip_path)
-                contents = mrjob_zip.namelist()
-
-                for path in contents:
-                    self.assertEqual(path[:6], 'mrjob/')
-
-                self.assertIn('mrjob/job.py', contents)
-                for filename in contents:
-                    self.assertFalse(filename.endswith('.pyc'),
-                                     msg="%s ends with '.pyc'" % filename)
-
-    def test_mrjob_zip_compiles(self):
-        runner = InlineMRJobRunner()
-        with no_handlers_for_logger('mrjob.runner'):
-            mrjob_zip = runner._create_mrjob_zip()
-
-        ZipFile(mrjob_zip).extractall(self.tmp_dir)
-
-        self.assertTrue(
-            compileall.compile_dir(os.path.join(self.tmp_dir, 'mrjob'),
-                                   quiet=1))
-
-
 class TestCatOutput(SandboxedTestCase):
 
     # Test regression for #269
@@ -341,6 +310,10 @@ class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
 
 class StepInputAndOutputURIsTestCase(SandboxedTestCase):
 
+    def add_files_for_upload(self, runner):
+        runner._add_input_files_for_upload()
+        runner._add_job_files_for_upload()
+
     def test_two_step_job(self):
         input1_path = self.makefile('input1')
         input2_path = self.makefile('input2')
@@ -352,7 +325,7 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
 
             input_uris_0 = runner._step_input_uris(0)
             self.assertEqual([os.path.basename(uri) for uri in input_uris_0],
@@ -382,7 +355,7 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._num_steps(), 3)
 
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
 
             input_uris_0 = runner._step_input_uris(0)
             self.assertEqual([os.path.basename(uri) for uri in input_uris_0],

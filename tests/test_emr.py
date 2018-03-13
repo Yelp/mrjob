@@ -48,6 +48,7 @@ from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _extract_tags
+from mrjob.protocol import JSONProtocol
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import INPUT
@@ -82,6 +83,7 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
+from tests.test_inline import InlineInputManifestTestCase
 from tests.test_local import _bash_wrap
 
 # used to match command lines
@@ -5447,3 +5449,19 @@ class CheckClusterEveryTestCase(MockBoto3TestCase):
 
         with job.make_runner() as runner:
             runner.run()
+
+
+class EMRInputManifestTestCase(InlineInputManifestTestCase, MockBoto3TestCase):
+
+    RUNNER = 'emr'
+
+    def test_input_manifest(self):
+        p = JSONProtocol()
+
+        output_lines = [p.write(k, v) + b'\n'
+                        for k, v in self.EXPECTED_OUTPUT.items()]
+        self.mock_emr_output = {('j-MOCKCLUSTER0', 1): output_lines}
+
+        super(EMRInputManifestTestCase, self).test_input_manifest()
+
+        # TODO: check that input protocol is set to NLinesInputFormat

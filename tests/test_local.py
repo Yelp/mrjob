@@ -54,6 +54,7 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+from tests.test_inline import InlineInputManifestTestCase
 from tests.test_sim import LocalFSTestCase
 from tests.test_sim import SimRunnerJobConfTestCase
 from tests.test_sim import SimRunnerNoMapperTestCase
@@ -975,6 +976,6 @@ class InputFileArgsTestCase(SandboxedTestCase):
             self.assertEqual(int(lines[0]), 7)
 
 
-class TestInputManifest(MRPhoneToURLTestCase):
+class LocalInputManifestTestCase(InlineInputManifestTestCase):
 
     RUNNER = 'local'

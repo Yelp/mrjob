@@ -24,37 +24,36 @@ from tests.job import run_job
 
 class MRPhoneToURLTestCase(SandboxedTestCase):
 
-    RUNNER = 'inline'
-
     def test_empty(self):
-        self.assertEqual(run_job(MRPhoneToURL(['-r', self.RUNNER])), {})
+        self.assertEqual(run_job(MRPhoneToURL()), {})
 
     def test_three_pages(self):
         wet1 = BytesIO()
         writer1 = WARCWriter(wet1, gzip=False)
 
-        writer1.write_record(writer1.create_warc_record(
-            'https://nophonenumbershere.info', 'conversion',
-            warc_content_type='text/plain',
-            payload=BytesIO(b'THIS-IS-NOT-A-NUMBER')))
-
-        writer1.write_record(writer1.create_warc_record(
-            'https://big.directory/', 'conversion',
-            warc_content_type='text/plain',
-            payload=BytesIO(b'The Time: (612) 777-9311\n'
-                            b'Jenny: (201) 867-5309\n')))
+        write_conversion_record(
+            writer1, 'https://nophonenumbershere.info',
+            b'THIS-IS-NOT-A-NUMBER')
+        write_conversion_record(
+            writer1, 'https://big.directory/',
+            b'The Time: (612) 777-9311\nJenny: (201) 867-5309\n')
 
         wet2_gz_path = join(self.tmp_dir, 'wet2.warc.wet.gz')
         with open(wet2_gz_path, 'wb') as wet2:
             writer2 = WARCWriter(wet2, gzip=True)
 
-            writer2.write_record(writer2.create_warc_record(
-                'https://jseventplanning.biz/', 'conversion',
-                warc_content_type='text/plain',
-                payload=BytesIO(b'contact us at +1 201 867 5309')))
+            write_conversion_record(
+                writer2, 'https://jseventplanning.biz/',
+                b'contact us at +1 201 867 5309')
 
         self.assertEqual(
-            run_job(MRPhoneToURL(['-r', self.RUNNER, wet2_gz_path, '-']),
+            run_job(MRPhoneToURL([wet2_gz_path, '-']),
                     raw_input=wet1.getvalue()),
             {'+12018675309': 'https://jseventplanning.biz/',
              '+16127779311': 'https://big.directory/'})
+
+
+def write_conversion_record(writer, url, content):
+    writer.write_record(writer.create_warc_record(
+        url, 'conversion', warc_content_type='text/plain',
+        payload=BytesIO(content)))

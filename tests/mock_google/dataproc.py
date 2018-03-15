@@ -17,8 +17,10 @@
 # see case.py for definition of mock_clusters and mock_gcs_fs
 from copy import deepcopy
 
+from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
-
+from google.cloud.dataproc_v1.types import Cluster
+from google.cloud.dataproc_v1.types import ClusterStatus
 
 class MockGoogleDataprocClusterClient(object):
 
@@ -30,6 +32,28 @@ class MockGoogleDataprocClusterClient(object):
         # see case.py
         self.mock_gcs_fs = mock_gcs_fs
 
+    def create_cluster(self, project_id, region, cluster):
+        # convert dict to object
+        if not isinstance(cluster, Cluster):
+            cluster = Cluster(**cluster)
+
+        if cluster.project_id:
+            if cluster.project_id != project_id:
+                raise InvalidArgument(
+                    'If provided, CreateClusterRequest.cluster.project_id must'
+                    ' match CreateClusterRequest.project_id')
+            else:
+                cluster.project_id = project_id
+
+        if not cluster.cluster_name:
+            raise InvalidArgument('Cluster name is required')
+
+        # initialize cluster status
+        cluster.status.state = ClusterStatus.State.Value('CREATING')
+
+        cluster_key = (project_id, region, cluster.cluster_name)
+        self.mock_clusters[cluster_key] = cluster
+
     def get_cluster(self, project_id, region, cluster_name):
         cluster_key = (project_id, region, cluster_name)
         if cluster_key not in self.mock_clusters:
@@ -38,9 +62,15 @@ class MockGoogleDataprocClusterClient(object):
                 ' projects/%s/regions/%s/clusters/%s' %
                 (project_id, region, cluster_name))
 
-        return deepcopy(self.mock_clusters[cluster_key])
+        cluster = self.mock_clusters[cluster_key]
 
+        result = deepcopy(cluster)
+        self._simulate_progress(cluster)
+        return result
 
+    def _simulate_progress(self, mock_cluster):
+        # just move from STARTING to RUNNING
+        mock_cluster.status.state = ClusterStatus.State.Value('RUNNING')
 
 
 class MockGoogleDataprocJobClient(object):

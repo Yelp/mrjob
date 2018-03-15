@@ -59,6 +59,8 @@ class MockGoogleTestCase(SandboxedTestCase):
         self.start(patch('google.cloud.storage.client.Client',
                          self.storage_client))
 
+        self.start(patch('time.sleep'))
+
     def auth_default(self):
         return (self.mock_credentials, self.mock_project_id)
 

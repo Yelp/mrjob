@@ -34,7 +34,8 @@ class MockGoogleTestCase(SandboxedTestCase):
     def setUp(self):
         super(MockGoogleTestCase, self).setUp()
 
-        # Maps cluster name to ???
+        # maps (project_id, region, cluster_name) to a
+        # google.cloud.dataproc_v1.types.Cluster
         self.mock_clusters = {}
 
         self.mock_credentials = Credentials('mock_token')

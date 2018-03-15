@@ -15,14 +15,32 @@
 # limitations under the License.
 
 # see case.py for definition of mock_clusters and mock_gcs_fs
+from copy import deepcopy
+
+from google.api_core.exceptions import NotFound
 
 
 class MockGoogleDataprocClusterClient(object):
 
     """Mock out google.cloud.dataproc_v1.ClusterControllerClient"""
     def __init__(self, mock_clusters, mock_gcs_fs):
+        # maps (project_id, region, cluster_name) to a
+        # google.cloud.dataproc_v1.types.Cluster
         self.mock_clusters = mock_clusters
+        # see case.py
         self.mock_gcs_fs = mock_gcs_fs
+
+    def get_cluster(self, project_id, region, cluster_name):
+        cluster_key = (project_id, region, cluster_name)
+        if cluster_key not in self.mock_clusters:
+            raise NotFound(
+                'Not Found: Cluster'
+                ' projects/%s/regions/%s/clusters/%s' %
+                (project_id, region, cluster_name))
+
+        return deepcopy(self.mock_clusters[cluster_key])
+
+
 
 
 class MockGoogleDataprocJobClient(object):

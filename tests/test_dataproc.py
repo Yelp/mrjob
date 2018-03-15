@@ -39,7 +39,6 @@ from mrjob.util import log_to_stream
 from mrjob.util import save_current_environment
 
 from tests.mock_google import MockGoogleTestCase
-from tests.mockgoogleapiclient import MockGoogleAPITestCase
 from tests.mockgoogleapiclient import _TEST_PROJECT
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_no_mapper import MRNoMapper

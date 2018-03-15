@@ -367,7 +367,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         chosen_bucket_name = None
 
         # determine region for bucket
-        region = self._opts['region'] or _zone_to_region(self._opts['zone'])
+        region = self._region()
 
         for tmp_bucket_name in self.fs.get_all_bucket_names(prefix='mrjob-'):
             tmp_bucket = self.fs.get_bucket(tmp_bucket_name)
@@ -388,6 +388,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 ['mrjob', region, random_identifier()])
 
         return 'gs://%s/tmp/' % chosen_bucket_name
+
+    def _region(self):
+        # region of cluster, which is either the region set by the user,
+        # or the region derived from the zone they set.
+        # used to pick bucket location and name cluster
+        return self._opts['region'] or _zone_to_region(self._opts['zone'])
 
     def _run(self):
         self._launch()
@@ -640,7 +646,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # (not currently documented in the Dataproc docs)
         if not self._cluster_id:
             self._cluster_id = '-'.join(
-                ['mrjob', self._opts['zone'] or 'global', random_identifier()])
+                ['mrjob', self._region(), random_identifier()])
 
         # Create the cluster if it's missing, otherwise join an existing one
         try:

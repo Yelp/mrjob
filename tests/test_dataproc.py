@@ -525,10 +525,10 @@ class GCEInstanceGroupTestCase(MockGoogleTestCase):
 
     def _gce_instance_group_summary(self, instance_group):
         if not instance_group:
-            return (0, None)
+            return (0, '')
 
-        num_instances = instance_group['numInstances']
-        instance_type = instance_group['machineTypeUri'].split('/')[-1]
+        num_instances = instance_group.num_instances
+        instance_type = instance_group.machine_type_uri.split('/')[-1]
         return (num_instances, instance_type)
 
     def _test_instance_groups(self, opts, **kwargs):
@@ -549,15 +549,14 @@ class GCEInstanceGroupTestCase(MockGoogleTestCase):
 
         cluster_id = runner._launch_cluster()
 
-        cluster_body = runner._api_cluster_get(cluster_id)
+        cluster = runner._get_cluster(cluster_id)
 
-        conf = cluster_body['config']
+        conf = cluster.config
 
         role_to_actual = dict(
-            master=self._gce_instance_group_summary(conf['masterConfig']),
-            core=self._gce_instance_group_summary(conf['workerConfig']),
-            task=self._gce_instance_group_summary(
-                conf.get('secondaryWorkerConfig'))
+            master=self._gce_instance_group_summary(conf.master_config),
+            core=self._gce_instance_group_summary(conf.worker_config),
+            task=self._gce_instance_group_summary(conf.secondary_worker_config)
         )
 
         role_to_expected = kwargs.copy()

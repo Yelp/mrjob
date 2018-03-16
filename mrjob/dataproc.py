@@ -503,13 +503,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         self._wait_for_fs_sync()
 
-    def _bucket_region(self):
-        if self._opts['region']:
-            return self._opts['region']
-        else:
-            return '-'.join(self._opts['zone'].split('-')[:-1])
-
-
     ### Running the job ###
     def cleanup(self, mode=None):
         super(DataprocJobRunner, self).cleanup(mode=mode)

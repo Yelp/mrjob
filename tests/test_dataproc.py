@@ -134,7 +134,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            jobs_list = runner.api_client.jobs().list(
+            jobs_list = runner.jobs_client.list_jobs(
                 projectId=runner._project_id,
                 region=_DATAPROC_API_REGION).execute()
             jobs = jobs_list['items']
@@ -394,7 +394,7 @@ class ExtraClusterParamsTestCase(MockGoogleTestCase):
         with self.make_runner(*args) as runner:
             runner.run()
 
-            cluster = runner._api_cluster_get(runner._cluster_id)
+            cluster = runner._get_cluster(runner._cluster_id)
             self.assertEqual(cluster['labels']['name'], 'wrench')
 
 
@@ -1023,7 +1023,7 @@ class CleanUpJobTestCase(MockGoogleTestCase):
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
             with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_api_cluster_delete') as m:
+                              '_delete_cluster') as m:
                 r._cleanup_cluster()
                 self.assertTrue(m.called)
 
@@ -1033,7 +1033,7 @@ class CleanUpJobTestCase(MockGoogleTestCase):
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
             with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_api_cluster_delete') as m:
+                              '_delete_cluster') as m:
                 r._ran_job = True
                 r._cleanup_cluster()
                 self.assertTrue(m.called)
@@ -1042,7 +1042,7 @@ class CleanUpJobTestCase(MockGoogleTestCase):
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
             with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_api_cluster_delete') as m:
+                              '_delete_cluster') as m:
                 r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
                 r._cleanup_cluster()
                 self.assertTrue(m.called)

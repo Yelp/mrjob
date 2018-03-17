@@ -27,6 +27,7 @@ from mrjob.dataproc import DataprocException
 from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _DATAPROC_API_REGION
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
+from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.fs.gcs import GCSFilesystem
@@ -65,7 +66,6 @@ if PY2:
 else:
     PYTHON_BIN = 'python3'
 
-DEFAULT_GCE_REGION = 'us-central1'
 US_EAST_GCE_REGION = 'us-east1'
 EU_WEST_GCE_REGION = 'europe-west1'
 
@@ -472,7 +472,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         fs.create_bucket(name, location=location)
 
     def test_default(self):
-        self.assert_new_tmp_bucket(DEFAULT_GCE_REGION)
+        self.assert_new_tmp_bucket(_DEFAULT_GCE_REGION)
 
     def test_us_east_1(self):
         self.assert_new_tmp_bucket(US_EAST_GCE_REGION,
@@ -484,7 +484,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
                                    region=EU_WEST_GCE_REGION)
 
     def test_reuse_mrjob_bucket_in_same_region(self):
-        self._make_bucket('mrjob-1', DEFAULT_GCE_REGION)
+        self._make_bucket('mrjob-1', _DEFAULT_GCE_REGION)
 
         runner = DataprocJobRunner()
         self.assertEqual(runner._cloud_tmp_dir, 'gs://mrjob-1/tmp/')
@@ -493,12 +493,12 @@ class TmpBucketTestCase(MockGoogleTestCase):
         # this tests 687
         self._make_bucket('mrjob-1', US_EAST_GCE_REGION)
 
-        self.assert_new_tmp_bucket(DEFAULT_GCE_REGION)
+        self.assert_new_tmp_bucket(_DEFAULT_GCE_REGION)
 
     def test_ignore_non_mrjob_bucket_in_different_region(self):
         self._make_bucket('walrus', US_EAST_GCE_REGION)
 
-        self.assert_new_tmp_bucket(DEFAULT_GCE_REGION)
+        self.assert_new_tmp_bucket(_DEFAULT_GCE_REGION)
 
     def test_explicit_tmp_uri(self):
         self._make_bucket('walrus', US_EAST_GCE_REGION)
@@ -516,7 +516,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         self.assertEqual(runner._cloud_tmp_dir, 'gs://walrus/tmp/')
 
         # tmp bucket shouldn't influence region (it did in 0.4.x)
-        self.assertEqual(runner._gce_region, US_EAST_GCE_REGION)
+        self.assertEqual(runner._region(), US_EAST_GCE_REGION)
 
 
 class GCEInstanceGroupTestCase(MockGoogleTestCase):

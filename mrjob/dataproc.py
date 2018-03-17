@@ -48,7 +48,7 @@ from mrjob.util import random_identifier
 
 log = logging.getLogger(__name__)
 
-_DEFAULT_REGION = 'us-west1'
+_DEFAULT_GCE_REGION = 'us-west1'
 
 _DEFAULT_ENDPOINT = 'dataproc.googleapis.com:443'
 
@@ -277,7 +277,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             elif environ.get('CLOUDSDK_COMPUTE_REGION'):
                 self._opts['region'] = environ['CLOUDSDK_COMPUTE_REGION']
             else:
-                self._opts['region'] = _DEFAULT_REGION
+                self._opts['region'] = _DEFAULT_GCE_REGION
 
     def _default_opts(self):
         return combine_dicts(

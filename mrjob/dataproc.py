@@ -156,6 +156,9 @@ def _check_and_fix_fs_dir(gcs_uri):
 
 
 def _zone_to_region(zone):
+    """Convert a zone (like us-west1-b) to the corresponding region
+    (like us-west1)."""
+    # See https://cloud.google.com/compute/docs/regions-zones/#identifying_a_region_or_zone  #noqa
     return '-'.join(zone.split('-')[:-1])
 
 

@@ -406,38 +406,62 @@ class RegionAndZoneOptsTestCase(MockGoogleTestCase):
 
     def test_default(self):
         runner = DataprocJobRunner()
-        self.assertEqual(runner._opts['region'], None)
-        self.assertEqual(runner._opts['zone'], 'us-west1-a')
+        self.assertEqual(runner._opts['region'], 'us-west1')
+        self.assertEqual(runner._opts['zone'], None)
         self.assertFalse(self.log.warning.called)
 
     def test_explicit_zone(self):
         runner = DataprocJobRunner(zone='europe-west1-a')
         self.assertEqual(runner._opts['zone'], 'europe-west1-a')
 
-    def test_zone_from_environment(self):
+    def test_region_from_environment(self):
         with save_current_environment():
-            os.environ['CLOUD_SDK_ZONE'] = 'us-west1-b'
+            os.environ['CLOUDSDK_COMPUTE_REGION'] = 'us-east1'
             runner = DataprocJobRunner()
 
-        self.assertEqual(runner._opts['zone'], 'us-west1-a')
+        self.assertEqual(runner._opts['region'], 'us-east1')
+
+    def test_explicit_region_beats_environment(self):
+        with save_current_environment():
+            os.environ['CLOUDSDK_COMPUTE_REGION'] = 'us-east1'
+            runner = DataprocJobRunner(region='europe-west1-a')
+
+        self.assertEqual(runner._opts['region'], 'europe-west1-a')
+
+    def test_zone_from_environment(self):
+        with save_current_environment():
+            os.environ['CLOUDSDK_COMPUTE_ZONE'] = 'us-west1-b'
+            runner = DataprocJobRunner()
+
+        self.assertEqual(runner._opts['zone'], 'us-west1-b')
 
     def test_explicit_zone_beats_environment(self):
         with save_current_environment():
-            os.environ['CLOUD_SDK_ZONE'] = 'us-west1-b'
+            os.environ['CLOUDSDK_COMPUTE_ZONE'] = 'us-west1-b'
             runner = DataprocJobRunner(zone='europe-west1-a')
 
         self.assertEqual(runner._opts['zone'], 'europe-west1-a')
 
-    def test_zone_cannot_be_empty(self):
-        runner = DataprocJobRunner(zone='')
-        self.assertEqual(runner._opts['zone'], 'us-west1-a')
+    def test_zone_beats_region(self):
+        runner = DataprocJobRunner(region='europe-west1',
+                                   zone='europe-west1-a')
 
-    def test_setting_region_triggers_warning(self):
-        runner = DataprocJobRunner(region='europe-west1-a')
-
-        self.assertEqual(runner._opts['region'], 'europe-west1-a')
         self.assertTrue(self.log.warning.called)
-        self.assertEqual(runner._opts['zone'], 'us-west1-a')
+        self.assertEqual(runner._opts['region'], None)
+        self.assertEqual(runner._opts['zone'], 'europe-west1-a')
+
+    def test_command_line_beats_config(self):
+        ZONE_CONF = dict(runners=dict(dataproc=dict(zone='us-west1-a')))
+
+        with mrjob_conf_patcher(ZONE_CONF):
+            runner = DataprocJobRunner(region='europe-west1')
+
+            # region takes precedence because it was set on the command line
+            self.assertEqual(runner._opts['region'], 'europe-west1')
+            self.assertEqual(runner._opts['zone'], None)
+            # only a problem if you set region and zone
+            # in the same config
+            self.assertFalse(self.log.warning.called)
 
 
 class TmpBucketTestCase(MockGoogleTestCase):

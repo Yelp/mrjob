@@ -38,6 +38,10 @@ class MockGoogleTestCase(SandboxedTestCase):
         # google.cloud.dataproc_v1.types.Cluster
         self.mock_clusters = {}
 
+        # maps (project_id, region, cluster_name) to job_id to a
+        # google.cloud.dataproc_v1.types.Job
+        self.mock_jobs = {}
+
         self.mock_credentials = Credentials('mock_token')
 
         # Maps bucket name to a dictionary with the key
@@ -67,11 +71,13 @@ class MockGoogleTestCase(SandboxedTestCase):
     def cluster_client(self, channel=None, credentials=None):
         return MockGoogleDataprocClusterClient(
             mock_clusters=self.mock_clusters,
+            mock_jobs=self.mock_jobs,
             mock_gcs_fs=self.mock_gcs_fs)
 
     def job_client(self, channel=None, credentials=None):
         return MockGoogleDataprocJobClient(
             mock_clusters=self.mock_clusters,
+            mock_jobs=self.mock_jobs,
             mock_gcs_fs=self.mock_gcs_fs)
 
     def storage_client(self, project=None, credentials=None):

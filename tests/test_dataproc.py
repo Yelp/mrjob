@@ -376,11 +376,11 @@ class AvailabilityZoneConfigTestCase(MockGoogleTestCase):
 
             cluster = runner._get_cluster(runner._cluster_id)
             self.assertIn(self.ZONE,
-                          cluster['config']['gceClusterConfig']['zoneUri'])
+                          cluster.config.gce_cluster_config.zone_uri)
             self.assertIn(self.ZONE,
-                          cluster['config']['masterConfig']['machineTypeUri'])
+                          cluster.config.master_config.machine_type_uri)
             self.assertIn(self.ZONE,
-                          cluster['config']['workerConfig']['machineTypeUri'])
+                          cluster.config.worker_config.machine_type_uri)
 
 
 class ExtraClusterParamsTestCase(MockGoogleTestCase):

@@ -17,6 +17,7 @@
 # see case.py for definition of mock_clusters and mock_gcs_fs
 from copy import deepcopy
 
+from google.api_core.exceptions import AlreadyExists
 from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
 from google.cloud.dataproc_v1.types import Cluster
@@ -61,7 +62,9 @@ class MockGoogleDataprocClusterClient(object):
 
         cluster_key = (project_id, region, cluster.cluster_name)
 
-        # TODO: check conflict with existing cluster
+        if cluster_key in self.mock_clusters:
+            raise AlreadyExists('Already exists: Cluster ' +
+                                _cluster_path(*cluster_key))
 
         self.mock_clusters[cluster_key] = cluster
 
@@ -69,9 +72,7 @@ class MockGoogleDataprocClusterClient(object):
         cluster_key = (project_id, region, cluster_name)
         if cluster_key not in self.mock_clusters:
             raise NotFound(
-                'Not Found: Cluster'
-                ' projects/%s/regions/%s/clusters/%s' %
-                (project_id, region, cluster_name))
+                'Not Found: Cluster ' + _cluster_path(*cluster_key))
 
         cluster = self.mock_clusters[cluster_key]
 
@@ -97,11 +98,14 @@ class MockGoogleDataprocJobClient(object):
         if not isinstance(job, Job):
             job = Job(**job)
 
-        if not (job.reference.project_id and job.reference.job_id):
+        if not (project_id and job.reference.job_id):
             raise NotImplementedError('generation of job IDs not implemented')
+        job_id = job.reference.job_id
 
         if not job.placement.cluster_name:
             raise InvalidArgument('Cluster name is required')
+
+        # TODO: what if cluster doesn't exist?
 
         if not job.hadoop_job:
             raise NotImplementedError('only hadoop jobs are supported')
@@ -114,17 +118,23 @@ class MockGoogleDataprocJobClient(object):
         else:
             job.reference.project_id = project_id
 
-        # copy the job as submitted
-        # TODO: look at what submit_job really returns
-        result = deepcopy(job)
-
         job.status.state = JobStatus.State.Value('PENDING')
 
-        cluster_key = (project_id, region, job.placement.cluster_name)
-        cluster_jobs = self.mock_jobs.setdefault(cluster_key, {})
+        job_key = (project_id, region, job_id)
 
-        # TODO: check for conflict
+        if job_key in self.mock_jobs:
+            raise AlreadyExists(
+                'Already exists: Job ' + _job_path(*job_key))
 
-        cluster_jobs[job.reference.job_id] = job
+        self.mock_jobs[job_key] = job
 
-        return result
+        return deepcopy(job)
+
+
+def _cluster_path(project_id, region, cluster_name):
+    return 'projects/%s/regions/%s/clusters/%s' % (
+        project_id, region, cluster_name)
+
+
+def _job_path(project_id, region, job_id):
+    return 'projects/%s/regions/%s/jobs/%s'

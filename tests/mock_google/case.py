@@ -38,7 +38,7 @@ class MockGoogleTestCase(SandboxedTestCase):
         # google.cloud.dataproc_v1.types.Cluster
         self.mock_clusters = {}
 
-        # maps (project_id, region, cluster_name) to job_id to a
+        # maps (project_id, region, job_name) to a
         # google.cloud.dataproc_v1.types.Job
         self.mock_jobs = {}
 

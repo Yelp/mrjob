@@ -395,7 +395,7 @@ class ExtraClusterParamsTestCase(MockGoogleTestCase):
             runner.run()
 
             cluster = runner._get_cluster(runner._cluster_id)
-            self.assertEqual(cluster['labels']['name'], 'wrench')
+            self.assertEqual(cluster.labels['name'], 'wrench')
 
 
 class RegionAndZoneOptsTestCase(MockGoogleTestCase):

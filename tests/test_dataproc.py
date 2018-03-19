@@ -188,8 +188,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
             stderr = StringIO()
             log_to_stream('mrjob.dataproc', stderr)
 
-            self._dataproc_client.job_get_advances_states = (
-                collections.deque(['SETUP_DONE', 'RUNNING', 'ERROR']))
+            self.mock_jobs_succeed = False
 
             with mr_job.make_runner() as runner:
                 self.assertIsInstance(runner, DataprocJobRunner)
@@ -201,10 +200,8 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
                 cluster_id = runner.get_cluster_id()
 
         # job should get terminated
-        cluster = (
-            self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id])
-        cluster_state = self._dataproc_client.get_state(cluster)
-        self.assertEqual(cluster_state, 'DELETING')
+        cluster = runner._get_cluster(cluster_id)
+        self.assertEqual(_cluster_state_name(cluster.status.state), 'DELETING')
 
     def _test_cloud_tmp_cleanup(self, mode, tmp_len):
         stdin = BytesIO(b'foo\nbar\n')

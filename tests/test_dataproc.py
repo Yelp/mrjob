@@ -135,13 +135,14 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            jobs_list = runner.jobs_client.list_jobs(
-                projectId=runner._project_id,
-                region=_DATAPROC_API_REGION).execute()
-            jobs = jobs_list['items']
+            jobs = list(runner._list_jobs())
+            self.assertEqual(len(jobs), 2)
 
-            step_0_args = jobs[0]['hadoopJob']['args']
-            step_1_args = jobs[1]['hadoopJob']['args']
+            # put earliest job first
+            jobs.sort(key=lambda j: j.reference.job_id)
+
+            step_0_args = jobs[0].hadoop_job.args
+            step_1_args = jobs[1].hadoop_job.args
 
             self.assertIn('-inputformat', step_0_args)
             self.assertNotIn('-outputformat', step_0_args)
@@ -176,10 +177,8 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
         self.assertEqual(len(fake_gcs_output), len(output_dirs))
 
         # job should get terminated
-        cluster = (
-            self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id])
-        cluster_state = self._dataproc_client.get_state(cluster)
-        self.assertEqual(cluster_state, 'DELETING')
+        cluster = runner._get_cluster(cluster_id)
+        self.assertEqual(_cluster_state_name(cluster.status.state), 'DELETING')
 
     def test_failed_job(self):
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v'])

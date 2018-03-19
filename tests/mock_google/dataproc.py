@@ -82,6 +82,16 @@ class MockGoogleDataprocClusterClient(object):
 
         self.mock_clusters[cluster_key] = cluster
 
+    def delete_cluster(self, project_id, region, cluster_name):
+        cluster_key = (project_id, region, cluster_name)
+
+        cluster = self.mock_clusters.get(cluster_key)
+
+        if not cluster:
+            raise NotFound('Not found: Cluster ' + _cluster_path(*cluster_key))
+
+        cluster.status.state = _cluster_state_value('DELETING')
+
     def get_cluster(self, project_id, region, cluster_name):
         cluster_key = (project_id, region, cluster_name)
         if cluster_key not in self.mock_clusters:
@@ -91,12 +101,22 @@ class MockGoogleDataprocClusterClient(object):
         cluster = self.mock_clusters[cluster_key]
 
         result = deepcopy(cluster)
-        self._simulate_progress(cluster)
+        self._simulate_progress(project_id, region, cluster_name)
         return result
 
-    def _simulate_progress(self, mock_cluster):
-        # just move from STARTING to RUNNING
-        mock_cluster.status.state = _cluster_state_value('RUNNING')
+    def _simulate_progress(self, project_id, region, cluster_name):
+        cluster_key = (project_id, region, cluster_name)
+        cluster = self.mock_clusters[cluster_key]
+
+        state_name = _cluster_state_name(cluster.status.state)
+
+        if state_name == 'DELETING':
+            del self.mock_clusters[cluster_key]
+        else:
+            # just move from STARTING to RUNNING
+            cluster.status.state = _cluster_state_value('RUNNING')
+
+
 
 
 class MockGoogleDataprocJobClient(object):
@@ -134,7 +154,7 @@ class MockGoogleDataprocJobClient(object):
         else:
             job.reference.project_id = project_id
 
-        job.status.state = _job_state_value('PENDING')
+        job.status.state = _job_state_value('SETUP_DONE')
 
         job_key = (project_id, region, job_id)
 
@@ -158,12 +178,40 @@ class MockGoogleDataprocJobClient(object):
         self._simulate_progress(job)
         return result
 
+    def list_jobs(self, project_id, region, page_size=None,
+                  cluster_name=None, job_state_matcher=None):
+        if page_size:
+            raise NotImplementedError('page_size is not mocked')
+
+        for job_key, job in self.mock_jobs.items():
+            job_project_id, job_region, job_id = job_key
+
+            if job_project_id != project_id:
+                continue
+
+            if job_region != region:
+                continue
+
+            if cluster_name and job.placement.cluster_name != cluster_name:
+                continue
+
+            if job_state_matcher:
+                if job_state_matcher != _STATE_MATCHER_ACTIVE:
+                    raise NotImplementedError(
+                        'only ACTIVE job state matcher is mocked')
+
+                if (_job_state_name(job.status.state) not in
+                        ('PENDING', 'RUNNING', 'CANCEL_PENDING')):
+                    continue
+
+            yield deepcopy(job)
+
     def _simulate_progress(self, mock_job):
         state = _job_state_name(mock_job.status.state)
 
-        if state == 'PENDING':
-            mock_job.status.state = _job_state_value('SETUP_DONE')
-        elif state == 'SETUP_DONE':
+        if state == 'SETUP_DONE':
+            mock_job.status.state = _job_state_value('PENDING')
+        elif state == 'PENDING':
             mock_job.status.state = _job_state_value('RUNNING')
         elif state == 'RUNNING':
             if self.mock_jobs_succeed:

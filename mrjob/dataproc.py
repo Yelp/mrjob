@@ -25,11 +25,10 @@ try:
     import google.auth
     import google.cloud.dataproc_v1
     import google.cloud.dataproc_v1.types
-    from google.api_core.exceptions import NotFound
+    import google.api_core.exceptions
     from google.api_core.grpc_helpers import create_channel
 except:
     google = None
-    NotFound = None
     create_channel = None
 
 import mrjob
@@ -119,8 +118,6 @@ def _cluster_state_name(state_value):
 
 def _job_state_name(state_value):
     return google.cloud.dataproc_v1.types.JobStatus.State.Name(state_value)
-
-
 
 
 ########## BEGIN - Helper fxns for _cluster_create_kwargs ##########
@@ -502,7 +499,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         try:
             self.fs.get_bucket(bucket_name)
             return
-        except NotFound:
+        except google.api_core.exceptions.NotFound:
             pass
 
         log.info('creating FS bucket %r' % bucket_name)
@@ -661,7 +658,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         try:
             self._get_cluster(self._cluster_id)
             log.info('Adding job to existing cluster - %s' % self._cluster_id)
-        except NotFound:
+        except google.api_core.exceptions.NotFound:
             log.info(
                 'Creating Dataproc Hadoop cluster - %s' % self._cluster_id)
 

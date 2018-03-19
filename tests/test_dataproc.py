@@ -923,16 +923,13 @@ class MaxMinsIdleTestCase(MockGoogleTestCase):
         self.assertEqual(last_init_exec, expected_uri)
 
     def _cluster_metadata_and_last_init_exec(self, runner):
-        cluster_id = runner.get_cluster_id()
-
-        cluster = self.get_cluster_from_runner(runner, cluster_id)
+        cluster = runner._get_cluster(runner.get_cluster_id())
 
         # Verify last arg
-        cluster_config = cluster['config']
-        last_init_action = cluster_config['initializationActions'][-1]
-        last_init_exec = last_init_action['executableFile']
+        last_init_action = cluster.config.initialization_actions[-1]
+        last_init_exec = last_init_action.executable_file
 
-        cluster_metadata = cluster_config['gceClusterConfig']['metadata']
+        cluster_metadata = cluster.config.gce_cluster_config.metadata
         return cluster_metadata, last_init_exec
 
     def test_default(self):

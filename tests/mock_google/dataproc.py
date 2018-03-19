@@ -25,6 +25,20 @@ from google.cloud.dataproc_v1.types import ClusterStatus
 from google.cloud.dataproc_v1.types import Job
 from google.cloud.dataproc_v1.types import JobStatus
 
+from mrjob.dataproc import _cluster_state_name
+from mrjob.dataproc import _job_state_name
+
+
+# convert strings (e.g. 'RUNNING') to enum values
+
+def _cluster_state_value(state_name):
+    return ClusterStatus.State.Value(state_name)
+
+
+def _job_state_value(state_name):
+    return JobStatus.State.Value(state_name)
+
+
 
 class MockGoogleDataprocClusterClient(object):
 
@@ -58,7 +72,7 @@ class MockGoogleDataprocClusterClient(object):
             raise InvalidArgument('Cluster name is required')
 
         # initialize cluster status
-        cluster.status.state = ClusterStatus.State.Value('CREATING')
+        cluster.status.state = _cluster_state_value('CREATING')
 
         cluster_key = (project_id, region, cluster.cluster_name)
 
@@ -82,7 +96,7 @@ class MockGoogleDataprocClusterClient(object):
 
     def _simulate_progress(self, mock_cluster):
         # just move from STARTING to RUNNING
-        mock_cluster.status.state = ClusterStatus.State.Value('RUNNING')
+        mock_cluster.status.state = _cluster_state_value('RUNNING')
 
 
 class MockGoogleDataprocJobClient(object):
@@ -118,7 +132,7 @@ class MockGoogleDataprocJobClient(object):
         else:
             job.reference.project_id = project_id
 
-        job.status.state = JobStatus.State.Value('PENDING')
+        job.status.state = _job_state_value('PENDING')
 
         job_key = (project_id, region, job_id)
 
@@ -129,6 +143,28 @@ class MockGoogleDataprocJobClient(object):
         self.mock_jobs[job_key] = job
 
         return deepcopy(job)
+
+    def get_job(self, project_id, region, job_id):
+        job_key = (project_id, region, job_id)
+
+        job = self.mock_jobs.get(job_key)
+
+        if not job:
+            raise NotFound('Not found: Job ' + _job_path(*job_key))
+
+        result = deepcopy(job)
+        self._simulate_progress(job)
+        return result
+
+    def _simulate_progress(self, mock_job):
+        state = _job_state_name(mock_job.status.state)
+
+        if state == 'PENDING':
+            mock_job.status.state = _job_state_value('SETUP_DONE')
+        elif state == 'SETUP_DONE':
+            mock_job.status.state = _job_state_value('RUNNING')
+        elif state == 'RUNNING':
+            mock_job.status.state = _job_state_value('DONE')
 
 
 def _cluster_path(project_id, region, cluster_name):

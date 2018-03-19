@@ -24,6 +24,7 @@ from os.path import join
 try:
     import google.auth
     import google.cloud.dataproc_v1
+    import google.cloud.dataproc_v1.types
     from google.api_core.exceptions import NotFound
     from google.api_core.grpc_helpers import create_channel
 except:
@@ -108,6 +109,18 @@ _HADOOP_STREAMING_JAR_URI = (
 # 'gs://dataproc-801485be-0997-40e7-84a7-00926031747c-us/google-cloud-dataproc-metainfo/8b76d95e-ebdc-4b81-896d-b2c5009b3560/jobs/mr_most_used_word-taim-20160228-172000-034993---Step-2-of-2/driveroutput'  # noqa
 
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
+
+
+# convert enum values to strings (e.g. 'RUNNING')
+
+def _cluster_state_name(state_value):
+    return google.cloud.dataproc_v1.ClusterStatus.State.Name(state_value)
+
+
+def _job_state_name(state_value):
+    return google.cloud.dataproc_v1.types.JobStatus.State.Name(state_value)
+
+
 
 
 ########## BEGIN - Helper fxns for _cluster_create_kwargs ##########

@@ -102,10 +102,12 @@ class MockGoogleDataprocClusterClient(object):
 class MockGoogleDataprocJobClient(object):
 
     """Mock out google.cloud.dataproc_v1.JobControllerClient"""
-    def __init__(self, mock_clusters, mock_jobs, mock_gcs_fs):
+    def __init__(
+            self, mock_clusters, mock_gcs_fs, mock_jobs, mock_jobs_succeed):
         self.mock_clusters = mock_clusters
-        self.mock_jobs = mock_jobs
         self.mock_gcs_fs = mock_gcs_fs
+        self.mock_jobs = mock_jobs
+        self.mock_jobs_succeed = mock_jobs_succeed
 
     def submit_job(self, project_id, region, job):
         # convert dict to object
@@ -164,7 +166,10 @@ class MockGoogleDataprocJobClient(object):
         elif state == 'SETUP_DONE':
             mock_job.status.state = _job_state_value('RUNNING')
         elif state == 'RUNNING':
-            mock_job.status.state = _job_state_value('DONE')
+            if self.mock_jobs_succeed:
+                mock_job.status.state = _job_state_value('DONE')
+            else:
+                mock_job.status.state = _job_state_value('ERROR')
 
 
 def _cluster_path(project_id, region, cluster_name):

@@ -114,7 +114,7 @@ _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 # convert enum values to strings (e.g. 'RUNNING')
 
 def _cluster_state_name(state_value):
-    return google.cloud.dataproc_v1.ClusterStatus.State.Name(state_value)
+    return google.cloud.dataproc_v1.types.ClusterStatus.State.Name(state_value)
 
 
 def _job_state_name(state_value):

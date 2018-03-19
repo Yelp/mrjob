@@ -30,6 +30,7 @@ from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.dataproc import _cluster_state_name
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.py2 import PY2
@@ -260,10 +261,10 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
 class ExistingClusterTestCase(MockGoogleTestCase):
 
     def test_attach_to_existing_cluster(self):
-        runner = DataprocJobRunner(conf_paths=[])
+        runner1 = DataprocJobRunner(conf_paths=[])
 
-        cluster_body = runner.api_client.cluster_create()
-        cluster_id = cluster_body['clusterName']
+        runner1._launch_cluster()
+        cluster_id = runner1._cluster_id
 
         stdin = BytesIO(b'foo\nbar\n')
 
@@ -273,51 +274,49 @@ class ExistingClusterTestCase(MockGoogleTestCase):
 
         results = []
 
-        with mr_job.make_runner() as runner:
-            runner.run()
+        with mr_job.make_runner() as runner2:
+            runner2.run()
 
             # Generate fake output
-            self.put_job_output_parts(runner, [
+            self.put_job_output_parts(runner2, [
                 b'1\t"bar"\n1\t"foo"\n2\tnull\n'
             ])
 
             # Issue 182: don't create the bootstrap script when
             # attaching to another cluster
-            self.assertIsNone(runner._master_bootstrap_script_path)
+            self.assertIsNone(runner2._master_bootstrap_script_path)
 
-            results.extend(mr_job.parse_output(runner.cat_output()))
+            results.extend(mr_job.parse_output(runner2.cat_output()))
 
         self.assertEqual(sorted(results),
                          [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_take_down_cluster_on_failure(self):
-        runner = DataprocJobRunner(conf_paths=[])
+        runner1 = DataprocJobRunner(conf_paths=[])
 
-        cluster_body = runner.api_client.cluster_create()
-        cluster_id = cluster_body['clusterName']
+        runner1._launch_cluster()
+        cluster_id = runner1._cluster_id
 
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v',
                                '--cluster-id', cluster_id])
         mr_job.sandbox()
 
-        self._dataproc_client.job_get_advances_states = (
-            collections.deque(['SETUP_DONE', 'RUNNING', 'ERROR']))
+        self.mock_jobs_succeed = False
 
-        with mr_job.make_runner() as runner:
-            self.assertIsInstance(runner, DataprocJobRunner)
+        with mr_job.make_runner() as runner2:
+            self.assertIsInstance(runner2, DataprocJobRunner)
 
             with logger_disabled('mrjob.dataproc'):
-                self.assertRaises(StepFailedException, runner.run)
+                self.assertRaises(StepFailedException, runner2.run)
 
-            cluster = self.get_cluster_from_runner(runner, cluster_id)
-            cluster_state = self._dataproc_client.get_state(cluster)
-            self.assertEqual(cluster_state, 'RUNNING')
+            cluster2 = runner2._get_cluster(runner2._cluster_id)
+            self.assertEqual(_cluster_state_name(cluster2.status.state),
+                             'RUNNING')
 
         # job shouldn't get terminated by cleanup
-        cluster = (
-            self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id])
-        cluster_state = self._dataproc_client.get_state(cluster)
-        self.assertEqual(cluster_state, 'RUNNING')
+        cluster1 = runner1._get_cluster(runner1._cluster_id)
+        self.assertEqual(_cluster_state_name(cluster1.status.state),
+                         'RUNNING')
 
 
 class CloudAndHadoopVersionTestCase(MockGoogleTestCase):

@@ -42,6 +42,9 @@ class MockGoogleTestCase(SandboxedTestCase):
         # google.cloud.dataproc_v1.types.Job
         self.mock_jobs = {}
 
+        # set this to False to make jobs ERROR
+        self.mock_jobs_succeed = True
+
         self.mock_credentials = Credentials('mock_token')
 
         # Maps bucket name to a dictionary with the key
@@ -71,14 +74,17 @@ class MockGoogleTestCase(SandboxedTestCase):
     def cluster_client(self, channel=None, credentials=None):
         return MockGoogleDataprocClusterClient(
             mock_clusters=self.mock_clusters,
+            mock_gcs_fs=self.mock_gcs_fs,
             mock_jobs=self.mock_jobs,
-            mock_gcs_fs=self.mock_gcs_fs)
+        )
 
     def job_client(self, channel=None, credentials=None):
         return MockGoogleDataprocJobClient(
             mock_clusters=self.mock_clusters,
+            mock_gcs_fs=self.mock_gcs_fs,
             mock_jobs=self.mock_jobs,
-            mock_gcs_fs=self.mock_gcs_fs)
+            mock_jobs_succeed=self.mock_jobs_succeed,
+        )
 
     def storage_client(self, project=None, credentials=None):
         return MockGoogleStorageClient(mock_gcs_fs=self.mock_gcs_fs)
@@ -108,3 +114,15 @@ class MockGoogleTestCase(SandboxedTestCase):
 
             blob = bucket.blob(blob_name)
             blob.upload_from_string(data)
+
+    def put_job_output_parts(self, dataproc_runner, raw_parts):
+        """Generate fake output on GCS for the given Dataproc runner."""
+        assert type(raw_parts) is list
+
+        base_uri = dataproc_runner.get_output_dir()
+        gcs_multi_dict = dict()
+        for part_num, part_data in enumerate(raw_parts):
+            gcs_uri = base_uri + 'part-%05d' % part_num
+            gcs_multi_dict[gcs_uri] = part_data
+
+        self.put_gcs_multi(gcs_multi_dict)

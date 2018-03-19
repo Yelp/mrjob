@@ -52,7 +52,6 @@ _DEFAULT_GCE_REGION = 'us-west1'
 
 _DEFAULT_ENDPOINT = 'dataproc.googleapis.com:443'
 
-_DATAPROC_API_REGION = 'global'
 _DATAPROC_MIN_WORKERS = 2
 _GCE_API_VERSION = 'v1'
 

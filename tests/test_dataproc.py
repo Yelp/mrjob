@@ -13,7 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for DataprocJobRunner"""
-import collections
 import getpass
 import os
 import os.path
@@ -25,7 +24,6 @@ import mrjob
 import mrjob.dataproc
 from mrjob.dataproc import DataprocException
 from mrjob.dataproc import DataprocJobRunner
-from mrjob.dataproc import _DATAPROC_API_REGION
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
@@ -50,15 +48,6 @@ from tests.py2 import patch
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
-
-try:
-    from oauth2client.client import GoogleCredentials
-    from googleapiclient import discovery
-except ImportError:
-    # don't require googleapiclient; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    GoogleCredentials = None
-    discovery = None
 
 # used to match command lines
 if PY2:

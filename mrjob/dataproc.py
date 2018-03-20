@@ -730,7 +730,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         If it fails, attempt to diagnose the error, and raise an
         exception.
 
-        This also adds an item to self._lo_ginterpretations
+        This also adds an item to self._log_interpretations
         """
         log_interpretation = dict(job_id=job_id)
         self._log_interpretations.append(log_interpretation)

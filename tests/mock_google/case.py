@@ -45,15 +45,17 @@ class MockGoogleTestCase(SandboxedTestCase):
         # set this to False to make jobs ERROR
         self.mock_jobs_succeed = True
 
+        # mock credentials, returned by mock google.auth.default()
         self.mock_credentials = Credentials('mock_token')
+
+        # mock project ID, returned by mock google.auth.default()
+        self.mock_project_id = 'mock-project-12345'
 
         # Maps bucket name to a dictionary with the key
         # *blobs*. *blobs* maps object name to
         # a dictionary with the key *data*, which is
         # a bytestring.
         self.mock_gcs_fs = {}
-
-        self.mock_project_id = 'mock-project-12345'
 
         self.start(patch('google.auth.default', self.auth_default))
 

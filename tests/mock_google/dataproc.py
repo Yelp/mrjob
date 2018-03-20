@@ -141,7 +141,10 @@ class MockGoogleDataprocJobClient(object):
         if not job.placement.cluster_name:
             raise InvalidArgument('Cluster name is required')
 
-        # TODO: what if cluster doesn't exist?
+        # cluster must exist
+        cluster_key = (project_id, region, job.placement.cluster_name)
+        if cluster_key not in self.mock_clusters:
+            raise NotFound('Not Found: Cluster ' + _cluster_path(*cluster_key))
 
         if not job.hadoop_job:
             raise NotImplementedError('only hadoop jobs are supported')

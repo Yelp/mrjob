@@ -30,8 +30,11 @@ try:
             'boto3>=1.4.6',
             'botocore>=1.6.0',
             'google-cloud>=0.32.0',
-            # this is in Alpha, so not assuming future versions will work
-            'google-cloud-dataproc==0.1.0',
+            # as of 2018-03-21, there is only one version of this library out
+            # (0.1.0), and it's in Alpha. No real point in pinning the version;
+            # we'll just have to upgrade mrjob if and when the library's
+            # API changes. Might be determined by google-cloud anyhow.
+            'google-cloud-dataproc',
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],

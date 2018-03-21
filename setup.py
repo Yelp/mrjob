@@ -34,7 +34,7 @@ try:
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
-        'tests_require': ['simplejson'],
+        'tests_require': ['simplejson', 'warcio'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 

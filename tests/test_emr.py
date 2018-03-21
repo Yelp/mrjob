@@ -5464,4 +5464,13 @@ class EMRInputManifestTestCase(InlineInputManifestTestCase, MockBoto3TestCase):
 
         super(EMRInputManifestTestCase, self).test_input_manifest()
 
-        # TODO: check that input protocol is set to NLinesInputFormat
+        cluster = self.mock_emr_clusters['j-MOCKCLUSTER0']
+        first_step_cmd = cmd_line(cluster['_Steps'][0]['Config']['Args'])
+
+        # verify that the correct input format was set
+        self.assertIn(
+            '-inputformat org.apache.hadoop.mapred.lib.NLineInputFormat',
+            first_step_cmd)
+
+        # verify that the input manfiest was used
+        self.assertIn('input-manifest.txt', first_step_cmd)

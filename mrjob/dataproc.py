@@ -938,3 +938,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             body=dict(job=job_data)
         )
         return self.api_client.jobs().submit(**jobs_submit_kwargs).execute()
+
+    def _manifest_download_commands(self):
+        return [
+            # TODO: SSH in and figure out how to use gsutil or similar
+            #('gs://*', 'gsutil cp'),
+            ('*://*', 'hadoop fs -copyToLocal'),
+        ]

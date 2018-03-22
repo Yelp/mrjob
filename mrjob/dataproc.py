@@ -26,10 +26,9 @@ try:
     import google.cloud.dataproc_v1
     import google.cloud.dataproc_v1.types
     import google.api_core.exceptions
-    from google.api_core.grpc_helpers import create_channel
+    import google.api_core.grpc_helpers
 except:
     google = None
-    create_channel = None
 
 import mrjob
 from mrjob.cloud import HadoopInTheCloudJobRunner
@@ -340,7 +339,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     def _client_create_kwargs(self):
         if self._opts['region']:
             endpoint = '%s-%s' % (self._opts['region'], _DEFAULT_ENDPOINT)
-            return dict(channel=create_channel(
+            return dict(channel=google.api_core.grpc_helpers.create_channel(
                 endpoint, credentials=self._credentials))
         else:
             return dict(credentials=self._credentials)

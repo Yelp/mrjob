@@ -23,6 +23,7 @@ from .dataproc import MockGoogleDataprocClusterClient
 from .dataproc import MockGoogleDataprocJobClient
 from .storage import MockGoogleStorageClient
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.py2 import Mock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
@@ -57,6 +58,10 @@ class MockGoogleTestCase(SandboxedTestCase):
         # a bytestring.
         self.mock_gcs_fs = {}
 
+
+        self.start(patch('google.api_core.grpc_helpers.create_channel',
+                         self.create_channel))
+
         self.start(patch('google.auth.default', self.auth_default))
 
         self.start(patch('google.cloud.dataproc_v1.ClusterControllerClient',
@@ -72,6 +77,11 @@ class MockGoogleTestCase(SandboxedTestCase):
 
     def auth_default(self):
         return (self.mock_credentials, self.mock_project_id)
+
+    def create_channel(self, target, credentials=None):
+        channel = Mock()
+        channel._channel = Mock()
+        channel._channel.target = Mock(return_value=target)
 
     def cluster_client(self, channel=None, credentials=None):
         return MockGoogleDataprocClusterClient(

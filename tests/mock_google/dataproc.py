@@ -39,11 +39,15 @@ def _job_state_value(state_name):
     return JobStatus.State.Value(state_name)
 
 
+class MockGoogleDataprocClient(object):
+    """Common code for mock dataproc clients."""
 
-class MockGoogleDataprocClusterClient(object):
+    def __init__(
+            self, mock_clusters, mock_jobs, mock_gcs_fs, mock_jobs_succeed,
+            channel=None, credentials=None):
+        self.channel = channel
+        self.credentials = credentials
 
-    """Mock out google.cloud.dataproc_v1.ClusterControllerClient"""
-    def __init__(self, mock_clusters, mock_jobs, mock_gcs_fs):
         # maps (project_id, region, cluster_name) to a
         # google.cloud.dataproc_v1.types.Cluster
         self.mock_clusters = mock_clusters
@@ -52,10 +56,37 @@ class MockGoogleDataprocClusterClient(object):
         # google.cloud.dataproc_v1.types.Job
         self.mock_jobs = mock_jobs
 
+        # if False, mock jobs end in ERROR
+        self.mock_jobs_succeed = mock_jobs_succeed
+
         # see case.py
         self.mock_gcs_fs = mock_gcs_fs
 
+    def _expected_region(self):
+        if self.channel:
+            target = self.channel._channel.target()
+            name = target.split('.')[0]
+            if '-' in name:
+                return '-'.join(name.split('-')[:-1])
+
+        return 'global'
+
+    def _check_region_matches_endpoint(self, region):
+        expected = self._expected_region()
+
+        if region != expected:
+            raise InvalidArgument(
+                "Region '%s' invalid or not supported by this endpoint;"
+                " permitted regions: '[%s]'" % (region, expected))
+
+
+class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
+
+    """Mock out google.cloud.dataproc_v1.ClusterControllerClient"""
+
     def create_cluster(self, project_id, region, cluster):
+        self._check_region_matches_endpoint(region)
+
         # convert dict to object
         if not isinstance(cluster, Cluster):
             cluster = Cluster(**cluster)
@@ -83,6 +114,8 @@ class MockGoogleDataprocClusterClient(object):
         self.mock_clusters[cluster_key] = cluster
 
     def delete_cluster(self, project_id, region, cluster_name):
+        self._check_region_matches_endpoint(region)
+
         cluster_key = (project_id, region, cluster_name)
 
         cluster = self.mock_clusters.get(cluster_key)
@@ -93,6 +126,8 @@ class MockGoogleDataprocClusterClient(object):
         cluster.status.state = _cluster_state_value('DELETING')
 
     def get_cluster(self, project_id, region, cluster_name):
+        self._check_region_matches_endpoint(region)
+
         cluster_key = (project_id, region, cluster_name)
         if cluster_key not in self.mock_clusters:
             raise NotFound(
@@ -117,19 +152,13 @@ class MockGoogleDataprocClusterClient(object):
             cluster.status.state = _cluster_state_value('RUNNING')
 
 
-
-
-class MockGoogleDataprocJobClient(object):
+class MockGoogleDataprocJobClient(MockGoogleDataprocClient):
 
     """Mock out google.cloud.dataproc_v1.JobControllerClient"""
-    def __init__(
-            self, mock_clusters, mock_gcs_fs, mock_jobs, mock_jobs_succeed):
-        self.mock_clusters = mock_clusters
-        self.mock_gcs_fs = mock_gcs_fs
-        self.mock_jobs = mock_jobs
-        self.mock_jobs_succeed = mock_jobs_succeed
 
     def submit_job(self, project_id, region, job):
+        self._check_region_matches_endpoint(region)
+
         # convert dict to object
         if not isinstance(job, Job):
             job = Job(**job)
@@ -170,6 +199,8 @@ class MockGoogleDataprocJobClient(object):
         return deepcopy(job)
 
     def get_job(self, project_id, region, job_id):
+        self._check_region_matches_endpoint(region)
+
         job_key = (project_id, region, job_id)
 
         job = self.mock_jobs.get(job_key)
@@ -183,6 +214,8 @@ class MockGoogleDataprocJobClient(object):
 
     def list_jobs(self, project_id, region, page_size=None,
                   cluster_name=None, job_state_matcher=None):
+        self._check_region_matches_endpoint(region)
+
         if page_size:
             raise NotImplementedError('page_size is not mocked')
 

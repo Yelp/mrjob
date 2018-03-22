@@ -339,8 +339,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     def _client_create_kwargs(self):
         if self._opts['region']:
             endpoint = '%s-%s' % (self._opts['region'], _DEFAULT_ENDPOINT)
-            return dict(channel=google.api_core.grpc_helpers.create_channel(
-                endpoint, credentials=self._credentials))
+            return dict(
+                channel=google.api_core.grpc_helpers.create_channel(
+                    endpoint, credentials=self._credentials))
         else:
             return dict(credentials=self._credentials)
 

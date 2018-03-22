@@ -82,15 +82,22 @@ class MockGoogleTestCase(SandboxedTestCase):
         channel._channel = Mock()
         channel._channel.target = Mock(return_value=target)
 
+        return channel
+
     def cluster_client(self, channel=None, credentials=None):
         return MockGoogleDataprocClusterClient(
+            channel=channel,
+            credentials=credentials,
             mock_clusters=self.mock_clusters,
             mock_gcs_fs=self.mock_gcs_fs,
             mock_jobs=self.mock_jobs,
+            mock_jobs_succeed=self.mock_jobs_succeed,
         )
 
     def job_client(self, channel=None, credentials=None):
         return MockGoogleDataprocJobClient(
+            channel=channel,
+            credentials=credentials,
             mock_clusters=self.mock_clusters,
             mock_gcs_fs=self.mock_gcs_fs,
             mock_jobs=self.mock_jobs,

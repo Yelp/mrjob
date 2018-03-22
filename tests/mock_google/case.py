@@ -58,7 +58,6 @@ class MockGoogleTestCase(SandboxedTestCase):
         # a bytestring.
         self.mock_gcs_fs = {}
 
-
         self.start(patch('google.api_core.grpc_helpers.create_channel',
                          self.create_channel))
 

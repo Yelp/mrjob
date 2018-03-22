@@ -366,6 +366,17 @@ class AvailabilityZoneConfigTestCase(MockGoogleTestCase):
                           cluster.config.worker_config.machine_type_uri)
 
 
+class ProjectIDTestCase(MockGoogleTestCase):
+
+    def test_default(self):
+        with self.make_runner() as runner:
+            self.assertEqual(runner._project_id, self.mock_project_id)
+
+    def test_project_id(self):
+        with self.make_runner('--project-id', 'alan-parsons') as runner:
+            self.assertEqual(runner._project_id, 'alan-parsons')
+
+
 class ExtraClusterParamsTestCase(MockGoogleTestCase):
 
     # just a basic test to make extra_cluster_params is respected.

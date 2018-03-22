@@ -890,7 +890,7 @@ _RUNNER_OPTS = dict(
     project_id=dict(
         deprecated_aliases=['gcp_project'],
         switches=[
-            (['--project_id'], dict(
+            (['--project-id'], dict(
                 deprecated_aliases=['--gcp-project'],
                 help='Project to run Dataproc jobs in'
             )),

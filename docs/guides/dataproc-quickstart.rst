@@ -3,30 +3,45 @@ Dataproc Quickstart
 
 .. _google-setup:
 
-Configuring Google Cloud Platform (GCP) credentials
----------------------------------------------------
+Getting started with Google Cloud
+---------------------------------
 
-Configuring your GCP credentials allows mrjob to run your jobs on
-Dataproc and use GCS.
+Using mrjob with Google Cloud Dataproc is as simple creating an account,
+enabling Google Cloud Dataproc, and creating credentials.
 
-* `Create a Google Cloud Platform account <http://cloud.google.com/>`_, see top-right
-* `Learn about Google Cloud Platform "projects" <https://cloud.google.com/docs/overview/#projects>`_
-* `Select or create a Cloud Platform Console project <https://console.cloud.google.com/project>`_
-* `Enable billing for your project <https://console.cloud.google.com/billing>`_
-* Go to the `API Manager <https://console.cloud.google.com/apis>`_ and search for / enable the following APIs...
+Creating an account
+^^^^^^^^^^^^^^^^^^^
 
-  * Google Cloud Storage
-  * Google Cloud Storage JSON API
-  * Google Cloud Dataproc API
+* Go to `cloud.google.com <https://cloud.google.com>`__.
+* Click the circle in the upper right, and select your Google account (if you
+  don't have one sign up `here <https://accounts.google.com/SignUp>`__.
+* `If you have multiple Google accounts, sign out first, and then sign into
+  the account you want to use.`
+* Click **Try it Free** in the upper right
+* Enter your name and payment information
+* Wait a few minutes while your first project is created
 
-* Under Credentials, **Create Credentials** and select **Service account key**.  Then, select **New service account**, enter a Name and select **Key type** JSON.
 
-* Install the `Google Cloud SDK <https://cloud.google.com/sdk/>`_
+Enabling Google Cloud Dataproc
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-`Dataproc Documentation <https://cloud.google.com/dataproc/overview>`_
+* Go `here <https://console.cloud.google.com/apis/library/dataproc.googleapis.com/>`__ (or search for "dataproc" under **APIs & Services > Library** in the upper left-hand menu)
+* Click **Enable**
 
-`How GCP Default credentials work <https://developers.google.com/identity/protocols/application-default-credentials#howtheywork>`_
+Creating credentials
+^^^^^^^^^^^^^^^^^^^^
 
+* Go `here <https://console.cloud.google.com/apis/credentials>__` (or pick **APIs & Services > Credentials** in the upper left-hand menu)
+* Pick **Create credentials > Service account key**
+* Select **Compute engine default service account**
+* Click **Create** to download a JSON file.
+* Point **$GOOGLE_APPLICATION_CREDENTIALS** at the file you downloaded (``export GOOGLE_APPLICATION_CREDENTIALS="/path/to/Your Credentials.json"``).
+
+You do not have to download or install the :command:`gcloud` utility, but if
+you have it installed and configured, mrjob can read credentials from its
+config files rather than **$GOOGLE_APPLICATION_CREDENTIALS**. See
+`Installing Cloud SDK <https://cloud.google.com/sdk/downloads>__` for more
+information.
 
 .. _running-a-dataproc-job:
 

@@ -85,11 +85,7 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
           require Java. If you need to test these, consider starting up a
           standalone Hadoop instance and running your job with ``-r hadoop``.
         """
-        self.NUM_CORES = kwargs.get('num_cores')
         super(LocalMRJobRunner, self).__init__(**kwargs)
-
-    def _get_num_cores(self):
-        return self.NUM_CORES if self.NUM_CORES else None
 
     def _invoke_task_func(self, task_type, step_num, task_num):
         args = self._substep_args(step_num, task_type)
@@ -103,7 +99,7 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
 
     def _run_multiple(self, funcs, num_processes=None):
         """Use multiprocessing to run in parallel."""
-        pool = Pool(processes=self._get_num_cores())
+        pool = Pool(processes=self._opts['num_cores'])
 
         try:
             results = [

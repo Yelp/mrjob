@@ -361,11 +361,11 @@ class SimMRJobRunner(MRJobRunner):
 
     def _num_mappers(self, step_num):
         # TODO: look up mapred.job.maps (convert to int) in _jobconf_for_step()
-        return cpu_count()
+        return self._opts['num_cores'] or cpu_count()
 
     def _num_reducers(self, step_num):
         # TODO: look up mapred.job.reduces in _jobconf_for_step()
-        return cpu_count()
+        return self._opts['num_cores'] or cpu_count()
 
     def _split_mapper_input(self, input_paths, step_num):
         """Take one or more input paths (which may be compressed) and split

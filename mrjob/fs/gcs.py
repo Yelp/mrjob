@@ -22,10 +22,8 @@ from tempfile import TemporaryFile
 from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
 from mrjob.parse import urlparse
-from mrjob.py2 import PY2
 from mrjob.runner import GLOB_RE
 
-# TODO: loading credentials
 try:
     import google.cloud.storage.client
     from google.api_core.exceptions import NotFound

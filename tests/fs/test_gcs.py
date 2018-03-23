@@ -13,21 +13,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import binascii
 import bz2
-import io
-import sys
 from hashlib import md5
-from unittest import skipIf
-
-from tests.py2 import patch
-from tests.py2 import mock
 
 from mrjob.fs.gcs import GCSFilesystem
 
 from tests.compress import gzip_compress
 from tests.mock_google import MockGoogleTestCase
-from tests.sandbox import PatcherTestCase
 
 
 class CatTestCase(MockGoogleTestCase):

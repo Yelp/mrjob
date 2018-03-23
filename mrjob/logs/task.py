@@ -110,7 +110,8 @@ def _ls_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
         attempt_to_container_id=attempt_to_container_id)
 
 
-def _ls_spark_task_logs(fs, log_dir_stream, application_id=None, job_id=None,
+def _ls_spark_task_logs(
+        fs, log_dir_stream, application_id=None, job_id=None,
         error_attempt_ids=None, attempt_to_container_id=None):
     """Yield matching Spark logs, optionally filtering by application_id
     or job_id.

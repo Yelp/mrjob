@@ -166,7 +166,7 @@ def _check_and_fix_fs_dir(gcs_uri):
 def _zone_to_region(zone):
     """Convert a zone (like us-west1-b) to the corresponding region
     (like us-west1)."""
-    # See https://cloud.google.com/compute/docs/regions-zones/#identifying_a_region_or_zone  #noqa
+    # See https://cloud.google.com/compute/docs/regions-zones/#identifying_a_region_or_zone  # noqa
     return '-'.join(zone.split('-')[:-1])
 
 
@@ -361,7 +361,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             return self._fs
 
         self._gcs_fs = GCSFilesystem(
-            credentials = self._credentials,
+            credentials=self._credentials,
             local_tmp_dir=self._get_local_tmp_dir(),
             project_id=self._project_id,
         )
@@ -835,7 +835,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         cluster_metadata['mrjob-max-secs-idle'] = str(int(
             self._opts['max_mins_idle'] * 60))
 
-        gce_cluster_config=dict(
+        gce_cluster_config = dict(
             service_account_scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
             metadata=cluster_metadata
         )

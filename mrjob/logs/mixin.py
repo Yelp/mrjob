@@ -226,13 +226,15 @@ class LogInterpretationMixin(object):
             ls_func = _ls_task_logs
 
         # logging messages are handled by a callback in _interpret_task_logs()
-        for match in ls_func(
-                self.fs,
-                self._stream_task_log_dirs(
-                    application_id=application_id, output_dir=output_dir),
-                application_id=application_id,
-                job_id=job_id,
-                error_attempt_ids=error_attempt_ids,
-                attempt_to_container_id=attempt_to_container_id,
-                ):
+        matches = ls_func(
+            self.fs,
+            self._stream_task_log_dirs(
+                application_id=application_id, output_dir=output_dir),
+            application_id=application_id,
+            job_id=job_id,
+            error_attempt_ids=error_attempt_ids,
+            attempt_to_container_id=attempt_to_container_id,
+        )
+
+        for match in matches:
             yield match

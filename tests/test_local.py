@@ -89,7 +89,8 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
         input_gz_glob = join(self.tmp_dir, '*.gz')
 
-        mr_job = MRTwoStepJob(['-r', 'local', '--num-cores', '4', '-', input_path, input_gz_glob])
+        mr_job = MRTwoStepJob(['-r', 'local', '--num-cores', '4',
+                               '-', input_path, input_gz_glob])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None

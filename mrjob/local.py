@@ -68,7 +68,6 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
         'sort_bin',
     }
 
-
     def __init__(self, **kwargs):
         """Arguments to this constructor may also appear in :file:`mrjob.conf`
         under ``runners/local``.

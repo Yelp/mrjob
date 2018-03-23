@@ -19,7 +19,6 @@ from mrjob.util import unique
 from .ids import _time_sort_key
 
 
-
 def _pick_error(log_interpretation):
     """Pick most recent error from a dictionary possibly containing
     step, history, and task interpretations. Returns None if there
@@ -42,7 +41,7 @@ def _pick_errors(log_interpretation):
                 yield error
 
     attempt_to_container_id = log_interpretation.get('history', {}).get(
-            'attempt_to_container_id', {})
+        'attempt_to_container_id', {})
 
     return _merge_and_sort_errors(yield_errors(), attempt_to_container_id)
 

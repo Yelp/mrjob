@@ -6,7 +6,7 @@ mrjob: the Python MapReduce library
 mrjob is a Python 2.7/3.3+ package that helps you write and run Hadoop
 Streaming jobs.
 
-`Stable version (v0.6.1) documentation <http://mrjob.readthedocs.org/en/stable/>`_
+`Stable version (v0.6.2) documentation <http://mrjob.readthedocs.org/en/stable/>`_
 
 `Development version documentation <http://mrjob.readthedocs.org/en/latest/>`_
 
@@ -35,8 +35,8 @@ Some important features:
 * Minimal setup
 
   * To run on EMR, set ``$AWS_ACCESS_KEY_ID`` and ``$AWS_SECRET_ACCESS_KEY``
-  * To run on Dataproc, set up your Google account and credentials (see `Dataproc Quickstart <http://pythonhosted.org/mrjob/guides/dataproc-quickstart.html>`_).
-  * To run on your Hadoop cluster, just make sure ``$HADOOP_HOME`` is set.
+  * To run on Dataproc, set ``$GOOGLE_APPLICATION_CREDENTIALS``
+  * No setup needed to use mrjob on your own Hadoop cluster
 
 Installation
 ------------

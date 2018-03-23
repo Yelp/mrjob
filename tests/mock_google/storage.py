@@ -19,12 +19,12 @@ from hashlib import md5
 from google.api_core.exceptions import Conflict
 from google.api_core.exceptions import NotFound
 
-# see case.py for definition of mock_gcs_fs
 
 class MockGoogleStorageClient(object):
     """Mock out google.cloud.storage.client.Client
     """
     def __init__(self, mock_gcs_fs):
+        # see case.py for definition of mock_gcs_fs
         self.mock_gcs_fs = mock_gcs_fs
 
     def bucket(self, bucket_name):

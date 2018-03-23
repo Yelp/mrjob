@@ -5,6 +5,7 @@
 # Copyright 2015 Yelp and Contributors
 # Copyright 2016 Google
 # Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,8 +22,9 @@
 # Author: Matthew Tai <mtai84@gmail.com>
 
 # This script is part of mrjob, but can be run as an initializationAction on
-# ANY GCP Dataproc cluster.  Because initializationAction scripts cannot take args
-# this script reads MAX_SECS_IDLE from metadata attribute "mrjob-max-secs-idle"
+# ANY GCP Dataproc cluster.  Because initializationAction scripts cannot take
+# args, this script reads MAX_SECS_IDLE from metadata attribute
+# "mrjob-max-secs-idle"
 
 # This script runs `yarn application -list` in a loop and considers the cluster
 # idle if no jobs are currently running.  If the cluster stays idle long

@@ -4,6 +4,35 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.2:
+
+0.6.2
+-----
+
+mrjob is now orders of magnitude quicker at parsing logs, making it practical
+to diagnose rare errors from very large jobs. However, on some AMIs, it can no
+longer parse errors without waiting for logs to transfer to S3 (this may be
+fixed in a future version).
+
+To run jobs on Google Cloud Dataproc, mrjob no longer requires you to install
+the :command:`gcloud` util (though if
+you do have it installed, mrjob can read credentials from its configs). For
+details, see :doc:`guides/dataproc-quickstart`.
+
+mrjob no longer requires you to select a Dataproc :mrjob-opt:`zone` prior
+to running jobs. Auto zone placement (just set :mrjob-opt:`region` and let
+Dataproc pick a zone) is now enabled, with the default being auto zone
+placement in ``us-west1``. mrjob no longer reads zone and region from
+:command:`gcloud`\'s compute engine configs.
+
+mrjob's Dataproc code has been ported from the ``google-python-api-client``
+library (which is in maintenance mode) to ``google-cloud-sdk``, resulting in
+some small changes to the GCS filesystem API. See `CHANGES.txt
+<https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_ for details.
+
+Local mode now has a :mrjob-opt:`num_cores` option that allow you to control
+how tasks it handles simultaneously.
+
 .. _v0.6.1:
 
 0.6.1

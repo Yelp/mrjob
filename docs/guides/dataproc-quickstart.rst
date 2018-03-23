@@ -14,8 +14,8 @@ Creating an account
 
 * Go to `cloud.google.com <https://cloud.google.com>`__.
 * Click the circle in the upper right, and select your Google account (if you
-  don't have one sign up `here <https://accounts.google.com/SignUp>`__.
-* `If you have multiple Google accounts, sign out first, and then sign into
+  don't have one sign up `here <https://accounts.google.com/SignUp>`__. `If
+  you have multiple Google accounts, sign out first, and then sign into
   the account you want to use.`
 * Click **Try it Free** in the upper right
 * Enter your name and payment information
@@ -31,7 +31,7 @@ Enabling Google Cloud Dataproc
 Creating credentials
 ^^^^^^^^^^^^^^^^^^^^
 
-* Go `here <https://console.cloud.google.com/apis/credentials>__` (or pick **APIs & Services > Credentials** in the upper left-hand menu)
+* Go `here <https://console.cloud.google.com/apis/credentials>`__ (or pick **APIs & Services > Credentials** in the upper left-hand menu)
 * Pick **Create credentials > Service account key**
 * Select **Compute engine default service account**
 * Click **Create** to download a JSON file.
@@ -39,8 +39,9 @@ Creating credentials
 
 You do not have to download or install the :command:`gcloud` utility, but if
 you have it installed and configured, mrjob can read credentials from its
-config files rather than **$GOOGLE_APPLICATION_CREDENTIALS**. See
-`Installing Cloud SDK <https://cloud.google.com/sdk/downloads>__` for more
+config files rather than **$GOOGLE_APPLICATION_CREDENTIALS**.
+
+See `Installing Cloud SDK <https://cloud.google.com/sdk/downloads>__` for more
 information.
 
 .. _running-a-dataproc-job:

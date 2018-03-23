@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2016 Yelp and Contributors
+# Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -226,13 +228,15 @@ class LogInterpretationMixin(object):
             ls_func = _ls_task_logs
 
         # logging messages are handled by a callback in _interpret_task_logs()
-        for match in ls_func(
-                self.fs,
-                self._stream_task_log_dirs(
-                    application_id=application_id, output_dir=output_dir),
-                application_id=application_id,
-                job_id=job_id,
-                error_attempt_ids=error_attempt_ids,
-                attempt_to_container_id=attempt_to_container_id,
-                ):
+        matches = ls_func(
+            self.fs,
+            self._stream_task_log_dirs(
+                application_id=application_id, output_dir=output_dir),
+            application_id=application_id,
+            job_id=job_id,
+            error_attempt_ids=error_attempt_ids,
+            attempt_to_container_id=attempt_to_container_id,
+        )
+
+        for match in matches:
             yield match

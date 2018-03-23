@@ -25,6 +25,7 @@ from google.cloud.dataproc_v1.types import ClusterStatus
 from google.cloud.dataproc_v1.types import Job
 from google.cloud.dataproc_v1.types import JobStatus
 
+from mrjob.dataproc import _STATE_MATCHER_ACTIVE
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _job_state_name
 

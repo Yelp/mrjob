@@ -1,6 +1,7 @@
 # Copyright 2009-2012 Yelp and Contributors
 # Copyright 2013 David Marin and Lyft
 # Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,6 +22,8 @@ import stat
 import sys
 import tempfile
 from io import BytesIO
+from multiprocessing import Pool
+from multiprocessing import cpu_count
 from os.path import exists
 from os.path import join
 from subprocess import check_call
@@ -89,7 +92,8 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
         input_gz_glob = join(self.tmp_dir, '*.gz')
 
-        mr_job = MRTwoStepJob(['-r', 'local', '--num-cores', '4', '-', input_path, input_gz_glob])
+        mr_job = MRTwoStepJob(['-r', 'local', '--num-cores', '4',
+                               '-', input_path, input_gz_glob])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -111,6 +115,40 @@ class LocalMRJobRunnerEndToEndTestCase(SandboxedTestCase):
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
+
+
+class NumCoresTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(NumCoresTestCase, self).setUp()
+
+        self.pool = self.start(patch('mrjob.local.Pool', wraps=Pool))
+
+    def test_default(self):
+        mr_job = MRTwoStepJob(['-r', 'local'])
+        mr_job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._num_mappers(0), cpu_count())
+            self.assertEqual(runner._num_reducers(0), cpu_count())
+
+            runner.run()
+
+            self.pool.assert_called_with(processes=None)
+
+    def test_three_cores(self):
+        mr_job = MRTwoStepJob(['-r', 'local', '--num-cores', '3'])
+        mr_job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
+
+        with mr_job.make_runner() as runner:
+            self.assertEqual(runner._num_mappers(0), 3)
+            self.assertEqual(runner._num_reducers(0), 3)
+
+            runner.run()
+
+            self.pool.assert_called_with(processes=3)
+
+
 
 
 # TODO: these belong in tests of the sim runner

@@ -122,6 +122,7 @@ __credits__ = [
     'William Vambenepe <vbp@google.com>',
     'Daniel Vetter <lord_fright@yahoo.com>',
     'Paul Wais <pwais@yelp.com>',
+    'Qiu Wei <qiuwei.cw@alibaba-inc.com>',
     'Derek Wilson <jderekwilson@gmail.com>',
     'Tao Yu <taoyu@yelp.com>',
     'Andrea Zonca <andrea.zonca@gmail.com>',

@@ -14,6 +14,7 @@ v0.6.2, 2018-03-23 -- log parsing at scale
        * defaults to auto zone placement in us-west1
        * no longer reads zone or region from gcloud GCE configs
      * Dataproc Quickstart is now up-to-date (#1589)
+     * api_client attr has been replaced with cluster_client and job_client
      * GCSFilesystem method changes:
        * api_client attr has been replaced with client
        * create_bucket() no longer takes a project ID

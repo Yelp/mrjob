@@ -31,11 +31,11 @@ Options specific to the local and inline runners
    :set: local
    :default: ``None``
 
-   Maximum number of workers to run at one time. If not set, runs one worker
-   per CPU on the machine.
+   Maximum number of tasks to handle at one time. If not set, defaults to the
+   number of CPUs on your system.
 
-   This also affects the number of input file splits the runner makes (which is
-   the only impact in ``inline`` mode).
+   This also affects the number of input file splits the runner makes (the
+   only impact in ``inline`` mode).
 
    .. versionadded:: 0.6.2
 

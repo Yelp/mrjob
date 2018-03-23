@@ -1,13 +1,21 @@
-v0.6.2, 2018-03-?? -- farewell google-api-python-client
+v0.6.2, 2018-03-23 -- log parsing at scale
  * runners:
    * dataproc:
-     * replaced google-api-python-client with google-cloud-sdk
-       * GCSFilesystem method changes:
-         * api_client attr has been replaced with client
-         * create_bucket() no longer takes a project ID
-         * delete_bucket() is disabled (use get_bucket(...).delete())
-         * get_bucket() returns a google.cloud.storage.bucket.Bucket
-         * list_buckets() is disabled (use get_all_bucket_names())
+     * replaced google-api-python-client with google-cloud-sdk (#1730)
+     * updated Dataproc Quickstart to match Google Cloud console (#1589)
+     * works without gcloud util config installed (#1742)
+       * credentials can be read from $GOOGLE_APPLICATION_CREDENTIALS
+       * or from gcloud util config (if installed)
+     * no longer required to set region or zone (#1732)
+       * auto zone placement (just set region) is enabled
+       * defaults to auto zone placement in us-west1
+       * no longer reads zone or region from gcloud GCE configs
+     * GCSFilesystem method changes:
+       * api_client attr has been replaced with client
+       * create_bucket() no longer takes a project ID
+       * delete_bucket() is disabled (use get_bucket(...).delete())
+       * get_bucket() returns a google.cloud.storage.bucket.Bucket
+       * list_buckets() is disabled (use get_all_bucket_names())
 
 v0.6.1, 2017-11-27 -- mrjob diagnose
  * fixed serious error log parsing issue (#1708)

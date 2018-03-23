@@ -33,9 +33,13 @@ Cluster creation and configuration
     :switch: --project-id
     :type: :ref:`string <data-type-string>`
     :set: dataproc
-    :default: (read from credentials config file)
+    :default: read from credentials config file
 
     The ID of the Google Cloud Project to run under.
+
+    .. versionchanged:: 0.6.2
+
+       This used to be called *gcp_project*
 
 .. mrjob-opt::
     :config: zone

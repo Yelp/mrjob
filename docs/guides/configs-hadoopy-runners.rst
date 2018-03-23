@@ -13,7 +13,7 @@ Options specific to the local and inline runners
     :config: hadoop_version
     :switch: --hadoop-version
     :type: :ref:`string <data-type-string>`
-    :set: emr
+    :set: local
     :default: ``None``
 
     Set the version of Hadoop to simulate (this currently only matters for
@@ -23,6 +23,21 @@ Options specific to the local and inline runners
     ``inline`` runners will run in a version-agnostic mode, where anytime
     the runner sets a simulated jobconf variable, it'll use *every* possible
     name for it (e.g. ``user.name`` *and* ``mapreduce.job.user.name``).
+
+.. mrjob-opt::
+   :config: num_cores
+   :switch: --num-cores
+   :type: integer
+   :set: local
+   :default: ``None``
+
+   Maximum number of workers to run at one time. If not set, runs one worker
+   per CPU on the machine.
+
+   This also affects the number of input file splits the runner makes (which is
+   the only impact in ``inline`` mode).
+
+   .. versionadded:: 0.6.2
 
 
 Options available to local, hadoop, and emr runners

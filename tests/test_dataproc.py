@@ -377,6 +377,15 @@ class ProjectIDTestCase(MockGoogleTestCase):
             self.assertEqual(runner._project_id, 'alan-parsons')
 
 
+class CredentialsTestCase(MockGoogleTestCase):
+
+    def test_credentials_are_scoped(self):
+        # if we don't set scope, we'll get an error unless we're reading
+        # credentials from gcloud (see #1742)
+        with self.make_runner() as runner:
+            self.assertTrue(runner._credentials.scopes)
+
+
 class ExtraClusterParamsTestCase(MockGoogleTestCase):
 
     # just a basic test to make extra_cluster_params is respected.

@@ -225,7 +225,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 'Dataproc v1 expects core/task instance types to be identical')
 
         # load credentials and project ID
-        self._credentials, auth_project_id = google.auth.default()
+        self._credentials, auth_project_id = google.auth.default(
+            scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES)
 
         self._project_id = self._opts['project_id'] or auth_project_id
 

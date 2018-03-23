@@ -46,8 +46,8 @@ class MockGoogleTestCase(SandboxedTestCase):
         # set this to False to make jobs ERROR
         self.mock_jobs_succeed = True
 
-        # mock credentials, returned by mock google.auth.default()
-        self.mock_credentials = Credentials('mock_token')
+        # mock OAuth token, returned by mock google.auth.default()
+        self.mock_token = 'mock_token'
 
         # mock project ID, returned by mock google.auth.default()
         self.mock_project_id = 'mock-project-12345'
@@ -74,8 +74,9 @@ class MockGoogleTestCase(SandboxedTestCase):
 
         self.start(patch('time.sleep'))
 
-    def auth_default(self):
-        return (self.mock_credentials, self.mock_project_id)
+    def auth_default(self, scopes=None):
+        credentials = Credentials(self.mock_token, scopes=scopes)
+        return (credentials, self.mock_project_id)
 
     def create_channel(self, target, credentials=None):
         channel = Mock()

@@ -29,13 +29,23 @@ Cluster creation and configuration
 -----------------------------------
 
 .. mrjob-opt::
+    :config: project_id
+    :switch: --project-id
+    :type: :ref:`string <data-type-string>`
+    :set: dataproc
+    :default: (read from credentials config file)
+
+    The ID of the Google Cloud Project to run under.
+
+.. mrjob-opt::
     :config: zone
     :switch: --zone
     :type: :ref:`string <data-type-string>`
     :set: dataproc
     :default: gcloud SDK default
 
-    Availability zone to run the job in
+    Availability zone to run the job in. If you set this, you do not neet
+    to set :mrjob-opt:`region`.
 
 .. mrjob-opt::
     :config: region
@@ -44,9 +54,9 @@ Cluster creation and configuration
     :set: dataproc
     :default: gcloud SDK default
 
-    region to run Dataproc jobs on (e.g.  ``us-central-1``). Also used by mrjob
-    to create temporary buckets if you don't set :mrjob-opt:`cloud_tmp_dir`
-    explicitly.
+    region to run Dataproc jobs on (e.g.  ``us-central-1``). Setting region
+    enables auto zone placement: a :mrjob-opt:`zone`) within the region will
+    be picked for you.
 
 .. mrjob-opt::
     :config: image_version

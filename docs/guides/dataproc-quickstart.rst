@@ -41,7 +41,7 @@ You do not have to download or install the :command:`gcloud` utility, but if
 you have it installed and configured, mrjob can read credentials from its
 config files rather than **$GOOGLE_APPLICATION_CREDENTIALS**.
 
-See `Installing Cloud SDK <https://cloud.google.com/sdk/downloads>__` for more
+See `Installing Cloud SDK <https://cloud.google.com/sdk/downloads>`__ for more
 information.
 
 .. _running-a-dataproc-job:

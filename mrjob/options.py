@@ -1284,7 +1284,7 @@ def _add_basic_args(parser):
         action='store_true', help='print more messages to stderr')
 
 
-def _add_job_args(parser):
+def _add_job_args(parser, include_deprecated=True):
 
     parser.add_argument(
         '--cat-output', dest='cat_output',
@@ -1292,9 +1292,15 @@ def _add_job_args(parser):
         help="Stream job output to stdout")
 
     parser.add_argument(
-        '--no-cat-output', '--no-output', dest='cat_output',
+        '--no-cat-output', dest='cat_output',
         default=None, action='store_false',
         help="Don't stream job output to stdout")
+
+    if include_deprecated:
+        parser.add_argument(
+            '--no-output', dest='cat_output',
+            default=None, action='store_false',
+            help='Deprecated alias for --no-cat-output')
 
     parser.add_argument(
         '-o', '--output-dir', dest='output_dir', default=None,
@@ -1313,6 +1319,15 @@ def _add_job_args(parser):
         help=('A directory to store output from job steps other than'
               ' the last one. Useful for debugging. Currently'
               ' ignored by local runners.'))
+
+    if include_deprecated:
+        parser.add_argument(
+            '--deprecated', dest='deprecated', action='store_true',
+            help='include help for deprecated options')
+
+    parser.add_argument(
+        '-h', '--help', dest='help', action='store_true',
+        help='show this message and exit')
 
 
 def _add_step_args(parser):
@@ -1348,21 +1363,8 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
     """
     help_parser = ArgumentParser(usage=usage, add_help=False)
 
-    for action in option_parser._actions:
-        if action.dest in _RUNNER_OPTS:
-            continue
-
-        if action.dest in _STEP_OPTS:
-            continue
-
-        if (action.dest in _DEPRECATED_NON_RUNNER_OPTS and
-                not include_deprecated):
-            continue
-
-        if not action.option_strings:
-            continue
-
-        help_parser._add_action(action)
+    _add_basic_args(help_parser)
+    _add_job_args(help_parser, include_deprecated=include_deprecated)
 
     help_parser.print_help()
 

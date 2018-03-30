@@ -264,14 +264,6 @@ class MRJobLauncher(object):
                 self.pass_arg_through(...)
                 ...
         """
-        self.arg_parser.add_argument(
-            '-h', '--help', dest='help', action='store_true',
-            help='show this message and exit')
-
-        self.arg_parser.add_argument(
-            '--deprecated', dest='deprecated', action='store_true',
-            help='include help for deprecated options')
-
         # if script path isn't set, expect it on the command line
         if self._FIRST_ARG_IS_SCRIPT_PATH:
             self.arg_parser.add_argument(

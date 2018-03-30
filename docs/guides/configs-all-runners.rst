@@ -209,14 +209,17 @@ Temp files and cleanup
     because it's understood that it has to be on HDFS.
 
 .. mrjob-opt::
-    :config: no_output
-    :switch: --no-output
+    :config: cat_output
+    :switch: --cat-output, --no-cat-output
     :type: boolean
     :set: no_mrjob_conf
-    :default: ``False``
+    :default: output if :mrjob-opt:`output_dir` is not set
 
-    Don't stream output to STDOUT after job completion.  This is often used in
-    conjunction with ``--output-dir`` to store output only in HDFS or S3.
+    Should we stream job output to STDOUT after completion?
+
+    .. versionchanged:: 0.6.3
+
+       used to be ``--no-output``.
 
 .. mrjob-opt::
    :config: step_output_dir

@@ -101,7 +101,7 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
 ### Test cases ###
 
 
-class RunJobTestCase(TestCase):
+class RunJobTestCase(SandboxedTestCase):
 
     def _make_launcher(self, *args):
         """Make a launcher, add a mock runner (``launcher.mock_runner``), and
@@ -128,12 +128,29 @@ class RunJobTestCase(TestCase):
         self.assertEqual(launcher.stdout.getvalue(), b'a line\n')
         self.assertEqual(launcher.stderr.getvalue(), b'')
 
-    def test_no_output(self):
-        launcher = self._make_launcher('--no-output')
+    def test_no_cat_output(self):
+        launcher = self._make_launcher('--no-cat-output')
 
         launcher.run_job()
 
         self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
+
+    def test_output_dir_implies_no_cat_output(self):
+        launcher = self._make_launcher('--output-dir', self.tmp_dir)
+
+        launcher.run_job()
+
+        self.assertEqual(launcher.stdout.getvalue(), b'')
+        self.assertEqual(launcher.stderr.getvalue(), b'')
+
+    def test_output_dir_with_explicit_cat_output(self):
+        launcher = self._make_launcher(
+            '--output-dir', self.tmp_dir, '--cat-output')
+
+        launcher.run_job()
+
+        self.assertEqual(launcher.stdout.getvalue(), b'a line\n')
         self.assertEqual(launcher.stderr.getvalue(), b'')
 
     def test_exit_on_step_failure(self):

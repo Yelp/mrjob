@@ -266,10 +266,7 @@ _STEP_OPTS = dict(
 )
 
 # don't show these unless someone types --help --deprecated
-_DEPRECATED_NON_RUNNER_OPTS = set([
-    'deprecated',
-])
-
+_DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
 
 ### runner opts ###
 
@@ -1365,6 +1362,35 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
 
     _add_basic_args(help_parser)
     _add_job_args(help_parser, include_deprecated=include_deprecated)
+
+    basic_dests = {action.dest for action in help_parser._actions}
+
+    # add other custom args added by the user
+    for action in option_parser._actions:
+        # option_parser already includes deprecated option dests
+
+        # this excludes deprecated switch aliases (e.g. --no-output)
+        if action.dest in basic_dests:
+            continue
+
+        # this excludes the --deprecated switch (which is explained below)
+        if action.dest in _DEPRECATED_NON_RUNNER_OPTS:
+            continue
+
+        # this excludes options that are shown with --help -r <runner>
+        if action.dest in _RUNNER_OPTS:
+            continue
+
+        # this excludes options that are show with --help --steps
+        if action.dest in _STEP_OPTS:
+            continue
+
+        # this excludes the ARGS option, which is already covered by usage
+        if not action.option_strings:
+            continue
+
+        # found a custom option. thanks, library user!
+        help_parser._add_action(action)
 
     help_parser.print_help()
 

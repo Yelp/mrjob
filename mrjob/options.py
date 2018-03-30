@@ -1285,10 +1285,16 @@ def _add_basic_args(parser):
 
 
 def _add_job_args(parser):
+
     parser.add_argument(
-        '--no-output', dest='no_output',
+        '--cat-output', dest='cat_output',
         default=None, action='store_true',
-        help="Don't stream output after job completion")
+        help="Stream job output to stdout")
+
+    parser.add_argument(
+        '--no-cat-output', '--no-output', dest='cat_output',
+        default=None, action='store_false',
+        help="Don't stream job output to stdout")
 
     parser.add_argument(
         '-o', '--output-dir', dest='output_dir', default=None,

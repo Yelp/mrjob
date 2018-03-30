@@ -237,7 +237,9 @@ class MRJobLauncher(object):
                 log.error(str(e))
                 sys.exit(1)
 
-            if not self.options.no_output:
+            if self.options.cat_output or (self.options.cat_output is None and
+                    not self.options.output_dir):
+
                 for chunk in runner.cat_output():
                     self.stdout.write(chunk)
                 self.stdout.flush()

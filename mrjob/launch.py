@@ -237,12 +237,16 @@ class MRJobLauncher(object):
                 log.error(str(e))
                 sys.exit(1)
 
-            if self.options.cat_output or (self.options.cat_output is None and
-                    not self.options.output_dir):
-
+            if self._should_cat_output():
                 for chunk in runner.cat_output():
                     self.stdout.write(chunk)
                 self.stdout.flush()
+
+    def _should_cat_output(self):
+        if self.options.cat_output is None:
+            return not self.options.output_dir
+        else:
+            return self.options.cat_output
 
     ### Command-line arguments ###
 

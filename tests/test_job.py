@@ -941,11 +941,11 @@ class RunJobTestCase(SandboxedTestCase):
         self.assertEqual(returncode, 0)
         self.assertGreater(len(stderr), len(normal_stderr))
 
-    def test_no_output(self):
+    def test_output_dir(self):
         self.assertEqual(os.listdir(self.tmp_dir), [])  # sanity check
 
-        args = ['--no-output', '--output-dir', self.tmp_dir]
-        stdout, stderr, returncode = self.run_job(args)
+        stdout, stderr, returncode = self.run_job(
+            ['--output-dir', self.tmp_dir])
         self.assertEqual(stdout, b'')
         self.assertNotEqual(stderr, b'')
         self.assertEqual(returncode, 0)
@@ -960,6 +960,24 @@ class RunJobTestCase(SandboxedTestCase):
 
         self.assertEqual(sorted(output_lines),
                          [b'1\t"foo"\n', b'2\t"bar"\n', b'3\tnull\n'])
+
+    def test_no_cat_output(self):
+        stdout, stderr, returncode = self.run_job(['--no-cat-output'])
+        self.assertEqual(stdout, b'')
+        self.assertNotEqual(stderr, b'')
+        self.assertEqual(returncode, 0)
+
+    def test_output_dir_and_cat_output(self):
+        self.assertEqual(os.listdir(self.tmp_dir), [])  # sanity check
+
+        stdout, stderr, returncode = self.run_job(
+            ['--output-dir', self.tmp_dir, '--cat-output'])
+        self.assertNotEqual(stdout, b'')
+        self.assertNotEqual(stderr, b'')
+        self.assertEqual(returncode, 0)
+
+        # make sure the correct output is in the temp dir
+        self.assertNotEqual(os.listdir(self.tmp_dir), [])
 
 
 class BadMainTestCase(TestCase):

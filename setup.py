@@ -29,7 +29,8 @@ try:
         'install_requires': [
             'boto3>=1.4.6',
             'botocore>=1.6.0',
-            'google-cloud>=0.32.0',
+            'google-auth',
+            'google-cloud-storage',
             # as of 2018-03-21, there is only one version of this library out
             # (0.1.0), and it's in Alpha. No real point in pinning the version;
             # we'll just have to upgrade mrjob if and when the library's

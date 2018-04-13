@@ -13,9 +13,8 @@
 # limitations under the License.
 """Limited mock of google-cloud-sdk for tests
 """
+from copy import deepcopy
 from io import BytesIO
-
-from google.oauth2.credentials import Credentials
 
 from mrjob.fs.gcs import parse_gcs_uri
 
@@ -75,7 +74,10 @@ class MockGoogleTestCase(SandboxedTestCase):
         self.start(patch('time.sleep'))
 
     def auth_default(self, scopes=None):
-        credentials = Credentials(self.mock_token, scopes=scopes)
+        credentials = Mock()
+        credentials.token = self.mock_token
+        credentials.scopes = deepcopy(scopes)
+
         return (credentials, self.mock_project_id)
 
     def create_channel(self, target, credentials=None):

@@ -36,6 +36,7 @@ try:
             # we'll just have to upgrade mrjob if and when the library's
             # API changes. Might be determined by google-cloud anyhow.
             'google-cloud-dataproc',
+            'google-oauth',  # not implied on Python 3.5 and later
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],
@@ -50,6 +51,10 @@ try:
     # mock is included in Python 3.3 as unittest.mock
     if sys.version_info < (3, 3):
         setuptools_kwargs['tests_require'].append('mock')
+
+    # grpc requires enum, which is a builtin starting in Python 3.4
+    if sys.version_info >= (3, 0) and sys.version_info < (3, 4):
+        setuptools_kwargs['install_requires'].append('enum34')
 
 except ImportError:
     from distutils.core import setup

@@ -36,6 +36,7 @@ try:
             # we'll just have to upgrade mrjob if and when the library's
             # API changes. Might be determined by google-cloud anyhow.
             'google-cloud-dataproc',
+            'grpcio>=1.9.1',
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],

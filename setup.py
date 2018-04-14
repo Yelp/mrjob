@@ -23,32 +23,43 @@ try:
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'extras_require': {
-            # highly recommended, but requires a compiler
             'ujson': ['ujson'],
         },
         'install_requires': [
             'boto3>=1.4.6',
             'botocore>=1.6.0',
-            'google-cloud>=0.32.0',
-            # as of 2018-03-21, there is only one version of this library out
-            # (0.1.0), and it's in Alpha. No real point in pinning the version;
-            # we'll just have to upgrade mrjob if and when the library's
-            # API changes. Might be determined by google-cloud anyhow.
-            'google-cloud-dataproc',
             'PyYAML>=3.08',
+            'google-api-core>=0.1.2',
+            'google-cloud-storage>=1.6.0',
+            'google-cloud-dataproc',
+            'grpcio>=1.9.1',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
-        'tests_require': ['simplejson'],
+        'tests_require': ['simplejson', 'ujson'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
+    # grpcio 1.11.0 seems not to compile with PyPy
+    if hasattr(sys, 'pypy_version_info'):
+        setuptools_kwargs['install_requires'] = [
+            x + ',<=1.10.0' if x.startswith('grpcio') else x
+            for x in setuptools_kwargs['install_requires']
+        ]
+
+    # rapidjson exists on Python 3 only
     if sys.version_info >= (3, 0):
         setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
+        setuptools_kwargs['tests_require'].append('rapidjson')
 
     # mock is included in Python 3.3 as unittest.mock
     if sys.version_info < (3, 3):
         setuptools_kwargs['tests_require'].append('mock')
+
+    # grpc requires enum, which is a builtin starting in Python 3.4
+    if sys.version_info >= (3, 0) and sys.version_info < (3, 4):
+        setuptools_kwargs['install_requires'].append('enum34')
+
 
 except ImportError:
     from distutils.core import setup

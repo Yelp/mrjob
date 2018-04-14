@@ -56,7 +56,6 @@ try:
         setuptools_kwargs['install_requires'].append('enum34')
 
 
-
 except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}

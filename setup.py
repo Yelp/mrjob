@@ -40,7 +40,7 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # latest grpcio seems not to work
+    # grpcio 1.11.0 seems not to compile with PyPy
     if hasattr(sys, 'pypy_version_info'):
         setuptools_kwargs['install_requires'] = [
             x + ',<=1.10.0' if x.startswith('grpcio') else x

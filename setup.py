@@ -29,6 +29,10 @@ try:
             'boto3>=1.4.6',
             'botocore>=1.6.0',
             'PyYAML>=3.08',
+            'google-api-core>=0.1.2',
+            'google-cloud-storage>=1.6.0',
+            'google-cloud-dataproc',
+            'grpcio>=1.9.1',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
@@ -36,20 +40,12 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # google deps do weird things on PyPy, so just install google-cloud
+    # latest grpcio seems not to work
     if hasattr(sys, 'pypy_version_info'):
-        setuptools_kwargs['install_requires'].extend([
-            'google-cloud>=0.32.0',
-            'google-cloud-dataproc',  # in alpha, no point in pinning version
-        ])
-    else:
-        # otherwise, only install the libraries we need (see #1746)
-        setuptools_kwargs['install_requires'].extend([
-            'google-api-core>=0.1.2',
-            'google-cloud-storage>=1.6.0',
-            'google-cloud-dataproc',
-            'grpcio>=1.9.1',
-        ])
+        setuptools_kwargs['install_requires'] = [
+            x + ',<=1.10.0' if x.startswith('grpcio') else x
+            for x in setuptools_kwargs['install_requires']
+        ]
 
     # rapidjson exists on Python 3 only
     if sys.version_info >= (3, 0):

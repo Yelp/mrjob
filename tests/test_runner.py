@@ -26,6 +26,7 @@ import mrjob.conf
 from mrjob.conf import ClearedValue
 from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
+from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
@@ -42,6 +43,8 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+
+
 
 
 class WithStatementTestCase(TestCase):
@@ -899,3 +902,20 @@ class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):
                          new_runner._working_dir_mgr._name_to_typed_path)
 
         self.assertTrue(self.log.warning.called)
+
+
+# job that improperly uses mapper_raw on a step other than the first
+class MRPhoneToURLToPhoneToURL(MRPhoneToURL):
+    def steps(self):
+        return 2 * super(MRPhoneToURLToPhoneToURL, self).steps()
+
+
+class InputManifestTestCase(SandboxedTestCase):
+
+    def test_only_first_step_can_use_mapper_raw(self):
+        job = MRPhoneToURLToPhoneToURL('')
+
+        with job.make_runner() as runner:
+            self.assertRaises(ValueError, runner._get_steps)
+
+    def test

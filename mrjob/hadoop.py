@@ -568,6 +568,13 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             except Exception as e:
                 log.exception(e)
 
+    def _manifest_download_commands(self):
+        cp_to_local = self.get_hadoop_bin() + ['fs', '-copyToLocal']
+
+        return [
+            ('*://*', cmd_line(cp_to_local)),
+        ]
+
     ### LOG (implementation of LogInterpretationMixin) ###
 
     def _stream_history_log_dirs(self, output_dir=None):

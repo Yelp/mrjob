@@ -19,6 +19,7 @@ import pipes
 from os.path import basename
 
 from mrjob.bin import MRJobBinRunner
+from mrjob.conf import combine_dicts
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
@@ -96,6 +97,12 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
     ### Options ###
 
+    def _default_opts(self):
+        return combine_dicts(
+            super(HadoopInTheCloudJobRunner, self)._default_opts(),
+            dict(max_mins_idle=_DEFAULT_MAX_MINS_IDLE)
+        )
+
     def _fix_opts(self, opts, source=None):
         opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
             opts, source=source)
@@ -107,11 +114,8 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 (' Please use max_mins_idle instead'
                  if opts.get('max_mins_idle') is None else ''))
 
-        if opts.get('max_mins_idle') is None:
-            if opts.get('max_hours_idle') is not None:
+            if opts.get('max_mins_idle') is None:
                 opts['max_mins_idle'] = opts['max_hours_idle'] * 60
-            else:
-                opts['max_mins_idle'] = _DEFAULT_MAX_MINS_IDLE
 
         return opts
 
@@ -231,12 +235,8 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
         contents = self._master_bootstrap_script_content(
             self._bootstrap + mrjob_bootstrap)
-        for line in contents:
-            log.debug('BOOTSTRAP: ' + line)
 
-        with open(path, 'wb') as f:
-            for line in contents:
-                f.write(line.encode('utf-8') + b'\n')
+        self._write_script(contents, path, 'master bootstrap script')
 
         self._master_bootstrap_script_path = path
 
@@ -275,12 +275,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         for name, path in sorted(
                 self._bootstrap_dir_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            out.append('')
             out.append('  %s %s $__mrjob_PWD/%s' %
                        (cp_to_local, pipes.quote(uri), pipes.quote(name)))
             # imitate Hadoop Distributed Cache (see #1602)
             out.append('  chmod u+rx $__mrjob_PWD/%s' % pipes.quote(name))
-        out.append('')
+            out.append('')
 
         # download and unarchive archives
         archive_names_and_paths = sorted(

@@ -722,7 +722,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _prepare_for_launch(self):
         """Set up files needed for the job."""
         self._check_output_not_exists()
-        self._create_setup_wrapper_script()
+        self._create_setup_wrapper_scripts()
         self._add_bootstrap_files_for_upload()
         self._add_master_node_setup_files_for_upload()
         self._add_job_files_for_upload()
@@ -812,9 +812,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._get_input_paths():
-            self._upload_mgr.add(path)
-
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
@@ -2294,6 +2291,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # on the 2.x and 3.x AMIs, use hadoop
             return 'hadoop fs -copyToLocal'
 
+    def _manifest_download_commands(self):
+        return [
+            ('s3://*', 'aws s3 cp'),
+            ('*://*', 'hadoop fs -copyToLocal'),
+        ]
+
     ### master node setup script ###
 
     def _create_master_node_setup_script_if_needed(self):
@@ -2312,15 +2315,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # create script
         path = os.path.join(self._get_local_tmp_dir(), 'mns.sh')
-        log.debug('writing master node setup script to %s' % path)
-
         contents = self._master_node_setup_script_content()
-        for line in contents:
-            log.debug('MASTER NODE SETUP: ' + line.rstrip('\r\n'))
 
-        with open(path, 'wb') as f:
-            for line in contents:
-                f.write(line.encode('utf-8'))
+        self._write_script(contents, path, 'master node setup script')
 
         # the script itself doesn't need to be on the master node, just S3
         self._master_node_setup_script_path = path
@@ -2336,43 +2333,32 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # merge common code
         out = []
 
-        def writeln(line=''):
-            out.append(line + '\n')
-
         # shebang, etc.
         for line in self._start_of_sh_script():
-            writeln(line)
-        writeln()
+            out.append(line)
+        out.append('')
 
         # run commands in a block so we can redirect stdout to stderr
         # (e.g. to catch errors from compileall). See #370
-        writeln('{')
+        out.append('{')
 
         # make working dir
         working_dir = self._master_node_setup_working_dir()
-        writeln('  mkdir -p %s' % pipes.quote(working_dir))
-        writeln('  cd %s' % pipes.quote(working_dir))
-        writeln()
-
-        # download files
-        if self._opts['release_label']:
-            # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
-            cp_to_local = 'aws s3 cp'
-        else:
-            # on the 2.x and 3.x AMIs, use hadoop
-            cp_to_local = 'hadoop fs -copyToLocal'
+        out.append('  mkdir -p %s' % pipes.quote(working_dir))
+        out.append('  cd %s' % pipes.quote(working_dir))
+        out.append('')
 
         for name, path in sorted(
                 self._master_node_setup_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
-            writeln('  %s %s %s' % (
-                cp_to_local, pipes.quote(uri), pipes.quote(name)))
+            out.append('  %s %s %s' % (
+                self._cp_to_local_cmd(), pipes.quote(uri), pipes.quote(name)))
             # imitate Hadoop Distributed Cache
-            writeln('  chmod u+rx %s' % pipes.quote(name))
+            out.append('  chmod u+rx %s' % pipes.quote(name))
 
         # at some point we will probably run commands as well (see #1336)
 
-        writeln('} 1>&2')  # stdout -> stderr for ease of error log parsing
+        out.append('} 1>&2')  # stdout -> stderr for ease of error log parsing
 
         return out
 

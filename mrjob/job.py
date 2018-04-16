@@ -189,6 +189,15 @@ class MRJob(MRJobLauncher):
         """
         raise NotImplementedError
 
+    def mapper_raw(self, input_path, input_uri):
+        """Re-define this to make Hadoop pass one input file to each
+        mapper.
+
+        :param input_path: a local path that the input file has been copied to
+        :param input_uri: the URI of the input file on HDFS, S3, etc
+        """
+        raise NotImplementedError
+
     def reducer_init(self):
         """Re-define this to define an action to run before the reducer
         processes any input.
@@ -502,6 +511,7 @@ class MRJob(MRJobLauncher):
         step = self._get_step(step_num, MRStep)
 
         mapper = step['mapper']
+        mapper_raw = step['mapper_raw']
         mapper_init = step['mapper_init']
         mapper_final = step['mapper_final']
 
@@ -512,10 +522,18 @@ class MRJob(MRJobLauncher):
             for out_key, out_value in mapper_init() or ():
                 write_line(out_key, out_value)
 
-        # run the mapper on each line
-        for key, value in read_lines():
-            for out_key, out_value in mapper(key, value) or ():
+        if mapper_raw:
+            # pass input path and uri to mapper_raw()
+            if len(self.options.args) != 2:
+                raise ValueError('Wrong number of args')
+            input_path, input_uri = self.options.args
+            for out_key, out_value in mapper_raw(input_path, input_uri) or ():
                 write_line(out_key, out_value)
+        else:
+            # run the mapper on each line
+            for key, value in read_lines():
+                for out_key, out_value in mapper(key, value) or ():
+                    write_line(out_key, out_value)
 
         if mapper_final:
             for out_key, out_value in mapper_final() or ():
@@ -723,16 +741,16 @@ class MRJob(MRJobLauncher):
         mapping = {}
         script_step_num = 0
         for i, step in enumerate(steps_desc):
-            if 'mapper' in step:
-                if step['mapper']['type'] == 'script':
-                    k = self._step_key(i, 'mapper')
-                    mapping[k] = script_step_num
-                    script_step_num += 1
-            if 'reducer' in step:
-                if step['reducer']['type'] == 'script':
-                    k = self._step_key(i, 'reducer')
-                    mapping[k] = script_step_num
-                    script_step_num += 1
+
+            if 'mapper' in step and step['mapper']['type'] == 'script':
+                k = self._step_key(i, 'mapper')
+                mapping[k] = script_step_num
+                script_step_num += 1
+
+            if 'reducer' in step and step['reducer']['type'] == 'script':
+                k = self._step_key(i, 'reducer')
+                mapping[k] = script_step_num
+                script_step_num += 1
 
         return mapping
 

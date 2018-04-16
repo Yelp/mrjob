@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the runner base class MRJobBinRunner"""
+import compileall
 import inspect
 import os
 import signal
@@ -421,7 +422,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._create_setup_wrapper_script()
+            runner._create_setup_wrapper_scripts()
 
             # note that local mode uses sys.executable, not python/python3
             self.assertEqual(
@@ -436,7 +437,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._create_setup_wrapper_script()
+            runner._create_setup_wrapper_scripts()
 
             # note that local mode uses sys.executable, not python/python3
             self.assertEqual(
@@ -453,7 +454,7 @@ class RenderSubstepTestCase(SandboxedTestCase):
                          return_value=['bash']))
 
         with job.make_runner() as runner:
-            runner._create_setup_wrapper_script()
+            runner._create_setup_wrapper_scripts()
 
             self.assertEqual(
                 runner._render_substep(0, 'mapper'),
@@ -797,7 +798,7 @@ class SetupWrapperScriptContentTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             out = runner._setup_wrapper_script_content([])
 
-            self.assertEqual(out[:2], ['set -e\n', 'set -v\n'])
+            self.assertEqual(out[:2], ['set -e', 'set -v'])
 
 
 class SparkPyFilesTestCase(SandboxedTestCase):
@@ -1476,3 +1477,32 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
             self.assertRaises(
                 TypeError,
                 runner._spark_submit_args, 0)
+
+
+class CreateMrjobZipTestCase(SandboxedTestCase):
+
+    def test_create_mrjob_zip(self):
+        with no_handlers_for_logger('mrjob.runner'):
+            with LocalMRJobRunner(conf_paths=[]) as runner:
+                mrjob_zip_path = runner._create_mrjob_zip()
+                mrjob_zip = ZipFile(mrjob_zip_path)
+                contents = mrjob_zip.namelist()
+
+                for path in contents:
+                    self.assertEqual(path[:6], 'mrjob/')
+
+                self.assertIn('mrjob/job.py', contents)
+                for filename in contents:
+                    self.assertFalse(filename.endswith('.pyc'),
+                                     msg="%s ends with '.pyc'" % filename)
+
+    def test_mrjob_zip_compiles(self):
+        runner = LocalMRJobRunner()
+        with no_handlers_for_logger('mrjob.runner'):
+            mrjob_zip = runner._create_mrjob_zip()
+
+        ZipFile(mrjob_zip).extractall(self.tmp_dir)
+
+        self.assertTrue(
+            compileall.compile_dir(os.path.join(self.tmp_dir, 'mrjob'),
+                                   quiet=1))

@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Test the runner base class MRJobRunner"""
-import compileall
 import datetime
 import getpass
 import os
@@ -22,12 +21,12 @@ import tarfile
 from time import sleep
 from unittest import TestCase
 from unittest import skipIf
-from zipfile import ZipFile
 
 import mrjob.conf
 from mrjob.conf import ClearedValue
 from mrjob.conf import dump_mrjob_conf
 from mrjob.emr import EMRJobRunner
+from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
 from mrjob.py2 import StringIO
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
@@ -44,6 +43,8 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
+
+
 
 
 class WithStatementTestCase(TestCase):
@@ -189,35 +190,6 @@ class TestJobName(TestCase):
         self.assertEqual(match.group(2), 'ads')
 
 
-class CreateMrjobZipTestCase(SandboxedTestCase):
-
-    def test_create_mrjob_zip(self):
-        with no_handlers_for_logger('mrjob.runner'):
-            with InlineMRJobRunner(conf_paths=[]) as runner:
-                mrjob_zip_path = runner._create_mrjob_zip()
-                mrjob_zip = ZipFile(mrjob_zip_path)
-                contents = mrjob_zip.namelist()
-
-                for path in contents:
-                    self.assertEqual(path[:6], 'mrjob/')
-
-                self.assertIn('mrjob/job.py', contents)
-                for filename in contents:
-                    self.assertFalse(filename.endswith('.pyc'),
-                                     msg="%s ends with '.pyc'" % filename)
-
-    def test_mrjob_zip_compiles(self):
-        runner = InlineMRJobRunner()
-        with no_handlers_for_logger('mrjob.runner'):
-            mrjob_zip = runner._create_mrjob_zip()
-
-        ZipFile(mrjob_zip).extractall(self.tmp_dir)
-
-        self.assertTrue(
-            compileall.compile_dir(os.path.join(self.tmp_dir, 'mrjob'),
-                                   quiet=1))
-
-
 class TestCatOutput(SandboxedTestCase):
 
     # Test regression for #269
@@ -341,6 +313,10 @@ class ClosedRunnerTestCase(EmptyMrjobConfTestCase):
 
 class StepInputAndOutputURIsTestCase(SandboxedTestCase):
 
+    def add_files_for_upload(self, runner):
+        runner._add_input_files_for_upload()
+        runner._add_job_files_for_upload()
+
     def test_two_step_job(self):
         input1_path = self.makefile('input1')
         input2_path = self.makefile('input2')
@@ -352,7 +328,7 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
 
             input_uris_0 = runner._step_input_uris(0)
             self.assertEqual([os.path.basename(uri) for uri in input_uris_0],
@@ -382,7 +358,7 @@ class StepInputAndOutputURIsTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._num_steps(), 3)
 
-            runner._add_job_files_for_upload()
+            self.add_files_for_upload(runner)
 
             input_uris_0 = runner._step_input_uris(0)
             self.assertEqual([os.path.basename(uri) for uri in input_uris_0],
@@ -926,3 +902,18 @@ class DeprecatedFileUploadArgsTestCase(SandboxedTestCase):
                          new_runner._working_dir_mgr._name_to_typed_path)
 
         self.assertTrue(self.log.warning.called)
+
+
+# job that improperly uses mapper_raw on a step other than the first
+class MRPhoneToURLToPhoneToURL(MRPhoneToURL):
+    def steps(self):
+        return 2 * super(MRPhoneToURLToPhoneToURL, self).steps()
+
+
+class InputManifestTestCase(SandboxedTestCase):
+
+    def test_only_first_step_can_use_mapper_raw(self):
+        job = MRPhoneToURLToPhoneToURL('')
+
+        with job.make_runner() as runner:
+            self.assertRaises(ValueError, runner._get_steps)

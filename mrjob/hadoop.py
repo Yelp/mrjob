@@ -344,7 +344,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
     def _run(self):
         self._find_binaries_and_jars()
-        self._create_setup_wrapper_script()
+        self._create_setup_wrapper_scripts()
         self._add_job_files_for_upload()
         self._upload_local_files_to_hdfs()
         self._run_job_in_hadoop()
@@ -368,9 +368,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
         to self._upload_mgr."""
-        for path in self._get_input_paths():
-            self._upload_mgr.add(path)
-
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
@@ -570,6 +567,13 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
                 self.fs.rm(self._hadoop_tmp_dir)
             except Exception as e:
                 log.exception(e)
+
+    def _manifest_download_commands(self):
+        cp_to_local = self.get_hadoop_bin() + ['fs', '-copyToLocal']
+
+        return [
+            ('*://*', cmd_line(cp_to_local)),
+        ]
 
     ### LOG (implementation of LogInterpretationMixin) ###
 

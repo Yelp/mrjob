@@ -20,14 +20,23 @@
 import gzip
 import os
 import os.path
+from os.path import exists
+from os.path import join
 from io import BytesIO
 
+from warcio.warcwriter import WARCWriter
+
+from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
+
+from tests.examples.test_mr_phone_to_url import write_conversion_record
 from tests.mr_test_cmdenv import MRTestCmdenv
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.job import run_job
 from tests.test_sim import MRIncrementerJob
+
 
 
 # the inline runner is extensively used in test_sim.py, so there are not
@@ -39,11 +48,11 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
         # read from STDIN, a regular file, and a .gz
         stdin = BytesIO(b'foo\nbar\n')
 
-        input_path = os.path.join(self.tmp_dir, 'input')
+        input_path = join(self.tmp_dir, 'input')
         with open(input_path, 'w') as input_file:
             input_file.write('bar\nqux\n')
 
-        input_gz_path = os.path.join(self.tmp_dir, 'input.gz')
+        input_gz_path = join(self.tmp_dir, 'input.gz')
         input_gz = gzip.GzipFile(input_gz_path, 'wb')
         input_gz.write(b'foo\n')
         input_gz.close()
@@ -62,10 +71,10 @@ class InlineMRJobRunnerEndToEndTestCase(SandboxedTestCase):
             results.extend(mr_job.parse_output(runner.cat_output()))
 
             local_tmp_dir = runner._get_local_tmp_dir()
-            assert os.path.exists(local_tmp_dir)
+            assert exists(local_tmp_dir)
 
         # make sure cleanup happens
-        assert not os.path.exists(local_tmp_dir)
+        assert not exists(local_tmp_dir)
 
         self.assertEqual(sorted(results),
                          [(1, 'qux'), (2, 'bar'), (2, 'foo'), (5, None)])
@@ -134,3 +143,37 @@ class InlineRunnerStepsTestCase(EmptyMrjobConfTestCase):
                 v for k, v in mr_job.parse_output(runner.cat_output()))
 
             self.assertEqual(output, [2, 3, 4])
+
+
+class InlineInputManifestTestCase(SandboxedTestCase):
+
+    RUNNER = 'inline'
+
+    EXPECTED_OUTPUT = {
+        '+12018675309': 'https://jseventplanning.biz/',
+        '+16127779311': 'https://big.directory/',
+    }
+
+    def test_input_manifest(self):
+        wet1 = BytesIO()
+        writer1 = WARCWriter(wet1, gzip=False)
+
+        write_conversion_record(
+            writer1, 'https://nophonenumbershere.info',
+            b'THIS-IS-NOT-A-NUMBER')
+        write_conversion_record(
+            writer1, 'https://big.directory/',
+            b'The Time: (612) 777-9311\nJenny: (201) 867-5309\n')
+
+        wet2_gz_path = join(self.tmp_dir, 'wet2.warc.wet.gz')
+        with open(wet2_gz_path, 'wb') as wet2:
+            writer2 = WARCWriter(wet2, gzip=True)
+
+            write_conversion_record(
+                writer2, 'https://jseventplanning.biz/',
+                b'contact us at +1 201 867 5309')
+
+        self.assertEqual(
+            run_job(MRPhoneToURL(['-r', self.RUNNER, wet2_gz_path, '-']),
+                    raw_input=wet1.getvalue()),
+            self.EXPECTED_OUTPUT)

@@ -13,10 +13,8 @@ matrix:
     - python: "3.5-dev"
     - python: "nightly"
   fast_finish: true
-# command to install dependencies. We definitely want to test against
-# ujson, but it isn't available on PyPy.
 install:
-  - "pip install .; pip install ujson || true"
+  - "pip install ."
 # command to run tests
-script: python setup.py test
+script: python -m unittest discover -v
 sudo: false

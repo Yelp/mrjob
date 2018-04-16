@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2016 Yelp and Contributors
 # Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -3531,7 +3532,6 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
         self.assertRaises(StopIteration, next, results)
 
     def test_stream_history_log_dirs_from_4_x_amis(self):
-        runner = EMRJobRunner(image_version='4.3.0')
         self._test_stream_history_log_dirs(
             ssh=True, image_version='4.3.0',
             expected_dir_name='hadoop-mapreduce/history',

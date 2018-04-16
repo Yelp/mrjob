@@ -30,8 +30,11 @@ from subprocess import check_call
 from unittest import TestCase
 from unittest import skipIf
 
+from warcio.warcwriter import WARCWriter
+
 import mrjob
 from mrjob.cat import decompress
+from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.launch import MRJobLauncher
 from mrjob.local import LocalMRJobRunner
 from mrjob.local import _sort_lines_in_memory
@@ -41,6 +44,8 @@ from mrjob.util import to_lines
 
 import tests.sr_wc
 from tests.examples.test_mr_phone_to_url import MRPhoneToURLTestCase
+from tests.examples.test_mr_phone_to_url import write_conversion_record
+from tests.job import run_job
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
 from tests.mr_exit_42_job import MRExit42Job
@@ -1017,3 +1022,27 @@ class InputFileArgsTestCase(SandboxedTestCase):
 class LocalInputManifestTestCase(InlineInputManifestTestCase):
 
     RUNNER = 'local'
+
+    def test_setup_cmd(self):
+        wet_path = join(self.tmp_dir, 'wet.warc.wet.gz')
+        with open(wet_path, 'wb') as wet:
+            writer = WARCWriter(wet)
+
+            write_conversion_record(
+                writer, 'https://big.directory/',
+                b'The Time: (612) 777-9311\nJenny: (201) 867-5309\n')
+            write_conversion_record(
+                writer, 'https://jseventplanning.biz/',
+                b'contact us at +1 201 867 5309')
+
+        touched_path = join(self.tmp_dir, 'touched')
+        setup_cmd = 'touch ' + touched_path
+
+        self.assertFalse(exists(touched_path))
+
+        self.assertEqual(
+            run_job(MRPhoneToURL(
+                ['-r', self.RUNNER, '--setup', setup_cmd, wet_path])),
+            self.EXPECTED_OUTPUT)
+
+        self.assertTrue(exists(touched_path))

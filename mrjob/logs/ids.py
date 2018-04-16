@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2016 Yelp
+# Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,8 +76,6 @@ def _time_sort_key(d):
         task_type,
         attempt_num,
         task_num)
-
-    return sort_key
 
 
 def _add_implied_task_id(d):

@@ -1,5 +1,6 @@
 # Copyright 2009-2013 Yelp and Contributors
 # Copyright 2015-2017 Yelp
+# Copyright 2018 Alibaba, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -43,6 +44,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'cloud_tmp_dir': None,
                 'cloud_upload_part_size': None,
                 'conf_paths': None,
+                'num_cores': None,
                 'core_instance_bid_price': None,
                 'core_instance_type': None,
                 'ec2_key_pair': None,

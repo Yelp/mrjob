@@ -5,6 +5,7 @@
 # Copyright 2015 Yelp and Contributors
 # Copyright 2016 Google
 # Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -21,8 +22,9 @@
 # Author: Matthew Tai <mtai84@gmail.com>
 
 # This script is part of mrjob, but can be run as an initializationAction on
-# ANY GCP Dataproc cluster.  Because initializationAction scripts cannot take args
-# this script reads MAX_SECS_IDLE from metadata attribute "mrjob-max-secs-idle"
+# ANY GCP Dataproc cluster.  Because initializationAction scripts cannot take
+# args, this script reads MAX_SECS_IDLE from metadata attribute
+# "mrjob-max-secs-idle"
 
 # This script runs `yarn application -list` in a loop and considers the cluster
 # idle if no jobs are currently running.  If the cluster stays idle long
@@ -43,11 +45,20 @@
 MAX_SECS_IDLE=$(/usr/share/google/get_metadata_value attributes/mrjob-max-secs-idle)
 if [ -z "${MAX_SECS_IDLE}" ]; then MAX_SECS_IDLE=300; fi
 
+GRACE_PERIOD_SECS=$(/usr/share/google/get_metadata_value attributes/mrjob-grace-period-secs)
+if [ -z "${GRACE_PERIOD_SECS}" ]; then GRACE_PERIOD_SECS=600; fi
+
+
 (
 while true  # the only way out is to SHUT DOWN THE MACHINE
 do
     # get the uptime as an integer (expr can't handle decimals)
     UPTIME=$(cat /proc/uptime | cut -f 1 -d .)
+
+    if [ -z "$START" ]
+    then
+        START=${UPTIME}
+    fi
 
     if [ -z "${LAST_ACTIVE}" ] || \
         (which yarn > /dev/null && \
@@ -56,12 +67,16 @@ do
     then
         LAST_ACTIVE=${UPTIME}
     else
-	# the cluster is idle! how long has this been going on?
-        SECS_IDLE=$(expr ${UPTIME} - ${LAST_ACTIVE})
-        if expr ${SECS_IDLE} '>' ${MAX_SECS_IDLE} > /dev/null
+        SECS_RUN=$(expr ${UPTIME} - ${START})
+        if expr ${SECS_RUN} '>' ${GRACE_PERIOD_SECS} > /dev/null
         then
-            yes | gcloud dataproc clusters delete $(/usr/share/google/get_metadata_value attributes/dataproc-cluster-name) --async
-            exit
+            # the cluster is idle! how long has this been going on?
+            SECS_IDLE=$(expr ${UPTIME} - ${LAST_ACTIVE})
+            if expr ${SECS_IDLE} '>' ${MAX_SECS_IDLE} > /dev/null
+            then
+                yes | gcloud dataproc clusters delete $(/usr/share/google/get_metadata_value attributes/dataproc-cluster-name) --async
+                exit
+            fi
         fi
     fi
 

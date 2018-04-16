@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2017 Yelp and Contributors
+# Copyright 2018 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,32 +14,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Tests for DataprocJobRunner"""
-import collections
-import copy
 import getpass
 import os
 import os.path
-
 from contextlib import contextmanager
+from copy import deepcopy
 from io import BytesIO
 
 import mrjob
 import mrjob.dataproc
 from mrjob.dataproc import DataprocException
 from mrjob.dataproc import DataprocJobRunner
-from mrjob.dataproc import _DATAPROC_API_REGION
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
+from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.dataproc import _cluster_state_name
+from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
 from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
+from mrjob.util import save_current_environment
 
-from tests.mockgoogleapiclient import MockGoogleAPITestCase
-from tests.mockgoogleapiclient import _TEST_PROJECT
+from tests.mock_google import MockGoogleTestCase
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
@@ -49,22 +50,12 @@ from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_conf_patcher
 
-try:
-    from oauth2client.client import GoogleCredentials
-    from googleapiclient import discovery
-except ImportError:
-    # don't require googleapiclient; MRJobs don't actually need it when running
-    # inside hadoop streaming
-    GoogleCredentials = None
-    discovery = None
-
 # used to match command lines
 if PY2:
     PYTHON_BIN = 'python'
 else:
     PYTHON_BIN = 'python3'
 
-DEFAULT_GCE_REGION = 'us-central1'
 US_EAST_GCE_REGION = 'us-east1'
 EU_WEST_GCE_REGION = 'europe-west1'
 
@@ -74,7 +65,7 @@ HIGHCPU_GCE_INSTANCE = 'n1-highcpu-2'
 MICRO_GCE_INSTANCE = 'f1-micro'
 
 
-class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
+class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
         'check_cluster_every': 0.00,
@@ -101,8 +92,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
         results = []
 
-        gcs_buckets_snapshot = copy.deepcopy(self._gcs_client._cache_buckets)
-        gcs_objects_snapshot = copy.deepcopy(self._gcs_client._cache_objects)
+        mock_gcs_fs_snapshot = deepcopy(self.mock_gcs_fs)
 
         fake_gcs_output = [
             b'1\t"qux"\n2\t"bar"\n',
@@ -114,10 +104,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
             # make sure that initializing the runner doesn't affect GCS
             # (Issue #50)
-            self.assertEqual(gcs_buckets_snapshot,
-                             self._gcs_client._cache_buckets)
-            self.assertEqual(gcs_objects_snapshot,
-                             self._gcs_client._cache_objects)
+            self.assertEqual(self.mock_gcs_fs, mock_gcs_fs_snapshot)
 
             runner.run()
 
@@ -137,13 +124,14 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
 
             # make sure our input and output formats are attached to
             # the correct steps
-            jobs_list = runner.api_client.jobs().list(
-                projectId=runner._gcp_project,
-                region=_DATAPROC_API_REGION).execute()
-            jobs = jobs_list['items']
+            jobs = list(runner._list_jobs())
+            self.assertEqual(len(jobs), 2)
 
-            step_0_args = jobs[0]['hadoopJob']['args']
-            step_1_args = jobs[1]['hadoopJob']['args']
+            # put earliest job first
+            jobs.sort(key=lambda j: j.reference.job_id)
+
+            step_0_args = jobs[0].hadoop_job.args
+            step_1_args = jobs[1].hadoop_job.args
 
             self.assertIn('-inputformat', step_0_args)
             self.assertNotIn('-outputformat', step_0_args)
@@ -178,10 +166,8 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
         self.assertEqual(len(fake_gcs_output), len(output_dirs))
 
         # job should get terminated
-        cluster = (
-            self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id])
-        cluster_state = self._dataproc_client.get_state(cluster)
-        self.assertEqual(cluster_state, 'DELETING')
+        cluster = runner._get_cluster(cluster_id)
+        self.assertEqual(_cluster_state_name(cluster.status.state), 'DELETING')
 
     def test_failed_job(self):
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v'])
@@ -191,8 +177,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             stderr = StringIO()
             log_to_stream('mrjob.dataproc', stderr)
 
-            self._dataproc_client.job_get_advances_states = (
-                collections.deque(['SETUP_DONE', 'RUNNING', 'ERROR']))
+            self.mock_jobs_succeed = False
 
             with mr_job.make_runner() as runner:
                 self.assertIsInstance(runner, DataprocJobRunner)
@@ -204,10 +189,8 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
                 cluster_id = runner.get_cluster_id()
 
         # job should get terminated
-        cluster = (
-            self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id])
-        cluster_state = self._dataproc_client.get_state(cluster)
-        self.assertEqual(cluster_state, 'DELETING')
+        cluster = runner._get_cluster(cluster_id)
+        self.assertEqual(_cluster_state_name(cluster.status.state), 'DELETING')
 
     def _test_cloud_tmp_cleanup(self, mode, tmp_len):
         stdin = BytesIO(b'foo\nbar\n')
@@ -224,8 +207,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
             # this is set and unset before we can get at it unless we do this
             list(runner.cat_output())
 
-        objects_in_bucket = self._gcs_fs.api_client._cache_objects[tmp_bucket]
-        self.assertEqual(len(objects_in_bucket), tmp_len)
+            fs = runner.fs
+
+        # with statement finishes, cleanup runs
+
+        self.assertEqual(
+            len(list(fs.client.bucket(tmp_bucket).list_blobs())),
+            tmp_len)
 
     def test_cleanup_all(self):
         self._test_cloud_tmp_cleanup('ALL', 0)
@@ -255,13 +243,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleAPITestCase):
                           'GARBAGE', 0)
 
 
-class ExistingClusterTestCase(MockGoogleAPITestCase):
+class ExistingClusterTestCase(MockGoogleTestCase):
 
     def test_attach_to_existing_cluster(self):
-        runner = DataprocJobRunner(conf_paths=[])
+        runner1 = DataprocJobRunner(conf_paths=[])
 
-        cluster_body = runner.api_client.cluster_create()
-        cluster_id = cluster_body['clusterName']
+        runner1._launch_cluster()
+        cluster_id = runner1._cluster_id
 
         stdin = BytesIO(b'foo\nbar\n')
 
@@ -271,54 +259,52 @@ class ExistingClusterTestCase(MockGoogleAPITestCase):
 
         results = []
 
-        with mr_job.make_runner() as runner:
-            runner.run()
+        with mr_job.make_runner() as runner2:
+            runner2.run()
 
             # Generate fake output
-            self.put_job_output_parts(runner, [
+            self.put_job_output_parts(runner2, [
                 b'1\t"bar"\n1\t"foo"\n2\tnull\n'
             ])
 
             # Issue 182: don't create the bootstrap script when
             # attaching to another cluster
-            self.assertIsNone(runner._master_bootstrap_script_path)
+            self.assertIsNone(runner2._master_bootstrap_script_path)
 
-            results.extend(mr_job.parse_output(runner.cat_output()))
+            results.extend(mr_job.parse_output(runner2.cat_output()))
 
         self.assertEqual(sorted(results),
                          [(1, 'bar'), (1, 'foo'), (2, None)])
 
     def test_dont_take_down_cluster_on_failure(self):
-        runner = DataprocJobRunner(conf_paths=[])
+        runner1 = DataprocJobRunner(conf_paths=[])
 
-        cluster_body = runner.api_client.cluster_create()
-        cluster_id = cluster_body['clusterName']
+        runner1._launch_cluster()
+        cluster_id = runner1._cluster_id
 
         mr_job = MRTwoStepJob(['-r', 'dataproc', '-v',
                                '--cluster-id', cluster_id])
         mr_job.sandbox()
 
-        self._dataproc_client.job_get_advances_states = (
-            collections.deque(['SETUP_DONE', 'RUNNING', 'ERROR']))
+        self.mock_jobs_succeed = False
 
-        with mr_job.make_runner() as runner:
-            self.assertIsInstance(runner, DataprocJobRunner)
+        with mr_job.make_runner() as runner2:
+            self.assertIsInstance(runner2, DataprocJobRunner)
 
             with logger_disabled('mrjob.dataproc'):
-                self.assertRaises(StepFailedException, runner.run)
+                self.assertRaises(StepFailedException, runner2.run)
 
-            cluster = self.get_cluster_from_runner(runner, cluster_id)
-            cluster_state = self._dataproc_client.get_state(cluster)
-            self.assertEqual(cluster_state, 'RUNNING')
+            cluster2 = runner2._get_cluster(runner2._cluster_id)
+            self.assertEqual(_cluster_state_name(cluster2.status.state),
+                             'RUNNING')
 
         # job shouldn't get terminated by cleanup
-        cluster = (
-            self._dataproc_client._cache_clusters[_TEST_PROJECT][cluster_id])
-        cluster_state = self._dataproc_client.get_state(cluster)
-        self.assertEqual(cluster_state, 'RUNNING')
+        cluster1 = runner1._get_cluster(runner1._cluster_id)
+        self.assertEqual(_cluster_state_name(cluster1.status.state),
+                         'RUNNING')
 
 
-class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
+class CloudAndHadoopVersionTestCase(MockGoogleTestCase):
 
     def test_default(self):
         with self.make_runner() as runner:
@@ -358,31 +344,50 @@ class CloudAndHadoopVersionTestCase(MockGoogleAPITestCase):
                 self.assertEqual(runner.get_hadoop_version(), '2.7.2')
 
 
-EXPECTED_ZONE = 'PUPPYLAND'
+class AvailabilityZoneConfigTestCase(MockGoogleTestCase):
 
-
-class ZoneTestCase(MockGoogleAPITestCase):
+    ZONE = 'puppy-land-1a'
 
     MRJOB_CONF_CONTENTS = {'runners': {'dataproc': {
         'check_cluster_every': 0.00,
         'cloud_fs_sync_secs': 0.00,
-        'zone': EXPECTED_ZONE,
+        'zone': ZONE,
     }}}
 
     def test_availability_zone_config(self):
-        with self.make_runner() as runner:
+        with self.make_runner('--zone', self.ZONE) as runner:
             runner.run()
 
-            cluster = runner._api_cluster_get(runner._cluster_id)
-            self.assertIn(EXPECTED_ZONE,
-                          cluster['config']['gceClusterConfig']['zoneUri'])
-            self.assertIn(EXPECTED_ZONE,
-                          cluster['config']['masterConfig']['machineTypeUri'])
-            self.assertIn(EXPECTED_ZONE,
-                          cluster['config']['workerConfig']['machineTypeUri'])
+            cluster = runner._get_cluster(runner._cluster_id)
+            self.assertIn(self.ZONE,
+                          cluster.config.gce_cluster_config.zone_uri)
+            self.assertIn(self.ZONE,
+                          cluster.config.master_config.machine_type_uri)
+            self.assertIn(self.ZONE,
+                          cluster.config.worker_config.machine_type_uri)
 
 
-class ExtraClusterParamsTestCase(MockGoogleAPITestCase):
+class ProjectIDTestCase(MockGoogleTestCase):
+
+    def test_default(self):
+        with self.make_runner() as runner:
+            self.assertEqual(runner._project_id, self.mock_project_id)
+
+    def test_project_id(self):
+        with self.make_runner('--project-id', 'alan-parsons') as runner:
+            self.assertEqual(runner._project_id, 'alan-parsons')
+
+
+class CredentialsTestCase(MockGoogleTestCase):
+
+    def test_credentials_are_scoped(self):
+        # if we don't set scope, we'll get an error unless we're reading
+        # credentials from gcloud (see #1742)
+        with self.make_runner() as runner:
+            self.assertTrue(runner._credentials.scopes)
+
+
+class ExtraClusterParamsTestCase(MockGoogleTestCase):
 
     # just a basic test to make extra_cluster_params is respected.
     # more extensive tests are found in tests.test_emr
@@ -393,34 +398,83 @@ class ExtraClusterParamsTestCase(MockGoogleAPITestCase):
         with self.make_runner(*args) as runner:
             runner.run()
 
-            cluster = runner._api_cluster_get(runner._cluster_id)
-            self.assertEqual(cluster['labels']['name'], 'wrench')
+            cluster = runner._get_cluster(runner._cluster_id)
+            self.assertEqual(cluster.labels['name'], 'wrench')
 
 
-class RegionTestCase(MockGoogleAPITestCase):
+class RegionAndZoneOptsTestCase(MockGoogleTestCase):
+
+    def setUp(self):
+        super(RegionAndZoneOptsTestCase, self).setUp()
+        self.log = self.start(patch('mrjob.dataproc.log'))
 
     def test_default(self):
         runner = DataprocJobRunner()
-        self.assertEqual(runner._gce_region, 'us-central1')
+        self.assertEqual(runner._opts['region'], 'us-west1')
+        self.assertEqual(runner._opts['zone'], None)
+        self.assertFalse(self.log.warning.called)
 
-    def test_explicit_region(self):
-        runner = DataprocJobRunner(region='europe-west1')
-        self.assertEqual(runner._gce_region, 'europe-west1')
+    def test_explicit_zone(self):
+        runner = DataprocJobRunner(zone='europe-west1-a')
+        self.assertEqual(runner._opts['zone'], 'europe-west1-a')
 
-    def test_cannot_be_empty(self):
-        runner = DataprocJobRunner(region='')
-        self.assertEqual(runner._gce_region, 'us-central1')
+    def test_region_from_environment(self):
+        with save_current_environment():
+            os.environ['CLOUDSDK_COMPUTE_REGION'] = 'us-east1'
+            runner = DataprocJobRunner()
+
+        self.assertEqual(runner._opts['region'], 'us-east1')
+
+    def test_explicit_region_beats_environment(self):
+        with save_current_environment():
+            os.environ['CLOUDSDK_COMPUTE_REGION'] = 'us-east1'
+            runner = DataprocJobRunner(region='europe-west1-a')
+
+        self.assertEqual(runner._opts['region'], 'europe-west1-a')
+
+    def test_zone_from_environment(self):
+        with save_current_environment():
+            os.environ['CLOUDSDK_COMPUTE_ZONE'] = 'us-west1-b'
+            runner = DataprocJobRunner()
+
+        self.assertEqual(runner._opts['zone'], 'us-west1-b')
+
+    def test_explicit_zone_beats_environment(self):
+        with save_current_environment():
+            os.environ['CLOUDSDK_COMPUTE_ZONE'] = 'us-west1-b'
+            runner = DataprocJobRunner(zone='europe-west1-a')
+
+        self.assertEqual(runner._opts['zone'], 'europe-west1-a')
+
+    def test_zone_beats_region(self):
+        runner = DataprocJobRunner(region='europe-west1',
+                                   zone='europe-west1-a')
+
+        self.assertTrue(self.log.warning.called)
+        self.assertEqual(runner._opts['region'], None)
+        self.assertEqual(runner._opts['zone'], 'europe-west1-a')
+
+    def test_command_line_beats_config(self):
+        ZONE_CONF = dict(runners=dict(dataproc=dict(zone='us-west1-a')))
+
+        with mrjob_conf_patcher(ZONE_CONF):
+            runner = DataprocJobRunner(region='europe-west1')
+
+            # region takes precedence because it was set on the command line
+            self.assertEqual(runner._opts['region'], 'europe-west1')
+            self.assertEqual(runner._opts['zone'], None)
+            # only a problem if you set region and zone
+            # in the same config
+            self.assertFalse(self.log.warning.called)
 
 
-class TmpBucketTestCase(MockGoogleAPITestCase):
+class TmpBucketTestCase(MockGoogleTestCase):
     def assert_new_tmp_bucket(self, location, **runner_kwargs):
         """Assert that if we create an DataprocJobRunner with the given keyword
         args, it'll create a new tmp bucket with the given location
         constraint.
         """
-        bucket_cache = self._gcs_client._cache_buckets
-
-        existing_buckets = set(bucket_cache.keys())
+        existing_buckets = set(self.mock_gcs_fs)
 
         runner = DataprocJobRunner(conf_paths=[], **runner_kwargs)
 
@@ -431,21 +485,22 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         self.assertNotIn(bucket_name, existing_buckets)
         self.assertEqual(path, 'tmp/')
 
-        current_bucket = bucket_cache[bucket_name]
-        self.assertEqual(current_bucket['location'], location)
+        current_bucket = runner.fs.get_bucket(bucket_name)
+
+        self.assertEqual(current_bucket.location, location.upper())
 
         # Verify that we setup bucket lifecycle rules of 28-day retention
-        first_lifecycle_rule = current_bucket['lifecycle']['rule'][0]
+        first_lifecycle_rule = current_bucket.lifecycle_rules[0]
         self.assertEqual(first_lifecycle_rule['action'], dict(type='Delete'))
         self.assertEqual(first_lifecycle_rule['condition'],
                          dict(age=_DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS))
 
     def _make_bucket(self, name, location=None):
-        self._gcs_fs.create_bucket(
-            project=_TEST_PROJECT, name=name, location=location)
+        fs = GCSFilesystem()
+        fs.create_bucket(name, location=location)
 
     def test_default(self):
-        self.assert_new_tmp_bucket(DEFAULT_GCE_REGION)
+        self.assert_new_tmp_bucket(_DEFAULT_GCE_REGION)
 
     def test_us_east_1(self):
         self.assert_new_tmp_bucket(US_EAST_GCE_REGION,
@@ -457,7 +512,7 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
                                    region=EU_WEST_GCE_REGION)
 
     def test_reuse_mrjob_bucket_in_same_region(self):
-        self._make_bucket('mrjob-1', DEFAULT_GCE_REGION)
+        self._make_bucket('mrjob-1', _DEFAULT_GCE_REGION)
 
         runner = DataprocJobRunner()
         self.assertEqual(runner._cloud_tmp_dir, 'gs://mrjob-1/tmp/')
@@ -466,12 +521,12 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         # this tests 687
         self._make_bucket('mrjob-1', US_EAST_GCE_REGION)
 
-        self.assert_new_tmp_bucket(DEFAULT_GCE_REGION)
+        self.assert_new_tmp_bucket(_DEFAULT_GCE_REGION)
 
     def test_ignore_non_mrjob_bucket_in_different_region(self):
         self._make_bucket('walrus', US_EAST_GCE_REGION)
 
-        self.assert_new_tmp_bucket(DEFAULT_GCE_REGION)
+        self.assert_new_tmp_bucket(_DEFAULT_GCE_REGION)
 
     def test_explicit_tmp_uri(self):
         self._make_bucket('walrus', US_EAST_GCE_REGION)
@@ -489,19 +544,19 @@ class TmpBucketTestCase(MockGoogleAPITestCase):
         self.assertEqual(runner._cloud_tmp_dir, 'gs://walrus/tmp/')
 
         # tmp bucket shouldn't influence region (it did in 0.4.x)
-        self.assertEqual(runner._gce_region, US_EAST_GCE_REGION)
+        self.assertEqual(runner._region(), US_EAST_GCE_REGION)
 
 
-class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
+class GCEInstanceGroupTestCase(MockGoogleTestCase):
 
     maxDiff = None
 
     def _gce_instance_group_summary(self, instance_group):
         if not instance_group:
-            return (0, None)
+            return (0, '')
 
-        num_instances = instance_group['numInstances']
-        instance_type = instance_group['machineTypeUri'].split('/')[-1]
+        num_instances = instance_group.num_instances
+        instance_type = instance_group.machine_type_uri.split('/')[-1]
         return (num_instances, instance_type)
 
     def _test_instance_groups(self, opts, **kwargs):
@@ -522,15 +577,14 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
 
         cluster_id = runner._launch_cluster()
 
-        cluster_body = runner._api_cluster_get(cluster_id)
+        cluster = runner._get_cluster(cluster_id)
 
-        conf = cluster_body['config']
+        conf = cluster.config
 
         role_to_actual = dict(
-            master=self._gce_instance_group_summary(conf['masterConfig']),
-            core=self._gce_instance_group_summary(conf['workerConfig']),
-            task=self._gce_instance_group_summary(
-                conf.get('secondaryWorkerConfig'))
+            master=self._gce_instance_group_summary(conf.master_config),
+            core=self._gce_instance_group_summary(conf.worker_config),
+            task=self._gce_instance_group_summary(conf.secondary_worker_config)
         )
 
         role_to_expected = kwargs.copy()
@@ -541,7 +595,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
         self.assertEqual(role_to_actual, role_to_expected)
 
     def set_in_mrjob_conf(self, **kwargs):
-        dataproc_opts = copy.deepcopy(self.MRJOB_CONF_CONTENTS)
+        dataproc_opts = deepcopy(self.MRJOB_CONF_CONTENTS)
         dataproc_opts['runners']['dataproc'].update(kwargs)
         patcher = mrjob_conf_patcher(dataproc_opts)
         patcher.start()
@@ -677,7 +731,7 @@ class GCEInstanceGroupTestCase(MockGoogleAPITestCase):
             task=(20, HIGHCPU_GCE_INSTANCE))
 
 
-class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
+class MasterBootstrapScriptTestCase(MockGoogleTestCase):
 
     def test_usr_bin_env(self):
         runner = DataprocJobRunner(conf_paths=[],
@@ -822,7 +876,7 @@ class MasterBootstrapScriptTestCase(MockGoogleAPITestCase):
                          ['garply', 'quux'])
 
 
-class DataprocNoMapperTestCase(MockGoogleAPITestCase):
+class DataprocNoMapperTestCase(MockGoogleTestCase):
 
     def test_no_mapper(self):
         # read from STDIN, a local file, and a remote file
@@ -858,7 +912,7 @@ class DataprocNoMapperTestCase(MockGoogleAPITestCase):
                           (4, ['fish'])])
 
 
-class MaxMinsIdleTestCase(MockGoogleAPITestCase):
+class MaxMinsIdleTestCase(MockGoogleTestCase):
 
     def assertRanIdleTimeoutScriptWith(self, runner, expected_metadata):
         cluster_metadata, last_init_exec = (
@@ -873,16 +927,13 @@ class MaxMinsIdleTestCase(MockGoogleAPITestCase):
         self.assertEqual(last_init_exec, expected_uri)
 
     def _cluster_metadata_and_last_init_exec(self, runner):
-        cluster_id = runner.get_cluster_id()
-
-        cluster = self.get_cluster_from_runner(runner, cluster_id)
+        cluster = runner._get_cluster(runner.get_cluster_id())
 
         # Verify last arg
-        cluster_config = cluster['config']
-        last_init_action = cluster_config['initializationActions'][-1]
-        last_init_exec = last_init_action['executableFile']
+        last_init_action = cluster.config.initialization_actions[-1]
+        last_init_exec = last_init_action.executable_file
 
-        cluster_metadata = cluster_config['gceClusterConfig']['metadata']
+        cluster_metadata = cluster.config.gce_cluster_config.metadata
         return cluster_metadata, last_init_exec
 
     def test_default(self):
@@ -909,9 +960,10 @@ class MaxMinsIdleTestCase(MockGoogleAPITestCase):
         self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
 
 
-class TestCatFallback(MockGoogleAPITestCase):
+class TestCatFallback(MockGoogleTestCase):
 
     def test_gcs_cat(self):
+
         self.put_gcs_multi({
             'gs://walrus/one': b'one_text',
             'gs://walrus/two': b'two_text',
@@ -924,7 +976,7 @@ class TestCatFallback(MockGoogleAPITestCase):
         self.assertEqual(list(runner.fs.cat('gs://walrus/one')), [b'one_text'])
 
 
-class CleanUpJobTestCase(MockGoogleAPITestCase):
+class CleanUpJobTestCase(MockGoogleTestCase):
 
     @contextmanager
     def _test_mode(self, mode):
@@ -972,7 +1024,7 @@ class CleanUpJobTestCase(MockGoogleAPITestCase):
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
             with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_api_cluster_delete') as m:
+                              '_delete_cluster') as m:
                 r._cleanup_cluster()
                 self.assertTrue(m.called)
 
@@ -982,7 +1034,7 @@ class CleanUpJobTestCase(MockGoogleAPITestCase):
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
             with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_api_cluster_delete') as m:
+                              '_delete_cluster') as m:
                 r._ran_job = True
                 r._cleanup_cluster()
                 self.assertTrue(m.called)
@@ -991,13 +1043,13 @@ class CleanUpJobTestCase(MockGoogleAPITestCase):
         with no_handlers_for_logger('mrjob.dataproc'):
             r = self._quick_runner()
             with patch.object(mrjob.dataproc.DataprocJobRunner,
-                              '_api_cluster_delete') as m:
+                              '_delete_cluster') as m:
                 r._opts['cluster_id'] = 'j-MOCKCLUSTER0'
                 r._cleanup_cluster()
                 self.assertTrue(m.called)
 
 
-class BootstrapPythonTestCase(MockGoogleAPITestCase):
+class BootstrapPythonTestCase(MockGoogleTestCase):
 
     if PY2:
         EXPECTED_BOOTSTRAP = [

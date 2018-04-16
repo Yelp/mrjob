@@ -46,9 +46,9 @@ from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
+from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import to_lines
-from mrjob.util import zip_dir
 
 
 log = logging.getLogger(__name__)
@@ -240,7 +240,9 @@ class MRJobRunner(object):
         self._spark_files = []
         self._spark_archives = []
 
-        self._upload_mgr = None  # define in subclasses that use this
+        # set this to an :py:class:`~mrjob.setup.UploadDirManager` in
+        # runners that upload files to HDFS, S3, etc.
+        self._upload_mgr = None
 
         self._script_path = mr_job_script
         if self._script_path:
@@ -317,8 +319,8 @@ class MRJobRunner(object):
             self._stdin = stdin or sys.stdin.buffer
         self._stdin_path = None  # temp file containing dump from stdin
 
-        # where a zip file of the mrjob library is stored locally
-        self._mrjob_zip_path = None
+        # where to keep the input manifest
+        self._input_manifest_path = None
 
         # store output_dir
         self._output_dir = output_dir
@@ -409,7 +411,7 @@ class MRJobRunner(object):
         if not isinstance(opts, dict):
             raise TypeError(
                 'options for %s (from %s) must be a dict' %
-                self.runner_alias, source)
+                (self.alias, source))
 
         deprecated_aliases = _deprecated_aliases(self.OPT_NAMES)
 
@@ -507,9 +509,15 @@ class MRJobRunner(object):
             raise AssertionError("Job already ran!")
 
         self._create_dir_archives()
+        # TODO: no point in checking input paths if we're going to
+        # make a manifest out of them
         self._check_input_paths()
+        self._add_input_files_for_upload()
+        self._create_input_manifest_if_needed()
         self._run()
         self._ran_job = True
+
+        log.info('job output is in %s' % self._output_dir)
 
     def cat_output(self):
         """Stream the jobs output, as a stream of ``bytes``. If there are
@@ -772,7 +780,9 @@ class MRJobRunner(object):
         Results are cached, so call this as many times as you want.
         """
         if self._steps is None:
-            self._steps = self._load_steps()
+            steps = self._load_steps()
+            self._check_steps(steps)
+            self._steps = steps
 
         return self._steps
 
@@ -783,6 +793,19 @@ class MRJobRunner(object):
         Returns output as described in :ref:`steps-format`.
         """
         raise NotImplementedError
+
+    def _check_steps(self, steps):
+        """Raise an exception if there's something wrong with the step
+        definition."""
+        for step_num, step in enumerate(steps):
+            if step['type'] not in STEP_TYPES:
+                raise ValueError(
+                    'unexpected step type %r in steps %r' % (
+                        step['type'], steps))
+
+            if step.get('input_manifest') and step_num != 0:
+                raise ValueError(
+                    'only first step may take an input manifest')
 
     def _get_step(self, step_num):
         """Get a single step (calls :py:meth:`_get_steps`)."""
@@ -796,6 +819,10 @@ class MRJobRunner(object):
         """Are any of our steps Hadoop streaming steps?"""
         return any(step['type'] == 'streaming'
                    for step in self._get_steps())
+
+    def _uses_input_manifest(self):
+        """Does the first step take an input manifest?"""
+        return bool(self._get_step(0).get('input_manifest'))
 
     def _has_spark_steps(self):
         """Are any of our steps Spark steps (either spark or spark_script)"""
@@ -908,6 +935,9 @@ class MRJobRunner(object):
     def _get_input_paths(self):
         """Get the paths to input files, dumping STDIN to a local
         file if need be."""
+        if self._input_manifest_path:
+            return [self._input_manifest_path]
+
         if '-' in self._input_paths:
             if self._stdin_path is None:
                 # prompt user, so they don't think the process has stalled
@@ -926,6 +956,39 @@ class MRJobRunner(object):
 
         return [self._stdin_path if p == '-' else p for p in self._input_paths]
 
+    def _create_input_manifest_if_needed(self):
+        """Create a file with a list of URIs of input files."""
+        if self._input_manifest_path or not self._uses_input_manifest():
+            return
+
+        uris = []
+
+        log.info('finding input files to add to manifest...')
+
+        for path in self._get_input_paths():
+            log.debug('  in %s' % path)
+            if is_uri(path):
+                # URIs might be globs
+                for uri in self.fs.ls(path):
+                    uris.append(uri)
+            else:
+                # local paths are expected to be single files
+                # (shell would resolve globs)
+                if self._upload_mgr:
+                    uris.append(self._upload_mgr.uri(path))
+                else:
+                    # just make sure job can find files from it's working dir
+                    uris.append(os.path.abspath(path))
+
+        log.info('found %d input files' % len(uris))
+
+        path = os.path.join(self._get_local_tmp_dir(), 'input-manifest.txt')
+        self._write_script(uris, path, 'input manifest')
+
+        self._input_manifest_path = path
+        if self._upload_mgr:
+            self._upload_mgr.add(self._input_manifest_path)
+
     def _check_input_paths(self):
         """Check that input exists prior to running the job, if the
         `check_input_paths` option is true."""
@@ -942,6 +1005,12 @@ class MRJobRunner(object):
             if not self.fs.exists(path):
                 raise IOError(
                     'Input path %s does not exist!' % (path,))
+
+    def _add_input_files_for_upload(self):
+        """If there is an upload manager, add input files to it."""
+        if self._upload_mgr:
+            for path in self._get_input_paths():
+                self._upload_mgr.add(path)
 
     def _intermediate_output_uri(self, step_num, local=False):
         """A URI for intermediate output for the given step number."""
@@ -997,48 +1066,6 @@ class MRJobRunner(object):
                 return arg
 
         return [interpolate(arg) for arg in args]
-
-    def _create_mrjob_zip(self):
-        """Make a zip of the mrjob library, without .pyc or .pyo files,
-        This will also set ``self._mrjob_zip_path`` and return it.
-
-        Typically called from
-        :py:meth:`_create_setup_wrapper_script`.
-
-        It's safe to call this method multiple times (we'll only create
-        the zip file once.)
-        """
-        if not self._mrjob_zip_path:
-            # find mrjob library
-            import mrjob
-
-            if not os.path.basename(mrjob.__file__).startswith('__init__.'):
-                raise Exception(
-                    "Bad path for mrjob library: %s; can't bootstrap mrjob",
-                    mrjob.__file__)
-
-            mrjob_dir = os.path.dirname(mrjob.__file__) or '.'
-
-            zip_path = os.path.join(self._get_local_tmp_dir(), 'mrjob.zip')
-
-            def filter_path(path):
-                filename = os.path.basename(path)
-                return not(filename.lower().endswith('.pyc') or
-                           filename.lower().endswith('.pyo') or
-                           # filter out emacs backup files
-                           filename.endswith('~') or
-                           # filter out emacs lock files
-                           filename.startswith('.#') or
-                           # filter out MacFuse resource forks
-                           filename.startswith('._'))
-
-            log.debug('archiving %s -> %s as %s' % (
-                mrjob_dir, zip_path, os.path.join('mrjob', '')))
-            zip_dir(mrjob_dir, zip_path, filter=filter_path, prefix='mrjob')
-
-            self._mrjob_zip_path = zip_path
-
-        return self._mrjob_zip_path
 
     def _jobconf_for_step(self, step_num):
         """Get the jobconf dictionary, optionally including step-specific
@@ -1144,6 +1171,30 @@ class MRJobRunner(object):
                 name = self._working_dir_mgr.name(type, path)
             uri = self._upload_mgr.uri(path)
             yield '%s#%s' % (uri, name)
+
+    def _write_script(self, lines, path, description):
+        """Write text of a setup script, input manifest, etc. to the given
+        file.
+
+        By default, this writes binary data. Redefine :py:meth:`write_lines`
+        to use other line endings.
+
+        :param lines: a list of lines as ``str``
+        :param path: path of file to write to
+        :param description: what we're writing to, for debug messages
+        """
+        log.debug('Writing %s to %s:' % (description, path))
+        for line in lines:
+            log.debug('  ' + line)
+
+        self._write_script_lines(lines, path)
+
+    def _write_script_lines(self, lines, path):
+        """Write text to the given file. By default, this writes
+        binary data, but can be redefined to use local line endings."""
+        with open(path, 'wb') as f:
+            for line in lines:
+                f.write((line + '\n').encode('utf-8'))
 
 
 def _fix_env(env):

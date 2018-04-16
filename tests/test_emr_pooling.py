@@ -2022,7 +2022,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             # don't have a mock_boto3 hook for termination of cluster
             # during run(), so running the two halves of run() separately
-            runner._launch()
+            self.launch(runner)
 
             self.assertEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(cluster_id), 2)
@@ -2036,7 +2036,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             cluster_id = runner.get_cluster_id()
             self.assertEqual(self.num_steps(cluster_id), 2)
@@ -2065,7 +2065,7 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             self.assertEqual(runner.get_cluster_id(), cluster_id)
             addr = runner._address_of_master()

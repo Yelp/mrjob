@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2016 Yelp and Contributors
 # Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -48,6 +49,7 @@ from mrjob.emr import _PRE_4_X_STREAMING_JAR
 from mrjob.job import MRJob
 from mrjob.parse import parse_s3_uri
 from mrjob.pool import _extract_tags
+from mrjob.protocol import JSONProtocol
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import INPUT
@@ -82,6 +84,7 @@ from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 from tests.test_hadoop import HadoopExtraArgsTestCase
+from tests.test_inline import InlineInputManifestTestCase
 from tests.test_local import _bash_wrap
 
 # used to match command lines
@@ -674,7 +677,7 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
 
     def test_ami_version_1_0_no_longer_supported(self):
         with self.make_runner('--image-version', '1.0') as runner:
-            self.assertRaises(ClientError, runner._launch)
+            self.assertRaises(ClientError, self.launch, runner)
 
     def test_ami_version_2_0(self):
         with self.make_runner('--image-version', '2.0') as runner:
@@ -1573,7 +1576,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check for idle timeout script
         self.assertTrue(actions[3]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[3]['ScriptPath'].endswith(
-            'terminate_idle_cluster.sh'))
+            'terminate_idle_cluster_emr.sh'))
         self.assertEqual(actions[3]['Args'], ['600'])
         self.assertEqual(actions[3]['Name'], 'idle timeout')
 
@@ -1628,7 +1631,7 @@ class MasterBootstrapScriptTestCase(MockBoto3TestCase):
         # check for idle timeout script
         self.assertTrue(actions[2]['ScriptPath'].startswith('s3://mrjob-'))
         self.assertTrue(actions[2]['ScriptPath'].endswith(
-            'terminate_idle_cluster.sh'))
+            'terminate_idle_cluster_emr.sh'))
         self.assertEqual(actions[2]['Args'], ['600'])
         self.assertEqual(actions[2]['Name'], 'idle timeout')
 
@@ -1849,20 +1852,32 @@ class MaxMinsIdleTestCase(MockBoto3TestCase):
             self.assertRanIdleTimeoutScriptWith(runner, ['600'])
 
     def test_custom_max_mins_idle(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '0.6'])
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '16.5'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['36'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['990'])
+
+    def test_custom_max_mins_idle_in_mrjob_conf(self):
+        # regression test for #1726
+        self.start(mrjob_conf_patcher(
+            dict(runners=dict(emr=dict(max_mins_idle=15)))))
+
+        mr_job = MRWordCount(['-r', 'emr'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.make_persistent_cluster()
+            self.assertRanIdleTimeoutScriptWith(runner, ['900'])
 
     def test_deprecated_max_hours_idle(self):
-        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '0.6'])
+        mr_job = MRWordCount(['-r', 'emr', '--max-mins-idle', '16.5'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['36'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['990'])
 
     def test_deprecated_mins_to_end_of_hour_does_nothing(self):
         mr_job = MRWordCount(['-r', 'emr', '--mins-to-end-of-hour', '10'])
@@ -2348,7 +2363,7 @@ class StreamingJarAndStepArgPrefixTestCase(MockBoto3TestCase):
         """make and launch runner, so cluster is created and files
         are uploaded."""
         runner = self.make_runner(*args)
-        runner._launch()
+        self.launch(runner)
         return runner
 
     def test_default(self):
@@ -3278,14 +3293,14 @@ class IAMEndpointTestCase(MockBoto3TestCase):
 
 class SetupLineEncodingTestCase(MockBoto3TestCase):
 
-    def test_setup_wrapper_script_uses_local_line_endings(self):
+    def test_setup_wrapper_script_uses_unix_line_endings(self):
         job = MRTwoStepJob(['-r', 'emr', '--setup', 'true'])
         job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
 
         # tests #1071. Unfortunately, we mostly run these tests on machines
         # that use unix line endings anyway. So monitor open() instead
         with patch(
-                'mrjob.bin.open', create=True, side_effect=open) as m_open:
+                'mrjob.runner.open', create=True, side_effect=open) as m_open:
             with logger_disabled('mrjob.emr'):
                 with job.make_runner() as runner:
                     runner.run()
@@ -3304,7 +3319,7 @@ class WaitForLogsOnS3TestCase(MockBoto3TestCase):
         job.sandbox(stdin=BytesIO(b'foo\nbar\n'))
 
         self.runner = job.make_runner()
-        self.runner._launch()
+        self.launch(self.runner)
 
         self.cluster = self.mock_emr_clusters[self.runner._cluster_id]
 
@@ -3517,7 +3532,6 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
         self.assertRaises(StopIteration, next, results)
 
     def test_stream_history_log_dirs_from_4_x_amis(self):
-        runner = EMRJobRunner(image_version='4.3.0')
         self._test_stream_history_log_dirs(
             ssh=True, image_version='4.3.0',
             expected_dir_name='hadoop-mapreduce/history',
@@ -3862,7 +3876,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._applications(), set())
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             applications = set(a['Name'] for a in cluster['Applications'])
@@ -3875,7 +3889,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertEqual(runner._applications(), set())
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             applications = set(a['Name'] for a in cluster['Applications'])
@@ -3890,7 +3904,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertRaises(ClientError, runner._launch)
+            self.assertRaises(ClientError, self.launch, runner)
 
     def test_explicit_hadoop(self):
         job = MRTwoStepJob(
@@ -3903,7 +3917,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
             self.assertEqual(runner._applications(),
                              set(['Hadoop', 'Mahout']))
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             applications = set(a['Name'] for a in cluster['Applications'])
@@ -3922,7 +3936,7 @@ class EMRApplicationsTestCase(MockBoto3TestCase):
             self.assertEqual(runner._applications(),
                              set(['Hadoop', 'Mahout']))
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             applications = set(a['Name'] for a in cluster['Applications'])
@@ -3940,7 +3954,7 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             self.assertFalse(hasattr(cluster, 'configurations'))
@@ -3953,7 +3967,7 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            self.assertRaises(ClientError, runner._launch)
+            self.assertRaises(ClientError, self.launch, runner)
 
     def _test_normalized_emr_configurations(self, emr_configurations):
 
@@ -3968,7 +3982,7 @@ class EMRConfigurationsTestCase(MockBoto3TestCase):
             self.assertEqual(runner._opts['emr_configurations'],
                              emr_configurations)
 
-            runner._launch()
+            self.launch(runner)
             cluster = runner._describe_cluster()
 
             self.assertEqual(cluster['Configurations'], emr_configurations)
@@ -4038,7 +4052,7 @@ class GetJobStepsTestCase(MockBoto3TestCase):
         job = MRTwoStepJob(['-r', 'emr']).sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             all_steps = _list_all_steps(runner)
 
@@ -4063,7 +4077,7 @@ class GetJobStepsTestCase(MockBoto3TestCase):
 
         with job.make_runner() as runner:
             add_other_steps(runner, 50)
-            runner._launch()
+            self.launch(runner)
             add_other_steps(runner, 3)
 
             all_steps = _list_all_steps(runner)
@@ -4109,7 +4123,7 @@ class WaitForStepsToCompleteTestCase(MockBoto3TestCase):
         """Make a runner for a two step job and launch it."""
         job = MRTwoStepJob(['-r', 'emr'] + list(extra_args)).sandbox()
         runner = job.make_runner()
-        runner._launch()
+        self.launch(runner)
         return runner
 
     def test_basic(self):
@@ -4407,7 +4421,7 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
             self.assertIsNotNone(runner._ssh_fs)
             self.assertFalse(runner._ssh_fs._sudo)
 
-            runner._launch()
+            self.launch(runner)
 
             self.assertTrue(runner._ssh_fs._sudo)
 
@@ -4421,7 +4435,7 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
             self.assertIsNotNone(runner._ssh_fs)
             self.assertFalse(runner._ssh_fs._sudo)
 
-            runner._launch()
+            self.launch(runner)
 
             self.assertFalse(runner._ssh_fs._sudo)
 
@@ -4434,7 +4448,7 @@ class UseSudoOverSshTestCase(MockBoto3TestCase):
         with job.make_runner() as runner:
             self.assertIsNone(runner._ssh_fs)
 
-            runner._launch()
+            self.launch(runner)
 
             self.assertIsNone(runner._ssh_fs)
 
@@ -4451,7 +4465,7 @@ class MasterPrivateIPTestCase(MockBoto3TestCase):
             # no cluster yet
             self.assertRaises(AssertionError, runner._master_private_ip)
 
-            runner._launch()
+            self.launch(runner)
 
             self.assertIsNone(runner._master_private_ip())
 
@@ -4482,7 +4496,7 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             cluster_id = runner.get_cluster_id()
 
@@ -4785,7 +4799,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
@@ -4795,7 +4809,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4812,7 +4826,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4831,7 +4845,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4845,7 +4859,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4861,7 +4875,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4874,7 +4888,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4888,7 +4902,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
@@ -4904,7 +4918,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
@@ -4920,7 +4934,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4946,7 +4960,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4968,7 +4982,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNotNone(message)
@@ -4994,7 +5008,7 @@ class TestClusterSparkSupportWarning(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
 
             message = runner._cluster_spark_support_warning()
             self.assertIsNone(message)
@@ -5135,7 +5149,7 @@ class LogProgressTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
             self.log.info.reset_mock()
 
             runner._log_step_progress()
@@ -5216,7 +5230,7 @@ class ProgressHtmlFromTunnelTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
             if ssh_tunnel:
                 runner._ssh_tunnel_url = self.MOCK_TUNNEL_URL
 
@@ -5288,7 +5302,7 @@ class ProgressHtmlOverSshTestCase(MockBoto3TestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
-            runner._launch()
+            self.launch(runner)
             return runner._progress_html_over_ssh()
 
     def test_default(self):
@@ -5435,3 +5449,28 @@ class CheckClusterEveryTestCase(MockBoto3TestCase):
 
         with job.make_runner() as runner:
             runner.run()
+
+
+class EMRInputManifestTestCase(InlineInputManifestTestCase, MockBoto3TestCase):
+
+    RUNNER = 'emr'
+
+    def test_input_manifest(self):
+        p = JSONProtocol()
+
+        output_lines = [p.write(k, v) + b'\n'
+                        for k, v in self.EXPECTED_OUTPUT.items()]
+        self.mock_emr_output = {('j-MOCKCLUSTER0', 1): output_lines}
+
+        super(EMRInputManifestTestCase, self).test_input_manifest()
+
+        cluster = self.mock_emr_clusters['j-MOCKCLUSTER0']
+        first_step_cmd = cmd_line(cluster['_Steps'][0]['Config']['Args'])
+
+        # verify that the correct input format was set
+        self.assertIn(
+            '-inputformat org.apache.hadoop.mapred.lib.NLineInputFormat',
+            first_step_cmd)
+
+        # verify that the input manfiest was used
+        self.assertIn('input-manifest.txt', first_step_cmd)

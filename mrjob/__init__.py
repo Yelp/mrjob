@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Copyright 2009-2017 Yelp and Contributors
+# Copyright 2009-2018 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -44,6 +44,7 @@ __credits__ = [
     'Tomer Elmalem <telmalem@gmail.com>',
     'Pedro Emanuel de Castro Faria Salgado <steenzout@ymail.com>',
     'Buck Evan <buck@yelp.com>',
+    'Cesar Gonzalez Fernandez <cesar.gon.fer@gmail.com>',
     'Dan Frank <danielhfrank@gmail.com>',
     'Sudarshan Gaikaiwari <sudarshan@acm.org>',
     'Alex Gaynor <alex.gaynor@gmail.com>',
@@ -121,9 +122,10 @@ __credits__ = [
     'William Vambenepe <vbp@google.com>',
     'Daniel Vetter <lord_fright@yahoo.com>',
     'Paul Wais <pwais@yelp.com>',
+    'Qiu Wei <qiuwei.cw@alibaba-inc.com>',
     'Derek Wilson <jderekwilson@gmail.com>',
     'Tao Yu <taoyu@yelp.com>',
     'Andrea Zonca <andrea.zonca@gmail.com>',
 ]
 
-__version__ = '0.6.2.dev0'
+__version__ = '0.6.3.dev0'

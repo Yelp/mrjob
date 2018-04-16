@@ -237,10 +237,16 @@ class MRJobLauncher(object):
                 log.error(str(e))
                 sys.exit(1)
 
-            if not self.options.no_output:
+            if self._should_cat_output():
                 for chunk in runner.cat_output():
                     self.stdout.write(chunk)
                 self.stdout.flush()
+
+    def _should_cat_output(self):
+        if self.options.cat_output is None:
+            return not self.options.output_dir
+        else:
+            return self.options.cat_output
 
     ### Command-line arguments ###
 
@@ -258,14 +264,6 @@ class MRJobLauncher(object):
                 self.pass_arg_through(...)
                 ...
         """
-        self.arg_parser.add_argument(
-            '-h', '--help', dest='help', action='store_true',
-            help='show this message and exit')
-
-        self.arg_parser.add_argument(
-            '--deprecated', dest='deprecated', action='store_true',
-            help='include help for deprecated options')
-
         # if script path isn't set, expect it on the command line
         if self._FIRST_ARG_IS_SCRIPT_PATH:
             self.arg_parser.add_argument(

@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2016 Yelp and Contributors
 # Copyright 2017 Yelp
+# Copyright 2018 Yelp, Google, Inc., and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -265,10 +266,7 @@ _STEP_OPTS = dict(
 )
 
 # don't show these unless someone types --help --deprecated
-_DEPRECATED_NON_RUNNER_OPTS = set([
-    'deprecated',
-])
-
+_DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
 
 ### runner opts ###
 
@@ -602,13 +600,6 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    gcp_project=dict(
-        switches=[
-            (['--gcp-project'], dict(
-                help='Project to run Dataproc jobs in'
-            )),
-        ],
-    ),
     hadoop_bin=dict(
         combiner=combine_cmds,
         switches=[
@@ -845,6 +836,15 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    num_cores=dict(
+        cloud_role='launch',
+        switches=[
+            (['--num-cores'], dict(
+                help='Total number of core to use while running in local mode',
+                type=int,
+            )),
+        ],
+    ),
     owner=dict(
         cloud_role='launch',
         switches=[
@@ -882,6 +882,15 @@ _RUNNER_OPTS = dict(
                       ' if a job finishes, run job on its cluster. Otherwise'
                       " create a new one. (0, the default, means don't wait)"),
                 type=int,
+            )),
+        ],
+    ),
+    project_id=dict(
+        deprecated_aliases=['gcp_project'],
+        switches=[
+            (['--project-id'], dict(
+                deprecated_aliases=['--gcp-project'],
+                help='Project to run Dataproc jobs in'
             )),
         ],
     ),
@@ -1272,11 +1281,23 @@ def _add_basic_args(parser):
         action='store_true', help='print more messages to stderr')
 
 
-def _add_job_args(parser):
+def _add_job_args(parser, include_deprecated=True):
+
     parser.add_argument(
-        '--no-output', dest='no_output',
+        '--cat-output', dest='cat_output',
         default=None, action='store_true',
-        help="Don't stream output after job completion")
+        help="Stream job output to stdout")
+
+    parser.add_argument(
+        '--no-cat-output', dest='cat_output',
+        default=None, action='store_false',
+        help="Don't stream job output to stdout")
+
+    if include_deprecated:
+        parser.add_argument(
+            '--no-output', dest='cat_output',
+            default=None, action='store_false',
+            help='Deprecated alias for --no-cat-output')
 
     parser.add_argument(
         '-o', '--output-dir', dest='output_dir', default=None,
@@ -1295,6 +1316,15 @@ def _add_job_args(parser):
         help=('A directory to store output from job steps other than'
               ' the last one. Useful for debugging. Currently'
               ' ignored by local runners.'))
+
+    if include_deprecated:
+        parser.add_argument(
+            '--deprecated', dest='deprecated', action='store_true',
+            help='include help for deprecated options')
+
+    parser.add_argument(
+        '-h', '--help', dest='help', action='store_true',
+        help='show this message and exit')
 
 
 def _add_step_args(parser):
@@ -1330,20 +1360,36 @@ def _print_basic_help(option_parser, usage, include_deprecated=False):
     """
     help_parser = ArgumentParser(usage=usage, add_help=False)
 
+    _add_basic_args(help_parser)
+    _add_job_args(help_parser, include_deprecated=include_deprecated)
+
+    basic_dests = {action.dest for action in help_parser._actions}
+
+    # add other custom args added by the user
     for action in option_parser._actions:
+        # option_parser already includes deprecated option dests
+
+        # this excludes deprecated switch aliases (e.g. --no-output)
+        if action.dest in basic_dests:
+            continue
+
+        # this excludes the --deprecated switch (which is explained below)
+        if action.dest in _DEPRECATED_NON_RUNNER_OPTS:
+            continue
+
+        # this excludes options that are shown with --help -r <runner>
         if action.dest in _RUNNER_OPTS:
             continue
 
+        # this excludes options that are show with --help --steps
         if action.dest in _STEP_OPTS:
             continue
 
-        if (action.dest in _DEPRECATED_NON_RUNNER_OPTS and
-                not include_deprecated):
-            continue
-
+        # this excludes the ARGS option, which is already covered by usage
         if not action.option_strings:
             continue
 
+        # found a custom option. thanks, library user!
         help_parser._add_action(action)
 
     help_parser.print_help()

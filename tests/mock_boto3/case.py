@@ -173,6 +173,11 @@ class MockBoto3TestCase(SandboxedTestCase):
 
         return mr_job.make_runner()
 
+    def launch(self, runner):
+        """Launch a job but don't wait for it to finish."""
+        runner._add_input_files_for_upload()
+        runner._launch()
+
     def run_and_get_cluster(self, *args):
         # TODO: not sure why we include -v
         with self.make_runner('-v', *args) as runner:

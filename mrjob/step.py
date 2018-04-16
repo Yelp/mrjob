@@ -23,7 +23,7 @@ STEP_TYPES = ('jar', 'spark', 'spark_jar', 'spark_script', 'streaming')
 
 # Function names mapping to mapper, reducer, and combiner operations
 _MAPPER_FUNCS = ('mapper', 'mapper_init', 'mapper_final', 'mapper_cmd',
-                 'mapper_pre_filter')
+                 'mapper_pre_filter', 'mapper_raw')
 _COMBINER_FUNCS = ('combiner', 'combiner_init', 'combiner_final',
                    'combiner_cmd', 'combiner_pre_filter')
 _REDUCER_FUNCS = ('reducer', 'reducer_init', 'reducer_final', 'reducer_cmd',
@@ -119,42 +119,22 @@ class StepFailedException(Exception):
 
 
 class MRStep(object):
+    # this docstring excludes mapper_cmd, etc.
     """Represents steps handled by the script containing your job.
 
     Used by :py:meth:`MRJob.steps <mrjob.job.MRJob.steps>`.
     See :ref:`writing-multi-step-jobs` for sample usage.
 
-    Accepts the following keyword arguments:
+    Takes the following keyword arguments: `combiner`, `combiner_cmd`,
+    `combiner_final`, `combiner_init`, `combiner_pre_filter`, `mapper`,
+    `mapper_cmd`, `mapper_final`, `mapper_init`, `mapper_pre_filter`,
+    `mapper_raw`, `reducer`, `reducer_cmd`, `reducer_final`, `reducer_init`,
+    `reducer_pre_filter`. These should be set to ``None`` or a function
+    with the same signature as the corresponding method in
+    :py:class:`~mrjob.job.MRJob`.
 
-    :param mapper: function with same function signature as
-                   :py:meth:`~mrjob.job.MRJob.mapper`, or ``None`` for an
-                   identity mapper.
-    :param reducer: function with same function signature as
-                    :py:meth:`~mrjob.job.MRJob.reducer`, or ``None`` for no
-                    reducer.
-    :param combiner: function with same function signature as
-                     :py:meth:`~mrjob.job.MRJob.combiner`, or ``None`` for no
-                     combiner.
-    :param mapper_init: function with same function signature as
-                        :py:meth:`~mrjob.job.MRJob.mapper_init`, or ``None``
-                        for no initial mapper action.
-    :param mapper_final: function with same function signature as
-                         :py:meth:`~mrjob.job.MRJob.mapper_final`, or ``None``
-                         for no final mapper action.
-    :param reducer_init: function with same function signature as
-                         :py:meth:`~mrjob.job.MRJob.reducer_init`, or ``None``
-                         for no initial reducer action.
-    :param reducer_final: function with same function signature as
-                          :py:meth:`~mrjob.job.MRJob.reducer_final`, or
-                          ``None`` for no final reducer action.
-    :param combiner_init: function with same function signature as
-                          :py:meth:`~mrjob.job.MRJob.combiner_init`, or
-                          ``None`` for no initial combiner action.
-    :param combiner_final: function with same function signature as
-                           :py:meth:`~mrjob.job.MRJob.combiner_final`, or
-                           ``None`` for no final combiner action.
-    :param jobconf: dictionary with custom jobconf arguments to pass to
-                    hadoop.
+    Also accepts `jobconf`, a dictionary with custom jobconf arguments to pass
+    to hadoop.
     """
     def __init__(self, **kwargs):
         # limit which keyword args can be specified
@@ -182,18 +162,17 @@ class MRStep(object):
 
         steps.update(kwargs)
 
-        def _prefix_set(prefix):
-            return set(k for k in steps if k.startswith(prefix) and steps[k])
+        def _check_conflict(func, other_funcs):
+            if steps[func]:
+                for other_func in other_funcs:
+                    if steps[other_func] and other_func != func:
+                        raise ValueError("Can't specify both %s and %s" % (
+                            func, other_func))
 
-        def _check_cmd(cmd, prefix_set):
-            if len(prefix_set) > 1 and cmd in prefix_set:
-                prefix_set.remove(cmd)
-                raise ValueError("Can't specify both %s and %s" % (
-                    cmd, prefix_set))
-
-        _check_cmd('mapper_cmd', _prefix_set('mapper'))
-        _check_cmd('combiner_cmd', _prefix_set('combiner'))
-        _check_cmd('reducer_cmd', _prefix_set('reducer'))
+        _check_conflict('mapper_cmd', _MAPPER_FUNCS)
+        _check_conflict('mapper_raw', ('mapper', 'mapper_pre_filter'))
+        _check_conflict('combiner_cmd', _COMBINER_FUNCS)
+        _check_conflict('reducer_cmd', _REDUCER_FUNCS)
 
         self._steps = steps
 
@@ -225,7 +204,7 @@ class MRStep(object):
             return _IDENTITY_REDUCER
         return self._steps[key]
 
-    def _render_substep(self, cmd_key, pre_filter_key=None):
+    def _render_substep(self, cmd_key, pre_filter_key):
         if self._steps[cmd_key]:
             cmd = self._steps[cmd_key]
             if not isinstance(cmd, string_types):
@@ -287,7 +266,7 @@ class MRStep(object):
 
         See :ref:`steps-format` for examples.
         """
-        substep_descs = {'type': 'streaming'}
+        desc = {'type': 'streaming'}
         # Use a mapper if:
         #   - the user writes one
         #   - it is the first step and we don't want to mess up protocols
@@ -295,15 +274,18 @@ class MRStep(object):
         if (step_num == 0 or
                 self.has_explicit_mapper or
                 self.has_explicit_combiner):
-            substep_descs['mapper'] = self.render_mapper()
+            desc['mapper'] = self.render_mapper()
         if self.has_explicit_combiner:
-            substep_descs['combiner'] = self.render_combiner()
+            desc['combiner'] = self.render_combiner()
         if self.has_explicit_reducer:
-            substep_descs['reducer'] = self.render_reducer()
+            desc['reducer'] = self.render_reducer()
+        if self._steps['mapper_raw']:
+            desc['input_manifest'] = True
         # TODO: verify this is a dict, convert booleans to strings
         if self._steps['jobconf']:
-            substep_descs['jobconf'] = self._steps['jobconf']
-        return substep_descs
+            desc['jobconf'] = self._steps['jobconf']
+
+        return desc
 
 
 class _Step(object):

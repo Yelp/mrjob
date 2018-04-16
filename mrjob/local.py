@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2013 Yelp and Contributors
 # Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -98,7 +99,7 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
 
     def _run_multiple(self, funcs, num_processes=None):
         """Use multiprocessing to run in parallel."""
-        pool = Pool(processes=num_processes)
+        pool = Pool(processes=self._opts['num_cores'])
 
         try:
             results = [

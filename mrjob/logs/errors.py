@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2016 Yelp
+# Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,7 +18,6 @@ import json
 
 from mrjob.util import unique
 from .ids import _time_sort_key
-
 
 
 def _pick_error(log_interpretation):
@@ -42,7 +42,7 @@ def _pick_errors(log_interpretation):
                 yield error
 
     attempt_to_container_id = log_interpretation.get('history', {}).get(
-            'attempt_to_container_id', {})
+        'attempt_to_container_id', {})
 
     return _merge_and_sort_errors(yield_errors(), attempt_to_container_id)
 

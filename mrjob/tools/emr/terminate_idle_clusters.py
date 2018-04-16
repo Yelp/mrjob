@@ -3,6 +3,7 @@
 # Copyright 2013 Yelp and Contributors
 # Copyright 2014 Brett Gibson
 # Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -152,10 +153,11 @@ def _maybe_terminate_clusters(dry_run=False,
     num_pending = 0
     num_running = 0
 
-    # We don't filter by cluster state because we want this to work even
-    # if Amazon adds another kind of idle state.
+    # include RUNNING to catch clusters with PENDING jobs that
+    # never ran (see #365).
     for cluster_summary in _boto3_paginate(
-            'Clusters', emr_client, 'list_clusters'):
+            'Clusters', emr_client, 'list_clusters',
+            ClusterStates=['WAITING', 'RUNNING']):
 
         cluster_id = cluster_summary['Id']
 

@@ -1,3 +1,32 @@
+v0.6.2, 2018-03-23 -- log parsing at scale
+ * runners:
+   * local runners
+     * added --num-cores option to control parallelism and file splits (#1727)
+   * cloud runners (EMR and Dataproc):
+     * idle timeout script has 10-minute grace period (#1694)
+   * Dataproc:
+     * replaced google-api-python-client with google-cloud-sdk (#1730)
+     * works without gcloud util config installed (#1742)
+       * credentials can be read from $GOOGLE_APPLICATION_CREDENTIALS
+       * or from gcloud util config (if installed)
+     * no longer required to set region or zone (#1732)
+       * auto zone placement (just set region) is enabled
+       * defaults to auto zone placement in us-west1
+       * no longer reads zone or region from gcloud GCE configs
+     * Dataproc Quickstart is now up-to-date (#1589)
+     * api_client attr has been replaced with cluster_client and job_client
+     * GCSFilesystem method changes:
+       * api_client attr has been replaced with client
+       * create_bucket() no longer takes a project ID
+       * delete_bucket() is disabled (use get_bucket(...).delete())
+       * get_bucket() returns a google.cloud.storage.bucket.Bucket
+       * list_buckets() is disabled (use get_all_bucket_names())
+  * EMR:
+    * much faster error log parsing (#1706)
+      * may have to wait for logs to transfer to S3 on some AMIs
+  * tools:
+    * terminate-idle-job-flows is faster and uses less API calls
+
 v0.6.1, 2017-11-27 -- mrjob diagnose
  * fixed serious error log parsing issue (#1708)
  * added mrjob diagnose utility to find why previously run jobs failed (#1707)

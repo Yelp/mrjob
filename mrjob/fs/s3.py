@@ -1,5 +1,6 @@
 # Copyright 2009-2016 Yelp and Contributors
 # Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -204,6 +205,8 @@ class S3Filesystem(Filesystem):
 
     def md5sum(self, path):
         k = self._get_s3_key(path)
+        if not k:
+            raise IOError('Key %r does not exist' % (path,))
         return k.e_tag.strip('"')
 
     def _cat_file(self, filename):

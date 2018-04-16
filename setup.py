@@ -1,5 +1,6 @@
 # Copyright 2009-2015 Yelp and Contributors
 # Copyright 2016-2017 Yelp
+# Copyright 2018 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,41 +23,43 @@ try:
     # arguments that distutils doesn't understand
     setuptools_kwargs = {
         'extras_require': {
-            # highly recommended, but requires a compiler
             'ujson': ['ujson'],
         },
         'install_requires': [
             'boto3>=1.4.6',
             'botocore>=1.6.0',
-            #'google-api-python-client>=1.5.0'  # see below
             'PyYAML>=3.08',
+            'google-api-core>=0.1.2',
+            'google-cloud-storage>=1.6.0',
+            'google-cloud-dataproc',
+            'grpcio>=1.9.1',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
-        'tests_require': ['simplejson'],
+        'tests_require': ['simplejson', 'ujson', 'warcio'],
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # mrjob doesn't actually support Python 3.2, but it tries to support
-    # PyPy3, which is currently Python 3.2 with some key 3.3 features
-    if (hasattr(sys, 'pypy_version_info') and
-            (3, 0) <= sys.version_info < (3, 3)):
-        # httplib2 is a dependency of google-api-python-client, used
-        # to run tests
-        setuptools_kwargs['install_requires'].append('httplib2>=0.8,<1')
-    elif sys.version_info < (2, 7):
-        setuptools_kwargs['install_requires'].append(
-            'google-api-python-client==1.5.0')
-    else:
-        setuptools_kwargs['install_requires'].append(
-            'google-api-python-client>=1.5.0')
+    # grpcio 1.11.0 seems not to compile with PyPy
+    if hasattr(sys, 'pypy_version_info'):
+        setuptools_kwargs['install_requires'] = [
+            x + ',<=1.10.0' if x.startswith('grpcio') else x
+            for x in setuptools_kwargs['install_requires']
+        ]
 
+    # rapidjson exists on Python 3 only
     if sys.version_info >= (3, 0):
         setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
+        setuptools_kwargs['tests_require'].append('rapidjson')
 
     # mock is included in Python 3.3 as unittest.mock
     if sys.version_info < (3, 3):
         setuptools_kwargs['tests_require'].append('mock')
+
+    # grpc requires enum, which is a builtin starting in Python 3.4
+    if sys.version_info >= (3, 0) and sys.version_info < (3, 4):
+        setuptools_kwargs['install_requires'].append('enum34')
+
 
 except ImportError:
     from distutils.core import setup

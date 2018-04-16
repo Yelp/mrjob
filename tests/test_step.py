@@ -36,6 +36,10 @@ def identity_reducer(k, vals):
         yield k, v
 
 
+def null_mapper_raw(input_path, input_uri):
+    pass
+
+
 def spark_func(input_path, output_path):
     pass
 
@@ -216,6 +220,11 @@ class MRStepInitTestCase(TestCase):
     def test_explicit_reducer_pre_filter(self):
         self._test_explicit(reducer_pre_filter='cat', r=True)
 
+    # raw
+
+    def test_explict_mapper_raw(self):
+        self._test_explicit(mapper_raw=null_mapper_raw, m=True)
+
     ### Conflicts ###
 
     def _test_conflict(self, **kwargs):
@@ -223,6 +232,13 @@ class MRStepInitTestCase(TestCase):
 
     def test_conflict_mapper(self):
         self._test_conflict(mapper_cmd='cat', mapper=identity_mapper)
+
+    def test_conflict_mapper_raw_and_mapper(self):
+        self._test_conflict(mapper=identity_mapper, mapper_raw=null_mapper_raw)
+
+    def test_conflict_mapper_raw_and_pre_filter(self):
+        self._test_conflict(mapper_pre_filter='cat',
+                            mapper_raw=null_mapper_raw)
 
     def test_conflict_combiner(self):
         self._test_conflict(combiner_cmd='cat', combiner=identity_reducer)

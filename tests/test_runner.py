@@ -917,5 +917,3 @@ class InputManifestTestCase(SandboxedTestCase):
 
         with job.make_runner() as runner:
             self.assertRaises(ValueError, runner._get_steps)
-
-    def test

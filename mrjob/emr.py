@@ -2348,19 +2348,11 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         out.append('  cd %s' % pipes.quote(working_dir))
         out.append('')
 
-        # download files
-        if self._opts['release_label']:
-            # on the 4.x AMIs, hadoop isn't yet installed, so use AWS CLI
-            cp_to_local = 'aws s3 cp'
-        else:
-            # on the 2.x and 3.x AMIs, use hadoop
-            cp_to_local = 'hadoop fs -copyToLocal'
-
         for name, path in sorted(
                 self._master_node_setup_mgr.name_to_path('file').items()):
             uri = self._upload_mgr.uri(path)
             out.append('  %s %s %s' % (
-                cp_to_local, pipes.quote(uri), pipes.quote(name)))
+                self._cp_to_local_cmd(), pipes.quote(uri), pipes.quote(name)))
             # imitate Hadoop Distributed Cache
             out.append('  chmod u+rx %s' % pipes.quote(name))
 

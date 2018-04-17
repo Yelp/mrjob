@@ -271,6 +271,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._image_version = None
         self._hadoop_version = None
 
+        # map driver_output_resource_uri to a dict with the keys:
+        # uri: uri of file we're reading from
+        # pos: position in file
+        # buffer: bytes read from file already
+        self._driver_output_state = {}
+
         # This will be filled by _run_steps()
         # NOTE - log_interpretations will be empty except job_id until we
         # parse task logs
@@ -733,6 +739,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         log_interpretation = dict(job_id=job_id)
         self._log_interpretations.append(log_interpretation)
 
+        step_interpretation = {}
+        log_interpretation['step'] = step_interpretation
+
         while True:
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus  # noqa
             job = self._get_job(job_id)
@@ -741,6 +750,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
             log.info('%s => %s' % (job_id, job_state))
 
+            # process as much of driver output as is available
+            # look at how hadoop.py uses
+            # _interpret_hadoop_jar_command_stderr()
+
+            # state:
+            # driveroutput URI
+            # current file
+            # unparsed data (partial lines)
+
+
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State  # noqa
             # these are the states covered by the ACTIVE job state matcher,
             # plus SETUP_DONE
@@ -748,6 +767,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                              'CANCEL_PENDING', 'SETUP_DONE'):
                 self._wait_for_api('job completion')
                 continue
+
+            # process as much of driver output as is available, add to
+            # log interpretation
 
             # we're done, will return at the end of this
             elif job_state == 'DONE':

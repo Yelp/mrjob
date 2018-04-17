@@ -66,6 +66,12 @@ _SUBMITTED_APPLICATION_RE = re.compile(
 _RUNNING_JOB_RE = re.compile(
     r'^Running job: (?P<job_id>job_\d+_\d{4})\s*$')
 
+# job progress (YARN)
+# no need to make this work for pre-YARN, only Dataproc runner uses it
+_JOB_PROGRESS_RE = re.compile(
+    r'^\s*map\s+(?P<map>\d+)%\s+reduce\s+(?P<reduce>\d+)%\s*$')
+
+
 # YARN prints this (sometimes followed by a Java exception) when tasks fail
 _TASK_ATTEMPT_FAILED_RE = re.compile(
     r'^Task Id *:'
@@ -254,14 +260,14 @@ def _parse_step_syslog(lines):
         _parse_hadoop_log4j_records(lines))
 
 
-def _parse_step_syslog_from_log4j_records(records):
+def _parse_step_syslog_from_log4j_records(records, step_interpretation=None):
     """Pulls errors, counters, IDs, etc. from log4j records
     emitted by Hadoop.
 
     This powers :py:func:`_parse_step_syslog` and
     :py:func:`_interpret_hadoop_jar_command_stderr`.
     """
-    result = {}
+    result = step_interpretation or {}
 
     for record in records:
         message = record['message']
@@ -289,6 +295,15 @@ def _parse_step_syslog_from_log4j_records(records):
         if m:
             result['job_id'] = m.group('job_id')
             continue
+
+        # progress
+        m = _JOB_PROGRESS_RE.match(message)
+        if m:
+            result['progress'] = dict(
+                map=int(m.group('map'),
+                reduce=int(m.group('reduce'),
+                message=message,
+            )
 
         # task failure
         m = _TASK_ATTEMPT_FAILED_RE.match(message)

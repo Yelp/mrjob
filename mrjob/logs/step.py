@@ -176,6 +176,14 @@ def _interpret_emr_step_syslog(fs, matches):
     return result
 
 
+def _interpret_new_dataproc_step_stderr(step_interpretation, new_lines):
+    """Incrementally update *step_interpretation* (a dict) with information
+    from new lines read from Hadoop job driver output on Dataproc."""
+    return _parse_step_syslog_from_log4j_records(
+        _parse_hadoop_log4j_records(new_lines),
+        step_interpretation)
+
+
 def _interpret_emr_step_stderr(fs, matches):
     """Extract information from step stderr (see
     :py:func:`~mrjob.logs.task._parse_task_stderr()`),
@@ -300,8 +308,8 @@ def _parse_step_syslog_from_log4j_records(records, step_interpretation=None):
         m = _JOB_PROGRESS_RE.match(message)
         if m:
             result['progress'] = dict(
-                map=int(m.group('map'),
-                reduce=int(m.group('reduce'),
+                map=int(m.group('map')),
+                reduce=int(m.group('reduce')),
                 message=message,
             )
 

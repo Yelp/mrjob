@@ -772,11 +772,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 self._wait_for_api('job completion')
                 continue
 
-            # we're done, will return at the end of this
-            elif job_state == 'DONE':
-                break
+            # print counters if job wasn't CANCELLED
+            if job_state != 'CANCELLED':
+                self._log_counters(log_interpretation, step_num)
 
-            raise StepFailedException(step_num=step_num, num_steps=num_steps)
+            # we're done, will return at the end of this
+            if job_state == 'DONE':
+                break
+            else:
+                raise StepFailedException(
+                    step_num=step_num, num_steps=num_steps)
 
     def _default_step_output_dir(self):
         # put intermediate data in HDFS

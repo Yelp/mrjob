@@ -41,6 +41,7 @@ from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
+from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_new_dataproc_step_stderr
 from mrjob.py2 import PY2
 from mrjob.py2 import to_unicode
@@ -177,7 +178,7 @@ class DataprocException(Exception):
     pass
 
 
-class DataprocJobRunner(HadoopInTheCloudJobRunner):
+class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Google Cloud Dataproc.
     Invoked when you run your job with ``-r dataproc``.
 
@@ -788,8 +789,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         return 'hdfs:///tmp/mrjob/%s/step-output' % self._job_key
 
     def _update_step_interpretation(
-            self, driver_output_uri, step_interpretation):
-
+            self, step_interpretation, driver_output_uri):
         new_lines = self._get_new_driver_output_lines(driver_output_uri)
         _interpret_new_dataproc_step_stderr(step_interpretation, new_lines)
 
@@ -819,7 +819,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 state['log_uri'] = log_uri
 
             log_blob = self.fs._get_blob(log_uri)
-            new_data = log_blob.download_as_string(start=state['pos'])
+            # TODO: use start= kwarg once google-cloud-storage 1.9 is out
+            new_data = log_blob.download_as_string()[state['pos']:]
 
             state['buffer'] += new_data
             state['pos'] += len(new_data)

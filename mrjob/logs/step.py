@@ -275,7 +275,10 @@ def _parse_step_syslog_from_log4j_records(records, step_interpretation=None):
     This powers :py:func:`_parse_step_syslog` and
     :py:func:`_interpret_hadoop_jar_command_stderr`.
     """
-    result = step_interpretation or {}
+    if step_interpretation is None:
+        result = {}
+    else:
+        result = step_interpretation
 
     for record in records:
         message = record['message']

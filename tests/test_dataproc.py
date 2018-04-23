@@ -1093,3 +1093,82 @@ class BootstrapPythonTestCase(MockGoogleTestCase):
             self.assertEqual(
                 runner._bootstrap,
                 self.EXPECTED_BOOTSTRAP + [['true']])
+
+
+class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
+    # test line parsing logic
+
+    URI = ('gs://mock-bucket/google-cloud-dataproc-metainfo/mock-cluster-id'
+           '/jobs/mock-job-name/driveroutput')
+
+    def setUp(self):
+        super(GetNewDriverOutputLinesTestCase, self).setUp()
+        self.runner = DataprocJobRunner()
+        self.fs = self.runner.fs
+
+    def append_data(self, uri, new_data):
+        old_data = b''.join(self.fs.cat(uri))
+        self.put_gcs_multi({uri: old_data + new_data})
+
+    def get_new_lines(self):
+        return self.runner._get_new_driver_output_lines(self.URI)
+
+    def test_no_log_files(self):
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_return_new_lines_as_available(self):
+        log_uri = self.URI + '.000000000'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'log line\nanother log line\n')
+
+        self.assertEqual(self.get_new_lines(),
+                         ['log line\n', 'another log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'third log line\n')
+
+        self.assertEqual(self.get_new_lines(), ['third log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_partial_lines(self):
+        # probably lines are going to be added atomically, but just in case
+
+        log_uri = self.URI + '.000000000'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'log line\nanother lo')
+
+        self.assertEqual(self.get_new_lines(), ['log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'g line\na thir')
+
+        self.assertEqual(self.get_new_lines(), ['another log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'd log line\n')
+
+    def test_iterating_through_log_files(self):
+        log0_uri = self.URI + '.000000000'
+        log1_uri = self.URI + '.000000001'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log0_uri, b'log line\n')
+
+        self.assertEqual(self.get_new_lines(), ['log line\n'])
+
+        self.append_data(log0_uri, b'another log line\n')
+        self.append_data(log1_uri, b'a third log line\n')
+
+        self.assertEqual(self.get_new_lines(),
+                         ['another log line\n', 'a third log line\n'])
+
+        # this shouldn't actually happen
+        self.append_data(log0_uri, b'Hey where did THIS come from???\n')
+
+        # because we've moved beyond log0
+        self.assertEqual(self.get_new_lines(), [])

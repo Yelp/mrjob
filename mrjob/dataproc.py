@@ -763,7 +763,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                                                  driver_output_uri)
 
             if step_interpretation.get('progress'):
-                log.info(step_interpretation['progress']['message'])
+                log.info(' ' + step_interpretation['progress']['message'])
 
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State  # noqa
             # these are the states covered by the ACTIVE job state matcher,

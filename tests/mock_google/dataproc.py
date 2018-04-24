@@ -28,6 +28,7 @@ from google.cloud.dataproc_v1.types import JobStatus
 from mrjob.dataproc import _STATE_MATCHER_ACTIVE
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _job_state_name
+from mrjob.util import random_identifier
 
 
 # convert strings (e.g. 'RUNNING') to enum values
@@ -250,6 +251,12 @@ class MockGoogleDataprocJobClient(MockGoogleDataprocClient):
             mock_job.status.state = _job_state_value('PENDING')
         elif state == 'PENDING':
             mock_job.status.state = _job_state_value('RUNNING')
+            # for now now, we just need this to be set
+            mock_job.driver_output_resource_uri = (
+                'gs://mock-bucket-%s/google-cloud-dataproc-metainfo/'
+                'mock-cluster-id-%s/jobs/mock-job-%s/driveroutput' % (
+                    random_identifier(), random_identifier(),
+                    random_identifier()))
         elif state == 'RUNNING':
             if self.mock_jobs_succeed:
                 mock_job.status.state = _job_state_value('DONE')

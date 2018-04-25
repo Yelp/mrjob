@@ -30,6 +30,7 @@ though the mixin doesn't care how or where you store them.
 from logging import getLogger
 
 from mrjob.compat import uses_yarn
+from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _pick_error
 from mrjob.logs.errors import _pick_error_attempt_ids
@@ -240,3 +241,15 @@ class LogInterpretationMixin(object):
 
         for match in matches:
             yield match
+
+    def _log_counters(self, log_interpretation, step_num):
+        """Utility for logging counters (if any) for a step."""
+        step_type = self._get_step(step_num)['type']
+
+        if not _is_spark_step_type(step_type):
+            counters = self._pick_counters(
+                log_interpretation, step_type)
+            if counters:
+                log.info(_format_counters(counters))
+            else:
+                log.warning('No counters found')

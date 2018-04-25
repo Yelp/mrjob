@@ -17,6 +17,7 @@
 import logging
 import time
 import re
+from io import BytesIO
 from os import environ
 from os.path import dirname
 from os.path import join
@@ -40,7 +41,10 @@ from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
+from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.step import _interpret_new_dataproc_step_stderr
 from mrjob.py2 import PY2
+from mrjob.py2 import to_unicode
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
 from mrjob.util import random_identifier
@@ -174,7 +178,7 @@ class DataprocException(Exception):
     pass
 
 
-class DataprocJobRunner(HadoopInTheCloudJobRunner):
+class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Google Cloud Dataproc.
     Invoked when you run your job with ``-r dataproc``.
 
@@ -270,6 +274,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # init hadoop, ami version caches
         self._image_version = None
         self._hadoop_version = None
+
+        # map driver_output_uri to a dict with the keys:
+        # log_uri: uri of file we're reading from
+        # pos: position in file
+        # buffer: bytes read from file already
+        self._driver_output_state = {}
 
         # This will be filled by _run_steps()
         # NOTE - log_interpretations will be empty except job_id until we
@@ -514,6 +524,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._wait_for_fs_sync()
 
     ### Running the job ###
+
     def cleanup(self, mode=None):
         super(DataprocJobRunner, self).cleanup(mode=mode)
 
@@ -733,13 +744,26 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         log_interpretation = dict(job_id=job_id)
         self._log_interpretations.append(log_interpretation)
 
+        step_interpretation = {}
+        log_interpretation['step'] = step_interpretation
+
         while True:
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus  # noqa
             job = self._get_job(job_id)
 
             job_state = job.status.State.Name(job.status.state)
 
+            driver_output_uri = job.driver_output_resource_uri
+
             log.info('%s => %s' % (job_id, job_state))
+
+            # interpret driver output so far
+            if driver_output_uri:
+                self._update_step_interpretation(step_interpretation,
+                                                 driver_output_uri)
+
+            if step_interpretation.get('progress'):
+                log.info(' ' + step_interpretation['progress']['message'])
 
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State  # noqa
             # these are the states covered by the ACTIVE job state matcher,
@@ -749,15 +773,72 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 self._wait_for_api('job completion')
                 continue
 
-            # we're done, will return at the end of this
-            elif job_state == 'DONE':
-                break
+            # print counters if job wasn't CANCELLED
+            if job_state != 'CANCELLED':
+                self._log_counters(log_interpretation, step_num)
 
-            raise StepFailedException(step_num=step_num, num_steps=num_steps)
+            # we're done, will return at the end of this
+            if job_state == 'DONE':
+                break
+            else:
+                raise StepFailedException(
+                    step_num=step_num, num_steps=num_steps)
 
     def _default_step_output_dir(self):
         # put intermediate data in HDFS
         return 'hdfs:///tmp/mrjob/%s/step-output' % self._job_key
+
+    def _update_step_interpretation(
+            self, step_interpretation, driver_output_uri):
+        new_lines = self._get_new_driver_output_lines(driver_output_uri)
+        _interpret_new_dataproc_step_stderr(step_interpretation, new_lines)
+
+    def _get_new_driver_output_lines(self, driver_output_uri):
+        """Get a list of complete job driver output lines that are
+        new since the last time we checked.
+        """
+        state = self._driver_output_state.setdefault(
+            driver_output_uri,
+            dict(log_uri=None, pos=0, buffer=b''))
+
+        # driver output is in logs with names like driveroutput.000000000
+        log_uris = sorted(self.fs.ls(driver_output_uri + '*'))
+
+        for log_uri in log_uris:
+            # initialize log_uri with first URI we see
+            if state['log_uri'] is None:
+                state['log_uri'] = log_uri
+
+            # skip log files already parsed
+            if log_uri < state['log_uri']:
+                continue
+
+            # when parsing the next file, reset *pos*
+            elif log_uri > state['log_uri']:
+                state['pos'] = 0
+                state['log_uri'] = log_uri
+
+            log_blob = self.fs._get_blob(log_uri)
+            # TODO: use start= kwarg once google-cloud-storage 1.9 is out
+            new_data = log_blob.download_as_string()[state['pos']:]
+
+            state['buffer'] += new_data
+            state['pos'] += len(new_data)
+
+        # convert buffer into lines, saving leftovers for next time
+        stream = BytesIO(state['buffer'])
+        state['buffer'] = b''
+
+        lines = []
+
+        for line_bytes in stream:
+            if line_bytes.endswith(b'\n'):
+                lines.append(to_unicode(line_bytes))
+            else:
+                # leave final partial line (if any) in buffer
+                state['buffer'] = line_bytes
+
+        return lines
 
     def counters(self):
         # TODO - mtai @ davidmarin - Counters are currently always empty as we

@@ -73,7 +73,6 @@ from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.bootstrap import _check_for_nonzero_return_code
 from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
 from mrjob.logs.bootstrap import _ls_emr_bootstrap_stderr_logs
-from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
@@ -1770,14 +1769,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters. (Except for master node setup
             # and Spark, which has no counters.)
-            if step['Status']['State'] != 'CANCELLED':
-                if step_num >= 0 and not _is_spark_step_type(step_type):
-                    counters = self._pick_counters(
-                        log_interpretation, step_type)
-                    if counters:
-                        log.info(_format_counters(counters))
-                    else:
-                        log.warning('No counters found')
+            if step['Status']['State'] != 'CANCELLED' and step_num >= 0:
+                self._log_counters(log_interpretation, step_num)
 
             if step['Status']['State'] == 'COMPLETED':
                 return

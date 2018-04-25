@@ -33,7 +33,6 @@ from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.hadoop import HadoopFilesystem
 from mrjob.fs.local import LocalFilesystem
-from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
@@ -461,14 +460,9 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
 
             log_interpretation['step'] = step_interpretation
 
-            step_type = step['type']
+            self._log_counters(log_interpretation, step_num)
 
-            if not _is_spark_step_type(step_type):
-                counters = self._pick_counters(log_interpretation, step_type)
-                if counters:
-                    log.info(_format_counters(counters))
-                else:
-                    log.warning('No counters found')
+            step_type = step['type']
 
             if returncode:
                 error = self._pick_error(log_interpretation, step_type)

@@ -44,6 +44,7 @@ from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
 from tests.quiet import logger_disabled
@@ -1093,3 +1094,202 @@ class BootstrapPythonTestCase(MockGoogleTestCase):
             self.assertEqual(
                 runner._bootstrap,
                 self.EXPECTED_BOOTSTRAP + [['true']])
+
+
+class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
+    # test line parsing logic
+
+    URI = ('gs://mock-bucket/google-cloud-dataproc-metainfo/mock-cluster-id'
+           '/jobs/mock-job-name/driveroutput')
+
+    def setUp(self):
+        super(GetNewDriverOutputLinesTestCase, self).setUp()
+        self.runner = DataprocJobRunner()
+        self.fs = self.runner.fs
+
+    def append_data(self, uri, new_data):
+        old_data = b''.join(self.fs.cat(uri))
+        self.put_gcs_multi({uri: old_data + new_data})
+
+    def get_new_lines(self):
+        return self.runner._get_new_driver_output_lines(self.URI)
+
+    def test_no_log_files(self):
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_return_new_lines_as_available(self):
+        log_uri = self.URI + '.000000000'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'log line\nanother log line\n')
+
+        self.assertEqual(self.get_new_lines(),
+                         ['log line\n', 'another log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'third log line\n')
+
+        self.assertEqual(self.get_new_lines(), ['third log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_partial_lines(self):
+        # probably lines are going to be added atomically, but just in case
+
+        log_uri = self.URI + '.000000000'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'log line\nanother lo')
+
+        self.assertEqual(self.get_new_lines(), ['log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'g line\na thir')
+
+        self.assertEqual(self.get_new_lines(), ['another log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'd log line\n')
+
+    def test_iterating_through_log_files(self):
+        log0_uri = self.URI + '.000000000'
+        log1_uri = self.URI + '.000000001'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log0_uri, b'log line\n')
+
+        self.assertEqual(self.get_new_lines(), ['log line\n'])
+
+        self.append_data(log0_uri, b'another log line\n')
+        self.append_data(log1_uri, b'a third log line\n')
+
+        self.assertEqual(self.get_new_lines(),
+                         ['another log line\n', 'a third log line\n'])
+
+        # this shouldn't actually happen
+        self.append_data(log0_uri, b'Hey where did THIS come from???\n')
+
+        # because we've moved beyond log0
+        self.assertEqual(self.get_new_lines(), [])
+
+
+class UpdateStepInterpretationTestCase(MockGoogleTestCase):
+    # make sure we parse status messages, counters, etc. properly
+
+    URI = ('gs://mock-bucket/google-cloud-dataproc-metainfo/mock-cluster-id'
+           '/jobs/mock-job-name/driveroutput')
+
+    def setUp(self):
+        super(UpdateStepInterpretationTestCase, self).setUp()
+        self.runner = DataprocJobRunner()
+        self.get_lines = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._get_new_driver_output_lines',
+            return_value=[]))
+
+        self.step_interpretation = {}
+
+    def update_step_interpretation(self):
+        self.runner._update_step_interpretation(
+            self.step_interpretation, self.URI)
+
+    def test_empty(self):
+        self.update_step_interpretation()
+
+        self.assertEqual(self.step_interpretation, {})
+
+    def test_progress(self):
+        self.get_lines.side_effect = [
+            ['18/04/17 22:03:40 INFO impl.YarnClientImpl: Submitted'
+             ' application application_1524002511355_0001\n'],
+            ['18/04/17 22:03:54 INFO mapreduce.Job:  map 0% reduce 0%\n'],
+            ['18/04/17 22:05:10 INFO mapreduce.Job:  map 52% reduce 0%\n',
+             '18/04/17 22:06:15 INFO mapreduce.Job:  map 100% reduce 0%\n'],
+            ['18/04/17 22:07:32 INFO mapreduce.Job:  map 100% reduce 100%\n'],
+        ]
+
+
+        self.update_step_interpretation()
+        self.assertEqual(self.step_interpretation['application_id'],
+                         'application_1524002511355_0001')
+
+        self.update_step_interpretation()
+        self.assertEqual(self.step_interpretation['progress'],
+                         dict(map=0, reduce=0,
+                              message=' map 0% reduce 0%'))
+
+        # make sure we didn't overwrite application_id
+        self.assertEqual(self.step_interpretation['application_id'],
+                         'application_1524002511355_0001')
+
+        self.update_step_interpretation()
+        self.assertEqual(self.step_interpretation['progress'],
+                         dict(map=100, reduce=0,
+                              message=' map 100% reduce 0%'))
+
+        self.update_step_interpretation()
+        self.assertEqual(self.step_interpretation['progress'],
+                         dict(map=100, reduce=100,
+                              message=' map 100% reduce 100%'))
+
+    def test_counters(self):
+        self.get_lines.return_value = [
+            '18/04/17 22:07:34 INFO mapreduce.Job: Counters: 3\n',
+            '\tFile System Counters\n',
+            '\t\tFILE: Number of bytes read=819\n',
+            '\t\tFILE: Number of bytes written=3698122\n',
+            '\tMap-Reduce Framework\n',
+            '\t\tMap input records=13\n',
+        ]
+
+        self.update_step_interpretation()
+        self.assertEqual(
+            self.step_interpretation['counters'],
+            {
+                'File System Counters': {
+                    'FILE: Number of bytes read': 819,
+                    'FILE: Number of bytes written': 3698122,
+                },
+                'Map-Reduce Framework': {
+                    'Map input records': 13,
+                },
+            },
+        )
+
+
+class ProgressAndCounterLoggingTestCase(MockGoogleTestCase):
+
+    def setUp(self):
+        super(ProgressAndCounterLoggingTestCase, self).setUp()
+
+        self.get_lines = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._get_new_driver_output_lines',
+            return_value=[]))
+
+        self.log = self.start(patch('mrjob.dataproc.log'))
+        self.start(patch('mrjob.logs.mixin.log', self.log))
+
+    def test_log_messages(self):
+        self.get_lines.return_value = [
+            '18/04/17 22:06:15 INFO mapreduce.Job:  map 100% reduce 0%\n',
+            '18/04/17 22:07:34 INFO mapreduce.Job: Counters: 1\n',
+            '\tFile System Counters\n',
+            '\t\tFILE: Number of bytes read=819\n',
+        ]
+
+        mr_job = MRWordCount(['-r', 'dataproc'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+
+        self.assertIn(call('  map 100% reduce 0%'),
+                      self.log.info.call_args_list)
+
+        self.assertIn(
+            call(
+                'Counters: 1\n\tFile System Counters\n\t\tFILE:'
+                ' Number of bytes read=819'),
+            self.log.info.call_args_list)

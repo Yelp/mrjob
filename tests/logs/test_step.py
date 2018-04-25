@@ -68,7 +68,9 @@ PARSED_YARN_STEP_LOG_LINES = dict(
     },
     job_id='job_1449857544442_0002',
     output_dir=('hdfs:///user/root/tmp/mrjob'
-                '/mr_wc.root.20151211.181326.984074/output'))
+                '/mr_wc.root.20151211.181326.984074/output'),
+    progress=dict(map=100, message=' map 100% reduce 100%', reduce=100),
+)
 
 
 # abbreviated version of real output from Hadoop 1.0.3 on EMR AMI 2.4.9
@@ -93,6 +95,7 @@ PARSED_PRE_YARN_STEP_LOG_LINES = dict(
     job_id='job_201512112247_0003',
     output_dir=('hdfs:///user/hadoop/tmp/mrjob'
                 '/mr_wc.hadoop.20151211.230352.433691/output'),
+    progress=dict(map=100, message=' map 100%  reduce 100%', reduce=100),
 )
 
 

@@ -111,6 +111,15 @@ _HADOOP_STREAMING_JAR_URI = (
 
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
+# on Dataproc, the resource manager is always at 8088. Tunnel to the master
+# node's own hostname, not localhost.
+_SSH_TUNNEL_CONFIG = dict(
+    localhost=False,
+    name='resource manager',
+    path='/cluster',
+    port=8088,
+)
+
 
 # convert enum values to strings (e.g. 'RUNNING')
 
@@ -1040,3 +1049,45 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             #('gs://*', 'gsutil cp'),
             ('*://*', 'hadoop fs -copyToLocal'),
         ]
+
+    ### SSH hooks ###
+
+    def _job_tracker_host(self):
+        return '%s-m' % self._cluster_id
+
+    def _ssh_tunnel_config(self):
+        return _SSH_TUNNEL_CONFIG
+
+    def _launch_ssh_proc(self, bind_port):
+        ssh_proc = super(DataprocJobRunner, self)._launch_ssh_proc(bind_port)
+
+        if ssh_proc:
+            # enter an empty passphrase if creating a key for the first time
+            ssh_proc.stdin.write('\n\n')
+
+        return ssh_proc
+
+    def _ssh_launch_wait_secs(self):
+        """Wait 20 seconds because gcloud has to update project metadata
+        (unless we were going to check the cluster sooner anyway)."""
+        return min(20.0, self._opts['check_cluster_every'])
+
+    def _ssh_tunnel_args(self, bind_port):
+        if not self._opts['gcloud_bin']:
+            self._give_up_on_ssh_tunnel = True
+            return None
+
+        if not self._cluster_id:
+            return
+
+        cluster = self._get_cluster(self._cluster_id)
+        zone = cluster.config.gce_cluster_config.split('/')[-1]
+
+        return self._opts['gcloud_bin'] + [
+            'compute', 'ssh',
+            '--zone', zone,
+            self._job_tracker_host(),
+            '--',
+        ] + self._ssh_tunnel_opts()
+
+    # move these to cloud.py

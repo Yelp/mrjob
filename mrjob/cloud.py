@@ -16,7 +16,13 @@
 import logging
 import os
 import pipes
+import socket
+import random
 from os.path import basename
+from signal import SIGKILL
+from subprocess import Popen
+from subprocess import PIPE
+from time import sleep
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.conf import combine_dicts
@@ -26,6 +32,9 @@ from mrjob.util import cmd_line
 from mrjob.util import file_ext
 
 log = logging.getLogger(__name__)
+
+# don't try to bind SSH tunnel to more than this many local ports
+_MAX_SSH_RETRIES = 20
 
 
 # map archive file extensions to the command used to unarchive them
@@ -62,6 +71,9 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'num_core_instances',
         'num_task_instances',
         'region',
+        'ssh_bind_ports',
+        'ssh_tunnel',
+        'ssh_tunnel_is_open',
         'task_instance_type',
         'zone',
     }
@@ -95,12 +107,34 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         # we'll create this script later, as needed
         self._master_bootstrap_script_path = None
 
+        # ssh state
+
+        # the process for the SSH tunnel
+        self._ssh_proc = None
+
+        # if this is true, stop trying to launch the SSH tunnel
+        self._give_up_on_ssh_tunnel = False
+
+        # store the (tunneled) URL of the job tracker/resource manager
+        self._ssh_tunnel_url = None
+
+
+
     ### Options ###
 
     def _default_opts(self):
         return combine_dicts(
             super(HadoopInTheCloudJobRunner, self)._default_opts(),
-            dict(max_mins_idle=_DEFAULT_MAX_MINS_IDLE)
+            dict(
+                max_mins_idle=_DEFAULT_MAX_MINS_IDLE,
+                # don't use a list because it makes it hard to read option
+                # values when running in verbose mode. See #1284
+                ssh_bind_ports=xrange(40001, 40841),
+                ssh_tunnel=False,
+                ssh_tunnel_is_open=False,
+                # ssh_bin isn't included here. For example, the Dataproc
+                # runner launches ssh through the gcloud util
+            ),
         )
 
     def _fix_opts(self, opts, source=None):
@@ -361,3 +395,191 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         params = {k: v for k, v in params.items() if v is not None}
 
         return params
+
+    ### SSH Tunnel ###
+
+    def _ssh_tunnel_args(self, bind_port):
+        """Redefine this in your subclass. You will probably want to call
+        :py:meth:`_ssh_tunnel_opts` somewhere in here.
+
+        Should return the list of args used to run the command
+        to open the SSH tunnel, bound to *bind_port* on your computer,
+        or ``None`` if it isn't possible to set up an SSH tunnel.
+        """
+        return None
+
+    def _ssh_tunnel_config(self):
+        """Redefine this in your subclass. Should return a dict with the
+        following keys:
+
+        *localhost*: once we SSH in, is the web interface?
+                     reachable at ``localhost``
+        *name*: either ``'job tracker'`` or ``'resource manager'``
+        *path*: path of main page on web interface (e.g. "/cluster")
+        *port*: port number of the web interface
+        """
+        raise NotImplementedError
+
+    def _launch_ssh_proc(self, bind_port):
+        """The command used to create a :py:class:`subprocess.Popen` to
+        run the SSH tunnel. You usually don't need to redefine this."""
+        args = self._ssh_tunnel_args(bind_port)
+
+        if args:
+            log.debug('> %s' % cmd_line(args))
+            return Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        else:
+            return None
+
+    def _ssh_launch_wait_secs(self):
+        """Wait this long after launching the SSH process before checking
+        for failure (default 1 second). You may redefine this."""
+        return 1.0
+
+    def _set_up_ssh_tunnel(self):
+        """Call this whenever you think it is possible to SSH to your cluster.
+        This sets :py:attr:`_ssh_proc`. Does nothing if :mrjob-opt:`ssh_tunnel`
+        is not set, or there is already a tunnel process running.
+        """
+        # did the user request an SSH tunnel?
+        if not self._opts['ssh_tunnel']:
+            return
+
+        # no point in trying to launch a nonexistent command twice
+        if self._give_up_on_ssh_tunnel:
+            return
+
+        # did we already launch the SSH tunnel process? is it still running?
+        if self._ssh_proc:
+            self._ssh_proc.poll()
+            if self._ssh_proc.returncode is None:
+                return
+            else:
+                log.warning('  Oops, ssh subprocess exited with return code'
+                            ' %d, restarting...' % self._ssh_proc.returncode)
+                self._ssh_proc = None
+
+        # create a Popen for the ssh proc
+        ssh_proc = self._launch_ssh_proc()
+
+        # is it not possible to launch a tunnel now?
+        if not ssh_proc:
+            return
+
+        tunnel_config = self._ssh_tunnel_config()
+
+        bind_port = None
+        popen_exception = None
+
+        for bind_port in self._pick_ssh_bind_ports():
+            ssh_proc = None
+
+            try:
+                ssh_proc = self._launch_ssh_proc()
+            except OSError as ex:
+                # e.g. OSError(2, 'File not found')
+                popen_exception = ex   # warning handled below
+                break
+
+            # can't launch SSH tunnel right now
+            if not ssh_proc:
+                return
+
+            if ssh_proc:
+                sleep(self._ssh_launch_wait_secs())
+
+                ssh_proc.poll()
+                # still running. We are golden
+                if ssh_proc.returncode is None:
+                    self._ssh_proc = ssh_proc
+                    break
+                else:
+                    ssh_proc.stdin.close()
+                    ssh_proc.stdout.close()
+                    ssh_proc.stderr.close()
+
+        if self._ssh_proc:
+            if self._opts['ssh_tunnel_is_open']:
+                bind_host = socket.getfqdn()
+            else:
+                bind_host = 'localhost'
+            self._ssh_tunnel_url = 'http://%s:%d%s' % (
+                bind_host, bind_port, tunnel_config['path'])
+            log.info('  Connect to %s at: %s' % (
+                tunnel_config['name'], self._ssh_tunnel_url))
+
+        else:
+            if popen_exception:
+                # this only happens if the ssh binary is not present
+                # or not executable (so tunnel_config and the args to the
+                # ssh binary don't matter)
+                log.warning("    Couldn't run %s: %s" % (
+                    cmd_line(self._opts['ssh_bin']), popen_exception))
+                self._give_up_on_ssh_tunnel = True
+                return
+            else:
+                log.warning(
+                    '    Failed to open ssh tunnel to %s' %
+                    tunnel_config['name'])
+
+    def _kill_ssh_tunnel(self):
+        """Send SIGKILL to SSH tunnel, if it's running."""
+        if not self._ssh_proc:
+            return
+
+        self._ssh_proc.poll()
+        if self._ssh_proc.returncode is None:
+            log.info('Killing our SSH tunnel (pid %d)' %
+                     self._ssh_proc.pid)
+
+            self._ssh_proc.stdin.close()
+            self._ssh_proc.stdout.close()
+            self._ssh_proc.stderr.close()
+
+            try:
+                os.kill(self._ssh_proc.pid, SIGKILL)
+            except Exception as e:
+                log.exception(e)
+
+        self._ssh_proc = None
+        self._ssh_tunnel_url = None
+
+    def _ssh_tunnel_opts(self, bind_port):
+        """Options to SSH related to setting up a tunnel (rather than
+        SSHing in). Helper for :py:meth:`_ssh_tunnel_args`.
+        """
+        args = self._ssh_local_tunnel_opt(bind_port) + [
+            '-N', '-n', '-q',
+        ]
+        if self._opts['ssh_tunnel_is_open']:
+            args.extend(['-g', '-4'])  # -4: listen on IPv4 only
+
+        return args
+
+    def _ssh_local_tunnel_opt(self, bind_port):
+        """Helper for :py:meth:`_ssh_tunnel_opts`."""
+        tunnel_config = self._ssh_tunnel_config()
+
+        return [
+            '-L', '%d:%s:%d' % (
+                bind_port,
+                self._job_tracker_host(),
+                tunnel_config['port'],
+            ),
+        ]
+
+    def _pick_ssh_bind_ports(self):
+        """Pick a list of ports to try binding our SSH tunnel to.
+
+        We will try to bind the same port for any given cluster (Issue #67)
+        """
+        # don't perturb the random number generator
+        random_state = random.getstate()
+        try:
+            # seed random port selection on cluster ID
+            random.seed(self._cluster_id)
+            num_picks = min(_MAX_SSH_RETRIES,
+                            len(self._opts['ssh_bind_ports']))
+            return random.sample(self._opts['ssh_bind_ports'], num_picks)
+        finally:
+            random.setstate(random_state)

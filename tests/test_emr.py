@@ -4478,7 +4478,7 @@ class SetUpSSHTunnelTestCase(MockBoto3TestCase):
     def setUp(self, *args):
         super(SetUpSSHTunnelTestCase, self).setUp()
 
-        self.mock_Popen = self.start(patch('mrjob.emr.Popen'))
+        self.mock_Popen = self.start(patch('mrjob.cloud.Popen'))
         # simulate successfully binding port
         self.mock_Popen.return_value.returncode = None
         self.mock_Popen.return_value.pid = 99999

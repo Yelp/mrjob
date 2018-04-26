@@ -841,7 +841,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 new_data = log_blob.download_as_string()[state['pos']:]
             except google.api_core.exceptions.NotFound:
                 # handle race condition where blob was just created
-                return
+                break
 
             state['buffer'] += new_data
             state['pos'] += len(new_data)

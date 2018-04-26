@@ -21,6 +21,8 @@ from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
 
+from google.api_core.exceptions import NotFound
+
 import mrjob
 import mrjob.dataproc
 from mrjob.dataproc import DataprocException
@@ -1172,6 +1174,18 @@ class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
         self.append_data(log0_uri, b'Hey where did THIS come from???\n')
 
         # because we've moved beyond log0
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_not_found_race_condition(self):
+        # in some cases the blob for the log file appears but
+        # raises NotFound when read from
+        self.start(patch('tests.mock_google.storage.MockGoogleStorageBlob'
+                         '.download_as_string',
+                         side_effect=NotFound('race condition')))
+
+        log_uri = self.URI + '.000000000'
+        self.append_data(log_uri, b'log line\nanother log line\n')
+
         self.assertEqual(self.get_new_lines(), [])
 
 

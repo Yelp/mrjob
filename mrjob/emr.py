@@ -865,7 +865,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # it work won't work on some VPC setups
             return self._master_private_ip()
 
-    def _ssh_tunnel_args(self):
+    def _ssh_tunnel_args(self, bind_port):
         for opt_name in ('ec2_key_pair', 'ec2_key_pair_file',
                          'ssh_bin', 'ssh_bind_ports'):
             if not self._opts[opt_name]:
@@ -896,7 +896,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'ExitOnForwardFailure=yes',
             '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
-        ] + self._ssh_tunnel_opts() + [
+        ] + self._ssh_tunnel_opts(bind_port) + [
             '-i', self._opts['ec2_key_pair_file'],
             ('hadoop@%s' % host),
         ]
@@ -917,8 +917,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         super(EMRJobRunner, self).cleanup(mode=mode)
 
         # always stop our SSH tunnel if it's still running
-        if self._ssh_proc:
-            self._kill_ssh_tunnel()
+        self._kill_ssh_tunnel()
 
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)

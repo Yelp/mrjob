@@ -206,6 +206,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     alias = 'dataproc'
 
     OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
+        'gcloud_bin',
         'project_id',
     }
 
@@ -538,6 +539,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def cleanup(self, mode=None):
         super(DataprocJobRunner, self).cleanup(mode=mode)
 
+        # close our SSH tunnel, if any
+        self._kill_ssh_tunnel()
+
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)
         if self._cluster_id and not self._opts['cluster_id']:
@@ -685,6 +689,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
             self._wait_for_cluster_ready(self._cluster_id)
 
+        self._set_up_ssh_tunnel()
+
         # keep track of when we launched our job
         self._dataproc_job_start = time.time()
         return self._cluster_id
@@ -829,8 +835,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 state['log_uri'] = log_uri
 
             log_blob = self.fs._get_blob(log_uri)
-            # TODO: use start= kwarg once google-cloud-storage 1.9 is out
-            new_data = log_blob.download_as_string()[state['pos']:]
+
+            try:
+                # TODO: use start= kwarg once google-cloud-storage 1.9 is out
+                new_data = log_blob.download_as_string()[state['pos']:]
+            except google.api_core.exceptions.NotFound:
+                # handle race condition where blob was just created
+                return
 
             state['buffer'] += new_data
             state['pos'] += len(new_data)
@@ -1063,7 +1074,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         if ssh_proc:
             # enter an empty passphrase if creating a key for the first time
-            ssh_proc.stdin.write('\n\n')
+            ssh_proc.stdin.write(b'\n\n')
 
         return ssh_proc
 
@@ -1081,13 +1092,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             return
 
         cluster = self._get_cluster(self._cluster_id)
-        zone = cluster.config.gce_cluster_config.split('/')[-1]
+        zone = cluster.config.gce_cluster_config.zone_uri.split('/')[-1]
 
         return self._opts['gcloud_bin'] + [
             'compute', 'ssh',
             '--zone', zone,
             self._job_tracker_host(),
             '--',
-        ] + self._ssh_tunnel_opts()
-
-    # move these to cloud.py
+        ] + self._ssh_tunnel_opts(bind_port)

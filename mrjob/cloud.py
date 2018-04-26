@@ -26,6 +26,7 @@ from time import sleep
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.conf import combine_dicts
+from mrjob.py2 import xrange
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
 from mrjob.util import cmd_line
@@ -459,13 +460,6 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                             ' %d, restarting...' % self._ssh_proc.returncode)
                 self._ssh_proc = None
 
-        # create a Popen for the ssh proc
-        ssh_proc = self._launch_ssh_proc()
-
-        # is it not possible to launch a tunnel now?
-        if not ssh_proc:
-            return
-
         tunnel_config = self._ssh_tunnel_config()
 
         bind_port = None
@@ -475,7 +469,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
             ssh_proc = None
 
             try:
-                ssh_proc = self._launch_ssh_proc()
+                ssh_proc = self._launch_ssh_proc(bind_port)
             except OSError as ex:
                 # e.g. OSError(2, 'File not found')
                 popen_exception = ex   # warning handled below

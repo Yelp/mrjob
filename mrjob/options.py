@@ -600,6 +600,12 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    gcloud_bin=dict(
+        combiner=combine_cmds,
+        switches=[
+            (['--gcloud-bin'], dict(help='path to gcloud binary')),
+        ],
+    ),
     hadoop_bin=dict(
         combiner=combine_cmds,
         switches=[

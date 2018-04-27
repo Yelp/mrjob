@@ -1069,12 +1069,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _ssh_tunnel_config(self):
         return _SSH_TUNNEL_CONFIG
 
-    def _launch_ssh_proc(self, bind_port):
-        ssh_proc = super(DataprocJobRunner, self)._launch_ssh_proc(bind_port)
+    def _launch_ssh_proc(self, args):
+        ssh_proc = super(DataprocJobRunner, self)._launch_ssh_proc(args)
 
-        if ssh_proc:
-            # enter an empty passphrase if creating a key for the first time
-            ssh_proc.stdin.write(b'\n\n')
+        # enter an empty passphrase if creating a key for the first time
+        ssh_proc.stdin.write(b'\n\n')
 
         return ssh_proc
 

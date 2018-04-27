@@ -18,11 +18,11 @@ import os
 import pipes
 import socket
 import random
+import time
 from os.path import basename
 from signal import SIGKILL
 from subprocess import Popen
 from subprocess import PIPE
-from time import sleep
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.conf import combine_dicts
@@ -421,16 +421,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         """
         raise NotImplementedError
 
-    def _launch_ssh_proc(self, bind_port):
+    def _launch_ssh_proc(self, args):
         """The command used to create a :py:class:`subprocess.Popen` to
         run the SSH tunnel. You usually don't need to redefine this."""
-        args = self._ssh_tunnel_args(bind_port)
-
-        if args:
-            log.debug('> %s' % cmd_line(args))
-            return Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        else:
-            return None
+        log.debug('> %s' % cmd_line(args))
+        return Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
 
     def _ssh_launch_wait_secs(self):
         """Wait this long after launching the SSH process before checking
@@ -464,23 +459,25 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
 
         bind_port = None
         popen_exception = None
+        ssh_tunnel_args = []
 
         for bind_port in self._pick_ssh_bind_ports():
             ssh_proc = None
+            ssh_tunnel_args = self._ssh_tunnel_args(bind_port)
+
+            # can't launch SSH tunnel right now
+            if not ssh_tunnel_args:
+                return
 
             try:
-                ssh_proc = self._launch_ssh_proc(bind_port)
+                ssh_proc = self._launch_ssh_proc(ssh_tunnel_args)
             except OSError as ex:
                 # e.g. OSError(2, 'File not found')
                 popen_exception = ex   # warning handled below
                 break
 
-            # can't launch SSH tunnel right now
-            if not ssh_proc:
-                return
-
             if ssh_proc:
-                sleep(self._ssh_launch_wait_secs())
+                time.sleep(self._ssh_launch_wait_secs())
 
                 ssh_proc.poll()
                 # still running. We are golden
@@ -508,7 +505,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 # or not executable (so tunnel_config and the args to the
                 # ssh binary don't matter)
                 log.warning("    Couldn't run %s: %s" % (
-                    cmd_line(self._opts['ssh_bin']), popen_exception))
+                    cmd_line(ssh_tunnel_args[:1]), popen_exception))
                 self._give_up_on_ssh_tunnel = True
                 return
             else:

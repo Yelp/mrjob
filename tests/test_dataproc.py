@@ -20,6 +20,7 @@ import os.path
 from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
+from subprocess import PIPE
 
 from google.api_core.exceptions import NotFound
 
@@ -1307,3 +1308,110 @@ class ProgressAndCounterLoggingTestCase(MockGoogleTestCase):
                 'Counters: 1\n\tFile System Counters\n\t\tFILE:'
                 ' Number of bytes read=819'),
             self.log.info.call_args_list)
+
+
+class SetUpSSHTunnelTestCase(MockGoogleTestCase):
+
+    def setUp(self, *args):
+        super(SetUpSSHTunnelTestCase, self).setUp()
+
+        self.mock_Popen = self.start(patch('mrjob.cloud.Popen'))
+        # simulate successfully binding port
+        self.mock_Popen.return_value.returncode = None
+        self.mock_Popen.return_value.pid = 99999
+
+        self.start(patch('os.kill'))  # don't clean up fake SSH proc
+
+        self.start(patch('time.sleep'))
+
+    def test_default(self):
+        job = MRWordCount(['-r', 'dataproc'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertFalse(self.mock_Popen.called)
+
+    def test_default_ssh_tunnel(self):
+        job = MRWordCount(['-r', 'dataproc', '--ssh-tunnel'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        args_tuple, kwargs = self.mock_Popen.call_args
+        args = args_tuple[0]
+
+        self.assertEqual(kwargs, dict(stdin=PIPE, stdout=PIPE, stderr=PIPE))
+
+        self.assertEqual(args[:3], ['gcloud', 'compute', 'ssh'])
+
+        self.assertIn('-L', args)
+        self.assertIn('-N', args)
+        self.assertIn('-n', args)
+        self.assertIn('-q', args)
+
+        self.assertNotIn('-g', args)
+        self.assertNotIn('-4', args)
+
+        self.mock_Popen.stdin.called_once_with(b'\n\n')
+
+    def test_open_ssh_tunnel(self):
+        job = MRWordCount(
+            ['-r', 'dataproc', '--ssh-tunnel', '--ssh-tunnel-is-open'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        args = self.mock_Popen.call_args[0][0]
+
+        self.assertIn('-L', args)
+        self.assertIn('-N', args)
+        self.assertIn('-n', args)
+        self.assertIn('-q', args)
+
+        self.assertIn('-g', args)
+        self.assertIn('-4', args)
+
+    def test_custom_gcloud_bin(self):
+        job = MRWordCount(['-r', 'dataproc', '--ssh-tunnel',
+                           '--gcloud-bin', '/path/to/gcloud -v'])
+
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        args = self.mock_Popen.call_args[0][0]
+
+        self.assertEqual(args[:4], ['/path/to/gcloud', '-v', 'compute', 'ssh'])
+
+    def test_missing_gcloud_bin(self):
+        self.mock_Popen.side_effect = OSError(2, 'No such file or directory')
+
+        job = MRWordCount(['-r', 'dataproc', '--ssh-tunnel'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        self.assertTrue(runner._give_up_on_ssh_tunnel)
+
+    def test_error_from_gcloud_bin(self):
+        self.mock_Popen.return_value.returncode = 255
+
+        job = MRWordCount(['-r', 'dataproc', '--ssh-tunnel'])
+
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertGreater(self.mock_Popen.call_count, 1)
+        self.assertFalse(runner._give_up_on_ssh_tunnel)

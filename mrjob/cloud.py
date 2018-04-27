@@ -504,8 +504,8 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
                 # this only happens if the ssh binary is not present
                 # or not executable (so tunnel_config and the args to the
                 # ssh binary don't matter)
-                log.warning("    Couldn't run %s: %s" % (
-                    cmd_line(ssh_tunnel_args[:1]), popen_exception))
+                log.warning(
+                    "    Couldn't open SSH tunnel: %s" % popen_exception)
                 self._give_up_on_ssh_tunnel = True
                 return
             else:

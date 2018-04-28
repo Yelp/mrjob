@@ -4,6 +4,7 @@
 # Copyright 2013 Yelp and Lyft
 # Copyright 2014 Marc Abramowitz
 # Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -28,6 +29,7 @@ from warcio.warcwriter import WARCWriter
 
 from mrjob.examples.mr_phone_to_url import MRPhoneToURL
 from mrjob.inline import InlineMRJobRunner
+from mrjob.job import MRJob
 
 from tests.examples.test_mr_phone_to_url import write_conversion_record
 from tests.mr_test_cmdenv import MRTestCmdenv
@@ -35,6 +37,7 @@ from tests.mr_two_step_job import MRTwoStepJob
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
 from tests.job import run_job
+from tests.py2 import patch
 from tests.test_sim import MRIncrementerJob
 
 
@@ -177,3 +180,42 @@ class InlineInputManifestTestCase(SandboxedTestCase):
             run_job(MRPhoneToURL(['-r', self.RUNNER, wet2_gz_path, '-']),
                     raw_input=wet1.getvalue()),
             self.EXPECTED_OUTPUT)
+
+
+class MRNope(MRJob):
+    def mapper_init(self):
+        raise NotImplementedError
+
+
+class MRManifestNope(MRJob):
+    def mapper_raw(self, input_path, input_uri):
+        raise NotImplementedError
+
+
+class WhileReadingFromTestCase(SandboxedTestCase):
+    # mostly a regression test for #1758
+
+    def _test_reading_from(self, job_class, expect_input_path):
+        # check that we report the actual input file and not the manifest file
+        input_path = self.makefile('input.txt')
+
+        job = job_class([input_path])
+        job.sandbox()
+
+        log = self.start(patch('mrjob.inline.log'))
+
+        with job.make_runner() as runner:
+            self.assertRaises(NotImplementedError, runner.run)
+
+        error_log = ''.join(a[0][0] for a in log.error.call_args_list)
+
+        if expect_input_path:
+            self.assertIn(input_path, error_log)
+        else:
+            self.assertNotIn(input_path, error_log)
+
+    def test_regular_job(self):
+        self._test_reading_from(MRNope, expect_input_path=False)
+
+    def test_input_manifest(self):
+        self._test_reading_from(MRManifestNope, expect_input_path=True)

@@ -2,6 +2,7 @@
 # Copyright 2011 Matthew Tai and Yelp
 # Copyright 2012-2016 Yelp and Contributors
 # Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -94,9 +95,9 @@ class InlineMRJobRunner(SimMRJobRunner):
                         # read input path from stdin, add to args
                         line = stdin.readline().decode('utf_8')
                         input_uri = line.split('\t')[-1].rstrip()
-                        # input_uri is an absolute path, no need to copy to cwd
-                        input_path = input_uri
-                        args = list(args) + [input_path, input_uri]
+                        # input_uri is an absolute path, can serve
+                        # as path and uri both
+                        args = list(args) + [input_uri, input_uri]
 
                     task = self._mrjob_cls(args)
                     task.sandbox(stdin=stdin, stdout=stdout, stderr=stderr)
@@ -108,7 +109,7 @@ class InlineMRJobRunner(SimMRJobRunner):
                     # because then we lose the stacktrace (which is the whole
                     # point of the inline runner)
 
-                    if input_path:  # from manifest
+                    if input_uri:  # from manifest
                         self._error_while_reading_from = input_uri
                     else:
                         self._error_while_reading_from = self._task_input_path(

@@ -921,10 +921,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             gcs_init_script_uris.append(
                 self._upload_mgr.uri(self._master_bootstrap_script_path))
 
+            # TODO: delete idle termination script (see #1705)
+            #
             # always add idle termination script
             # add it last, so that we don't count bootstrapping as idle time
-            gcs_init_script_uris.append(
-                self._upload_mgr.uri(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
+            #gcs_init_script_uris.append(
+            #    self._upload_mgr.uri(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
 
         # NOTE - Cluster initialization_actions can only take scripts with no
         # script args, so the auto-term script receives 'mrjob-max-secs-idle'
@@ -976,6 +978,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         cluster_config['worker_config'] = worker_conf
         if self._opts['num_task_instances']:
             cluster_config['secondary_worker_config'] = secondary_worker_conf
+
+        cluster_config['lifecycle_config'] = dict(
+            idle_delete_ttl=('%.1fs' % self._opts['max_mins_idle'] * 60))
 
         # See - https://cloud.google.com/dataproc/dataproc-versions
         if self._opts['image_version']:

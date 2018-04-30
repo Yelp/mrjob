@@ -58,12 +58,10 @@ class GCSFilesystem(Filesystem):
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
-    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None,
-                 chunk_size=None):
+    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None):
         self._credentials = credentials
         self._local_tmp_dir = local_tmp_dir
         self._project_id = project_id
-        self._chunk_size = chunk_size
 
     @property
     def client(self):
@@ -182,13 +180,14 @@ class GCSFilesystem(Filesystem):
 
         self._blob(dest_uri).upload_from_string(b'')
 
-    def put(self, src_path, dest_uri):
+    def put(self, src_path, dest_uri, chunk_size=None):
         """Uploads a local file to a specific destination."""
         old_blob = self._get_blob(dest_uri)
         if old_blob:
             raise IOError('File already exists: %s' % dest_uri)
 
-        self._blob(dest_uri).upload_from_filename(src_path)
+        self._blob(dest_uri, chunk_size=chunk_size).upload_from_filename(
+            src_path)
 
     def get_all_bucket_names(self, prefix=None):
         """Yield the names of all buckets associated with this client.
@@ -236,15 +235,17 @@ class GCSFilesystem(Filesystem):
             'delete_bucket() was disabled in v0.6.2. Use'
             'fs.bucket(name).delete()')
 
-    def _get_blob(self, uri):
+    def _get_blob(self, uri, chunk_size=None):
+        # NOTE: chunk_size seems not to work well with downloading
         bucket_name, blob_name = parse_gcs_uri(uri)
         bucket = self.client.get_bucket(bucket_name)
-        return bucket.get_blob(blob_name, chunk_size=self._chunk_size)
+        return bucket.get_blob(blob_name, chunk_size=chunk_size)
 
-    def _blob(self, uri):
+    def _blob(self, uri, chunk_size=None):
+        # NOTE: chunk_size seems not to work well with downloading
         bucket_name, blob_name = parse_gcs_uri(uri)
         bucket = self.client.get_bucket(bucket_name)
-        return bucket.blob(blob_name, chunk_size=self._chunk_size)
+        return bucket.blob(blob_name, chunk_size=chunk_size)
 
 
 # The equivalent S3 methods are in parse.py but it's cleaner to keep them

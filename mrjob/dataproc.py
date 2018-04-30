@@ -21,6 +21,8 @@ from io import BytesIO
 from os import environ
 from os.path import dirname
 from os.path import join
+from subprocess import PIPE
+from subprocess import Popen
 
 try:
     import google.auth
@@ -789,6 +791,21 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 self._wait_for_api('job completion')
                 continue
 
+            if job_state == 'ERROR':
+                log.info('Downloading logs...')
+                # TODO: break out into separate method
+                diagnose_args = self._opts['gcloud_bin'] + [
+                    'dataproc', 'clusters', 'diagnose',
+                    '--region', self._region(),
+                    self._cluster_id,
+                ]
+
+                # TODO: handle error
+                diagnose_proc = Popen(
+                    diagnose_args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
+                stdout, stderr = diagnose_proc.communicate()
+                log.info(repr((stdout, stderr)))
+
             # print counters if job wasn't CANCELLED
             if job_state != 'CANCELLED':
                 self._log_counters(log_interpretation, step_num)
@@ -1002,6 +1019,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         self.cluster_client.create_cluster(
             cluster=cluster_data,
+            **self._project_id_and_region()
+        )
+
+    def _diagnose_cluster(self, cluster_id):
+        return self.cluster_client.diagnose_cluster(
+            cluster_name=cluster_id,
             **self._project_id_and_region()
         )
 

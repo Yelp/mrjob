@@ -894,6 +894,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._hadoop_version = map_version(
             self._image_version, _DATAPROC_IMAGE_TO_HADOOP_VERSION)
 
+    def _bootstrap_pre_commands(self):
+        # don't run the bootstrap script in / (see #1601)
+        return [
+            'mkdir /tmp/mrjob',
+            'cd /tmp/mrjob',
+        ]
+
     ### Bootstrapping ###
 
     def _bootstrap_python(self):

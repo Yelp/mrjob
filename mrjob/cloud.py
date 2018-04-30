@@ -285,6 +285,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         out.extend(self._start_of_sh_script())
         out.append('')
 
+        # for example, create a tmp dir and cd to it
+        if self._bootstrap_pre_commands():
+            out.extend(self._bootstrap_pre_commands())
+            out.append('')
+
         # store $PWD
         out.append('# store $PWD')
         out.append('__mrjob_PWD=$PWD')
@@ -369,6 +374,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         out.append('} 1>&2')  # stdout -> stderr for ease of error log parsing
 
         return out
+
+    def _bootstrap_pre_commands(self):
+        """A list of hard-coded commands to run at the beginning of the
+        bootstrap script. Currently used by dataproc to cd into a tmp dir."""
+        return []
 
     def _start_of_sh_script(self):
         """Return a list of lines (without trailing newlines) containing the

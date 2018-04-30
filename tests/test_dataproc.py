@@ -804,6 +804,11 @@ class MasterBootstrapScriptTestCase(MockGoogleTestCase):
         # check scripts get run
 
         # bootstrap
+
+        # see #1601
+        self.assertIn('mkdir /tmp/mrjob', lines)
+        self.assertIn('cd /tmp/mrjob', lines)
+
         self.assertIn('  ' + PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
         self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
 

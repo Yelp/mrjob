@@ -78,11 +78,11 @@ class MockGoogleStorageBucket(object):
     def exists(self):
         return self.name in self.client.mock_gcs_fs
 
-    def get_blob(self, blob_name):
+    def get_blob(self, blob_name, chunk_size=None):
         fs = self.client.mock_gcs_fs
 
         if self.name in fs and blob_name in fs[self.name]['blobs']:
-            blob = self.blob(blob_name)
+            blob = self.blob(blob_name, chunk_size=chunk_size)
             blob._set_md5_hash()
             return blob
 

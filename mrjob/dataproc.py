@@ -385,10 +385,17 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             credentials=self._credentials,
             local_tmp_dir=self._get_local_tmp_dir(),
             project_id=self._project_id,
+            chunk_size=self._fs_chunk_size(),
         )
 
         self._fs = CompositeFilesystem(self._gcs_fs, LocalFilesystem())
         return self._fs
+
+    def _fs_chunk_size(self):
+        if self._opts['cloud_upload_part_size']:
+            return self._opts['cloud_upload_part_size'] * 1024 * 1024
+        else:
+            return None
 
     def _get_tmpdir(self, given_tmpdir):
         """Helper for _fix_tmpdir"""
@@ -839,7 +846,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             try:
                 # TODO: use start= kwarg once google-cloud-storage 1.9 is out
                 new_data = log_blob.download_as_string()[state['pos']:]
-            except google.api_core.exceptions.NotFound:
+            except (google.api_core.exceptions.NotFound,
+                    google.api_core.exceptions.RequestRangeNotSatisfiable):
                 # handle race condition where blob was just created
                 break
 

@@ -26,6 +26,7 @@ from subprocess import PIPE
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.conf import combine_dicts
+from mrjob.py2 import integer_types
 from mrjob.py2 import xrange
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
@@ -61,6 +62,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'check_cluster_every',
         'cloud_fs_sync_secs',
         'cloud_tmp_dir',
+        'cloud_upload_part_size',
         'cluster_id',
         'core_instance_type',
         'extra_cluster_params',
@@ -119,14 +121,13 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         # store the (tunneled) URL of the job tracker/resource manager
         self._ssh_tunnel_url = None
 
-
-
     ### Options ###
 
     def _default_opts(self):
         return combine_dicts(
             super(HadoopInTheCloudJobRunner, self)._default_opts(),
             dict(
+                cloud_upload_part_size=100,  # 100 MB
                 max_mins_idle=_DEFAULT_MAX_MINS_IDLE,
                 # don't use a list because it makes it hard to read option
                 # values when running in verbose mode. See #1284
@@ -141,6 +142,12 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
     def _fix_opts(self, opts, source=None):
         opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
             opts, source=source)
+
+        # cloud_upload_part_size should be a number
+        if opts.get('cloud_upload_part_size') is not None:
+            if not isinstance(opts['cloud_upload_part_size'],
+                              (integer_types, float)):
+                raise TypeError('cloud_upload_part_size must be a number')
 
         # patch max_hours_idle into max_mins_idle (see #1663)
         if opts.get('max_hours_idle') is not None:

@@ -58,10 +58,12 @@ class GCSFilesystem(Filesystem):
     :py:class:`~mrjob.fs.ssh.SSHFilesystem` and
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
-    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None):
-        self._local_tmp_dir = local_tmp_dir
+    def __init__(self, local_tmp_dir=None, credentials=None, project_id=None,
+                 chunk_size=None):
         self._credentials = credentials
+        self._local_tmp_dir = local_tmp_dir
         self._project_id = project_id
+        self._chunk_size = chunk_size
 
     @property
     def client(self):
@@ -237,12 +239,12 @@ class GCSFilesystem(Filesystem):
     def _get_blob(self, uri):
         bucket_name, blob_name = parse_gcs_uri(uri)
         bucket = self.client.get_bucket(bucket_name)
-        return bucket.get_blob(blob_name)
+        return bucket.get_blob(blob_name, chunk_size=self._chunk_size)
 
     def _blob(self, uri):
         bucket_name, blob_name = parse_gcs_uri(uri)
         bucket = self.client.get_bucket(bucket_name)
-        return bucket.blob(blob_name)
+        return bucket.blob(blob_name, chunk_size=self._chunk_size)
 
 
 # The equivalent S3 methods are in parse.py but it's cleaner to keep them

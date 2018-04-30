@@ -846,8 +846,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             try:
                 # TODO: use start= kwarg once google-cloud-storage 1.9 is out
                 new_data = log_blob.download_as_string()[state['pos']:]
-            except (google.api_core.exceptions.NotFound,
-                    google.api_core.exceptions.RequestRangeNotSatisfiable):
+            except google.api_core.exceptions.NotFound:
                 # handle race condition where blob was just created
                 break
 

@@ -748,8 +748,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         return job_id
 
-    def _wait_for_step_to_complete(
-            self, job_id, step_num=None, num_steps=None):
+    def _wait_for_step_to_complete(self, job_id, step_num, num_steps):
         """Helper for _wait_for_step_to_complete(). Wait for
         step with the given ID to complete, and fetch counters.
         If it fails, attempt to diagnose the error, and raise an
@@ -760,8 +759,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log_interpretation = dict(job_id=job_id)
         self._log_interpretations.append(log_interpretation)
 
-        step_interpretation = {}
-        log_interpretation['step'] = step_interpretation
+        log_interpretation['step'] = {}
+        step_type = self._get_step(step_num)['type']
 
         while True:
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus  # noqa
@@ -769,17 +768,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
             job_state = job.status.State.Name(job.status.state)
 
-            driver_output_uri = job.driver_output_resource_uri
-
             log.info('%s => %s' % (job_id, job_state))
 
-            # interpret driver output so far
-            if driver_output_uri:
-                self._update_step_interpretation(step_interpretation,
-                                                 driver_output_uri)
+            log_interpretation['step']['driver_output_uri'] = (
+                job.driver_output_resource_uri)
 
-            if step_interpretation.get('progress'):
-                log.info(' ' + step_interpretation['progress']['message'])
+            self._interpret_step_logs(log_interpretation, step_type)
+
+            progress = log_interpretation['step'].get('progress')
+            if progress:
+                log.info(' ' + progress['message'])
 
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State  # noqa
             # these are the states covered by the ACTIVE job state matcher,
@@ -803,6 +801,29 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _default_step_output_dir(self):
         # put intermediate data in HDFS
         return 'hdfs:///tmp/mrjob/%s/step-output' % self._job_key
+
+    ### log intepretation ###
+
+    def _interpret_step_logs(self, log_interpretation, step_type):
+        """Hook for interpreting step logs.
+
+        Unlike with most runners, you may call this multiple times and it
+        will continue to parse the step log incrementally, which is useful
+        for getting job progress."""
+        driver_output_uri = log_interpretation.get(
+            'step', {}).get('driver_output_uri')
+
+        if driver_output_uri:
+            self._update_step_interpretation(
+                log_interpretation['step'], driver_output_uri)
+
+    def _interpret_history_log(self, log_interpretation):
+        pass
+
+    def _interpret_task_logs(
+            self, log_interpretation, step_type, error_attempt_ids=(),
+            partial=True):
+        pass
 
     def _update_step_interpretation(
             self, step_interpretation, driver_output_uri):
@@ -862,8 +883,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         return lines
 
     def counters(self):
-        # TODO - mtai @ davidmarin - Counters are currently always empty as we
-        # are not processing task logs
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
 

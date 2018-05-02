@@ -44,6 +44,8 @@ from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.task import _parse_task_stderr
+from mrjob.logs.task import _parse_task_syslog
 from mrjob.logs.step import _interpret_new_dataproc_step_stderr
 from mrjob.py2 import PY2
 from mrjob.py2 import to_unicode
@@ -826,6 +828,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     ### log intepretation ###
 
+    # step
+
     def _interpret_step_logs(self, log_interpretation, step_type):
         """Hook for interpreting step logs.
 
@@ -838,77 +842,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if driver_output_uri:
             self._update_step_interpretation(
                 log_interpretation['step'], driver_output_uri)
-
-    def _interpret_history_log(self, log_interpretation):
-        """This actually parses the yarn-yarn-nodemanager log, as the history
-        log is unavailable."""
-        if 'history' in log_interpretation:
-            return  # already interpreted
-
-        step_interpretation = log_interpretation.get('step') or {}
-
-        application_id = step_interpretation.get('application_id')
-        if not application_id:
-            log.warning(
-                "Can't parse node manager logs; missing application ID")
-            return
-
-        history_interpretation = {}
-
-        container_id_prefix = 'container' + application_id[11:]
-
-        # TODO: bound by timestamp
-        log_filter = self._make_log_filter(
-            'yarn-yarn-nodemanager',
-            {'jsonPayload.class': _CONTAINER_EXECUTOR_CLASS_NAME})
-
-        log.info('Parsing node manager logs...')
-
-        # it doesn't seem to work to do self.logging_client.logger();
-        # there's some RPC dispute about whether the log name should
-        # be qualified by project name or not
-        entries = self.logging_client.list_entries(
-            filter_=log_filter, order_by=google.cloud.logging.DESCENDING)
-
-        for entry in entries:
-            path = entry.payload.get('filename')
-            if not path:
-                continue
-
-            message = entry.payload.get('message')
-            if not message:
-                continue
-
-            m = _CONTAINER_EXIT_RE.match(message)
-            if not m:
-                continue
-
-            returncode = int(m.group('returncode'))
-            if not returncode:
-                continue
-
-            container_id = m.group('container_id')
-            # matches some other step
-            if not container_id.startswith(container_id_prefix):
-                continue
-
-            error = dict(
-                container_id=container_id,
-                hadoop_error=dict(
-                    message=message,
-                    path=path,
-                )
-            )
-
-            errors = history_interpretation.setdefault('errors', [])
-            errors.append(error)
-
-        log_interpretation['history'] = history_interpretation
-
-    def _interpret_task_logs(
-            self, log_interpretation, step_type, error_attempt_ids=(),
-            partial=True):
-        pass
 
     def _update_step_interpretation(
             self, step_interpretation, driver_output_uri):
@@ -966,6 +899,140 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 state['buffer'] = line_bytes
 
         return lines
+
+    # history
+
+    def _interpret_history_log(self, log_interpretation):
+        """Does nothing. We can't get the history logs, and we don't need
+        them."""
+        log_interpretation.setdefault('history', {})
+
+    # task
+
+    def _interpret_task_logs(self, log_interpretation, step_type,
+                             error_attempt_ids=(), partial=True):
+        """Scan node manager log to find failed container IDs of failed
+        tasks, and then scan the corresponding stderr and syslogs."""
+        if 'task' in log_interpretation and (
+                partial or not log_interpretation['task'].get('partial')):
+            return   # already interpreted
+
+        step_interpretation = log_interpretation.get('step') or {}
+
+        application_id = step_interpretation.get('application_id')
+        if not application_id:
+            log.warning(
+                "Can't parse node manager logs; missing application ID")
+            return
+
+        log_interpretation['task'] = self._task_log_interpretation(
+            application_id, step_type, partial)
+
+    def _task_log_interpretation(self, application_id, step_type, partial):
+        """Helper for :py:meth:`_interpret_task_logs`"""
+        result = {}
+
+        for container_id in self._failed_task_container_ids(application_id):
+            error = _parse_task_syslog(
+                self._task_syslog_records(
+                    application_id, container_id, step_type))
+
+            if not error.get('hadoop_error'):
+                # not sure if this ever happens, since we already know
+                # which containers failed
+                continue
+
+            task_error = _parse_task_stderr(
+                self._task_stderr_lines(
+                    application_id, container_id, step_type))
+
+            if task_error:
+                error['task_error'] = task_error
+
+            result.setdefault('errors', []).append(error)
+
+            # if partial is true, bail out when we find the first task error
+            if task_error and partial:
+                result['partial'] = True
+                return result
+
+        return result
+
+    def _failed_task_container_ids(self, application_id):
+        """Stream container IDs of failed tasks, in reverse order."""
+        container_id_prefix = 'container' + application_id[11:]
+
+        log_filter = self._make_log_filter(
+            'yarn-yarn-nodemanager',
+            {'jsonPayload.class': _CONTAINER_EXECUTOR_CLASS_NAME})
+
+        log.info('Scanning node manager logs for IDs of failed tasks...')
+
+        # it doesn't seem to work to do self.logging_client.logger();
+        # there's some RPC dispute about whether the log name should
+        # be qualified by project name or not
+        entries = self.logging_client.list_entries(
+            filter_=log_filter, order_by=google.cloud.logging.DESCENDING)
+
+        for entry in entries:
+            message = entry.payload.get('message')
+            if not message:
+                continue
+
+            m = _CONTAINER_EXIT_RE.match(message)
+            if not m:
+                continue
+
+            returncode = int(m.group('returncode'))
+            if not returncode:
+                continue
+
+            container_id = m.group('container_id')
+            # matches some other step
+            if not container_id.startswith(container_id_prefix):
+                continue
+
+            log.debug('  %s' % container_id)
+            yield container_id
+
+    def _task_stderr_lines(self, application_id, container_id, step_type):
+        """Yield lines from a specific stderr log."""
+        log_filter = self._make_log_filter(
+            'yarn-userlogs', {
+                'jsonPayload.application': application_id,
+                'jsonPayload.container': container_id,
+                # TODO: pick based on step_type
+                'container_logname': 'stderr',
+            })
+
+        log.info('  Readingz stderr log for %s...' % container_id)
+        entries = self.logging_client.list_entries(filter_=log_filter)
+
+        for entry in entries:
+            message = entry.payload.get('message')
+            if not message:
+                continue
+
+            for line in message.split('\n'):
+                yield line
+
+    def _task_syslog_records(self, application_id, container_id, step_type):
+        """Yield log4j records from a specific syslog.
+        """
+        log_filter = self._make_log_filter(
+            'yarn-userlogs', {
+                'jsonPayload.application': application_id,
+                'jsonPayload.container': container_id,
+                # TODO: pick based on step_type
+                'jsonPayload.container_logname': 'syslog',
+            })
+
+        log.info('  Reading syslog for %s' % container_id)
+        entries = self.logging_client.list_entries(filter_=log_filter)
+
+        return _log_entries_to_log4j(entries)
+
+    # misc
 
     def _make_log_filter(self, log_name=None, extra_values=None):
         # we only want logs from this project, cluster, and region
@@ -1234,3 +1301,30 @@ def _log_filter_str(name_to_value):
 def _quote_filter_value(s):
     """Put a string in double quotes, escaping double quote characters"""
     return '"%s"' % s.replace('"', r'\"')
+
+
+def _log_entries_to_log4j(entries):
+    """Convert log entries from a single log file to log4j format, tracking
+    line number.
+
+    See :py:meth:`mrjob.logs.log4j._parse_hadoop_log4j_records`
+    for format.
+    """
+    line_num = 0
+
+    for entry in entries:
+        record = dict(
+            caller_location='',
+            level=(entry.severity or ''),
+            line_num=line_num,
+            logger=(entry.payload.get('class') or ''),
+            message=(entry.payload.get('message') or ''),
+            thread='',
+            timestamp=(entry.timestamp or ''),
+        )
+
+        record['num_lines'] = len(record['message'].split('\n'))
+
+        yield record
+
+        line_num += record['num_lines']

@@ -31,6 +31,7 @@ try:
             'PyYAML>=3.08',
             'google-cloud>=0.32.0',
             'google-cloud-dataproc',
+            'grpcio>=1.9.1',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',

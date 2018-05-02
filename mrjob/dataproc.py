@@ -45,7 +45,7 @@ from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.task import _parse_task_stderr
-from mrjob.logs.task import _parse_task_syslog
+from mrjob.logs.task import _parse_task_syslog_records
 from mrjob.logs.step import _interpret_new_dataproc_step_stderr
 from mrjob.py2 import PY2
 from mrjob.py2 import to_unicode
@@ -933,7 +933,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         result = {}
 
         for container_id in self._failed_task_container_ids(application_id):
-            error = _parse_task_syslog(
+            error = _parse_task_syslog_records(
                 self._task_syslog_records(
                     application_id, container_id, step_type))
 
@@ -1002,18 +1002,15 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 'jsonPayload.application': application_id,
                 'jsonPayload.container': container_id,
                 # TODO: pick based on step_type
-                'container_logname': 'stderr',
+                'jsonPayload.container_logname': 'stderr',
             })
 
-        log.info('  Readingz stderr log for %s...' % container_id)
+        log.info('    reading stderr log...')
         entries = self.logging_client.list_entries(filter_=log_filter)
 
-        for entry in entries:
-            message = entry.payload.get('message')
-            if not message:
-                continue
-
-            for line in message.split('\n'):
+        # use log4j parsing to handle tab -> newline conversion
+        for record in _log_entries_to_log4j(entries):
+            for line in record['message'].split('\n'):
                 yield line
 
     def _task_syslog_records(self, application_id, container_id, step_type):
@@ -1027,7 +1024,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 'jsonPayload.container_logname': 'syslog',
             })
 
-        log.info('  Reading syslog for %s' % container_id)
+        log.info('    reading syslog...')
         entries = self.logging_client.list_entries(filter_=log_filter)
 
         return _log_entries_to_log4j(entries)
@@ -1313,18 +1310,22 @@ def _log_entries_to_log4j(entries):
     line_num = 0
 
     for entry in entries:
-        record = dict(
+        message = entry.payload.get('message') or ''
+        # newlines in stacktraces seem to get replaced with tabs, confusing
+        # our error parsing
+        message = message.replace('\t', '\n')
+
+        num_lines = len(message.split('\n'))
+
+        yield dict(
             caller_location='',
             level=(entry.severity or ''),
-            line_num=line_num,
             logger=(entry.payload.get('class') or ''),
-            message=(entry.payload.get('message') or ''),
+            message=message,
+            num_lines=num_lines,
+            start_line=line_num,
             thread='',
             timestamp=(entry.timestamp or ''),
         )
 
-        record['num_lines'] = len(record['message'].split('\n'))
-
-        yield record
-
-        line_num += record['num_lines']
+        line_num += num_lines

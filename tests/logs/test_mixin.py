@@ -587,7 +587,7 @@ class PickErrorTestCase(LogInterpretationMixinTestCase):
 
     def test_logs_already_interpreted(self):
         log_interpretation = dict(
-            job={}, step={}, task={})
+            history={}, step={}, task={})
 
         self.assertEqual(
             self.runner._pick_error(log_interpretation, 'streaming'),

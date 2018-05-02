@@ -69,6 +69,9 @@ class MockGoogleTestCase(SandboxedTestCase):
         self.start(patch('google.cloud.dataproc_v1.JobControllerClient',
                          self.job_client))
 
+        # TODO: mock this
+        self.start(patch('google.cloud.logging.Client'))
+
         self.start(patch('google.cloud.storage.client.Client',
                          self.storage_client))
 

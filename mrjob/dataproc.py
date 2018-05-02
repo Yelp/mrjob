@@ -26,6 +26,7 @@ try:
     import google.auth
     import google.cloud.dataproc_v1
     import google.cloud.dataproc_v1.types
+    import google.cloud.logging
     import google.api_core.exceptions
     import google.api_core.grpc_helpers
 except:
@@ -41,6 +42,7 @@ from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
+from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.step import _interpret_new_dataproc_step_stderr
 from mrjob.py2 import PY2
@@ -119,6 +121,16 @@ _SSH_TUNNEL_CONFIG = dict(
     path='/cluster',
     port=8088,
 )
+
+
+# used to match log entries that tell us if a container exited
+_CONTAINER_EXECUTOR_CLASS_NAME = (
+    'org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor')
+
+# used to determine which containers exited with nonzero status
+_CONTAINER_EXIT_RE = re.compile(
+    r'Exit code from container (?P<container_id>\w+)'
+    r' is ?: (?P<returncode>\d+)')
 
 
 # convert enum values to strings (e.g. 'RUNNING')
@@ -357,6 +369,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def job_client(self):
         return google.cloud.dataproc_v1.JobControllerClient(
             **self._client_create_kwargs())
+
+    @property
+    def logging_client(self):
+        return google.cloud.logging.Client(credentials=self._credentials)
 
     def _client_create_kwargs(self):
         if self._opts['region']:
@@ -791,6 +807,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             if job_state != 'CANCELLED':
                 self._log_counters(log_interpretation, step_num)
 
+            if job_state == 'ERROR':
+                error = self._pick_error(log_interpretation, step_type)
+                if error:
+                    log.error('Probable cause of failure:\n\n%s\n\n' %
+                              _format_error(error))
+
             # we're done, will return at the end of this
             if job_state == 'DONE':
                 break
@@ -818,7 +840,70 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 log_interpretation['step'], driver_output_uri)
 
     def _interpret_history_log(self, log_interpretation):
-        pass
+        """This actually parses the yarn-yarn-nodemanager log, as the history
+        log is unavailable."""
+        if 'history' in log_interpretation:
+            return  # already interpreted
+
+        step_interpretation = log_interpretation.get('step') or {}
+
+        application_id = step_interpretation.get('application_id')
+        if not application_id:
+            log.warning(
+                "Can't parse node manager logs; missing application ID")
+            return
+
+        history_interpretation = {}
+
+        container_id_prefix = 'container' + application_id[11:]
+
+        # TODO: bound by timestamp
+        log_filter = self._make_log_filter(
+            'yarn-yarn-nodemanager',
+            {'jsonPayload.class': _CONTAINER_EXECUTOR_CLASS_NAME})
+
+        log.info('Parsing node manager logs...')
+
+        # it doesn't seem to work to do self.logging_client.logger();
+        # there's some RPC dispute about whether the log name should
+        # be qualified by project name or not
+        entries = self.logging_client.list_entries(
+            filter_=log_filter, order_by=google.cloud.logging.DESCENDING)
+
+        for entry in entries:
+            path = entry.payload.get('filename')
+            if not path:
+                continue
+
+            message = entry.payload.get('message')
+            if not message:
+                continue
+
+            m = _CONTAINER_EXIT_RE.match(message)
+            if not m:
+                continue
+
+            returncode = int(m.group('returncode'))
+            if not returncode:
+                continue
+
+            container_id = m.group('container_id')
+            # matches some other step
+            if not container_id.startswith(container_id_prefix):
+                continue
+
+            error = dict(
+                container_id=container_id,
+                hadoop_error=dict(
+                    message=message,
+                    path=path,
+                )
+            )
+
+            errors = history_interpretation.setdefault('errors', [])
+            errors.append(error)
+
+        log_interpretation['history'] = history_interpretation
 
     def _interpret_task_logs(
             self, log_interpretation, step_type, error_attempt_ids=(),
@@ -881,6 +966,24 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 state['buffer'] = line_bytes
 
         return lines
+
+    def _make_log_filter(self, log_name=None, extra_values=None):
+        # we only want logs from this project, cluster, and region
+        d = {}
+
+        d['resource.labels.cluster_name'] = self._cluster_id
+        d['resource.labels.project_id'] = self._project_id
+        d['resource.labels.region'] = self._region()
+        d['resource.type'] = 'cloud_dataproc_cluster'
+
+        if log_name:
+            d['logName'] = 'projects/%s/logs/%s' % (
+                self._project_id, log_name)
+
+        if extra_values:
+            d.update(extra_values)
+
+        return _log_filter_str(d)
 
     def counters(self):
         return [_pick_counters(log_interpretation)
@@ -1118,3 +1221,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._job_tracker_host(),
             '--',
         ] + self._ssh_tunnel_opts(bind_port)
+
+
+def _log_filter_str(name_to_value):
+    """return a map from name to value into a log filter query that requires
+    each name to equal the given value."""
+    return ' AND '.join(
+        '%s = %s' % (name, _quote_filter_value(value))
+        for name, value in sorted(name_to_value.items()))
+
+
+def _quote_filter_value(s):
+    """Put a string in double quotes, escaping double quote characters"""
+    return '"%s"' % s.replace('"', r'\"')

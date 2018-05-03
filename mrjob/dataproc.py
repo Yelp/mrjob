@@ -134,6 +134,12 @@ _CONTAINER_EXIT_RE = re.compile(
     r'Exit code from container (?P<container_id>\w+)'
     r' is ?: (?P<returncode>\d+)')
 
+_TRACEBACK_EXCEPTION_RE = re.compile('\w+: .*$')
+
+_STDERR_LOG4J_WARNING = re.compile(
+    r'.*(No appenders could be found for logger'
+    r'|Please initialize the log4j system'
+    r'|See http://logging.apache.org/log4j)')
 
 # convert enum values to strings (e.g. 'RUNNING')
 
@@ -943,11 +949,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 # which containers failed
                 continue
 
+            # fix weird munging of java stacktrace
+            error['hadoop_error']['message'] = _fix_java_stack_trace(
+                error['hadoop_error']['message'])
+
             task_error = _parse_task_stderr(
                 self._task_stderr_lines(
                     application_id, container_id, step_type))
 
             if task_error:
+                task_error['message'] = _fix_traceback(task_error['message'])
                 error['task_error'] = task_error
 
             result.setdefault('errors', []).append(error)
@@ -1312,10 +1323,8 @@ def _log_entries_to_log4j(entries):
 
     for entry in entries:
         message = entry.payload.get('message') or ''
-        # newlines in stacktraces seem to get replaced with tabs, confusing
-        # our error parsing
-        message = message.replace('\t', '\n')
 
+        # NOTE: currently, google.cloud.logging seems strip newlines :(
         num_lines = len(message.split('\n'))
 
         yield dict(
@@ -1330,3 +1339,32 @@ def _log_entries_to_log4j(entries):
         )
 
         line_num += num_lines
+
+
+def _fix_java_stack_trace(s):
+    # this is what we get from `gcloud logging`
+    if '\n' in s:
+        return s
+    else:
+        return s.replace('\t', '\n\t')
+
+
+def _fix_traceback(s):
+    lines = s.split('\n')
+
+    # strip log4j warnings (which do have proper linebreaks)
+    lines = [
+        line for line in lines
+        if line and not _STDERR_LOG4J_WARNING.match(line)
+    ]
+
+    s = '\n'.join(lines)
+
+    if '\n' in s:
+        return s  # traceback does have newlines
+
+    s = s.replace('  File', '\n  File')
+    s = s.replace('    ', '\n    ')
+    s = _TRACEBACK_EXCEPTION_RE.sub(lambda m: '\n' + m.group(0), s)
+
+    return s

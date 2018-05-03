@@ -21,6 +21,7 @@ from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
 from subprocess import PIPE
+from unittest import TestCase
 
 from google.api_core.exceptions import NotFound
 
@@ -33,6 +34,8 @@ from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.dataproc import _cluster_state_name
+from mrjob.dataproc import _fix_java_stack_trace
+from mrjob.dataproc import _fix_traceback
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.py2 import PY2
@@ -1493,11 +1496,31 @@ class FailedTaskContainerIDsTestCase(MockGoogleTestCase):
             [])
 
 
+
+
 class TaskLogInterpretationTestCase(MockGoogleTestCase):
 
     APP_ID = 'application_1525195653111_0001'
     CONTAINER_ID_1 = 'container_1525195653111_0001_0001_01_000001'
     CONTAINER_ID_2 = 'container_1525195653111_0001_0002_02_000002'
+
+
+    JAVA_STACK_TRACE = ('Diagnostics report from'
+                        ' attempt_1525195653111_0001_m_000000_3: Error:\n'
+                        ' java.lang.RuntimeException:'
+                        ' PipeMapRed.waitOutputThreads(): subprocess failed\n'
+                        ' with code 1\t'
+                        'at org.apache.hadoop.streaming.PipeMapRed'
+                        '.waitOutputThreads(PipeMapRed.java:322)\t\n'
+                        'at org.apache.hadoop.mapred.YarnChild.main('
+                        'YarnChild.java:158)')
+
+    # unfortunately, tracebacks are all garbled like this
+    TRACEBACK = ('Traceback (most recent call last):'
+                 '  File "mr_boom.py", line 23, in <module>\n'
+                 ' "mr_boom.py", line 20, in mapper_init'
+                 '    raise Exception(\'BOOM\')Exception:\n'
+                 ' BOOM')
 
     def setUp(self):
         super(TaskLogInterpretationTestCase, self).setUp()
@@ -1505,3 +1528,100 @@ class TaskLogInterpretationTestCase(MockGoogleTestCase):
         self.container_ids_method = self.start(patch(
             'mrjob.dataproc.DataprocJobRunner._failed_task_container_ids',
             return_value=[self.CONTAINER_ID_2, self.CONTAINER_ID_1]))
+
+
+class FixTracebackTestCase(TestCase):
+
+    LOGGING_TRACEBACK = (
+        'Traceback (most recent call last):'
+        '  File "mr_boom.py", line 23, in <module>'
+        '    MRBoom.run()  File "/usr/lib/python2.7/dist-packages/mrjob'
+        '/job.py", line'
+        ' 433, in run    mr_job.execute()  File "/usr/lib/python2.7'
+        '/dist-packages/mrjob/job.py"'
+        ', line 442, in execute    self.run_mapper(self.options.step_num)'
+        '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+        ', line 522, in run_mapper    for out_key, out_value in mapper_init()'
+        ' or ():  File'
+        ' "mr_boom.py", line 20, in mapper_init    raise Exception(\'BOOM\')'
+        'Exception:'
+        ' BOOM')
+
+    # what we should display
+    TRACEBACK = (
+       'Traceback (most recent call last):\n'
+        '  File "mr_boom.py", line 23, in <module>\n'
+        '    MRBoom.run()\n'
+        '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+        ', line 433, in run\n'
+        '    mr_job.execute()\n'
+        '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+        ', line 442, in execute\n'
+        '    self.run_mapper(self.options.step_num)\n'
+        '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+        ', line 522, in run_mapper\n'
+        '    for out_key, out_value in mapper_init() or ():\n'
+        '  File "mr_boom.py", line 20, in mapper_init\n'
+        '    raise Exception(\'BOOM\')\n'
+        'Exception: BOOM')
+
+    LOG4J_WARNINGS = (
+        '\n'
+        'No appenders could be found for logger'
+        ' (org.apache.hadoop.metrics2.impl.MetricsSystemImpl).'
+        'Please initialize the log4j system properly.\n'
+        'See http://logging.apache.org/log4j/1.2/faq.html#noconfig'
+        ' for more info.'
+    )
+
+    def test_empty(self):
+        self.assertEqual(_fix_traceback(''), '')
+
+    def test_fix_traceback_with_no_newlines(self):
+        self.assertEqual(_fix_traceback(self.LOGGING_TRACEBACK),
+                         self.TRACEBACK)
+
+    def test_fix_traceback_plus_log4j_warnings(self):
+        self.assertEqual(
+            _fix_traceback(self.LOGGING_TRACEBACK + self.LOG4J_WARNINGS),
+            self.TRACEBACK)
+
+    def test_no_need_to_fix(self):
+        self.assertEqual(_fix_traceback(self.TRACEBACK), self.TRACEBACK)
+
+    def test_can_strip_log4j_warnings_from_correct_traceback(self):
+        self.assertEqual(
+            _fix_traceback(self.TRACEBACK + self.LOG4J_WARNINGS),
+            self.TRACEBACK)
+
+    def test_something_else(self):
+        message = 'mice in your kitchen\nare bad'
+
+        self.assertEqual(_fix_traceback(message), message)
+
+
+class FixJavaStackTraceTestCase(TestCase):
+
+    STACK_TRACE = (
+        'Diagnostics report from attempt_1525195653111_0001_m_000000_3:'
+        ' Error: java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+        ' subprocess failed with code 1\n'
+        '\tat org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+        '(PipeMapRed.java:322)\n'
+        '\tat org.apache.hadoop.mapred.YarnChild.main(YarnChild.java:158)'
+    )
+
+    LOGGING_STACK_TRACE = STACK_TRACE.replace('\n', '')
+
+    def test_add_missing_newlines(self):
+        self.assertEqual(_fix_java_stack_trace(self.LOGGING_STACK_TRACE),
+                         self.STACK_TRACE)
+
+    def test_no_need_to_fix(self):
+        self.assertEqual(_fix_java_stack_trace(self.STACK_TRACE),
+                         self.STACK_TRACE)
+
+    def test_something_else(self):
+        message = 'mice in your kitchen\nare bad'
+
+        self.assertEqual(_fix_traceback(message), message)

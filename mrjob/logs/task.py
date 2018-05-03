@@ -31,7 +31,7 @@ log = getLogger(__name__)
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
 # use this with search()
 _JAVA_TRACEBACK_RE = re.compile(
-    r'$\s+at .*\((.*\.(java|scala):\d+|Native Method)\)$',
+    r'\s+at .*\((.*\.(java|scala):\d+|Native Method)\)$',
     re.MULTILINE)
 
 # Match an error stating that Spark's subprocess has failed (and thus we

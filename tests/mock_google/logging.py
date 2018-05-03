@@ -30,7 +30,6 @@ _FILTER_FIELD_TO_ENTRY_FIELD = dict(
 )
 
 
-
 class MockGoogleLoggingClient(object):
     """Mocks :py:class:`google.cloud.logging.client.Client`"""
 
@@ -42,9 +41,8 @@ class MockGoogleLoggingClient(object):
 
         self.mock_log_entries = mock_log_entries
 
-    def list_entries(
-            projects=None, filter_=None, order_by=None, page_size=None,
-            page_token=None):
+    def list_entries(self, projects=None, filter_=None, order_by=None,
+                     page_size=None, page_token=None):
         if projects:
             raise NotImplementedError
 
@@ -66,7 +64,10 @@ class MockGoogleLoggingClient(object):
                 key_chain = key.split('.')
 
                 # map query to fields in StructEntry
-                field = _FILTER_FIELD_TO_ENTRY_FIELD(key_chain[0])
+                field = key_chain[0]
+                if field in _FILTER_FIELD_TO_ENTRY_FIELD:
+                    field = _FILTER_FIELD_TO_ENTRY_FIELD[field]
+
                 value = getattr(entry, field, None)
 
                 # drill down into entry fields
@@ -81,6 +82,8 @@ class MockGoogleLoggingClient(object):
                     return False
 
             return True
+
+        return matches_filter
 
     def _parse_filter(self, filter_):
         """Parse a filter of the form:
@@ -98,9 +101,9 @@ class MockGoogleLoggingClient(object):
             if not match:
                 raise ValueError("Can't parse filter clause %r" % clause)
 
-            key = match.group(0)
-            quoted_value = match.group(1)
-            value = _ESCAPE_RE.sub(lambda m: m.group(0))
+            key = match.group(1)
+            quoted_value = match.group(2)
+            value = _ESCAPE_RE.sub(lambda m: m.group(0), quoted_value)
 
             if key in result:
                 raise ValueError('Duplicate key %r in filter' % key)

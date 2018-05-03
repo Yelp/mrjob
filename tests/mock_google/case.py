@@ -16,6 +16,7 @@
 from io import BytesIO
 
 from google.cloud.logging.entries import StructEntry
+from google.cloud.logging.resource import Resource
 from google.oauth2.credentials import Credentials
 
 from mrjob.fs.gcs import parse_gcs_uri
@@ -127,6 +128,9 @@ class MockGoogleTestCase(SandboxedTestCase):
     def add_mock_log_entry(
             self, payload, logger, insert_id=None, timestamp=None,
             labels=None, severity=None, http_request=None, resource=None):
+
+        if isinstance(resource, dict):
+            resource = Resource(**resource)
 
         entry = StructEntry(
             payload, logger, insert_id=insert_id, timestamp=timestamp,

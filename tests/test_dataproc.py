@@ -1415,3 +1415,93 @@ class SetUpSSHTunnelTestCase(MockGoogleTestCase):
 
         self.assertGreater(self.mock_Popen.call_count, 1)
         self.assertFalse(runner._give_up_on_ssh_tunnel)
+
+
+class FailedTaskContainerIDsTestCase(MockGoogleTestCase):
+
+    APP_ID = 'application_1525195653111_0001'
+    CONTAINER_ID_1 = 'container_1525195653111_0001_0001_01_000001'
+    CONTAINER_ID_2 = 'container_1525195653111_0001_0002_02_000002'
+    OTHER_APP_CONTAINER_ID = 'container_1234567890111_0001_01_000001'
+
+    JAVA_CLASS = ('org.apache.hadoop.yarn.server.nodemanager'
+                  '.DefaultContainerExecutor')
+
+    def setUp(self):
+        super(FailedTaskContainerIDsTestCase, self).setUp()
+
+        self.runner = DataprocJobRunner()
+        self.runner._cluster_id = 'mock-cluster-name'
+
+    def add_container_exit(self, container_id, returncode=143):
+        payload = {
+            'class': self.JAVA_CLASS,
+            'message': ('Exit code from container %s is : %d' % (
+                container_id, returncode)),
+        }
+
+        self.add_mock_log_entry(
+            payload,
+            self.log_name('yarn-yarn-nodemanager'),
+            resource=self.log_resource())
+
+    def log_name(self, name):
+        return 'projects/%s/logs/%s' % (self.runner._project_id, name)
+
+    def log_resource(self):
+        return dict(
+            labels=dict(
+                cluster_name=self.runner._cluster_id,
+                project_id=self.runner._project_id,
+                region=self.runner._region(),
+            ),
+            type='cloud_dataproc_cluster',
+        )
+
+    def test_empty(self):
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(self.APP_ID)),
+            [])
+
+    def test_one_failure(self):
+        self.add_container_exit(self.CONTAINER_ID_1)
+
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(self.APP_ID)),
+            [self.CONTAINER_ID_1])
+
+    def test_reverse_order(self):
+        self.add_container_exit(self.CONTAINER_ID_1)
+        self.add_container_exit(self.CONTAINER_ID_2)
+
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(self.APP_ID)),
+            [self.CONTAINER_ID_2, self.CONTAINER_ID_1])
+
+    def test_ignore_failures_from_other_runs(self):
+        self.add_container_exit(self.OTHER_APP_CONTAINER_ID)
+
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(self.APP_ID)),
+            [])
+
+    def test_ignore_zero_returncode(self):
+        self.add_container_exit(self.CONTAINER_ID_1, returncode=0)
+
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(self.APP_ID)),
+            [])
+
+
+class TaskLogInterpretationTestCase(MockGoogleTestCase):
+
+    APP_ID = 'application_1525195653111_0001'
+    CONTAINER_ID_1 = 'container_1525195653111_0001_0001_01_000001'
+    CONTAINER_ID_2 = 'container_1525195653111_0001_0002_02_000002'
+
+    def setUp(self):
+        super(TaskLogInterpretationTestCase, self).setUp()
+
+        self.container_ids_method = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._failed_task_container_ids',
+            return_value=[self.CONTAINER_ID_2, self.CONTAINER_ID_1]))

@@ -374,7 +374,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     @property
     def logging_client(self):
-        return google.cloud.logging.Client(credentials=self._credentials)
+        return google.cloud.logging.Client(credentials=self._credentials,
+                                           project=self._project_id)
 
     def _client_create_kwargs(self):
         if self._opts['region']:

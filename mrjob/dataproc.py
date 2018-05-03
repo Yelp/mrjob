@@ -935,7 +935,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log_interpretation['task'] = self._task_log_interpretation(
             application_id, step_type, partial)
 
-    def _task_log_interpretation(self, application_id, step_type, partial):
+    def _task_log_interpretation(
+            self, application_id, step_type, partial=True):
         """Helper for :py:meth:`_interpret_task_logs`"""
         result = {}
 
@@ -948,6 +949,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 # not sure if this ever happens, since we already know
                 # which containers failed
                 continue
+
+            error['container_id'] = container_id
 
             # fix weird munging of java stacktrace
             error['hadoop_error']['message'] = _fix_java_stack_trace(

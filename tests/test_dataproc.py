@@ -1420,11 +1420,35 @@ class SetUpSSHTunnelTestCase(MockGoogleTestCase):
         self.assertFalse(runner._give_up_on_ssh_tunnel)
 
 
-class FailedTaskContainerIDsTestCase(MockGoogleTestCase):
+class MockLogEntriesTestCase(MockGoogleTestCase):
+    """Superclass for tests that create fake log entries."""
 
     APP_ID = 'application_1525195653111_0001'
     CONTAINER_ID_1 = 'container_1525195653111_0001_0001_01_000001'
     CONTAINER_ID_2 = 'container_1525195653111_0001_0002_02_000002'
+
+    def setUp(self):
+        super(MockLogEntriesTestCase, self).setUp()
+
+        self.runner = DataprocJobRunner()
+        self.runner._cluster_id = 'mock-cluster-name'
+
+    def log_name(self, name):
+        return 'projects/%s/logs/%s' % (self.runner._project_id, name)
+
+    def log_resource(self):
+        return dict(
+            labels=dict(
+                cluster_name=self.runner._cluster_id,
+                project_id=self.runner._project_id,
+                region=self.runner._region(),
+            ),
+            type='cloud_dataproc_cluster',
+        )
+
+
+class FailedTaskContainerIDsTestCase(MockLogEntriesTestCase):
+
     OTHER_APP_CONTAINER_ID = 'container_1234567890111_0001_01_000001'
 
     JAVA_CLASS = ('org.apache.hadoop.yarn.server.nodemanager'
@@ -1446,19 +1470,7 @@ class FailedTaskContainerIDsTestCase(MockGoogleTestCase):
         self.add_mock_log_entry(
             payload,
             self.log_name('yarn-yarn-nodemanager'),
-            resource=self.log_resource())
-
-    def log_name(self, name):
-        return 'projects/%s/logs/%s' % (self.runner._project_id, name)
-
-    def log_resource(self):
-        return dict(
-            labels=dict(
-                cluster_name=self.runner._cluster_id,
-                project_id=self.runner._project_id,
-                region=self.runner._region(),
-            ),
-            type='cloud_dataproc_cluster',
+            resource=self.log_resource(),
         )
 
     def test_empty(self):
@@ -1494,40 +1506,6 @@ class FailedTaskContainerIDsTestCase(MockGoogleTestCase):
         self.assertEqual(
             list(self.runner._failed_task_container_ids(self.APP_ID)),
             [])
-
-
-
-
-class TaskLogInterpretationTestCase(MockGoogleTestCase):
-
-    APP_ID = 'application_1525195653111_0001'
-    CONTAINER_ID_1 = 'container_1525195653111_0001_0001_01_000001'
-    CONTAINER_ID_2 = 'container_1525195653111_0001_0002_02_000002'
-
-
-    JAVA_STACK_TRACE = ('Diagnostics report from'
-                        ' attempt_1525195653111_0001_m_000000_3: Error:\n'
-                        ' java.lang.RuntimeException:'
-                        ' PipeMapRed.waitOutputThreads(): subprocess failed\n'
-                        ' with code 1\t'
-                        'at org.apache.hadoop.streaming.PipeMapRed'
-                        '.waitOutputThreads(PipeMapRed.java:322)\t\n'
-                        'at org.apache.hadoop.mapred.YarnChild.main('
-                        'YarnChild.java:158)')
-
-    # unfortunately, tracebacks are all garbled like this
-    TRACEBACK = ('Traceback (most recent call last):'
-                 '  File "mr_boom.py", line 23, in <module>\n'
-                 ' "mr_boom.py", line 20, in mapper_init'
-                 '    raise Exception(\'BOOM\')Exception:\n'
-                 ' BOOM')
-
-    def setUp(self):
-        super(TaskLogInterpretationTestCase, self).setUp()
-
-        self.container_ids_method = self.start(patch(
-            'mrjob.dataproc.DataprocJobRunner._failed_task_container_ids',
-            return_value=[self.CONTAINER_ID_2, self.CONTAINER_ID_1]))
 
 
 class FixTracebackTestCase(TestCase):
@@ -1625,3 +1603,144 @@ class FixJavaStackTraceTestCase(TestCase):
         message = 'mice in your kitchen\nare bad'
 
         self.assertEqual(_fix_traceback(message), message)
+
+
+class TaskLogInterpretationTestCase(MockLogEntriesTestCase):
+
+    LOGGING_TRACEBACK = FixTracebackTestCase.LOGGING_TRACEBACK
+    TRACEBACK = FixTracebackTestCase.TRACEBACK
+
+    LOGGING_STACK_TRACE = FixJavaStackTraceTestCase.LOGGING_STACK_TRACE
+    STACK_TRACE = FixJavaStackTraceTestCase.STACK_TRACE
+
+
+    SPLIT_URI = ('gs://mrjob-us-west1-aaaaaaaaaaaaaaaa/tmp/mr_boom'
+                 '.davidmarin.20180503.232439.647629/files/LICENSE.txt')
+    SPLIT_MESSAGE = (
+        'Processing split: %s:0+28' % SPLIT_URI)
+    SPLIT = dict(path=SPLIT_URI, start_line=0, num_lines=28)
+
+    def setUp(self):
+        super(TaskLogInterpretationTestCase, self).setUp()
+
+        self.container_ids_method = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._failed_task_container_ids',
+            return_value=[self.CONTAINER_ID_2, self.CONTAINER_ID_1]))
+
+        self.runner = DataprocJobRunner()
+        self.runner._cluster_id = 'mock-cluster-name'
+
+    def add_entry(self, container_id, logname, message):
+        payload = dict(
+            application=self.APP_ID,
+            container=container_id,
+            container_logname=logname,
+            message=message,
+        )
+
+        self.add_mock_log_entry(
+            payload,
+            self.log_name('yarn-userlogs'),
+            resource=self.log_resource(),
+        )
+
+    def add_split(self, container_id):
+        self.add_entry(container_id, 'syslog', self.SPLIT_MESSAGE)
+
+    def add_stack_trace(self, container_id):
+        self.add_entry(container_id, 'syslog', self.LOGGING_STACK_TRACE)
+
+    def add_traceback(self, container_id):
+        self.add_entry(container_id, 'stderr', self.LOGGING_TRACEBACK)
+
+    def test_empty(self):
+        self.assertEqual(
+            self.runner._task_log_interpretation(self.APP_ID, 'streaming'), {})
+
+    def test_find_error(self):
+        self.add_split(self.CONTAINER_ID_1)
+        self.add_stack_trace(self.CONTAINER_ID_1)
+        self.add_traceback(self.CONTAINER_ID_1)
+
+        interp = self.runner._task_log_interpretation(self.APP_ID, 'streaming')
+
+        self.assertEqual(len(interp.get('errors', [])), 1)
+
+        error = interp['errors'][0]
+
+        self.assertEqual(error['container_id'], self.CONTAINER_ID_1)
+        self.assertEqual(error['hadoop_error']['message'], self.STACK_TRACE)
+        self.assertEqual(error['split'], self.SPLIT)
+        self.assertEqual(error['task_error']['message'], self.TRACEBACK)
+
+        self.assertTrue(interp.get('partial'))
+
+    def test_stop_after_first_task_error(self):
+        self.add_stack_trace(self.CONTAINER_ID_1)
+        self.add_traceback(self.CONTAINER_ID_1)
+        self.add_stack_trace(self.CONTAINER_ID_2)
+        self.add_traceback(self.CONTAINER_ID_2)
+
+        interp = self.runner._task_log_interpretation(self.APP_ID, 'streaming')
+
+        self.assertEqual(len(interp.get('errors', [])), 1)
+
+        error = interp['errors'][0]
+
+        self.assertEqual(error['container_id'], self.CONTAINER_ID_2)
+        self.assertTrue(interp.get('partial'))
+
+    def test_keep_going_if_just_hadoop_error(self):
+        self.add_stack_trace(self.CONTAINER_ID_1)
+        self.add_traceback(self.CONTAINER_ID_1)
+        self.add_stack_trace(self.CONTAINER_ID_2)
+
+        interp = self.runner._task_log_interpretation(self.APP_ID, 'streaming')
+        errors = interp.get('errors', [])
+
+        self.assertEqual(len(errors), 2)
+
+        self.assertEqual(errors[0]['container_id'], self.CONTAINER_ID_2)
+        self.assertNotIn('task_error', errors[0])
+
+        self.assertEqual(errors[1]['container_id'], self.CONTAINER_ID_1)
+        self.assertIn('task_error', errors[1])
+
+        self.assertTrue(interp.get('partial'))
+
+    def test_hadoop_errors_only(self):
+        self.add_stack_trace(self.CONTAINER_ID_1)
+        self.add_stack_trace(self.CONTAINER_ID_2)
+
+        interp = self.runner._task_log_interpretation(self.APP_ID, 'streaming')
+        errors = interp.get('errors', [])
+
+        self.assertEqual(len(errors), 2)
+
+        self.assertEqual(errors[0]['container_id'], self.CONTAINER_ID_2)
+        self.assertNotIn('task_error', errors[0])
+
+        self.assertEqual(errors[1]['container_id'], self.CONTAINER_ID_1)
+        self.assertNotIn('task_error', errors[1])
+
+        self.assertFalse(interp.get('partial'))
+
+    def test_task_error_only(self):
+        self.add_traceback(self.CONTAINER_ID_1)
+
+        self.assertEqual(
+            self.runner._task_log_interpretation(self.APP_ID, 'streaming'), {})
+
+    def test_not_partial(self):
+        self.add_stack_trace(self.CONTAINER_ID_1)
+        self.add_traceback(self.CONTAINER_ID_1)
+        self.add_stack_trace(self.CONTAINER_ID_2)
+        self.add_traceback(self.CONTAINER_ID_2)
+
+        interp = self.runner._task_log_interpretation(
+            self.APP_ID, 'streaming', partial=False)
+        errors = interp.get('errors', [])
+
+        self.assertEqual(len(errors), 2)
+
+        self.assertFalse(interp.get('partial'))

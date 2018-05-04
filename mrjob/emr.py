@@ -301,7 +301,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'bootstrap_actions',
         'bootstrap_spark',
         'cloud_log_dir',
-        'cloud_upload_part_size',
         'core_instance_bid_price',
         'ec2_key_pair',
         'ec2_key_pair_file',
@@ -442,7 +441,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 check_cluster_every=30,
                 cleanup_on_failure=['JOB'],
                 cloud_fs_sync_secs=5.0,
-                cloud_upload_part_size=100,  # 100 MB
                 image_version=_DEFAULT_IMAGE_VERSION,
                 num_core_instances=0,
                 num_task_instances=0,

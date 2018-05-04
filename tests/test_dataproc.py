@@ -27,6 +27,7 @@ from google.api_core.exceptions import NotFound
 
 import mrjob
 import mrjob.dataproc
+import mrjob.fs.gcs
 from mrjob.dataproc import DataprocException
 from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _CONTAINER_EXECUTOR_CLASS_NAME
@@ -49,6 +50,7 @@ from mrjob.util import log_to_stream
 from mrjob.util import save_current_environment
 
 from tests.mock_google import MockGoogleTestCase
+from tests.mock_google.storage import MockGoogleStorageBlob
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
@@ -868,6 +870,11 @@ class MasterBootstrapScriptTestCase(MockGoogleTestCase):
         # check scripts get run
 
         # bootstrap
+
+        # see #1601
+        self.assertIn('mkdir /tmp/mrjob', lines)
+        self.assertIn('cd /tmp/mrjob', lines)
+
         self.assertIn('  ' + PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
         self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
 
@@ -1792,3 +1799,44 @@ class CauseOfErrorTestCase(MockLogEntriesTestCase):
             self.assertEqual(error['split'], SPLIT)
             self.assertEqual(error['hadoop_error']['message'], STACK_TRACE)
             self.assertEqual(error['task_error']['message'], TRACEBACK)
+
+
+class CloudUploadPartSizeTestCase(MockGoogleTestCase):
+
+    def setUp(self):
+        super(CloudUploadPartSizeTestCase, self).setUp()
+
+        self.upload_from_string = self.start(patch(
+            'tests.mock_google.storage.MockGoogleStorageBlob'
+            '.upload_from_string',
+            side_effect=MockGoogleStorageBlob.upload_from_string,
+            autospec=True))
+
+    def test_default(self):
+        runner = DataprocJobRunner()
+
+        self.assertEqual(runner._fs_chunk_size(), 100 * 1024 * 1024)
+
+    def test_float(self):
+        runner = DataprocJobRunner(cloud_upload_part_size=0.25)
+
+        self.assertEqual(runner._fs_chunk_size(), 256 * 1024)
+
+    def test_zero(self):
+        runner = DataprocJobRunner(cloud_upload_part_size=0)
+
+        self.assertEqual(runner._fs_chunk_size(), None)
+
+    def test_multipart_upload(self):
+        job = MRWordCount(
+            ['-r', 'dataproc', '--cloud-upload-part-size', '2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._prepare_for_launch()
+
+        # chunk size should be set on blob object used to upload
+        self.assertTrue(self.upload_from_string.called)
+        for call_args in self.upload_from_string.call_args_list:
+            blob = call_args[0][0]
+            self.assertEqual(blob.chunk_size, 2 * 1024 * 1024)

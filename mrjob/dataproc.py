@@ -415,6 +415,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._fs = CompositeFilesystem(self._gcs_fs, LocalFilesystem())
         return self._fs
 
+    def _fs_chunk_size(self):
+        """Chunk size for cloud storage Blob objects. Currently
+        only used for uploading."""
+        if self._opts['cloud_upload_part_size']:
+            return int(self._opts['cloud_upload_part_size'] * 1024 * 1024)
+        else:
+            return None
+
     def _get_tmpdir(self, given_tmpdir):
         """Helper for _fix_tmpdir"""
         if given_tmpdir:
@@ -527,8 +535,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for path, gcs_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, gcs_uri))
 
-            # TODO - mtai @ davidmarin - Implement put function for other FSs
-            self.fs.put(path, gcs_uri)
+            self.fs.put(path, gcs_uri, chunk_size=self._fs_chunk_size())
 
         self._wait_for_fs_sync()
 
@@ -1094,6 +1101,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # we didn't explicitly request. See #1428
         self._hadoop_version = map_version(
             self._image_version, _DATAPROC_IMAGE_TO_HADOOP_VERSION)
+
+    def _bootstrap_pre_commands(self):
+        # don't run the bootstrap script in / (see #1601)
+        return [
+            'mkdir /tmp/mrjob',
+            'cd /tmp/mrjob',
+        ]
 
     ### Bootstrapping ###
 

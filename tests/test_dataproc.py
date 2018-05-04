@@ -29,6 +29,7 @@ import mrjob
 import mrjob.dataproc
 from mrjob.dataproc import DataprocException
 from mrjob.dataproc import DataprocJobRunner
+from mrjob.dataproc import _CONTAINER_EXECUTOR_CLASS_NAME
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
@@ -36,8 +37,10 @@ from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _fix_java_stack_trace
 from mrjob.dataproc import _fix_traceback
+from mrjob.examples.mr_boom import MRBoom
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
+from mrjob.logs.errors import _pick_error
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
@@ -70,6 +73,64 @@ DEFAULT_GCE_INSTANCE = 'n1-standard-1'
 HIGHMEM_GCE_INSTANCE = 'n1-highmem-2'
 HIGHCPU_GCE_INSTANCE = 'n1-highcpu-2'
 MICRO_GCE_INSTANCE = 'f1-micro'
+
+DRIVER_OUTPUT_URI = (
+    'gs://mock-bucket/google-cloud-dataproc-metainfo/mock-cluster-id'
+    '/jobs/mock-job-name/driveroutput')
+
+APPLICATION_ID = 'application_1525195653111_0001'
+CONTAINER_ID_1 = 'container_1525195653111_0001_0001_01_000001'
+CONTAINER_ID_2 = 'container_1525195653111_0001_0002_02_000002'
+
+STACK_TRACE = (
+    'Diagnostics report from attempt_1525195653111_0001_m_000000_3:'
+    ' Error: java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+    ' subprocess failed with code 1\n'
+    '\tat org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+    '(PipeMapRed.java:322)\n'
+    '\tat org.apache.hadoop.mapred.YarnChild.main(YarnChild.java:158)'
+)
+
+# newlines don't get logged for some reason
+LOGGING_STACK_TRACE = STACK_TRACE.replace('\n', '')
+
+# sample traceback from MRBoom
+TRACEBACK = (
+   'Traceback (most recent call last):\n'
+    '  File "mr_boom.py", line 23, in <module>\n'
+    '    MRBoom.run()\n'
+    '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+    ', line 433, in run\n'
+    '    mr_job.execute()\n'
+    '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+    ', line 442, in execute\n'
+    '    self.run_mapper(self.options.step_num)\n'
+    '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+    ', line 522, in run_mapper\n'
+    '    for out_key, out_value in mapper_init() or ():\n'
+    '  File "mr_boom.py", line 20, in mapper_init\n'
+    '    raise Exception(\'BOOM\')\n'
+    'Exception: BOOM')
+
+LOGGING_TRACEBACK = TRACEBACK.replace('\n', '')
+
+# these very occasionally appear in the stderr log
+LOG4J_WARNINGS = (
+    '\n'
+    'No appenders could be found for logger'
+    ' (org.apache.hadoop.metrics2.impl.MetricsSystemImpl).'
+    'Please initialize the log4j system properly.\n'
+    'See http://logging.apache.org/log4j/1.2/faq.html#noconfig'
+    ' for more info.'
+)
+
+SPLIT_URI = ('gs://mrjob-us-west1-aaaaaaaaaaaaaaaa/tmp/mr_boom'
+             '.davidmarin.20180503.232439.647629/files/LICENSE.txt')
+SPLIT_MESSAGE = (
+    'Processing split: %s:0+28' % SPLIT_URI)
+SPLIT = dict(path=SPLIT_URI, start_line=0, num_lines=28)
+
+LOGGING_CLUSTER_NAME = 'mock-cluster-with-logging'
 
 
 class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
@@ -1118,13 +1179,13 @@ class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
         self.put_gcs_multi({uri: old_data + new_data})
 
     def get_new_lines(self):
-        return self.runner._get_new_driver_output_lines(self.URI)
+        return self.runner._get_new_driver_output_lines(DRIVER_OUTPUT_URI)
 
     def test_no_log_files(self):
         self.assertEqual(self.get_new_lines(), [])
 
     def test_return_new_lines_as_available(self):
-        log_uri = self.URI + '.000000000'
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
 
         self.assertEqual(self.get_new_lines(), [])
 
@@ -1142,7 +1203,7 @@ class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
     def test_partial_lines(self):
         # probably lines are going to be added atomically, but just in case
 
-        log_uri = self.URI + '.000000000'
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
 
         self.assertEqual(self.get_new_lines(), [])
 
@@ -1159,8 +1220,8 @@ class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
         self.append_data(log_uri, b'd log line\n')
 
     def test_iterating_through_log_files(self):
-        log0_uri = self.URI + '.000000000'
-        log1_uri = self.URI + '.000000001'
+        log0_uri = DRIVER_OUTPUT_URI + '.000000000'
+        log1_uri = DRIVER_OUTPUT_URI + '.000000001'
 
         self.assertEqual(self.get_new_lines(), [])
 
@@ -1187,7 +1248,7 @@ class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
                          '.download_as_string',
                          side_effect=NotFound('race condition')))
 
-        log_uri = self.URI + '.000000000'
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
         self.append_data(log_uri, b'log line\nanother log line\n')
 
         self.assertEqual(self.get_new_lines(), [])
@@ -1210,7 +1271,7 @@ class UpdateStepInterpretationTestCase(MockGoogleTestCase):
 
     def update_step_interpretation(self):
         self.runner._update_step_interpretation(
-            self.step_interpretation, self.URI)
+            self.step_interpretation, DRIVER_OUTPUT_URI)
 
     def test_empty(self):
         self.update_step_interpretation()
@@ -1226,7 +1287,6 @@ class UpdateStepInterpretationTestCase(MockGoogleTestCase):
              '18/04/17 22:06:15 INFO mapreduce.Job:  map 100% reduce 0%\n'],
             ['18/04/17 22:07:32 INFO mapreduce.Job:  map 100% reduce 100%\n'],
         ]
-
 
         self.update_step_interpretation()
         self.assertEqual(self.step_interpretation['application_id'],
@@ -1423,46 +1483,14 @@ class SetUpSSHTunnelTestCase(MockGoogleTestCase):
 class MockLogEntriesTestCase(MockGoogleTestCase):
     """Superclass for tests that create fake log entries."""
 
-    APP_ID = 'application_1525195653111_0001'
-    CONTAINER_ID_1 = 'container_1525195653111_0001_0001_01_000001'
-    CONTAINER_ID_2 = 'container_1525195653111_0001_0002_02_000002'
-
     def setUp(self):
         super(MockLogEntriesTestCase, self).setUp()
 
-        self.runner = DataprocJobRunner()
-        self.runner._cluster_id = 'mock-cluster-name'
-
-    def log_name(self, name):
-        return 'projects/%s/logs/%s' % (self.runner._project_id, name)
-
-    def log_resource(self):
-        return dict(
-            labels=dict(
-                cluster_name=self.runner._cluster_id,
-                project_id=self.runner._project_id,
-                region=self.runner._region(),
-            ),
-            type='cloud_dataproc_cluster',
-        )
-
-
-class FailedTaskContainerIDsTestCase(MockLogEntriesTestCase):
-
-    OTHER_APP_CONTAINER_ID = 'container_1234567890111_0001_01_000001'
-
-    JAVA_CLASS = ('org.apache.hadoop.yarn.server.nodemanager'
-                  '.DefaultContainerExecutor')
-
-    def setUp(self):
-        super(FailedTaskContainerIDsTestCase, self).setUp()
-
-        self.runner = DataprocJobRunner()
-        self.runner._cluster_id = 'mock-cluster-name'
+        self.mock_cluster_id = LOGGING_CLUSTER_NAME
 
     def add_container_exit(self, container_id, returncode=143):
         payload = {
-            'class': self.JAVA_CLASS,
+            'class': _CONTAINER_EXECUTOR_CLASS_NAME,
             'message': ('Exit code from container %s is : %d' % (
                 container_id, returncode)),
         }
@@ -1473,104 +1501,109 @@ class FailedTaskContainerIDsTestCase(MockLogEntriesTestCase):
             resource=self.log_resource(),
         )
 
+    def add_split(self, container_id, cluster=LOGGING_CLUSTER_NAME):
+        self.add_entry(container_id, 'syslog', SPLIT_MESSAGE)
+
+    def add_stack_trace(self, container_id, cluster=LOGGING_CLUSTER_NAME):
+        self.add_entry(container_id, 'syslog', LOGGING_STACK_TRACE)
+
+    def add_traceback(self, container_id, cluster=LOGGING_CLUSTER_NAME):
+        self.add_entry(container_id, 'stderr', LOGGING_TRACEBACK)
+
+    def add_entry(self, container_id, logname, message):
+        payload = dict(
+            application=APPLICATION_ID,
+            container=container_id,
+            container_logname=logname,
+            message=message,
+        )
+
+        self.add_mock_log_entry(
+            payload,
+            self.log_name('yarn-userlogs'),
+            resource=self.log_resource(),
+        )
+
+    def log_name(self, name):
+        return 'projects/%s/logs/%s' % (self.mock_project_id, name)
+
+    def log_resource(self):
+        return dict(
+            labels=dict(
+                cluster_name=LOGGING_CLUSTER_NAME,
+                project_id=self.mock_project_id,
+                region=_DEFAULT_GCE_REGION,
+            ),
+            type='cloud_dataproc_cluster',
+        )
+
+
+class FailedTaskContainerIDsTestCase(MockLogEntriesTestCase):
+
+    OTHER_APP_CONTAINER_ID = 'container_1234567890111_0001_01_000001'
+
+    def setUp(self):
+        super(FailedTaskContainerIDsTestCase, self).setUp()
+
+        self.runner = DataprocJobRunner()
+        self.runner._cluster_id = LOGGING_CLUSTER_NAME
+
     def test_empty(self):
         self.assertEqual(
-            list(self.runner._failed_task_container_ids(self.APP_ID)),
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
             [])
 
     def test_one_failure(self):
-        self.add_container_exit(self.CONTAINER_ID_1)
+        self.add_container_exit(CONTAINER_ID_1)
 
         self.assertEqual(
-            list(self.runner._failed_task_container_ids(self.APP_ID)),
-            [self.CONTAINER_ID_1])
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
+            [CONTAINER_ID_1])
 
     def test_reverse_order(self):
-        self.add_container_exit(self.CONTAINER_ID_1)
-        self.add_container_exit(self.CONTAINER_ID_2)
+        self.add_container_exit(CONTAINER_ID_1)
+        self.add_container_exit(CONTAINER_ID_2)
 
         self.assertEqual(
-            list(self.runner._failed_task_container_ids(self.APP_ID)),
-            [self.CONTAINER_ID_2, self.CONTAINER_ID_1])
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
+            [CONTAINER_ID_2, CONTAINER_ID_1])
 
     def test_ignore_failures_from_other_runs(self):
         self.add_container_exit(self.OTHER_APP_CONTAINER_ID)
 
         self.assertEqual(
-            list(self.runner._failed_task_container_ids(self.APP_ID)),
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
             [])
 
     def test_ignore_zero_returncode(self):
-        self.add_container_exit(self.CONTAINER_ID_1, returncode=0)
+        self.add_container_exit(CONTAINER_ID_1, returncode=0)
 
         self.assertEqual(
-            list(self.runner._failed_task_container_ids(self.APP_ID)),
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
             [])
 
 
 class FixTracebackTestCase(TestCase):
 
-    LOGGING_TRACEBACK = (
-        'Traceback (most recent call last):'
-        '  File "mr_boom.py", line 23, in <module>'
-        '    MRBoom.run()  File "/usr/lib/python2.7/dist-packages/mrjob'
-        '/job.py", line'
-        ' 433, in run    mr_job.execute()  File "/usr/lib/python2.7'
-        '/dist-packages/mrjob/job.py"'
-        ', line 442, in execute    self.run_mapper(self.options.step_num)'
-        '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
-        ', line 522, in run_mapper    for out_key, out_value in mapper_init()'
-        ' or ():  File'
-        ' "mr_boom.py", line 20, in mapper_init    raise Exception(\'BOOM\')'
-        'Exception:'
-        ' BOOM')
-
-    # what we should display
-    TRACEBACK = (
-       'Traceback (most recent call last):\n'
-        '  File "mr_boom.py", line 23, in <module>\n'
-        '    MRBoom.run()\n'
-        '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
-        ', line 433, in run\n'
-        '    mr_job.execute()\n'
-        '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
-        ', line 442, in execute\n'
-        '    self.run_mapper(self.options.step_num)\n'
-        '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
-        ', line 522, in run_mapper\n'
-        '    for out_key, out_value in mapper_init() or ():\n'
-        '  File "mr_boom.py", line 20, in mapper_init\n'
-        '    raise Exception(\'BOOM\')\n'
-        'Exception: BOOM')
-
-    LOG4J_WARNINGS = (
-        '\n'
-        'No appenders could be found for logger'
-        ' (org.apache.hadoop.metrics2.impl.MetricsSystemImpl).'
-        'Please initialize the log4j system properly.\n'
-        'See http://logging.apache.org/log4j/1.2/faq.html#noconfig'
-        ' for more info.'
-    )
-
     def test_empty(self):
         self.assertEqual(_fix_traceback(''), '')
 
     def test_fix_traceback_with_no_newlines(self):
-        self.assertEqual(_fix_traceback(self.LOGGING_TRACEBACK),
-                         self.TRACEBACK)
+        self.assertEqual(_fix_traceback(LOGGING_TRACEBACK),
+                         TRACEBACK)
 
     def test_fix_traceback_plus_log4j_warnings(self):
         self.assertEqual(
-            _fix_traceback(self.LOGGING_TRACEBACK + self.LOG4J_WARNINGS),
-            self.TRACEBACK)
+            _fix_traceback(LOGGING_TRACEBACK + LOG4J_WARNINGS),
+            TRACEBACK)
 
     def test_no_need_to_fix(self):
-        self.assertEqual(_fix_traceback(self.TRACEBACK), self.TRACEBACK)
+        self.assertEqual(_fix_traceback(TRACEBACK), TRACEBACK)
 
     def test_can_strip_log4j_warnings_from_correct_traceback(self):
         self.assertEqual(
-            _fix_traceback(self.TRACEBACK + self.LOG4J_WARNINGS),
-            self.TRACEBACK)
+            _fix_traceback(TRACEBACK + LOG4J_WARNINGS),
+            TRACEBACK)
 
     def test_something_else(self):
         message = 'mice in your kitchen\nare bad'
@@ -1592,12 +1625,12 @@ class FixJavaStackTraceTestCase(TestCase):
     LOGGING_STACK_TRACE = STACK_TRACE.replace('\n', '')
 
     def test_add_missing_newlines(self):
-        self.assertEqual(_fix_java_stack_trace(self.LOGGING_STACK_TRACE),
-                         self.STACK_TRACE)
+        self.assertEqual(_fix_java_stack_trace(LOGGING_STACK_TRACE),
+                         STACK_TRACE)
 
     def test_no_need_to_fix(self):
-        self.assertEqual(_fix_java_stack_trace(self.STACK_TRACE),
-                         self.STACK_TRACE)
+        self.assertEqual(_fix_java_stack_trace(STACK_TRACE),
+                         STACK_TRACE)
 
     def test_something_else(self):
         message = 'mice in your kitchen\nare bad'
@@ -1607,140 +1640,155 @@ class FixJavaStackTraceTestCase(TestCase):
 
 class TaskLogInterpretationTestCase(MockLogEntriesTestCase):
 
-    LOGGING_TRACEBACK = FixTracebackTestCase.LOGGING_TRACEBACK
-    TRACEBACK = FixTracebackTestCase.TRACEBACK
-
-    LOGGING_STACK_TRACE = FixJavaStackTraceTestCase.LOGGING_STACK_TRACE
-    STACK_TRACE = FixJavaStackTraceTestCase.STACK_TRACE
-
-
-    SPLIT_URI = ('gs://mrjob-us-west1-aaaaaaaaaaaaaaaa/tmp/mr_boom'
-                 '.davidmarin.20180503.232439.647629/files/LICENSE.txt')
-    SPLIT_MESSAGE = (
-        'Processing split: %s:0+28' % SPLIT_URI)
-    SPLIT = dict(path=SPLIT_URI, start_line=0, num_lines=28)
-
     def setUp(self):
         super(TaskLogInterpretationTestCase, self).setUp()
 
         self.container_ids_method = self.start(patch(
             'mrjob.dataproc.DataprocJobRunner._failed_task_container_ids',
-            return_value=[self.CONTAINER_ID_2, self.CONTAINER_ID_1]))
+            return_value=[CONTAINER_ID_2, CONTAINER_ID_1]))
 
         self.runner = DataprocJobRunner()
-        self.runner._cluster_id = 'mock-cluster-name'
-
-    def add_entry(self, container_id, logname, message):
-        payload = dict(
-            application=self.APP_ID,
-            container=container_id,
-            container_logname=logname,
-            message=message,
-        )
-
-        self.add_mock_log_entry(
-            payload,
-            self.log_name('yarn-userlogs'),
-            resource=self.log_resource(),
-        )
-
-    def add_split(self, container_id):
-        self.add_entry(container_id, 'syslog', self.SPLIT_MESSAGE)
-
-    def add_stack_trace(self, container_id):
-        self.add_entry(container_id, 'syslog', self.LOGGING_STACK_TRACE)
-
-    def add_traceback(self, container_id):
-        self.add_entry(container_id, 'stderr', self.LOGGING_TRACEBACK)
+        self.runner._cluster_id = LOGGING_CLUSTER_NAME
 
     def test_empty(self):
         self.assertEqual(
-            self.runner._task_log_interpretation(self.APP_ID, 'streaming'), {})
+            self.runner._task_log_interpretation(APPLICATION_ID, 'streaming'),
+            {})
 
     def test_find_error(self):
-        self.add_split(self.CONTAINER_ID_1)
-        self.add_stack_trace(self.CONTAINER_ID_1)
-        self.add_traceback(self.CONTAINER_ID_1)
+        self.add_split(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
 
-        interp = self.runner._task_log_interpretation(self.APP_ID, 'streaming')
-
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming')
         self.assertEqual(len(interp.get('errors', [])), 1)
 
         error = interp['errors'][0]
 
-        self.assertEqual(error['container_id'], self.CONTAINER_ID_1)
-        self.assertEqual(error['hadoop_error']['message'], self.STACK_TRACE)
-        self.assertEqual(error['split'], self.SPLIT)
-        self.assertEqual(error['task_error']['message'], self.TRACEBACK)
+        self.assertEqual(error['container_id'], CONTAINER_ID_1)
+        self.assertEqual(error['hadoop_error']['message'], STACK_TRACE)
+        self.assertEqual(error['split'], SPLIT)
+        self.assertEqual(error['task_error']['message'], TRACEBACK)
 
         self.assertTrue(interp.get('partial'))
 
     def test_stop_after_first_task_error(self):
-        self.add_stack_trace(self.CONTAINER_ID_1)
-        self.add_traceback(self.CONTAINER_ID_1)
-        self.add_stack_trace(self.CONTAINER_ID_2)
-        self.add_traceback(self.CONTAINER_ID_2)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_2)
+        self.add_traceback(CONTAINER_ID_2)
 
-        interp = self.runner._task_log_interpretation(self.APP_ID, 'streaming')
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming')
 
         self.assertEqual(len(interp.get('errors', [])), 1)
-
         error = interp['errors'][0]
 
-        self.assertEqual(error['container_id'], self.CONTAINER_ID_2)
+        self.assertEqual(error['container_id'], CONTAINER_ID_2)
         self.assertTrue(interp.get('partial'))
 
     def test_keep_going_if_just_hadoop_error(self):
-        self.add_stack_trace(self.CONTAINER_ID_1)
-        self.add_traceback(self.CONTAINER_ID_1)
-        self.add_stack_trace(self.CONTAINER_ID_2)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_2)
 
-        interp = self.runner._task_log_interpretation(self.APP_ID, 'streaming')
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming')
+
         errors = interp.get('errors', [])
-
         self.assertEqual(len(errors), 2)
 
-        self.assertEqual(errors[0]['container_id'], self.CONTAINER_ID_2)
+        self.assertEqual(errors[0]['container_id'], CONTAINER_ID_2)
         self.assertNotIn('task_error', errors[0])
 
-        self.assertEqual(errors[1]['container_id'], self.CONTAINER_ID_1)
+        self.assertEqual(errors[1]['container_id'], CONTAINER_ID_1)
         self.assertIn('task_error', errors[1])
 
         self.assertTrue(interp.get('partial'))
 
     def test_hadoop_errors_only(self):
-        self.add_stack_trace(self.CONTAINER_ID_1)
-        self.add_stack_trace(self.CONTAINER_ID_2)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_2)
 
-        interp = self.runner._task_log_interpretation(self.APP_ID, 'streaming')
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming')
+
         errors = interp.get('errors', [])
-
         self.assertEqual(len(errors), 2)
 
-        self.assertEqual(errors[0]['container_id'], self.CONTAINER_ID_2)
+        self.assertEqual(errors[0]['container_id'], CONTAINER_ID_2)
         self.assertNotIn('task_error', errors[0])
 
-        self.assertEqual(errors[1]['container_id'], self.CONTAINER_ID_1)
+        self.assertEqual(errors[1]['container_id'], CONTAINER_ID_1)
         self.assertNotIn('task_error', errors[1])
 
         self.assertFalse(interp.get('partial'))
 
     def test_task_error_only(self):
-        self.add_traceback(self.CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
 
         self.assertEqual(
-            self.runner._task_log_interpretation(self.APP_ID, 'streaming'), {})
+            self.runner._task_log_interpretation(APPLICATION_ID, 'streaming'),
+            {})
 
     def test_not_partial(self):
-        self.add_stack_trace(self.CONTAINER_ID_1)
-        self.add_traceback(self.CONTAINER_ID_1)
-        self.add_stack_trace(self.CONTAINER_ID_2)
-        self.add_traceback(self.CONTAINER_ID_2)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_2)
+        self.add_traceback(CONTAINER_ID_2)
 
         interp = self.runner._task_log_interpretation(
-            self.APP_ID, 'streaming', partial=False)
+            APPLICATION_ID, 'streaming', partial=False)
         errors = interp.get('errors', [])
 
         self.assertEqual(len(errors), 2)
 
         self.assertFalse(interp.get('partial'))
+
+
+class CauseOfErrorTestCase(MockLogEntriesTestCase):
+
+    def setUp(self):
+        super(CauseOfErrorTestCase, self).setUp()
+        self.get_lines = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._get_new_driver_output_lines',
+            return_value=[]))
+
+    def test_end_to_end(self):
+        # use LOGGING_CLUSTER_NAME so we can generage fake logging entries
+        job = MRBoom(['-r', 'dataproc', '--cluster-id', LOGGING_CLUSTER_NAME])
+        job.sandbox()
+
+        self.mock_jobs_succeed = False
+
+        # feed application_id into mock driver output
+        self.get_lines.side_effect = [
+            ['15/12/11 13:32:45 INFO impl.YarnClientImpl:'
+             ' Submitted application %s' % APPLICATION_ID],
+            [],
+            [],
+            [],
+        ]
+
+        self.add_container_exit(CONTAINER_ID_1)
+        self.add_split(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+            self.assertEqual(len(runner._log_interpretations), 1)
+            interp = runner._log_interpretations[0]
+
+            self.assertIn('step', interp)
+            self.assertIn('history', interp)
+            self.assertIn('task', interp)
+
+            error = _pick_error(interp)
+            self.assertIsNotNone(error)
+
+            self.assertEqual(error['split'], SPLIT)
+            self.assertEqual(error['hadoop_error']['message'], STACK_TRACE)
+            self.assertEqual(error['task_error']['message'], TRACEBACK)

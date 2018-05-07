@@ -27,7 +27,13 @@ from mrjob.step import JarStep
 from mrjob.step import MRStep
 from mrjob.step import OUTPUT
 
-# use the file:// trick to access a jar hosted on the EMR machines
+# use the file:// trick to access a jar hosted on the cloud
+_RUNNER_TO_EXAMPLES_JAR = dict(
+    dataproc='file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar',
+    emr='file:///home/hadoop/hadoop-examples.jar',
+)
+
+
 HADOOP_EXAMPLES_JAR = 'file:///home/hadoop/hadoop-examples.jar'
 
 
@@ -35,7 +41,14 @@ class MRJarStepExample(MRJob):
     """A contrived example that runs wordcount from the hadoop example
     jar, and then does a frequency count of the frequencies."""
 
+    def configure_args(self):
+        super(MRJarStepExample, self).configure_args()
+
+        self.pass_arg_through('--runner')
+
     def steps(self):
+        jar = _RUNNER_TO_EXAMPLES_JAR[self.options.runner]
+
         return [
             JarStep(
                 jar=HADOOP_EXAMPLES_JAR,

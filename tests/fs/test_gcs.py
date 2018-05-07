@@ -17,6 +17,7 @@ import bz2
 from hashlib import md5
 
 from mrjob.fs.gcs import GCSFilesystem
+from mrjob.fs.gcs import _CAT_CHUNK_SIZE
 
 from tests.compress import gzip_compress
 from tests.mock_google import MockGoogleTestCase
@@ -57,12 +58,24 @@ class CatTestCase(MockGoogleTestCase):
 
     def test_chunks_file(self):
         self.put_gcs_multi({
-            'gs://walrus/data/foo': b'foo\nfoo\n' * 1000
+            'gs://walrus/data/foo': b'foo\nfoo\n' * 10000
         })
 
         self.assertGreater(
             len(list(self.fs._cat_file('gs://walrus/data/foo'))),
             1)
+
+    def test_chunk_boundary(self):
+        # trying to read from end of file raises an exception, which we catch
+        data = b'a' * _CAT_CHUNK_SIZE + b'b' * _CAT_CHUNK_SIZE
+
+        self.put_gcs_multi({
+            'gs://walrus/data/foo': data,
+        })
+
+        self.assertEqual(
+            list(self.fs._cat_file('gs://walrus/data/foo')),
+            [b'a' * _CAT_CHUNK_SIZE, b'b' * _CAT_CHUNK_SIZE])
 
 
 class GCSFSTestCase(MockGoogleTestCase):

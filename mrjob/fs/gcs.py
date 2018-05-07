@@ -38,8 +38,10 @@ try:
 except ImportError:
     google = None
 
-
 log = logging.getLogger(__name__)
+
+# download this many bytes at once from cat()
+_CAT_CHUNK_SIZE = 8192
 
 
 def _path_glob_to_parsed_gcs_uri(path_glob):
@@ -141,19 +143,30 @@ class GCSFilesystem(Filesystem):
         return binascii.hexlify(b64decode(blob.md5_hash)).decode('ascii')
 
     def _cat_file(self, gcs_uri):
+        return decompress(self._cat_blob(gcs_uri), gcs_uri)
+
+    def _cat_blob(self, gcs_uri):
+        """:py:meth:`cat_file`, minus decompression."""
         blob = self._get_blob(gcs_uri)
 
         if not blob:
             return  # don't cat nonexistent files
 
-        with TemporaryFile(dir=self._local_tmp_dir) as temp:
-            blob.download_to_file(temp)
+        start = 0
 
-            # now read from that file
-            temp.seek(0)
+        while True:
+            end = start + _CAT_CHUNK_SIZE
+            try:
+                chunk = _download_as_string(blob, start=start, end=end)
+            except google.api_core.exceptions.RequestRangeNotSatisfiable:
+                return
 
-            for chunk in decompress(temp, gcs_uri):
-                yield chunk
+            yield chunk
+
+            if len(chunk) < _CAT_CHUNK_SIZE:
+                return
+
+            start = end
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on GCS because there are

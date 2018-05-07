@@ -80,6 +80,9 @@ def decompress(readable, path, bufsize=1024):
     possibly decompressing based on *path*.
 
     if *readable* appears to be a fileobj, pass it through as-is.
+
+    if *readable* does not have a ``read()`` method, assume that it's
+    a generator that yields chunks of bytes
     """
     if path.endswith('.gz'):
         return gunzip_stream(readable)
@@ -103,7 +106,15 @@ def is_compressed(path):
 def to_chunks(readable, bufsize=1024):
     """Convert *readable*, which is any object supporting ``read()``
     (e.g. fileobjs) to a stream of non-empty ``bytes``.
+
+    If *readable* has an ``__iter__`` method but not a ``read`` method,
+    pass through as-is.
     """
+    if hasattr(readable, '__iter__') and not hasattr(readable, 'read'):
+        for chunk in readable:
+            yield chunk
+        return
+
     while True:
         chunk = readable.read(bufsize)
         if chunk:

@@ -639,61 +639,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         :param step_num:
         :return: output_hadoop_job
         """
-        # Reference: https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
-
-        args = list()
-        file_uris = list()
-        archive_uris = list()
-        properties = dict()
-
-        step = self._get_step(step_num)
-
-        assert step['type'] in ('streaming', 'jar'), (
-            'Bad step type: %r' % (step['type'],))
-
-        # TODO - mtai @ davidmarin - Might be trivial to support jar running,
-        # see "main_jar_file_uri" of variable "output_hadoop_job" in
-        #         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
-
-        assert step['type'] == 'streaming', 'Jar not implemented'
-        main_jar_uri = _HADOOP_STREAMING_JAR_URI
-
-        # TODO - mtai @ davidmarin - Not clear if we should move _upload_args
-        # to file_uris, currently works fine as-is
-
-        # TODO - dmarin @ mtai - Probably a little safer to do the API's way,
-        # assuming the API supports distributed cache syntax (so we can pick
-        # the names of the uploaded files).
-        args.extend(self._upload_args())
-
-        args.extend(self._hadoop_args_for_step(step_num))
-
-        mapper, combiner, reducer = (self._hadoop_streaming_commands(step_num))
-
-        if mapper:
-            args += ['-mapper', mapper]
-
-        if combiner:
-            args += ['-combiner', combiner]
-
-        if reducer:
-            args += ['-reducer', reducer]
-
-        for current_input_uri in self._step_input_uris(step_num):
-            args += ['-input', current_input_uri]
-
-        args += ['-output', self._step_output_uri(step_num)]
-
-        # TODO - mtai @ davidmarin - Add back support to specify a different
-        # main_jar_file_uri
-        output_hadoop_job = dict(
-            args=args,
-            file_uris=file_uris,
-            archive_uris=archive_uris,
-            properties=properties,
-            main_jar_file_uri=main_jar_uri
+        return dict(
+            args=self._hadoop_streaming_jar_args(step_num),
+            main_jar_file_uri=_HADOOP_STREAMING_JAR_URI,
         )
-        return output_hadoop_job
 
     def _launch_cluster(self):
         """Create an empty cluster on Dataproc, and set self._cluster_id to

@@ -157,7 +157,7 @@ class GCSFilesystem(Filesystem):
         while True:
             end = start + _CAT_CHUNK_SIZE
             try:
-                chunk = _download_as_string(blob, start=start, end=end)
+                chunk = blob.download_as_string(start=start, end=end)
             except google.api_core.exceptions.RequestRangeNotSatisfiable:
                 return
 
@@ -293,73 +293,3 @@ def parse_gcs_uri(uri):
         raise ValueError('Invalid GCS URI: %s' % uri)
 
     return components.netloc, components.path[1:]
-
-
-# temporary shim for incremental download, taken from
-# https://github.com/GoogleCloudPlatform/google-cloud-python
-# Remove this once google-cloud-storage>1.8.0 comes out.
-
-# note that this raises RequestRangeNotSatisfiable if start is at the
-# end of the blob
-def _download_as_string(blob, client=None, start=None, end=None):
-    string_buffer = BytesIO()
-    _download_to_file(
-        blob, string_buffer, client=client, start=start, end=end)
-    return string_buffer.getvalue()
-
-# don't call the functions below directly; they're just to support
-# _download_as_string()
-
-def _download_to_file(blob, file_obj, client=None, start=None, end=None):
-    download_url = blob._get_download_url()
-    headers = _get_encryption_headers(blob._encryption_key)
-    headers['accept-encoding'] = 'gzip'
-
-    transport = blob._get_transport(client)
-    try:
-        _do_download(
-            blob, transport, file_obj, download_url, headers, start, end)
-    except google.resumable_media.InvalidResponse as exc:
-        _raise_from_invalid_response(exc)
-
-
-def _do_download(blob, transport, file_obj, download_url, headers,
-                 start=None, end=None):
-    if blob.chunk_size is None:
-        download = google.resumable_media.requests.Download(
-            download_url, stream=file_obj, headers=headers,
-            start=start, end=end)
-        download.consume(transport)
-    else:
-        download = google.resumable_media.requests.ChunkedDownload(
-            download_url, blob.chunk_size, file_obj, headers=headers,
-            start=start if start else 0, end=end)
-
-        while not download.finished:
-            download.consume_next_chunk(transport)
-
-
-def _get_encryption_headers(key, source=False):
-    if key is None:
-        return {}
-
-    key = google.cloud._helpers._to_bytes(key)
-    key_hash = hashlib.sha256(key).digest()
-    key_hash = base64.b64encode(key_hash)
-    key = base64.b64encode(key)
-
-    if source:
-        prefix = 'X-Goog-Copy-Source-Encryption-'
-    else:
-        prefix = 'X-Goog-Encryption-'
-
-    return {
-        prefix + 'Algorithm': 'AES256',
-        prefix + 'Key': google.cloud.helpers._bytes_to_unicode(key),
-        prefix + 'Key-Sha256': (
-            google.cloud.helpers._bytes_to_unicode(key_hash)),
-    }
-
-
-def _raise_from_invalid_response(error):
-    raise google.cloud.exceptions.from_http_response(error.response)

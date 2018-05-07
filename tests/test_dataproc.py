@@ -24,6 +24,7 @@ from subprocess import PIPE
 from unittest import TestCase
 
 from google.api_core.exceptions import NotFound
+from google.api_core.exceptions import RequestRangeNotSatisfiable
 
 import mrjob
 import mrjob.dataproc
@@ -1191,6 +1192,12 @@ class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
     def test_no_log_files(self):
         self.assertEqual(self.get_new_lines(), [])
 
+    def test_empty_log_file(self):
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
+        self.append_data(log_uri, b'')
+
+        self.assertEqual(self.get_new_lines(), [])
+
     def test_return_new_lines_as_available(self):
         log_uri = DRIVER_OUTPUT_URI + '.000000000'
 
@@ -1248,15 +1255,30 @@ class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
         # because we've moved beyond log0
         self.assertEqual(self.get_new_lines(), [])
 
-    def test_not_found_race_condition(self):
+    def test_not_found(self):
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
+        self.append_data(log_uri, b'log line\nanother log line\n')
+
         # in some cases the blob for the log file appears but
-        # raises NotFound when read from
+        # raises NotFound when read from, maybe an eventual consistency
+        # race condition?
         self.start(patch('tests.mock_google.storage.MockGoogleStorageBlob'
                          '.download_as_string',
                          side_effect=NotFound('race condition')))
 
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_request_range_not_satisfiable(self):
         log_uri = DRIVER_OUTPUT_URI + '.000000000'
-        self.append_data(log_uri, b'log line\nanother log line\n')
+        self.append_data(log_uri, b'')
+
+        # this is normal and happens when we request a range starting
+        # at or after the end of the file. Our mock Blob object imitates
+        # this behavior, so this test should be redundant with
+        # test_empty_log_file(), above.
+        self.start(patch('tests.mock_google.storage.MockGoogleStorageBlob'
+                         '.download_as_string',
+                         side_effect=RequestRangeNotSatisfiable('too far')))
 
         self.assertEqual(self.get_new_lines(), [])
 

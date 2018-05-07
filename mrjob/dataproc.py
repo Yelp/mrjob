@@ -38,6 +38,7 @@ from mrjob.compat import map_version
 from mrjob.conf import combine_dicts
 from mrjob.fs.composite import CompositeFilesystem
 from mrjob.fs.gcs import GCSFilesystem
+from mrjob.fs.gcs import _download_as_string
 from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.local import LocalFilesystem
@@ -891,9 +892,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
             try:
                 # TODO: use start= kwarg once google-cloud-storage 1.9 is out
-                new_data = log_blob.download_as_string()[state['pos']:]
-            except google.api_core.exceptions.NotFound:
-                # handle race condition where blob was just created
+                #new_data = log_blob.download_as_string()[state['pos']:]
+                new_data = _download_as_string(log_blob, start=state['pos'])
+            except (google.api_core.exceptions.NotFound,
+                    google.api_core.exceptions.RequestRangeNotSatisfiable):
+                # blob was just created, or no more data is available
                 break
 
             state['buffer'] += new_data

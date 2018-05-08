@@ -865,6 +865,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for log_uri in log_uris:
             # initialize log_uri with first URI we see
             if state['log_uri'] is None:
+                # log the location of job driver output just once
+                log.info(
+                    '  Parsing job driver output from %s*' % driver_output_uri)
                 state['log_uri'] = log_uri
 
             # skip log files already parsed

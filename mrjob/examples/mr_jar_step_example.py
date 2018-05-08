@@ -34,9 +34,6 @@ _RUNNER_TO_EXAMPLES_JAR = dict(
 )
 
 
-HADOOP_EXAMPLES_JAR = 'file:///home/hadoop/hadoop-examples.jar'
-
-
 class MRJarStepExample(MRJob):
     """A contrived example that runs wordcount from the hadoop example
     jar, and then does a frequency count of the frequencies."""
@@ -50,12 +47,17 @@ class MRJarStepExample(MRJob):
         jar = _RUNNER_TO_EXAMPLES_JAR[self.options.runner]
 
         return [
+            # below, can also specify main_class rather than 'wordcount'
             JarStep(
-                jar=HADOOP_EXAMPLES_JAR,
-                args=['wordcount', INPUT, OUTPUT]),
+                jar=jar,
+                args=['wordcount', INPUT, OUTPUT],#[INPUT, OUTPUT],
+                #main_class='org.apache.hadoop.examples.WordCount',
+            ),
             MRStep(
-                mapper=self.mapper, combiner=self.reducer,
-                reducer=self.reducer)
+                mapper=self.mapper,
+                combiner=self.reducer,
+                reducer=self.reducer,
+            )
         ]
 
     def mapper(self, key, freq):

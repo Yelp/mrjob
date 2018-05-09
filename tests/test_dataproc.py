@@ -35,6 +35,7 @@ from mrjob.dataproc import _CONTAINER_EXECUTOR_CLASS_NAME
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
+from mrjob.dataproc import _HADOOP_STREAMING_JAR_URI
 from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _fix_java_stack_trace
@@ -1983,3 +1984,52 @@ class JarStepTestCase(MockGoogleTestCase):
             streaming_input_arg = streaming_args[
                 streaming_args.index('-input') + 1]
             self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class HadoopStreamingJarTestCase(MockGoogleTestCase):
+
+    def get_runner_and_job(self, *args):
+        mr_job = MRWordCount(['-r', 'dataproc'] + list(args))
+        mr_job.sandbox()
+
+        runner = mr_job.make_runner()
+        runner.run()
+
+        jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+        self.assertEqual(len(jobs), 1)
+
+        return runner, jobs[0]
+
+    def test_default(self):
+        runner, job = self.get_runner_and_job()
+
+        self.assertEqual(job.hadoop_job.main_jar_file_uri,
+                         _HADOOP_STREAMING_JAR_URI)
+
+    def test_local_hadoop_streaming_jar(self):
+        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
+        open(jar_path, 'w').close()
+
+        runner, job = self.get_runner_and_job(
+            '--hadoop-streaming-jar', jar_path)
+
+        jar_uri = runner._upload_mgr.uri(jar_path)
+
+        self.assertEqual(job.hadoop_job.main_jar_file_uri, jar_uri)
+
+    def test_hadoop_streaming_jar_on_node(self):
+        jar_uri = 'file:///path/to/victory.jar'
+
+        runner, job = self.get_runner_and_job(
+            '--hadoop-streaming-jar', jar_uri)
+
+        self.assertEqual(job.hadoop_job.main_jar_file_uri, jar_uri)
+
+    def test_hadoop_streaming_jar_on_gcs(self):
+        jar_uri = 'gs://dubliners/whiskeyinthe.jar'
+        self.put_gcs_multi({jar_uri: b''})
+
+        runner, job = self.get_runner_and_job(
+            '--hadoop-streaming-jar', jar_uri)
+
+        self.assertEqual(job.hadoop_job.main_jar_file_uri, jar_uri)

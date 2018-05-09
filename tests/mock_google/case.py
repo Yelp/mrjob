@@ -25,7 +25,6 @@ from .dataproc import MockGoogleDataprocClusterClient
 from .dataproc import MockGoogleDataprocJobClient
 from .logging import MockGoogleLoggingClient
 from .storage import MockGoogleStorageClient
-from .storage import _mock_download_as_string_shim
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import Mock
 from tests.py2 import patch
@@ -81,11 +80,6 @@ class MockGoogleTestCase(SandboxedTestCase):
 
         self.start(patch('google.cloud.storage.client.Client',
                          self.storage_client))
-
-        self.start(patch('mrjob.dataproc._download_as_string',
-                         _mock_download_as_string_shim))
-        self.start(patch('mrjob.fs.gcs._download_as_string',
-                         _mock_download_as_string_shim))
 
         self.start(patch('time.sleep'))
 

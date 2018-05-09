@@ -146,10 +146,6 @@ class MockGoogleStorageBlob(object):
 
         del self._fs[self.bucket.name]['blobs'][self.name]
 
-    # this mocks a future version of this method which is
-    # currently only available in dev. Our code accesses the start and end
-    # keywords through mrjob.fs.gcs._download_as_string(). See
-    # _mock_download_as_string_shim() below.
     def download_as_string(self, client=None, start=None, end=None):
         try:
             data = self._fs[self.bucket.name]['blobs'][self.name]['data']
@@ -213,8 +209,3 @@ class MockGoogleStorageBlob(object):
             pass
 
         self.md5_hash = b64encode(md5(data).digest())
-
-
-# mock mrjob.fs.gcs._download_as_string(), which is a shim
-def _mock_download_as_string_shim(blob, client=None, start=None, end=None):
-    return blob.download_as_string(client=client, start=start, end=end)

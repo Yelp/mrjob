@@ -53,6 +53,8 @@ from mrjob.util import save_current_environment
 from tests.mock_google import MockGoogleTestCase
 from tests.mock_google.storage import MockGoogleStorageBlob
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_jar_and_streaming import MRJarAndStreaming
+from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
@@ -1862,3 +1864,122 @@ class CloudUploadPartSizeTestCase(MockGoogleTestCase):
         for call_args in self.upload_from_string.call_args_list:
             blob = call_args[0][0]
             self.assertEqual(blob.chunk_size, 2 * 1024 * 1024)
+
+
+class JarStepTestCase(MockGoogleTestCase):
+
+    def test_local_jar_gets_uploaded(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        with open(fake_jar, 'w'):
+            pass
+
+        job = MRJustAJar(['-r', 'dataproc', '--jar', fake_jar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(fake_jar, runner._upload_mgr.path_to_uri())
+            jar_uri = runner._upload_mgr.uri(fake_jar)
+            self.assertTrue(runner.fs.ls(jar_uri))
+
+            jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+
+            self.assertEqual(len(jobs), 1)
+            self.assertEqual(jobs[0].hadoop_job.main_jar_file_uri, jar_uri)
+
+    def test_jar_on_gcs(self):
+        jar_uri = 'gs://dubliners/whiskeyinthe.jar'
+        self.put_gcs_multi({jar_uri: b''})
+
+        job = MRJustAJar(['-r', 'dataproc', '--jar', jar_uri])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+
+            self.assertEqual(len(jobs), 1)
+            self.assertEqual(jobs[0].hadoop_job.main_jar_file_uri, jar_uri)
+
+            # for comparison with test_main_class()
+            self.assertFalse(jobs[0].hadoop_job.main_class)
+
+    def test_main_class(self):
+        jar_uri = 'gs://dubliners/whiskeyinthe.jar'
+        self.put_gcs_multi({jar_uri: b''})
+
+        job = MRJustAJar(['-r', 'dataproc', '--jar', jar_uri,
+                          '--main-class', 'ThingAnalyzer'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+
+            self.assertEqual(len(jobs), 1)
+            self.assertEqual(jobs[0].hadoop_job.jar_file_uris, [jar_uri])
+            self.assertEqual(jobs[0].hadoop_job.main_class, 'ThingAnalyzer')
+
+            # main_jar_file_uri and main_class are mutually exclusive
+            self.assertFalse(jobs[0].hadoop_job.main_jar_file_uri)
+
+    def test_jar_inside_dataproc(self):
+        jar_uri = (
+            'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar')
+
+        job = MRJustAJar(['-r', 'dataproc', '--jar', jar_uri])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+
+            self.assertEqual(len(jobs), 1)
+            # Dataproc accepts file:// URIs as-is
+            self.assertEqual(jobs[0].hadoop_job.main_jar_file_uri, jar_uri)
+
+    def test_input_output_interpolation(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        open(fake_jar, 'w').close()
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
+
+        job = MRJarAndStreaming(
+            ['-r', 'dataproc', '--jar', fake_jar, input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            jobs = sorted(runner._list_jobs(cluster_name=runner._cluster_id),
+                          key=lambda j: j.reference.job_id)
+
+            self.assertEqual(len(jobs), 2)
+            jar_job, streaming_job = jobs
+
+            jar_uri = runner._upload_mgr.uri(fake_jar)
+
+            self.assertEqual(jar_job.hadoop_job.main_jar_file_uri, jar_uri)
+            jar_args = jar_job.hadoop_job.args
+
+            self.assertEqual(len(jar_args), 3)
+            self.assertEqual(jar_args[0], 'stuff')
+
+            # check input is interpolated
+            input_arg = ','.join(
+                runner._upload_mgr.uri(path) for path in (input1, input2))
+            self.assertEqual(jar_args[1], input_arg)
+
+            # check output of jar is input of next step
+            jar_output_arg = jar_args[2]
+
+            streaming_args = list(streaming_job.hadoop_job.args)
+            streaming_input_arg = streaming_args[
+                streaming_args.index('-input') + 1]
+            self.assertEqual(jar_output_arg, streaming_input_arg)

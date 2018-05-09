@@ -516,10 +516,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
-        # TODO - mtai @ davidmarin - hadoop_streaming_jar is currently ignored,
-        # see _HADOOP_STREAMING_JAR_URI
-        # if self._opts['hadoop_streaming_jar']:
-        #     self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
+        if self._opts['hadoop_streaming_jar']:
+           self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
         for step in self._get_steps():
             if step.get('jar'):
@@ -631,68 +629,47 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         _wait_for('GCS sync (eventual consistency)',
                   self._opts['cloud_fs_sync_secs'])
 
-    def _build_dataproc_hadoop_job(self, step_num):
-        """This function creates a "HadoopJob" to be passed to
-        self._submit_hadoop_job
-
-        :param step_num:
-        :return: output_hadoop_job
+    def _streaming_step_job_kwarg(self, step_num):
+        """Returns a map from ``'hadoop_job'`` to a dict representing
+        a hadoop streaming job.
         """
-        # Reference: https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
-
-        args = list()
-        file_uris = list()
-        archive_uris = list()
-        properties = dict()
-
         step = self._get_step(step_num)
 
-        assert step['type'] in ('streaming', 'jar'), (
-            'Bad step type: %r' % (step['type'],))
-
-        # TODO - mtai @ davidmarin - Might be trivial to support jar running,
-        # see "main_jar_file_uri" of variable "output_hadoop_job" in
-        #         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
-
-        assert step['type'] == 'streaming', 'Jar not implemented'
-        main_jar_uri = _HADOOP_STREAMING_JAR_URI
-
-        # TODO - mtai @ davidmarin - Not clear if we should move _upload_args
-        # to file_uris, currently works fine as-is
-
-        # TODO - dmarin @ mtai - Probably a little safer to do the API's way,
-        # assuming the API supports distributed cache syntax (so we can pick
-        # the names of the uploaded files).
-        args.extend(self._upload_args())
-
-        args.extend(self._hadoop_args_for_step(step_num))
-
-        mapper, combiner, reducer = (self._hadoop_streaming_commands(step_num))
-
-        if mapper:
-            args += ['-mapper', mapper]
-
-        if combiner:
-            args += ['-combiner', combiner]
-
-        if reducer:
-            args += ['-reducer', reducer]
-
-        for current_input_uri in self._step_input_uris(step_num):
-            args += ['-input', current_input_uri]
-
-        args += ['-output', self._step_output_uri(step_num)]
-
-        # TODO - mtai @ davidmarin - Add back support to specify a different
-        # main_jar_file_uri
-        output_hadoop_job = dict(
-            args=args,
-            file_uris=file_uris,
-            archive_uris=archive_uris,
-            properties=properties,
-            main_jar_file_uri=main_jar_uri
+        return dict(
+            hadoop_job=dict(
+                args=self._hadoop_streaming_jar_args(step_num),
+                main_jar_file_uri=self._hadoop_streaming_jar_uri(),
+            )
         )
-        return output_hadoop_job
+
+    def _jar_step_job_kwarg(self, step_num):
+        """Returns a map from ``'hadoop_job'`` to a dict representing
+        a Hadoop job that runs a JAR"""
+        step = self._get_step(step_num)
+
+        hadoop_job = {}
+
+        hadoop_job['args'] = (
+            self._hadoop_generic_args_for_step(step_num) +
+            self._interpolate_input_and_output(step['args'], step_num))
+
+        jar_uri = self._upload_mgr.uri(step['jar'])
+
+        # can't specify main_class and main_jar_file_uri; see
+        # https://cloud.google.com/dataproc/docs/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
+        if step.get('main_class'):
+            hadoop_job['jar_file_uris'] = [jar_uri]
+            hadoop_job['main_class'] = step['main_class']
+        else:
+            hadoop_job['main_jar_file_uri'] = jar_uri
+
+        return dict(hadoop_job=hadoop_job)
+
+    def _hadoop_streaming_jar_uri(self):
+        if self._opts['hadoop_streaming_jar']:
+            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar'])
+        else:
+            return _HADOOP_STREAMING_JAR_URI
 
     def _launch_cluster(self):
         """Create an empty cluster on Dataproc, and set self._cluster_id to
@@ -763,16 +740,27 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._wait_for_fs_sync()
 
     def _launch_step(self, step_num):
-        # Build each step
-        hadoop_job = self._build_dataproc_hadoop_job(step_num)
+        step = self._get_step(step_num)
 
         # Clean-up step name
         step_name = '%s---step-%05d-of-%05d' % (
             self._dataproc_job_prefix(), step_num + 1, self._num_steps())
 
+        # Build step
+
+        # job_kwarg is a single-item dict, where the key is 'hadoop_job',
+        # 'spark_job', etc.
+        if step['type'] == 'streaming':
+            job_kwarg = self._streaming_step_job_kwarg(step_num)
+        elif step['type'] == 'jar':
+            job_kwarg = self._jar_step_job_kwarg(step_num)
+        else:
+            raise NotImplementedError(
+                'Unsupported step type: %r' % step['type'])
+
         # Submit it
         log.info('Submitting Dataproc Hadoop Job - %s', step_name)
-        result = self._submit_hadoop_job(step_name, hadoop_job)
+        result = self._submit_job(step_name, job_kwarg)
         log.info('Submitted Dataproc Hadoop Job - %s', step_name)
 
         job_id = result.reference.job_id
@@ -876,6 +864,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for log_uri in log_uris:
             # initialize log_uri with first URI we see
             if state['log_uri'] is None:
+                # log the location of job driver output just once
+                log.info(
+                    '  Parsing job driver output from %s*' % driver_output_uri)
                 state['log_uri'] = log_uri
 
             # skip log files already parsed
@@ -1250,18 +1241,24 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             **self._project_id_and_region()
         )
 
-    def _submit_hadoop_job(self, step_name, hadoop_job):
+    def _submit_job(self, step_name, job_kwarg):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/submit  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobReference  # noqa
-        return self.job_client.submit_job(
+
+        submit_job_kwargs = dict(
             job=dict(
                 reference=dict(project_id=self._project_id, job_id=step_name),
                 placement=dict(cluster_name=self._cluster_id),
-                hadoop_job=hadoop_job,
+                **job_kwarg
             ),
             **self._project_id_and_region()
         )
+
+        log.debug('  submit_job(%s)' % ', '.join(
+            '%s=%r' % (k, v) for k, v in sorted(submit_job_kwargs.items())))
+
+        return self.job_client.submit_job(**submit_job_kwargs)
 
     def _project_id_and_region(self):
         return dict(

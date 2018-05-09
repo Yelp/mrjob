@@ -310,7 +310,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'emr_endpoint',
         'enable_emr_debugging',
         'hadoop_extra_args',
-        'hadoop_streaming_jar',
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',

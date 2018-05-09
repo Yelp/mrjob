@@ -12,10 +12,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-"""A simple example of linking a hadoop jar with a Python step.
+"""A simple example of linking a hadoop jar with a Python step. This
+calculates the frequency of various word frequencies in a text file.
 
-This example only works out-of-the-box on EMR; to make it work on Hadoop,
-change HADOOP_EXAMPLES_JAR to the (local) path of your hadoop-examples.jar.
+This example works out-of-the box on EMR and Google Cloud Dataproc.
 
 This also only works on a single input path/directory, due to limitations
 of the example jar.
@@ -33,6 +33,7 @@ _RUNNER_TO_EXAMPLES_JAR = dict(
     emr='file:///home/hadoop/hadoop-examples.jar',
 )
 
+_WORDCOUNT_MAIN_CLASS = 'org.apache.hadoop.examples.WordCount'
 
 class MRJarStepExample(MRJob):
     """A contrived example that runs wordcount from the hadoop example
@@ -41,18 +42,29 @@ class MRJarStepExample(MRJob):
     def configure_args(self):
         super(MRJarStepExample, self).configure_args()
 
+        self.add_passthru_arg(
+            '--use-main-class', dest='use_main_class',
+            default=False, action='store_true')
+
         self.pass_arg_through('--runner')
 
     def steps(self):
         jar = _RUNNER_TO_EXAMPLES_JAR[self.options.runner]
 
-        return [
-            # below, can also specify main_class rather than 'wordcount'
-            JarStep(
+        if self.options.use_main_class:
+            jar_step = JarStep(
                 jar=jar,
-                args=['wordcount', INPUT, OUTPUT],#[INPUT, OUTPUT],
-                #main_class='org.apache.hadoop.examples.WordCount',
-            ),
+                args=[INPUT, OUTPUT],
+                main_class=_WORDCOUNT_MAIN_CLASS,
+            )
+        else:
+            jar_step = JarStep(
+                jar=jar,
+                args=['wordcount', INPUT, OUTPUT],
+            )
+
+        return [
+            jar_step,
             MRStep(
                 mapper=self.mapper,
                 combiner=self.reducer,

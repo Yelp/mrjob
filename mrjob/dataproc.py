@@ -1248,7 +1248,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/submit  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobReference  # noqa
-        return self.job_client.submit_job(
+
+        submit_job_kwargs = dict(
             job=dict(
                 reference=dict(project_id=self._project_id, job_id=step_name),
                 placement=dict(cluster_name=self._cluster_id),
@@ -1256,6 +1257,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             ),
             **self._project_id_and_region()
         )
+
+        log.debug('  submit_job(%s)' % ', '.join(
+            '%s=%r' % (k, v) for k, v in sorted(submit_job_kwargs.items())))
+
+        return self.job_client.submit_job(**submit_job_kwargs)
 
     def _project_id_and_region(self):
         return dict(

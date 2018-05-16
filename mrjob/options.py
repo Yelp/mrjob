@@ -1258,7 +1258,7 @@ def _filter_by_role(opt_names, *cloud_roles):
     return {
         opt_name
         for opt_name, conf in _RUNNER_OPTS.items()
-        if conf.get('cloud_role') in cloud_roles
+        if opt_name in opt_names and conf.get('cloud_role') in cloud_roles
     }
 
 

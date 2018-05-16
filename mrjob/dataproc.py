@@ -1189,7 +1189,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         cluster_config['master_config'] = master_conf
         cluster_config['worker_config'] = worker_conf
-        if self._opts['num_task_instances']:
+        if secondary_worker_conf.get('num_instances'):
             cluster_config['secondary_worker_config'] = secondary_worker_conf
 
         # See - https://cloud.google.com/dataproc/dataproc-versions

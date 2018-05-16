@@ -840,6 +840,13 @@ class InstanceConfigTestCase(MockGoogleTestCase):
         self.assertEqual(
             conf.worker_config.disk_config.num_local_ssds, 2)
 
+    def test_can_override_num_instances(self):
+        conf = self._get_cluster_config(
+            '--core-instance-config', '{"num_instances": 10}')
+
+        self.assertEqual(
+            conf.worker_config.num_instances, 10)
+
     def test_set_task_config(self):
         conf = self._get_cluster_config(
             '--num-task-instances', '3',
@@ -856,6 +863,16 @@ class InstanceConfigTestCase(MockGoogleTestCase):
 
         self.assertFalse(
             conf.secondary_worker_config.disk_config.boot_disk_size_gb)
+
+    def test_can_set_num_instances_through_task_config(self):
+        conf = self._get_cluster_config(
+            '--task-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 300}, "num_instances": 3}')
+
+        self.assertEqual(
+            conf.secondary_worker_config.num_instances, 3)
+        self.assertEqual(
+            conf.secondary_worker_config.disk_config.boot_disk_size_gb, 300)
 
     def test_preemtible_task_instances(self):
         conf = self._get_cluster_config(

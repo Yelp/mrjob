@@ -30,6 +30,8 @@ from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _job_state_name
 from mrjob.util import random_identifier
 
+# default boot disk size set by the API
+_DEFAULT_BOOT_DISK_SIZE_GB = 500
 
 # convert strings (e.g. 'RUNNING') to enum values
 
@@ -103,6 +105,10 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
         if not cluster.cluster_name:
             raise InvalidArgument('Cluster name is required')
+
+        # add in default disk config
+        if not cluster.disk_config.boot_disk_size_gb:
+            cluster.disk_config.boot_disk_size_gb = _DEFAULT_BOOT_DISK_SIZE_GB
 
         # initialize cluster status
         cluster.status.state = _cluster_state_value('CREATING')

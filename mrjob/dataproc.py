@@ -226,8 +226,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     alias = 'dataproc'
 
     OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
+        'core_instance_config',
         'gcloud_bin',
+        'master_instance_config',
         'project_id',
+        'task_instance_config',
     }
 
     def __init__(self, **kwargs):
@@ -1162,6 +1165,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             project=self._project_id, zone=self._opts['zone'],
             count=1, instance_type=self._opts['master_instance_type'],
         )
+        if self._opts['master_instance_config']:
+            master_conf.update(self._opts['master_instance_config'])
 
         # Compute + storage
         worker_conf = _gcp_instance_group_config(
@@ -1169,6 +1174,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             count=self._opts['num_core_instances'],
             instance_type=self._opts['core_instance_type']
         )
+        if self._opts['core_instance_config']:
+            worker_conf.update(self._opts['core_instance_config'])
 
         # Compute ONLY
         secondary_worker_conf = _gcp_instance_group_config(
@@ -1177,6 +1184,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             instance_type=self._opts['task_instance_type'],
             is_preemptible=True
         )
+        if self._opts['task_instance_config']:
+            secondary_worker_conf.update(self._opts['task_instance_config'])
 
         cluster_config['master_config'] = master_conf
         cluster_config['worker_config'] = worker_conf

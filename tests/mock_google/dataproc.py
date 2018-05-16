@@ -22,6 +22,7 @@ from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
 from google.cloud.dataproc_v1.types import Cluster
 from google.cloud.dataproc_v1.types import ClusterStatus
+from google.cloud.dataproc_v1.types import DiskConfig
 from google.cloud.dataproc_v1.types import Job
 from google.cloud.dataproc_v1.types import JobStatus
 
@@ -31,7 +32,7 @@ from mrjob.dataproc import _job_state_name
 from mrjob.util import random_identifier
 
 # default boot disk size set by the API
-_DEFAULT_BOOT_DISK_SIZE_GB = 500
+_DEFAULT_DISK_SIZE_GB = 500
 
 # convert strings (e.g. 'RUNNING') to enum values
 
@@ -107,8 +108,14 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
             raise InvalidArgument('Cluster name is required')
 
         # add in default disk config
-        if not cluster.disk_config.boot_disk_size_gb:
-            cluster.disk_config.boot_disk_size_gb = _DEFAULT_BOOT_DISK_SIZE_GB
+        for x in ('master', 'worker', 'secondary_worker'):
+            field = x + '_config'
+            conf = getattr(cluster.config, field, None)
+            if conf and str(conf):  # empty DiskConfigs are still true-ish
+                if not conf.disk_config:
+                    conf.disk_config = DiskConfig()
+                if not conf.disk_config.boot_disk_size_gb:
+                    conf.disk_config.boot_disk_size_gb = _DEFAULT_DISK_SIZE_GB
 
         # initialize cluster status
         cluster.status.state = _cluster_state_value('CREATING')

@@ -621,7 +621,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         self.assertEqual(runner._region(), US_EAST_GCE_REGION)
 
 
-class GCEInstanceGroupTestCase(MockGoogleTestCase):
+class InstanceTypeAndNumberTestCase(MockGoogleTestCase):
 
     maxDiff = None
 
@@ -803,6 +803,85 @@ class GCEInstanceGroupTestCase(MockGoogleTestCase):
             master=(1, DEFAULT_GCE_INSTANCE),
             core=(5, HIGHCPU_GCE_INSTANCE),
             task=(20, HIGHCPU_GCE_INSTANCE))
+
+
+class InstanceConfigTestCase(MockGoogleTestCase):
+    # test the *_instance_config options
+
+    def _get_cluster_config(self, *args):
+        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            return runner._get_cluster(runner._cluster_id).config
+
+    def test_default(self):
+        conf = self._get_cluster_config()
+
+        self.assertEqual(
+            conf.master_config.disk_config.boot_disk_size_gb, 500)
+        self.assertEqual(
+            conf.worker_config.disk_config.boot_disk_size_gb, 500)
+
+    def test_set_disk_config(self):
+        conf = self._get_cluster_config(
+            '--master-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 100}}',
+            '--core-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 200, "num_local_ssds": 2}}')
+
+        self.assertEqual(
+            conf.master_config.disk_config.boot_disk_size_gb, 100)
+        self.assertFalse(
+            conf.master_config.disk_config.num_local_ssds)
+        self.assertEqual(
+            conf.worker_config.disk_config.boot_disk_size_gb, 200)
+        self.assertEqual(
+            conf.worker_config.disk_config.num_local_ssds, 2)
+
+    def test_can_override_num_instances(self):
+        conf = self._get_cluster_config(
+            '--core-instance-config', '{"num_instances": 10}')
+
+        self.assertEqual(
+            conf.worker_config.num_instances, 10)
+
+    def test_set_task_config(self):
+        conf = self._get_cluster_config(
+            '--num-task-instances', '3',
+            '--task-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 300}}')
+
+        self.assertEqual(
+            conf.secondary_worker_config.disk_config.boot_disk_size_gb, 300)
+
+    def test_dont_set_task_config_if_no_task_instances(self):
+        conf = self._get_cluster_config(
+            '--task-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 300}}')
+
+        self.assertFalse(
+            conf.secondary_worker_config.disk_config.boot_disk_size_gb)
+
+    def test_can_set_num_instances_through_task_config(self):
+        conf = self._get_cluster_config(
+            '--task-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 300}, "num_instances": 3}')
+
+        self.assertEqual(
+            conf.secondary_worker_config.num_instances, 3)
+        self.assertEqual(
+            conf.secondary_worker_config.disk_config.boot_disk_size_gb, 300)
+
+    def test_preemtible_task_instances(self):
+        conf = self._get_cluster_config(
+            '--num-task-instances', '3',
+            '--task-instance-config',
+            '{"is_preemptible": true}')
+
+        self.assertTrue(
+            conf.secondary_worker_config.is_preemptible)
 
 
 class MasterBootstrapScriptTestCase(MockGoogleTestCase):

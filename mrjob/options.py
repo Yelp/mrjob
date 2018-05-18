@@ -495,6 +495,21 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    core_instance_config=dict(
+        cloud_role='launch',
+        switches=[
+            (['--core-instance-config'], dict(
+                action=_JSONAction,
+                help=('detailed JSON dict of configs for the core'
+                      ' (worker) instances'
+                      ' on Dataproc, including disk config. For format, see'
+                      ' https://cloud.google.com/dataproc/docs/reference/rest'
+                      '/v1/projects.regions.clusters#InstanceGroupConfig'
+                      ' (except that fields in your JSON should use'
+                      ' snake_case, not camelCase).')
+            )),
+        ],
+    ),
     core_instance_bid_price=dict(
         cloud_role='launch',
         switches=[
@@ -699,7 +714,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--instance-groups'], dict(
                 action=_JSONAction,
-                help=('detailed JSON list of instance configs, including'
+                help=('detailed JSON list of EMR instance configs, including'
                       ' EBS configuration. See docs for --instance-groups'
                       ' at http://docs.aws.amazon.com/cli/latest/reference'
                       '/emr/create-cluster.html'),
@@ -780,6 +795,20 @@ _RUNNER_OPTS = dict(
                 help=('Bid price to specify for the master node when'
                       ' setting it up as an EC2 spot instance (you probably'
                       ' only want to do this for task instances).'),
+            )),
+        ],
+    ),
+    master_instance_config=dict(
+        cloud_role='launch',
+        switches=[
+            (['--master-instance-config'], dict(
+                action=_JSONAction,
+                help=('detailed JSON dict of configs for the master instance'
+                      ' on Dataproc including disk config. For format, see'
+                      ' https://cloud.google.com/dataproc/docs/reference/rest'
+                      '/v1/projects.regions.clusters#InstanceGroupConfig'
+                      ' (except that fields in your JSON should use'
+                      ' snake_case, not camelCase).')
             )),
         ],
     ),
@@ -1110,6 +1139,21 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    task_instance_config=dict(
+        cloud_role='launch',
+        switches=[
+            (['--task-instance-config'], dict(
+                action=_JSONAction,
+                help=('detailed JSON dict of configs for the task'
+                      ' (secondary worker) instances'
+                      ' on Dataproc including disk config. For format, see'
+                      ' https://cloud.google.com/dataproc/docs/reference/rest'
+                      '/v1/projects.regions.clusters#InstanceGroupConfig'
+                      ' (except that fields in your JSON should use'
+                      ' snake_case, not camelCase).')
+            )),
+        ],
+    ),
     task_instance_type=dict(
         cloud_role='launch',
         switches=[
@@ -1214,7 +1258,7 @@ def _filter_by_role(opt_names, *cloud_roles):
     return {
         opt_name
         for opt_name, conf in _RUNNER_OPTS.items()
-        if conf.get('cloud_role') in cloud_roles
+        if opt_name in opt_names and conf.get('cloud_role') in cloud_roles
     }
 
 

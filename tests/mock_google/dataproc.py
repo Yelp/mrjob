@@ -107,6 +107,11 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
         if not cluster.cluster_name:
             raise InvalidArgument('Cluster name is required')
 
+        # TODO: could better mock behavior of service_account_scopes,
+        # including default values, and sorting, though this doesn't affect
+        # existing tests. See:
+        # https://cloud.google.com/dataproc/docs/reference/rest/v1/projects.regions.clusters#GceClusterConfig
+
         # add in default disk config
         for x in ('master', 'worker', 'secondary_worker'):
             field = x + '_config'

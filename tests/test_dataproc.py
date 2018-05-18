@@ -34,6 +34,7 @@ from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _CONTAINER_EXECUTOR_CLASS_NAME
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_GCE_REGION
+from mrjob.dataproc import _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _HADOOP_STREAMING_JAR_URI
 from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
@@ -439,6 +440,64 @@ class AvailabilityZoneConfigTestCase(MockGoogleTestCase):
                           cluster.config.master_config.machine_type_uri)
             self.assertIn(self.ZONE,
                           cluster.config.worker_config.machine_type_uri)
+
+
+class GCEClusterConfigTestCase(MockGoogleTestCase):
+    # test service_account, service_account_scopes
+
+    def _get_gce_cluster_config(self, *args):
+        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            return runner._get_cluster(
+                runner._cluster_id).config.gce_cluster_config
+
+    def test_default(self):
+        gcc = self._get_gce_cluster_config()
+
+        self.assertFalse(gcc.service_account)
+        self.assertEqual(set(gcc.service_account_scopes),
+                         set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
+
+    def test_service_account(self):
+        account = '12345678901-compute@developer.gserviceaccount.com'
+
+        gcc = self._get_gce_cluster_config(
+            '--service-account', account)
+
+        self.assertEqual(gcc.service_account, account)
+
+    def test_service_account_scopes(self):
+        scope1 = 'https://www.googleapis.com/auth/scope1'
+        scope2 = 'https://www.googleapis.com/auth/scope2'
+
+        gcc = self._get_gce_cluster_config(
+            '--service-account-scope', scope1,
+            '--service-account-scope', scope2)
+
+        self.assertGreater(
+            set(gcc.service_account_scopes),
+            set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
+        self.assertIn(scope1, set(gcc.service_account_scopes))
+        self.assertIn(scope2, set(gcc.service_account_scopes))
+
+    def test_clear_service_account_scopes(self):
+        # it's possible to use less service accounts than the default,
+        # just not very wise
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    service_account_scopes: !clear')
+
+        self.mrjob_conf_patcher.stop()
+        gcc = self._get_gce_cluster_config('-c', conf_path)
+        self.mrjob_conf_patcher.start()
+
+        self.assertLess(
+            set(gcc.service_account_scopes),
+            set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
+
 
 
 class ProjectIDTestCase(MockGoogleTestCase):
@@ -882,6 +941,9 @@ class InstanceConfigTestCase(MockGoogleTestCase):
 
         self.assertTrue(
             conf.secondary_worker_config.is_preemptible)
+
+
+
 
 
 class MasterBootstrapScriptTestCase(MockGoogleTestCase):

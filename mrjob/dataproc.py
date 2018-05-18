@@ -230,6 +230,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'gcloud_bin',
         'master_instance_config',
         'project_id',
+        'service_account',
+        'service_account_scopes',
         'task_instance_config',
     }
 
@@ -348,6 +350,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 master_instance_type=_DEFAULT_INSTANCE_TYPE,
                 num_core_instances=_DATAPROC_MIN_WORKERS,
                 num_task_instances=0,
+                service_account_scopes=list(
+                    _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES),
                 sh_bin=['/bin/sh', '-ex'],
             )
         )
@@ -1144,9 +1148,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._opts['max_mins_idle'] * 60))
 
         gce_cluster_config = dict(
-            service_account_scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
-            metadata=cluster_metadata
+            metadata=cluster_metadata,
+            service_account_scopes=self._opts['service_account_scopes'],
         )
+
+        if self._opts['service_account']:
+            gce_cluster_config['service_account'] = (
+                self._opts['service_account'])
 
         if self._opts['zone']:
             gce_cluster_config['zone_uri'] = _gcp_zone_uri(

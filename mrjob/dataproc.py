@@ -226,6 +226,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     alias = 'dataproc'
 
     OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
+        'cluster_properties',
         'core_instance_config',
         'gcloud_bin',
         'master_instance_config',
@@ -1200,10 +1201,17 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if secondary_worker_conf.get('num_instances'):
             cluster_config['secondary_worker_config'] = secondary_worker_conf
 
+        software_config = {}
+
+        if self._opts['cluster_properties']:
+            software_config['properties'] = self._opts['cluster_properties']
+
         # See - https://cloud.google.com/dataproc/dataproc-versions
         if self._opts['image_version']:
-            cluster_config['software_config'] = dict(
-                image_version=self._opts['image_version'])
+            software_config['image_version'] = self._opts['image_version']
+
+        if software_config:
+            cluster_config['software_config'] = software_config
 
         # in Python 2, dict keys loaded from JSON will be unicode, which
         # the Google protobuf objects don't like

@@ -484,6 +484,20 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    cluster_properties=dict(
+        combiner=combine_dicts,
+        switches=[
+            (['--cluster-property'], dict(
+                action=_KeyValueAction,
+                help=('Properties to set in Hadoop config files on Dataproc.'
+                      'Args take the form file_prefix:property=value.'
+                      ' You can use --cluster-property multiple times.'
+                      ' For more info, see'
+                      ' https://cloud.google.com/dataproc/docs/concepts'
+                      '/configuring-clusters/cluster-properties'),
+            )),
+        ],
+    ),
     cmdenv=dict(
         combiner=combine_envs,
         switches=[

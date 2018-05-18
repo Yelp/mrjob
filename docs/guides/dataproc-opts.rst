@@ -107,6 +107,8 @@ Cluster creation and configuration
    you'll want to use :mrjob-opt:`num_core_instances` and
    :mrjob-opt:`core_instance_type` along with this option.
 
+   .. versionadded:: 0.6.3
+
 .. mrjob-opt::
    :config: master_instance_config
    :switch: --master-instance-config
@@ -116,6 +118,8 @@ Cluster creation and configuration
    A dictionary of additional parameters to pass as ``config.master_config``
    when creating the cluster. See :mrjob-opt:`core_instance_config` for
    more details.
+
+   .. versionadded:: 0.6.3
 
 .. mrjob-opt::
    :config: task_instance_config
@@ -140,6 +144,8 @@ Cluster creation and configuration
    Note that this config won't be applied unless you specify at least one
    task instance (either through :mrjob-opt:`num_task_instances` or
    by passing ``num_instances`` to this option).
+
+   .. versionadded:: 0.6.3
 
 Bootstrapping
 -------------

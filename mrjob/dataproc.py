@@ -1197,6 +1197,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             cluster_config['software_config'] = dict(
                 image_version=self._opts['image_version'])
 
+        # in Python 2, dict keys loaded from JSON will be unicode, which
+        # the Google protobuf objects don't like
+        if PY2:
+            cluster_config = _clean_json_dict_keys(cluster_config)
+
         kwargs = dict(project_id=self._project_id,
                       cluster_name=self._cluster_id,
                       config=cluster_config)
@@ -1391,3 +1396,15 @@ def _fix_traceback(s):
     s = _TRACEBACK_EXCEPTION_RE.sub(lambda m: '\n' + m.group(0), s)
 
     return s
+
+
+def _clean_json_dict_keys(x):
+    """Cast any dictionary keys in the given JSON object to str.
+    We can assume that x isn't a recursive data structure, and that
+    this is only called in Python 2."""
+    if isinstance(x, dict):
+        return {str(k): _clean_json_dict_keys(v) for k, v in x.items()}
+    elif isinstance(x, list):
+        return [_clean_json_dict_keys(item) for item in x]
+    else:
+        return x

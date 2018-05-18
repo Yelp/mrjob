@@ -34,6 +34,23 @@ from mrjob.util import random_identifier
 # default boot disk size set by the API
 _DEFAULT_DISK_SIZE_GB = 500
 
+# account scopes that are included whether you ask for them or not
+# for more info, see:
+# https://cloud.google.com/dataproc/docs/reference/rest/v1/projects.regions.clusters#GceClusterConfig  # noqa
+_MANDATORY_SCOPES = {
+    'https://www.googleapis.com/auth/cloud.useraccounts.readonly',
+    'https://www.googleapis.com/auth/devstorage.read_write',
+    'https://www.googleapis.com/auth/logging.write',
+}
+
+# account scopes that are included if you don't specify any
+_DEFAULT_SCOPES = {
+    'https://www.googleapis.com/auth/bigquery',
+    'https://www.googleapis.com/auth/bigtable.admin.table',
+    'https://www.googleapis.com/auth/bigtable.data',
+    'https://www.googleapis.com/auth/devstorage.full_control',
+}
+
 # convert strings (e.g. 'RUNNING') to enum values
 
 def _cluster_state_value(state_name):
@@ -121,6 +138,19 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
                     conf.disk_config = DiskConfig()
                 if not conf.disk_config.boot_disk_size_gb:
                     conf.disk_config.boot_disk_size_gb = _DEFAULT_DISK_SIZE_GB
+
+        # update gce_cluster_config
+        gce_config = cluster.config.gce_cluster_config
+
+        # add in default scopes and sort
+        scopes = set(gce_config.service_account_scopes)
+
+        if not scopes:
+            scopes.update(_DEFAULT_SCOPES)
+        scopes.update(_MANDATORY_SCOPES)
+
+        gce_config.service_account_scopes[:] = sorted(scopes)
+
 
         # initialize cluster status
         cluster.status.state = _cluster_state_value('CREATING')

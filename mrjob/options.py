@@ -976,6 +976,28 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    service_account=dict(
+        cloud_role='launch',
+        switches=[
+            (['--service-account'], dict(
+                help=('Service account to use when creating a Dataproc'
+                      ' cluster. Usually takes the form'
+                      ' [account_id]@[project_id].iam.gserviceaccount.com.'
+                      ' Set to "" to use the default.'),
+            )),
+        ],
+    ),
+    service_account_scopes=dict(
+        cloud_role='launch',
+        combiner=combine_lists,
+        switches=[
+            (['--service-account-scope'], dict(
+                action='append',
+                help=('Additional service account scope to use when creating'
+                      ' a Dataproc cluster.'),
+            )),
+        ],
+    ),
     setup=dict(
         combiner=combine_lists,
         switches=[

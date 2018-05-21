@@ -526,6 +526,20 @@ class ClusterPropertiesTestCase(MockGoogleTestCase):
         self.assertEqual(props['dataproc:dataproc.allow.zero.workers'], 'true')
         self.assertEqual(props['mapred:mapreduce.map.memory.mb'], '1024')
 
+    def test_convert_conf_values_to_strings(self):
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    cluster_properties:\n'
+            b"      'dataproc:dataproc.allow.zero.workers': true\n"
+            b"      'hdfs:dfs.namenode.handler.count': 40\n")
+
+        self.mrjob_conf_patcher.stop()
+        props = self._get_cluster_properties('-c', conf_path)
+        self.mrjob_conf_patcher.start()
+
+        self.assertEqual(props['dataproc:dataproc.allow.zero.workers'], 'true')
+        self.assertEqual(props['hdfs:dfs.namenode.handler.count'], '40')
+
 
 class ProjectIDTestCase(MockGoogleTestCase):
 

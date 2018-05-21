@@ -51,6 +51,38 @@ _DEFAULT_SCOPES = {
     'https://www.googleapis.com/auth/devstorage.full_control',
 }
 
+# actual properties taken from Dataproc
+_DEFAULT_CLUSTER_PROPERTIES = {
+    'distcp:mapreduce.map.java.opts': '-Xmx2457m',
+    'distcp:mapreduce.map.memory.mb': '3072',
+    'distcp:mapreduce.reduce.java.opts': '-Xmx2457m',
+    'distcp:mapreduce.reduce.memory.mb': '3072',
+    'hdfs:dfs.namenode.handler.count': '20',
+    'hdfs:dfs.namenode.service.handler.count': '10',
+    'mapred-env:HADOOP_JOB_HISTORYSERVER_HEAPSIZE': '1000',
+    'mapred:mapreduce.map.cpu.vcores': '1',
+    'mapred:mapreduce.map.java.opts': '-Xmx2457m',
+    'mapred:mapreduce.map.memory.mb': '3072',
+    'mapred:mapreduce.reduce.cpu.vcores': '1',
+    'mapred:mapreduce.reduce.java.opts': '-Xmx2457m',
+    'mapred:mapreduce.reduce.memory.mb': '3072',
+    'mapred:yarn.app.mapreduce.am.command-opts': '-Xmx2457m',
+    'mapred:yarn.app.mapreduce.am.resource.cpu-vcores': '1',
+    'mapred:yarn.app.mapreduce.am.resource.mb': '3072',
+    'spark-env:SPARK_DAEMON_MEMORY': '1000m',
+    'spark:spark.driver.maxResultSize': '480m',
+    'spark:spark.driver.memory': '960m',
+    'spark:spark.executor.cores': '1',
+    'spark:spark.executor.memory': '1152m',
+    'spark:spark.yarn.am.memory': '1152m',
+    'spark:spark.yarn.am.memoryOverhead': '384',
+    'spark:spark.yarn.executor.memoryOverhead': '384',
+    'yarn-env:YARN_TIMELINESERVER_HEAPSIZE': '1000',
+    'yarn:yarn.nodemanager.resource.memory-mb': '3072',
+    'yarn:yarn.scheduler.maximum-allocation-mb': '3072',
+    'yarn:yarn.scheduler.minimum-allocation-mb': '256',
+}
+
 # convert strings (e.g. 'RUNNING') to enum values
 
 def _cluster_state_value(state_name):

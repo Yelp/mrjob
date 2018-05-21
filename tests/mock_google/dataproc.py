@@ -178,6 +178,13 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
         gce_config.service_account_scopes[:] = sorted(scopes)
 
+        # add in default cluster properties
+        props = cluster.config.software_config.properties
+
+        for k, v in _DEFAULT_CLUSTER_PROPERTIES.items():
+            if k not in props:
+                props[k] = v
+
         # initialize cluster status
         cluster.status.state = _cluster_state_value('CREATING')
 

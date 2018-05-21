@@ -499,6 +499,33 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
             set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
 
 
+class ClusterPropertiesTestCase(MockGoogleTestCase):
+
+    def _get_cluster_properties(self, *args):
+        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            return runner._get_cluster(
+                runner._cluster_id).config.software_config.properties
+
+    def test_default(self):
+        props = self._get_cluster_properties()
+
+        self.assertNotIn('foo:bar', props)
+
+    def test_command_line(self):
+        props = self._get_cluster_properties(
+            '--cluster-property',
+            'dataproc:dataproc.allow.zero.workers=true',
+            '--cluster-property',
+            'mapred:mapreduce.map.memory.mb=1024',
+        )
+
+        self.assertEqual(props['dataproc:dataproc.allow.zero.workers'], 'true')
+        self.assertEqual(props['mapred:mapreduce.map.memory.mb'], '1024')
+
 
 class ProjectIDTestCase(MockGoogleTestCase):
 

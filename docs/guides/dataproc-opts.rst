@@ -182,6 +182,17 @@ Cluster creation and configuration
 
    .. versionadded:: 0.6.3
 
+.. mrjob-opt::
+   :config: cluster_properties
+   :switch: --cluster-property
+   :set: dataproc
+   :default: ``None``
+
+   A dictionary of properties to set in the cluster's config files
+   (e.g. ``mapred-site.xml``). For details, see
+   `Cluster properties <https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/cluster-properties>`__.
+
+
 Bootstrapping
 -------------
 

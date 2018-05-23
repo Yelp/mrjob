@@ -29,6 +29,7 @@ from google.cloud.dataproc_v1.types import JobStatus
 from mrjob.dataproc import _STATE_MATCHER_ACTIVE
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _job_state_name
+from mrjob.parse import is_uri
 from mrjob.util import random_identifier
 
 # default boot disk size set by the API
@@ -177,6 +178,18 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
         scopes.update(_MANDATORY_SCOPES)
 
         gce_config.service_account_scopes[:] = sorted(scopes)
+
+        # set default network and fully qualify network uri
+        if not (gce_config.network_uri or gce_config.subnetwork_uri):
+            gce_config.network_uri = 'default'
+
+        if gce_config.network_uri:
+            gce_config.network_uri = _fully_qualify_network_uri(
+                gce_config.network_uri, project_id, 'global')
+
+        if gce_config.subnetwork_uri:
+            gce_config.subnetwork_uri = _fully_qualify_network_uri(
+                gce_config.subnetwork_uri, project_id, region)
 
         # add in default cluster properties
         props = cluster.config.software_config.properties
@@ -352,3 +365,13 @@ def _cluster_path(project_id, region, cluster_name):
 
 def _job_path(project_id, region, job_id):
     return 'projects/%s/regions/%s/jobs/%s'
+
+
+def _fully_qualify_network_uri(uri, project_id, region):
+    if '/' not in uri:  # just a name
+        uri = 'projects/%s/regions/%s/%s' % (project_id, region, uri)
+
+    if not is_uri(uri):
+        uri = 'https://www.googleapis.com/compute/v1/%s' % uri
+
+    return uri

@@ -872,7 +872,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--network'], dict(
                 help=('URI of Google Compute Engine network to launch cluster'
-                      ' in.'),
+                      " in. Can't be used with --subnet."),
             )),
         ],
     ),

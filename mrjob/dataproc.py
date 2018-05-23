@@ -51,6 +51,7 @@ from mrjob.logs.step import _interpret_new_dataproc_step_stderr
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import to_unicode
+from mrjob.runner import _blank_out_conflicting_opts
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
 from mrjob.util import random_identifier
@@ -362,20 +363,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         )
 
     def _combine_opts(self, opt_list):
-        """Blank out overridden *zone* and *region* opts."""
-        # copy opt_list so we can modify it
-        opt_list = [dict(opts) for opts in opt_list]
-
-        # blank out any instance_fleets/groups before the last config
-        # where they are set
-        blank_out = False
-        for opts in reversed(opt_list):
-            if blank_out:
-                opts['region'] = None
-                opts['zone'] = None
-            elif any(opts.get(k) is not None
-                     for k in ('region', 'zone')):
-                blank_out = True
+        """Blank out conflicts between *network*/*subnet* and
+        *region*/*zone*."""
+        opt_list = _blank_out_conflicting_opts(opt_list, 'region', 'zone')
+        opt_list = _blank_out_conflicting_opts(opt_list, 'network', 'subnet')
 
         # now combine opts, with region/zone blanked out
         return super(DataprocJobRunner, self)._combine_opts(opt_list)

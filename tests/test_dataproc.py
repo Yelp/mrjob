@@ -2303,3 +2303,35 @@ class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
             self._get_project_id_and_gce_config,
             '--network', 'default',
             '--subnet', 'default')
+
+    def test_network_on_cmd_line_overrides_subnet_in_config(self):
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    subnet: default')
+
+        self.mrjob_conf_patcher.stop()
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '-c', conf_path, '--network', 'test')
+        self.mrjob_conf_patcher.start()
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/global/networks/test' % project_id)
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_subnet_on_cmd_line_overrides_network_in_config(self):
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    network: default')
+
+        self.mrjob_conf_patcher.stop()
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '-c', conf_path, '--subnet', 'test')
+        self.mrjob_conf_patcher.start()
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/us-west1/subnetworks/test' % project_id)
+        self.assertFalse(gce_config.network_uri)

@@ -232,9 +232,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'core_instance_config',
         'gcloud_bin',
         'master_instance_config',
+        'network',
         'project_id',
         'service_account',
         'service_account_scopes',
+        'subnet',
         'task_instance_config',
     }
 
@@ -1154,6 +1156,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             metadata=cluster_metadata,
             service_account_scopes=self._opts['service_account_scopes'],
         )
+
+        if self._opts['network']:
+            gce_cluster_config['network_uri'] = self._opts['network']
+
+        if self._opts['subnet']:
+            gce_cluster_config['subnetwork_uri'] = self._opts['subnet']
 
         if self._opts['service_account']:
             gce_cluster_config['service_account'] = (

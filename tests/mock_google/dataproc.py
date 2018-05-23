@@ -29,6 +29,7 @@ from google.cloud.dataproc_v1.types import JobStatus
 from mrjob.dataproc import _STATE_MATCHER_ACTIVE
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _job_state_name
+from mrjob.dataproc import _zone_to_region
 from mrjob.parse import is_uri
 from mrjob.util import random_identifier
 
@@ -170,6 +171,17 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
         # update gce_cluster_config
         gce_config = cluster.config.gce_cluster_config
 
+        # check region and zone_uri
+        if region == 'global':
+            if gce_config.zone_uri:
+                cluster_region = _zone_to_region(gce_config.zone_uri)
+            else:
+                raise InvalidArgument(
+                    "Must specify a zone in GCE configuration"
+                    " when using 'regions/global'")
+        else:
+            cluster_region = region
+
         # add in default scopes and sort
         scopes = set(gce_config.service_account_scopes)
 
@@ -179,7 +191,11 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
         gce_config.service_account_scopes[:] = sorted(scopes)
 
-        # set default network and fully qualify network uri
+        # handle network_uri and subnetwork_uri
+        if gce_config.network_uri and gce_config.subnetwork_uri:
+            raise InvalidArgument('GceClusterConfiguration cannot contain both'
+                                  ' Network URI and Subnetwork URI')
+
         if not (gce_config.network_uri or gce_config.subnetwork_uri):
             gce_config.network_uri = 'default'
 

@@ -14,6 +14,7 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 import time
 import re
@@ -48,6 +49,7 @@ from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog_records
 from mrjob.logs.step import _interpret_new_dataproc_step_stderr
 from mrjob.py2 import PY2
+from mrjob.py2 import string_types
 from mrjob.py2 import to_unicode
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
@@ -226,6 +228,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     alias = 'dataproc'
 
     OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
+        'cluster_properties',
         'core_instance_config',
         'gcloud_bin',
         'master_instance_config',
@@ -1200,10 +1203,18 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if secondary_worker_conf.get('num_instances'):
             cluster_config['secondary_worker_config'] = secondary_worker_conf
 
+        software_config = {}
+
+        if self._opts['cluster_properties']:
+            software_config['properties'] = _values_to_text(
+                self._opts['cluster_properties'])
+
         # See - https://cloud.google.com/dataproc/dataproc-versions
         if self._opts['image_version']:
-            cluster_config['software_config'] = dict(
-                image_version=self._opts['image_version'])
+            software_config['image_version'] = self._opts['image_version']
+
+        if software_config:
+            cluster_config['software_config'] = software_config
 
         # in Python 2, dict keys loaded from JSON will be unicode, which
         # the Google protobuf objects don't like
@@ -1416,3 +1427,20 @@ def _clean_json_dict_keys(x):
         return [_clean_json_dict_keys(item) for item in x]
     else:
         return x
+
+
+def _values_to_text(d):
+    """Return a dictionary with the same keys as *d*, but where the
+    non-string, non-bytes values have been JSON-encoded.
+
+    Used to encode cluster properties.
+    """
+    result = {}
+
+    for k, v in d.items():
+        if not isinstance(v, (string_types, bytes)):
+            v = json.dumps(v)
+
+        result[k] = v
+
+    return result

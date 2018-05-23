@@ -29,6 +29,8 @@ from google.cloud.dataproc_v1.types import JobStatus
 from mrjob.dataproc import _STATE_MATCHER_ACTIVE
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _job_state_name
+from mrjob.dataproc import _zone_to_region
+from mrjob.parse import is_uri
 from mrjob.util import random_identifier
 
 # default boot disk size set by the API
@@ -169,6 +171,17 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
         # update gce_cluster_config
         gce_config = cluster.config.gce_cluster_config
 
+        # check region and zone_uri
+        if region == 'global':
+            if gce_config.zone_uri:
+                cluster_region = _zone_to_region(gce_config.zone_uri)
+            else:
+                raise InvalidArgument(
+                    "Must specify a zone in GCE configuration"
+                    " when using 'regions/global'")
+        else:
+            cluster_region = region
+
         # add in default scopes and sort
         scopes = set(gce_config.service_account_scopes)
 
@@ -177,6 +190,22 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
         scopes.update(_MANDATORY_SCOPES)
 
         gce_config.service_account_scopes[:] = sorted(scopes)
+
+        # handle network_uri and subnetwork_uri
+        if gce_config.network_uri and gce_config.subnetwork_uri:
+            raise InvalidArgument('GceClusterConfiguration cannot contain both'
+                                  ' Network URI and Subnetwork URI')
+
+        if not (gce_config.network_uri or gce_config.subnetwork_uri):
+            gce_config.network_uri = 'default'
+
+        if gce_config.network_uri:
+            gce_config.network_uri = _fully_qualify_network_uri(
+                gce_config.network_uri, project_id)
+
+        if gce_config.subnetwork_uri:
+            gce_config.subnetwork_uri = _fully_qualify_subnetwork_uri(
+                gce_config.subnetwork_uri, project_id, region)
 
         # add in default cluster properties
         props = cluster.config.software_config.properties
@@ -352,3 +381,23 @@ def _cluster_path(project_id, region, cluster_name):
 
 def _job_path(project_id, region, job_id):
     return 'projects/%s/regions/%s/jobs/%s'
+
+
+def _fully_qualify_network_uri(uri, project_id):
+    if '/' not in uri:  # just a name
+        uri = 'projects/%s/global/networks/%s' % (project_id, uri)
+
+    if not is_uri(uri):
+        uri = 'https://www.googleapis.com/compute/v1/' + uri
+
+    return uri
+
+
+def _fully_qualify_subnetwork_uri(uri, project_id, region):
+    if '/' not in uri:  # just a name
+        uri = 'projects/%s/%s/subnetworks/%s' % (project_id, region, uri)
+
+    if not is_uri(uri):
+        uri = 'https://www.googleapis.com/compute/v1/' + uri
+
+    return uri

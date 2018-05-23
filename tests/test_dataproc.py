@@ -23,6 +23,7 @@ from io import BytesIO
 from subprocess import PIPE
 from unittest import TestCase
 
+from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
 from google.api_core.exceptions import RequestRangeNotSatisfiable
 
@@ -2215,3 +2216,122 @@ class HadoopStreamingJarTestCase(MockGoogleTestCase):
             '--hadoop-streaming-jar', jar_uri)
 
         self.assertEqual(job.hadoop_job.main_jar_file_uri, jar_uri)
+
+
+class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
+
+    def _get_project_id_and_gce_config(self, *args):
+        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            cluster = runner._get_cluster(
+                runner._cluster_id)
+            return cluster.project_id, cluster.config.gce_cluster_config
+
+
+    def test_default(self):
+        project_id, gce_config = self._get_project_id_and_gce_config()
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/global/networks/default' % project_id)
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_network_name(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--network', 'test')
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/global/networks/test' % project_id)
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_network_path(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--network', 'projects/manhattan/global/networks/secret')
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1'
+            '/projects/manhattan/global/networks/secret')
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_network_uri(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--network', 'https://www.cnn.com/')
+
+        self.assertEqual(
+            gce_config.network_uri, 'https://www.cnn.com/')
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_subnetwork_name(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--subnet', 'test')
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/us-west1/subnetworks/test' % project_id)
+        self.assertFalse(gce_config.network_uri)
+
+    def test_subnetwork_path(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--subnet', 'projects/manhattan/los-alamos/networks/lanl')
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.googleapis.com/compute/v1'
+            '/projects/manhattan/los-alamos/networks/lanl')
+        self.assertFalse(gce_config.network_uri)
+
+    def test_subnetwork_uri(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--subnet', 'https://www.cnn.com/specials/videos/hln')
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.cnn.com/specials/videos/hln')
+        self.assertFalse(gce_config.network_uri)
+
+    def test_network_and_subnet_conflict(self):
+        self.assertRaises(
+            InvalidArgument,
+            self._get_project_id_and_gce_config,
+            '--network', 'default',
+            '--subnet', 'default')
+
+    def test_network_on_cmd_line_overrides_subnet_in_config(self):
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    subnet: default')
+
+        self.mrjob_conf_patcher.stop()
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '-c', conf_path, '--network', 'test')
+        self.mrjob_conf_patcher.start()
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/global/networks/test' % project_id)
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_subnet_on_cmd_line_overrides_network_in_config(self):
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    network: default')
+
+        self.mrjob_conf_patcher.stop()
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '-c', conf_path, '--subnet', 'test')
+        self.mrjob_conf_patcher.start()
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/us-west1/subnetworks/test' % project_id)
+        self.assertFalse(gce_config.network_uri)

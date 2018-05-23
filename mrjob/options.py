@@ -867,6 +867,15 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    network=dict(
+        cloud_role='launch',
+        switches=[
+            (['--network'], dict(
+                help=('URI of Google Compute Engine network to launch cluster'
+                      " in. Can't be used with --subnet."),
+            )),
+        ],
+    ),
     num_core_instances=dict(
         cloud_role='launch',
         switches=[
@@ -1142,15 +1151,14 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         switches=[
             (['--subnet'], dict(
-                help=('ID of Amazon VPC subnet to launch cluster in. If not'
-                      ' set or empty string, cluster is launched in the normal'
-                      ' AWS cloud.'),
+                help=('ID of Amazon VPC subnet/URI of Google Compute Engine'
+                      ' subnetwork to launch cluster in.'),
             )),
             (['--subnets'], dict(
                 action=_SubnetsAction,
-                help=('Like --subnets, but with a comma-separated list, to'
+                help=('Like --subnet, but with a comma-separated list, to'
                       ' specify multiple subnets in conjunction with'
-                      ' --instance-fleets'),
+                      ' --instance-fleets (EMR only)'),
             )),
         ],
     ),

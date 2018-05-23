@@ -1156,9 +1156,9 @@ _RUNNER_OPTS = dict(
             )),
             (['--subnets'], dict(
                 action=_SubnetsAction,
-                help=('Like --subnets, but with a comma-separated list, to'
+                help=('Like --subnet, but with a comma-separated list, to'
                       ' specify multiple subnets in conjunction with'
-                      ' --instance-fleets'),
+                      ' --instance-fleets (EMR only)'),
             )),
         ],
     ),

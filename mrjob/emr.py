@@ -84,6 +84,7 @@ from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
+from mrjob.runner import _blank_out_conflicting_opts
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
 from mrjob.step import StepFailedException
@@ -457,19 +458,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Blank out overriden *instance_fleets* and *instance_groups*
 
         Convert image_version of 4.x and later to release_label."""
-        # copy opt_list so we can modify it
-        opt_list = [dict(opts) for opts in opt_list]
-
         # blank out any instance_fleets/groups before the last config
         # where they are set
-        blank_out = False
-        for opts in reversed(opt_list):
-            if blank_out:
-                opts['instance_fleets'] = None
-                opts['instance_groups'] = None
-            elif any(opts.get(k) is not None
-                     for k in self._INSTANCE_OPT_NAMES):
-                blank_out = True
+        opt_list = _blank_out_conflicting_opts(
+            opt_list,
+            ['instance_fleets', 'instance_groups'],
+            self._INSTANCE_OPT_NAMES)
 
         # now combine opts, with instance_groups/fleets blanked out
         opts = super(EMRJobRunner, self)._combine_opts(opt_list)

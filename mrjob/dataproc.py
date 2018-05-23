@@ -365,8 +365,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _combine_opts(self, opt_list):
         """Blank out conflicts between *network*/*subnet* and
         *region*/*zone*."""
-        opt_list = _blank_out_conflicting_opts(opt_list, 'region', 'zone')
-        opt_list = _blank_out_conflicting_opts(opt_list, 'network', 'subnet')
+        opt_list = _blank_out_conflicting_opts(opt_list, ['region', 'zone'])
+        opt_list = _blank_out_conflicting_opts(opt_list, ['network', 'subnet'])
 
         # now combine opts, with region/zone blanked out
         return super(DataprocJobRunner, self)._combine_opts(opt_list)

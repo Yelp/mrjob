@@ -30,11 +30,7 @@ from mrjob.runner import GLOB_RE
 
 try:
     import google.api_core.exceptions
-    import google.cloud._helpers
-    import google.cloud.exceptions
     import google.cloud.storage.client
-    import google.resumable_media
-    import google.resumable_media.requests
 except ImportError:
     google = None
 

@@ -547,7 +547,7 @@ made more generic, to make it easier to share code with the
 *s3_log_uri*                    :mrjob-opt:`cloud_log_dir`
 *s3_sync_wait_time*             :mrjob-opt:`cloud_fs_sync_secs`
 *s3_tmp_dir*                    :mrjob-opt:`cloud_tmp_dir`
-*s3_upload_part_size*           :mrjob-opt:`cloud_upload_part_size`
+*s3_upload_part_size*           *cloud_upload_part_size*
 =============================== ======================================
 
 The old option names and command-line switches are now deprecated but will

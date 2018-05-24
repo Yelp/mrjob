@@ -310,18 +310,17 @@ The output of the job should always be ``0``, since every line that gets to
 :py:func:`test_for_kitty()` is filtered by :command:`grep` to have "kitty" in
 it.
 
-
-
-
-
-
 .. _job-protocols:
 
 Protocols
 ---------
 
-mrjob assumes that all data is newline-delimited bytes. It automatically
-serializes and deserializes these bytes using :term:`protocols <protocol>`.
+Hadoop streaming assumes that all data is newline-delimited bytes. By default,
+mrjob assumes all output is in JSON format, but it can actually read and write
+lines in any format by using protocols.
+
+(If you need to read non-line-based data, see :ref:`raw-input`, below.)
+
 Each job has an :term:`input protocol`, an :term:`output protocol`, and an
 :term:`internal protocol`.
 
@@ -547,11 +546,52 @@ You can improve performance significantly by caching the
 serialization/deserialization results of keys. Look at the source code of
 :py:mod:`mrjob.protocol` for an example.
 
+.. _raw-input:
+
+Passing entire files to the mapper
+----------------------------------
+
+Sometimes you need to read binary data (e.g. image files), or text-based
+data that has records longer than one line.
+
+By using :py:meth:`~mrjob.job.MRJob.mapper_raw`, you can pass entire files
+to your mapper, and read them however you want. Each mapper gets one file,
+and is passed both the path of a local copy of the file, and the URI where
+the original file is located on Hadoop's filesystem.
+
+For example, if you want to read ``.wet`` files from
+`Common Crawl <http://commoncrawl.org/>`__ data, you could handle them like
+this::
+
+    class MRCrawler(MRJob):
+
+        def mapper_raw(self, wet_path, wet_uri):
+            from warcio.archiveiterator import ArchiveIterator
+
+            with open(wet_path, 'rb') as f:
+                for record in ArchiveIterator(f):
+                    ...
+
+To use a library like :py:mod:`warcio`, you'll need to ensure that it gets
+installed on your cluster. See :ref:`using-a-virtualenv` for one way to do
+this.
+
+Under the hood, mrjob is passes an input manifest (a list of
+URIs of input files) to Hadoop, and instructs Hadoop to send one line to
+each mapper. In most cases, this should be seamless, even to the point of
+telling you which file was being read when a task fails.
+
+.. warning::
+
+   For all runners except EMR, mrjob uses :command:`hadoop fs` to download
+   files to the local filesystem, which means Hadoop has to invoke
+   itself. If your cluster has tightly tuned memory requirements, this can
+   sometimes cause an out-of-memory error.
 
 .. _non-hadoop-streaming-jar-steps:
 
 Jar steps
-^^^^^^^^^
+---------
 
 You can run Java directly on Hadoop (bypassing Hadoop Streaming) by using
 :py:class:`~mrjob.step.JarStep` instead of :py:meth:`~mrjob.step.MRStep`.

@@ -466,13 +466,15 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    cloud_upload_part_size=dict(
+    cloud_part_size_mb=dict(
+        deprecated_aliases=['cloud_upload_part_size'],
         cloud_role='launch',
         switches=[
-            (['--cloud-upload-part-size'], dict(
-                help=('Upload files to S3 in parts no bigger than this many'
-                      ' megabytes. Default is 100 MiB. Set to 0 to disable'
-                      ' multipart uploading entirely.'),
+            (['--cloud-part-size-mb'], dict(
+                deprecated_aliases=['--cloud-upload-part-size'],
+                help=('Upload files to cloud FS in parts no bigger than this'
+                      ' many megabytes. Default is 100 MiB. Set to 0 to'
+                      ' disable multipart uploading entirely.'),
                 type=float,
             )),
         ],

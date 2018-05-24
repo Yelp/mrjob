@@ -2009,10 +2009,10 @@ class CauseOfErrorTestCase(MockLogEntriesTestCase):
             self.assertEqual(error['task_error']['message'], TRACEBACK)
 
 
-class CloudUploadPartSizeTestCase(MockGoogleTestCase):
+class CloudPartSizeTestCase(MockGoogleTestCase):
 
     def setUp(self):
-        super(CloudUploadPartSizeTestCase, self).setUp()
+        super(CloudPartSizeTestCase, self).setUp()
 
         self.upload_from_string = self.start(patch(
             'tests.mock_google.storage.MockGoogleStorageBlob'
@@ -2026,18 +2026,18 @@ class CloudUploadPartSizeTestCase(MockGoogleTestCase):
         self.assertEqual(runner._fs_chunk_size(), 100 * 1024 * 1024)
 
     def test_float(self):
-        runner = DataprocJobRunner(cloud_upload_part_size=0.25)
+        runner = DataprocJobRunner(cloud_part_size_mb=0.25)
 
         self.assertEqual(runner._fs_chunk_size(), 256 * 1024)
 
     def test_zero(self):
-        runner = DataprocJobRunner(cloud_upload_part_size=0)
+        runner = DataprocJobRunner(cloud_part_size_mb=0)
 
         self.assertEqual(runner._fs_chunk_size(), None)
 
     def test_multipart_upload(self):
         job = MRWordCount(
-            ['-r', 'dataproc', '--cloud-upload-part-size', '2'])
+            ['-r', 'dataproc', '--cloud-part-size-mb', '2'])
         job.sandbox()
 
         with job.make_runner() as runner:

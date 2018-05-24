@@ -61,8 +61,8 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'bootstrap_python',
         'check_cluster_every',
         'cloud_fs_sync_secs',
+        'cloud_part_size_mb',
         'cloud_tmp_dir',
-        'cloud_upload_part_size',
         'cluster_id',
         'core_instance_type',
         'extra_cluster_params',
@@ -128,7 +128,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         return combine_dicts(
             super(HadoopInTheCloudJobRunner, self)._default_opts(),
             dict(
-                cloud_upload_part_size=100,  # 100 MB
+                cloud_part_size_mb=100,  # 100 MB
                 max_mins_idle=_DEFAULT_MAX_MINS_IDLE,
                 # don't use a list because it makes it hard to read option
                 # values when running in verbose mode. See #1284
@@ -144,11 +144,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
             opts, source=source)
 
-        # cloud_upload_part_size should be a number
-        if opts.get('cloud_upload_part_size') is not None:
-            if not isinstance(opts['cloud_upload_part_size'],
+        # cloud_part_size_mb should be a number
+        if opts.get('cloud_part_size_mb') is not None:
+            if not isinstance(opts['cloud_part_size_mb'],
                               (integer_types, float)):
-                raise TypeError('cloud_upload_part_size must be a number')
+                raise TypeError('cloud_part_size_mb must be a number')
 
         # patch max_hours_idle into max_mins_idle (see #1663)
         if opts.get('max_hours_idle') is not None:

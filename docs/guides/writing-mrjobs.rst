@@ -239,18 +239,15 @@ lines containing the string "kitty"::
     if __name__ == '__main__':
         KittyJob().run()
 
-Step commands are run without a shell. But if you'd like to use shell features
-such as pipes, you can use :py:func:`mrjob.util.bash_wrap()` to wrap your
-command in a call to ``bash``.
+Step commands are run without a shell, so if you want to use pipes, etc, you'll
+need to run them in a subshell. For example:
 
-::
-
-    from mrjob.util import bash_wrap
+.. code-block:: python
 
     class DemoJob(MRJob):
 
         def mapper_cmd(self):
-            return bash_wrap("grep 'blah blah' | wc -l")
+            return 'sh -c "grep 'blah' | wc -l"'
 
 .. note::
 
@@ -313,10 +310,10 @@ The output of the job should always be ``0``, since every line that gets to
 :py:func:`test_for_kitty()` is filtered by :command:`grep` to have "kitty" in
 it.
 
-Filter commands are run without a shell. But if you'd like to use shell
-features such as pipes, you can use :py:func:`mrjob.util.bash_wrap()` to wrap
-your command in a call to ``bash``. See :ref:`cmd-filters` for an example of
-:py:func:`mrjob.util.bash_wrap()`.
+
+
+
+
 
 .. _job-protocols:
 

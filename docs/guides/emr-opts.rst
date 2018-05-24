@@ -944,13 +944,13 @@ MRJob uses boto3 to manipulate/access S3.
        This used to be called *s3_sync_wait_time*
 
 .. mrjob-opt::
-   :config: cloud_upload_part_size
-   :switch: --cloud-upload-part-size
+   :config: cloud_part_size_mb
+   :switch: --cloud-part-size-mb
    :type: integer
    :set: emr
    :default: 100
 
-   Upload files to S3 in parts no bigger than this many megabytes
+   Upload files to cloud filesystem in parts no bigger than this many megabytes
    (technically, `mebibytes`_). Default is 100 MiB, as
    `recommended by Amazon`_. Set to 0 to disable multipart uploading
    entirely.
@@ -964,6 +964,10 @@ MRJob uses boto3 to manipulate/access S3.
        http://docs.aws.amazon.com/AmazonS3/latest/dev/UploadingObjects.html
    .. _`requires parts to be between 5 MiB and 5 GiB`:
        http://docs.aws.amazon.com/AmazonS3/latest/dev/qfacts.html
+
+   .. versionchanged:: 0.6.3
+
+      This used to be called *cloud_upload_part_size*.
 
    .. versionchanged:: 0.5.4
 

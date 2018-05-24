@@ -421,8 +421,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _fs_chunk_size(self):
         """Chunk size for cloud storage Blob objects. Currently
         only used for uploading."""
-        if self._opts['cloud_upload_part_size']:
-            return int(self._opts['cloud_upload_part_size'] * 1024 * 1024)
+        if self._opts['cloud_part_size_mb']:
+            return int(self._opts['cloud_part_size_mb'] * 1024 * 1024)
         else:
             return None
 

@@ -71,6 +71,8 @@ _RUNNING_JOB_RE = re.compile(
 _JOB_PROGRESS_RE = re.compile(
     r'^\s*map\s+(?P<map>\d+)%\s+reduce\s+(?P<reduce>\d+)%\s*$')
 
+# if you specify a bad jar, this is all you get
+_NOT_A_VALID_JAR_RE = re.compile(r'^\s*Not a valid JAR:.*')
 
 # YARN prints this (sometimes followed by a Java exception) when tasks fail
 _TASK_ATTEMPT_FAILED_RE = re.compile(
@@ -315,6 +317,19 @@ def _parse_step_syslog_from_log4j_records(records, step_interpretation=None):
                 reduce=int(m.group('reduce')),
                 message=message,
             )
+
+        # invalid jar
+        m = _NOT_A_VALID_JAR_RE.match(message)
+        if m:
+            error = dict(
+                hadoop_error=dict(
+                    message=message,
+                    num_lines=record['num_lines'],
+                    start_line=record['start_line'],
+                ),
+            )
+            result.setdefault('errors', [])
+            result['errors'].append(error)
 
         # task failure
         m = _TASK_ATTEMPT_FAILED_RE.match(message)

@@ -113,6 +113,10 @@ Options available to hadoop and emr runners
 
    .. versionadded:: 0.5.3
 
+   .. note::
+
+      mrjob does not yet support *libjars* on Google Cloud Dataproc.
+
 .. mrjob-opt::
     :config: label
     :switch: --label

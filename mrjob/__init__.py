@@ -24,6 +24,7 @@ __credits__ = [
     'Jordan Andersen <jordandandersen@gmail.com>',
     'Tom Arnfeld <tarnfeld@me.com>',
     'Martin Baeuml <baeuml@kit.edu>',
+    'Benjamin Bariteau <bariteau@yelp.com>',
     'Étienne Batise <etienne.batise@gmail.com>',
     'Edward Betts <edward@4angle.com>',
     'Hunter Blanks <hblanks@monetate.com>',

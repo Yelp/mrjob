@@ -14,14 +14,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-import base64
 import binascii
 import fnmatch
-import hashlib
 import logging
 from base64 import b64decode
-from io import BytesIO
-from tempfile import TemporaryFile
 
 from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem

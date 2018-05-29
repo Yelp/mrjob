@@ -205,7 +205,7 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
         if gce_config.subnetwork_uri:
             gce_config.subnetwork_uri = _fully_qualify_subnetwork_uri(
-                gce_config.subnetwork_uri, project_id, region)
+                gce_config.subnetwork_uri, project_id, cluster_region)
 
         # add in default cluster properties
         props = cluster.config.software_config.properties

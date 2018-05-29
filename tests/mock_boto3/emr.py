@@ -1150,7 +1150,7 @@ class MockEMRClient(object):
         cluster['_Steps'].extend(new_steps)
 
         # add_job_flow_steps() needs to return step IDs
-        return [new_step['Id'] for new_step in new_steps]
+        return [ns['Id'] for ns in new_steps]
 
     def _add_tags(self, operation_name, Tags, cluster):
         _validate_param_type(Tags, (list, tuple))

@@ -43,7 +43,6 @@ from mrjob.util import cmd_line
 from mrjob.util import to_lines
 
 import tests.sr_wc
-from tests.examples.test_mr_phone_to_url import MRPhoneToURLTestCase
 from tests.examples.test_mr_phone_to_url import write_conversion_record
 from tests.job import run_job
 from tests.mr_cmd_job import MRCmdJob

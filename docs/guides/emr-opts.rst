@@ -1030,6 +1030,12 @@ SSH access and tunneling
 
        This option used to be named *ssh_tunnel_to_job_tracker*.
 
+    .. note::
+
+       *ssh_tunnel* works on Google Cloud Dataproc as well, as long as you
+       have the :command:`gcloud` utility installed and set up. See
+       :ref:`installing-gcloud`.
+
 .. mrjob-opt::
     :config: ssh_tunnel_is_open
     :switch: --ssh-tunnel-is-open

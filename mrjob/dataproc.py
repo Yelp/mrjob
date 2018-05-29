@@ -636,8 +636,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Returns a map from ``'hadoop_job'`` to a dict representing
         a hadoop streaming job.
         """
-        step = self._get_step(step_num)
-
         return dict(
             hadoop_job=dict(
                 args=self._hadoop_streaming_jar_args(step_num),

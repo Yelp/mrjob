@@ -98,6 +98,7 @@ PARSED_PRE_YARN_STEP_LOG_LINES = dict(
     progress=dict(map=100, message=' map 100%  reduce 100%', reduce=100),
 )
 
+# complete contents of job driver, from Google Cloud Dataproc
 NOT_A_VALID_JAR_LOG_LINES = [
     'Not a valid JAR: /home/hadoop/hadoop-examples.jar',
 ]
@@ -113,6 +114,7 @@ PARSED_NOT_A_VALID_JAR_LOG_LINES = dict(
         ),
     ],
 )
+
 
 class ParseStepSyslogTestCase(TestCase):
 

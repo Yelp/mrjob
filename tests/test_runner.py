@@ -45,8 +45,6 @@ from tests.sandbox import SandboxedTestCase
 from tests.sandbox import mrjob_conf_patcher
 
 
-
-
 class WithStatementTestCase(TestCase):
 
     def setUp(self):

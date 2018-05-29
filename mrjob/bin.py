@@ -485,7 +485,7 @@ class MRJobBinRunner(MRJobRunner):
         lines.append('exec 9>/tmp/wrapper.lock.%s' % self._job_key)
         # would use flock(1), but it's not always available
         lines.append("%s -c 'import fcntl; fcntl.flock(9, fcntl.LOCK_EX)'" %
-                cmd_line(self._python_bin()))
+                     cmd_line(self._python_bin()))
         lines.append('')
 
         lines.append('# setup commands')
@@ -563,7 +563,7 @@ class MRJobBinRunner(MRJobRunner):
             lines.append('    *.%s)' % ext)
             lines.append('      %s $INPUT_PATH' % cmd)
             lines.append("      INPUT_PATH="
-                    "$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
+                         "$(echo $INPUT_PATH | sed -e 's/\.%s$//')" % ext)
             lines.append('      ;;')
         lines.append('  esac')
         lines.append('} 1>&2')

@@ -155,8 +155,6 @@ class NumCoresTestCase(SandboxedTestCase):
             self.pool.assert_called_with(processes=3)
 
 
-
-
 # TODO: these belong in tests of the sim runner
 class TestsToPort:
 

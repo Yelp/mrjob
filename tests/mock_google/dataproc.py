@@ -85,6 +85,7 @@ _DEFAULT_CLUSTER_PROPERTIES = {
     'yarn:yarn.scheduler.minimum-allocation-mb': '256',
 }
 
+
 # convert strings (e.g. 'RUNNING') to enum values
 
 def _cluster_state_value(state_name):

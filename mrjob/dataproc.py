@@ -144,6 +144,7 @@ _STDERR_LOG4J_WARNING = re.compile(
     r'|Please initialize the log4j system'
     r'|See http://logging.apache.org/log4j)')
 
+
 # convert enum values to strings (e.g. 'RUNNING')
 
 def _cluster_state_name(state_value):
@@ -520,7 +521,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._upload_mgr.add(path)
 
         if self._opts['hadoop_streaming_jar']:
-           self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
+            self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
         for step in self._get_steps():
             if step.get('jar'):

@@ -98,6 +98,21 @@ PARSED_PRE_YARN_STEP_LOG_LINES = dict(
     progress=dict(map=100, message=' map 100%  reduce 100%', reduce=100),
 )
 
+NOT_A_VALID_JAR_LOG_LINES = [
+    'Not a valid JAR: /home/hadoop/hadoop-examples.jar',
+]
+
+PARSED_NOT_A_VALID_JAR_LOG_LINES = dict(
+    errors=[
+        dict(
+            hadoop_error=dict(
+                message='Not a valid JAR: /home/hadoop/hadoop-examples.jar',
+                start_line=0,
+                num_lines=1,
+            ),
+        ),
+    ],
+)
 
 class ParseStepSyslogTestCase(TestCase):
 
@@ -113,6 +128,12 @@ class ParseStepSyslogTestCase(TestCase):
         self.assertEqual(
             _parse_step_syslog(PRE_YARN_STEP_LOG_LINES),
             PARSED_PRE_YARN_STEP_LOG_LINES)
+
+    def test_not_a_valid_jar(self):
+        self.assertEqual(
+            _parse_step_syslog(NOT_A_VALID_JAR_LOG_LINES),
+            PARSED_NOT_A_VALID_JAR_LOG_LINES,
+        )
 
 
 class InterpretHadoopJarCommandStderrTestCase(TestCase):

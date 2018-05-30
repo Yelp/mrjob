@@ -239,7 +239,7 @@ class ClusterControllerClient(object):
             operation,
             self._operations_client,
             clusters_pb2.Cluster,
-            metadata_type=operations_pb2.ClusterOperationMetadata,
+            metadata_type=proto_operations_pb2.ClusterOperationMetadata,
         )
 
     def update_cluster(self,

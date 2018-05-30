@@ -38,7 +38,6 @@ from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _HADOOP_STREAMING_JAR_URI
-from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _fix_java_stack_trace
 from mrjob.dataproc import _fix_traceback
@@ -748,7 +747,6 @@ class InstanceTypeAndNumberTestCase(MockGoogleTestCase):
         fake_bootstrap_script = 'gs://fake-bucket/fake-script.sh'
         runner._master_bootstrap_script_path = fake_bootstrap_script
         runner._upload_mgr.add(fake_bootstrap_script)
-        runner._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
         cluster_id = runner._launch_cluster()
 
@@ -1176,37 +1174,18 @@ class DataprocNoMapperTestCase(MockGoogleTestCase):
 
 class MaxMinsIdleTestCase(MockGoogleTestCase):
 
-    def assertRanIdleTimeoutScriptWith(self, runner, expected_metadata):
-        cluster_metadata, last_init_exec = (
-            self._cluster_metadata_and_last_init_exec(runner))
-
-        # Verify args
-        for key in expected_metadata.keys():
-            self.assertEqual(cluster_metadata[key], expected_metadata[key])
-
-        expected_uri = runner._upload_mgr.uri(
-            _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
-        self.assertEqual(last_init_exec, expected_uri)
-
-    def _cluster_metadata_and_last_init_exec(self, runner):
-        cluster = runner._get_cluster(runner.get_cluster_id())
-
-        # Verify last arg
-        last_init_action = cluster.config.initialization_actions[-1]
-        last_init_exec = last_init_action.executable_file
-
-        cluster_metadata = cluster.config.gce_cluster_config.metadata
-        return cluster_metadata, last_init_exec
-
     def test_default(self):
         mr_job = MRWordCount(['-r', 'dataproc'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, {
-                'mrjob-max-secs-idle': '600',
-            })
+
+            cluster = runner._get_cluster(runner._cluster_id)
+
+            self.assertEqual(
+                cluster.config.lifecycle_config.idle_delete_ttl.seconds,
+                600)
 
     def test_persistent_cluster(self):
         mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '0.6'])
@@ -1214,12 +1193,12 @@ class MaxMinsIdleTestCase(MockGoogleTestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, {
-                'mrjob-max-secs-idle': '36',
-            })
 
-    def test_bootstrap_script_is_actually_installed(self):
-        self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
+            cluster = runner._get_cluster(runner._cluster_id)
+
+            self.assertEqual(
+                cluster.config.lifecycle_config.idle_delete_ttl.seconds,
+                36)
 
 
 class TestCatFallback(MockGoogleTestCase):

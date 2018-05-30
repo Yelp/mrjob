@@ -1188,7 +1188,7 @@ class MaxMinsIdleTestCase(MockGoogleTestCase):
                 600)
 
     def test_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '0.6'])
+        mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '30'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
@@ -1198,7 +1198,7 @@ class MaxMinsIdleTestCase(MockGoogleTestCase):
 
             self.assertEqual(
                 cluster.config.lifecycle_config.idle_delete_ttl.seconds,
-                36)
+                1800)
 
 
 class TestCatFallback(MockGoogleTestCase):

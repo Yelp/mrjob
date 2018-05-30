@@ -1205,7 +1205,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             cluster_config['secondary_worker_config'] = secondary_worker_conf
 
         cluster_config['lifecycle_config'] = dict(
-            idle_delete_ttl=('%.1fs' % self._opts['max_mins_idle'] * 60))
+            idle_delete_ttl=dict(
+                seconds=int(self._opts['max_mins_idle'] * 60)))
 
         software_config = {}
 

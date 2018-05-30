@@ -35,8 +35,9 @@ from google.protobuf import duration_pb2
 from google.protobuf import empty_pb2
 from google.protobuf import field_mask_pb2
 
-_GAPIC_LIBRARY_VERSION = pkg_resources.get_distribution(
-    'google-cloud-dataproc', ).version
+#_GAPIC_LIBRARY_VERSION = pkg_resources.get_distribution(
+#    'google-cloud-dataproc', ).version
+_GAPIC_LIBRARY_VERSION = '0.11.0.dev-mrjob'
 
 
 class JobControllerClient(object):

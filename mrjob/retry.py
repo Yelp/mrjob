@@ -79,7 +79,7 @@ class RetryWrapper(object):
             backoff = self.__backoff
             tries = 0
 
-            while (not self.__max_tries or tries < self.__max_tries):
+            while not self.__max_tries or tries < self.__max_tries:
                 try:
                     return f(*args, **kwargs)
                 except Exception as ex:
@@ -96,5 +96,5 @@ class RetryWrapper(object):
 
         # pretend to be the original function
         if hasattr(f, '__name__'):
-            call_and_maybe_retry.__name__ == f.__name__
+            call_and_maybe_retry.__name__ = f.__name__
         return call_and_maybe_retry

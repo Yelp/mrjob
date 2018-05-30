@@ -23,13 +23,13 @@ import google.api_core.grpc_helpers
 import google.api_core.page_iterator
 import grpc
 
-from google.cloud.dataproc_v1beta2.gapic import enums
-from google.cloud.dataproc_v1beta2.gapic import job_controller_client_config
-from google.cloud.dataproc_v1beta2.proto import clusters_pb2
-from google.cloud.dataproc_v1beta2.proto import clusters_pb2_grpc
-from google.cloud.dataproc_v1beta2.proto import jobs_pb2
-from google.cloud.dataproc_v1beta2.proto import jobs_pb2_grpc
-from google.cloud.dataproc_v1beta2.proto import operations_pb2 as proto_operations_pb2
+from mrjob._vendor.dataproc_v1beta2.gapic import enums
+from mrjob._vendor.dataproc_v1beta2.gapic import job_controller_client_config
+from mrjob._vendor.dataproc_v1beta2.proto import clusters_pb2
+from mrjob._vendor.dataproc_v1beta2.proto import clusters_pb2_grpc
+from mrjob._vendor.dataproc_v1beta2.proto import jobs_pb2
+from mrjob._vendor.dataproc_v1beta2.proto import jobs_pb2_grpc
+from mrjob._vendor.dataproc_v1beta2.proto import operations_pb2 as proto_operations_pb2
 from google.longrunning import operations_pb2 as longrunning_operations_pb2
 from google.protobuf import duration_pb2
 from google.protobuf import empty_pb2
@@ -163,9 +163,9 @@ class JobControllerClient(object):
             project_id (str): Required. The ID of the Google Cloud Platform project that the job
                 belongs to.
             region (str): Required. The Cloud Dataproc region in which to handle the request.
-            job (Union[dict, ~google.cloud.dataproc_v1beta2.types.Job]): Required. The job resource.
+            job (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.Job]): Required. The job resource.
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.Job`
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.Job`
             request_id (str): Optional. A unique id used to identify the request. If the server
                 receives two ``SubmitJobRequest`` requests  with the same
                 id, then the second request will be ignored and the
@@ -187,7 +187,7 @@ class JobControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types.Job` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types.Job` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -255,7 +255,7 @@ class JobControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types.Job` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types.Job` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -328,7 +328,7 @@ class JobControllerClient(object):
                 of resources in a page.
             cluster_name (str): Optional. If set, the returned jobs list includes only jobs that were
                 submitted to the named cluster.
-            job_state_matcher (~google.cloud.dataproc_v1beta2.types.JobStateMatcher): Optional. Specifies enumerated categories of jobs to list.
+            job_state_matcher (~mrjob._vendor.dataproc_v1beta2.types.JobStateMatcher): Optional. Specifies enumerated categories of jobs to list.
                 (default = match ALL jobs).
 
                 If ``filter`` is provided, ``jobStateMatcher`` will be ignored.
@@ -357,7 +357,7 @@ class JobControllerClient(object):
 
         Returns:
             A :class:`~google.gax.PageIterator` instance. By default, this
-            is an iterable of :class:`~google.cloud.dataproc_v1beta2.types.Job` instances.
+            is an iterable of :class:`~mrjob._vendor.dataproc_v1beta2.types.Job` instances.
             This object can also be configured to iterate over the pages
             of the response through the `options` parameter.
 
@@ -438,17 +438,17 @@ class JobControllerClient(object):
                 belongs to.
             region (str): Required. The Cloud Dataproc region in which to handle the request.
             job_id (str): Required. The job ID.
-            job (Union[dict, ~google.cloud.dataproc_v1beta2.types.Job]): Required. The changes to the job.
+            job (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.Job]): Required. The changes to the job.
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.Job`
-            update_mask (Union[dict, ~google.cloud.dataproc_v1beta2.types.FieldMask]): Required. Specifies the path, relative to <code>Job</code>, of
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.Job`
+            update_mask (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.FieldMask]): Required. Specifies the path, relative to <code>Job</code>, of
                 the field to update. For example, to update the labels of a Job the
                 <code>update_mask</code> parameter would be specified as
                 <code>labels</code>, and the ``PATCH`` request body would specify the new
                 value. <strong>Note:</strong> Currently, <code>labels</code> is the only
                 field that can be updated.
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.FieldMask`
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.FieldMask`
             retry (Optional[google.api_core.retry.Retry]):  A retry object used
                 to retry requests. If ``None`` is specified, requests will not
                 be retried.
@@ -459,7 +459,7 @@ class JobControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types.Job` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types.Job` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -531,7 +531,7 @@ class JobControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types.Job` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types.Job` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request

@@ -25,8 +25,8 @@ from os.path import join
 
 try:
     import google.auth
-    import google.cloud.dataproc_v1
-    import google.cloud.dataproc_v1.types
+    import mrjob._vendor.dataproc_v1beta2
+    import mrjob._vendor.dataproc_v1beta2.types
     import google.cloud.logging
     import google.api_core.exceptions
     import google.api_core.grpc_helpers
@@ -147,11 +147,11 @@ _STDERR_LOG4J_WARNING = re.compile(
 # convert enum values to strings (e.g. 'RUNNING')
 
 def _cluster_state_name(state_value):
-    return google.cloud.dataproc_v1.types.ClusterStatus.State.Name(state_value)
+    return mrjob._vendor.dataproc_v1beta2.types.ClusterStatus.State.Name(state_value)
 
 
 def _job_state_name(state_value):
-    return google.cloud.dataproc_v1.types.JobStatus.State.Name(state_value)
+    return mrjob._vendor.dataproc_v1beta2.types.JobStatus.State.Name(state_value)
 
 
 ########## BEGIN - Helper fxns for _cluster_create_kwargs ##########
@@ -373,12 +373,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     @property
     def cluster_client(self):
-        return google.cloud.dataproc_v1.ClusterControllerClient(
+        return mrjob._vendor.dataproc_v1beta2.ClusterControllerClient(
             **self._client_create_kwargs())
 
     @property
     def job_client(self):
-        return google.cloud.dataproc_v1.JobControllerClient(
+        return mrjob._vendor.dataproc_v1beta2.JobControllerClient(
             **self._client_create_kwargs())
 
     @property

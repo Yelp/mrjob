@@ -2005,12 +2005,12 @@ LoggingConfig = _reflection.GeneratedProtocolMessageType('LoggingConfig', (_mess
 
   DriverLogLevelsEntry = _reflection.GeneratedProtocolMessageType('DriverLogLevelsEntry', (_message.Message,), dict(
     DESCRIPTOR = _LOGGINGCONFIG_DRIVERLOGLEVELSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.LoggingConfig.DriverLogLevelsEntry)
     ))
   ,
   DESCRIPTOR = _LOGGINGCONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """The runtime logging config of the job.
   
@@ -2030,12 +2030,12 @@ HadoopJob = _reflection.GeneratedProtocolMessageType('HadoopJob', (_message.Mess
 
   PropertiesEntry = _reflection.GeneratedProtocolMessageType('PropertiesEntry', (_message.Message,), dict(
     DESCRIPTOR = _HADOOPJOB_PROPERTIESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.HadoopJob.PropertiesEntry)
     ))
   ,
   DESCRIPTOR = _HADOOPJOB,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A Cloud Dataproc job for running `Apache Hadoop
   MapReduce <https://hadoop.apache.org/docs/current/hadoop-mapreduce-client/hadoop-mapreduce-client-core/MapReduceTutorial.html>`__
@@ -2094,12 +2094,12 @@ SparkJob = _reflection.GeneratedProtocolMessageType('SparkJob', (_message.Messag
 
   PropertiesEntry = _reflection.GeneratedProtocolMessageType('PropertiesEntry', (_message.Message,), dict(
     DESCRIPTOR = _SPARKJOB_PROPERTIESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.SparkJob.PropertiesEntry)
     ))
   ,
   DESCRIPTOR = _SPARKJOB,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A Cloud Dataproc job for running `Apache
   Spark <http://spark.apache.org/>`__ applications on YARN.
@@ -2153,12 +2153,12 @@ PySparkJob = _reflection.GeneratedProtocolMessageType('PySparkJob', (_message.Me
 
   PropertiesEntry = _reflection.GeneratedProtocolMessageType('PropertiesEntry', (_message.Message,), dict(
     DESCRIPTOR = _PYSPARKJOB_PROPERTIESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.PySparkJob.PropertiesEntry)
     ))
   ,
   DESCRIPTOR = _PYSPARKJOB,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A Cloud Dataproc job for running `Apache
   PySpark <https://spark.apache.org/docs/0.9.0/python-programming-guide.html>`__
@@ -2203,7 +2203,7 @@ _sym_db.RegisterMessage(PySparkJob.PropertiesEntry)
 
 QueryList = _reflection.GeneratedProtocolMessageType('QueryList', (_message.Message,), dict(
   DESCRIPTOR = _QUERYLIST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A list of queries to run on a cluster.
   
@@ -2226,19 +2226,19 @@ HiveJob = _reflection.GeneratedProtocolMessageType('HiveJob', (_message.Message,
 
   ScriptVariablesEntry = _reflection.GeneratedProtocolMessageType('ScriptVariablesEntry', (_message.Message,), dict(
     DESCRIPTOR = _HIVEJOB_SCRIPTVARIABLESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.HiveJob.ScriptVariablesEntry)
     ))
   ,
 
   PropertiesEntry = _reflection.GeneratedProtocolMessageType('PropertiesEntry', (_message.Message,), dict(
     DESCRIPTOR = _HIVEJOB_PROPERTIESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.HiveJob.PropertiesEntry)
     ))
   ,
   DESCRIPTOR = _HIVEJOB,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A Cloud Dataproc job for running `Apache
   Hive <https://hive.apache.org/>`__ queries on YARN.
@@ -2280,19 +2280,19 @@ SparkSqlJob = _reflection.GeneratedProtocolMessageType('SparkSqlJob', (_message.
 
   ScriptVariablesEntry = _reflection.GeneratedProtocolMessageType('ScriptVariablesEntry', (_message.Message,), dict(
     DESCRIPTOR = _SPARKSQLJOB_SCRIPTVARIABLESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.SparkSqlJob.ScriptVariablesEntry)
     ))
   ,
 
   PropertiesEntry = _reflection.GeneratedProtocolMessageType('PropertiesEntry', (_message.Message,), dict(
     DESCRIPTOR = _SPARKSQLJOB_PROPERTIESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.SparkSqlJob.PropertiesEntry)
     ))
   ,
   DESCRIPTOR = _SPARKSQLJOB,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A Cloud Dataproc job for running `Apache Spark
   SQL <http://spark.apache.org/sql/>`__ queries.
@@ -2329,19 +2329,19 @@ PigJob = _reflection.GeneratedProtocolMessageType('PigJob', (_message.Message,),
 
   ScriptVariablesEntry = _reflection.GeneratedProtocolMessageType('ScriptVariablesEntry', (_message.Message,), dict(
     DESCRIPTOR = _PIGJOB_SCRIPTVARIABLESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.PigJob.ScriptVariablesEntry)
     ))
   ,
 
   PropertiesEntry = _reflection.GeneratedProtocolMessageType('PropertiesEntry', (_message.Message,), dict(
     DESCRIPTOR = _PIGJOB_PROPERTIESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.PigJob.PropertiesEntry)
     ))
   ,
   DESCRIPTOR = _PIGJOB,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A Cloud Dataproc job for running `Apache
   Pig <https://pig.apache.org/>`__ queries on YARN.
@@ -2383,7 +2383,7 @@ _sym_db.RegisterMessage(PigJob.PropertiesEntry)
 
 JobPlacement = _reflection.GeneratedProtocolMessageType('JobPlacement', (_message.Message,), dict(
   DESCRIPTOR = _JOBPLACEMENT,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """Cloud Dataproc job config.
   
@@ -2402,7 +2402,7 @@ _sym_db.RegisterMessage(JobPlacement)
 
 JobStatus = _reflection.GeneratedProtocolMessageType('JobStatus', (_message.Message,), dict(
   DESCRIPTOR = _JOBSTATUS,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """Cloud Dataproc job status.
   
@@ -2425,7 +2425,7 @@ _sym_db.RegisterMessage(JobStatus)
 
 JobReference = _reflection.GeneratedProtocolMessageType('JobReference', (_message.Message,), dict(
   DESCRIPTOR = _JOBREFERENCE,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """Encapsulates the full scoping used to reference a job.
   
@@ -2448,7 +2448,7 @@ _sym_db.RegisterMessage(JobReference)
 
 YarnApplication = _reflection.GeneratedProtocolMessageType('YarnApplication', (_message.Message,), dict(
   DESCRIPTOR = _YARNAPPLICATION,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A YARN application created by a job. Application information is a subset
   of org.apache.hadoop.yarn.proto.YarnProtos.ApplicationReportProto.
@@ -2479,12 +2479,12 @@ Job = _reflection.GeneratedProtocolMessageType('Job', (_message.Message,), dict(
 
   LabelsEntry = _reflection.GeneratedProtocolMessageType('LabelsEntry', (_message.Message,), dict(
     DESCRIPTOR = _JOB_LABELSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.Job.LabelsEntry)
     ))
   ,
   DESCRIPTOR = _JOB,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A Cloud Dataproc job resource.
   
@@ -2549,7 +2549,7 @@ _sym_db.RegisterMessage(Job.LabelsEntry)
 
 JobScheduling = _reflection.GeneratedProtocolMessageType('JobScheduling', (_message.Message,), dict(
   DESCRIPTOR = _JOBSCHEDULING,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """Job scheduling options.
   
@@ -2568,7 +2568,7 @@ _sym_db.RegisterMessage(JobScheduling)
 
 SubmitJobRequest = _reflection.GeneratedProtocolMessageType('SubmitJobRequest', (_message.Message,), dict(
   DESCRIPTOR = _SUBMITJOBREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A request to submit a job.
   
@@ -2600,7 +2600,7 @@ _sym_db.RegisterMessage(SubmitJobRequest)
 
 GetJobRequest = _reflection.GeneratedProtocolMessageType('GetJobRequest', (_message.Message,), dict(
   DESCRIPTOR = _GETJOBREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A request to get the resource representation for a job in a project.
   
@@ -2621,7 +2621,7 @@ _sym_db.RegisterMessage(GetJobRequest)
 
 ListJobsRequest = _reflection.GeneratedProtocolMessageType('ListJobsRequest', (_message.Message,), dict(
   DESCRIPTOR = _LISTJOBSREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A request to list jobs in a project.
   
@@ -2663,7 +2663,7 @@ _sym_db.RegisterMessage(ListJobsRequest)
 
 UpdateJobRequest = _reflection.GeneratedProtocolMessageType('UpdateJobRequest', (_message.Message,), dict(
   DESCRIPTOR = _UPDATEJOBREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A request to update a job.
   
@@ -2692,7 +2692,7 @@ _sym_db.RegisterMessage(UpdateJobRequest)
 
 ListJobsResponse = _reflection.GeneratedProtocolMessageType('ListJobsResponse', (_message.Message,), dict(
   DESCRIPTOR = _LISTJOBSRESPONSE,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A list of jobs in a project.
   
@@ -2712,7 +2712,7 @@ _sym_db.RegisterMessage(ListJobsResponse)
 
 CancelJobRequest = _reflection.GeneratedProtocolMessageType('CancelJobRequest', (_message.Message,), dict(
   DESCRIPTOR = _CANCELJOBREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A request to cancel a job.
   
@@ -2733,7 +2733,7 @@ _sym_db.RegisterMessage(CancelJobRequest)
 
 DeleteJobRequest = _reflection.GeneratedProtocolMessageType('DeleteJobRequest', (_message.Message,), dict(
   DESCRIPTOR = _DELETEJOBREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.jobs_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.jobs_pb2'
   ,
   __doc__ = """A request to delete a job.
   

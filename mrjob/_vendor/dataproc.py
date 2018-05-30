@@ -14,11 +14,11 @@
 
 from __future__ import absolute_import
 
-from google.cloud.dataproc_v1beta2 import ClusterControllerClient
-from google.cloud.dataproc_v1beta2 import JobControllerClient
-from google.cloud.dataproc_v1beta2 import WorkflowTemplateServiceClient
-from google.cloud.dataproc_v1beta2 import enums
-from google.cloud.dataproc_v1beta2 import types
+from mrjob._vendor.dataproc_v1beta2 import ClusterControllerClient
+from mrjob._vendor.dataproc_v1beta2 import JobControllerClient
+from mrjob._vendor.dataproc_v1beta2 import WorkflowTemplateServiceClient
+from mrjob._vendor.dataproc_v1beta2 import enums
+from mrjob._vendor.dataproc_v1beta2 import types
 
 __all__ = (
     'enums',

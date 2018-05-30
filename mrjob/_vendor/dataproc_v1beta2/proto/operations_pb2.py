@@ -240,7 +240,7 @@ _sym_db.RegisterFileDescriptor(DESCRIPTOR)
 
 ClusterOperationStatus = _reflection.GeneratedProtocolMessageType('ClusterOperationStatus', (_message.Message,), dict(
   DESCRIPTOR = _CLUSTEROPERATIONSTATUS,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.operations_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.operations_pb2'
   ,
   __doc__ = """The status of the operation.
   
@@ -265,12 +265,12 @@ ClusterOperationMetadata = _reflection.GeneratedProtocolMessageType('ClusterOper
 
   LabelsEntry = _reflection.GeneratedProtocolMessageType('LabelsEntry', (_message.Message,), dict(
     DESCRIPTOR = _CLUSTEROPERATIONMETADATA_LABELSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.operations_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.operations_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.ClusterOperationMetadata.LabelsEntry)
     ))
   ,
   DESCRIPTOR = _CLUSTEROPERATIONMETADATA,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.operations_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.operations_pb2'
   ,
   __doc__ = """Metadata describing the operation.
   

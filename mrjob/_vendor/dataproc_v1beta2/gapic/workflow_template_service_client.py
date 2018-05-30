@@ -26,15 +26,15 @@ import google.api_core.page_iterator
 import google.api_core.path_template
 import grpc
 
-from google.cloud.dataproc_v1beta2.gapic import enums
-from google.cloud.dataproc_v1beta2.gapic import workflow_template_service_client_config
-from google.cloud.dataproc_v1beta2.proto import clusters_pb2
-from google.cloud.dataproc_v1beta2.proto import clusters_pb2_grpc
-from google.cloud.dataproc_v1beta2.proto import jobs_pb2
-from google.cloud.dataproc_v1beta2.proto import jobs_pb2_grpc
-from google.cloud.dataproc_v1beta2.proto import operations_pb2 as proto_operations_pb2
-from google.cloud.dataproc_v1beta2.proto import workflow_templates_pb2
-from google.cloud.dataproc_v1beta2.proto import workflow_templates_pb2_grpc
+from mrjob._vendor.dataproc_v1beta2.gapic import enums
+from mrjob._vendor.dataproc_v1beta2.gapic import workflow_template_service_client_config
+from mrjob._vendor.dataproc_v1beta2.proto import clusters_pb2
+from mrjob._vendor.dataproc_v1beta2.proto import clusters_pb2_grpc
+from mrjob._vendor.dataproc_v1beta2.proto import jobs_pb2
+from mrjob._vendor.dataproc_v1beta2.proto import jobs_pb2_grpc
+from mrjob._vendor.dataproc_v1beta2.proto import operations_pb2 as proto_operations_pb2
+from mrjob._vendor.dataproc_v1beta2.proto import workflow_templates_pb2
+from mrjob._vendor.dataproc_v1beta2.proto import workflow_templates_pb2_grpc
 from google.longrunning import operations_pb2 as longrunning_operations_pb2
 from google.protobuf import duration_pb2
 from google.protobuf import empty_pb2
@@ -196,9 +196,9 @@ class WorkflowTemplateServiceClient(object):
             parent (str): Required. The \"resource name\" of the region, as described
                 in https://cloud.google.com/apis/design/resource_names of the form
                 ``projects/{project_id}/regions/{region}``
-            template (Union[dict, ~google.cloud.dataproc_v1beta2.types.WorkflowTemplate]): Required. The Dataproc workflow template to create.
+            template (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.WorkflowTemplate]): Required. The Dataproc workflow template to create.
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.WorkflowTemplate`
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.WorkflowTemplate`
             retry (Optional[google.api_core.retry.Retry]):  A retry object used
                 to retry requests. If ``None`` is specified, requests will not
                 be retried.
@@ -209,7 +209,7 @@ class WorkflowTemplateServiceClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types.WorkflowTemplate` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types.WorkflowTemplate` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -276,7 +276,7 @@ class WorkflowTemplateServiceClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types.WorkflowTemplate` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types.WorkflowTemplate` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -378,7 +378,7 @@ class WorkflowTemplateServiceClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types._OperationFuture` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types._OperationFuture` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -434,11 +434,11 @@ class WorkflowTemplateServiceClient(object):
             >>> response = client.update_workflow_template(template)
 
         Args:
-            template (Union[dict, ~google.cloud.dataproc_v1beta2.types.WorkflowTemplate]): Required. The updated workflow template.
+            template (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.WorkflowTemplate]): Required. The updated workflow template.
 
                 The ``template.version`` field must match the current version.
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.WorkflowTemplate`
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.WorkflowTemplate`
             retry (Optional[google.api_core.retry.Retry]):  A retry object used
                 to retry requests. If ``None`` is specified, requests will not
                 be retried.
@@ -449,7 +449,7 @@ class WorkflowTemplateServiceClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types.WorkflowTemplate` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types.WorkflowTemplate` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -524,7 +524,7 @@ class WorkflowTemplateServiceClient(object):
 
         Returns:
             A :class:`~google.gax.PageIterator` instance. By default, this
-            is an iterable of :class:`~google.cloud.dataproc_v1beta2.types.WorkflowTemplate` instances.
+            is an iterable of :class:`~mrjob._vendor.dataproc_v1beta2.types.WorkflowTemplate` instances.
             This object can also be configured to iterate over the pages
             of the response through the `options` parameter.
 

@@ -14,8 +14,8 @@ _sym_db = _symbol_database.Default()
 
 
 from google.api import annotations_pb2 as google_dot_api_dot_annotations__pb2
-from google.cloud.dataproc_v1beta2.proto import clusters_pb2 as google_dot_cloud_dot_dataproc__v1beta2_dot_proto_dot_clusters__pb2
-from google.cloud.dataproc_v1beta2.proto import jobs_pb2 as google_dot_cloud_dot_dataproc__v1beta2_dot_proto_dot_jobs__pb2
+from mrjob._vendor.dataproc_v1beta2.proto import clusters_pb2 as google_dot_cloud_dot_dataproc__v1beta2_dot_proto_dot_clusters__pb2
+from mrjob._vendor.dataproc_v1beta2.proto import jobs_pb2 as google_dot_cloud_dot_dataproc__v1beta2_dot_proto_dot_jobs__pb2
 from google.longrunning import operations_pb2 as google_dot_longrunning_dot_operations__pb2
 from google.protobuf import empty_pb2 as google_dot_protobuf_dot_empty__pb2
 from google.protobuf import timestamp_pb2 as google_dot_protobuf_dot_timestamp__pb2
@@ -1203,12 +1203,12 @@ WorkflowTemplate = _reflection.GeneratedProtocolMessageType('WorkflowTemplate', 
 
   LabelsEntry = _reflection.GeneratedProtocolMessageType('LabelsEntry', (_message.Message,), dict(
     DESCRIPTOR = _WORKFLOWTEMPLATE_LABELSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.WorkflowTemplate.LabelsEntry)
     ))
   ,
   DESCRIPTOR = _WORKFLOWTEMPLATE,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A Cloud Dataproc workflow template resource.
   
@@ -1261,7 +1261,7 @@ _sym_db.RegisterMessage(WorkflowTemplate.LabelsEntry)
 
 WorkflowTemplatePlacement = _reflection.GeneratedProtocolMessageType('WorkflowTemplatePlacement', (_message.Message,), dict(
   DESCRIPTOR = _WORKFLOWTEMPLATEPLACEMENT,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """Specifies workflow execution target.
   
@@ -1287,12 +1287,12 @@ ManagedCluster = _reflection.GeneratedProtocolMessageType('ManagedCluster', (_me
 
   LabelsEntry = _reflection.GeneratedProtocolMessageType('LabelsEntry', (_message.Message,), dict(
     DESCRIPTOR = _MANAGEDCLUSTER_LABELSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.ManagedCluster.LabelsEntry)
     ))
   ,
   DESCRIPTOR = _MANAGEDCLUSTER,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """Cluster that is managed by the workflow.
   
@@ -1326,12 +1326,12 @@ ClusterSelector = _reflection.GeneratedProtocolMessageType('ClusterSelector', (_
 
   ClusterLabelsEntry = _reflection.GeneratedProtocolMessageType('ClusterLabelsEntry', (_message.Message,), dict(
     DESCRIPTOR = _CLUSTERSELECTOR_CLUSTERLABELSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.ClusterSelector.ClusterLabelsEntry)
     ))
   ,
   DESCRIPTOR = _CLUSTERSELECTOR,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A selector that chooses target cluster for jobs based on metadata.
   
@@ -1355,12 +1355,12 @@ OrderedJob = _reflection.GeneratedProtocolMessageType('OrderedJob', (_message.Me
 
   LabelsEntry = _reflection.GeneratedProtocolMessageType('LabelsEntry', (_message.Message,), dict(
     DESCRIPTOR = _ORDEREDJOB_LABELSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.OrderedJob.LabelsEntry)
     ))
   ,
   DESCRIPTOR = _ORDEREDJOB,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A job executed by the workflow.
   
@@ -1415,12 +1415,12 @@ WorkflowMetadata = _reflection.GeneratedProtocolMessageType('WorkflowMetadata', 
 
   ParametersEntry = _reflection.GeneratedProtocolMessageType('ParametersEntry', (_message.Message,), dict(
     DESCRIPTOR = _WORKFLOWMETADATA_PARAMETERSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.WorkflowMetadata.ParametersEntry)
     ))
   ,
   DESCRIPTOR = _WORKFLOWMETADATA,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A Cloud Dataproc workflow template resource.
   
@@ -1452,7 +1452,7 @@ _sym_db.RegisterMessage(WorkflowMetadata.ParametersEntry)
 
 ClusterOperation = _reflection.GeneratedProtocolMessageType('ClusterOperation', (_message.Message,), dict(
   DESCRIPTOR = _CLUSTEROPERATION,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """The cluster operation triggered by a workflow.
   
@@ -1471,7 +1471,7 @@ _sym_db.RegisterMessage(ClusterOperation)
 
 WorkflowGraph = _reflection.GeneratedProtocolMessageType('WorkflowGraph', (_message.Message,), dict(
   DESCRIPTOR = _WORKFLOWGRAPH,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """The workflow graph.
   
@@ -1486,7 +1486,7 @@ _sym_db.RegisterMessage(WorkflowGraph)
 
 WorkflowNode = _reflection.GeneratedProtocolMessageType('WorkflowNode', (_message.Message,), dict(
   DESCRIPTOR = _WORKFLOWNODE,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """The workflow node.
   
@@ -1510,7 +1510,7 @@ _sym_db.RegisterMessage(WorkflowNode)
 
 CreateWorkflowTemplateRequest = _reflection.GeneratedProtocolMessageType('CreateWorkflowTemplateRequest', (_message.Message,), dict(
   DESCRIPTOR = _CREATEWORKFLOWTEMPLATEREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A request to create a workflow template.
   
@@ -1529,7 +1529,7 @@ _sym_db.RegisterMessage(CreateWorkflowTemplateRequest)
 
 GetWorkflowTemplateRequest = _reflection.GeneratedProtocolMessageType('GetWorkflowTemplateRequest', (_message.Message,), dict(
   DESCRIPTOR = _GETWORKFLOWTEMPLATEREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A request to fetch a workflow template.
   
@@ -1552,7 +1552,7 @@ _sym_db.RegisterMessage(GetWorkflowTemplateRequest)
 
 InstantiateWorkflowTemplateRequest = _reflection.GeneratedProtocolMessageType('InstantiateWorkflowTemplateRequest', (_message.Message,), dict(
   DESCRIPTOR = _INSTANTIATEWORKFLOWTEMPLATEREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A request to instantiate a workflow template.
   
@@ -1586,7 +1586,7 @@ _sym_db.RegisterMessage(InstantiateWorkflowTemplateRequest)
 
 InstantiateInlineWorkflowTemplateRequest = _reflection.GeneratedProtocolMessageType('InstantiateInlineWorkflowTemplateRequest', (_message.Message,), dict(
   DESCRIPTOR = _INSTANTIATEINLINEWORKFLOWTEMPLATEREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A request to instantiate an inline workflow template.
   
@@ -1615,7 +1615,7 @@ _sym_db.RegisterMessage(InstantiateInlineWorkflowTemplateRequest)
 
 UpdateWorkflowTemplateRequest = _reflection.GeneratedProtocolMessageType('UpdateWorkflowTemplateRequest', (_message.Message,), dict(
   DESCRIPTOR = _UPDATEWORKFLOWTEMPLATEREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A request to update a workflow template.
   
@@ -1631,7 +1631,7 @@ _sym_db.RegisterMessage(UpdateWorkflowTemplateRequest)
 
 ListWorkflowTemplatesRequest = _reflection.GeneratedProtocolMessageType('ListWorkflowTemplatesRequest', (_message.Message,), dict(
   DESCRIPTOR = _LISTWORKFLOWTEMPLATESREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A request to list workflow templates in a project.
   
@@ -1654,7 +1654,7 @@ _sym_db.RegisterMessage(ListWorkflowTemplatesRequest)
 
 ListWorkflowTemplatesResponse = _reflection.GeneratedProtocolMessageType('ListWorkflowTemplatesResponse', (_message.Message,), dict(
   DESCRIPTOR = _LISTWORKFLOWTEMPLATESRESPONSE,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A response to a request to list workflow templates in a project.
   
@@ -1674,7 +1674,7 @@ _sym_db.RegisterMessage(ListWorkflowTemplatesResponse)
 
 DeleteWorkflowTemplateRequest = _reflection.GeneratedProtocolMessageType('DeleteWorkflowTemplateRequest', (_message.Message,), dict(
   DESCRIPTOR = _DELETEWORKFLOWTEMPLATEREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.workflow_templates_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.workflow_templates_pb2'
   ,
   __doc__ = """A request to delete a workflow template.
   

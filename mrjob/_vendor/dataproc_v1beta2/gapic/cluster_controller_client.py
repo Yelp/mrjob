@@ -25,11 +25,11 @@ import google.api_core.operations_v1
 import google.api_core.page_iterator
 import grpc
 
-from google.cloud.dataproc_v1beta2.gapic import cluster_controller_client_config
-from google.cloud.dataproc_v1beta2.gapic import enums
-from google.cloud.dataproc_v1beta2.proto import clusters_pb2
-from google.cloud.dataproc_v1beta2.proto import clusters_pb2_grpc
-from google.cloud.dataproc_v1beta2.proto import operations_pb2 as proto_operations_pb2
+from mrjob._vendor.dataproc_v1beta2.gapic import cluster_controller_client_config
+from mrjob._vendor.dataproc_v1beta2.gapic import enums
+from mrjob._vendor.dataproc_v1beta2.proto import clusters_pb2
+from mrjob._vendor.dataproc_v1beta2.proto import clusters_pb2_grpc
+from mrjob._vendor.dataproc_v1beta2.proto import operations_pb2 as proto_operations_pb2
 from google.longrunning import operations_pb2 as longrunning_operations_pb2
 from google.protobuf import duration_pb2
 from google.protobuf import empty_pb2
@@ -184,9 +184,9 @@ class ClusterControllerClient(object):
             project_id (str): Required. The ID of the Google Cloud Platform project that the cluster
                 belongs to.
             region (str): Required. The Cloud Dataproc region in which to handle the request.
-            cluster (Union[dict, ~google.cloud.dataproc_v1beta2.types.Cluster]): Required. The cluster to create.
+            cluster (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.Cluster]): Required. The cluster to create.
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.Cluster`
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.Cluster`
             request_id (str): Optional. A unique id used to identify the request. If the server
                 receives two ``CreateClusterRequest`` requests  with the same
                 id, then the second request will be ignored and the
@@ -208,7 +208,7 @@ class ClusterControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types._OperationFuture` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types._OperationFuture` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -292,10 +292,10 @@ class ClusterControllerClient(object):
                 cluster belongs to.
             region (str): Required. The Cloud Dataproc region in which to handle the request.
             cluster_name (str): Required. The cluster name.
-            cluster (Union[dict, ~google.cloud.dataproc_v1beta2.types.Cluster]): Required. The changes to the cluster.
+            cluster (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.Cluster]): Required. The changes to the cluster.
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.Cluster`
-            update_mask (Union[dict, ~google.cloud.dataproc_v1beta2.types.FieldMask]): Required. Specifies the path, relative to ``Cluster``, of
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.Cluster`
+            update_mask (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.FieldMask]): Required. Specifies the path, relative to ``Cluster``, of
                 the field to update. For example, to change the number of workers
                 in a cluster to 5, the ``update_mask`` parameter would be
                 specified as ``config.worker_config.num_instances``,
@@ -350,8 +350,8 @@ class ClusterControllerClient(object):
                 </tr>
                 </table>
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.FieldMask`
-            graceful_decommission_timeout (Union[dict, ~google.cloud.dataproc_v1beta2.types.Duration]): Optional. Timeout for graceful YARN decomissioning. Graceful
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.FieldMask`
+            graceful_decommission_timeout (Union[dict, ~mrjob._vendor.dataproc_v1beta2.types.Duration]): Optional. Timeout for graceful YARN decomissioning. Graceful
                 decommissioning allows removing nodes from the cluster without
                 interrupting jobs in progress. Timeout specifies how long to wait for jobs
                 in progress to finish before forcefully removing nodes (and potentially
@@ -360,7 +360,7 @@ class ClusterControllerClient(object):
 
                 Only supported on Dataproc image versions 1.2 and higher.
                 If a dict is provided, it must be of the same form as the protobuf
-                message :class:`~google.cloud.dataproc_v1beta2.types.Duration`
+                message :class:`~mrjob._vendor.dataproc_v1beta2.types.Duration`
             request_id (str): Optional. A unique id used to identify the request. If the server
                 receives two ``UpdateClusterRequest`` requests  with the same
                 id, then the second request will be ignored and the
@@ -382,7 +382,7 @@ class ClusterControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types._OperationFuture` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types._OperationFuture` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -484,7 +484,7 @@ class ClusterControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types._OperationFuture` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types._OperationFuture` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -560,7 +560,7 @@ class ClusterControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types.Cluster` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types.Cluster` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request
@@ -659,7 +659,7 @@ class ClusterControllerClient(object):
 
         Returns:
             A :class:`~google.gax.PageIterator` instance. By default, this
-            is an iterable of :class:`~google.cloud.dataproc_v1beta2.types.Cluster` instances.
+            is an iterable of :class:`~mrjob._vendor.dataproc_v1beta2.types.Cluster` instances.
             This object can also be configured to iterate over the pages
             of the response through the `options` parameter.
 
@@ -752,7 +752,7 @@ class ClusterControllerClient(object):
                 that is provided to the method.
 
         Returns:
-            A :class:`~google.cloud.dataproc_v1beta2.types._OperationFuture` instance.
+            A :class:`~mrjob._vendor.dataproc_v1beta2.types._OperationFuture` instance.
 
         Raises:
             google.api_core.exceptions.GoogleAPICallError: If the request

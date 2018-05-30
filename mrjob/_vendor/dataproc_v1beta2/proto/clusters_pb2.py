@@ -14,7 +14,7 @@ _sym_db = _symbol_database.Default()
 
 
 from google.api import annotations_pb2 as google_dot_api_dot_annotations__pb2
-from google.cloud.dataproc_v1beta2.proto import shared_pb2 as google_dot_cloud_dot_dataproc__v1beta2_dot_proto_dot_shared__pb2
+from mrjob._vendor.dataproc_v1beta2.proto import shared_pb2 as google_dot_cloud_dot_dataproc__v1beta2_dot_proto_dot_shared__pb2
 from google.longrunning import operations_pb2 as google_dot_longrunning_dot_operations__pb2
 from google.protobuf import duration_pb2 as google_dot_protobuf_dot_duration__pb2
 from google.protobuf import field_mask_pb2 as google_dot_protobuf_dot_field__mask__pb2
@@ -1416,17 +1416,17 @@ Cluster = _reflection.GeneratedProtocolMessageType('Cluster', (_message.Message,
 
   LabelsEntry = _reflection.GeneratedProtocolMessageType('LabelsEntry', (_message.Message,), dict(
     DESCRIPTOR = _CLUSTER_LABELSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.Cluster.LabelsEntry)
     ))
   ,
   DESCRIPTOR = _CLUSTER,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Describes the identifying information, config, and status of a cluster
   of Compute Engine instances.
-  
-  
+
+
   Attributes:
       project_id:
           Required. The Google Cloud Platform project ID that the
@@ -1466,11 +1466,11 @@ _sym_db.RegisterMessage(Cluster.LabelsEntry)
 
 ClusterConfig = _reflection.GeneratedProtocolMessageType('ClusterConfig', (_message.Message,), dict(
   DESCRIPTOR = _CLUSTERCONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """The cluster config.
-  
-  
+
+
   Attributes:
       config_bucket:
           Optional. A Cloud Storage staging bucket used for sharing
@@ -1515,17 +1515,17 @@ GceClusterConfig = _reflection.GeneratedProtocolMessageType('GceClusterConfig', 
 
   MetadataEntry = _reflection.GeneratedProtocolMessageType('MetadataEntry', (_message.Message,), dict(
     DESCRIPTOR = _GCECLUSTERCONFIG_METADATAENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.GceClusterConfig.MetadataEntry)
     ))
   ,
   DESCRIPTOR = _GCECLUSTERCONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Common config settings for resources of Compute Engine cluster
   instances, applicable to all instances in the cluster.
-  
-  
+
+
   Attributes:
       zone_uri:
           Optional. The zone where the Compute Engine cluster will be
@@ -1601,12 +1601,12 @@ _sym_db.RegisterMessage(GceClusterConfig.MetadataEntry)
 
 InstanceGroupConfig = _reflection.GeneratedProtocolMessageType('InstanceGroupConfig', (_message.Message,), dict(
   DESCRIPTOR = _INSTANCEGROUPCONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Optional. The config settings for Compute Engine resources in an
   instance group, such as a master or worker group.
-  
-  
+
+
   Attributes:
       num_instances:
           Optional. The number of VM instances in the instance group.
@@ -1655,11 +1655,11 @@ _sym_db.RegisterMessage(InstanceGroupConfig)
 
 ManagedGroupConfig = _reflection.GeneratedProtocolMessageType('ManagedGroupConfig', (_message.Message,), dict(
   DESCRIPTOR = _MANAGEDGROUPCONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Specifies the resources used to actively manage an instance group.
-  
-  
+
+
   Attributes:
       instance_template_name:
           Output only. The name of the Instance Template used for the
@@ -1674,13 +1674,13 @@ _sym_db.RegisterMessage(ManagedGroupConfig)
 
 AcceleratorConfig = _reflection.GeneratedProtocolMessageType('AcceleratorConfig', (_message.Message,), dict(
   DESCRIPTOR = _ACCELERATORCONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Specifies the type and number of accelerator cards attached to the
   instances of an instance group (see `GPUs on Compute
   Engine </compute/docs/gpus/>`__).
-  
-  
+
+
   Attributes:
       accelerator_type_uri:
           Full URL, partial URI, or short name of the accelerator type
@@ -1707,11 +1707,11 @@ _sym_db.RegisterMessage(AcceleratorConfig)
 
 DiskConfig = _reflection.GeneratedProtocolMessageType('DiskConfig', (_message.Message,), dict(
   DESCRIPTOR = _DISKCONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Specifies the config of disk options for a group of VM instances.
-  
-  
+
+
   Attributes:
       boot_disk_type:
           Optional. Type of the boot disk (default is "pd-standard").
@@ -1734,11 +1734,11 @@ _sym_db.RegisterMessage(DiskConfig)
 
 LifecycleConfig = _reflection.GeneratedProtocolMessageType('LifecycleConfig', (_message.Message,), dict(
   DESCRIPTOR = _LIFECYCLECONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Specifies the cluster auto delete related schedule configuration.
-  
-  
+
+
   Attributes:
       idle_delete_ttl:
           Optional. The longest duration that cluster would keep alive
@@ -1759,12 +1759,12 @@ _sym_db.RegisterMessage(LifecycleConfig)
 
 NodeInitializationAction = _reflection.GeneratedProtocolMessageType('NodeInitializationAction', (_message.Message,), dict(
   DESCRIPTOR = _NODEINITIALIZATIONACTION,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Specifies an executable to run on a fully configured node and a timeout
   period for executable completion.
-  
-  
+
+
   Attributes:
       executable_file:
           Required. Cloud Storage URI of executable file.
@@ -1781,11 +1781,11 @@ _sym_db.RegisterMessage(NodeInitializationAction)
 
 ClusterStatus = _reflection.GeneratedProtocolMessageType('ClusterStatus', (_message.Message,), dict(
   DESCRIPTOR = _CLUSTERSTATUS,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """The status of a cluster and its instances.
-  
-  
+
+
   Attributes:
       state:
           Output only. The cluster's state.
@@ -1805,16 +1805,16 @@ SoftwareConfig = _reflection.GeneratedProtocolMessageType('SoftwareConfig', (_me
 
   PropertiesEntry = _reflection.GeneratedProtocolMessageType('PropertiesEntry', (_message.Message,), dict(
     DESCRIPTOR = _SOFTWARECONFIG_PROPERTIESENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.SoftwareConfig.PropertiesEntry)
     ))
   ,
   DESCRIPTOR = _SOFTWARECONFIG,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Specifies the selection and config of software inside the cluster.
-  
-  
+
+
   Attributes:
       image_version:
           Optional. The version of software inside the cluster. It must
@@ -1847,26 +1847,26 @@ ClusterMetrics = _reflection.GeneratedProtocolMessageType('ClusterMetrics', (_me
 
   HdfsMetricsEntry = _reflection.GeneratedProtocolMessageType('HdfsMetricsEntry', (_message.Message,), dict(
     DESCRIPTOR = _CLUSTERMETRICS_HDFSMETRICSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.ClusterMetrics.HdfsMetricsEntry)
     ))
   ,
 
   YarnMetricsEntry = _reflection.GeneratedProtocolMessageType('YarnMetricsEntry', (_message.Message,), dict(
     DESCRIPTOR = _CLUSTERMETRICS_YARNMETRICSENTRY,
-    __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+    __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
     # @@protoc_insertion_point(class_scope:google.cloud.dataproc.v1beta2.ClusterMetrics.YarnMetricsEntry)
     ))
   ,
   DESCRIPTOR = _CLUSTERMETRICS,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Contains cluster daemon metrics, such as HDFS and YARN stats.
-  
+
   **Beta Feature**: This report is available for testing purposes only. It
   may be changed before final release.
-  
-  
+
+
   Attributes:
       hdfs_metrics:
           The HDFS metrics.
@@ -1881,11 +1881,11 @@ _sym_db.RegisterMessage(ClusterMetrics.YarnMetricsEntry)
 
 CreateClusterRequest = _reflection.GeneratedProtocolMessageType('CreateClusterRequest', (_message.Message,), dict(
   DESCRIPTOR = _CREATECLUSTERREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """A request to create a cluster.
-  
-  
+
+
   Attributes:
       project_id:
           Required. The ID of the Google Cloud Platform project that the
@@ -1914,11 +1914,11 @@ _sym_db.RegisterMessage(CreateClusterRequest)
 
 UpdateClusterRequest = _reflection.GeneratedProtocolMessageType('UpdateClusterRequest', (_message.Message,), dict(
   DESCRIPTOR = _UPDATECLUSTERREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """A request to update a cluster.
-  
-  
+
+
   Attributes:
       project_id:
           Required. The ID of the Google Cloud Platform project the
@@ -1999,11 +1999,11 @@ _sym_db.RegisterMessage(UpdateClusterRequest)
 
 DeleteClusterRequest = _reflection.GeneratedProtocolMessageType('DeleteClusterRequest', (_message.Message,), dict(
   DESCRIPTOR = _DELETECLUSTERREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """A request to delete a cluster.
-  
-  
+
+
   Attributes:
       project_id:
           Required. The ID of the Google Cloud Platform project that the
@@ -2036,11 +2036,11 @@ _sym_db.RegisterMessage(DeleteClusterRequest)
 
 GetClusterRequest = _reflection.GeneratedProtocolMessageType('GetClusterRequest', (_message.Message,), dict(
   DESCRIPTOR = _GETCLUSTERREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """Request to get the resource representation for a cluster in a project.
-  
-  
+
+
   Attributes:
       project_id:
           Required. The ID of the Google Cloud Platform project that the
@@ -2057,11 +2057,11 @@ _sym_db.RegisterMessage(GetClusterRequest)
 
 ListClustersRequest = _reflection.GeneratedProtocolMessageType('ListClustersRequest', (_message.Message,), dict(
   DESCRIPTOR = _LISTCLUSTERSREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """A request to list the clusters in a project.
-  
-  
+
+
   Attributes:
       project_id:
           Required. The ID of the Google Cloud Platform project that the
@@ -2097,11 +2097,11 @@ _sym_db.RegisterMessage(ListClustersRequest)
 
 ListClustersResponse = _reflection.GeneratedProtocolMessageType('ListClustersResponse', (_message.Message,), dict(
   DESCRIPTOR = _LISTCLUSTERSRESPONSE,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """The list of all clusters in a project.
-  
-  
+
+
   Attributes:
       clusters:
           Output only. The clusters in the project.
@@ -2117,11 +2117,11 @@ _sym_db.RegisterMessage(ListClustersResponse)
 
 DiagnoseClusterRequest = _reflection.GeneratedProtocolMessageType('DiagnoseClusterRequest', (_message.Message,), dict(
   DESCRIPTOR = _DIAGNOSECLUSTERREQUEST,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """A request to collect cluster diagnostic information.
-  
-  
+
+
   Attributes:
       project_id:
           Required. The ID of the Google Cloud Platform project that the
@@ -2138,11 +2138,11 @@ _sym_db.RegisterMessage(DiagnoseClusterRequest)
 
 DiagnoseClusterResults = _reflection.GeneratedProtocolMessageType('DiagnoseClusterResults', (_message.Message,), dict(
   DESCRIPTOR = _DIAGNOSECLUSTERRESULTS,
-  __module__ = 'google.cloud.dataproc_v1beta2.proto.clusters_pb2'
+  __module__ = 'mrjob._vendor.dataproc_v1beta2.proto.clusters_pb2'
   ,
   __doc__ = """The location of diagnostic output.
-  
-  
+
+
   Attributes:
       output_uri:
           Output only. The Cloud Storage URI of the diagnostic output.

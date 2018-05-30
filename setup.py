@@ -40,12 +40,9 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # grpcio 1.11.0 seems not to compile with PyPy
+    # grpcio 1.11.0 and 1.12.0 seem not to compile with PyPy
     if hasattr(sys, 'pypy_version_info'):
-        setuptools_kwargs['install_requires'] = [
-            x + ',<=1.10.0' if x.startswith('grpcio') else x
-            for x in setuptools_kwargs['install_requires']
-        ]
+        setuptools_kwargs['install_requires'].append('grpcio<=1.10.0')
 
     # rapidjson exists on Python 3 only
     if sys.version_info >= (3, 0):

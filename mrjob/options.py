@@ -466,13 +466,15 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
-    cloud_upload_part_size=dict(
+    cloud_part_size_mb=dict(
+        deprecated_aliases=['cloud_upload_part_size'],
         cloud_role='launch',
         switches=[
-            (['--cloud-upload-part-size'], dict(
-                help=('Upload files to S3 in parts no bigger than this many'
-                      ' megabytes. Default is 100 MiB. Set to 0 to disable'
-                      ' multipart uploading entirely.'),
+            (['--cloud-part-size-mb'], dict(
+                deprecated_aliases=['--cloud-upload-part-size'],
+                help=('Upload files to cloud FS in parts no bigger than this'
+                      ' many megabytes. Default is 100 MiB. Set to 0 to'
+                      ' disable multipart uploading entirely.'),
                 type=float,
             )),
         ],
@@ -484,6 +486,20 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    cluster_properties=dict(
+        combiner=combine_dicts,
+        switches=[
+            (['--cluster-property'], dict(
+                action=_KeyValueAction,
+                help=('Properties to set in Hadoop config files on Dataproc.'
+                      'Args take the form file_prefix:property=value.'
+                      ' You can use --cluster-property multiple times.'
+                      ' For more info, see'
+                      ' https://cloud.google.com/dataproc/docs/concepts'
+                      '/configuring-clusters/cluster-properties'),
+            )),
+        ],
+    ),
     cmdenv=dict(
         combiner=combine_envs,
         switches=[
@@ -492,6 +508,21 @@ _RUNNER_OPTS = dict(
                 help=('Set an environment variable for your job inside Hadoop '
                       'streaming. Must take the form KEY=VALUE. You can use'
                       ' --cmdenv multiple times.'),
+            )),
+        ],
+    ),
+    core_instance_config=dict(
+        cloud_role='launch',
+        switches=[
+            (['--core-instance-config'], dict(
+                action=_JSONAction,
+                help=('detailed JSON dict of configs for the core'
+                      ' (worker) instances'
+                      ' on Dataproc, including disk config. For format, see'
+                      ' https://cloud.google.com/dataproc/docs/reference/rest'
+                      '/v1/projects.regions.clusters#InstanceGroupConfig'
+                      ' (except that fields in your JSON should use'
+                      ' snake_case, not camelCase).')
             )),
         ],
     ),
@@ -699,7 +730,7 @@ _RUNNER_OPTS = dict(
         switches=[
             (['--instance-groups'], dict(
                 action=_JSONAction,
-                help=('detailed JSON list of instance configs, including'
+                help=('detailed JSON list of EMR instance configs, including'
                       ' EBS configuration. See docs for --instance-groups'
                       ' at http://docs.aws.amazon.com/cli/latest/reference'
                       '/emr/create-cluster.html'),
@@ -783,6 +814,20 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    master_instance_config=dict(
+        cloud_role='launch',
+        switches=[
+            (['--master-instance-config'], dict(
+                action=_JSONAction,
+                help=('detailed JSON dict of configs for the master instance'
+                      ' on Dataproc including disk config. For format, see'
+                      ' https://cloud.google.com/dataproc/docs/reference/rest'
+                      '/v1/projects.regions.clusters#InstanceGroupConfig'
+                      ' (except that fields in your JSON should use'
+                      ' snake_case, not camelCase).')
+            )),
+        ],
+    ),
     master_instance_type=dict(
         cloud_role='launch',
         switches=[
@@ -821,6 +866,15 @@ _RUNNER_OPTS = dict(
                       " end of an hour the cluster can automatically"
                       " terminate itself (default is 5 minutes)"),
                 type=float,
+            )),
+        ],
+    ),
+    network=dict(
+        cloud_role='launch',
+        switches=[
+            (['--network'], dict(
+                help=('URI of Google Compute Engine network to launch cluster'
+                      " in. Can't be used with --subnet."),
             )),
         ],
     ),
@@ -944,6 +998,28 @@ _RUNNER_OPTS = dict(
                       " s3-us-west-1.amazonaws.com). You usually shouldn't"
                       " set this; by default mrjob will choose the correct"
                       " endpoint for each S3 bucket based on its location."),
+            )),
+        ],
+    ),
+    service_account=dict(
+        cloud_role='launch',
+        switches=[
+            (['--service-account'], dict(
+                help=('Service account to use when creating a Dataproc'
+                      ' cluster. Usually takes the form'
+                      ' [account_id]@[project_id].iam.gserviceaccount.com.'
+                      ' Set to "" to use the default.'),
+            )),
+        ],
+    ),
+    service_account_scopes=dict(
+        cloud_role='launch',
+        combiner=combine_lists,
+        switches=[
+            (['--service-account-scope'], dict(
+                action='append',
+                help=('Additional service account scope to use when creating'
+                      ' a Dataproc cluster.'),
             )),
         ],
     ),
@@ -1077,15 +1153,14 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         switches=[
             (['--subnet'], dict(
-                help=('ID of Amazon VPC subnet to launch cluster in. If not'
-                      ' set or empty string, cluster is launched in the normal'
-                      ' AWS cloud.'),
+                help=('ID of Amazon VPC subnet/URI of Google Compute Engine'
+                      ' subnetwork to launch cluster in.'),
             )),
             (['--subnets'], dict(
                 action=_SubnetsAction,
-                help=('Like --subnets, but with a comma-separated list, to'
+                help=('Like --subnet, but with a comma-separated list, to'
                       ' specify multiple subnets in conjunction with'
-                      ' --instance-fleets'),
+                      ' --instance-fleets (EMR only)'),
             )),
         ],
     ),
@@ -1107,6 +1182,21 @@ _RUNNER_OPTS = dict(
             (['--task-instance-bid-price'], dict(
                 help=('Bid price to specify for task nodes when'
                       ' setting them up as EC2 spot instances'),
+            )),
+        ],
+    ),
+    task_instance_config=dict(
+        cloud_role='launch',
+        switches=[
+            (['--task-instance-config'], dict(
+                action=_JSONAction,
+                help=('detailed JSON dict of configs for the task'
+                      ' (secondary worker) instances'
+                      ' on Dataproc including disk config. For format, see'
+                      ' https://cloud.google.com/dataproc/docs/reference/rest'
+                      '/v1/projects.regions.clusters#InstanceGroupConfig'
+                      ' (except that fields in your JSON should use'
+                      ' snake_case, not camelCase).')
             )),
         ],
     ),
@@ -1214,7 +1304,7 @@ def _filter_by_role(opt_names, *cloud_roles):
     return {
         opt_name
         for opt_name, conf in _RUNNER_OPTS.items()
-        if conf.get('cloud_role') in cloud_roles
+        if opt_name in opt_names and conf.get('cloud_role') in cloud_roles
     }
 
 

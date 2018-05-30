@@ -84,6 +84,7 @@ from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
+from mrjob.runner import _blank_out_conflicting_opts
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
 from mrjob.step import StepFailedException
@@ -301,7 +302,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'bootstrap_actions',
         'bootstrap_spark',
         'cloud_log_dir',
-        'cloud_upload_part_size',
         'core_instance_bid_price',
         'ec2_key_pair',
         'ec2_key_pair_file',
@@ -311,7 +311,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'emr_endpoint',
         'enable_emr_debugging',
         'hadoop_extra_args',
-        'hadoop_streaming_jar',
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',
@@ -442,7 +441,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 check_cluster_every=30,
                 cleanup_on_failure=['JOB'],
                 cloud_fs_sync_secs=5.0,
-                cloud_upload_part_size=100,  # 100 MB
                 image_version=_DEFAULT_IMAGE_VERSION,
                 num_core_instances=0,
                 num_task_instances=0,
@@ -460,19 +458,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Blank out overriden *instance_fleets* and *instance_groups*
 
         Convert image_version of 4.x and later to release_label."""
-        # copy opt_list so we can modify it
-        opt_list = [dict(opts) for opts in opt_list]
-
         # blank out any instance_fleets/groups before the last config
         # where they are set
-        blank_out = False
-        for opts in reversed(opt_list):
-            if blank_out:
-                opts['instance_fleets'] = None
-                opts['instance_groups'] = None
-            elif any(opts.get(k) is not None
-                     for k in self._INSTANCE_OPT_NAMES):
-                blank_out = True
+        opt_list = _blank_out_conflicting_opts(
+            opt_list,
+            ['instance_fleets', 'instance_groups'],
+            self._INSTANCE_OPT_NAMES)
 
         # now combine opts, with instance_groups/fleets blanked out
         opts = super(EMRJobRunner, self)._combine_opts(opt_list)
@@ -837,7 +828,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB
-        return int((self._opts['cloud_upload_part_size'] or 0) * 1024 * 1024)
+        return int((self._opts['cloud_part_size_mb'] or 0) * 1024 * 1024)
 
     def _ssh_tunnel_config(self):
         """Look up AMI version, and return a dict with the following keys:

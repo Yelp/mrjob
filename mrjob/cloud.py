@@ -26,6 +26,7 @@ from subprocess import PIPE
 
 from mrjob.bin import MRJobBinRunner
 from mrjob.conf import combine_dicts
+from mrjob.py2 import integer_types
 from mrjob.py2 import xrange
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import parse_setup_cmd
@@ -60,10 +61,12 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'bootstrap_python',
         'check_cluster_every',
         'cloud_fs_sync_secs',
+        'cloud_part_size_mb',
         'cloud_tmp_dir',
         'cluster_id',
         'core_instance_type',
         'extra_cluster_params',
+        'hadoop_streaming_jar',
         'image_version',
         'instance_type',
         'master_instance_type',
@@ -119,14 +122,13 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         # store the (tunneled) URL of the job tracker/resource manager
         self._ssh_tunnel_url = None
 
-
-
     ### Options ###
 
     def _default_opts(self):
         return combine_dicts(
             super(HadoopInTheCloudJobRunner, self)._default_opts(),
             dict(
+                cloud_part_size_mb=100,  # 100 MB
                 max_mins_idle=_DEFAULT_MAX_MINS_IDLE,
                 # don't use a list because it makes it hard to read option
                 # values when running in verbose mode. See #1284
@@ -141,6 +143,12 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
     def _fix_opts(self, opts, source=None):
         opts = super(HadoopInTheCloudJobRunner, self)._fix_opts(
             opts, source=source)
+
+        # cloud_part_size_mb should be a number
+        if opts.get('cloud_part_size_mb') is not None:
+            if not isinstance(opts['cloud_part_size_mb'],
+                              (integer_types, float)):
+                raise TypeError('cloud_part_size_mb must be a number')
 
         # patch max_hours_idle into max_mins_idle (see #1663)
         if opts.get('max_hours_idle') is not None:
@@ -285,6 +293,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         out.extend(self._start_of_sh_script())
         out.append('')
 
+        # for example, create a tmp dir and cd to it
+        if self._bootstrap_pre_commands():
+            out.extend(self._bootstrap_pre_commands())
+            out.append('')
+
         # store $PWD
         out.append('# store $PWD')
         out.append('__mrjob_PWD=$PWD')
@@ -369,6 +382,11 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         out.append('} 1>&2')  # stdout -> stderr for ease of error log parsing
 
         return out
+
+    def _bootstrap_pre_commands(self):
+        """A list of hard-coded commands to run at the beginning of the
+        bootstrap script. Currently used by dataproc to cd into a tmp dir."""
+        return []
 
     def _start_of_sh_script(self):
         """Return a list of lines (without trailing newlines) containing the

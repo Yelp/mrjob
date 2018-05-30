@@ -2882,13 +2882,13 @@ class MultiPartUploadTestCase(MockBoto3TestCase):
     def test_custom_part_size(self):
         # this test used to simulate multipart upload, but now we leave
         # that to boto3
-        runner = EMRJobRunner(cloud_upload_part_size=50.0 / 1024 / 1024)
+        runner = EMRJobRunner(cloud_part_size_mb=50.0 / 1024 / 1024)
 
         data = b'Mew' * 20
         self.assert_upload_succeeds(runner, data, 50)
 
     def test_disable_multipart(self):
-        runner = EMRJobRunner(cloud_upload_part_size=0)
+        runner = EMRJobRunner(cloud_part_size_mb=0)
 
         data = b'Mew' * 20
         self.assert_upload_succeeds(runner, data, _HUGE_PART_THRESHOLD)

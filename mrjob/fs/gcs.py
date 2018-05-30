@@ -14,10 +14,13 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import base64
 import binascii
 import fnmatch
+import hashlib
 import logging
 from base64 import b64decode
+from io import BytesIO
 from tempfile import TemporaryFile
 
 from mrjob.cat import decompress
@@ -26,14 +29,15 @@ from mrjob.parse import urlparse
 from mrjob.runner import GLOB_RE
 
 try:
+    import google.api_core.exceptions
     import google.cloud.storage.client
-    from google.api_core.exceptions import NotFound
 except ImportError:
-    NotFound = None
     google = None
 
-
 log = logging.getLogger(__name__)
+
+# download this many bytes at once from cat()
+_CAT_CHUNK_SIZE = 8192
 
 
 def _path_glob_to_parsed_gcs_uri(path_glob):
@@ -59,8 +63,8 @@ class GCSFilesystem(Filesystem):
     :py:class:`~mrjob.fs.local.LocalFilesystem`.
     """
     def __init__(self, local_tmp_dir=None, credentials=None, project_id=None):
-        self._local_tmp_dir = local_tmp_dir
         self._credentials = credentials
+        self._local_tmp_dir = local_tmp_dir
         self._project_id = project_id
 
     @property
@@ -115,7 +119,7 @@ class GCSFilesystem(Filesystem):
 
         try:
             bucket = self.get_bucket(bucket_name)
-        except NotFound:
+        except google.api_core.exceptions.NotFound:
             return  # treat nonexistent buckets as empty
 
         for blob in bucket.list_blobs(prefix=base_name):
@@ -135,19 +139,30 @@ class GCSFilesystem(Filesystem):
         return binascii.hexlify(b64decode(blob.md5_hash)).decode('ascii')
 
     def _cat_file(self, gcs_uri):
+        return decompress(self._cat_blob(gcs_uri), gcs_uri)
+
+    def _cat_blob(self, gcs_uri):
+        """:py:meth:`cat_file`, minus decompression."""
         blob = self._get_blob(gcs_uri)
 
         if not blob:
             return  # don't cat nonexistent files
 
-        with TemporaryFile(dir=self._local_tmp_dir) as temp:
-            blob.download_to_file(temp)
+        start = 0
 
-            # now read from that file
-            temp.seek(0)
+        while True:
+            end = start + _CAT_CHUNK_SIZE
+            try:
+                chunk = blob.download_as_string(start=start, end=end)
+            except google.api_core.exceptions.RequestRangeNotSatisfiable:
+                return
 
-            for chunk in decompress(temp, gcs_uri):
-                yield chunk
+            yield chunk
+
+            if len(chunk) < _CAT_CHUNK_SIZE:
+                return
+
+            start = end
 
     def mkdir(self, dest):
         """Make a directory. This does nothing on GCS because there are
@@ -180,13 +195,14 @@ class GCSFilesystem(Filesystem):
 
         self._blob(dest_uri).upload_from_string(b'')
 
-    def put(self, src_path, dest_uri):
+    def put(self, src_path, dest_uri, chunk_size=None):
         """Uploads a local file to a specific destination."""
         old_blob = self._get_blob(dest_uri)
         if old_blob:
             raise IOError('File already exists: %s' % dest_uri)
 
-        self._blob(dest_uri).upload_from_filename(src_path)
+        self._blob(dest_uri, chunk_size=chunk_size).upload_from_filename(
+            src_path)
 
     def get_all_bucket_names(self, prefix=None):
         """Yield the names of all buckets associated with this client.
@@ -234,15 +250,17 @@ class GCSFilesystem(Filesystem):
             'delete_bucket() was disabled in v0.6.2. Use'
             'fs.bucket(name).delete()')
 
-    def _get_blob(self, uri):
+    def _get_blob(self, uri, chunk_size=None):
+        # NOTE: chunk_size seems not to work well with downloading
         bucket_name, blob_name = parse_gcs_uri(uri)
         bucket = self.client.get_bucket(bucket_name)
-        return bucket.get_blob(blob_name)
+        return bucket.get_blob(blob_name, chunk_size=chunk_size)
 
-    def _blob(self, uri):
+    def _blob(self, uri, chunk_size=None):
+        # NOTE: chunk_size seems not to work well with downloading
         bucket_name, blob_name = parse_gcs_uri(uri)
         bucket = self.client.get_bucket(bucket_name)
-        return bucket.blob(blob_name)
+        return bucket.blob(blob_name, chunk_size=chunk_size)
 
 
 # The equivalent S3 methods are in parse.py but it's cleaner to keep them

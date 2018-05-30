@@ -74,6 +74,76 @@ Cluster creation and configuration
     .. _`the Dataproc docs on specifying the Dataproc version`:
         https://cloud.google.com/dataproc/dataproc-versions
 
+.. mrjob-opt::
+   :config: network
+   :switch: --network
+   :type: :ref:`string <data-type-string>`
+   :set: dataproc
+   :default: ``None``
+
+   Name or URI on network to launch cluster in on Dataproc. Cannot be used
+   with :mrjob-opt:`subnet`.
+
+   .. versionadded:: 0.6.3
+
+.. mrjob-opt::
+   :config: subnet
+   :switch: --subnet
+   :type: :ref:`string <data-type-string>`
+   :set: dataproc
+   :default: ``None``
+
+   Name or URI on subnetwork to launch cluster in on Dataproc. Cannot be used
+   with :mrjob-opt:`network`.
+
+   .. versionadded:: 0.6.3
+
+.. mrjob-opt::
+   :config: service_account
+   :switch: --service-account
+   :set: dataproc
+   :default: ``None``
+
+   Optional service account to use when creating a cluster. For more
+   information see `Service Accounts <https://cloud.google.com/compute/docs/access/service-accounts#custom_service_accounts>`__.
+
+   .. versionadded:: 0.6.3
+
+.. mrjob-opt::
+   :config: service_account_scopes
+   :switch: --service-account-scope
+   :set: dataproc
+   :default: (automatic)
+
+   Service account scopes to use when creating a cluster. By default,
+   Dataproc uses these scopes::
+
+     https://www.googleapis.com/auth/bigquery
+     https://www.googleapis.com/auth/bigtable.admin.table
+     https://www.googleapis.com/auth/bigtable.data
+     https://www.googleapis.com/auth/cloud-platform
+     https://www.googleapis.com/auth/cloud.useraccounts.readonly
+     https://www.googleapis.com/auth/devstorage.full_control
+     https://www.googleapis.com/auth/devstorage.read_write
+     https://www.googleapis.com/auth/logging.write
+
+   ``--service-account-scope`` can only be used to add additional scopes.
+   If you wish to exclude some of these scopes, you can use ``!clear`` in
+   your config file (see :ref:`clearing-configs`).
+
+   .. versionadded:: 0.6.3
+
+.. mrjob-opt::
+   :config: cluster_properties
+   :switch: --cluster-property
+   :set: dataproc
+   :default: ``None``
+
+   A dictionary of properties to set in the cluster's config files
+   (e.g. ``mapred-site.xml``). For details, see
+   `Cluster properties <https://cloud.google.com/dataproc/docs/concepts/configuring-clusters/cluster-properties>`__.
+
+
 Bootstrapping
 -------------
 
@@ -203,6 +273,82 @@ Number and type of instances
     HDFS. If you use this, you must set :mrjob-opt:`num_core_instances`; Dataproc does not allow you to
     run task instances without core instances (because there's nowhere to host
     HDFS).
+
+
+.. mrjob-opt::
+   :config: core_instance_config
+   :switch: --core-instance-config
+   :set: dataproc
+   :default: ``None``
+
+   A dictionary of additional parameters to pass as ``config.worker_config``
+   when creating the cluster. Follows the format of
+   `InstanceGroupConfig <https://cloud.google.com/dataproc/docs/reference/rest/v1/projects.regions.clusters#InstanceGroupConfig>`__ except that it uses
+   `snake_case` instead of `camel_case`.
+
+   For example, to specify 100GB of disk space on core instances, add this to
+   your config file:
+
+   .. code-block:: yaml
+
+       runners:
+         dataproc:
+           core_instance_config:
+             disk_config:
+               boot_disk_size_gb: 100
+
+   To set this option on the command line, pass in JSON:
+
+   .. code-block:: sh
+
+       --core-instance-config '{"disk_config": {"boot_disk_size_gb": 100}}'
+
+   This option *can* be used to set number of core instances
+   (``num_instances``) or instance type (``machine_type_uri``), but usually
+   you'll want to use :mrjob-opt:`num_core_instances` and
+   :mrjob-opt:`core_instance_type` along with this option.
+
+   .. versionadded:: 0.6.3
+
+.. mrjob-opt::
+   :config: master_instance_config
+   :switch: --master-instance-config
+   :set: dataproc
+   :default: ``None``
+
+   A dictionary of additional parameters to pass as ``config.master_config``
+   when creating the cluster. See :mrjob-opt:`core_instance_config` for
+   more details.
+
+   .. versionadded:: 0.6.3
+
+
+.. mrjob-opt::
+   :config: task_instance_config
+   :switch: --task-instance-config
+   :set: dataproc
+   :default: ``None``
+
+   A dictionary of additional parameters to pass as
+   ``config.secondary_worker_config``
+   when creating the cluster. See :mrjob-opt:`task_instance_config` for
+   more details.
+
+   To make task instances preemptible, add this to your config file:
+
+   .. code-block:: yaml
+
+       runners:
+         dataproc:
+           task_instance_config:
+             is_preemptible: true
+
+   Note that this config won't be applied unless you specify at least one
+   task instance (either through :mrjob-opt:`num_task_instances` or
+   by passing ``num_instances`` to this option).
+
+   .. versionadded:: 0.6.3
+
 
 FS paths and options
 --------------------

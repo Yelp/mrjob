@@ -20,16 +20,70 @@ from copy import deepcopy
 from google.api_core.exceptions import AlreadyExists
 from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
-from google.cloud.dataproc_v1.types import Cluster
-from google.cloud.dataproc_v1.types import ClusterStatus
-from google.cloud.dataproc_v1.types import Job
-from google.cloud.dataproc_v1.types import JobStatus
+from mrjob._vendor.dataproc_v1beta2.types import Cluster
+from mrjob._vendor.dataproc_v1beta2.types import ClusterStatus
+from mrjob._vendor.dataproc_v1beta2.types import DiskConfig
+from mrjob._vendor.dataproc_v1beta2.types import Job
+from mrjob._vendor.dataproc_v1beta2.types import JobStatus
 
 from mrjob.dataproc import _STATE_MATCHER_ACTIVE
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _job_state_name
+from mrjob.dataproc import _zone_to_region
+from mrjob.parse import is_uri
 from mrjob.util import random_identifier
 
+# default boot disk size set by the API
+_DEFAULT_DISK_SIZE_GB = 500
+
+# account scopes that are included whether you ask for them or not
+# for more info, see:
+# https://cloud.google.com/dataproc/docs/reference/rest/v1/projects.regions.clusters#GceClusterConfig  # noqa
+_MANDATORY_SCOPES = {
+    'https://www.googleapis.com/auth/cloud.useraccounts.readonly',
+    'https://www.googleapis.com/auth/devstorage.read_write',
+    'https://www.googleapis.com/auth/logging.write',
+}
+
+# account scopes that are included if you don't specify any
+_DEFAULT_SCOPES = {
+    'https://www.googleapis.com/auth/bigquery',
+    'https://www.googleapis.com/auth/bigtable.admin.table',
+    'https://www.googleapis.com/auth/bigtable.data',
+    'https://www.googleapis.com/auth/devstorage.full_control',
+}
+
+# actual properties taken from Dataproc
+_DEFAULT_CLUSTER_PROPERTIES = {
+    'distcp:mapreduce.map.java.opts': '-Xmx2457m',
+    'distcp:mapreduce.map.memory.mb': '3072',
+    'distcp:mapreduce.reduce.java.opts': '-Xmx2457m',
+    'distcp:mapreduce.reduce.memory.mb': '3072',
+    'hdfs:dfs.namenode.handler.count': '20',
+    'hdfs:dfs.namenode.service.handler.count': '10',
+    'mapred-env:HADOOP_JOB_HISTORYSERVER_HEAPSIZE': '1000',
+    'mapred:mapreduce.map.cpu.vcores': '1',
+    'mapred:mapreduce.map.java.opts': '-Xmx2457m',
+    'mapred:mapreduce.map.memory.mb': '3072',
+    'mapred:mapreduce.reduce.cpu.vcores': '1',
+    'mapred:mapreduce.reduce.java.opts': '-Xmx2457m',
+    'mapred:mapreduce.reduce.memory.mb': '3072',
+    'mapred:yarn.app.mapreduce.am.command-opts': '-Xmx2457m',
+    'mapred:yarn.app.mapreduce.am.resource.cpu-vcores': '1',
+    'mapred:yarn.app.mapreduce.am.resource.mb': '3072',
+    'spark-env:SPARK_DAEMON_MEMORY': '1000m',
+    'spark:spark.driver.maxResultSize': '480m',
+    'spark:spark.driver.memory': '960m',
+    'spark:spark.executor.cores': '1',
+    'spark:spark.executor.memory': '1152m',
+    'spark:spark.yarn.am.memory': '1152m',
+    'spark:spark.yarn.am.memoryOverhead': '384',
+    'spark:spark.yarn.executor.memoryOverhead': '384',
+    'yarn-env:YARN_TIMELINESERVER_HEAPSIZE': '1000',
+    'yarn:yarn.nodemanager.resource.memory-mb': '3072',
+    'yarn:yarn.scheduler.maximum-allocation-mb': '3072',
+    'yarn:yarn.scheduler.minimum-allocation-mb': '256',
+}
 
 # convert strings (e.g. 'RUNNING') to enum values
 
@@ -51,11 +105,11 @@ class MockGoogleDataprocClient(object):
         self.credentials = credentials
 
         # maps (project_id, region, cluster_name) to a
-        # google.cloud.dataproc_v1.types.Cluster
+        # mrjob._vendor.dataproc_v1beta2.types.Cluster
         self.mock_clusters = mock_clusters
 
         # maps (project_id, region, cluster_name, job_name) to a
-        # google.cloud.dataproc_v1.types.Job
+        # mrjob._vendor.dataproc_v1beta2.types.Job
         self.mock_jobs = mock_jobs
 
         # if False, mock jobs end in ERROR
@@ -84,7 +138,7 @@ class MockGoogleDataprocClient(object):
 
 class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
-    """Mock out google.cloud.dataproc_v1.ClusterControllerClient"""
+    """Mock out mrjob._vendor.dataproc_v1beta2.ClusterControllerClient"""
 
     def create_cluster(self, project_id, region, cluster):
         self._check_region_matches_endpoint(region)
@@ -103,6 +157,62 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
         if not cluster.cluster_name:
             raise InvalidArgument('Cluster name is required')
+
+        # add in default disk config
+        for x in ('master', 'worker', 'secondary_worker'):
+            field = x + '_config'
+            conf = getattr(cluster.config, field, None)
+            if conf and str(conf):  # empty DiskConfigs are still true-ish
+                if not conf.disk_config:
+                    conf.disk_config = DiskConfig()
+                if not conf.disk_config.boot_disk_size_gb:
+                    conf.disk_config.boot_disk_size_gb = _DEFAULT_DISK_SIZE_GB
+
+        # update gce_cluster_config
+        gce_config = cluster.config.gce_cluster_config
+
+        # check region and zone_uri
+        if region == 'global':
+            if gce_config.zone_uri:
+                cluster_region = _zone_to_region(gce_config.zone_uri)
+            else:
+                raise InvalidArgument(
+                    "Must specify a zone in GCE configuration"
+                    " when using 'regions/global'")
+        else:
+            cluster_region = region
+
+        # add in default scopes and sort
+        scopes = set(gce_config.service_account_scopes)
+
+        if not scopes:
+            scopes.update(_DEFAULT_SCOPES)
+        scopes.update(_MANDATORY_SCOPES)
+
+        gce_config.service_account_scopes[:] = sorted(scopes)
+
+        # handle network_uri and subnetwork_uri
+        if gce_config.network_uri and gce_config.subnetwork_uri:
+            raise InvalidArgument('GceClusterConfiguration cannot contain both'
+                                  ' Network URI and Subnetwork URI')
+
+        if not (gce_config.network_uri or gce_config.subnetwork_uri):
+            gce_config.network_uri = 'default'
+
+        if gce_config.network_uri:
+            gce_config.network_uri = _fully_qualify_network_uri(
+                gce_config.network_uri, project_id)
+
+        if gce_config.subnetwork_uri:
+            gce_config.subnetwork_uri = _fully_qualify_subnetwork_uri(
+                gce_config.subnetwork_uri, project_id, region)
+
+        # add in default cluster properties
+        props = cluster.config.software_config.properties
+
+        for k, v in _DEFAULT_CLUSTER_PROPERTIES.items():
+            if k not in props:
+                props[k] = v
 
         # initialize cluster status
         cluster.status.state = _cluster_state_value('CREATING')
@@ -156,7 +266,7 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
 class MockGoogleDataprocJobClient(MockGoogleDataprocClient):
 
-    """Mock out google.cloud.dataproc_v1.JobControllerClient"""
+    """Mock out mrjob._vendor.dataproc_v1beta2.JobControllerClient"""
 
     def submit_job(self, project_id, region, job):
         self._check_region_matches_endpoint(region)
@@ -271,3 +381,23 @@ def _cluster_path(project_id, region, cluster_name):
 
 def _job_path(project_id, region, job_id):
     return 'projects/%s/regions/%s/jobs/%s'
+
+
+def _fully_qualify_network_uri(uri, project_id):
+    if '/' not in uri:  # just a name
+        uri = 'projects/%s/global/networks/%s' % (project_id, uri)
+
+    if not is_uri(uri):
+        uri = 'https://www.googleapis.com/compute/v1/' + uri
+
+    return uri
+
+
+def _fully_qualify_subnetwork_uri(uri, project_id, region):
+    if '/' not in uri:  # just a name
+        uri = 'projects/%s/%s/subnetworks/%s' % (project_id, region, uri)
+
+    if not is_uri(uri):
+        uri = 'https://www.googleapis.com/compute/v1/' + uri
+
+    return uri

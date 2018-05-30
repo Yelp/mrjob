@@ -98,9 +98,10 @@ class EmptyMrjobConfTestCase(PatcherTestCase):
         add_null_handler_to_root_logger()
 
         if self.MRJOB_CONF_CONTENTS is not None:
-            patcher = mrjob_conf_patcher(self.MRJOB_CONF_CONTENTS)
-            patcher.start()
-            self.addCleanup(patcher.stop)
+            self.mrjob_conf_patcher = mrjob_conf_patcher(
+                self.MRJOB_CONF_CONTENTS)
+            self.mrjob_conf_patcher.start()
+            self.addCleanup(self.mrjob_conf_patcher.stop)
 
 
 class SandboxedTestCase(EmptyMrjobConfTestCase):

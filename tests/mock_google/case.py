@@ -39,11 +39,11 @@ class MockGoogleTestCase(SandboxedTestCase):
         super(MockGoogleTestCase, self).setUp()
 
         # maps (project_id, region, cluster_name) to a
-        # google.cloud.dataproc_v1.types.Cluster
+        # mrjob._vendor.dataproc_v1beta2.types.Cluster
         self.mock_clusters = {}
 
         # maps (project_id, region, job_name) to a
-        # google.cloud.dataproc_v1.types.Job
+        # mrjob._vendor.dataproc_v1beta2.types.Job
         self.mock_jobs = {}
 
         # set this to False to make jobs ERROR
@@ -69,10 +69,10 @@ class MockGoogleTestCase(SandboxedTestCase):
 
         self.start(patch('google.auth.default', self.auth_default))
 
-        self.start(patch('google.cloud.dataproc_v1.ClusterControllerClient',
+        self.start(patch('mrjob._vendor.dataproc_v1beta2.ClusterControllerClient',
                          self.cluster_client))
 
-        self.start(patch('google.cloud.dataproc_v1.JobControllerClient',
+        self.start(patch('mrjob._vendor.dataproc_v1beta2.JobControllerClient',
                          self.job_client))
 
         self.start(patch('google.cloud.logging.Client',

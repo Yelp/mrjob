@@ -252,8 +252,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # check for library support
         if google is None:
             raise ImportError(
-                'You must install google-cloud and google-cloud-dataproc'
-                ' to connect to Dataproc')
+                'You must install google-cloud-logging and '
+                'google-cloud-storage to connect to Dataproc')
 
         # Dataproc requires a master and >= 2 core instances
         # num_core_instances refers ONLY to number of CORE instances and does

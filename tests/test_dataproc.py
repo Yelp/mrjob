@@ -300,13 +300,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
         self._test_cloud_tmp_cleanup('CLOUD_TMP', 0)
 
     def test_cleanup_local(self):
-        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 4)
 
     def test_cleanup_logs(self):
-        self._test_cloud_tmp_cleanup('LOGS', 5)
+        self._test_cloud_tmp_cleanup('LOGS', 4)
 
     def test_cleanup_none(self):
-        self._test_cloud_tmp_cleanup('NONE', 5)
+        self._test_cloud_tmp_cleanup('NONE', 4)
 
     def test_cleanup_combine(self):
         self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0)

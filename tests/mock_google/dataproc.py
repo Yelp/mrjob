@@ -33,8 +33,6 @@ from mrjob.dataproc import _zone_to_region
 from mrjob.parse import is_uri
 from mrjob.util import random_identifier
 
-# default boot disk size set by the API
-_DEFAULT_DISK_SIZE_GB = 500
 
 # account scopes that are included whether you ask for them or not
 # for more info, see:
@@ -52,6 +50,9 @@ _DEFAULT_SCOPES = {
     'https://www.googleapis.com/auth/bigtable.data',
     'https://www.googleapis.com/auth/devstorage.full_control',
 }
+
+# default boot disk size set by the API
+_DEFAULT_DISK_SIZE_GB = 500
 
 # actual properties taken from Dataproc
 _DEFAULT_CLUSTER_PROPERTIES = {

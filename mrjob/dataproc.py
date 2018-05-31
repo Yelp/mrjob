@@ -48,6 +48,7 @@ from mrjob.logs.mixin import LogInterpretationMixin
 from mrjob.logs.task import _parse_task_stderr
 from mrjob.logs.task import _parse_task_syslog_records
 from mrjob.logs.step import _interpret_new_dataproc_step_stderr
+from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import to_unicode
@@ -73,19 +74,6 @@ _DEFAULT_IMAGE_VERSION = '1.0'
 _DEFAULT_CHECK_CLUSTER_EVERY = 10.0
 _DEFAULT_CLOUD_FS_SYNC_SECS = 5.0
 _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS = 90
-
-# https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#GceClusterConfig  # noqa
-# NOTE - added cloud-platform so we can invoke gcloud commands from the cluster master (used for auto termination script)  # noqa
-_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
-    'https://www.googleapis.com/auth/cloud.useraccounts.readonly',
-    'https://www.googleapis.com/auth/devstorage.read_write',
-    'https://www.googleapis.com/auth/logging.write',
-    'https://www.googleapis.com/auth/bigquery',
-    'https://www.googleapis.com/auth/bigtable.admin.table',
-    'https://www.googleapis.com/auth/bigtable.data',
-    'https://www.googleapis.com/auth/devstorage.full_control',
-    'https://www.googleapis.com/auth/cloud-platform',
-]
 
 # job state matcher enum
 # use this to only find active jobs. (2 for NON_ACTIVE, but we don't use that)
@@ -121,7 +109,6 @@ _SSH_TUNNEL_CONFIG = dict(
     port=8088,
 )
 
-
 # used to match log entries that tell us if a container exited
 _CONTAINER_EXECUTOR_CLASS_NAME = (
     'org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor')
@@ -137,6 +124,9 @@ _STDERR_LOG4J_WARNING = re.compile(
     r'.*(No appenders could be found for logger'
     r'|Please initialize the log4j system'
     r'|See http://logging.apache.org/log4j)')
+
+# this is equivalent to full permission
+_FULL_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 
 # convert enum values to strings (e.g. 'RUNNING')
 
@@ -265,7 +255,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # load credentials and project ID
         self._credentials, auth_project_id = google.auth.default(
-            scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES)
+            scopes=[_FULL_SCOPE]) # needed for $GOOGLE_APPLICATION_CREDENTIALS
 
         self._project_id = self._opts['project_id'] or auth_project_id
 
@@ -275,6 +265,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 ' set $GOOGLE_CLOUD_PROJECT')
 
         self._fix_zone_and_region_opts()
+
+        if self._opts['service_account_scopes']:
+            self._opts['service_account_scopes'] = [
+                _fully_qualify_scope_uri(s)
+                for s in self._opts['service_account_scopes']
+            ]
 
         # cluster_id can be None here
         self._cluster_id = self._opts['cluster_id']
@@ -350,8 +346,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 master_instance_type=_DEFAULT_INSTANCE_TYPE,
                 num_core_instances=_DATAPROC_MIN_WORKERS,
                 num_task_instances=0,
-                service_account_scopes=list(
-                    _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES),
                 sh_bin=['/bin/sh', '-ex'],
             )
         )
@@ -1149,6 +1143,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             gce_cluster_config['service_account'] = (
                 self._opts['service_account'])
 
+        if self._opts['service_account_scopes']:
+            gce_cluster_config['service_account_scopes'] = (
+                self._opts['service_account_scopes'])
+
         if self._opts['zone']:
             gce_cluster_config['zone_uri'] = _gcp_zone_uri(
                 project=self._project_id, zone=self._opts['zone'])
@@ -1438,3 +1436,10 @@ def _values_to_text(d):
         result[k] = v
 
     return result
+
+
+def _fully_qualify_scope_uri(uri):
+    if is_uri(uri):
+        return uri
+    else:
+        return 'https://www.googleapis.com/auth/%s' % uri

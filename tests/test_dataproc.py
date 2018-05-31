@@ -35,7 +35,6 @@ from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _CONTAINER_EXECUTOR_CLASS_NAME
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_GCE_REGION
-from mrjob.dataproc import _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _HADOOP_STREAMING_JAR_URI
 from mrjob.dataproc import _cluster_state_name
@@ -45,6 +44,7 @@ from mrjob.examples.mr_boom import MRBoom
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.logs.errors import _pick_error
+from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
@@ -53,6 +53,8 @@ from mrjob.util import log_to_stream
 from mrjob.util import save_current_environment
 
 from tests.mock_google import MockGoogleTestCase
+from tests.mock_google.dataproc import _DEFAULT_SCOPES
+from tests.mock_google.dataproc import _MANDATORY_SCOPES
 from tests.mock_google.storage import MockGoogleStorageBlob
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
@@ -458,8 +460,18 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
         gcc = self._get_gce_cluster_config()
 
         self.assertFalse(gcc.service_account)
-        self.assertEqual(set(gcc.service_account_scopes),
-                         set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
+        self.assertEqual(
+            set(gcc.service_account_scopes),
+            _MANDATORY_SCOPES | _DEFAULT_SCOPES
+        )
+
+    def test_blank_means_default(self):
+        gcc = self._get_gce_cluster_config('--service-account-scopes', '')
+
+        self.assertEqual(
+            set(gcc.service_account_scopes),
+            _MANDATORY_SCOPES | _DEFAULT_SCOPES
+        )
 
     def test_service_account(self):
         account = '12345678901-compute@developer.gserviceaccount.com'
@@ -474,29 +486,25 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
         scope2 = 'https://www.googleapis.com/auth/scope2'
 
         gcc = self._get_gce_cluster_config(
-            '--service-account-scope', scope1,
-            '--service-account-scope', scope2)
+            '--service-account-scopes', '%s,%s' % (scope1, scope2))
 
-        self.assertGreater(
+        self.assertEqual(
             set(gcc.service_account_scopes),
-            set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
-        self.assertIn(scope1, set(gcc.service_account_scopes))
-        self.assertIn(scope2, set(gcc.service_account_scopes))
+            _MANDATORY_SCOPES | {scope1, scope2})
 
-    def test_clear_service_account_scopes(self):
-        # it's possible to use less service accounts than the default,
-        # just not very wise
-        conf_path = self.makefile(
-            'mrjob.conf',
-            b'runners:\n  dataproc:\n    service_account_scopes: !clear')
+    def test_set_scope_by_name(self):
+        scope_name = 'test.name'
+        scope_uri = 'https://www.googleapis.com/auth/test.name'
 
-        self.mrjob_conf_patcher.stop()
-        gcc = self._get_gce_cluster_config('-c', conf_path)
-        self.mrjob_conf_patcher.start()
+        gcc = self._get_gce_cluster_config(
+            '--service-account-scopes', scope_name)
 
-        self.assertLess(
+        self.assertEqual(
             set(gcc.service_account_scopes),
-            set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
+            _MANDATORY_SCOPES | {scope_uri})
+
+
+
 
 
 class ClusterPropertiesTestCase(MockGoogleTestCase):

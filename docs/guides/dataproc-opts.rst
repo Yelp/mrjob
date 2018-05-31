@@ -111,25 +111,14 @@ Cluster creation and configuration
 
 .. mrjob-opt::
    :config: service_account_scopes
-   :switch: --service-account-scope
+   :switch: --service-account-scopes
    :set: dataproc
    :default: (automatic)
 
-   Service account scopes to use when creating a cluster. By default,
-   Dataproc uses these scopes::
+   Optional service account scopes to pass to the API when creating a cluster.
 
-     https://www.googleapis.com/auth/bigquery
-     https://www.googleapis.com/auth/bigtable.admin.table
-     https://www.googleapis.com/auth/bigtable.data
-     https://www.googleapis.com/auth/cloud-platform
-     https://www.googleapis.com/auth/cloud.useraccounts.readonly
-     https://www.googleapis.com/auth/devstorage.full_control
-     https://www.googleapis.com/auth/devstorage.read_write
-     https://www.googleapis.com/auth/logging.write
-
-   ``--service-account-scope`` can only be used to add additional scopes.
-   If you wish to exclude some of these scopes, you can use ``!clear`` in
-   your config file (see :ref:`clearing-configs`).
+   Generally it's suggested that you instead create a
+   :mrjob-opt:`service_account` with the scopes you want.
 
    .. versionadded:: 0.6.3
 

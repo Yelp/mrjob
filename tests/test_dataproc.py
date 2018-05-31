@@ -503,9 +503,6 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
             _MANDATORY_SCOPES | {scope_uri})
 
 
-
-
-
 class ClusterPropertiesTestCase(MockGoogleTestCase):
 
     def _get_cluster_properties(self, *args):

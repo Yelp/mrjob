@@ -130,11 +130,13 @@ _FULL_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 # convert enum values to strings (e.g. 'RUNNING')
 
 def _cluster_state_name(state_value):
-    return mrjob._vendor.dataproc_v1beta2.types.ClusterStatus.State.Name(state_value)
+    return mrjob._vendor.dataproc_v1beta2.types.ClusterStatus.State.Name(
+        state_value)
 
 
 def _job_state_name(state_value):
-    return mrjob._vendor.dataproc_v1beta2.types.JobStatus.State.Name(state_value)
+    return mrjob._vendor.dataproc_v1beta2.types.JobStatus.State.Name(
+        state_value)
 
 
 ########## BEGIN - Helper fxns for _cluster_create_kwargs ##########
@@ -254,7 +256,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # load credentials and project ID
         self._credentials, auth_project_id = google.auth.default(
-            scopes=[_FULL_SCOPE]) # needed for $GOOGLE_APPLICATION_CREDENTIALS
+            scopes=[_FULL_SCOPE])  # needed for $GOOGLE_APPLICATION_CREDENTIALS
 
         self._project_id = self._opts['project_id'] or auth_project_id
 

@@ -69,8 +69,9 @@ class MockGoogleTestCase(SandboxedTestCase):
 
         self.start(patch('google.auth.default', self.auth_default))
 
-        self.start(patch('mrjob._vendor.dataproc_v1beta2.ClusterControllerClient',
-                         self.cluster_client))
+        self.start(patch(
+            'mrjob._vendor.dataproc_v1beta2.ClusterControllerClient',
+            self.cluster_client))
 
         self.start(patch('mrjob._vendor.dataproc_v1beta2.JobControllerClient',
                          self.job_client))

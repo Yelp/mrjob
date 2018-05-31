@@ -44,7 +44,6 @@ from mrjob.examples.mr_boom import MRBoom
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.logs.errors import _pick_error
-from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException

@@ -20,8 +20,6 @@ import time
 import re
 from io import BytesIO
 from os import environ
-from os.path import dirname
-from os.path import join
 
 try:
     import google.auth

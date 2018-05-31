@@ -1116,14 +1116,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             gcs_init_script_uris.append(
                 self._upload_mgr.uri(self._master_bootstrap_script_path))
 
-        # NOTE - Cluster initialization_actions can only take scripts with no
-        # script args, so the auto-term script receives 'mrjob-max-secs-idle'
-        # via metadata instead of as an arg
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
 
-        # TODO: remove this once lifecycle_config is visible through
-        # gcloud and the Google Cloud Console
+        # TODO: remove mrjob-max-secs-idle once lifecycle_config is visible
+        # through the gcloud utility and the Google Cloud Console
         cluster_metadata['mrjob-max-secs-idle'] = str(int(
             self._opts['max_mins_idle'] * 60))
 

@@ -74,6 +74,7 @@ __credits__ = [
     'Jerome Leclanche <jerome@leclan.ch>',
     'Robert Leftwich <rl.0x0@eml.cc>',
     'Andrew Lenards <andrew.lenards@gmail.com>',
+    'Ronny Lindner <ronny.lindner@invia.de>',
     'Tianhui Michael Li <tianhuil@cs.princeton.edu>',
     'James Lim <jim@affirm.com>',
     'Shusen Liu <liushusen.smart@gmail.com>',

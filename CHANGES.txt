@@ -3,6 +3,10 @@ v0.6.3, 2018-05-?? -- Dataproc parity
    * use mapper_raw() to read entire file, in any format (#754)
  * log interpretation:
    * handles "not a valid JAR" error from Hadoop (#1771)
+ * less dependencies on Google libraries (#1746):
+   * google-cloud-logging 1.5.0+
+   * google-cloud-storage 1.9.0+
+   * google-cloud-dataproc is vendored (future releases will require 0.11.0+)
  * runners:
    * all runners:
      * don't stream output if --output-dir is specified (#1739)
@@ -27,8 +31,9 @@ v0.6.3, 2018-05-?? -- Dataproc parity
      * full support for parsing probable cause of job failure (#1672)
      * full support for fetching and parsing counters (#1703)
      * job progress messages (#1671)
-     * bootstrap script runs in temp dir, not / (#1601)
      * can now run JAR steps (#1677)
+     * uses Dataproc's built-in idle timeout, not a script (#1705)
+     * bootstrap script runs in temp dir, not / (#1601)
 
 v0.6.2, 2018-03-23 -- log parsing at scale
  * runners:

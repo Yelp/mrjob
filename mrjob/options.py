@@ -1014,7 +1014,6 @@ _RUNNER_OPTS = dict(
     ),
     service_account_scopes=dict(
         cloud_role='launch',
-        combiner=combine_lists,
         switches=[
             (['--service-account-scopes'], dict(
                 action=_CommaSeparatedListAction,

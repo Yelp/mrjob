@@ -104,12 +104,6 @@ _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '1.0': '2.7.2'
 }
 
-# bootstrap action which automatically terminates idle clusters
-_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = join(
-    dirname(mrjob.__file__),
-    'bootstrap',
-    'terminate_idle_cluster_dataproc.sh')
-
 _HADOOP_STREAMING_JAR_URI = (
     'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
 
@@ -511,7 +505,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         self._create_master_bootstrap_script_if_needed()
         if self._master_bootstrap_script_path:
             self._upload_mgr.add(self._master_bootstrap_script_path)
-            self._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -1130,16 +1123,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             gcs_init_script_uris.append(
                 self._upload_mgr.uri(self._master_bootstrap_script_path))
 
-            # always add idle termination script
-            # add it last, so that we don't count bootstrapping as idle time
-            gcs_init_script_uris.append(
-                self._upload_mgr.uri(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
-
         # NOTE - Cluster initialization_actions can only take scripts with no
         # script args, so the auto-term script receives 'mrjob-max-secs-idle'
         # via metadata instead of as an arg
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
+
+        # TODO: remove this once lifecycle_config is visible through
+        # gcloud and the Google Cloud Console
         cluster_metadata['mrjob-max-secs-idle'] = str(int(
             self._opts['max_mins_idle'] * 60))
 
@@ -1201,6 +1192,10 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         cluster_config['worker_config'] = worker_conf
         if secondary_worker_conf.get('num_instances'):
             cluster_config['secondary_worker_config'] = secondary_worker_conf
+
+        cluster_config['lifecycle_config'] = dict(
+            idle_delete_ttl=dict(
+                seconds=int(self._opts['max_mins_idle'] * 60)))
 
         software_config = {}
 

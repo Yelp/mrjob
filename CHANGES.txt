@@ -7,6 +7,7 @@ v0.6.3, 2018-05-?? -- Dataproc parity
    * google-cloud-logging 1.5.0+
    * google-cloud-storage 1.9.0+
    * google-cloud-dataproc is vendored (future releases will require 0.11.0+)
+ * RetryWrapper now sets __name__ of wrapped functions (#1790)
  * runners:
    * all runners:
      * don't stream output if --output-dir is specified (#1739)

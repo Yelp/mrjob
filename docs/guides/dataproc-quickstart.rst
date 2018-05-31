@@ -57,7 +57,9 @@ uses.
 To install :command:`gcloud` and :command:`gsutil`:
 
 * Follow `these three steps <https://cloud.google.com/sdk/downloads#interactive>`__ to install the utilities
-* Run :command:`gcloud auth application-default init`. This will launch your browser; log in with your Google credentials
+* Log in with your Google credentials (these will launch a browser):
+  * :command:`gcloud auth login`
+  * :command:`gcloud auth application-default init`
 
 It's also helpful to set :command:`gcloud`\'s :mrjob-opt:`region` and
 :mrjob-opt:`zone` to match mrjob's defaults:

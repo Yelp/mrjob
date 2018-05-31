@@ -405,7 +405,8 @@ Monitoring your job
 
     On Dataproc, you don't need to set a key, but you do need to have
     the :command:`gcloud` utility installed and set up (make
-    sure to run :command:`gcloud auth login`). See
+    sure you ran :command:`gcloud auth login` and
+    :command:`gcloud config set project <project_id>`). See
     :ref:`installing-gcloud`.
 
     .. versionchanged:: 0.6.3

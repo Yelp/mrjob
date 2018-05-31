@@ -61,6 +61,12 @@ To install :command:`gcloud` and :command:`gsutil`:
   * :command:`gcloud auth login`
   * :command:`gcloud auth application-default init`
 
+On some versions of gcloud, you may have to manually configure
+project ID for :mrjob-opt:`ssh_tunnel` to work.
+
+* run :command:`gcloud projects list` to get your project ID
+* :command:`gcloud config set project <project_id>`
+
 It's also helpful to set :command:`gcloud`\'s :mrjob-opt:`region` and
 :mrjob-opt:`zone` to match mrjob's defaults:
 

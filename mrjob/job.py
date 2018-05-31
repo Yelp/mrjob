@@ -196,6 +196,8 @@ class MRJob(MRJobLauncher):
 
         :param input_path: a local path that the input file has been copied to
         :param input_uri: the URI of the input file on HDFS, S3, etc
+
+        .. versionadded:: 0.6.3
         """
         raise NotImplementedError
 

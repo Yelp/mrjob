@@ -1,4 +1,5 @@
 # Copyright 2009-2017 Yelp and Contributors
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -195,6 +196,8 @@ class MRJob(MRJobLauncher):
 
         :param input_path: a local path that the input file has been copied to
         :param input_uri: the URI of the input file on HDFS, S3, etc
+
+        .. versionadded:: 0.6.3
         """
         raise NotImplementedError
 

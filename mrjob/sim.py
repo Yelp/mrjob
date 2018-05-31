@@ -641,9 +641,9 @@ def _chmod_u_rx(path, recursive=False):
     """make *path* user readable and executable. If *recursive* is true,
     make *path* and everything inside it executable."""
     if recursive:
-        for dirname, _, filenames in os.walk(path, followlinks=True):
-            for filename in filenames:
-                _chmod_u_rx(join(dirname, filename))
+        for dir_name, _, file_names in os.walk(path, followlinks=True):
+            for file_name in file_names:
+                _chmod_u_rx(join(dir_name, file_name))
     else:
         if hasattr(os, 'chmod'):  # only available on Unix, Windows
             os.chmod(path, stat.S_IRUSR | stat.S_IXUSR)

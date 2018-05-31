@@ -41,7 +41,6 @@ from tests.py2 import patch
 from tests.test_sim import MRIncrementerJob
 
 
-
 # the inline runner is extensively used in test_sim.py, so there are not
 # many inline-specific tests
 

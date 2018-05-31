@@ -44,7 +44,6 @@ from mrjob.examples.mr_boom import MRBoom
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.logs.errors import _pick_error
-from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
@@ -105,7 +104,7 @@ LOGGING_STACK_TRACE = STACK_TRACE.replace('\n', '')
 
 # sample traceback from MRBoom
 TRACEBACK = (
-   'Traceback (most recent call last):\n'
+    'Traceback (most recent call last):\n'
     '  File "mr_boom.py", line 23, in <module>\n'
     '    MRBoom.run()\n'
     '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
@@ -502,9 +501,6 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
         self.assertEqual(
             set(gcc.service_account_scopes),
             _MANDATORY_SCOPES | {scope_uri})
-
-
-
 
 
 class ClusterPropertiesTestCase(MockGoogleTestCase):
@@ -989,9 +985,6 @@ class InstanceConfigTestCase(MockGoogleTestCase):
 
         self.assertTrue(
             conf.secondary_worker_config.is_preemptible)
-
-
-
 
 
 class MasterBootstrapScriptTestCase(MockGoogleTestCase):
@@ -1563,7 +1556,6 @@ class ProgressAndCounterLoggingTestCase(MockGoogleTestCase):
 
         with mr_job.make_runner() as runner:
             runner.run()
-
 
         self.assertIn(call('  map 100% reduce 0%'),
                       self.log.info.call_args_list)
@@ -2216,7 +2208,6 @@ class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
             cluster = runner._get_cluster(
                 runner._cluster_id)
             return cluster.project_id, cluster.config.gce_cluster_config
-
 
     def test_default(self):
         project_id, gce_config = self._get_project_id_and_gce_config()

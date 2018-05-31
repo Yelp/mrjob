@@ -20,8 +20,6 @@ import time
 import re
 from io import BytesIO
 from os import environ
-from os.path import dirname
-from os.path import join
 
 try:
     import google.auth
@@ -128,14 +126,17 @@ _STDERR_LOG4J_WARNING = re.compile(
 # this is equivalent to full permission
 _FULL_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 
+
 # convert enum values to strings (e.g. 'RUNNING')
 
 def _cluster_state_name(state_value):
-    return mrjob._vendor.dataproc_v1beta2.types.ClusterStatus.State.Name(state_value)
+    return mrjob._vendor.dataproc_v1beta2.types.ClusterStatus.State.Name(
+        state_value)
 
 
 def _job_state_name(state_value):
-    return mrjob._vendor.dataproc_v1beta2.types.JobStatus.State.Name(state_value)
+    return mrjob._vendor.dataproc_v1beta2.types.JobStatus.State.Name(
+        state_value)
 
 
 ########## BEGIN - Helper fxns for _cluster_create_kwargs ##########
@@ -255,7 +256,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # load credentials and project ID
         self._credentials, auth_project_id = google.auth.default(
-            scopes=[_FULL_SCOPE]) # needed for $GOOGLE_APPLICATION_CREDENTIALS
+            scopes=[_FULL_SCOPE])  # needed for $GOOGLE_APPLICATION_CREDENTIALS
 
         self._project_id = self._opts['project_id'] or auth_project_id
 
@@ -507,7 +508,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             self._upload_mgr.add(path)
 
         if self._opts['hadoop_streaming_jar']:
-           self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
+            self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
         for step in self._get_steps():
             if step.get('jar'):
@@ -623,8 +624,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Returns a map from ``'hadoop_job'`` to a dict representing
         a hadoop streaming job.
         """
-        step = self._get_step(step_num)
-
         return dict(
             hadoop_job=dict(
                 args=self._hadoop_streaming_jar_args(step_num),
@@ -1117,14 +1116,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             gcs_init_script_uris.append(
                 self._upload_mgr.uri(self._master_bootstrap_script_path))
 
-        # NOTE - Cluster initialization_actions can only take scripts with no
-        # script args, so the auto-term script receives 'mrjob-max-secs-idle'
-        # via metadata instead of as an arg
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
 
-        # TODO: remove this once lifecycle_config is visible through
-        # gcloud and the Google Cloud Console
+        # TODO: remove mrjob-max-secs-idle once lifecycle_config is visible
+        # through the gcloud utility and the Google Cloud Console
         cluster_metadata['mrjob-max-secs-idle'] = str(int(
             self._opts['max_mins_idle'] * 60))
 

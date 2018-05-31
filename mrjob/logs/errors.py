@@ -92,10 +92,12 @@ def _merge_and_sort_errors(errors, attempt_to_container_id=None):
     def sort_key(key_and_error):
         key, error = key_and_error
 
-        # key[0] is step number
-        return (key[0], bool(error.get('task_error')), key[1:])
+        # key[0] is 'container_id' or 'time_key'
+        return (bool(error.get('task_error')),
+                key[0] == 'container_id',
+                key[1:])
 
-    return [error for key, error in
+    return [error for _, error in
             sorted(key_to_error.items(), key=sort_key, reverse=True)]
 
 

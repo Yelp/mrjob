@@ -1,3 +1,41 @@
+v0.6.3, 2018-05-31 -- Dataproc parity
+ * jobs:
+   * use mapper_raw() to read entire file, in any format (#754)
+ * log interpretation:
+   * handles "not a valid JAR" error from Hadoop (#1771)
+ * less dependencies on Google libraries (#1746):
+   * google-cloud-logging 1.5.0+
+   * google-cloud-storage 1.9.0+
+   * google-cloud-dataproc is vendored (future releases will require 0.11.0+)
+ * RetryWrapper now sets __name__ of wrapped functions (#1790)
+ * runners:
+   * all runners:
+     * don't stream output if --output-dir is specified (#1739)
+       * --no-output switch is now --no-cat-output
+       * added --cat-output switch
+   * cloud runners (Dataproc, EMR):
+     * renamed cloud_upload_part_size option to cloud_part_size_mb (#1774)
+   * DataprocJobRunner:
+     * options now supported:
+       * cloud_part_size_mb: control chunked uploading (#1404)
+       * {core,master,task}_instance_config (#1681):
+         * set disk_config, is_preemptible, other instance options
+       * cluster_config: set properties in Hadoop config files (#1680)
+       * hadoop_streaming_jar: specify custom Hadoop streaming JAR (#1676)
+       * network/subnet: specify network/subnetwork (#1683)
+       * service_account: specify custom IAM service account (#1682)
+       * service_account_scopes: specify custom permissions for cluster (#1682)
+       * ssh_tunnel/ssh_tunnel_is_open: access resource manager (#1670)
+     * fs:
+       * cat() streams data rather than dumping to a temp file (#1674)
+       * exists() no longer swallows exceptions (#1675)
+     * full support for parsing probable cause of job failure (#1672)
+     * full support for fetching and parsing counters (#1703)
+     * job progress messages (#1671)
+     * can now run JAR steps (#1677)
+     * uses Dataproc's built-in idle timeout, not a script (#1705)
+     * bootstrap script runs in temp dir, not / (#1601)
+
 v0.6.2, 2018-03-23 -- log parsing at scale
  * runners:
    * local runners

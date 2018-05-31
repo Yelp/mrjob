@@ -86,6 +86,7 @@ _DEFAULT_CLUSTER_PROPERTIES = {
     'yarn:yarn.scheduler.minimum-allocation-mb': '256',
 }
 
+
 # convert strings (e.g. 'RUNNING') to enum values
 
 def _cluster_state_value(state_name):
@@ -206,7 +207,7 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
         if gce_config.subnetwork_uri:
             gce_config.subnetwork_uri = _fully_qualify_subnetwork_uri(
-                gce_config.subnetwork_uri, project_id, region)
+                gce_config.subnetwork_uri, project_id, cluster_region)
 
         # add in default cluster properties
         props = cluster.config.software_config.properties

@@ -34,23 +34,12 @@ To find the latest crawl:
 
 ``aws s3 ls s3://commoncrawl/crawl-data/ | grep CC-MAIN``
 """
-import os
 import re
-import sys
-from bz2 import BZ2File
-from contextlib import contextmanager
-from gzip import GzipFile
 from itertools import islice
-from subprocess import Popen
-from subprocess import PIPE
 
 from mrjob.job import MRJob
-from mrjob.parse import is_uri
-from mrjob.protocol import RawProtocol
 from mrjob.py2 import urlparse
 from mrjob.step import MRStep
-from mrjob.util import cmd_line
-from mrjob.util import random_identifier
 
 PHONE_RE = re.compile(
     br'(?:[\D\b]|^)(1?[2-9]\d{2}[\-. ()+]+\d{3}[\-. ()+]+\d{4})(?:[\D\b]|$)')

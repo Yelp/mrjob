@@ -551,6 +551,8 @@ serialization/deserialization results of keys. Look at the source code of
 Passing entire files to the mapper
 ----------------------------------
 
+.. versionadded:: 0.6.3
+
 Sometimes you need to read binary data (e.g. image files), or text-based
 data that has records longer than one line.
 

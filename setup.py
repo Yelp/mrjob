@@ -29,10 +29,10 @@ try:
             'boto3>=1.4.6',
             'botocore>=1.6.0',
             'PyYAML>=3.08',
-            'google-cloud>=0.32.0',
-            'google-cloud-dataproc',
+            #'google-cloud-dataproc>=0.11.0',  # vendored because not out yet
+            # google-cloud-dataproc's deps are implied by google-cloud-logging
+            'google-cloud-logging>=1.5.0',
             'google-cloud-storage>=1.9.0',
-            'grpcio>=1.9.1',
         ],
         'provides': ['mrjob'],
         'test_suite': 'tests',
@@ -40,12 +40,9 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # grpcio 1.11.0 seems not to compile with PyPy
+    # grpcio 1.11.0 and 1.12.0 seem not to compile with PyPy
     if hasattr(sys, 'pypy_version_info'):
-        setuptools_kwargs['install_requires'] = [
-            x + ',<=1.10.0' if x.startswith('grpcio') else x
-            for x in setuptools_kwargs['install_requires']
-        ]
+        setuptools_kwargs['install_requires'].append('grpcio<=1.10.0')
 
     # rapidjson exists on Python 3 only
     if sys.version_info >= (3, 0):

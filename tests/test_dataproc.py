@@ -35,10 +35,8 @@ from mrjob.dataproc import DataprocJobRunner
 from mrjob.dataproc import _CONTAINER_EXECUTOR_CLASS_NAME
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_GCE_REGION
-from mrjob.dataproc import _DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
 from mrjob.dataproc import _HADOOP_STREAMING_JAR_URI
-from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _fix_java_stack_trace
 from mrjob.dataproc import _fix_traceback
@@ -46,6 +44,7 @@ from mrjob.examples.mr_boom import MRBoom
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.logs.errors import _pick_error
+from mrjob.parse import is_uri
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
@@ -54,6 +53,8 @@ from mrjob.util import log_to_stream
 from mrjob.util import save_current_environment
 
 from tests.mock_google import MockGoogleTestCase
+from tests.mock_google.dataproc import _DEFAULT_SCOPES
+from tests.mock_google.dataproc import _MANDATORY_SCOPES
 from tests.mock_google.storage import MockGoogleStorageBlob
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_jar_and_streaming import MRJarAndStreaming
@@ -301,13 +302,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
         self._test_cloud_tmp_cleanup('CLOUD_TMP', 0)
 
     def test_cleanup_local(self):
-        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 4)
 
     def test_cleanup_logs(self):
-        self._test_cloud_tmp_cleanup('LOGS', 5)
+        self._test_cloud_tmp_cleanup('LOGS', 4)
 
     def test_cleanup_none(self):
-        self._test_cloud_tmp_cleanup('NONE', 5)
+        self._test_cloud_tmp_cleanup('NONE', 4)
 
     def test_cleanup_combine(self):
         self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0)
@@ -459,8 +460,18 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
         gcc = self._get_gce_cluster_config()
 
         self.assertFalse(gcc.service_account)
-        self.assertEqual(set(gcc.service_account_scopes),
-                         set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
+        self.assertEqual(
+            set(gcc.service_account_scopes),
+            _MANDATORY_SCOPES | _DEFAULT_SCOPES
+        )
+
+    def test_blank_means_default(self):
+        gcc = self._get_gce_cluster_config('--service-account-scopes', '')
+
+        self.assertEqual(
+            set(gcc.service_account_scopes),
+            _MANDATORY_SCOPES | _DEFAULT_SCOPES
+        )
 
     def test_service_account(self):
         account = '12345678901-compute@developer.gserviceaccount.com'
@@ -475,29 +486,25 @@ class GCEClusterConfigTestCase(MockGoogleTestCase):
         scope2 = 'https://www.googleapis.com/auth/scope2'
 
         gcc = self._get_gce_cluster_config(
-            '--service-account-scope', scope1,
-            '--service-account-scope', scope2)
+            '--service-account-scopes', '%s,%s' % (scope1, scope2))
 
-        self.assertGreater(
+        self.assertEqual(
             set(gcc.service_account_scopes),
-            set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
-        self.assertIn(scope1, set(gcc.service_account_scopes))
-        self.assertIn(scope2, set(gcc.service_account_scopes))
+            _MANDATORY_SCOPES | {scope1, scope2})
 
-    def test_clear_service_account_scopes(self):
-        # it's possible to use less service accounts than the default,
-        # just not very wise
-        conf_path = self.makefile(
-            'mrjob.conf',
-            b'runners:\n  dataproc:\n    service_account_scopes: !clear')
+    def test_set_scope_by_name(self):
+        scope_name = 'test.name'
+        scope_uri = 'https://www.googleapis.com/auth/test.name'
 
-        self.mrjob_conf_patcher.stop()
-        gcc = self._get_gce_cluster_config('-c', conf_path)
-        self.mrjob_conf_patcher.start()
+        gcc = self._get_gce_cluster_config(
+            '--service-account-scopes', scope_name)
 
-        self.assertLess(
+        self.assertEqual(
             set(gcc.service_account_scopes),
-            set(_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES))
+            _MANDATORY_SCOPES | {scope_uri})
+
+
+
 
 
 class ClusterPropertiesTestCase(MockGoogleTestCase):
@@ -748,7 +755,6 @@ class InstanceTypeAndNumberTestCase(MockGoogleTestCase):
         fake_bootstrap_script = 'gs://fake-bucket/fake-script.sh'
         runner._master_bootstrap_script_path = fake_bootstrap_script
         runner._upload_mgr.add(fake_bootstrap_script)
-        runner._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
         cluster_id = runner._launch_cluster()
 
@@ -1173,50 +1179,31 @@ class DataprocNoMapperTestCase(MockGoogleTestCase):
 
 class MaxMinsIdleTestCase(MockGoogleTestCase):
 
-    def assertRanIdleTimeoutScriptWith(self, runner, expected_metadata):
-        cluster_metadata, last_init_exec = (
-            self._cluster_metadata_and_last_init_exec(runner))
-
-        # Verify args
-        for key in expected_metadata.keys():
-            self.assertEqual(cluster_metadata[key], expected_metadata[key])
-
-        expected_uri = runner._upload_mgr.uri(
-            _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
-        self.assertEqual(last_init_exec, expected_uri)
-
-    def _cluster_metadata_and_last_init_exec(self, runner):
-        cluster = runner._get_cluster(runner.get_cluster_id())
-
-        # Verify last arg
-        last_init_action = cluster.config.initialization_actions[-1]
-        last_init_exec = last_init_action.executable_file
-
-        cluster_metadata = cluster.config.gce_cluster_config.metadata
-        return cluster_metadata, last_init_exec
-
     def test_default(self):
         mr_job = MRWordCount(['-r', 'dataproc'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, {
-                'mrjob-max-secs-idle': '600',
-            })
+
+            cluster = runner._get_cluster(runner._cluster_id)
+
+            self.assertEqual(
+                cluster.config.lifecycle_config.idle_delete_ttl.seconds,
+                600)
 
     def test_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '0.6'])
+        mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '30'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, {
-                'mrjob-max-secs-idle': '36',
-            })
 
-    def test_bootstrap_script_is_actually_installed(self):
-        self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
+            cluster = runner._get_cluster(runner._cluster_id)
+
+            self.assertEqual(
+                cluster.config.lifecycle_config.idle_delete_ttl.seconds,
+                1800)
 
 
 class TestCatFallback(MockGoogleTestCase):

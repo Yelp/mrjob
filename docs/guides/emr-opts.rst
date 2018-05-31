@@ -390,6 +390,10 @@ Cluster creation and configuration
        and when it may first terminate the cluster, to allow Hadoop to
        accept your first job.
 
+    .. note::
+
+       The Google Dataproc won't allow an idle time of less than 10 minutes.
+
 .. mrjob-opt::
     :config: max_hours_idle
     :switch: --max-hours-idle

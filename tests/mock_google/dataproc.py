@@ -20,11 +20,11 @@ from copy import deepcopy
 from google.api_core.exceptions import AlreadyExists
 from google.api_core.exceptions import InvalidArgument
 from google.api_core.exceptions import NotFound
-from google.cloud.dataproc_v1.types import Cluster
-from google.cloud.dataproc_v1.types import ClusterStatus
-from google.cloud.dataproc_v1.types import DiskConfig
-from google.cloud.dataproc_v1.types import Job
-from google.cloud.dataproc_v1.types import JobStatus
+from mrjob._vendor.dataproc_v1beta2.types import Cluster
+from mrjob._vendor.dataproc_v1beta2.types import ClusterStatus
+from mrjob._vendor.dataproc_v1beta2.types import DiskConfig
+from mrjob._vendor.dataproc_v1beta2.types import Job
+from mrjob._vendor.dataproc_v1beta2.types import JobStatus
 
 from mrjob.dataproc import _STATE_MATCHER_ACTIVE
 from mrjob.dataproc import _cluster_state_name
@@ -33,8 +33,6 @@ from mrjob.dataproc import _zone_to_region
 from mrjob.parse import is_uri
 from mrjob.util import random_identifier
 
-# default boot disk size set by the API
-_DEFAULT_DISK_SIZE_GB = 500
 
 # account scopes that are included whether you ask for them or not
 # for more info, see:
@@ -52,6 +50,9 @@ _DEFAULT_SCOPES = {
     'https://www.googleapis.com/auth/bigtable.data',
     'https://www.googleapis.com/auth/devstorage.full_control',
 }
+
+# default boot disk size set by the API
+_DEFAULT_DISK_SIZE_GB = 500
 
 # actual properties taken from Dataproc
 _DEFAULT_CLUSTER_PROPERTIES = {
@@ -106,11 +107,11 @@ class MockGoogleDataprocClient(object):
         self.credentials = credentials
 
         # maps (project_id, region, cluster_name) to a
-        # google.cloud.dataproc_v1.types.Cluster
+        # mrjob._vendor.dataproc_v1beta2.types.Cluster
         self.mock_clusters = mock_clusters
 
         # maps (project_id, region, cluster_name, job_name) to a
-        # google.cloud.dataproc_v1.types.Job
+        # mrjob._vendor.dataproc_v1beta2.types.Job
         self.mock_jobs = mock_jobs
 
         # if False, mock jobs end in ERROR
@@ -139,7 +140,7 @@ class MockGoogleDataprocClient(object):
 
 class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
-    """Mock out google.cloud.dataproc_v1.ClusterControllerClient"""
+    """Mock out mrjob._vendor.dataproc_v1beta2.ClusterControllerClient"""
 
     def create_cluster(self, project_id, region, cluster):
         self._check_region_matches_endpoint(region)
@@ -267,7 +268,7 @@ class MockGoogleDataprocClusterClient(MockGoogleDataprocClient):
 
 class MockGoogleDataprocJobClient(MockGoogleDataprocClient):
 
-    """Mock out google.cloud.dataproc_v1.JobControllerClient"""
+    """Mock out mrjob._vendor.dataproc_v1beta2.JobControllerClient"""
 
     def submit_job(self, project_id, region, job):
         self._check_region_matches_endpoint(region)

@@ -138,15 +138,15 @@ class _CleanupAction(Action):
         setattr(namespace, self.dest, result)
 
 
-class _SubnetsAction(Action):
+class _CommaSeparatedListAction(Action):
     """action to parse a comma-separated list of subnets.
 
     This eliminates whitespace
     """
     def __call__(self, parser, namespace, value, option_string=None):
-        subnets = [s.strip() for s in value.split(',') if s]
+        items = [s.strip() for s in value.split(',') if s]
 
-        setattr(namespace, self.dest, subnets)
+        setattr(namespace, self.dest, items)
 
 
 class _AppendJSONAction(Action):
@@ -1014,12 +1014,13 @@ _RUNNER_OPTS = dict(
     ),
     service_account_scopes=dict(
         cloud_role='launch',
-        combiner=combine_lists,
         switches=[
-            (['--service-account-scope'], dict(
-                action='append',
-                help=('Additional service account scope to use when creating'
-                      ' a Dataproc cluster.'),
+            (['--service-account-scopes'], dict(
+                action=_CommaSeparatedListAction,
+                help=("A comma-separated list of service account scopes"
+                      " on Dataproc, used to limit your cluster's access."
+                      " For each scope, you can specify the"
+                      " full URI or just the name (e.g. 'logging.write')"),
             )),
         ],
     ),
@@ -1157,7 +1158,7 @@ _RUNNER_OPTS = dict(
                       ' subnetwork to launch cluster in.'),
             )),
             (['--subnets'], dict(
-                action=_SubnetsAction,
+                action=_CommaSeparatedListAction,
                 help=('Like --subnet, but with a comma-separated list, to'
                       ' specify multiple subnets in conjunction with'
                       ' --instance-fleets (EMR only)'),

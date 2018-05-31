@@ -26,8 +26,6 @@ from mrjob._vendor.dataproc_v1beta2.types import DiskConfig
 from mrjob._vendor.dataproc_v1beta2.types import Job
 from mrjob._vendor.dataproc_v1beta2.types import JobStatus
 
-from mrjob.dataproc import _DEFAULT_SCOPES
-from mrjob.dataproc import _MANDATORY_SCOPES
 from mrjob.dataproc import _STATE_MATCHER_ACTIVE
 from mrjob.dataproc import _cluster_state_name
 from mrjob.dataproc import _job_state_name

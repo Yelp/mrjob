@@ -15,12 +15,15 @@
 """
 from io import BytesIO
 
+from google.cloud.logging.entries import StructEntry
+from google.cloud.logging.resource import Resource
 from google.oauth2.credentials import Credentials
 
 from mrjob.fs.gcs import parse_gcs_uri
 
 from .dataproc import MockGoogleDataprocClusterClient
 from .dataproc import MockGoogleDataprocJobClient
+from .logging import MockGoogleLoggingClient
 from .storage import MockGoogleStorageClient
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import Mock
@@ -36,15 +39,18 @@ class MockGoogleTestCase(SandboxedTestCase):
         super(MockGoogleTestCase, self).setUp()
 
         # maps (project_id, region, cluster_name) to a
-        # google.cloud.dataproc_v1.types.Cluster
+        # mrjob._vendor.dataproc_v1beta2.types.Cluster
         self.mock_clusters = {}
 
         # maps (project_id, region, job_name) to a
-        # google.cloud.dataproc_v1.types.Job
+        # mrjob._vendor.dataproc_v1beta2.types.Job
         self.mock_jobs = {}
 
         # set this to False to make jobs ERROR
         self.mock_jobs_succeed = True
+
+        # a list of StructEntry objects for mock logging client to return
+        self.mock_log_entries = []
 
         # mock OAuth token, returned by mock google.auth.default()
         self.mock_token = 'mock_token'
@@ -63,11 +69,15 @@ class MockGoogleTestCase(SandboxedTestCase):
 
         self.start(patch('google.auth.default', self.auth_default))
 
-        self.start(patch('google.cloud.dataproc_v1.ClusterControllerClient',
-                         self.cluster_client))
+        self.start(patch(
+            'mrjob._vendor.dataproc_v1beta2.ClusterControllerClient',
+            self.cluster_client))
 
-        self.start(patch('google.cloud.dataproc_v1.JobControllerClient',
+        self.start(patch('mrjob._vendor.dataproc_v1beta2.JobControllerClient',
                          self.job_client))
+
+        self.start(patch('google.cloud.logging.Client',
+                         self.logging_client))
 
         self.start(patch('google.cloud.storage.client.Client',
                          self.storage_client))
@@ -105,8 +115,29 @@ class MockGoogleTestCase(SandboxedTestCase):
             mock_jobs_succeed=self.mock_jobs_succeed,
         )
 
+    def logging_client(self, project=None, credentials=None):
+        return MockGoogleLoggingClient(
+            credentials=credentials,
+            mock_log_entries=self.mock_log_entries,
+            project=project,
+        )
+
     def storage_client(self, project=None, credentials=None):
         return MockGoogleStorageClient(mock_gcs_fs=self.mock_gcs_fs)
+
+    def add_mock_log_entry(
+            self, payload, logger, insert_id=None, timestamp=None,
+            labels=None, severity=None, http_request=None, resource=None):
+
+        if isinstance(resource, dict):
+            resource = Resource(**resource)
+
+        entry = StructEntry(
+            payload, logger, insert_id=insert_id, timestamp=timestamp,
+            labels=labels, severity=severity, http_request=http_request,
+            resource=resource)
+
+        self.mock_log_entries.append(entry)
 
     def make_runner(self, *args):
         """create a dummy job, and call make_runner() on it.

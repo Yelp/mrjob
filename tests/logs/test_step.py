@@ -1,5 +1,5 @@
-# Copyright 2015-2016 Yelp
-# Copyright 2017 Yelp
+# Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp and Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -68,7 +68,9 @@ PARSED_YARN_STEP_LOG_LINES = dict(
     },
     job_id='job_1449857544442_0002',
     output_dir=('hdfs:///user/root/tmp/mrjob'
-                '/mr_wc.root.20151211.181326.984074/output'))
+                '/mr_wc.root.20151211.181326.984074/output'),
+    progress=dict(map=100, message=' map 100% reduce 100%', reduce=100),
+)
 
 
 # abbreviated version of real output from Hadoop 1.0.3 on EMR AMI 2.4.9
@@ -93,6 +95,24 @@ PARSED_PRE_YARN_STEP_LOG_LINES = dict(
     job_id='job_201512112247_0003',
     output_dir=('hdfs:///user/hadoop/tmp/mrjob'
                 '/mr_wc.hadoop.20151211.230352.433691/output'),
+    progress=dict(map=100, message=' map 100%  reduce 100%', reduce=100),
+)
+
+# complete contents of job driver, from Google Cloud Dataproc
+NOT_A_VALID_JAR_LOG_LINES = [
+    'Not a valid JAR: /home/hadoop/hadoop-examples.jar',
+]
+
+PARSED_NOT_A_VALID_JAR_LOG_LINES = dict(
+    errors=[
+        dict(
+            hadoop_error=dict(
+                message='Not a valid JAR: /home/hadoop/hadoop-examples.jar',
+                start_line=0,
+                num_lines=1,
+            ),
+        ),
+    ],
 )
 
 
@@ -110,6 +130,12 @@ class ParseStepSyslogTestCase(TestCase):
         self.assertEqual(
             _parse_step_syslog(PRE_YARN_STEP_LOG_LINES),
             PARSED_PRE_YARN_STEP_LOG_LINES)
+
+    def test_not_a_valid_jar(self):
+        self.assertEqual(
+            _parse_step_syslog(NOT_A_VALID_JAR_LOG_LINES),
+            PARSED_NOT_A_VALID_JAR_LOG_LINES,
+        )
 
 
 class InterpretHadoopJarCommandStderrTestCase(TestCase):

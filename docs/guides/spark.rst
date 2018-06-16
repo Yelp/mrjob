@@ -19,6 +19,10 @@ the following features familiar to users of mrjob:
 * automatically making the mrjob library available to your job
   (see :mrjob-opt:`bootstrap_mrjob`)
 
+.. note::
+
+   mrjob does not yet support Spark on Google Cloud Dataproc.
+
 Writing your first Spark job
 ----------------------------
 

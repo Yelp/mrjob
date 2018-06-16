@@ -4,6 +4,77 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.3:
+
+0.6.3
+-----
+
+Read arbitrary file formats
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+You can now pass entire files in any format to your mapper by defining
+:py:meth:`~mrjob.job.MRJob.mapper_raw`. See :ref:`raw-input` for an example.
+
+Google Cloud Datatproc parity
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+mrjob now offers feature parity between Google Cloud Dataproc
+and Amazon Elastic MapReduce. Support for :doc:`guides/spark`
+and :mrjob-opt:`libjars` will be added in a future release.
+(There is no plan to introduce :ref:`cluster-pooling` with Dataproc.)
+
+Specifically, :py:class:`~mrjob.dataproc.DataprocJobRunner` now supports:
+
+* fetching and parsing counters
+* parsing logs for probable cause of failure
+* job progress messages (% complete)
+* :ref:`non-hadoop-streaming-jar-steps`
+* these config options:
+
+  * :mrjob-opt:`cloud_part_size_mb` (chunked uploading)
+  * :mrjob-opt:`core_instance_config`, :mrjob-opt:`master_instance_config`,
+    :mrjob-opt:`task_instance_config`
+  * :mrjob-opt:`hadoop_streaming_jar`
+  * :mrjob-opt:`network`/:mrjob-opt:`subnet` (running in a VPC)
+  * :mrjob-opt:`service_account` (custom IAM account)
+  * :mrjob-opt:`service_account_scopes` (fine-grained permissions)
+  * :mrjob-opt:`ssh_tunnel`/:mrjob-opt:`ssh_tunnel_is_open` (resource manager)
+
+Improvements to existing Dataproc features:
+
+* :mrjob-opt:`bootstrap` scripts run in a temp dir, rather than ``/``
+* uses Dataproc's built-in auto-termination feature, rather than a script
+* GCS filesystem:
+
+  * :py:meth:`~mrjob.fs.gcs.GCSFilesystem.cat` streams data rather than dumping
+    to a temp file
+  * :py:meth:`~mrjob.fs.gcs.GCSFilesystem.exists` no longer swallows all
+    exceptions
+
+To get started, read :ref:`google-setup`.
+
+Other changes
+^^^^^^^^^^^^^
+
+mrjob no longer streams your job output to the command line if you specify
+:mrjob-opt:`output_dir`. You can control this with the :command:`--cat-output`
+and :command:`--no-cat-output` switches (:command:`--no-output` is deprecated).
+
+`cloud_upload_part_size` has been renamed to :mrjob-opt:`cloud_part_size_mb`
+(the old name will work until v0.7.0).
+
+mrjob can now recognize "not a valid JAR" errors from Hadoop and suggest
+them as probable cause of job failure.
+
+mrjob no longer depends on :mod:`google-cloud` (which implies several other
+Google libraries). Its current Google library dependencies are
+:mod:`google-cloud-logging` 1.5.0+ and :mod:`google-cloud-storage` 1.9.0+.
+Future versions of mrjob will depend on :mod:`google-cloud-dataproc` 0.11.0+
+(currently included with mrjob because it hasn't yet been released).
+
+:py:class:`~mrjob.retry.RetryWrapper` now sets ``__name__`` when wrapping
+methods, making for easier debugging.
+
 .. _v0.6.2:
 
 0.6.2
@@ -547,7 +618,7 @@ made more generic, to make it easier to share code with the
 *s3_log_uri*                    :mrjob-opt:`cloud_log_dir`
 *s3_sync_wait_time*             :mrjob-opt:`cloud_fs_sync_secs`
 *s3_tmp_dir*                    :mrjob-opt:`cloud_tmp_dir`
-*s3_upload_part_size*           :mrjob-opt:`cloud_upload_part_size`
+*s3_upload_part_size*           *cloud_upload_part_size*
 =============================== ======================================
 
 The old option names and command-line switches are now deprecated but will

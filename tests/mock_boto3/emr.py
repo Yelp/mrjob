@@ -1,4 +1,5 @@
 # Copyright 2009-2017 Yelp and Contributors
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1150,7 +1151,7 @@ class MockEMRClient(object):
         cluster['_Steps'].extend(new_steps)
 
         # add_job_flow_steps() needs to return step IDs
-        return [new_step['Id'] for new_step in new_steps]
+        return [ns['Id'] for ns in new_steps]
 
     def _add_tags(self, operation_name, Tags, cluster):
         _validate_param_type(Tags, (list, tuple))

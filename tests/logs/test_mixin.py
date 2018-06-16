@@ -1,4 +1,5 @@
 # Copyright 2016-2017 Yelp
+# Copyright 2018 Yelp and Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -587,7 +588,7 @@ class PickErrorTestCase(LogInterpretationMixinTestCase):
 
     def test_logs_already_interpreted(self):
         log_interpretation = dict(
-            job={}, step={}, task={})
+            history={}, step={}, task={})
 
         self.assertEqual(
             self.runner._pick_error(log_interpretation, 'streaming'),

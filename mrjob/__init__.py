@@ -24,6 +24,7 @@ __credits__ = [
     'Jordan Andersen <jordandandersen@gmail.com>',
     'Tom Arnfeld <tarnfeld@me.com>',
     'Martin Baeuml <baeuml@kit.edu>',
+    'Benjamin Bariteau <bariteau@yelp.com>',
     'Étienne Batise <etienne.batise@gmail.com>',
     'Edward Betts <edward@4angle.com>',
     'Hunter Blanks <hblanks@monetate.com>',
@@ -73,6 +74,7 @@ __credits__ = [
     'Jerome Leclanche <jerome@leclan.ch>',
     'Robert Leftwich <rl.0x0@eml.cc>',
     'Andrew Lenards <andrew.lenards@gmail.com>',
+    'Ronny Lindner <ronny.lindner@invia.de>',
     'Tianhui Michael Li <tianhuil@cs.princeton.edu>',
     'James Lim <jim@affirm.com>',
     'Shusen Liu <liushusen.smart@gmail.com>',
@@ -128,4 +130,4 @@ __credits__ = [
     'Andrea Zonca <andrea.zonca@gmail.com>',
 ]
 
-__version__ = '0.6.3.dev0'
+__version__ = '0.6.4.dev0'

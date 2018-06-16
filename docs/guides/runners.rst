@@ -101,7 +101,7 @@ Running on Dataproc
 
 .. note::
 
-   Dataproc support is new and has some :ref:`dataproc-limitations`.
+   Dataproc does not yet support :doc:`spark` or :mrjob-opt:`libjars`.
 
 Configuration
 -------------

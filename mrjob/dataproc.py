@@ -14,17 +14,18 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import json
 import logging
 import time
 import re
+from io import BytesIO
 from os import environ
-from os.path import dirname
-from os.path import join
 
 try:
     import google.auth
-    import google.cloud.dataproc_v1
-    import google.cloud.dataproc_v1.types
+    import mrjob._vendor.dataproc_v1beta2
+    import mrjob._vendor.dataproc_v1beta2.types
+    import google.cloud.logging
     import google.api_core.exceptions
     import google.api_core.grpc_helpers
 except:
@@ -40,7 +41,16 @@ from mrjob.fs.gcs import is_gcs_uri
 from mrjob.fs.gcs import parse_gcs_uri
 from mrjob.fs.local import LocalFilesystem
 from mrjob.logs.counters import _pick_counters
+from mrjob.logs.errors import _format_error
+from mrjob.logs.mixin import LogInterpretationMixin
+from mrjob.logs.task import _parse_task_stderr
+from mrjob.logs.task import _parse_task_syslog_records
+from mrjob.logs.step import _interpret_new_dataproc_step_stderr
+from mrjob.parse import is_uri
 from mrjob.py2 import PY2
+from mrjob.py2 import string_types
+from mrjob.py2 import to_unicode
+from mrjob.runner import _blank_out_conflicting_opts
 from mrjob.setup import UploadDirManager
 from mrjob.step import StepFailedException
 from mrjob.util import random_identifier
@@ -63,19 +73,6 @@ _DEFAULT_CHECK_CLUSTER_EVERY = 10.0
 _DEFAULT_CLOUD_FS_SYNC_SECS = 5.0
 _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS = 90
 
-# https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.clusters#GceClusterConfig  # noqa
-# NOTE - added cloud-platform so we can invoke gcloud commands from the cluster master (used for auto termination script)  # noqa
-_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES = [
-    'https://www.googleapis.com/auth/cloud.useraccounts.readonly',
-    'https://www.googleapis.com/auth/devstorage.read_write',
-    'https://www.googleapis.com/auth/logging.write',
-    'https://www.googleapis.com/auth/bigquery',
-    'https://www.googleapis.com/auth/bigtable.admin.table',
-    'https://www.googleapis.com/auth/bigtable.data',
-    'https://www.googleapis.com/auth/devstorage.full_control',
-    'https://www.googleapis.com/auth/cloud-platform',
-]
-
 # job state matcher enum
 # use this to only find active jobs. (2 for NON_ACTIVE, but we don't use that)
 _STATE_MATCHER_ACTIVE = 1
@@ -93,12 +90,6 @@ _DATAPROC_IMAGE_TO_HADOOP_VERSION = {
     '1.0': '2.7.2'
 }
 
-# bootstrap action which automatically terminates idle clusters
-_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = join(
-    dirname(mrjob.__file__),
-    'bootstrap',
-    'terminate_idle_cluster_dataproc.sh')
-
 _HADOOP_STREAMING_JAR_URI = (
     'file:///usr/lib/hadoop-mapreduce/hadoop-streaming.jar')
 
@@ -107,15 +98,45 @@ _HADOOP_STREAMING_JAR_URI = (
 
 _GCP_CLUSTER_NAME_REGEX = '(?:[a-z](?:[-a-z0-9]{0,53}[a-z0-9])?).'
 
+# on Dataproc, the resource manager is always at 8088. Tunnel to the master
+# node's own hostname, not localhost.
+_SSH_TUNNEL_CONFIG = dict(
+    localhost=False,
+    name='resource manager',
+    path='/cluster',
+    port=8088,
+)
+
+# used to match log entries that tell us if a container exited
+_CONTAINER_EXECUTOR_CLASS_NAME = (
+    'org.apache.hadoop.yarn.server.nodemanager.DefaultContainerExecutor')
+
+# used to determine which containers exited with nonzero status
+_CONTAINER_EXIT_RE = re.compile(
+    r'Exit code from container (?P<container_id>\w+)'
+    r' is ?: (?P<returncode>\d+)')
+
+_TRACEBACK_EXCEPTION_RE = re.compile('\w+: .*$')
+
+_STDERR_LOG4J_WARNING = re.compile(
+    r'.*(No appenders could be found for logger'
+    r'|Please initialize the log4j system'
+    r'|See http://logging.apache.org/log4j)')
+
+# this is equivalent to full permission
+_FULL_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
+
 
 # convert enum values to strings (e.g. 'RUNNING')
 
 def _cluster_state_name(state_value):
-    return google.cloud.dataproc_v1.types.ClusterStatus.State.Name(state_value)
+    return mrjob._vendor.dataproc_v1beta2.types.ClusterStatus.State.Name(
+        state_value)
 
 
 def _job_state_name(state_value):
-    return google.cloud.dataproc_v1.types.JobStatus.State.Name(state_value)
+    return mrjob._vendor.dataproc_v1beta2.types.JobStatus.State.Name(
+        state_value)
 
 
 ########## BEGIN - Helper fxns for _cluster_create_kwargs ##########
@@ -174,7 +195,7 @@ class DataprocException(Exception):
     pass
 
 
-class DataprocJobRunner(HadoopInTheCloudJobRunner):
+class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     """Runs an :py:class:`~mrjob.job.MRJob` on Google Cloud Dataproc.
     Invoked when you run your job with ``-r dataproc``.
 
@@ -193,7 +214,16 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
     alias = 'dataproc'
 
     OPT_NAMES = HadoopInTheCloudJobRunner.OPT_NAMES | {
+        'cluster_properties',
+        'core_instance_config',
+        'gcloud_bin',
+        'master_instance_config',
+        'network',
         'project_id',
+        'service_account',
+        'service_account_scopes',
+        'subnet',
+        'task_instance_config',
     }
 
     def __init__(self, **kwargs):
@@ -207,8 +237,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         # check for library support
         if google is None:
             raise ImportError(
-                'You must install google-cloud and google-cloud-dataproc'
-                ' to connect to Dataproc')
+                'You must install google-cloud-logging and '
+                'google-cloud-storage to connect to Dataproc')
 
         # Dataproc requires a master and >= 2 core instances
         # num_core_instances refers ONLY to number of CORE instances and does
@@ -226,7 +256,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         # load credentials and project ID
         self._credentials, auth_project_id = google.auth.default(
-            scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES)
+            scopes=[_FULL_SCOPE])  # needed for $GOOGLE_APPLICATION_CREDENTIALS
 
         self._project_id = self._opts['project_id'] or auth_project_id
 
@@ -236,6 +266,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 ' set $GOOGLE_CLOUD_PROJECT')
 
         self._fix_zone_and_region_opts()
+
+        if self._opts['service_account_scopes']:
+            self._opts['service_account_scopes'] = [
+                _fully_qualify_scope_uri(s)
+                for s in self._opts['service_account_scopes']
+            ]
 
         # cluster_id can be None here
         self._cluster_id = self._opts['cluster_id']
@@ -271,6 +307,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._image_version = None
         self._hadoop_version = None
 
+        # map driver_output_uri to a dict with the keys:
+        # log_uri: uri of file we're reading from
+        # pos: position in file
+        # buffer: bytes read from file already
+        self._driver_output_state = {}
+
         # This will be filled by _run_steps()
         # NOTE - log_interpretations will be empty except job_id until we
         # parse task logs
@@ -299,6 +341,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 check_cluster_every=_DEFAULT_CHECK_CLUSTER_EVERY,
                 cleanup=['CLUSTER', 'JOB', 'LOCAL_TMP'],
                 cloud_fs_sync_secs=_DEFAULT_CLOUD_FS_SYNC_SECS,
+                gcloud_bin=['gcloud'],
                 image_version=_DEFAULT_IMAGE_VERSION,
                 instance_type=_DEFAULT_INSTANCE_TYPE,
                 master_instance_type=_DEFAULT_INSTANCE_TYPE,
@@ -309,33 +352,28 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         )
 
     def _combine_opts(self, opt_list):
-        """Blank out overridden *zone* and *region* opts."""
-        # copy opt_list so we can modify it
-        opt_list = [dict(opts) for opts in opt_list]
-
-        # blank out any instance_fleets/groups before the last config
-        # where they are set
-        blank_out = False
-        for opts in reversed(opt_list):
-            if blank_out:
-                opts['region'] = None
-                opts['zone'] = None
-            elif any(opts.get(k) is not None
-                     for k in ('region', 'zone')):
-                blank_out = True
+        """Blank out conflicts between *network*/*subnet* and
+        *region*/*zone*."""
+        opt_list = _blank_out_conflicting_opts(opt_list, ['region', 'zone'])
+        opt_list = _blank_out_conflicting_opts(opt_list, ['network', 'subnet'])
 
         # now combine opts, with region/zone blanked out
         return super(DataprocJobRunner, self)._combine_opts(opt_list)
 
     @property
     def cluster_client(self):
-        return google.cloud.dataproc_v1.ClusterControllerClient(
+        return mrjob._vendor.dataproc_v1beta2.ClusterControllerClient(
             **self._client_create_kwargs())
 
     @property
     def job_client(self):
-        return google.cloud.dataproc_v1.JobControllerClient(
+        return mrjob._vendor.dataproc_v1beta2.JobControllerClient(
             **self._client_create_kwargs())
+
+    @property
+    def logging_client(self):
+        return google.cloud.logging.Client(credentials=self._credentials,
+                                           project=self._project_id)
 
     def _client_create_kwargs(self):
         if self._opts['region']:
@@ -368,6 +406,14 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         self._fs = CompositeFilesystem(self._gcs_fs, LocalFilesystem())
         return self._fs
+
+    def _fs_chunk_size(self):
+        """Chunk size for cloud storage Blob objects. Currently
+        only used for uploading."""
+        if self._opts['cloud_part_size_mb']:
+            return int(self._opts['cloud_part_size_mb'] * 1024 * 1024)
+        else:
+            return None
 
     def _get_tmpdir(self, given_tmpdir):
         """Helper for _fix_tmpdir"""
@@ -454,7 +500,6 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._create_master_bootstrap_script_if_needed()
         if self._master_bootstrap_script_path:
             self._upload_mgr.add(self._master_bootstrap_script_path)
-            self._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
     def _add_job_files_for_upload(self):
         """Add files needed for running the job (setup and input)
@@ -462,10 +507,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
-        # TODO - mtai @ davidmarin - hadoop_streaming_jar is currently ignored,
-        # see _HADOOP_STREAMING_JAR_URI
-        # if self._opts['hadoop_streaming_jar']:
-        #     self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
+        if self._opts['hadoop_streaming_jar']:
+            self._upload_mgr.add(self._opts['hadoop_streaming_jar'])
 
         for step in self._get_steps():
             if step.get('jar'):
@@ -481,8 +524,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         for path, gcs_uri in self._upload_mgr.path_to_uri().items():
             log.debug('uploading %s -> %s' % (path, gcs_uri))
 
-            # TODO - mtai @ davidmarin - Implement put function for other FSs
-            self.fs.put(path, gcs_uri)
+            self.fs.put(path, gcs_uri, chunk_size=self._fs_chunk_size())
 
         self._wait_for_fs_sync()
 
@@ -514,8 +556,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._wait_for_fs_sync()
 
     ### Running the job ###
+
     def cleanup(self, mode=None):
         super(DataprocJobRunner, self).cleanup(mode=mode)
+
+        # close our SSH tunnel, if any
+        self._kill_ssh_tunnel()
 
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)
@@ -574,68 +620,45 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         _wait_for('GCS sync (eventual consistency)',
                   self._opts['cloud_fs_sync_secs'])
 
-    def _build_dataproc_hadoop_job(self, step_num):
-        """This function creates a "HadoopJob" to be passed to
-        self._submit_hadoop_job
-
-        :param step_num:
-        :return: output_hadoop_job
+    def _streaming_step_job_kwarg(self, step_num):
+        """Returns a map from ``'hadoop_job'`` to a dict representing
+        a hadoop streaming job.
         """
-        # Reference: https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
+        return dict(
+            hadoop_job=dict(
+                args=self._hadoop_streaming_jar_args(step_num),
+                main_jar_file_uri=self._hadoop_streaming_jar_uri(),
+            )
+        )
 
-        args = list()
-        file_uris = list()
-        archive_uris = list()
-        properties = dict()
-
+    def _jar_step_job_kwarg(self, step_num):
+        """Returns a map from ``'hadoop_job'`` to a dict representing
+        a Hadoop job that runs a JAR"""
         step = self._get_step(step_num)
 
-        assert step['type'] in ('streaming', 'jar'), (
-            'Bad step type: %r' % (step['type'],))
+        hadoop_job = {}
 
-        # TODO - mtai @ davidmarin - Might be trivial to support jar running,
-        # see "main_jar_file_uri" of variable "output_hadoop_job" in
-        #         https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
+        hadoop_job['args'] = (
+            self._hadoop_generic_args_for_step(step_num) +
+            self._interpolate_input_and_output(step['args'], step_num))
 
-        assert step['type'] == 'streaming', 'Jar not implemented'
-        main_jar_uri = _HADOOP_STREAMING_JAR_URI
+        jar_uri = self._upload_mgr.uri(step['jar'])
 
-        # TODO - mtai @ davidmarin - Not clear if we should move _upload_args
-        # to file_uris, currently works fine as-is
+        # can't specify main_class and main_jar_file_uri; see
+        # https://cloud.google.com/dataproc/docs/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
+        if step.get('main_class'):
+            hadoop_job['jar_file_uris'] = [jar_uri]
+            hadoop_job['main_class'] = step['main_class']
+        else:
+            hadoop_job['main_jar_file_uri'] = jar_uri
 
-        # TODO - dmarin @ mtai - Probably a little safer to do the API's way,
-        # assuming the API supports distributed cache syntax (so we can pick
-        # the names of the uploaded files).
-        args.extend(self._upload_args())
+        return dict(hadoop_job=hadoop_job)
 
-        args.extend(self._hadoop_args_for_step(step_num))
-
-        mapper, combiner, reducer = (self._hadoop_streaming_commands(step_num))
-
-        if mapper:
-            args += ['-mapper', mapper]
-
-        if combiner:
-            args += ['-combiner', combiner]
-
-        if reducer:
-            args += ['-reducer', reducer]
-
-        for current_input_uri in self._step_input_uris(step_num):
-            args += ['-input', current_input_uri]
-
-        args += ['-output', self._step_output_uri(step_num)]
-
-        # TODO - mtai @ davidmarin - Add back support to specify a different
-        # main_jar_file_uri
-        output_hadoop_job = dict(
-            args=args,
-            file_uris=file_uris,
-            archive_uris=archive_uris,
-            properties=properties,
-            main_jar_file_uri=main_jar_uri
-        )
-        return output_hadoop_job
+    def _hadoop_streaming_jar_uri(self):
+        if self._opts['hadoop_streaming_jar']:
+            return self._upload_mgr.uri(self._opts['hadoop_streaming_jar'])
+        else:
+            return _HADOOP_STREAMING_JAR_URI
 
     def _launch_cluster(self):
         """Create an empty cluster on Dataproc, and set self._cluster_id to
@@ -663,6 +686,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             self._create_cluster(cluster_data)
 
             self._wait_for_cluster_ready(self._cluster_id)
+
+        self._set_up_ssh_tunnel()
 
         # keep track of when we launched our job
         self._dataproc_job_start = time.time()
@@ -704,16 +729,27 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._wait_for_fs_sync()
 
     def _launch_step(self, step_num):
-        # Build each step
-        hadoop_job = self._build_dataproc_hadoop_job(step_num)
+        step = self._get_step(step_num)
 
         # Clean-up step name
         step_name = '%s---step-%05d-of-%05d' % (
             self._dataproc_job_prefix(), step_num + 1, self._num_steps())
 
+        # Build step
+
+        # job_kwarg is a single-item dict, where the key is 'hadoop_job',
+        # 'spark_job', etc.
+        if step['type'] == 'streaming':
+            job_kwarg = self._streaming_step_job_kwarg(step_num)
+        elif step['type'] == 'jar':
+            job_kwarg = self._jar_step_job_kwarg(step_num)
+        else:
+            raise NotImplementedError(
+                'Unsupported step type: %r' % step['type'])
+
         # Submit it
         log.info('Submitting Dataproc Hadoop Job - %s', step_name)
-        result = self._submit_hadoop_job(step_name, hadoop_job)
+        result = self._submit_job(step_name, job_kwarg)
         log.info('Submitted Dataproc Hadoop Job - %s', step_name)
 
         job_id = result.reference.job_id
@@ -721,8 +757,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
 
         return job_id
 
-    def _wait_for_step_to_complete(
-            self, job_id, step_num=None, num_steps=None):
+    def _wait_for_step_to_complete(self, job_id, step_num, num_steps):
         """Helper for _wait_for_step_to_complete(). Wait for
         step with the given ID to complete, and fetch counters.
         If it fails, attempt to diagnose the error, and raise an
@@ -733,6 +768,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         log_interpretation = dict(job_id=job_id)
         self._log_interpretations.append(log_interpretation)
 
+        log_interpretation['step'] = {}
+        step_type = self._get_step(step_num)['type']
+
         while True:
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobStatus  # noqa
             job = self._get_job(job_id)
@@ -740,6 +778,15 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             job_state = job.status.State.Name(job.status.state)
 
             log.info('%s => %s' % (job_id, job_state))
+
+            log_interpretation['step']['driver_output_uri'] = (
+                job.driver_output_resource_uri)
+
+            self._interpret_step_logs(log_interpretation, step_type)
+
+            progress = log_interpretation['step'].get('progress')
+            if progress:
+                log.info(' ' + progress['message'])
 
             # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#State  # noqa
             # these are the states covered by the ACTIVE job state matcher,
@@ -749,19 +796,262 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
                 self._wait_for_api('job completion')
                 continue
 
-            # we're done, will return at the end of this
-            elif job_state == 'DONE':
-                break
+            # print counters if job wasn't CANCELLED
+            if job_state != 'CANCELLED':
+                self._log_counters(log_interpretation, step_num)
 
-            raise StepFailedException(step_num=step_num, num_steps=num_steps)
+            if job_state == 'ERROR':
+                error = self._pick_error(log_interpretation, step_type)
+                if error:
+                    log.error('Probable cause of failure:\n\n%s\n\n' %
+                              _format_error(error))
+
+            # we're done, will return at the end of this
+            if job_state == 'DONE':
+                break
+            else:
+                raise StepFailedException(
+                    step_num=step_num, num_steps=num_steps)
 
     def _default_step_output_dir(self):
         # put intermediate data in HDFS
         return 'hdfs:///tmp/mrjob/%s/step-output' % self._job_key
 
+    ### log intepretation ###
+
+    # step
+
+    def _interpret_step_logs(self, log_interpretation, step_type):
+        """Hook for interpreting step logs.
+
+        Unlike with most runners, you may call this multiple times and it
+        will continue to parse the step log incrementally, which is useful
+        for getting job progress."""
+        driver_output_uri = log_interpretation.get(
+            'step', {}).get('driver_output_uri')
+
+        if driver_output_uri:
+            self._update_step_interpretation(
+                log_interpretation['step'], driver_output_uri)
+
+    def _update_step_interpretation(
+            self, step_interpretation, driver_output_uri):
+        new_lines = self._get_new_driver_output_lines(driver_output_uri)
+        _interpret_new_dataproc_step_stderr(step_interpretation, new_lines)
+
+    def _get_new_driver_output_lines(self, driver_output_uri):
+        """Get a list of complete job driver output lines that are
+        new since the last time we checked.
+        """
+        state = self._driver_output_state.setdefault(
+            driver_output_uri,
+            dict(log_uri=None, pos=0, buffer=b''))
+
+        # driver output is in logs with names like driveroutput.000000000
+        log_uris = sorted(self.fs.ls(driver_output_uri + '*'))
+
+        for log_uri in log_uris:
+            # initialize log_uri with first URI we see
+            if state['log_uri'] is None:
+                # log the location of job driver output just once
+                log.info(
+                    '  Parsing job driver output from %s*' % driver_output_uri)
+                state['log_uri'] = log_uri
+
+            # skip log files already parsed
+            if log_uri < state['log_uri']:
+                continue
+
+            # when parsing the next file, reset *pos*
+            elif log_uri > state['log_uri']:
+                state['pos'] = 0
+                state['log_uri'] = log_uri
+
+            log_blob = self.fs._get_blob(log_uri)
+
+            try:
+                new_data = log_blob.download_as_string(start=state['pos'])
+            except (google.api_core.exceptions.NotFound,
+                    google.api_core.exceptions.RequestRangeNotSatisfiable):
+                # blob was just created, or no more data is available
+                break
+
+            state['buffer'] += new_data
+            state['pos'] += len(new_data)
+
+        # convert buffer into lines, saving leftovers for next time
+        stream = BytesIO(state['buffer'])
+        state['buffer'] = b''
+
+        lines = []
+
+        for line_bytes in stream:
+            if line_bytes.endswith(b'\n'):
+                lines.append(to_unicode(line_bytes))
+            else:
+                # leave final partial line (if any) in buffer
+                state['buffer'] = line_bytes
+
+        return lines
+
+    # history
+
+    def _interpret_history_log(self, log_interpretation):
+        """Does nothing. We can't get the history logs, and we don't need
+        them."""
+        log_interpretation.setdefault('history', {})
+
+    # task
+
+    def _interpret_task_logs(self, log_interpretation, step_type,
+                             error_attempt_ids=(), partial=True):
+        """Scan node manager log to find failed container IDs of failed
+        tasks, and then scan the corresponding stderr and syslogs."""
+        if 'task' in log_interpretation and (
+                partial or not log_interpretation['task'].get('partial')):
+            return   # already interpreted
+
+        step_interpretation = log_interpretation.get('step') or {}
+
+        application_id = step_interpretation.get('application_id')
+        if not application_id:
+            log.warning(
+                "Can't parse node manager logs; missing application ID")
+            return
+
+        log_interpretation['task'] = self._task_log_interpretation(
+            application_id, step_type, partial)
+
+    def _task_log_interpretation(
+            self, application_id, step_type, partial=True):
+        """Helper for :py:meth:`_interpret_task_logs`"""
+        result = {}
+
+        for container_id in self._failed_task_container_ids(application_id):
+            error = _parse_task_syslog_records(
+                self._task_syslog_records(
+                    application_id, container_id, step_type))
+
+            if not error.get('hadoop_error'):
+                # not sure if this ever happens, since we already know
+                # which containers failed
+                continue
+
+            error['container_id'] = container_id
+
+            # fix weird munging of java stacktrace
+            error['hadoop_error']['message'] = _fix_java_stack_trace(
+                error['hadoop_error']['message'])
+
+            task_error = _parse_task_stderr(
+                self._task_stderr_lines(
+                    application_id, container_id, step_type))
+
+            if task_error:
+                task_error['message'] = _fix_traceback(task_error['message'])
+                error['task_error'] = task_error
+
+            result.setdefault('errors', []).append(error)
+
+            # if partial is true, bail out when we find the first task error
+            if task_error and partial:
+                result['partial'] = True
+                return result
+
+        return result
+
+    def _failed_task_container_ids(self, application_id):
+        """Stream container IDs of failed tasks, in reverse order."""
+        container_id_prefix = 'container' + application_id[11:]
+
+        log_filter = self._make_log_filter(
+            'yarn-yarn-nodemanager',
+            {'jsonPayload.class': _CONTAINER_EXECUTOR_CLASS_NAME})
+
+        log.info('Scanning node manager logs for IDs of failed tasks...')
+
+        # it doesn't seem to work to do self.logging_client.logger();
+        # there's some RPC dispute about whether the log name should
+        # be qualified by project name or not
+        entries = self.logging_client.list_entries(
+            filter_=log_filter, order_by=google.cloud.logging.DESCENDING)
+
+        for entry in entries:
+            message = entry.payload.get('message')
+            if not message:
+                continue
+
+            m = _CONTAINER_EXIT_RE.match(message)
+            if not m:
+                continue
+
+            returncode = int(m.group('returncode'))
+            if not returncode:
+                continue
+
+            container_id = m.group('container_id')
+            # matches some other step
+            if not container_id.startswith(container_id_prefix):
+                continue
+
+            log.debug('  %s' % container_id)
+            yield container_id
+
+    def _task_stderr_lines(self, application_id, container_id, step_type):
+        """Yield lines from a specific stderr log."""
+        log_filter = self._make_log_filter(
+            'yarn-userlogs', {
+                'jsonPayload.application': application_id,
+                'jsonPayload.container': container_id,
+                # TODO: pick based on step_type
+                'jsonPayload.container_logname': 'stderr',
+            })
+
+        log.info('    reading stderr log...')
+        entries = self.logging_client.list_entries(filter_=log_filter)
+
+        # use log4j parsing to handle tab -> newline conversion
+        for record in _log_entries_to_log4j(entries):
+            for line in record['message'].split('\n'):
+                yield line
+
+    def _task_syslog_records(self, application_id, container_id, step_type):
+        """Yield log4j records from a specific syslog.
+        """
+        log_filter = self._make_log_filter(
+            'yarn-userlogs', {
+                'jsonPayload.application': application_id,
+                'jsonPayload.container': container_id,
+                # TODO: pick based on step_type
+                'jsonPayload.container_logname': 'syslog',
+            })
+
+        log.info('    reading syslog...')
+        entries = self.logging_client.list_entries(filter_=log_filter)
+
+        return _log_entries_to_log4j(entries)
+
+    # misc
+
+    def _make_log_filter(self, log_name=None, extra_values=None):
+        # we only want logs from this project, cluster, and region
+        d = {}
+
+        d['resource.labels.cluster_name'] = self._cluster_id
+        d['resource.labels.project_id'] = self._project_id
+        d['resource.labels.region'] = self._region()
+        d['resource.type'] = 'cloud_dataproc_cluster'
+
+        if log_name:
+            d['logName'] = 'projects/%s/logs/%s' % (
+                self._project_id, log_name)
+
+        if extra_values:
+            d.update(extra_values)
+
+        return _log_filter_str(d)
+
     def counters(self):
-        # TODO - mtai @ davidmarin - Counters are currently always empty as we
-        # are not processing task logs
         return [_pick_counters(log_interpretation)
                 for log_interpretation in self._log_interpretations]
 
@@ -792,6 +1082,13 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
         self._hadoop_version = map_version(
             self._image_version, _DATAPROC_IMAGE_TO_HADOOP_VERSION)
 
+    def _bootstrap_pre_commands(self):
+        # don't run the bootstrap script in / (see #1601)
+        return [
+            'mkdir /tmp/mrjob',
+            'cd /tmp/mrjob',
+        ]
+
     ### Bootstrapping ###
 
     def _bootstrap_python(self):
@@ -819,23 +1116,32 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             gcs_init_script_uris.append(
                 self._upload_mgr.uri(self._master_bootstrap_script_path))
 
-            # always add idle termination script
-            # add it last, so that we don't count bootstrapping as idle time
-            gcs_init_script_uris.append(
-                self._upload_mgr.uri(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
-
-        # NOTE - Cluster initialization_actions can only take scripts with no
-        # script args, so the auto-term script receives 'mrjob-max-secs-idle'
-        # via metadata instead of as an arg
         cluster_metadata = dict()
         cluster_metadata['mrjob-version'] = mrjob.__version__
+
+        # TODO: remove mrjob-max-secs-idle once lifecycle_config is visible
+        # through the gcloud utility and the Google Cloud Console
         cluster_metadata['mrjob-max-secs-idle'] = str(int(
             self._opts['max_mins_idle'] * 60))
 
         gce_cluster_config = dict(
-            service_account_scopes=_DEFAULT_GCE_SERVICE_ACCOUNT_SCOPES,
-            metadata=cluster_metadata
+            metadata=cluster_metadata,
+            service_account_scopes=self._opts['service_account_scopes'],
         )
+
+        if self._opts['network']:
+            gce_cluster_config['network_uri'] = self._opts['network']
+
+        if self._opts['subnet']:
+            gce_cluster_config['subnetwork_uri'] = self._opts['subnet']
+
+        if self._opts['service_account']:
+            gce_cluster_config['service_account'] = (
+                self._opts['service_account'])
+
+        if self._opts['service_account_scopes']:
+            gce_cluster_config['service_account_scopes'] = (
+                self._opts['service_account_scopes'])
 
         if self._opts['zone']:
             gce_cluster_config['zone_uri'] = _gcp_zone_uri(
@@ -854,6 +1160,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             project=self._project_id, zone=self._opts['zone'],
             count=1, instance_type=self._opts['master_instance_type'],
         )
+        if self._opts['master_instance_config']:
+            master_conf.update(self._opts['master_instance_config'])
 
         # Compute + storage
         worker_conf = _gcp_instance_group_config(
@@ -861,6 +1169,8 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             count=self._opts['num_core_instances'],
             instance_type=self._opts['core_instance_type']
         )
+        if self._opts['core_instance_config']:
+            worker_conf.update(self._opts['core_instance_config'])
 
         # Compute ONLY
         secondary_worker_conf = _gcp_instance_group_config(
@@ -869,16 +1179,35 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             instance_type=self._opts['task_instance_type'],
             is_preemptible=True
         )
+        if self._opts['task_instance_config']:
+            secondary_worker_conf.update(self._opts['task_instance_config'])
 
         cluster_config['master_config'] = master_conf
         cluster_config['worker_config'] = worker_conf
-        if self._opts['num_task_instances']:
+        if secondary_worker_conf.get('num_instances'):
             cluster_config['secondary_worker_config'] = secondary_worker_conf
+
+        cluster_config['lifecycle_config'] = dict(
+            idle_delete_ttl=dict(
+                seconds=int(self._opts['max_mins_idle'] * 60)))
+
+        software_config = {}
+
+        if self._opts['cluster_properties']:
+            software_config['properties'] = _values_to_text(
+                self._opts['cluster_properties'])
 
         # See - https://cloud.google.com/dataproc/dataproc-versions
         if self._opts['image_version']:
-            cluster_config['software_config'] = dict(
-                image_version=self._opts['image_version'])
+            software_config['image_version'] = self._opts['image_version']
+
+        if software_config:
+            cluster_config['software_config'] = software_config
+
+        # in Python 2, dict keys loaded from JSON will be unicode, which
+        # the Google protobuf objects don't like
+        if PY2:
+            cluster_config = _clean_json_dict_keys(cluster_config)
 
         kwargs = dict(project_id=self._project_id,
                       cluster_name=self._cluster_id,
@@ -933,18 +1262,24 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             **self._project_id_and_region()
         )
 
-    def _submit_hadoop_job(self, step_name, hadoop_job):
+    def _submit_job(self, step_name, job_kwarg):
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs/submit  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#HadoopJob  # noqa
         # https://cloud.google.com/dataproc/reference/rest/v1/projects.regions.jobs#JobReference  # noqa
-        return self.job_client.submit_job(
+
+        submit_job_kwargs = dict(
             job=dict(
                 reference=dict(project_id=self._project_id, job_id=step_name),
                 placement=dict(cluster_name=self._cluster_id),
-                hadoop_job=hadoop_job,
+                **job_kwarg
             ),
             **self._project_id_and_region()
         )
+
+        log.debug('  submit_job(%s)' % ', '.join(
+            '%s=%r' % (k, v) for k, v in sorted(submit_job_kwargs.items())))
+
+        return self.job_client.submit_job(**submit_job_kwargs)
 
     def _project_id_and_region(self):
         return dict(
@@ -958,3 +1293,149 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner):
             #('gs://*', 'gsutil cp'),
             ('*://*', 'hadoop fs -copyToLocal'),
         ]
+
+    ### SSH hooks ###
+
+    def _job_tracker_host(self):
+        return '%s-m' % self._cluster_id
+
+    def _ssh_tunnel_config(self):
+        return _SSH_TUNNEL_CONFIG
+
+    def _launch_ssh_proc(self, args):
+        ssh_proc = super(DataprocJobRunner, self)._launch_ssh_proc(args)
+
+        # enter an empty passphrase if creating a key for the first time
+        ssh_proc.stdin.write(b'\n\n')
+
+        return ssh_proc
+
+    def _ssh_launch_wait_secs(self):
+        """Wait 20 seconds because gcloud has to update project metadata
+        (unless we were going to check the cluster sooner anyway)."""
+        return min(20.0, self._opts['check_cluster_every'])
+
+    def _ssh_tunnel_args(self, bind_port):
+        if not self._opts['gcloud_bin']:
+            self._give_up_on_ssh_tunnel = True
+            return None
+
+        if not self._cluster_id:
+            return
+
+        cluster = self._get_cluster(self._cluster_id)
+        zone = cluster.config.gce_cluster_config.zone_uri.split('/')[-1]
+
+        return self._opts['gcloud_bin'] + [
+            'compute', 'ssh',
+            '--zone', zone,
+            self._job_tracker_host(),
+            '--',
+        ] + self._ssh_tunnel_opts(bind_port)
+
+
+def _log_filter_str(name_to_value):
+    """return a map from name to value into a log filter query that requires
+    each name to equal the given value."""
+    return ' AND '.join(
+        '%s = %s' % (name, _quote_filter_value(value))
+        for name, value in sorted(name_to_value.items()))
+
+
+def _quote_filter_value(s):
+    """Put a string in double quotes, escaping double quote characters"""
+    return '"%s"' % s.replace('"', r'\"')
+
+
+def _log_entries_to_log4j(entries):
+    """Convert log entries from a single log file to log4j format, tracking
+    line number.
+
+    See :py:meth:`mrjob.logs.log4j._parse_hadoop_log4j_records`
+    for format.
+    """
+    line_num = 0
+
+    for entry in entries:
+        message = entry.payload.get('message') or ''
+
+        # NOTE: currently, google.cloud.logging seems strip newlines :(
+        num_lines = len(message.split('\n'))
+
+        yield dict(
+            caller_location='',
+            level=(entry.severity or ''),
+            logger=(entry.payload.get('class') or ''),
+            message=message,
+            num_lines=num_lines,
+            start_line=line_num,
+            thread='',
+            timestamp=(entry.timestamp or ''),
+        )
+
+        line_num += num_lines
+
+
+def _fix_java_stack_trace(s):
+    # this is what we get from `gcloud logging`
+    if '\n' in s:
+        return s
+    else:
+        return s.replace('\t', '\n\t')
+
+
+def _fix_traceback(s):
+    lines = s.split('\n')
+
+    # strip log4j warnings (which do have proper linebreaks)
+    lines = [
+        line for line in lines
+        if line and not _STDERR_LOG4J_WARNING.match(line)
+    ]
+
+    s = '\n'.join(lines)
+
+    if '\n' in s:
+        return s  # traceback does have newlines
+
+    s = s.replace('  File', '\n  File')
+    s = s.replace('    ', '\n    ')
+    s = _TRACEBACK_EXCEPTION_RE.sub(lambda m: '\n' + m.group(0), s)
+
+    return s
+
+
+def _clean_json_dict_keys(x):
+    """Cast any dictionary keys in the given JSON object to str.
+    We can assume that x isn't a recursive data structure, and that
+    this is only called in Python 2."""
+    if isinstance(x, dict):
+        return {str(k): _clean_json_dict_keys(v) for k, v in x.items()}
+    elif isinstance(x, list):
+        return [_clean_json_dict_keys(item) for item in x]
+    else:
+        return x
+
+
+def _values_to_text(d):
+    """Return a dictionary with the same keys as *d*, but where the
+    non-string, non-bytes values have been JSON-encoded.
+
+    Used to encode cluster properties.
+    """
+    result = {}
+
+    for k, v in d.items():
+        if not isinstance(v, (string_types, bytes)):
+            v = json.dumps(v)
+
+        result[k] = v
+
+    return result
+
+
+def _fully_qualify_scope_uri(uri):
+    if is_uri(uri):
+        return uri
+    else:
+        return 'https://www.googleapis.com/auth/%s' % uri

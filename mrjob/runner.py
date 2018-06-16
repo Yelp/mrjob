@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 # Copyright 2009-2017 Yelp and Contributors
+# Copyright 2018 Yelp and Google, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -1207,3 +1208,28 @@ def _fix_env(env):
             return s
 
     return dict((_to_str(k), _to_str(v)) for k, v in env.items())
+
+
+def _blank_out_conflicting_opts(opt_list, opt_names, conflicting_opts=None):
+    """Utility for :py:meth:`MRJobRunner._combine_opts()`: if multiple
+    configs specify conflicting opts, blank them out in all but the
+    last config (so, for example, the command line beats the config file).
+
+    This returns a copy of *opt_list*
+    """
+    conflicting_opts = set(conflicting_opts or ()) | set(opt_names)
+
+    # copy opt_list so we can modify it
+    opt_list = [dict(opts) for opts in opt_list]
+
+    # blank out region/zone before the last config where they are set
+    blank_out = False
+    for opts in reversed(opt_list):
+        if blank_out:
+            for opt_name in opt_names:
+                opts[opt_name] = None
+        elif any(opts.get(opt_name) is not None
+                 for opt_name in conflicting_opts):
+            blank_out = True
+
+    return opt_list

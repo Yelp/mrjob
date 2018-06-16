@@ -20,18 +20,30 @@ import os.path
 from contextlib import contextmanager
 from copy import deepcopy
 from io import BytesIO
+from subprocess import PIPE
+from unittest import TestCase
+
+from google.api_core.exceptions import InvalidArgument
+from google.api_core.exceptions import NotFound
+from google.api_core.exceptions import RequestRangeNotSatisfiable
 
 import mrjob
 import mrjob.dataproc
+import mrjob.fs.gcs
 from mrjob.dataproc import DataprocException
 from mrjob.dataproc import DataprocJobRunner
+from mrjob.dataproc import _CONTAINER_EXECUTOR_CLASS_NAME
 from mrjob.dataproc import _DEFAULT_CLOUD_TMP_DIR_OBJECT_TTL_DAYS
 from mrjob.dataproc import _DEFAULT_GCE_REGION
 from mrjob.dataproc import _DEFAULT_IMAGE_VERSION
-from mrjob.dataproc import _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH
+from mrjob.dataproc import _HADOOP_STREAMING_JAR_URI
 from mrjob.dataproc import _cluster_state_name
+from mrjob.dataproc import _fix_java_stack_trace
+from mrjob.dataproc import _fix_traceback
+from mrjob.examples.mr_boom import MRBoom
 from mrjob.fs.gcs import GCSFilesystem
 from mrjob.fs.gcs import parse_gcs_uri
+from mrjob.logs.errors import _pick_error
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
 from mrjob.step import StepFailedException
@@ -40,10 +52,16 @@ from mrjob.util import log_to_stream
 from mrjob.util import save_current_environment
 
 from tests.mock_google import MockGoogleTestCase
+from tests.mock_google.dataproc import _DEFAULT_SCOPES
+from tests.mock_google.dataproc import _MANDATORY_SCOPES
+from tests.mock_google.storage import MockGoogleStorageBlob
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
+from tests.mr_jar_and_streaming import MRJarAndStreaming
+from tests.mr_just_a_jar import MRJustAJar
 from tests.mr_no_mapper import MRNoMapper
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
+from tests.py2 import call
 from tests.py2 import mock
 from tests.py2 import patch
 from tests.quiet import logger_disabled
@@ -63,6 +81,64 @@ DEFAULT_GCE_INSTANCE = 'n1-standard-1'
 HIGHMEM_GCE_INSTANCE = 'n1-highmem-2'
 HIGHCPU_GCE_INSTANCE = 'n1-highcpu-2'
 MICRO_GCE_INSTANCE = 'f1-micro'
+
+DRIVER_OUTPUT_URI = (
+    'gs://mock-bucket/google-cloud-dataproc-metainfo/mock-cluster-id'
+    '/jobs/mock-job-name/driveroutput')
+
+APPLICATION_ID = 'application_1525195653111_0001'
+CONTAINER_ID_1 = 'container_1525195653111_0001_0001_01_000001'
+CONTAINER_ID_2 = 'container_1525195653111_0001_0002_02_000002'
+
+STACK_TRACE = (
+    'Diagnostics report from attempt_1525195653111_0001_m_000000_3:'
+    ' Error: java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+    ' subprocess failed with code 1\n'
+    '\tat org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+    '(PipeMapRed.java:322)\n'
+    '\tat org.apache.hadoop.mapred.YarnChild.main(YarnChild.java:158)'
+)
+
+# newlines don't get logged for some reason
+LOGGING_STACK_TRACE = STACK_TRACE.replace('\n', '')
+
+# sample traceback from MRBoom
+TRACEBACK = (
+    'Traceback (most recent call last):\n'
+    '  File "mr_boom.py", line 23, in <module>\n'
+    '    MRBoom.run()\n'
+    '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+    ', line 433, in run\n'
+    '    mr_job.execute()\n'
+    '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+    ', line 442, in execute\n'
+    '    self.run_mapper(self.options.step_num)\n'
+    '  File "/usr/lib/python2.7/dist-packages/mrjob/job.py"'
+    ', line 522, in run_mapper\n'
+    '    for out_key, out_value in mapper_init() or ():\n'
+    '  File "mr_boom.py", line 20, in mapper_init\n'
+    '    raise Exception(\'BOOM\')\n'
+    'Exception: BOOM')
+
+LOGGING_TRACEBACK = TRACEBACK.replace('\n', '')
+
+# these very occasionally appear in the stderr log
+LOG4J_WARNINGS = (
+    '\n'
+    'No appenders could be found for logger'
+    ' (org.apache.hadoop.metrics2.impl.MetricsSystemImpl).'
+    'Please initialize the log4j system properly.\n'
+    'See http://logging.apache.org/log4j/1.2/faq.html#noconfig'
+    ' for more info.'
+)
+
+SPLIT_URI = ('gs://mrjob-us-west1-aaaaaaaaaaaaaaaa/tmp/mr_boom'
+             '.davidmarin.20180503.232439.647629/files/LICENSE.txt')
+SPLIT_MESSAGE = (
+    'Processing split: %s:0+28' % SPLIT_URI)
+SPLIT = dict(path=SPLIT_URI, start_line=0, num_lines=28)
+
+LOGGING_CLUSTER_NAME = 'mock-cluster-with-logging'
 
 
 class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
@@ -225,13 +301,13 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
         self._test_cloud_tmp_cleanup('CLOUD_TMP', 0)
 
     def test_cleanup_local(self):
-        self._test_cloud_tmp_cleanup('LOCAL_TMP', 5)
+        self._test_cloud_tmp_cleanup('LOCAL_TMP', 4)
 
     def test_cleanup_logs(self):
-        self._test_cloud_tmp_cleanup('LOGS', 5)
+        self._test_cloud_tmp_cleanup('LOGS', 4)
 
     def test_cleanup_none(self):
-        self._test_cloud_tmp_cleanup('NONE', 5)
+        self._test_cloud_tmp_cleanup('NONE', 4)
 
     def test_cleanup_combine(self):
         self._test_cloud_tmp_cleanup('LOGS,CLOUD_TMP', 0)
@@ -365,6 +441,108 @@ class AvailabilityZoneConfigTestCase(MockGoogleTestCase):
                           cluster.config.master_config.machine_type_uri)
             self.assertIn(self.ZONE,
                           cluster.config.worker_config.machine_type_uri)
+
+
+class GCEClusterConfigTestCase(MockGoogleTestCase):
+    # test service_account, service_account_scopes
+
+    def _get_gce_cluster_config(self, *args):
+        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            return runner._get_cluster(
+                runner._cluster_id).config.gce_cluster_config
+
+    def test_default(self):
+        gcc = self._get_gce_cluster_config()
+
+        self.assertFalse(gcc.service_account)
+        self.assertEqual(
+            set(gcc.service_account_scopes),
+            _MANDATORY_SCOPES | _DEFAULT_SCOPES
+        )
+
+    def test_blank_means_default(self):
+        gcc = self._get_gce_cluster_config('--service-account-scopes', '')
+
+        self.assertEqual(
+            set(gcc.service_account_scopes),
+            _MANDATORY_SCOPES | _DEFAULT_SCOPES
+        )
+
+    def test_service_account(self):
+        account = '12345678901-compute@developer.gserviceaccount.com'
+
+        gcc = self._get_gce_cluster_config(
+            '--service-account', account)
+
+        self.assertEqual(gcc.service_account, account)
+
+    def test_service_account_scopes(self):
+        scope1 = 'https://www.googleapis.com/auth/scope1'
+        scope2 = 'https://www.googleapis.com/auth/scope2'
+
+        gcc = self._get_gce_cluster_config(
+            '--service-account-scopes', '%s,%s' % (scope1, scope2))
+
+        self.assertEqual(
+            set(gcc.service_account_scopes),
+            _MANDATORY_SCOPES | {scope1, scope2})
+
+    def test_set_scope_by_name(self):
+        scope_name = 'test.name'
+        scope_uri = 'https://www.googleapis.com/auth/test.name'
+
+        gcc = self._get_gce_cluster_config(
+            '--service-account-scopes', scope_name)
+
+        self.assertEqual(
+            set(gcc.service_account_scopes),
+            _MANDATORY_SCOPES | {scope_uri})
+
+
+class ClusterPropertiesTestCase(MockGoogleTestCase):
+
+    def _get_cluster_properties(self, *args):
+        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            return runner._get_cluster(
+                runner._cluster_id).config.software_config.properties
+
+    def test_default(self):
+        props = self._get_cluster_properties()
+
+        self.assertNotIn('foo:bar', props)
+
+    def test_command_line(self):
+        props = self._get_cluster_properties(
+            '--cluster-property',
+            'dataproc:dataproc.allow.zero.workers=true',
+            '--cluster-property',
+            'mapred:mapreduce.map.memory.mb=1024',
+        )
+
+        self.assertEqual(props['dataproc:dataproc.allow.zero.workers'], 'true')
+        self.assertEqual(props['mapred:mapreduce.map.memory.mb'], '1024')
+
+    def test_convert_conf_values_to_strings(self):
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    cluster_properties:\n'
+            b"      'dataproc:dataproc.allow.zero.workers': true\n"
+            b"      'hdfs:dfs.namenode.handler.count': 40\n")
+
+        self.mrjob_conf_patcher.stop()
+        props = self._get_cluster_properties('-c', conf_path)
+        self.mrjob_conf_patcher.start()
+
+        self.assertEqual(props['dataproc:dataproc.allow.zero.workers'], 'true')
+        self.assertEqual(props['hdfs:dfs.namenode.handler.count'], '40')
 
 
 class ProjectIDTestCase(MockGoogleTestCase):
@@ -547,7 +725,7 @@ class TmpBucketTestCase(MockGoogleTestCase):
         self.assertEqual(runner._region(), US_EAST_GCE_REGION)
 
 
-class GCEInstanceGroupTestCase(MockGoogleTestCase):
+class InstanceTypeAndNumberTestCase(MockGoogleTestCase):
 
     maxDiff = None
 
@@ -573,7 +751,6 @@ class GCEInstanceGroupTestCase(MockGoogleTestCase):
         fake_bootstrap_script = 'gs://fake-bucket/fake-script.sh'
         runner._master_bootstrap_script_path = fake_bootstrap_script
         runner._upload_mgr.add(fake_bootstrap_script)
-        runner._upload_mgr.add(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
 
         cluster_id = runner._launch_cluster()
 
@@ -731,6 +908,85 @@ class GCEInstanceGroupTestCase(MockGoogleTestCase):
             task=(20, HIGHCPU_GCE_INSTANCE))
 
 
+class InstanceConfigTestCase(MockGoogleTestCase):
+    # test the *_instance_config options
+
+    def _get_cluster_config(self, *args):
+        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            return runner._get_cluster(runner._cluster_id).config
+
+    def test_default(self):
+        conf = self._get_cluster_config()
+
+        self.assertEqual(
+            conf.master_config.disk_config.boot_disk_size_gb, 500)
+        self.assertEqual(
+            conf.worker_config.disk_config.boot_disk_size_gb, 500)
+
+    def test_set_disk_config(self):
+        conf = self._get_cluster_config(
+            '--master-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 100}}',
+            '--core-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 200, "num_local_ssds": 2}}')
+
+        self.assertEqual(
+            conf.master_config.disk_config.boot_disk_size_gb, 100)
+        self.assertFalse(
+            conf.master_config.disk_config.num_local_ssds)
+        self.assertEqual(
+            conf.worker_config.disk_config.boot_disk_size_gb, 200)
+        self.assertEqual(
+            conf.worker_config.disk_config.num_local_ssds, 2)
+
+    def test_can_override_num_instances(self):
+        conf = self._get_cluster_config(
+            '--core-instance-config', '{"num_instances": 10}')
+
+        self.assertEqual(
+            conf.worker_config.num_instances, 10)
+
+    def test_set_task_config(self):
+        conf = self._get_cluster_config(
+            '--num-task-instances', '3',
+            '--task-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 300}}')
+
+        self.assertEqual(
+            conf.secondary_worker_config.disk_config.boot_disk_size_gb, 300)
+
+    def test_dont_set_task_config_if_no_task_instances(self):
+        conf = self._get_cluster_config(
+            '--task-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 300}}')
+
+        self.assertFalse(
+            conf.secondary_worker_config.disk_config.boot_disk_size_gb)
+
+    def test_can_set_num_instances_through_task_config(self):
+        conf = self._get_cluster_config(
+            '--task-instance-config',
+            '{"disk_config": {"boot_disk_size_gb": 300}, "num_instances": 3}')
+
+        self.assertEqual(
+            conf.secondary_worker_config.num_instances, 3)
+        self.assertEqual(
+            conf.secondary_worker_config.disk_config.boot_disk_size_gb, 300)
+
+    def test_preemtible_task_instances(self):
+        conf = self._get_cluster_config(
+            '--num-task-instances', '3',
+            '--task-instance-config',
+            '{"is_preemptible": true}')
+
+        self.assertTrue(
+            conf.secondary_worker_config.is_preemptible)
+
+
 class MasterBootstrapScriptTestCase(MockGoogleTestCase):
 
     def test_usr_bin_env(self):
@@ -800,6 +1056,11 @@ class MasterBootstrapScriptTestCase(MockGoogleTestCase):
         # check scripts get run
 
         # bootstrap
+
+        # see #1601
+        self.assertIn('mkdir /tmp/mrjob', lines)
+        self.assertIn('cd /tmp/mrjob', lines)
+
         self.assertIn('  ' + PYTHON_BIN + ' $__mrjob_PWD/bar.py', lines)
         self.assertIn('  $__mrjob_PWD/ohnoes.sh', lines)
 
@@ -914,50 +1175,31 @@ class DataprocNoMapperTestCase(MockGoogleTestCase):
 
 class MaxMinsIdleTestCase(MockGoogleTestCase):
 
-    def assertRanIdleTimeoutScriptWith(self, runner, expected_metadata):
-        cluster_metadata, last_init_exec = (
-            self._cluster_metadata_and_last_init_exec(runner))
-
-        # Verify args
-        for key in expected_metadata.keys():
-            self.assertEqual(cluster_metadata[key], expected_metadata[key])
-
-        expected_uri = runner._upload_mgr.uri(
-            _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH)
-        self.assertEqual(last_init_exec, expected_uri)
-
-    def _cluster_metadata_and_last_init_exec(self, runner):
-        cluster = runner._get_cluster(runner.get_cluster_id())
-
-        # Verify last arg
-        last_init_action = cluster.config.initialization_actions[-1]
-        last_init_exec = last_init_action.executable_file
-
-        cluster_metadata = cluster.config.gce_cluster_config.metadata
-        return cluster_metadata, last_init_exec
-
     def test_default(self):
         mr_job = MRWordCount(['-r', 'dataproc'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, {
-                'mrjob-max-secs-idle': '600',
-            })
+
+            cluster = runner._get_cluster(runner._cluster_id)
+
+            self.assertEqual(
+                cluster.config.lifecycle_config.idle_delete_ttl.seconds,
+                600)
 
     def test_persistent_cluster(self):
-        mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '0.6'])
+        mr_job = MRWordCount(['-r', 'dataproc', '--max-mins-idle', '30'])
         mr_job.sandbox()
 
         with mr_job.make_runner() as runner:
             runner.run()
-            self.assertRanIdleTimeoutScriptWith(runner, {
-                'mrjob-max-secs-idle': '36',
-            })
 
-    def test_bootstrap_script_is_actually_installed(self):
-        self.assertTrue(os.path.exists(_MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH))
+            cluster = runner._get_cluster(runner._cluster_id)
+
+            self.assertEqual(
+                cluster.config.lifecycle_config.idle_delete_ttl.seconds,
+                1800)
 
 
 class TestCatFallback(MockGoogleTestCase):
@@ -1093,3 +1335,981 @@ class BootstrapPythonTestCase(MockGoogleTestCase):
             self.assertEqual(
                 runner._bootstrap,
                 self.EXPECTED_BOOTSTRAP + [['true']])
+
+
+class GetNewDriverOutputLinesTestCase(MockGoogleTestCase):
+    # test line parsing logic
+
+    URI = ('gs://mock-bucket/google-cloud-dataproc-metainfo/mock-cluster-id'
+           '/jobs/mock-job-name/driveroutput')
+
+    def setUp(self):
+        super(GetNewDriverOutputLinesTestCase, self).setUp()
+        self.runner = DataprocJobRunner()
+        self.fs = self.runner.fs
+
+    def append_data(self, uri, new_data):
+        old_data = b''.join(self.fs.cat(uri))
+        self.put_gcs_multi({uri: old_data + new_data})
+
+    def get_new_lines(self):
+        return self.runner._get_new_driver_output_lines(DRIVER_OUTPUT_URI)
+
+    def test_no_log_files(self):
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_empty_log_file(self):
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
+        self.append_data(log_uri, b'')
+
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_return_new_lines_as_available(self):
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'log line\nanother log line\n')
+
+        self.assertEqual(self.get_new_lines(),
+                         ['log line\n', 'another log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'third log line\n')
+
+        self.assertEqual(self.get_new_lines(), ['third log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_partial_lines(self):
+        # probably lines are going to be added atomically, but just in case
+
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'log line\nanother lo')
+
+        self.assertEqual(self.get_new_lines(), ['log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'g line\na thir')
+
+        self.assertEqual(self.get_new_lines(), ['another log line\n'])
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log_uri, b'd log line\n')
+
+    def test_iterating_through_log_files(self):
+        log0_uri = DRIVER_OUTPUT_URI + '.000000000'
+        log1_uri = DRIVER_OUTPUT_URI + '.000000001'
+
+        self.assertEqual(self.get_new_lines(), [])
+
+        self.append_data(log0_uri, b'log line\n')
+
+        self.assertEqual(self.get_new_lines(), ['log line\n'])
+
+        self.append_data(log0_uri, b'another log line\n')
+        self.append_data(log1_uri, b'a third log line\n')
+
+        self.assertEqual(self.get_new_lines(),
+                         ['another log line\n', 'a third log line\n'])
+
+        # this shouldn't actually happen
+        self.append_data(log0_uri, b'Hey where did THIS come from???\n')
+
+        # because we've moved beyond log0
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_not_found(self):
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
+        self.append_data(log_uri, b'log line\nanother log line\n')
+
+        # in some cases the blob for the log file appears but
+        # raises NotFound when read from, maybe an eventual consistency
+        # race condition?
+        self.start(patch('tests.mock_google.storage.MockGoogleStorageBlob'
+                         '.download_as_string',
+                         side_effect=NotFound('race condition')))
+
+        self.assertEqual(self.get_new_lines(), [])
+
+    def test_request_range_not_satisfiable(self):
+        log_uri = DRIVER_OUTPUT_URI + '.000000000'
+        self.append_data(log_uri, b'')
+
+        # this is normal and happens when we request a range starting
+        # at or after the end of the file. Our mock Blob object imitates
+        # this behavior, so this test should be redundant with
+        # test_empty_log_file(), above.
+        self.start(patch('tests.mock_google.storage.MockGoogleStorageBlob'
+                         '.download_as_string',
+                         side_effect=RequestRangeNotSatisfiable('too far')))
+
+        self.assertEqual(self.get_new_lines(), [])
+
+
+class UpdateStepInterpretationTestCase(MockGoogleTestCase):
+    # make sure we parse status messages, counters, etc. properly
+
+    URI = ('gs://mock-bucket/google-cloud-dataproc-metainfo/mock-cluster-id'
+           '/jobs/mock-job-name/driveroutput')
+
+    def setUp(self):
+        super(UpdateStepInterpretationTestCase, self).setUp()
+        self.runner = DataprocJobRunner()
+        self.get_lines = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._get_new_driver_output_lines',
+            return_value=[]))
+
+        self.step_interpretation = {}
+
+    def update_step_interpretation(self):
+        self.runner._update_step_interpretation(
+            self.step_interpretation, DRIVER_OUTPUT_URI)
+
+    def test_empty(self):
+        self.update_step_interpretation()
+
+        self.assertEqual(self.step_interpretation, {})
+
+    def test_progress(self):
+        self.get_lines.side_effect = [
+            ['18/04/17 22:03:40 INFO impl.YarnClientImpl: Submitted'
+             ' application application_1524002511355_0001\n'],
+            ['18/04/17 22:03:54 INFO mapreduce.Job:  map 0% reduce 0%\n'],
+            ['18/04/17 22:05:10 INFO mapreduce.Job:  map 52% reduce 0%\n',
+             '18/04/17 22:06:15 INFO mapreduce.Job:  map 100% reduce 0%\n'],
+            ['18/04/17 22:07:32 INFO mapreduce.Job:  map 100% reduce 100%\n'],
+        ]
+
+        self.update_step_interpretation()
+        self.assertEqual(self.step_interpretation['application_id'],
+                         'application_1524002511355_0001')
+
+        self.update_step_interpretation()
+        self.assertEqual(self.step_interpretation['progress'],
+                         dict(map=0, reduce=0,
+                              message=' map 0% reduce 0%'))
+
+        # make sure we didn't overwrite application_id
+        self.assertEqual(self.step_interpretation['application_id'],
+                         'application_1524002511355_0001')
+
+        self.update_step_interpretation()
+        self.assertEqual(self.step_interpretation['progress'],
+                         dict(map=100, reduce=0,
+                              message=' map 100% reduce 0%'))
+
+        self.update_step_interpretation()
+        self.assertEqual(self.step_interpretation['progress'],
+                         dict(map=100, reduce=100,
+                              message=' map 100% reduce 100%'))
+
+    def test_counters(self):
+        self.get_lines.return_value = [
+            '18/04/17 22:07:34 INFO mapreduce.Job: Counters: 3\n',
+            '\tFile System Counters\n',
+            '\t\tFILE: Number of bytes read=819\n',
+            '\t\tFILE: Number of bytes written=3698122\n',
+            '\tMap-Reduce Framework\n',
+            '\t\tMap input records=13\n',
+        ]
+
+        self.update_step_interpretation()
+        self.assertEqual(
+            self.step_interpretation['counters'],
+            {
+                'File System Counters': {
+                    'FILE: Number of bytes read': 819,
+                    'FILE: Number of bytes written': 3698122,
+                },
+                'Map-Reduce Framework': {
+                    'Map input records': 13,
+                },
+            },
+        )
+
+
+class ProgressAndCounterLoggingTestCase(MockGoogleTestCase):
+
+    def setUp(self):
+        super(ProgressAndCounterLoggingTestCase, self).setUp()
+
+        self.get_lines = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._get_new_driver_output_lines',
+            return_value=[]))
+
+        self.log = self.start(patch('mrjob.dataproc.log'))
+        self.start(patch('mrjob.logs.mixin.log', self.log))
+
+    def test_log_messages(self):
+        self.get_lines.return_value = [
+            '18/04/17 22:06:15 INFO mapreduce.Job:  map 100% reduce 0%\n',
+            '18/04/17 22:07:34 INFO mapreduce.Job: Counters: 1\n',
+            '\tFile System Counters\n',
+            '\t\tFILE: Number of bytes read=819\n',
+        ]
+
+        mr_job = MRWordCount(['-r', 'dataproc'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            runner.run()
+
+        self.assertIn(call('  map 100% reduce 0%'),
+                      self.log.info.call_args_list)
+
+        self.assertIn(
+            call(
+                'Counters: 1\n\tFile System Counters\n\t\tFILE:'
+                ' Number of bytes read=819'),
+            self.log.info.call_args_list)
+
+
+class SetUpSSHTunnelTestCase(MockGoogleTestCase):
+
+    def setUp(self, *args):
+        super(SetUpSSHTunnelTestCase, self).setUp()
+
+        self.mock_Popen = self.start(patch('mrjob.cloud.Popen'))
+        # simulate successfully binding port
+        self.mock_Popen.return_value.returncode = None
+        self.mock_Popen.return_value.pid = 99999
+
+        self.start(patch('os.kill'))  # don't clean up fake SSH proc
+
+        self.start(patch('time.sleep'))
+
+    def test_default(self):
+        job = MRWordCount(['-r', 'dataproc'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertFalse(self.mock_Popen.called)
+
+    def test_default_ssh_tunnel(self):
+        job = MRWordCount(['-r', 'dataproc', '--ssh-tunnel'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        args_tuple, kwargs = self.mock_Popen.call_args
+        args = args_tuple[0]
+
+        self.assertEqual(kwargs, dict(stdin=PIPE, stdout=PIPE, stderr=PIPE))
+
+        self.assertEqual(args[:3], ['gcloud', 'compute', 'ssh'])
+
+        self.assertIn('-L', args)
+        self.assertIn('-N', args)
+        self.assertIn('-n', args)
+        self.assertIn('-q', args)
+
+        self.assertNotIn('-g', args)
+        self.assertNotIn('-4', args)
+
+        self.mock_Popen.stdin.called_once_with(b'\n\n')
+
+    def test_open_ssh_tunnel(self):
+        job = MRWordCount(
+            ['-r', 'dataproc', '--ssh-tunnel', '--ssh-tunnel-is-open'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        args = self.mock_Popen.call_args[0][0]
+
+        self.assertIn('-L', args)
+        self.assertIn('-N', args)
+        self.assertIn('-n', args)
+        self.assertIn('-q', args)
+
+        self.assertIn('-g', args)
+        self.assertIn('-4', args)
+
+    def test_custom_gcloud_bin(self):
+        job = MRWordCount(['-r', 'dataproc', '--ssh-tunnel',
+                           '--gcloud-bin', '/path/to/gcloud -v'])
+
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        args = self.mock_Popen.call_args[0][0]
+
+        self.assertEqual(args[:4], ['/path/to/gcloud', '-v', 'compute', 'ssh'])
+
+    def test_missing_gcloud_bin(self):
+        self.mock_Popen.side_effect = OSError(2, 'No such file or directory')
+
+        job = MRWordCount(['-r', 'dataproc', '--ssh-tunnel'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertEqual(self.mock_Popen.call_count, 1)
+        self.assertTrue(runner._give_up_on_ssh_tunnel)
+
+    def test_error_from_gcloud_bin(self):
+        self.mock_Popen.return_value.returncode = 255
+
+        job = MRWordCount(['-r', 'dataproc', '--ssh-tunnel'])
+
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+        self.assertGreater(self.mock_Popen.call_count, 1)
+        self.assertFalse(runner._give_up_on_ssh_tunnel)
+
+
+class MockLogEntriesTestCase(MockGoogleTestCase):
+    """Superclass for tests that create fake log entries."""
+
+    def setUp(self):
+        super(MockLogEntriesTestCase, self).setUp()
+
+        self.mock_cluster_id = LOGGING_CLUSTER_NAME
+
+    def add_container_exit(self, container_id, returncode=143):
+        payload = {
+            'class': _CONTAINER_EXECUTOR_CLASS_NAME,
+            'message': ('Exit code from container %s is : %d' % (
+                container_id, returncode)),
+        }
+
+        self.add_mock_log_entry(
+            payload,
+            self.log_name('yarn-yarn-nodemanager'),
+            resource=self.log_resource(),
+        )
+
+    def add_split(self, container_id, cluster=LOGGING_CLUSTER_NAME):
+        self.add_entry(container_id, 'syslog', SPLIT_MESSAGE)
+
+    def add_stack_trace(self, container_id, cluster=LOGGING_CLUSTER_NAME):
+        self.add_entry(container_id, 'syslog', LOGGING_STACK_TRACE)
+
+    def add_traceback(self, container_id, cluster=LOGGING_CLUSTER_NAME):
+        self.add_entry(container_id, 'stderr', LOGGING_TRACEBACK)
+
+    def add_entry(self, container_id, logname, message):
+        payload = dict(
+            application=APPLICATION_ID,
+            container=container_id,
+            container_logname=logname,
+            message=message,
+        )
+
+        self.add_mock_log_entry(
+            payload,
+            self.log_name('yarn-userlogs'),
+            resource=self.log_resource(),
+        )
+
+    def log_name(self, name):
+        return 'projects/%s/logs/%s' % (self.mock_project_id, name)
+
+    def log_resource(self):
+        return dict(
+            labels=dict(
+                cluster_name=LOGGING_CLUSTER_NAME,
+                project_id=self.mock_project_id,
+                region=_DEFAULT_GCE_REGION,
+            ),
+            type='cloud_dataproc_cluster',
+        )
+
+
+class FailedTaskContainerIDsTestCase(MockLogEntriesTestCase):
+
+    OTHER_APP_CONTAINER_ID = 'container_1234567890111_0001_01_000001'
+
+    def setUp(self):
+        super(FailedTaskContainerIDsTestCase, self).setUp()
+
+        self.runner = DataprocJobRunner()
+        self.runner._cluster_id = LOGGING_CLUSTER_NAME
+
+    def test_empty(self):
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
+            [])
+
+    def test_one_failure(self):
+        self.add_container_exit(CONTAINER_ID_1)
+
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
+            [CONTAINER_ID_1])
+
+    def test_reverse_order(self):
+        self.add_container_exit(CONTAINER_ID_1)
+        self.add_container_exit(CONTAINER_ID_2)
+
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
+            [CONTAINER_ID_2, CONTAINER_ID_1])
+
+    def test_ignore_failures_from_other_runs(self):
+        self.add_container_exit(self.OTHER_APP_CONTAINER_ID)
+
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
+            [])
+
+    def test_ignore_zero_returncode(self):
+        self.add_container_exit(CONTAINER_ID_1, returncode=0)
+
+        self.assertEqual(
+            list(self.runner._failed_task_container_ids(APPLICATION_ID)),
+            [])
+
+
+class FixTracebackTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(_fix_traceback(''), '')
+
+    def test_fix_traceback_with_no_newlines(self):
+        self.assertEqual(_fix_traceback(LOGGING_TRACEBACK),
+                         TRACEBACK)
+
+    def test_fix_traceback_plus_log4j_warnings(self):
+        self.assertEqual(
+            _fix_traceback(LOGGING_TRACEBACK + LOG4J_WARNINGS),
+            TRACEBACK)
+
+    def test_no_need_to_fix(self):
+        self.assertEqual(_fix_traceback(TRACEBACK), TRACEBACK)
+
+    def test_can_strip_log4j_warnings_from_correct_traceback(self):
+        self.assertEqual(
+            _fix_traceback(TRACEBACK + LOG4J_WARNINGS),
+            TRACEBACK)
+
+    def test_something_else(self):
+        message = 'mice in your kitchen\nare bad'
+
+        self.assertEqual(_fix_traceback(message), message)
+
+
+class FixJavaStackTraceTestCase(TestCase):
+
+    STACK_TRACE = (
+        'Diagnostics report from attempt_1525195653111_0001_m_000000_3:'
+        ' Error: java.lang.RuntimeException: PipeMapRed.waitOutputThreads():'
+        ' subprocess failed with code 1\n'
+        '\tat org.apache.hadoop.streaming.PipeMapRed.waitOutputThreads'
+        '(PipeMapRed.java:322)\n'
+        '\tat org.apache.hadoop.mapred.YarnChild.main(YarnChild.java:158)'
+    )
+
+    LOGGING_STACK_TRACE = STACK_TRACE.replace('\n', '')
+
+    def test_add_missing_newlines(self):
+        self.assertEqual(_fix_java_stack_trace(LOGGING_STACK_TRACE),
+                         STACK_TRACE)
+
+    def test_no_need_to_fix(self):
+        self.assertEqual(_fix_java_stack_trace(STACK_TRACE),
+                         STACK_TRACE)
+
+    def test_something_else(self):
+        message = 'mice in your kitchen\nare bad'
+
+        self.assertEqual(_fix_traceback(message), message)
+
+
+class TaskLogInterpretationTestCase(MockLogEntriesTestCase):
+
+    def setUp(self):
+        super(TaskLogInterpretationTestCase, self).setUp()
+
+        self.container_ids_method = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._failed_task_container_ids',
+            return_value=[CONTAINER_ID_2, CONTAINER_ID_1]))
+
+        self.runner = DataprocJobRunner()
+        self.runner._cluster_id = LOGGING_CLUSTER_NAME
+
+    def test_empty(self):
+        self.assertEqual(
+            self.runner._task_log_interpretation(APPLICATION_ID, 'streaming'),
+            {})
+
+    def test_find_error(self):
+        self.add_split(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming')
+        self.assertEqual(len(interp.get('errors', [])), 1)
+
+        error = interp['errors'][0]
+
+        self.assertEqual(error['container_id'], CONTAINER_ID_1)
+        self.assertEqual(error['hadoop_error']['message'], STACK_TRACE)
+        self.assertEqual(error['split'], SPLIT)
+        self.assertEqual(error['task_error']['message'], TRACEBACK)
+
+        self.assertTrue(interp.get('partial'))
+
+    def test_stop_after_first_task_error(self):
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_2)
+        self.add_traceback(CONTAINER_ID_2)
+
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming')
+
+        self.assertEqual(len(interp.get('errors', [])), 1)
+        error = interp['errors'][0]
+
+        self.assertEqual(error['container_id'], CONTAINER_ID_2)
+        self.assertTrue(interp.get('partial'))
+
+    def test_keep_going_if_just_hadoop_error(self):
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_2)
+
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming')
+
+        errors = interp.get('errors', [])
+        self.assertEqual(len(errors), 2)
+
+        self.assertEqual(errors[0]['container_id'], CONTAINER_ID_2)
+        self.assertNotIn('task_error', errors[0])
+
+        self.assertEqual(errors[1]['container_id'], CONTAINER_ID_1)
+        self.assertIn('task_error', errors[1])
+
+        self.assertTrue(interp.get('partial'))
+
+    def test_hadoop_errors_only(self):
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_2)
+
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming')
+
+        errors = interp.get('errors', [])
+        self.assertEqual(len(errors), 2)
+
+        self.assertEqual(errors[0]['container_id'], CONTAINER_ID_2)
+        self.assertNotIn('task_error', errors[0])
+
+        self.assertEqual(errors[1]['container_id'], CONTAINER_ID_1)
+        self.assertNotIn('task_error', errors[1])
+
+        self.assertFalse(interp.get('partial'))
+
+    def test_task_error_only(self):
+        self.add_traceback(CONTAINER_ID_1)
+
+        self.assertEqual(
+            self.runner._task_log_interpretation(APPLICATION_ID, 'streaming'),
+            {})
+
+    def test_not_partial(self):
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_2)
+        self.add_traceback(CONTAINER_ID_2)
+
+        interp = self.runner._task_log_interpretation(
+            APPLICATION_ID, 'streaming', partial=False)
+        errors = interp.get('errors', [])
+
+        self.assertEqual(len(errors), 2)
+
+        self.assertFalse(interp.get('partial'))
+
+
+class CauseOfErrorTestCase(MockLogEntriesTestCase):
+
+    def setUp(self):
+        super(CauseOfErrorTestCase, self).setUp()
+        self.get_lines = self.start(patch(
+            'mrjob.dataproc.DataprocJobRunner._get_new_driver_output_lines',
+            return_value=[]))
+
+    def test_end_to_end(self):
+        # use LOGGING_CLUSTER_NAME so we can generage fake logging entries
+        job = MRBoom(['-r', 'dataproc', '--cluster-id', LOGGING_CLUSTER_NAME])
+        job.sandbox()
+
+        self.mock_jobs_succeed = False
+
+        # feed application_id into mock driver output
+        self.get_lines.side_effect = [
+            ['15/12/11 13:32:45 INFO impl.YarnClientImpl:'
+             ' Submitted application %s' % APPLICATION_ID],
+            [],
+            [],
+            [],
+        ]
+
+        self.add_container_exit(CONTAINER_ID_1)
+        self.add_split(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+            self.assertEqual(len(runner._log_interpretations), 1)
+            interp = runner._log_interpretations[0]
+
+            self.assertIn('step', interp)
+            self.assertIn('history', interp)
+            self.assertIn('task', interp)
+
+            error = _pick_error(interp)
+            self.assertIsNotNone(error)
+
+            self.assertEqual(error['split'], SPLIT)
+            self.assertEqual(error['hadoop_error']['message'], STACK_TRACE)
+            self.assertEqual(error['task_error']['message'], TRACEBACK)
+
+
+class CloudPartSizeTestCase(MockGoogleTestCase):
+
+    def setUp(self):
+        super(CloudPartSizeTestCase, self).setUp()
+
+        self.upload_from_string = self.start(patch(
+            'tests.mock_google.storage.MockGoogleStorageBlob'
+            '.upload_from_string',
+            side_effect=MockGoogleStorageBlob.upload_from_string,
+            autospec=True))
+
+    def test_default(self):
+        runner = DataprocJobRunner()
+
+        self.assertEqual(runner._fs_chunk_size(), 100 * 1024 * 1024)
+
+    def test_float(self):
+        runner = DataprocJobRunner(cloud_part_size_mb=0.25)
+
+        self.assertEqual(runner._fs_chunk_size(), 256 * 1024)
+
+    def test_zero(self):
+        runner = DataprocJobRunner(cloud_part_size_mb=0)
+
+        self.assertEqual(runner._fs_chunk_size(), None)
+
+    def test_multipart_upload(self):
+        job = MRWordCount(
+            ['-r', 'dataproc', '--cloud-part-size-mb', '2'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._prepare_for_launch()
+
+        # chunk size should be set on blob object used to upload
+        self.assertTrue(self.upload_from_string.called)
+        for call_args in self.upload_from_string.call_args_list:
+            blob = call_args[0][0]
+            self.assertEqual(blob.chunk_size, 2 * 1024 * 1024)
+
+
+class JarStepTestCase(MockGoogleTestCase):
+
+    def test_local_jar_gets_uploaded(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        with open(fake_jar, 'w'):
+            pass
+
+        job = MRJustAJar(['-r', 'dataproc', '--jar', fake_jar])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            self.assertIn(fake_jar, runner._upload_mgr.path_to_uri())
+            jar_uri = runner._upload_mgr.uri(fake_jar)
+            self.assertTrue(runner.fs.ls(jar_uri))
+
+            jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+
+            self.assertEqual(len(jobs), 1)
+            self.assertEqual(jobs[0].hadoop_job.main_jar_file_uri, jar_uri)
+
+    def test_jar_on_gcs(self):
+        jar_uri = 'gs://dubliners/whiskeyinthe.jar'
+        self.put_gcs_multi({jar_uri: b''})
+
+        job = MRJustAJar(['-r', 'dataproc', '--jar', jar_uri])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+
+            self.assertEqual(len(jobs), 1)
+            self.assertEqual(jobs[0].hadoop_job.main_jar_file_uri, jar_uri)
+
+            # for comparison with test_main_class()
+            self.assertFalse(jobs[0].hadoop_job.main_class)
+
+    def test_main_class(self):
+        jar_uri = 'gs://dubliners/whiskeyinthe.jar'
+        self.put_gcs_multi({jar_uri: b''})
+
+        job = MRJustAJar(['-r', 'dataproc', '--jar', jar_uri,
+                          '--main-class', 'ThingAnalyzer'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+
+            self.assertEqual(len(jobs), 1)
+            self.assertEqual(jobs[0].hadoop_job.jar_file_uris, [jar_uri])
+            self.assertEqual(jobs[0].hadoop_job.main_class, 'ThingAnalyzer')
+
+            # main_jar_file_uri and main_class are mutually exclusive
+            self.assertFalse(jobs[0].hadoop_job.main_jar_file_uri)
+
+    def test_jar_inside_dataproc(self):
+        jar_uri = (
+            'file:///usr/lib/hadoop-mapreduce/hadoop-mapreduce-examples.jar')
+
+        job = MRJustAJar(['-r', 'dataproc', '--jar', jar_uri])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+
+            self.assertEqual(len(jobs), 1)
+            # Dataproc accepts file:// URIs as-is
+            self.assertEqual(jobs[0].hadoop_job.main_jar_file_uri, jar_uri)
+
+    def test_input_output_interpolation(self):
+        fake_jar = os.path.join(self.tmp_dir, 'fake.jar')
+        open(fake_jar, 'w').close()
+        input1 = os.path.join(self.tmp_dir, 'input1')
+        open(input1, 'w').close()
+        input2 = os.path.join(self.tmp_dir, 'input2')
+        open(input2, 'w').close()
+
+        job = MRJarAndStreaming(
+            ['-r', 'dataproc', '--jar', fake_jar, input1, input2])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            jobs = sorted(runner._list_jobs(cluster_name=runner._cluster_id),
+                          key=lambda j: j.reference.job_id)
+
+            self.assertEqual(len(jobs), 2)
+            jar_job, streaming_job = jobs
+
+            jar_uri = runner._upload_mgr.uri(fake_jar)
+
+            self.assertEqual(jar_job.hadoop_job.main_jar_file_uri, jar_uri)
+            jar_args = jar_job.hadoop_job.args
+
+            self.assertEqual(len(jar_args), 3)
+            self.assertEqual(jar_args[0], 'stuff')
+
+            # check input is interpolated
+            input_arg = ','.join(
+                runner._upload_mgr.uri(path) for path in (input1, input2))
+            self.assertEqual(jar_args[1], input_arg)
+
+            # check output of jar is input of next step
+            jar_output_arg = jar_args[2]
+
+            streaming_args = list(streaming_job.hadoop_job.args)
+            streaming_input_arg = streaming_args[
+                streaming_args.index('-input') + 1]
+            self.assertEqual(jar_output_arg, streaming_input_arg)
+
+
+class HadoopStreamingJarTestCase(MockGoogleTestCase):
+
+    def get_runner_and_job(self, *args):
+        mr_job = MRWordCount(['-r', 'dataproc'] + list(args))
+        mr_job.sandbox()
+
+        runner = mr_job.make_runner()
+        runner.run()
+
+        jobs = list(runner._list_jobs(cluster_name=runner._cluster_id))
+        self.assertEqual(len(jobs), 1)
+
+        return runner, jobs[0]
+
+    def test_default(self):
+        runner, job = self.get_runner_and_job()
+
+        self.assertEqual(job.hadoop_job.main_jar_file_uri,
+                         _HADOOP_STREAMING_JAR_URI)
+
+    def test_local_hadoop_streaming_jar(self):
+        jar_path = os.path.join(self.tmp_dir, 'righteousness.jar')
+        open(jar_path, 'w').close()
+
+        runner, job = self.get_runner_and_job(
+            '--hadoop-streaming-jar', jar_path)
+
+        jar_uri = runner._upload_mgr.uri(jar_path)
+
+        self.assertEqual(job.hadoop_job.main_jar_file_uri, jar_uri)
+
+    def test_hadoop_streaming_jar_on_node(self):
+        jar_uri = 'file:///path/to/victory.jar'
+
+        runner, job = self.get_runner_and_job(
+            '--hadoop-streaming-jar', jar_uri)
+
+        self.assertEqual(job.hadoop_job.main_jar_file_uri, jar_uri)
+
+    def test_hadoop_streaming_jar_on_gcs(self):
+        jar_uri = 'gs://dubliners/whiskeyinthe.jar'
+        self.put_gcs_multi({jar_uri: b''})
+
+        runner, job = self.get_runner_and_job(
+            '--hadoop-streaming-jar', jar_uri)
+
+        self.assertEqual(job.hadoop_job.main_jar_file_uri, jar_uri)
+
+
+class NetworkAndSubnetworkTestCase(MockGoogleTestCase):
+
+    def _get_project_id_and_gce_config(self, *args):
+        job = MRWordCount(['-r', 'dataproc'] + list(args))
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner._launch()
+            cluster = runner._get_cluster(
+                runner._cluster_id)
+            return cluster.project_id, cluster.config.gce_cluster_config
+
+    def test_default(self):
+        project_id, gce_config = self._get_project_id_and_gce_config()
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/global/networks/default' % project_id)
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_network_name(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--network', 'test')
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/global/networks/test' % project_id)
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_network_path(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--network', 'projects/manhattan/global/networks/secret')
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1'
+            '/projects/manhattan/global/networks/secret')
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_network_uri(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--network', 'https://www.cnn.com/')
+
+        self.assertEqual(
+            gce_config.network_uri, 'https://www.cnn.com/')
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_subnetwork_name(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--subnet', 'test')
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/us-west1/subnetworks/test' % project_id)
+        self.assertFalse(gce_config.network_uri)
+
+    def test_subnetwork_path(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--subnet', 'projects/manhattan/los-alamos/networks/lanl')
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.googleapis.com/compute/v1'
+            '/projects/manhattan/los-alamos/networks/lanl')
+        self.assertFalse(gce_config.network_uri)
+
+    def test_subnetwork_uri(self):
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '--subnet', 'https://www.cnn.com/specials/videos/hln')
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.cnn.com/specials/videos/hln')
+        self.assertFalse(gce_config.network_uri)
+
+    def test_network_and_subnet_conflict(self):
+        self.assertRaises(
+            InvalidArgument,
+            self._get_project_id_and_gce_config,
+            '--network', 'default',
+            '--subnet', 'default')
+
+    def test_network_on_cmd_line_overrides_subnet_in_config(self):
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    subnet: default')
+
+        self.mrjob_conf_patcher.stop()
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '-c', conf_path, '--network', 'test')
+        self.mrjob_conf_patcher.start()
+
+        self.assertEqual(
+            gce_config.network_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/global/networks/test' % project_id)
+        self.assertFalse(gce_config.subnetwork_uri)
+
+    def test_subnet_on_cmd_line_overrides_network_in_config(self):
+        conf_path = self.makefile(
+            'mrjob.conf',
+            b'runners:\n  dataproc:\n    network: default')
+
+        self.mrjob_conf_patcher.stop()
+        project_id, gce_config = self._get_project_id_and_gce_config(
+            '-c', conf_path, '--subnet', 'test')
+        self.mrjob_conf_patcher.start()
+
+        self.assertEqual(
+            gce_config.subnetwork_uri,
+            'https://www.googleapis.com/compute/v1/projects/%s'
+            '/us-west1/subnetworks/test' % project_id)
+        self.assertFalse(gce_config.network_uri)

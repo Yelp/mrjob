@@ -1,5 +1,6 @@
 # Copyright 2009-2013 Yelp and Contributors
 # Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -60,12 +61,14 @@ Options::
                         the default is 5.0 to be safe.
   --cloud-log-dir CLOUD_LOG_DIR
                         URI on remote FS to write logs into
+  --cloud-part-size-mb CLOUD_PART_SIZE_MB
+                        Upload files to cloud FS in parts no bigger than this
+                        many megabytes. Default is 100 MiB. Set to 0 to
+                        disable multipart uploading entirely.
+  --cloud-upload-part-size CLOUD_PART_SIZE_MB
+                        Deprecated alias for --cloud-part-size-mb
   --cloud-tmp-dir CLOUD_TMP_DIR
                         URI on remote FS to use as our temp directory.
-  --cloud-upload-part-size CLOUD_UPLOAD_PART_SIZE
-                        Upload files to S3 in parts no bigger than this many
-                        megabytes. Default is 100 MiB. Set to 0 to disable
-                        multipart uploading entirely.
   -c CONF_PATHS, --conf-path CONF_PATHS
                         Path to alternate mrjob.conf file to read from
   --no-conf             Don't load mrjob.conf even if it's available
@@ -119,8 +122,8 @@ Options::
                         http://docs.aws.amazon.com/cli/latest/reference/emr
                         /create-cluster.html
   --instance-groups INSTANCE_GROUPS
-                        detailed JSON list of instance configs, including EBS
-                        configuration. See docs for --instance-groups at
+                        detailed JSON list of EMR instance configs, including
+                        EBS configuration. See docs for --instance-groups at
                         http://docs.aws.amazon.com/cli/latest/reference/emr
                         /create-cluster.html
   --instance-type INSTANCE_TYPE
@@ -166,12 +169,11 @@ Options::
                         -us-west-1.amazonaws.com). You usually shouldn't set
                         this; by default mrjob will choose the correct
                         endpoint for each S3 bucket based on its location.
-  --subnet SUBNET       ID of Amazon VPC subnet to launch cluster in. If not
-                        set or empty string, cluster is launched in the normal
-                        AWS cloud.
-  --subnets SUBNET      Like --subnets, but with a comma-separated list, to
+  --subnet SUBNET       ID of Amazon VPC subnet/URI of Google Compute Engine
+                        subnetwork to launch cluster in.
+  --subnets SUBNET      Like --subnet, but with a comma-separated list, to
                         specify multiple subnets in conjunction with
-                        --instance-fleets
+                        --instance-fleets (EMR only)
   --tag TAGS            Metadata tags to apply to the EMR cluster; should take
                         the form KEY=VALUE. You can use --tag multiple times
   --task-instance-bid-price TASK_INSTANCE_BID_PRICE

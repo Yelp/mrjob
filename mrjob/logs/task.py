@@ -31,7 +31,7 @@ log = getLogger(__name__)
 # Match a java exception, possibly preceded by 'PipeMapRed failed!', etc.
 # use this with search()
 _JAVA_TRACEBACK_RE = re.compile(
-    r'$\s+at .*\((.*\.(java|scala):\d+|Native Method)\)$',
+    r'\s+at .*\((.*\.(java|scala):\d+|Native Method)\)$',
     re.MULTILINE)
 
 # Match an error stating that Spark's subprocess has failed (and thus we
@@ -433,9 +433,15 @@ def _parse_task_syslog(lines):
         num_lines: (optional) number of lines in split
         start_line: (optional) first line of split (0-indexed)
     """
+    return _parse_task_syslog_records(_parse_hadoop_log4j_records(lines))
+
+
+def _parse_task_syslog_records(records):
+    """Helper for _parse_task_syslog(); takes log4j records rather than
+    lines"""
     result = {}
 
-    for record in _parse_hadoop_log4j_records(lines):
+    for record in records:
         message = record['message']
 
         m = _OPENING_FOR_READING_RE.match(message)

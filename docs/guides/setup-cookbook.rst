@@ -117,6 +117,8 @@ If you're a :mrjob-opt:`setup` purist, you can also do something like this:
 
 since :command:`true` has no effect and ignores its arguments.
 
+.. _using-a-virtualenv:
+
 Using a virtualenv
 ------------------
 

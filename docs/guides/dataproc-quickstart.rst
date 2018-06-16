@@ -35,14 +35,44 @@ Creating credentials
 * Pick **Create credentials > Service account key**
 * Select **Compute engine default service account**
 * Click **Create** to download a JSON file.
-* Point **$GOOGLE_APPLICATION_CREDENTIALS** at the file you downloaded (``export GOOGLE_APPLICATION_CREDENTIALS="/path/to/Your Credentials.json"``).
 
-You do not have to download or install the :command:`gcloud` utility, but if
-you have it installed and configured, mrjob can read credentials from its
-config files rather than **$GOOGLE_APPLICATION_CREDENTIALS**.
+Then you should either install and set up the optional :command:`gcloud`
+utility (see below) or point **$GOOGLE_APPLICATION_CREDENTIALS** at the file
+you downloaded (``export GOOGLE_APPLICATION_CREDENTIALS="/path/to/Your Credentials.json"``).
 
-See `Installing Cloud SDK <https://cloud.google.com/sdk/downloads>`__ for more
-information.
+.. _installing-gcloud:
+
+Installing gcloud, gsutil, and other utilities
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+mrjob does not require you to install the :command:`gcloud` command in order
+to run jobs on Google Cloud Dataproc, unless you want to set up an SSH
+tunnel to the Hadoop resource manager (see :mrjob-opt:`ssh_tunnel`).
+
+The :command:`gcloud` command can be very useful for monitoring your job.
+The :command:`gsutil` utility, packaged with it, is very helpful for
+dealing with Google Storage, the cloud filesystem that Google Cloud Dataproc
+uses.
+
+To install :command:`gcloud` and :command:`gsutil`:
+
+* Follow `these three steps <https://cloud.google.com/sdk/downloads#interactive>`__ to install the utilities
+* Log in with your Google credentials (these will launch a browser):
+  * :command:`gcloud auth login`
+  * :command:`gcloud auth application-default init`
+
+On some versions of gcloud, you may have to manually configure
+project ID for :mrjob-opt:`ssh_tunnel` to work.
+
+* run :command:`gcloud projects list` to get your project ID
+* :command:`gcloud config set project <project_id>`
+
+It's also helpful to set :command:`gcloud`\'s :mrjob-opt:`region` and
+:mrjob-opt:`zone` to match mrjob's defaults:
+
+* :command:`gcloud config set compute/region us-west1`
+* :command:`gcloud config set compute/zone us-west1-a`
+* :command:`gcloud config set dataproc/region us-west1`
 
 .. _running-a-dataproc-job:
 
@@ -138,17 +168,3 @@ master instance if you have a very large number of input files; in this case,
 use the :mrjob-opt:`master_instance_type` option.
 
 If you want to run preemptible instances, use the :mrjob-opt:`task_instance_type` and :mrjob-opt:`num_task_instances` options.
-
-
-.. _dataproc-limitations:
-
-Limitations
------------
-
-mrjob's Dataproc implementation is relatively new and does not yet have some
-features supported by other runners, including:
-
-* fetching counters
-* finding probable cause of errors
-* running Java JARs as steps
-* :mrjob-opt:`libjars` support

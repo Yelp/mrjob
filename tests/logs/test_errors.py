@@ -278,14 +278,14 @@ class MergeAndSortErrorsTestCase(TestCase):
             _merge_and_sort_errors(errors, attempt_to_container_id),
             [
                 dict(
-                    attempt_id='attempt_201512232143_0008_r_000000_0',
-                    hadoop_error=dict(message='BOOM'),
-                ),
-                dict(
                     attempt_id='attempt_201512232143_0008_r_000000_1',
                     container_id='container_1450486922681_0005_01_000003',
                     hadoop_error=dict(message='BOOM again'),
                     task_error=dict(message='it was probably snakes'),
+                ),
+                dict(
+                    attempt_id='attempt_201512232143_0008_r_000000_0',
+                    hadoop_error=dict(message='BOOM'),
                 ),
             ],
         )

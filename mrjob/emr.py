@@ -20,16 +20,11 @@ import os
 import os.path
 import pipes
 import posixpath
-import random
 import re
-import signal
-import socket
 import time
 from collections import defaultdict
 from datetime import datetime
 from datetime import timedelta
-from subprocess import Popen
-from subprocess import PIPE
 
 try:
     import botocore.client
@@ -73,7 +68,6 @@ from mrjob.iam import get_or_create_mrjob_service_role
 from mrjob.logs.bootstrap import _check_for_nonzero_return_code
 from mrjob.logs.bootstrap import _interpret_emr_bootstrap_stderr
 from mrjob.logs.bootstrap import _ls_emr_bootstrap_stderr_logs
-from mrjob.logs.counters import _format_counters
 from mrjob.logs.counters import _pick_counters
 from mrjob.logs.errors import _format_error
 from mrjob.logs.mixin import LogInterpretationMixin
@@ -90,12 +84,11 @@ from mrjob.pool import _pool_hash_and_name
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.py2 import urlopen
-from mrjob.py2 import xrange
+from mrjob.runner import _blank_out_conflicting_opts
 from mrjob.setup import UploadDirManager
 from mrjob.setup import WorkingDirManager
 from mrjob.step import StepFailedException
 from mrjob.step import _is_spark_step_type
-from mrjob.util import cmd_line
 from mrjob.util import shlex_split
 from mrjob.util import strip_microseconds
 from mrjob.util import random_identifier
@@ -309,7 +302,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'bootstrap_actions',
         'bootstrap_spark',
         'cloud_log_dir',
-        'cloud_upload_part_size',
         'core_instance_bid_price',
         'ec2_key_pair',
         'ec2_key_pair_file',
@@ -319,7 +311,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'emr_endpoint',
         'enable_emr_debugging',
         'hadoop_extra_args',
-        'hadoop_streaming_jar',
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',
@@ -411,14 +402,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # when did our particular task start?
         self._emr_job_start = None
 
-        # ssh state
-        self._ssh_proc = None
-        self._gave_cant_ssh_warning = False
         # we don't upload the ssh key to master until it's needed
         self._ssh_key_is_copied = False
-
-        # store the (tunneled) URL of the job tracker/resource manager
-        self._ssh_tunnel_url = None
 
         # map from cluster ID to a dictionary containing cached info about
         # that cluster. Includes the following keys:
@@ -456,7 +441,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 check_cluster_every=30,
                 cleanup_on_failure=['JOB'],
                 cloud_fs_sync_secs=5.0,
-                cloud_upload_part_size=100,  # 100 MB
                 image_version=_DEFAULT_IMAGE_VERSION,
                 num_core_instances=0,
                 num_task_instances=0,
@@ -466,11 +450,6 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 region=_DEFAULT_EMR_REGION,
                 sh_bin=None,  # see _sh_bin(), below
                 ssh_bin=['ssh'],
-                # don't use a list because it makes it hard to read option
-                # values when running in verbose mode. See #1284
-                ssh_bind_ports=xrange(40001, 40841),
-                ssh_tunnel=False,
-                ssh_tunnel_is_open=False,
                 visible_to_all_users=True,
             )
         )
@@ -479,19 +458,12 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         """Blank out overriden *instance_fleets* and *instance_groups*
 
         Convert image_version of 4.x and later to release_label."""
-        # copy opt_list so we can modify it
-        opt_list = [dict(opts) for opts in opt_list]
-
         # blank out any instance_fleets/groups before the last config
         # where they are set
-        blank_out = False
-        for opts in reversed(opt_list):
-            if blank_out:
-                opts['instance_fleets'] = None
-                opts['instance_groups'] = None
-            elif any(opts.get(k) is not None
-                     for k in self._INSTANCE_OPT_NAMES):
-                blank_out = True
+        opt_list = _blank_out_conflicting_opts(
+            opt_list,
+            ['instance_fleets', 'instance_groups'],
+            self._INSTANCE_OPT_NAMES)
 
         # now combine opts, with instance_groups/fleets blanked out
         opts = super(EMRJobRunner, self)._combine_opts(opt_list)
@@ -856,7 +828,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _get_upload_part_size(self):
         # part size is in MB, as the minimum is 5 MB
-        return int((self._opts['cloud_upload_part_size'] or 0) * 1024 * 1024)
+        return int((self._opts['cloud_part_size_mb'] or 0) * 1024 * 1024)
 
     def _ssh_tunnel_config(self):
         """Look up AMI version, and return a dict with the following keys:
@@ -884,49 +856,19 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # it work won't work on some VPC setups
             return self._master_private_ip()
 
-    def _job_tracker_url(self):
-        tunnel_config = self._ssh_tunnel_config()
-
-        return 'http://%s:%d%s' % (
-            self._job_tracker_host(),
-            tunnel_config['port'],
-            tunnel_config['path'])
-
-    def _set_up_ssh_tunnel(self):
-        """set up the ssh tunnel to the job tracker, if it's not currently
-        running.
-        """
-        if not self._opts['ssh_tunnel']:
-            return
+    def _ssh_tunnel_args(self, bind_port):
+        for opt_name in ('ec2_key_pair', 'ec2_key_pair_file',
+                         'ssh_bin', 'ssh_bind_ports'):
+            if not self._opts[opt_name]:
+                log.warning(
+                    "  You must set %s in order to set up the SSH tunnel!"
+                    % opt_name)
+                self._give_up_on_ssh_tunnel = True
+                return
 
         host = self._address_of_master()
         if not host:
             return
-
-        # look up what we're supposed to do on this AMI version
-        tunnel_config = self._ssh_tunnel_config()
-
-        REQUIRED_OPTS = ['ec2_key_pair', 'ec2_key_pair_file', 'ssh_bind_ports']
-        for opt_name in REQUIRED_OPTS:
-            if not self._opts[opt_name]:
-                if not self._gave_cant_ssh_warning:
-                    log.warning(
-                        "  You must set %s in order to set up the SSH tunnel!"
-                        % opt_name)
-                    self._gave_cant_ssh_warning = True
-                return
-
-        # if there was already a tunnel, make sure it's still up
-        if self._ssh_proc:
-            self._ssh_proc.poll()
-            if self._ssh_proc.returncode is None:
-                return
-            else:
-                log.warning('  Oops, ssh subprocess exited with return code'
-                            ' %d, restarting...' % self._ssh_proc.returncode)
-                self._ssh_proc = None
-
-        log.info('  Opening ssh tunnel to %s...' % tunnel_config['name'])
 
         # if ssh detects that a host key has changed, it will silently not
         # open the tunnel, so make a fake empty known_hosts file and use that.
@@ -940,107 +882,25 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         log.debug('Created empty ssh known-hosts file: %s' % (
             fake_known_hosts_file,))
 
-        bind_port = None
-        popen_exception = None
+        return self._opts['ssh_bin'] + [
+            '-o', 'VerifyHostKeyDNS=no',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'ExitOnForwardFailure=yes',
+            '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
+        ] + self._ssh_tunnel_opts(bind_port) + [
+            '-i', self._opts['ec2_key_pair_file'],
+            ('hadoop@%s' % host),
+        ]
 
-        for bind_port in self._pick_ssh_bind_ports():
-            # this could be refactored to use SSHFilesystem._ssh_launch(),
-            # but that would probably just make this code less readable
-            args = self._opts['ssh_bin'] + [
-                '-o', 'VerifyHostKeyDNS=no',
-                '-o', 'StrictHostKeyChecking=no',
-                '-o', 'ExitOnForwardFailure=yes',
-                '-o', 'UserKnownHostsFile=%s' % fake_known_hosts_file,
-                '-L', '%d:%s:%d' % (
-                    bind_port,
-                    self._job_tracker_host(),
-                    tunnel_config['port']),
-                '-N', '-n', '-q',  # no shell, no input, no output
-                '-i', self._opts['ec2_key_pair_file'],
-            ]
-            if self._opts['ssh_tunnel_is_open']:
-                args.extend(['-g', '-4'])  # -4: listen on IPv4 only
-            args.append('hadoop@' + host)
-            log.debug('> %s' % cmd_line(args))
+    def _job_tracker_url(self):
+        """Not actually used to set up the SSH tunnel, used to run curl
+        over SSH to fetch from the job tracker directly."""
+        tunnel_config = self._ssh_tunnel_config()
 
-            ssh_proc = None
-            try:
-                ssh_proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE)
-            except OSError as ex:
-                # e.g. OSError(2, 'File not found')
-                popen_exception = ex   # warning handled below
-                break
-
-            if ssh_proc:
-                time.sleep(_WAIT_FOR_SSH_TO_FAIL)
-                ssh_proc.poll()
-                # still running. We are golden
-                if ssh_proc.returncode is None:
-                    self._ssh_proc = ssh_proc
-                    break
-                else:
-                    ssh_proc.stdin.close()
-                    ssh_proc.stdout.close()
-                    ssh_proc.stderr.close()
-
-        if not self._ssh_proc:
-            if popen_exception:
-                # this only happens if the ssh binary is not present
-                # or not executable (so tunnel_config and the args to the
-                # ssh binary don't matter)
-                log.warning("    Couldn't run %s: %s" % (
-                    cmd_line(self._opts['ssh_bin']), popen_exception))
-            else:
-                log.warning(
-                    '    Failed to open ssh tunnel to %s' %
-                    tunnel_config['name'])
-        else:
-            if self._opts['ssh_tunnel_is_open']:
-                bind_host = socket.getfqdn()
-            else:
-                bind_host = 'localhost'
-            self._ssh_tunnel_url = 'http://%s:%d%s' % (
-                bind_host, bind_port, tunnel_config['path'])
-            log.info('  Connect to %s at: %s' % (
-                tunnel_config['name'], self._ssh_tunnel_url))
-
-    def _kill_ssh_tunnel(self):
-        """Send SIGKILL to SSH tunnel, if it's running."""
-        if not self._ssh_proc:
-            return
-
-        self._ssh_proc.poll()
-        if self._ssh_proc.returncode is None:
-            log.info('Killing our SSH tunnel (pid %d)' %
-                     self._ssh_proc.pid)
-
-            self._ssh_proc.stdin.close()
-            self._ssh_proc.stdout.close()
-            self._ssh_proc.stderr.close()
-
-            try:
-                os.kill(self._ssh_proc.pid, signal.SIGKILL)
-            except Exception as e:
-                log.exception(e)
-
-        self._ssh_proc = None
-        self._ssh_tunnel_url = None
-
-    def _pick_ssh_bind_ports(self):
-        """Pick a list of ports to try binding our SSH tunnel to.
-
-        We will try to bind the same port for any given cluster (Issue #67)
-        """
-        # don't perturb the random number generator
-        random_state = random.getstate()
-        try:
-            # seed random port selection on cluster ID
-            random.seed(self._cluster_id)
-            num_picks = min(_MAX_SSH_RETRIES,
-                            len(self._opts['ssh_bind_ports']))
-            return random.sample(self._opts['ssh_bind_ports'], num_picks)
-        finally:
-            random.setstate(random_state)
+        return 'http://%s:%d%s' % (
+            self._job_tracker_host(),
+            tunnel_config['port'],
+            tunnel_config['path'])
 
     ### Running the job ###
 
@@ -1048,8 +908,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         super(EMRJobRunner, self).cleanup(mode=mode)
 
         # always stop our SSH tunnel if it's still running
-        if self._ssh_proc:
-            self._kill_ssh_tunnel()
+        self._kill_ssh_tunnel()
 
         # stop the cluster if it belongs to us (it may have stopped on its
         # own already, but that's fine)
@@ -1770,14 +1629,8 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             # step is done (either COMPLETED, FAILED, INTERRUPTED). so
             # try to fetch counters. (Except for master node setup
             # and Spark, which has no counters.)
-            if step['Status']['State'] != 'CANCELLED':
-                if step_num >= 0 and not _is_spark_step_type(step_type):
-                    counters = self._pick_counters(
-                        log_interpretation, step_type)
-                    if counters:
-                        log.info(_format_counters(counters))
-                    else:
-                        log.warning('No counters found')
+            if step['Status']['State'] != 'CANCELLED' and step_num >= 0:
+                self._log_counters(log_interpretation, step_num)
 
             if step['Status']['State'] == 'COMPLETED':
                 return

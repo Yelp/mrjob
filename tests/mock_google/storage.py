@@ -18,6 +18,7 @@ from hashlib import md5
 
 from google.api_core.exceptions import Conflict
 from google.api_core.exceptions import NotFound
+from google.api_core.exceptions import RequestRangeNotSatisfiable
 
 
 class MockGoogleStorageClient(object):
@@ -78,11 +79,11 @@ class MockGoogleStorageBucket(object):
     def exists(self):
         return self.name in self.client.mock_gcs_fs
 
-    def get_blob(self, blob_name):
+    def get_blob(self, blob_name, chunk_size=None):
         fs = self.client.mock_gcs_fs
 
         if self.name in fs and blob_name in fs[self.name]['blobs']:
-            blob = self.blob(blob_name)
+            blob = self.blob(blob_name, chunk_size=chunk_size)
             blob._set_md5_hash()
             return blob
 
@@ -139,37 +140,29 @@ class MockGoogleStorageBlob(object):
         self.md5_hash = None
 
     def delete(self):
-        fs = self.bucket.client.mock_gcs_fs
+        if (self.bucket.name not in self._fs or
+                self.name not in self._fs[self.bucket.name]['blobs']):
+            raise NotFound('DELETE %s: Not Found' % self._blob_uri())
 
-        if (self.bucket.name not in fs or
-                self.name not in fs[self.bucket.name]['blobs']):
-            raise NotFound('DELETE https://www.googleapis.com/storage/v1/b'
-                           '/%s/o/%s: Not Found' %
-                           (self.bucket.name, self.name))
+        del self._fs[self.bucket.name]['blobs'][self.name]
 
-        del fs[self.bucket.name]['blobs'][self.name]
-
-    def download_as_string(self):
-        fs = self.bucket.client.mock_gcs_fs
-
+    def download_as_string(self, client=None, start=None, end=None):
         try:
-            return fs[self.bucket.name]['blobs'][self.name]['data']
+            data = self._fs[self.bucket.name]['blobs'][self.name]['data']
         except KeyError:
-            raise NotFound('GET https://www.googleapis.com/download/storage'
-                           '/v1/b/%s/o/%s?alt=media: Not Found' %
-                           (self.bucket.name, self.name))
+            raise NotFound('GET %s?alt=media: Not Found' % self._blob_uri())
+
+        if start is not None and start >= len(data):
+            # it doesn't care if *end* exceeds the range
+            raise RequestRangeNotSatisfiable(
+                'GET %s?alt=media: Request range not satisfiable' %
+                self._blob_uri())
+
+        return data[start:end]
 
     def download_to_file(self, file_obj):
         data = self.download_as_string()
         file_obj.write(data)
-
-    def _set_md5_hash(self):
-        # call this when we upload data, or when we _get_blob
-        try:
-            self.md5_hash = b64encode(
-                md5(self.download_as_string()).digest())
-        except NotFound:
-            pass
 
     @property
     def size(self):
@@ -185,15 +178,34 @@ class MockGoogleStorageBlob(object):
         self.upload_from_string(data)
 
     def upload_from_string(self, data):
-        fs = self.bucket.client.mock_gcs_fs
-
-        if self.bucket.name not in fs:
+        if self.bucket.name not in self._fs:
             raise NotFound('POST https://www.googleapis.com/upload/storage'
                            '/v1/b/%s/o?uploadType=multipart: Not Found' %
                            self.bucket.name)
 
-        fs_objs = fs[self.bucket.name]['blobs']
+        fs_objs = self._fs[self.bucket.name]['blobs']
         fs_obj = fs_objs.setdefault(self.name, dict(data=b''))
         fs_obj['data'] = data
 
         self._set_md5_hash()
+
+    def _blob_uri(self):
+        # used for error messages
+        return ('https://www.googleapis.com/download/storage'
+                '/v1/b/%s/o/%s' % (self.bucket.name, self.name))
+
+    @property
+    def _fs(self):
+        return self.bucket.client.mock_gcs_fs
+
+    def _set_md5_hash(self):
+        # call this when we upload data, or when we Bucket.get_blob()
+
+        try:
+            # don't call download_as_string() because we need to mock
+            # exceptions from it
+            data = self._fs[self.bucket.name]['blobs'][self.name]['data']
+        except KeyError:
+            pass
+
+        self.md5_hash = b64encode(md5(data).digest())

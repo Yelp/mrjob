@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-# Copyright 2015-2016 Yelp
-# Copyright 2017 Yelp
+# Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp and Google, Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -65,6 +65,14 @@ _SUBMITTED_APPLICATION_RE = re.compile(
 # how to get job_id (all versions)
 _RUNNING_JOB_RE = re.compile(
     r'^Running job: (?P<job_id>job_\d+_\d{4})\s*$')
+
+# job progress (YARN)
+# no need to make this work for pre-YARN, only Dataproc runner uses it
+_JOB_PROGRESS_RE = re.compile(
+    r'^\s*map\s+(?P<map>\d+)%\s+reduce\s+(?P<reduce>\d+)%\s*$')
+
+# if you specify a bad jar, this is all you get
+_NOT_A_VALID_JAR_RE = re.compile(r'^\s*Not a valid JAR:.*')
 
 # YARN prints this (sometimes followed by a Java exception) when tasks fail
 _TASK_ATTEMPT_FAILED_RE = re.compile(
@@ -170,6 +178,14 @@ def _interpret_emr_step_syslog(fs, matches):
     return result
 
 
+def _interpret_new_dataproc_step_stderr(step_interpretation, new_lines):
+    """Incrementally update *step_interpretation* (a dict) with information
+    from new lines read from Hadoop job driver output on Dataproc."""
+    return _parse_step_syslog_from_log4j_records(
+        _parse_hadoop_log4j_records(new_lines),
+        step_interpretation)
+
+
 def _interpret_emr_step_stderr(fs, matches):
     """Extract information from step stderr (see
     :py:func:`~mrjob.logs.task._parse_task_stderr()`),
@@ -254,14 +270,17 @@ def _parse_step_syslog(lines):
         _parse_hadoop_log4j_records(lines))
 
 
-def _parse_step_syslog_from_log4j_records(records):
+def _parse_step_syslog_from_log4j_records(records, step_interpretation=None):
     """Pulls errors, counters, IDs, etc. from log4j records
     emitted by Hadoop.
 
     This powers :py:func:`_parse_step_syslog` and
     :py:func:`_interpret_hadoop_jar_command_stderr`.
     """
-    result = {}
+    if step_interpretation is None:
+        result = {}
+    else:
+        result = step_interpretation
 
     for record in records:
         message = record['message']
@@ -289,6 +308,28 @@ def _parse_step_syslog_from_log4j_records(records):
         if m:
             result['job_id'] = m.group('job_id')
             continue
+
+        # progress
+        m = _JOB_PROGRESS_RE.match(message)
+        if m:
+            result['progress'] = dict(
+                map=int(m.group('map')),
+                reduce=int(m.group('reduce')),
+                message=message,
+            )
+
+        # invalid jar
+        m = _NOT_A_VALID_JAR_RE.match(message)
+        if m:
+            error = dict(
+                hadoop_error=dict(
+                    message=message,
+                    num_lines=record['num_lines'],
+                    start_line=record['start_line'],
+                ),
+            )
+            result.setdefault('errors', [])
+            result['errors'].append(error)
 
         # task failure
         m = _TASK_ATTEMPT_FAILED_RE.match(message)

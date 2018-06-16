@@ -1,6 +1,7 @@
 # Copyright 2009-2013 Yelp, David Marin
 # Copyright 2015 Yelp
 # Copyright 2017 Yelp
+# Copyright 2018 Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -79,7 +80,7 @@ class RetryWrapper(object):
             backoff = self.__backoff
             tries = 0
 
-            while (not self.__max_tries or tries < self.__max_tries):
+            while not self.__max_tries or tries < self.__max_tries:
                 try:
                     return f(*args, **kwargs)
                 except Exception as ex:
@@ -96,5 +97,5 @@ class RetryWrapper(object):
 
         # pretend to be the original function
         if hasattr(f, '__name__'):
-            call_and_maybe_retry.__name__ == f.__name__
+            call_and_maybe_retry.__name__ = f.__name__
         return call_and_maybe_retry

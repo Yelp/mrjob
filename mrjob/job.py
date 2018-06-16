@@ -1136,7 +1136,7 @@ class MRJob(MRJobLauncher):
         """Optional list of paths of directories upload to the job's working
         directory
 
-        By default, this returns :py:attr:`ARCHIV`, with paths interpreted
+        By default, this returns :py:attr:`DIRS`, with paths interpreted
         as relative to the directory containing the script.
 
         (You do not have to worry about directories passed in by the ``--dir``
@@ -1195,45 +1195,6 @@ class MRJob(MRJobLauncher):
                 paths.append(os.path.join(script_dir, path))
 
         return paths
-
-    def _upload_from_attr(self):
-        """Optional list of paths of files to upload to the job's working
-        directory.
-
-        By default, this returns :py:attr:`FILES`, with paths interpreted
-        as relative to the directory containing the script.
-
-        (You do not have to worry about files passed in by the ``--files``
-        option; the runner handles those separately.)
-
-        Note that ``~`` and environment variables in paths will always be
-        expanded by the job runner (see :mrjob-opt:`libjars`).
-
-        .. versionadded:: 0.6.3
-        """
-        # catch FILES = '<path>'
-        if isinstance(self.FILES, string_types):
-            raise TypeError('FILES must be a list or other sequence.')
-
-        script_dir = os.path.dirname(self.mr_job_script())
-        paths = []
-
-        for path in self.FILES:
-            expanded_path = expand_path(path)
-
-            if os.path.isabs(expanded_path):
-                paths.append(path)
-            else:
-                # if people have a file data/foo.json, Hadoop will
-                # put foo.json in the job's working dir, not data/
-                if os.sep in path and '#' not in path:
-                    log.warn('%s will appear in same directory as job script,'
-                             ' not a subdirectory' % path)
-
-                paths.append(os.path.join(script_dir, path))
-
-        return paths
-
 
     ### Jobconf ###
 

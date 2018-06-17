@@ -1398,6 +1398,17 @@ class UploadAttrsTestCase(SandboxedTestCase):
             job.FILES
         )
 
+    def test_files_attr_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            FILES = ['/tmp/foo.db']
+
+        job = TestJob(['--file', 'foo/bar.txt'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['foo/bar.txt', '/tmp/foo.db']
+        )
+
     def test_envvar_files(self):
         class TestJob(MRJob):
             FILES = ['$ABSPATH', '$RELPATH#b.txt', '~/$RELPATH']
@@ -1418,7 +1429,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             ]
         )
 
-    def test_relative_subdir_warning(self):
+    def test_files_attr_relative_subdir_warning(self):
         class TestJob(MRJob):
             FILES = ['fs/test_s3.py']
 
@@ -1433,7 +1444,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
         self.assertTrue(self.log.warning.called)
 
-    def test_no_relative_subdir_warning_with_hash(self):
+    def test_files_attr_no_relative_subdir_warning_with_hash(self):
         class TestJob(MRJob):
             FILES = ['fs/test_s3.py#test_s3.py']
 
@@ -1460,7 +1471,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             ['foo/bar.txt'],
         )
 
-    def test_files_can_return_string(self):
+    def test_files_method_can_return_string(self):
         class TestJob(MRJob):
             def files(self):
                 return '/var/foo.db'
@@ -1472,10 +1483,123 @@ class UploadAttrsTestCase(SandboxedTestCase):
             ['/var/foo.db'],
         )
 
+    def test_files_method_can_return_none(self):
+        class TestJob(MRJob):
+            def files(self):
+                pass
+
+        job = TestJob()
+
+        self.assertEqual(job._runner_kwargs()['upload_files'], [])
+
     def test_files_method_overrides_files_attr(self):
         class TestJob(MRJob):
             FILES = ['test_runner.py']
             def files(self):
-                return ['foo/bar.txt']
+                return ['/var/foo.db']
 
         job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['/var/foo.db'],
+        )
+
+    def test_files_method_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            def files(self):
+                return ['foo/bar.txt']
+
+        job = TestJob(['--file', 'baz.txt'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['baz.txt', 'foo/bar.txt'],
+        )
+
+    # DIRS and ARCHIVES use _upload_attr() too, so we don't need
+    # to test them as extensively
+
+    def test_dirs_attr(self):
+        class TestJob(MRJob):
+            DIRS = ['/tmp', 'fs', 'logs']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            [
+                '/tmp',
+                join(dirname(__file__), 'fs'),
+                join(dirname(__file__), 'logs'),
+            ],
+        )
+
+    def test_dirs_attr_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            DIRS = ['/tmp']
+
+        job = TestJob(['--dir', 'foo'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['foo', '/tmp']
+        )
+
+    def test_dirs_method_doesnt_qualify_path(self):
+        class TestJob(MRJob):
+            def dirs(self):
+                return ['logs']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['logs'],
+        )
+
+    def test_dirs_method_can_return_string(self):
+        class TestJob(MRJob):
+            def dirs(self):
+                return '/tmp'
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['/tmp'],
+        )
+
+    def test_files_method_can_return_none(self):
+        class TestJob(MRJob):
+            def dirs(self):
+                pass
+
+        job = TestJob()
+
+        self.assertEqual(job._runner_kwargs()['upload_dirs'], [])
+
+    def test_dirs_method_overrides_dirs_attr(self):
+        class TestJob(MRJob):
+            DIRS = ['logs']
+            def dirs(self):
+                return ['/tmp']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['/tmp'],
+        )
+
+    def test_dirs_method_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            def dirs(self):
+                return ['/tmp']
+
+        job = TestJob(['--dir', 'stuff_dir'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['stuff_dir', '/tmp'],
+        )

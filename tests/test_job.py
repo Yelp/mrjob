@@ -16,10 +16,12 @@
 # limitations under the License.
 """Unit testing of MRJob."""
 import os
-import os.path
 import sys
 import time
 from io import BytesIO
+from os.path import abspath
+from os.path import dirname
+from os.path import join
 from subprocess import Popen
 from subprocess import PIPE
 from unittest import TestCase
@@ -696,17 +698,17 @@ class LibjarsTestCase(TestCase):
                              ['/left/dora.jar', 'honey.jar'])
 
     def test_libjars_attr_relative_path(self):
-        job_dir = os.path.dirname(MRJob.mr_job_script())
+        job_dir = dirname(MRJob.mr_job_script())
 
         with patch.object(MRJob, 'LIBJARS', ['cookie.jar', '/left/dora.jar']):
             job = MRJob()
 
             self.assertEqual(
                 job._runner_kwargs()['libjars'],
-                [os.path.join(job_dir, 'cookie.jar'), '/left/dora.jar'])
+                [join(job_dir, 'cookie.jar'), '/left/dora.jar'])
 
     def test_libjars_environment_variables(self):
-        job_dir = os.path.dirname(MRJob.mr_job_script())
+        job_dir = dirname(MRJob.mr_job_script())
 
         with patch.dict('os.environ', A='/path/to/a', B='b'):
             with patch.object(MRJob, 'LIBJARS',
@@ -717,7 +719,7 @@ class LibjarsTestCase(TestCase):
                 # is relative or absolute
                 self.assertEqual(
                     job._runner_kwargs()['libjars'],
-                    ['$A/cookie.jar', os.path.join(job_dir, '$B/honey.jar')])
+                    ['$A/cookie.jar', join(job_dir, '$B/honey.jar')])
 
     def test_override_libjars(self):
         with patch.object(MRJob, 'libjars', return_value=['honey.jar']):
@@ -875,7 +877,7 @@ class StepNumTestCase(TestCase):
 class FileOptionsTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
-        n_file_path = os.path.join(self.tmp_dir, 'n_file')
+        n_file_path = join(self.tmp_dir, 'n_file')
 
         with open(n_file_path, 'w') as f:
             f.write('3')
@@ -912,7 +914,7 @@ class RunJobTestCase(SandboxedTestCase):
                 list(args) + ['--no-conf'])
         # add . to PYTHONPATH (in case mrjob isn't actually installed)
         env = combine_envs(os.environ,
-                           {'PYTHONPATH': os.path.abspath('.')})
+                           {'PYTHONPATH': abspath('.')})
         proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         stdout, stderr = proc.communicate(input=b'foo\nbar\nbar\n')
         return stdout, stderr, proc.returncode
@@ -956,7 +958,7 @@ class RunJobTestCase(SandboxedTestCase):
         output_lines = []
         for dirpath, _, filenames in os.walk(self.tmp_dir):
             for filename in filenames:
-                with open(os.path.join(dirpath, filename), 'rb') as output_f:
+                with open(join(dirpath, filename), 'rb') as output_f:
                     output_lines.extend(output_f)
 
         self.assertEqual(sorted(output_lines),
@@ -1362,3 +1364,31 @@ class RunnerKwargsTestCase(TestCase):
 
     def test_local(self):
         self._test_runner_kwargs('local')
+
+
+class UploadAttrsTestCase(SandboxedTestCase):
+
+    class MRRelativeFilesAttrJob(MRJob):
+        FILES = ['sandbox.py', 'quiet.py']
+
+    def test_relative_files(self):
+        job = self.MRRelativeFilesAttrJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            [
+                join(dirname(__file__), 'sandbox.py'),
+                join(dirname(__file__), 'quiet.py'),
+            ]
+        )
+
+    class MRAbsoluteFilesAttrJob(MRJob):
+        FILES = [abspath(__file__)]
+
+    def test_absolute_files(self):
+        job = self.MRAbsoluteFilesAttrJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            job.FILES
+        )

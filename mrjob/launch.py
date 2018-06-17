@@ -472,6 +472,7 @@ class MRJobLauncher(object):
             return LocalMRJobRunner
 
     def _runner_kwargs(self):
+        # TODO: why combine_dicts() and not combine_options()?
         return combine_dicts(
             self._non_option_kwargs(),
             self._kwargs_from_switches(self._runner_opt_names()),

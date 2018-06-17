@@ -1447,3 +1447,37 @@ class UploadAttrsTestCase(SandboxedTestCase):
         )
 
         self.assertFalse(self.log.warning.called)
+
+    def test_files_method_doesnt_qualify_path(self):
+        class TestJob(MRJob):
+            def files(self):
+                return ['foo/bar.txt']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['foo/bar.txt'],
+        )
+
+    def test_files_method_overrides_files_attr(self):
+        class TestJob(MRJob):
+            FILES = ['test_runner.py']
+            def files(self):
+                return ['foo/bar.txt']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['foo/bar.txt'],
+        )
+
+    def test_files_method_cant_return_string(self):
+        class TestJob(MRJob):
+            def files(self):
+                return 'foo/bar.txt'
+
+        job = TestJob()
+
+        self.assertRaises(TypeError, job._runner_kwargs)

@@ -32,6 +32,7 @@ from mrjob.options import _optparse_kwargs_to_argparse
 from mrjob.options import _parse_raw_args
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
+from mrjob.py2 import string_types
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
@@ -530,17 +531,24 @@ class MRJobLauncher(object):
     def _job_kwargs(self):
         """Keyword arguments to the runner class that can be specified
         by the job/launcher itself."""
-        # TODO: this method should take more responsibility for options that
-        # can be specified on the command line and by the job
+        # call self.files() etc., check its value, and return it as a list
+        def expect_list(name):
+            paths = getattr(self, name)()
+            if paths is None or isinstance(paths, string_types):
+                raise TypeError('%s() must return a string' % name)
+            return list(paths)
+
+        # TODO: this method should take responsibility for combining
+        # self.options with method result for jobconf and libjars
         return dict(
             jobconf=self.jobconf(),
             libjars=self.libjars(),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),
-            upload_archives=self.options.upload_archives + list(
-                self.archives()),
-            upload_dirs=self.options.upload_dirs + list(self.dirs()),
-            upload_files=self.options.upload_files + list(self.files()),
+            upload_archives=self.options.upload_archives + expect_list(
+                'archives'),
+            upload_dirs=self.options.upload_dirs + expect_list('dirs'),
+            upload_files=self.options.upload_files + expect_list('files'),
         )
 
     ### Hooks for options defined by the job ###

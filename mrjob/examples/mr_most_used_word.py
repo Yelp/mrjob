@@ -56,7 +56,10 @@ class MRMostUsedWord(MRJob):
     def reducer_find_max_word(self, _, word_count_pairs):
         # each item of word_count_pairs is (count, word),
         # so yielding one results in key=counts, value=word
-        yield max(word_count_pairs)
+        try:
+            yield max(word_count_pairs)
+        except ValueError:
+            pass
 
     def steps(self):
         return [

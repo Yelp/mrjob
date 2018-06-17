@@ -1373,11 +1373,11 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
         self.log = self.start(patch('mrjob.job.log'))
 
-    class MRRelativeFilesAttrJob(MRJob):
-        FILES = ['sandbox.py', 'quiet.py#q.py']
-
     def test_relative_files(self):
-        job = self.MRRelativeFilesAttrJob()
+        class TestJob(MRJob):
+            FILES = ['sandbox.py', 'quiet.py#q.py']
+
+        job = TestJob()
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1387,27 +1387,27 @@ class UploadAttrsTestCase(SandboxedTestCase):
             ]
         )
 
-    class MRAbsoluteFilesAttrJob(MRJob):
-        FILES = [abspath(__file__)]
-
     def test_absolute_files(self):
-        job = self.MRAbsoluteFilesAttrJob()
+        class TestJob(MRJob):
+            FILES = [abspath(__file__)]
+
+        job = TestJob()
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
             job.FILES
         )
 
-    class MREnvVarFilesAttrJob(MRJob):
-        FILES = ['$ABSPATH', '$RELPATH#b.txt', '~/$RELPATH']
-
     def test_envvar_files(self):
+        class TestJob(MRJob):
+            FILES = ['$ABSPATH', '$RELPATH#b.txt', '~/$RELPATH']
+
         # verify that we check if the path will be relative or
         # absolute after expansion
         os.environ['ABSPATH'] = '/var/foo.db'
         os.environ['RELPATH'] = 'bar.txt'
 
-        job = self.MREnvVarFilesAttrJob()
+        job = TestJob()
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1418,11 +1418,11 @@ class UploadAttrsTestCase(SandboxedTestCase):
             ]
         )
 
-    class MRRelativeSubdirFilesAttrJob(MRJob):
-        FILES = ['fs/test_s3.py']
-
     def test_relative_subdir_warning(self):
-        job = self.MRRelativeSubdirFilesAttrJob()
+        class TestJob(MRJob):
+            FILES = ['fs/test_s3.py']
+
+        job = TestJob()
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],
@@ -1433,11 +1433,11 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
         self.assertTrue(self.log.warning.called)
 
-    class MRRelativeSubdirWithHashFilesAttrJob(MRJob):
-        FILES = ['fs/test_s3.py#test_s3.py']
-
     def test_no_relative_subdir_warning_with_hash(self):
-        job = self.MRRelativeSubdirWithHashFilesAttrJob()
+        class TestJob(MRJob):
+            FILES = ['fs/test_s3.py#test_s3.py']
+
+        job = TestJob()
 
         self.assertEqual(
             job._runner_kwargs()['upload_files'],

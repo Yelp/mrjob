@@ -1570,7 +1570,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
             ['/tmp'],
         )
 
-    def test_files_method_can_return_none(self):
+    def test_dirs_method_can_return_none(self):
         class TestJob(MRJob):
             def dirs(self):
                 pass
@@ -1602,4 +1602,87 @@ class UploadAttrsTestCase(SandboxedTestCase):
         self.assertEqual(
             job._runner_kwargs()['upload_dirs'],
             ['stuff_dir', '/tmp'],
+        )
+
+    def test_archives_attr(self):
+        class TestJob(MRJob):
+            ARCHIVES = ['/tmp/dir.tar.gz', 'foo.zip']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            [
+                '/tmp/dir.tar.gz',
+                join(dirname(__file__), 'foo.zip'),
+            ],
+        )
+
+    def test_archives_attr_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            ARCHIVES = ['/tmp/dir.tar.gz']
+
+        job = TestJob(['--archive', 'foo.zip'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['foo.zip', '/tmp/dir.tar.gz']
+        )
+
+    def test_archives_method_doesnt_qualify_path(self):
+        class TestJob(MRJob):
+            def archives(self):
+                return ['logs.tar.gz']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['logs.tar.gz'],
+        )
+
+    def test_archives_method_can_return_string(self):
+        class TestJob(MRJob):
+            def archives(self):
+                return '/tmp/dir.tar.gz'
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['/tmp/dir.tar.gz'],
+        )
+
+    def test_archives_method_can_return_none(self):
+        class TestJob(MRJob):
+            def archives(self):
+                pass
+
+        job = TestJob()
+
+        self.assertEqual(job._runner_kwargs()['upload_archives'], [])
+
+    def test_archives_method_overrides_dirs_attr(self):
+        class TestJob(MRJob):
+            ARCHIVES = ['logs.tar.gz']
+            def archives(self):
+                return ['/tmp/dirs.tar.gz']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['/tmp/dirs.tar.gz'],
+        )
+
+    def test_archives_method_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            def archives(self):
+                return ['/tmp/dir.tar.gz']
+
+        job = TestJob(['--archive', 'stuff.zip'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['stuff.zip', '/tmp/dir.tar.gz'],
         )

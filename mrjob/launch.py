@@ -25,6 +25,7 @@ from argparse import ArgumentParser
 from argparse import ArgumentError
 
 from mrjob.conf import combine_dicts
+from mrjob.conf import combine_lists
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args
 from mrjob.options import _add_runner_args
@@ -531,13 +532,6 @@ class MRJobLauncher(object):
     def _job_kwargs(self):
         """Keyword arguments to the runner class that can be specified
         by the job/launcher itself."""
-        # call self.files() etc., check its value, and return it as a list
-        def expect_list(name):
-            paths = getattr(self, name)()
-            if paths is None or isinstance(paths, string_types):
-                raise TypeError('%s() must return a string' % name)
-            return list(paths)
-
         # TODO: this method should take responsibility for combining
         # self.options with method result for jobconf and libjars
         return dict(
@@ -545,10 +539,12 @@ class MRJobLauncher(object):
             libjars=self.libjars(),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),
-            upload_archives=self.options.upload_archives + expect_list(
-                'archives'),
-            upload_dirs=self.options.upload_dirs + expect_list('dirs'),
-            upload_files=self.options.upload_files + expect_list('files'),
+            upload_archives=combine_lists(
+                self.options.upload_archives, self.archives()),
+            upload_dirs=combine_lists(
+                self.options.upload_dirs, self.dirs()),
+            upload_files=combine_lists(
+                self.options.upload_files, self.files()),
         )
 
     ### Hooks for options defined by the job ###

@@ -236,6 +236,21 @@ class ClusterTerminationTestCase(MockBotoTestCase):
             )],
         ))
 
+        # idle, but termination protected. this cluster can never actually be
+        # terminated, but the job must handle this case gracefully
+        self.add_mock_emr_cluster(MockEmrObject(
+            id='j-IDLE_AND_PROTECTED',
+            _TerminationProtected=True,
+            status=MockEmrObject(
+                state='WAITING',
+                timeline=MockEmrObject(
+                    creationdatetime=ago(hours=6),
+                    readydatetime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _steps=[step(start_hours_ago=4, end_hours_ago=2)],
+        ))
+
         mock_emr_conn = self.connect_emr()
 
         # hadoop debugging without any other steps
@@ -722,9 +737,12 @@ class ClusterTerminationTestCase(MockBotoTestCase):
         self.maybe_terminate_quietly(
             stdout=stdout, max_hours_idle=0.01, dry_run=True)
 
-        # dry_run doesn't actually try to lock
         expected_stdout_lines = self.EXPECTED_STDOUT_LINES + [
+            # dry_run doesn't actually try to lock
             'Terminated cluster j-IDLE_AND_LOCKED (IDLE_AND_LOCKED);'
+            ' was idle for 2:00:00, 1:00:00 to end of hour',
+            # dry_run also can't tell when clusters are termination protected
+            'Terminated cluster j-IDLE_AND_PROTECTED (IDLE_AND_PROTECTED);'
             ' was idle for 2:00:00, 1:00:00 to end of hour']
 
         self.assertEqual(set(stdout.getvalue().splitlines()),

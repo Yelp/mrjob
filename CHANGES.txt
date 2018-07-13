@@ -141,7 +141,7 @@ v0.6.0, 2017-11-01 -- wave of deprecation
          * removed methods that return boto 2 objects (see below)
          * create_bucket()'s second arg is now named region, not location
  * mrjob tools:
-   * updated billing cacluations in audit-emr-usage (#1688)
+   * updated billing calculations in audit-emr-usage (#1688)
  * mrjob.util
    * deprecated read_file() (#1605) (use mrjob.cat.decompress())
    * deprecated read_input()

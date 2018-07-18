@@ -1,4 +1,6 @@
-# Copyright 2009-2015 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
+# Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -50,14 +52,6 @@ try:
     if sys.version_info >= (3, 0):
         setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
 
-    # mock is included in Python 3.3 as unittest.mock
-    if sys.version_info < (3, 3):
-        setuptools_kwargs['tests_require'].append('mock')
-
-        # unittest2 is a backport of unittest from Python 2.7
-        if sys.version_info < (2, 7):
-            setuptools_kwargs['tests_require'].append('unittest2')
-
 except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}
@@ -73,10 +67,8 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',

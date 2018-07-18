@@ -2,7 +2,6 @@ language: python
 python:
   - "2.7"
   - "pypy"
-  - "3.3"
   - "3.4"
   - "3.5"
   - "3.6"
@@ -17,7 +16,6 @@ install:
   - "pip install ."
   - "pip install ujson warcio"
   - "pip install rapidjson || true"
-  - "if [[ $TRAVIS_PYTHON_VERSION == 3.3 ]]; then pip install virtualenv==15.2.0; fi"
 # command to run tests
 script: python -m unittest discover -v
 sudo: false

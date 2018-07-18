@@ -74,7 +74,7 @@ v0.6.1, 2017-11-27 -- mrjob diagnose
  * exposed EMRJobRunner.get_job_steps() (#1625)
 
 v0.6.0, 2017-11-01 -- wave of deprecation
- * dropped support for Python 2.7
+ * dropped support for Python 2.6
  * use boto3 instead of boto (#1304)
  * job output is now byte-based, not line-based:
    * runner.fs.cat() now yields chunks of bytes, not lines (#1533)

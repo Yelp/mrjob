@@ -310,6 +310,7 @@ v0.5.8, 2017-02-01 -- upload_dirs, pre-filters
      * use ListInstances rather than dfsadmin to get node list (#1345)
  * moved mrjob.util.bunzip2_stream() to mrjob.cat
  * moved mrjob.util.gunzip_stream() to mrjob.cat
+ * mrjob.util.parse_and_save_options() now returns dict, not defaultdict
  * deprecated:
    * mrjob.util.args_for_opt_dest_subset()
    * mrjob.util.bash_wrap()

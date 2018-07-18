@@ -200,12 +200,14 @@ def _maybe_terminate_clusters(dry_run=False,
             num_idle += 1
 
         log.debug(
-            'cluster %s %s for %s, %s (%s)' %
+            'cluster %s %s for %s, %s (%s) - %s' %
             (cluster_id,
              'pending' if is_pending else 'idle',
              strip_microseconds(time_idle),
              ('unpooled' if pool is None else 'in %s pool' % pool),
-             cluster_summary['Name']))
+             cluster_summary['Name'],
+            'protected' if cluster['TerminationProtected'] else 'unprotected',
+            ))
 
         # filter out clusters that don't meet our criteria
         if (max_mins_idle is not None and
@@ -219,6 +221,9 @@ def _maybe_terminate_clusters(dry_run=False,
             continue
 
         if (pool_name is not None and pool != pool_name):
+            continue
+
+        if cluster['TerminationProtected']:
             continue
 
         # terminate idle cluster

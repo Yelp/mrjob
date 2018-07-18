@@ -49,10 +49,6 @@ try:
         setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
         setuptools_kwargs['tests_require'].append('rapidjson')
 
-    # mock is included in Python 3.3 as unittest.mock
-    if sys.version_info < (3, 3):
-        setuptools_kwargs['tests_require'].append('mock')
-
     # grpc requires enum, which is a builtin starting in Python 3.4
     if sys.version_info >= (3, 0) and sys.version_info < (3, 4):
         setuptools_kwargs['install_requires'].append('enum34')
@@ -75,7 +71,6 @@ setup(
         'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',

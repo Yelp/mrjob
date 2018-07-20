@@ -1875,16 +1875,7 @@ class CreateDirArchiveTestCase(SandboxedTestCase):
 
         runner._create_dir_archive(empty_dir)
 
-        tar_gz = None
-        try:
-            tar_gz = tarfile.open(tar_gz_path, 'r:gz')
-        except ReadError as e:
-            # Python 2.6 can produce valid empty tarballs (verified this
-            # by hand) but it can't read them
-            if sys.version_info < (2, 7) and e.args == ('empty header',):
-                return
-            else:
-                raise
+        tar_gz = tarfile.open(tar_gz_path, 'r:gz')
 
         try:
             self.assertEqual(sorted(tar_gz.getnames()), [])

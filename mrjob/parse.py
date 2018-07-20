@@ -2,7 +2,7 @@
 # Copyright 2013 Steve Johnson and David Marin
 # Copyright 2014 Yelp and Contributors
 # Copyright 2015-2016 Yelp
-# Copyright 2017 Yelp
+ Copyright 2017 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,11 +39,6 @@ log = logging.getLogger(__name__)
 
 
 ### URI PARSING ###
-
-
-# Used to parse the real netloc out of a malformed path from early Python 2.6
-# urlparse()
-_NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
 
 # Used to check if the candidate uri is actually a local windows path.
 _WINPATH_RE = re.compile(r"^[aA-zZ]:\\")

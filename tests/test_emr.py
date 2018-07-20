@@ -1534,6 +1534,7 @@ class MasterBootstrapScriptTestCase(MockBotoTestCase):
 
     def test_create_master_bootstrap_script_on_3_11_0_ami(self):
         self._test_create_master_bootstrap_script(
+            expected_python_bin=('python2.7' if PY2 else PYTHON_BIN),
             image_version='3.11.0')
 
     def test_create_master_bootstrap_script_on_2_4_11_ami(self):
@@ -3499,11 +3500,13 @@ class DefaultPythonBinTestCase(MockBotoTestCase):
 
     def test_4_x_release_label(self):
         runner = EMRJobRunner(release_label='emr-4.0.0')
-        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+        self.assertEqual(runner._default_python_bin(),
+                         ['python2.7'] if PY2 else [PYTHON_BIN])
 
     def test_3_11_0_ami(self):
         runner = EMRJobRunner(image_version='3.11.0')
-        self.assertEqual(runner._default_python_bin(), [PYTHON_BIN])
+        self.assertEqual(runner._default_python_bin(),
+                         ['python2.7'] if PY2 else [PYTHON_BIN])
 
     def test_2_4_3_ami(self):
         runner = EMRJobRunner(image_version='2.4.3')

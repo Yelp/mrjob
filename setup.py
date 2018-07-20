@@ -29,7 +29,7 @@ try:
         'install_requires': [
             'boto>=2.35.0',
             'filechunkio',
-            'google-api-python-client>=1.5.0'
+            'google-api-python-client>=1.5.0',
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],

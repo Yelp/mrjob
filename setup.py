@@ -30,6 +30,7 @@ try:
             'boto>=2.35.0',
             'filechunkio',
             'google-api-python-client>=1.5.0',
+            'oauth2client>=2.0.0',
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],

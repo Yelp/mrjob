@@ -22,6 +22,7 @@ from collections import defaultdict
 from optparse import OptionError
 from subprocess import Popen
 from subprocess import PIPE
+from unittest import TestCase
 
 from mrjob.conf import combine_envs
 from mrjob.dataproc import DataprocJobRunner
@@ -39,7 +40,6 @@ from tests.mr_no_runner import MRNoRunner
 from tests.mr_runner import MRRunner
 from tests.py2 import MagicMock
 from tests.py2 import Mock
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import mrjob_pythonpath

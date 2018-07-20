@@ -24,6 +24,7 @@ import tempfile
 from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
+from unittest import TestCase
 
 from mrjob.py2 import PY2
 from mrjob.py2 import StringIO
@@ -43,7 +44,6 @@ from mrjob.util import unarchive
 from mrjob.util import unique
 from mrjob.util import which
 
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import SandboxedTestCase

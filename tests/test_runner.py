@@ -28,6 +28,7 @@ from io import BytesIO
 from subprocess import CalledProcessError
 from tarfile import ReadError
 from time import sleep
+from unittest import TestCase
 from zipfile import ZipFile
 from zipfile import ZIP_DEFLATED
 
@@ -46,7 +47,6 @@ from mrjob.tools.emr.audit_usage import _JOB_KEY_RE
 from mrjob.util import log_to_stream
 from mrjob.util import tar_and_gzip
 
-
 from tests.mockboto import MockBotoTestCase
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_counting_job import MRCountingJob
@@ -62,7 +62,6 @@ from tests.mr_spark_script import MRSparkScript
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase

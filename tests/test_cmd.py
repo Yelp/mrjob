@@ -13,6 +13,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import TestCase
+
 from mrjob import cmd
 from mrjob import launch
 from mrjob.tools.emr import audit_usage
@@ -25,7 +27,6 @@ from mrjob.tools.emr import terminate_idle_clusters
 from mrjob.tools.emr import terminate_idle_job_flows
 from mrjob.tools.emr import terminate_job_flow
 
-from tests.py2 import TestCase
 from tests.py2 import patch
 
 

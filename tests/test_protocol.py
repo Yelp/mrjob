@@ -15,6 +15,10 @@
 # limitations under the License.
 
 """Make sure all of our protocols work as advertised."""
+import unittest
+from unittest import TestCase
+from unittest import skipIf
+
 from mrjob.protocol import BytesProtocol
 from mrjob.protocol import BytesValueProtocol
 from mrjob.protocol import JSONProtocol
@@ -39,10 +43,6 @@ from mrjob.protocol import rapidjson
 from mrjob.protocol import simplejson
 from mrjob.protocol import ujson
 from mrjob.py2 import PY2
-
-from tests.py2 import TestCase
-from tests.py2 import skipIf
-from tests.py2 import unittest
 
 
 class Point(object):

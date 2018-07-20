@@ -21,6 +21,7 @@ import gzip
 import os
 import os.path
 from io import BytesIO
+from unittest import TestCase
 
 from mrjob import conf
 from mrjob.fs.base import Filesystem
@@ -35,7 +36,6 @@ from tests.mr_test_jobconf import MRTestJobConf
 from tests.mr_test_per_step_jobconf import MRTestPerStepJobConf
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
-from tests.py2 import TestCase
 from tests.py2 import mock
 from tests.py2 import patch
 from tests.sandbox import EmptyMrjobConfTestCase

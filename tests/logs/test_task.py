@@ -12,6 +12,9 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import TestCase
+import unittest
+
 from mrjob.logs.task import _interpret_task_logs
 from mrjob.logs.task import _interpret_spark_task_logs
 from mrjob.logs.task import _ls_spark_task_logs
@@ -22,8 +25,6 @@ from mrjob.logs.task import _parse_task_syslog
 
 from tests.py2 import call
 from tests.py2 import Mock
-from tests.py2 import unittest
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.sandbox import PatcherTestCase
 

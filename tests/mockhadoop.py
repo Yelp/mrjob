@@ -2,6 +2,7 @@
 # Copyright 2013 Tom Arnfeld and David Marin
 # Copyright 2014 Contributors
 # Copyright 2015-2016 Yelp
+# Copyright 2017 Yelp and Contributors
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -196,7 +197,7 @@ def real_path_to_hdfs_uri(real_path, environ):
     if not real_path.startswith(hdfs_root):
         raise ValueError('path %s is not in %s' % (real_path, hdfs_root))
 
-    # janky version of os.path.relpath(), for Python 2.6
+    # for some reason, relpath() doesn't work here
     hdfs_uri = real_path[len(hdfs_root):]
     if not hdfs_uri.startswith('/'):
         hdfs_uri = '/' + hdfs_uri
@@ -387,7 +388,7 @@ def _hadoop_ls_line(real_path, scheme, netloc, size=0, max_size=0, environ={}):
     else:
         file_type = '-'
 
-    if scheme in ('s3', 's3n'):
+    if scheme in ('s3', 's3n', 's3a'):
         # no user and group on S3 (see Pull Request #573)
         user_and_group = ''
     else:

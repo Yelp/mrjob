@@ -1,4 +1,6 @@
-# Copyright 2009-2015 Yelp and Contributors
+# Copyright 2009-2016 Yelp and Contributors
+# Copyright 2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +29,8 @@ try:
         'install_requires': [
             'boto>=2.35.0',
             'filechunkio',
-            #'google-api-python-client>=1.5.0'  # see below
+            'google-api-python-client>=1.5.0',
+            'oauth2client>=2.0.0',
             'PyYAML>=3.08',
         ],
         'provides': ['mrjob'],
@@ -36,27 +39,8 @@ try:
         'zip_safe': False,  # so that we can bootstrap mrjob
     }
 
-    # mrjob doesn't actually support Python 3.2, but it tries to support
-    # PyPy3, which is currently Python 3.2 with some key 3.3 features
-    if (hasattr(sys, 'pypy_version_info') and
-            (3, 0) <= sys.version_info < (3, 3)):
-        # httplib2 is a dependency of google-api-python-client, used
-        # to run tests
-        setuptools_kwargs['install_requires'].append('httplib2>=0.8,<1')
-    else:
-        setuptools_kwargs['install_requires'].append(
-            'google-api-python-client>=1.5.0')
-
     if sys.version_info >= (3, 0):
         setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
-
-    # mock is included in Python 3.3 as unittest.mock
-    if sys.version_info < (3, 3):
-        setuptools_kwargs['tests_require'].append('mock')
-
-        # unittest2 is a backport of unittest from Python 2.7
-        if sys.version_info < (2, 7):
-            setuptools_kwargs['tests_require'].append('unittest2')
 
 except ImportError:
     from distutils.core import setup
@@ -73,10 +57,8 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
         'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.6',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.3',
         'Programming Language :: Python :: 3.4',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',

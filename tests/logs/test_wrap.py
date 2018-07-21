@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 from io import BytesIO
+from unittest import TestCase
 
 from mrjob.logs.wrap import _cat_log
 from mrjob.logs.wrap import _ls_logs
@@ -21,7 +22,6 @@ from mrjob.util import log_to_stream
 
 from tests.py2 import patch
 from tests.py2 import Mock
-from tests.py2 import TestCase
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import PatcherTestCase
 

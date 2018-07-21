@@ -19,6 +19,7 @@ import sys
 from io import BytesIO
 from subprocess import PIPE
 from subprocess import Popen
+from unittest import TestCase
 
 from mrjob.parse import _find_python_traceback
 from mrjob.parse import is_windows_path
@@ -30,9 +31,6 @@ from mrjob.parse import parse_s3_uri
 from mrjob.parse import urlparse
 from mrjob.parse import _parse_progress_from_job_tracker
 from mrjob.parse import _parse_progress_from_resource_manager
-
-from tests.py2 import TestCase
-
 
 
 class FindPythonTracebackTestCase(TestCase):

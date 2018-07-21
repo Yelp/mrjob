@@ -15,13 +15,13 @@
 # limitations under the License.
 from datetime import datetime
 from datetime import timedelta
+from unittest import TestCase
 
 from mrjob.pool import _est_time_to_hour
 from mrjob.pool import _pool_hash_and_name
 
 from tests.mockboto import MockEmrObject
 from tests.mockboto import to_iso8601
-from tests.py2 import TestCase
 
 
 class EstTimeToEndOfHourTestCase(TestCase):

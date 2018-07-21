@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 import errno
+from unittest import TestCase
 
 from mrjob.logs.step import _interpret_emr_step_syslog
 from mrjob.logs.step import _interpret_emr_step_stderr
@@ -26,7 +27,6 @@ from mrjob.py2 import StringIO
 from mrjob.util import log_to_stream
 
 from tests.py2 import Mock
-from tests.py2 import TestCase
 from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import PatcherTestCase

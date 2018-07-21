@@ -16,6 +16,8 @@
 import os
 from tempfile import mkdtemp
 from shutil import rmtree
+from unittest import TestCase
+from unittest import skipIf
 
 try:
     import boto
@@ -38,8 +40,6 @@ from mrjob.runner import RunnerOptionStore
 from mrjob.sim import SimRunnerOptionStore
 from mrjob.util import log_to_stream
 
-from tests.py2 import TestCase
-from tests.py2 import skipIf
 from tests.quiet import logger_disabled
 from tests.quiet import no_handlers_for_logger
 

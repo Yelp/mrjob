@@ -21,6 +21,7 @@ import os.path
 from io import BytesIO
 from subprocess import check_call
 from subprocess import PIPE
+from unittest import TestCase
 
 import mrjob.step
 from mrjob.conf import combine_dicts
@@ -44,7 +45,6 @@ from tests.mr_streaming_and_spark import MRStreamingAndSpark
 from tests.mr_two_step_hadoop_format_job import MRTwoStepJob
 from tests.mr_word_count import MRWordCount
 from tests.py2 import Mock
-from tests.py2 import TestCase
 from tests.py2 import call
 from tests.py2 import patch
 from tests.quiet import logger_disabled

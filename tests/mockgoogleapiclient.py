@@ -22,6 +22,7 @@ import sys
 from datetime import datetime
 from httplib2 import Response
 from io import BytesIO
+from unittest import skipIf
 
 try:
     from oauth2client.client import GoogleCredentials
@@ -46,7 +47,6 @@ from mrjob.fs.gcs import _LS_FIELDS_TO_RETURN
 from tests.mr_two_step_job import MRTwoStepJob
 from tests.py2 import patch
 from tests.py2 import mock
-from tests.py2 import skipIf
 from tests.sandbox import SandboxedTestCase
 
 # list_clusters() only returns this many results at a time

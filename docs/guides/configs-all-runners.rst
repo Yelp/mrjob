@@ -307,15 +307,8 @@ Job execution context
 
     If you're on Python 3, this always defaults to ``'python3'``.
 
-    If you're on Python 2, this defaults to ``'python'``, except on EMR,
-    where it will be either ``'python2.6'`` or ``'python2.7'``.
-
-    Generally, :py:class:`~mrjob.emr.EMRJobRunner` just matches whichever
-    minor version of Python 2 you're running. However, if you're on a
-    (deprecated) 2.x AMI, it'll instead default to ``'python2.6'`` on AMI
-    version 2.4.2 and earlier (because Python 2.7 is unavailable) and
-    ``'python2.7'`` on later 2.x AMI versions (because they have
-    :command:`pip-2.7` but not :command:`pip-2.6`).
+    If you're on Python 2, this defaults to ``'python'`` (except on EMR
+    AMIs prior to 4.3.0, where it will be ``'python2.7'``).
 
     This option also affects which Python binary is used for file locking in
     :mrjob-opt:`setup` scripts, so it might be useful to set even if you're

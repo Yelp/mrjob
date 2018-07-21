@@ -11,10 +11,10 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+from unittest import TestCase
+
 from mrjob.logs.log4j import _parse_hadoop_log4j_records
 from mrjob.py2 import StringIO
-
-from tests.py2 import TestCase
 
 
 class ParseHadoopLog4JRecordsCase(TestCase):

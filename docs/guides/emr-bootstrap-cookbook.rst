@@ -32,7 +32,7 @@ version of Python.
 Figure out which version of Python you'll be running on EMR (see
 :mrjob-opt:`python_bin` for defaults).
 
- * If it's Python 2, use :command:`pip2.7` (just plain :command:`pip` also
+ * If it's Python 2, use :command:`pip-2.7` (just plain :command:`pip` also
    works on AMI 4.3.0 and later)
  * If it's Python 3, use :command:`pip-3.4`
 

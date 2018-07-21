@@ -30,12 +30,6 @@ log = logging.getLogger(__name__)
 
 ### URI PARSING ###
 
-
-# Used to parse the real netloc out of a malformed path from early Python 2.6
-# urlparse()
-_NETLOC_RE = re.compile(r'//(.*?)((/.*?)?)$')
-
-
 def is_uri(uri):
     """Return True if *uri* is a URI and contains ``://``
     (we only care about URIs that can describe files)

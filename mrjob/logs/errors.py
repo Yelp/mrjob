@@ -56,7 +56,7 @@ def _merge_and_sort_errors(errors):
         # key[0] is step number
         return (key[0], bool(error.get('task_error')), key[1:])
 
-    return [error for key, error in
+    return [error for _, error in
             sorted(key_to_error.items(), key=sort_key, reverse=True)]
 
 

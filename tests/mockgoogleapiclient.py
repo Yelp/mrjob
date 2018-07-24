@@ -14,8 +14,6 @@
 import re
 import collections
 import copy
-import os
-import tempfile
 import time
 import hashlib
 import sys

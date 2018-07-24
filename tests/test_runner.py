@@ -26,7 +26,6 @@ import tarfile
 import tempfile
 from io import BytesIO
 from subprocess import CalledProcessError
-from tarfile import ReadError
 from time import sleep
 from unittest import TestCase
 from zipfile import ZipFile

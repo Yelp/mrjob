@@ -444,7 +444,7 @@ class EMRRunnerOptionStore(RunnerOptionStore):
             'bootstrap_python': None,
             'check_cluster_every': 30,
             'cleanup_on_failure': ['JOB'],
-            'mins_to_end_of_hour': 5.0,
+            'mins_to_end_of_hour': 60.0,  # disable by default
             'num_core_instances': 0,
             'num_ec2_instances': 1,
             'num_task_instances': 0,

@@ -295,12 +295,17 @@ Cluster creation and configuration
     :switch: --mins-to-end-of-hour
     :type: :ref:`string <data-type-string>`
     :set: emr
-    :default: 5.0
+    :default: 60.0
 
-    If :mrjob-opt:`max_hours_idle` is set, controls how close to the end of an
-    EC2 billing hour the cluster can automatically terminate itself.
+    Controls how close to the end of an EC2 billing hour the cluster can
+    automatically terminate itself.
 
     .. versionadded:: 0.4.1
+
+    .. versionchanged:: 0.5.12
+
+       Changed from 5.0 to 60.0 (effectively disabling it), since
+       `Amazon no longer bills by the full hour <https://aws.amazon.com/about-aws/whats-new/2017/10/amazon-emr-now-supports-per-second-billing/>`__.
 
 .. mrjob-opt::
     :config: region

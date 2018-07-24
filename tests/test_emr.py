@@ -3031,7 +3031,7 @@ class MaxHoursIdleTestCase(MockBotoTestCase):
 
         with mr_job.make_runner() as runner:
             runner.make_persistent_cluster()
-            self.assertRanIdleTimeoutScriptWith(runner, ['36', '300'])
+            self.assertRanIdleTimeoutScriptWith(runner, ['36', '3600'])
 
     def test_mins_to_end_of_hour(self):
         mr_job = MRWordCount(['-r', 'emr', '--max-hours-idle', '1',

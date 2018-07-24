@@ -1,3 +1,10 @@
+v0.5.12, 2018-07-24 -- v0.6.x backport
+ * (released after v0.6.3)
+ * dropped support for Python 2.6 and 3.3
+ * termination protection doesn't make terminate-idle-clusters crash (#1802)
+ * mrjob.parse.parse_s3_uri() handles s3a:// URIs (#1709)
+ * always use str in environment dictionaries (affects Python 2 on Windows)
+
 v0.5.11, 2017-08-28 -- tweak report-long-jobs
  * report-long-jobs tool can exclude jobs based on tag (#1636)
  * mrjob won't crash when inspecting instance fleet clusters (#1639)

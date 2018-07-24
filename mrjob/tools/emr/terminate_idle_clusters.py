@@ -68,6 +68,8 @@ from datetime import timedelta
 import logging
 from optparse import OptionParser
 
+from boto.exception import EmrResponseError
+
 from mrjob.emr import _attempt_to_acquire_lock
 from mrjob.emr import EMRJobRunner
 from mrjob.emr import _list_all_steps
@@ -332,8 +334,17 @@ def _terminate_and_notify(runner, cluster_id, cluster_name, num_steps,
             mins_to_expiration=max_mins_locked,
         )
         if status:
-            runner.make_emr_conn().terminate_jobflow(cluster_id)
-            did_terminate = True
+            try:
+                runner.make_emr_conn().terminate_jobflow(cluster_id)
+                did_terminate = True
+            except EmrResponseError as e:
+                if (e.code == 'ValidationError' and
+                        'termination protected' in e.body):
+                    if not quiet:
+                        log.info('%s was termination protected, skipping' % (
+                                 cluster_id,))
+                else:
+                    raise
         elif not quiet:
             log.info('%s was locked between getting cluster info and'
                      ' trying to terminate it; skipping' % cluster_id)

@@ -1266,6 +1266,13 @@ class MockEmrConnection(object):
                 'TERMINATED', 'TERMINATED_WITH_ERRORS'):
             return
 
+        # termination protected clusters may not be terminated
+        if getattr(cluster, '_TerminationProtected', False):
+            raise boto.exception.EmrResponseError(
+                400, 'Bad Request', body=err_xml(
+                    'Could not shut down one or more job flows since they are'
+                    ' termination protected.'))
+
         # mark cluster as shutting down
         cluster.status.state = 'TERMINATING'
         cluster.status.statechangereason = MockEmrObject(

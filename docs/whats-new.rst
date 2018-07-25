@@ -315,6 +315,27 @@ About a hundred functions, methods, options, and more that were deprecated in
 v0.5.x have been removed. See `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_ for details.
 
+.. _v0.5.12:
+
+0.5.12
+------
+
+`This release came out after v0.6.3. It was mostly a backport from v0.6.x.`
+
+Python 2.6 and 3.3 are no longer supported.
+
+:py:func:`mrjob.parse.parse_s3_uri` handles ``s3a://`` URIs.
+
+:ref:`terminate-idle-clusters` now skips termination-protected idle clusters,
+rather than crashing.
+
+Since `Amazon no longer bills by the full hour <https://aws.amazon.com/about-aws/whats-new/2017/10/amazon-emr-now-supports-per-second-billing/>`__,
+the :mrjob-opt:`mins_to_end_of_hour` option now defaults to 60, effectively
+disabling it.
+
+When mrjob passes an environment dictionary to subprocesses, it ensures
+that the keys and values are always :py:class:`str`\s (this mostly affects
+Python 2 on Windows).
 
 .. _v0.5.11:
 

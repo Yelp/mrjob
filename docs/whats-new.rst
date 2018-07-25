@@ -13,7 +13,7 @@ For a complete list of changes, see `CHANGES.txt
 
 Python 2.6 and 3.3 are no longer supported.
 
-`py:func:mrjob.parse.parse_s3_uri` handles ``s3a://`` URIs.
+:py:func:`mrjob.parse.parse_s3_uri` handles ``s3a://`` URIs.
 
 :ref:`terminate-idle-clusters` now skips termination-protected idle clusters,
 rather than crashing.
@@ -23,7 +23,7 @@ the :mrjob-opt:`mins_to_end_of_hour` option now defaults to 60, effectively
 disabling it.
 
 When mrjob passes an environment dictionary to subprocesses, it ensures
-that the keys and values are always :py:type:`str`\s (this mostly affects
+that the keys and values are always :py:class:`str`\s (this mostly affects
 Python 2 on Windows).
 
 .. _v0.5.11:

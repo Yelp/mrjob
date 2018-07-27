@@ -93,6 +93,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.add_mock_emr_cluster(
             dict(
                 Id='j-EMPTY',
+                TerminationProtected=False,
                 Status=dict(
                     State='STARTING',
                     Timeline=dict(
@@ -105,6 +106,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # job that's bootstrapping
         self.add_mock_emr_cluster(dict(
             Id='j-BOOTSTRAPPING',
+            TerminationProtected=False,
             Status=dict(
                 State='BOOTSTRAPPING',
                 Timeline=dict(
@@ -118,6 +120,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         self.add_mock_emr_cluster(
             dict(
                 Id='j-CURRENTLY_RUNNING',
+                TerminationProtected=False,
                 Status=dict(
                     State='RUNNING',
                     Timeline=dict(
@@ -132,6 +135,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # finished cluster
         self.add_mock_emr_cluster(dict(
             Id='j-DONE',
+            TerminationProtected=False,
             Status=dict(
                 State='TERMINATED',
                 Timeline=dict(
@@ -146,6 +150,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # idle cluster
         self.add_mock_emr_cluster(dict(
             Id='j-DONE_AND_IDLE',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -160,6 +165,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # recognizable as a streaming step
         self.add_mock_emr_cluster(dict(
             Id='j-DONE_AND_IDLE_4_X',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -175,6 +181,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # idle cluster with an active lock
         self.add_mock_emr_cluster(dict(
             Id='j-IDLE_AND_LOCKED',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -193,6 +200,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # idle cluster with an expired lock
         self.add_mock_emr_cluster(dict(
             Id='j-IDLE_AND_EXPIRED',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -211,6 +219,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # idle cluster with an expired lock
         self.add_mock_emr_cluster(dict(
             Id='j-IDLE_BUT_INCOMPLETE_STEPS',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -224,6 +233,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # custom hadoop streaming jar
         self.add_mock_emr_cluster(dict(
             Id='j-CUSTOM_DONE_AND_IDLE',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -240,9 +250,25 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
             )],
         ))
 
+        # idle cluster, termination protected
+        self.add_mock_emr_cluster(dict(
+            Id='j-IDLE_AND_PROTECTED',
+            TerminationProtected=True,
+            Status=dict(
+                State='WAITING',
+                Timeline=dict(
+                    CreationDateTime=ago(hours=6),
+                    ReadyDateTime=ago(hours=5, minutes=5),
+                ),
+            ),
+            _Steps=[step(started=ago(hours=4), ended=ago(hours=2))],
+        ))
+
+
         # hadoop debugging without any other steps
         self.add_mock_emr_cluster(dict(
             Id='j-DEBUG_ONLY',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -262,6 +288,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # hadoop debugging + actual job
         self.add_mock_emr_cluster(dict(
             Id='j-HADOOP_DEBUGGING',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -282,6 +309,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # should skip cancelled steps
         self.add_mock_emr_cluster(dict(
             Id='j-IDLE_AND_FAILED',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -306,6 +334,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
                 ),
             ],
             Id='j-POOLED',
+            TerminationProtected=False,
             Status=dict(
                 State='WAITING',
                 Timeline=dict(
@@ -324,6 +353,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
         # cluster that has had pending jobs but hasn't run them
         self.add_mock_emr_cluster(dict(
             Id='j-PENDING_BUT_IDLE',
+            TerminationProtected=False,
             Status=dict(
                 State='RUNNING',
                 Timeline=dict(
@@ -499,6 +529,7 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
             'j-BOOTSTRAPPING',
             'j-CURRENTLY_RUNNING',
             'j-CUSTOM_DONE_AND_IDLE',
+            'j-IDLE_AND_PROTECTED',
             'j-DEBUG_ONLY',
             'j-DONE',
             'j-DONE_AND_IDLE',

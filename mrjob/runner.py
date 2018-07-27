@@ -568,7 +568,7 @@ class MRJobRunner(object):
 
     def stream_output(self):
         """Like :py:meth:`cat_output` except that it groups bytes into
-        lines. Equivalent to ``mrjob.util.to_lines(runner.stream_output())``.
+        lines. Equivalent to ``mrjob.util.to_lines(runner.cat_output())``.
 
         .. deprecated:: 0.6.0
         """

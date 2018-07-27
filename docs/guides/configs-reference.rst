@@ -17,9 +17,9 @@ You can set an option by:
 
     runners:
         local:
-            python_bin: python2.7  # only used in local runner
+            python_bin: python3.6  # only used in local runner
         emr:
-            python_bin: python2.6  # only used in Elastic MapReduce runner
+            python_bin: python3  # only used in Elastic MapReduce runner
 
   See :ref:`mrjob.conf` for information on where to put config files.
 

@@ -114,10 +114,6 @@ By default, :py:mod:`mrjob` runs a single ``m1.medium``, which is a cheap but no
 
 Here are some things to consider when tuning your instance settings:
 
-* Amazon bills you for the full hour even if your cluster only lasts for a few
-  minutes (this is an artifact of the EC2 billing structure), so for many
-  jobs that you run repeatedly, it is a good strategy to pick instance settings
-  that make your job consistently run in a little less than an hour.
 * Your job will take much longer and may fail if any task (usually a reducer)
   runs out of memory and starts using swap. (You can verify this by running
   :command:`mrjob boss j-CLUSTERID vmstat` and then looking in

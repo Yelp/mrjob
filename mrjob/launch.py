@@ -434,7 +434,7 @@ class MRJobLauncher(object):
     def pass_through_option(self, opt_str):
         """.. deprecated:: 0.6.0
 
-        Like :py:meth:`pass_arg_througj` except that it emulates the
+        Like :py:meth:`pass_arg_through` except that it emulates the
         old :py:mod:`optparse` interface (which is almost identical).
         """
         log.warning(

@@ -1,5 +1,4 @@
 v0.5.12, 2018-07-24 -- v0.6.x backport
- * (released after v0.6.3)
  * dropped support for Python 2.6 and 3.3
  * termination protection doesn't make terminate-idle-clusters crash (#1802)
  * mrjob.parse.parse_s3_uri() handles s3a:// URIs (#1709)

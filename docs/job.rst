@@ -85,6 +85,18 @@ configuration options.
 .. automethod:: MRJob.load_args
 .. automethod:: MRJob.is_task
 
+.. _uploading-support-files:
+
+Uploading support files
+-----------------------
+
+.. autoattribute:: MRJob.FILES
+.. autoattribute:: MRJob.DIRS
+.. autoattribute:: MRJob.ARCHIVES
+.. automethod:: MRJob.files
+.. automethod:: MRJob.dirs
+.. automethod:: MRJob.archives
+
 .. _job-configuration:
 
 Job runner configuration

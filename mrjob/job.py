@@ -1084,7 +1084,7 @@ class MRJob(MRJobLauncher):
     #: If you require more sophisticated behavior, try overriding
     #: :py:meth:`archives`.
     #:
-    #: .. versionadded:: 0.6.3
+    #: .. versionadded:: 0.6.4
     ARCHIVES = []
 
     #: Optional list of directories to upload to the job's working directory.
@@ -1098,7 +1098,7 @@ class MRJob(MRJobLauncher):
     #: If you require more sophisticated behavior, try overriding
     #: :py:meth:`dirs`.
     #:
-    #: .. versionadded:: 0.6.3
+    #: .. versionadded:: 0.6.4
     DIRS = []
 
     #: Optional list of files to upload to the job's working directory.
@@ -1112,7 +1112,7 @@ class MRJob(MRJobLauncher):
     #: If you require more sophisticated behavior, try overriding
     #: :py:meth:`files`.
     #:
-    #: .. versionadded:: 0.6.3
+    #: .. versionadded:: 0.6.4
     FILES = []
 
     def archives(self):
@@ -1128,7 +1128,7 @@ class MRJob(MRJobLauncher):
         Note that ``~`` and environment variables in paths will always be
         expanded by the job runner (see :mrjob-opt:`libjars`).
 
-        .. versionadded:: 0.6.3
+        .. versionadded:: 0.6.4
         """
         return self._upload_attr('ARCHIVES')
 
@@ -1145,7 +1145,7 @@ class MRJob(MRJobLauncher):
         Note that ``~`` and environment variables in paths will always be
         expanded by the job runner (see :mrjob-opt:`libjars`).
 
-        .. versionadded:: 0.6.3
+        .. versionadded:: 0.6.4
         """
         return self._upload_attr('DIRS')
 
@@ -1162,7 +1162,7 @@ class MRJob(MRJobLauncher):
         Note that ``~`` and environment variables in paths will always be
         expanded by the job runner (see :mrjob-opt:`libjars`).
 
-        .. versionadded:: 0.6.3
+        .. versionadded:: 0.6.4
         """
         return self._upload_attr('FILES')
 

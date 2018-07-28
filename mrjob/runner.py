@@ -644,7 +644,8 @@ class MRJobRunner(object):
             # cleanup() called automatically here
 
         :param mode: override *cleanup* passed into the constructor. Should be
-                     a list of strings from :py:data:`CLEANUP_CHOICES`
+                     a list of strings from
+                     :py:data:`~mrjob.options.CLEANUP_CHOICES`
         """
         mode = self._cleanup_mode(mode)
 

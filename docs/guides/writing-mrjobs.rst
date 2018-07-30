@@ -721,8 +721,8 @@ API: :py:meth:`~mrjob.job.MRJob.add_passthru_arg` and
 Passthrough options
 ^^^^^^^^^^^^^^^^^^^
 
-A :dfn:`passthrough option` is an :py:mod:`optparse` option that mrjob is aware
-of. mrjob inspects the value of the option when you invoke your script [#popt]_
+A :dfn:`passthrough option` is an :py:mod:`argparse` option that mrjob is aware
+of. mrjob inspects the value of the option when you invoke your script
 and reproduces that value when it invokes your script in other contexts. The
 command line-switchable protocol example from before uses this feature::
 
@@ -746,16 +746,10 @@ other context, such as on Hadoop, it adds ``--output-format=json`` to its
 command string.
 
 :py:meth:`~mrjob.job.MRJob.add_passthru_arg` takes the same arguments as
-:py:meth:`optparse.OptionParser.add_option`. For more information, see the
-`optparse docs`_.
+:py:meth:`argparse.ArgumentParser.add_argument`. For more information, see the
+`argparse docs`_.
 
-.. _`optparse docs`: http://docs.python.org/library/optparse.html
-
-.. rubric:: Footnotes
-
-.. [#popt] This is accomplished using crazy :py:mod:`optparse` hacks so you
-    don't need to limit yourself to certain option types. However, your default
-    values need to be compatible with :py:func:`copy.deepcopy`.
+.. _`argparse docs`: http://docs.python.org/library/argparse.html
 
 Passing through existing options
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -834,36 +828,6 @@ tasks' working directories without writing a custom command line option.
     You **must** wait to read files until **after class initialization**. That
     means you should use the :ref:`*_init() <single-step-method-names>` methods
     to read files. Trying to read files into class variables will not work.
-
-.. _custom-options:
-
-Custom option types
-^^^^^^^^^^^^^^^^^^^
-
-:py:mod:`optparse` allows you to add custom types and actions to your options
-(see `Extending optparse`_), but doing so requires passing a custom
-:py:class:`Option` object into the :py:class:`~optparse.OptionParser`
-constructor.  mrjob creates its own :py:class:`~optparse.OptionParser` object,
-so if you want to use a custom :py:class:`~optparse.Option` class, you'll need
-to set the :py:attr:`~mrjob.job.MRJob.OPTION_CLASS` attribute.
-
-::
-
-    import optparse
-
-    import mrjob
-
-
-    class MyOption(optparse.Option):
-        pass    # extend optparse as documented by the Python standard library
-
-
-    class MyJob(mrjob.job.MRJob):
-
-        OPTION_CLASS = MyOption
-
-.. _Extending optparse:
-    http://docs.python.org/library/optparse.html#extending-optparse
 
 Counters
 --------

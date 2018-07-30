@@ -1302,8 +1302,6 @@ Features
     It is now possible to define your own option types and actions using a
     custom :py:class:`OptionParser` subclass.
 
-    More info: :ref:`custom-options`
-
 **Job Flow Pooling**
 
     EMR jobs can pull job flows out of a "pool" of similarly configured job
@@ -1417,8 +1415,7 @@ Changes and Deprecations
         these options.
 
         Most limitations have been lifted from passthrough options, including
-        the former inability to use custom types and actions. More info:
-        :ref:`custom-options`
+        the former inability to use custom types and actions.
 
         The ``job_name_prefix`` option is gone (was deprecated).
 

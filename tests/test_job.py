@@ -1709,6 +1709,6 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
     def test_use_dirs_to_import_code(self):
         self.assertEqual(
-            run_job(MRRot13Lib(), 'The quick brown fox'),
+            run_job(MRRot13Lib(), b'The quick brown fox'),
             {None: 'Gur dhvpx oebja sbk\n'}
         )

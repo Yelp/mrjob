@@ -1080,9 +1080,11 @@ class MRJob(MRJobLauncher):
     #
     #: Environment variables and ``~`` in paths will be expanded.
     #:
-    #: If you want a directory to be unpacked into a directory a name other
-    #: than that of the archive, append ``#<name>`` (e.g.
-    #: ``data/foo.tar.gz#foo``).
+    #: By default, the directory will have the same name as the archive
+    #: (e.g. ``foo.tar.gz/``). To change the directory's name, append
+    #: ``#<name>``::
+    #:
+    #:     ARCHIVES = ['data/foo.tar.gz#foo']
     #:
     #: If you need to dynamically generate a list of files, override
     #: :py:meth:`archives` instead.

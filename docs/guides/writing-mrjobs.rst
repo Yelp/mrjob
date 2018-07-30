@@ -649,6 +649,61 @@ before and after it by overriding :py:meth:`~mrjob.job.MRJob.pick_protocols`.
     Best practice in this case is to put all your input into a single
     directory and pass that as your input path.
 
+.. _uploading-modules-and-packages:
+
+Using other python modules and packages
+---------------------------------------
+
+.. versionadded:: 0.6.4
+
+If you want to run Python code outside of the file containing your
+:py:class:`~mrjob.job.MRJob`, you'll to make sure that code gets uploaded to
+Hadoop.
+
+The easiest way to do this is with by setting the
+:py:attr:`~mrjob.job.MRJob.DIRS` attribute in your job. Put the code you
+want to import in one or more packages (directories with an
+``__init__.py`` file), and point :py:attr:`~mrjob.job.MRJob.DIRS`
+at them::
+
+  class MRPackageUsingJob(MRJob):
+
+    DIRS = ['mycode', '../someothercode']
+
+    ...
+
+And then import code from inside a mapper or reducer::
+
+  def mapper(self, key, value):
+    from mycode.custom import important_business_logic
+    from someotherlibrary import util_function
+    ...
+
+(If you want to import code from the top level of your script rather than
+inside a method, make sure it's in your ``PYTHONPATH``, just like with
+any other code.)
+
+:py:attr:`~mrjob.job.MRJob.DIRS` is relative to the directory your script is
+in (not the current working directory). This works inside Hadoop because the
+current working directory is the same as the directory your script is in.
+
+If you want to access individual Python modules or other support code, you
+can use :py:attr:`~mrjob.job.MRJob.FILES` to upload them to your job's working
+directory inside Hadoop::
+
+  class MRFileUsingJob(MRJob):
+
+    FILES = ['mymodule.py', '../data/zipcodes.db']
+
+    def mapper(self, key, value):
+      from mymodule import open_zipcode_db
+      with open_zipcode_db('zipcodes.db') as db:
+        ...
+
+For jobs with more complex dependencies (e.g. code that needs to be compiled),
+you may need to use the :mrjob-opt:`setup` option. See :doc:`setup-cookbook`
+for more information.
+
 .. _writing-cl-opts:
 
 Defining command line options

@@ -206,8 +206,8 @@ def _maybe_terminate_clusters(dry_run=False,
              strip_microseconds(time_idle),
              ('unpooled' if pool is None else 'in %s pool' % pool),
              cluster_summary['Name'],
-            'protected' if cluster['TerminationProtected'] else 'unprotected',
-            ))
+             'protected' if cluster['TerminationProtected'] else 'unprotected',
+             ))
 
         # filter out clusters that don't meet our criteria
         if (max_mins_idle is not None and

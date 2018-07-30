@@ -264,7 +264,6 @@ class ClusterTerminationTestCase(MockBoto3TestCase):
             _Steps=[step(started=ago(hours=4), ended=ago(hours=2))],
         ))
 
-
         # hadoop debugging without any other steps
         self.add_mock_emr_cluster(dict(
             Id='j-DEBUG_ONLY',

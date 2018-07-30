@@ -13,9 +13,12 @@
 # limitations under the License.from os.path import join
 """Silly submodule for a silly library"""
 
+
 def encode(s):
+    """Rot13-encode the given string."""
+
     def encode_char(c):
-        if 'A' <= c <='M' or 'a' <= c <= 'm':
+        if 'A' <= c <= 'M' or 'a' <= c <= 'm':
             return chr(ord(c) + 13)
         elif 'N' <= c <= 'Z' or 'n' <= c <= 'z':
             return chr(ord(c) - 13)

@@ -1498,6 +1498,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
     def test_files_method_overrides_files_attr(self):
         class TestJob(MRJob):
             FILES = ['test_runner.py']
+
             def files(self):
                 return ['/var/foo.db']
 
@@ -1575,6 +1576,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
     def test_dirs_method_can_return_none(self):
         class TestJob(MRJob):
+
             def dirs(self):
                 pass
 
@@ -1585,6 +1587,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
     def test_dirs_method_overrides_dirs_attr(self):
         class TestJob(MRJob):
             DIRS = ['logs']
+
             def dirs(self):
                 return ['/tmp']
 
@@ -1634,6 +1637,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
     def test_archives_method_doesnt_qualify_path(self):
         class TestJob(MRJob):
+
             def archives(self):
                 return ['logs.tar.gz']
 
@@ -1646,6 +1650,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
     def test_archives_method_can_return_string(self):
         class TestJob(MRJob):
+
             def archives(self):
                 return '/tmp/dir.tar.gz'
 
@@ -1658,6 +1663,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
 
     def test_archives_method_can_return_none(self):
         class TestJob(MRJob):
+
             def archives(self):
                 pass
 
@@ -1668,6 +1674,7 @@ class UploadAttrsTestCase(SandboxedTestCase):
     def test_archives_method_overrides_dirs_attr(self):
         class TestJob(MRJob):
             ARCHIVES = ['logs.tar.gz']
+
             def archives(self):
                 return ['/tmp/dirs.tar.gz']
 

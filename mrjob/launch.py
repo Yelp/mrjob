@@ -33,7 +33,6 @@ from mrjob.options import _optparse_kwargs_to_argparse
 from mrjob.options import _parse_raw_args
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
-from mrjob.py2 import string_types
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null

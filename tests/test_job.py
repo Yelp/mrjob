@@ -45,11 +45,13 @@ from mrjob.step import MRStep
 from mrjob.step import SparkStep
 from mrjob.util import log_to_stream
 
+from tests.job import run_job
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_cmd_job import MRCmdJob
 from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_upload_attrs_job import MRUploadAttrsJob
 from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
@@ -1685,4 +1687,21 @@ class UploadAttrsTestCase(SandboxedTestCase):
         self.assertEqual(
             job._runner_kwargs()['upload_archives'],
             ['stuff.zip', '/tmp/dir.tar.gz'],
+        )
+
+    def test_attrs_with_real_job(self):
+        # MRUploadAttrsJob uses FILES, DIRS, and ARCHIVES to upload
+        # a static set of files
+        self.assertEqual(
+            set(run_job(MRUploadAttrsJob())),
+            {
+                '.',
+                './empty',
+                './empty.tar.gz',
+                './mr_upload_attrs_job',
+                './mr_upload_attrs_job.py',
+                './mr_upload_attrs_job/empty.tar.gz',
+                './mr_upload_attrs_job/README.txt',
+                './README.txt',
+            }
         )

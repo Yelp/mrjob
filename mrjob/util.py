@@ -17,7 +17,6 @@
 
 # don't add imports here that aren't part of the standard Python library,
 # since MRJobs need to run in Amazon's generic EMR environment
-import contextlib
 import glob
 import logging
 import os
@@ -28,6 +27,7 @@ import shlex
 import shutil
 import sys
 import tarfile
+from contextlib import contextmanager
 from datetime import timedelta
 from distutils.spawn import find_executable
 from logging import getLogger
@@ -310,7 +310,7 @@ def safeeval(expr, globals=None, locals=None):
     return eval(expr, safe_globals, locals)
 
 
-@contextlib.contextmanager
+@contextmanager
 def save_current_environment():
     """ Context manager that saves os.environ and loads
         it back again after execution
@@ -325,7 +325,7 @@ def save_current_environment():
         os.environ.update(original_environ)
 
 
-@contextlib.contextmanager
+@contextmanager
 def save_cwd():
     """Context manager that saves the current working directory,
     and chdir's back to it after execution."""
@@ -336,6 +336,18 @@ def save_cwd():
 
     finally:
         os.chdir(original_cwd)
+
+
+@contextmanager
+def save_sys_path():
+    """Context manager that saves sys.path and restores it after execution."""
+    original_sys_path = list(sys.path)
+
+    try:
+        yield
+
+    finally:
+        sys.path = original_sys_path
 
 
 def shlex_split(s):

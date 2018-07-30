@@ -22,8 +22,8 @@ EMR, take a look at the :doc:`emr-bootstrap-cookbook`.
 Uploading your source tree
 --------------------------
 
-.. note:: This relies on a feature that was added in 0.5.8. See below
-          for how to do it in earlier versions.
+.. note:: If you're using mrjob 0.6.4 or later, check out
+          :ref:`uploading-modules-and-packages` first.
 
 mrjob can automatically tarball your source directory and include it
 in your job's working directory. We can use setup scripts to upload the
@@ -52,8 +52,8 @@ this in your :file:`mrjob.conf`:
 Uploading your source tree as an archive
 ----------------------------------------
 
-If you're using an earlier version of Python, you'll have to build the
-tarball yourself:
+Prior to mrjob 0.5.8, you had to archive directories yourself before uploading
+them.
 
 .. code-block:: sh
 

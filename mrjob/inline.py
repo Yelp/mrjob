@@ -19,12 +19,14 @@
 process. Useful for debugging."""
 import logging
 import os
+import sys
 
 from mrjob.job import MRJob
 #from mrjob.parse import parse_mr_job_stderr
 from mrjob.sim import SimMRJobRunner
 from mrjob.util import save_current_environment
 from mrjob.util import save_cwd
+from mrjob.util import save_sys_path
 
 log = logging.getLogger(__name__)
 
@@ -83,9 +85,11 @@ class InlineMRJobRunner(SimMRJobRunner):
 
         # Don't care about pickleability since this runs in the same process
         def invoke_task(stdin, stdout, stderr, wd, env):
-            with save_current_environment(), save_cwd():
+            with save_current_environment(), save_cwd(), save_sys_path():
+                # pretend we're running the script in the working dir
                 os.environ.update(env)
                 os.chdir(wd)
+                sys.path = [os.getcwd()] + sys.path
 
                 input_uri = None
                 try:

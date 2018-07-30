@@ -14,7 +14,7 @@ Running your job
 .. automethod:: MRJobRunner.cat_output
 .. automethod:: MRJobRunner.stream_output
 .. automethod:: MRJobRunner.cleanup
-.. autodata:: mrjob.runner.CLEANUP_CHOICES
+.. autodata:: mrjob.options.CLEANUP_CHOICES
 
 Run Information
 ---------------

@@ -25,6 +25,7 @@ from argparse import ArgumentParser
 from argparse import ArgumentError
 
 from mrjob.conf import combine_dicts
+from mrjob.conf import combine_lists
 from mrjob.options import _add_basic_args
 from mrjob.options import _add_job_args
 from mrjob.options import _add_runner_args
@@ -32,6 +33,7 @@ from mrjob.options import _optparse_kwargs_to_argparse
 from mrjob.options import _parse_raw_args
 from mrjob.options import _print_help_for_runner
 from mrjob.options import _print_basic_help
+from mrjob.py2 import string_types
 from mrjob.setup import parse_legacy_hash_path
 from mrjob.step import StepFailedException
 from mrjob.util import log_to_null
@@ -472,6 +474,7 @@ class MRJobLauncher(object):
             return LocalMRJobRunner
 
     def _runner_kwargs(self):
+        # TODO: why combine_dicts() and not combine_options()?
         return combine_dicts(
             self._non_option_kwargs(),
             self._kwargs_from_switches(self._runner_opt_names()),
@@ -529,14 +532,34 @@ class MRJobLauncher(object):
     def _job_kwargs(self):
         """Keyword arguments to the runner class that can be specified
         by the job/launcher itself."""
+        # TODO: this method should take responsibility for combining
+        # self.options with method result for jobconf and libjars
         return dict(
             jobconf=self.jobconf(),
             libjars=self.libjars(),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),
+            upload_archives=combine_lists(
+                self.options.upload_archives, self.archives()),
+            upload_dirs=combine_lists(
+                self.options.upload_dirs, self.dirs()),
+            upload_files=combine_lists(
+                self.options.upload_files, self.files()),
         )
 
     ### Hooks for options defined by the job ###
+
+    def archives(self):
+        """See :py:meth:`mrjob.job.MRJob.files`."""
+        return []
+
+    def dirs(self):
+        """See :py:meth:`mrjob.job.MRJob.dirs`."""
+        return []
+
+    def files(self):
+        """See :py:meth:`mrjob.job.MRJob.files`."""
+        return []
 
     def hadoop_input_format(self):
         """See :py:meth:`mrjob.job.MRJob.hadoop_input_format`."""

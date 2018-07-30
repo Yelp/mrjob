@@ -83,7 +83,7 @@ class MRJobRunner(object):
     # mrjob.bin.MRJobBinRunner
 
     #: alias for this runner; used for picking section of
-    #: :py:mod:``mrjob.conf`` to load one of ``'local'``, ``'emr'``,
+    #: :py:mod:`mrjob.conf` to load one of ``'local'``, ``'emr'``,
     #: or ``'hadoop'``
     alias = None
 
@@ -635,7 +635,7 @@ class MRJobRunner(object):
         """Clean up running jobs, temp files, and logs, subject to the
         *cleanup* option passed to the constructor.
 
-        If you create your runner in a :keyword:`with` block,
+        If you create your runner in a ``with`` block,
         :py:meth:`cleanup` will be called automatically::
 
             with mr_job.make_runner() as runner:
@@ -644,7 +644,8 @@ class MRJobRunner(object):
             # cleanup() called automatically here
 
         :param mode: override *cleanup* passed into the constructor. Should be
-                     a list of strings from :py:data:`CLEANUP_CHOICES`
+                     a list of strings from
+                     :py:data:`~mrjob.options.CLEANUP_CHOICES`
         """
         mode = self._cleanup_mode(mode)
 

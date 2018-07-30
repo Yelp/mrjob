@@ -1240,7 +1240,7 @@ delay itself in case a job flow becomes available. Reference:
 
 The ``JOB`` and ``JOB_FLOW`` cleanup options tell mrjob to clean up the job
 and/or the job flow on failure (including Ctrl+C). See
-:py:data:`~mrjob.runner.CLEANUP_CHOICES` for more information.
+:py:data:`~mrjob.options.CLEANUP_CHOICES` for more information.
 
 0.3.3
 -----

@@ -16,10 +16,12 @@
 # limitations under the License.
 """Unit testing of MRJob."""
 import os
-import os.path
 import sys
 import time
 from io import BytesIO
+from os.path import abspath
+from os.path import dirname
+from os.path import join
 from subprocess import Popen
 from subprocess import PIPE
 from unittest import TestCase
@@ -43,11 +45,14 @@ from mrjob.step import MRStep
 from mrjob.step import SparkStep
 from mrjob.util import log_to_stream
 
+from tests.job import run_job
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_cmd_job import MRCmdJob
+from tests.mr_rot13lib import MRRot13Lib
 from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
+from tests.mr_upload_attrs_job import MRUploadAttrsJob
 from tests.py2 import Mock
 from tests.py2 import MagicMock
 from tests.py2 import patch
@@ -696,17 +701,17 @@ class LibjarsTestCase(TestCase):
                              ['/left/dora.jar', 'honey.jar'])
 
     def test_libjars_attr_relative_path(self):
-        job_dir = os.path.dirname(MRJob.mr_job_script())
+        job_dir = dirname(MRJob.mr_job_script())
 
         with patch.object(MRJob, 'LIBJARS', ['cookie.jar', '/left/dora.jar']):
             job = MRJob()
 
             self.assertEqual(
                 job._runner_kwargs()['libjars'],
-                [os.path.join(job_dir, 'cookie.jar'), '/left/dora.jar'])
+                [join(job_dir, 'cookie.jar'), '/left/dora.jar'])
 
     def test_libjars_environment_variables(self):
-        job_dir = os.path.dirname(MRJob.mr_job_script())
+        job_dir = dirname(MRJob.mr_job_script())
 
         with patch.dict('os.environ', A='/path/to/a', B='b'):
             with patch.object(MRJob, 'LIBJARS',
@@ -717,7 +722,7 @@ class LibjarsTestCase(TestCase):
                 # is relative or absolute
                 self.assertEqual(
                     job._runner_kwargs()['libjars'],
-                    ['$A/cookie.jar', os.path.join(job_dir, '$B/honey.jar')])
+                    ['$A/cookie.jar', join(job_dir, '$B/honey.jar')])
 
     def test_override_libjars(self):
         with patch.object(MRJob, 'libjars', return_value=['honey.jar']):
@@ -875,7 +880,7 @@ class StepNumTestCase(TestCase):
 class FileOptionsTestCase(SandboxedTestCase):
 
     def test_end_to_end(self):
-        n_file_path = os.path.join(self.tmp_dir, 'n_file')
+        n_file_path = join(self.tmp_dir, 'n_file')
 
         with open(n_file_path, 'w') as f:
             f.write('3')
@@ -912,7 +917,7 @@ class RunJobTestCase(SandboxedTestCase):
                 list(args) + ['--no-conf'])
         # add . to PYTHONPATH (in case mrjob isn't actually installed)
         env = combine_envs(os.environ,
-                           {'PYTHONPATH': os.path.abspath('.')})
+                           {'PYTHONPATH': abspath('.')})
         proc = Popen(args, stdin=PIPE, stdout=PIPE, stderr=PIPE, env=env)
         stdout, stderr = proc.communicate(input=b'foo\nbar\nbar\n')
         return stdout, stderr, proc.returncode
@@ -956,7 +961,7 @@ class RunJobTestCase(SandboxedTestCase):
         output_lines = []
         for dirpath, _, filenames in os.walk(self.tmp_dir):
             for filename in filenames:
-                with open(os.path.join(dirpath, filename), 'rb') as output_f:
+                with open(join(dirpath, filename), 'rb') as output_f:
                     output_lines.extend(output_f)
 
         self.assertEqual(sorted(output_lines),
@@ -1362,3 +1367,348 @@ class RunnerKwargsTestCase(TestCase):
 
     def test_local(self):
         self._test_runner_kwargs('local')
+
+
+class UploadAttrsTestCase(SandboxedTestCase):
+
+    def setUp(self):
+        super(UploadAttrsTestCase, self).setUp()
+
+        self.log = self.start(patch('mrjob.job.log'))
+
+    def test_relative_files(self):
+        class TestJob(MRJob):
+            FILES = ['sandbox.py', 'quiet.py#q.py']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            [
+                join(dirname(__file__), 'sandbox.py'),
+                join(dirname(__file__), 'quiet.py#q.py'),
+            ]
+        )
+
+    def test_absolute_files(self):
+        class TestJob(MRJob):
+            FILES = [abspath(__file__)]
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            job.FILES
+        )
+
+    def test_files_attr_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            FILES = ['/tmp/foo.db']
+
+        job = TestJob(['--file', 'foo/bar.txt'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['foo/bar.txt', '/tmp/foo.db']
+        )
+
+    def test_envvar_files(self):
+        class TestJob(MRJob):
+            FILES = ['$ABSPATH', '$RELPATH#b.txt', '~/$RELPATH']
+
+        # verify that we check if the path will be relative or
+        # absolute after expansion
+        os.environ['ABSPATH'] = '/var/foo.db'
+        os.environ['RELPATH'] = 'bar.txt'
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            [
+                '$ABSPATH',
+                join(dirname(__file__), '$RELPATH#b.txt'),
+                '~/$RELPATH',
+            ]
+        )
+
+    def test_files_attr_relative_subdir_warning(self):
+        class TestJob(MRJob):
+            FILES = ['fs/test_s3.py']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            [
+                join(dirname(__file__), 'fs/test_s3.py'),
+            ]
+        )
+
+        self.assertTrue(self.log.warning.called)
+
+    def test_files_attr_no_relative_subdir_warning_with_hash(self):
+        class TestJob(MRJob):
+            FILES = ['fs/test_s3.py#test_s3.py']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            [
+                join(dirname(__file__), 'fs/test_s3.py#test_s3.py'),
+            ]
+        )
+
+        self.assertFalse(self.log.warning.called)
+
+    def test_files_method_doesnt_qualify_path(self):
+        class TestJob(MRJob):
+            def files(self):
+                return ['foo/bar.txt']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['foo/bar.txt'],
+        )
+
+    def test_files_method_can_return_string(self):
+        class TestJob(MRJob):
+            def files(self):
+                return '/var/foo.db'
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['/var/foo.db'],
+        )
+
+    def test_files_method_can_return_none(self):
+        class TestJob(MRJob):
+            def files(self):
+                pass
+
+        job = TestJob()
+
+        self.assertEqual(job._runner_kwargs()['upload_files'], [])
+
+    def test_files_method_overrides_files_attr(self):
+        class TestJob(MRJob):
+            FILES = ['test_runner.py']
+            def files(self):
+                return ['/var/foo.db']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['/var/foo.db'],
+        )
+
+    def test_files_method_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            def files(self):
+                return ['foo/bar.txt']
+
+        job = TestJob(['--file', 'baz.txt'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_files'],
+            ['baz.txt', 'foo/bar.txt'],
+        )
+
+    # DIRS and ARCHIVES use _upload_attr() too, so we don't need
+    # to test them as extensively
+
+    def test_dirs_attr(self):
+        class TestJob(MRJob):
+            DIRS = ['/tmp', 'fs', 'logs']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            [
+                '/tmp',
+                join(dirname(__file__), 'fs'),
+                join(dirname(__file__), 'logs'),
+            ],
+        )
+
+    def test_dirs_attr_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            DIRS = ['/tmp']
+
+        job = TestJob(['--dir', 'foo'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['foo', '/tmp']
+        )
+
+    def test_dirs_method_doesnt_qualify_path(self):
+        class TestJob(MRJob):
+            def dirs(self):
+                return ['logs']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['logs'],
+        )
+
+    def test_dirs_method_can_return_string(self):
+        class TestJob(MRJob):
+            def dirs(self):
+                return '/tmp'
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['/tmp'],
+        )
+
+    def test_dirs_method_can_return_none(self):
+        class TestJob(MRJob):
+            def dirs(self):
+                pass
+
+        job = TestJob()
+
+        self.assertEqual(job._runner_kwargs()['upload_dirs'], [])
+
+    def test_dirs_method_overrides_dirs_attr(self):
+        class TestJob(MRJob):
+            DIRS = ['logs']
+            def dirs(self):
+                return ['/tmp']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['/tmp'],
+        )
+
+    def test_dirs_method_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            def dirs(self):
+                return ['/tmp']
+
+        job = TestJob(['--dir', 'stuff_dir'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_dirs'],
+            ['stuff_dir', '/tmp'],
+        )
+
+    def test_archives_attr(self):
+        class TestJob(MRJob):
+            ARCHIVES = ['/tmp/dir.tar.gz', 'foo.zip']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            [
+                '/tmp/dir.tar.gz',
+                join(dirname(__file__), 'foo.zip'),
+            ],
+        )
+
+    def test_archives_attr_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            ARCHIVES = ['/tmp/dir.tar.gz']
+
+        job = TestJob(['--archive', 'foo.zip'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['foo.zip', '/tmp/dir.tar.gz']
+        )
+
+    def test_archives_method_doesnt_qualify_path(self):
+        class TestJob(MRJob):
+            def archives(self):
+                return ['logs.tar.gz']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['logs.tar.gz'],
+        )
+
+    def test_archives_method_can_return_string(self):
+        class TestJob(MRJob):
+            def archives(self):
+                return '/tmp/dir.tar.gz'
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['/tmp/dir.tar.gz'],
+        )
+
+    def test_archives_method_can_return_none(self):
+        class TestJob(MRJob):
+            def archives(self):
+                pass
+
+        job = TestJob()
+
+        self.assertEqual(job._runner_kwargs()['upload_archives'], [])
+
+    def test_archives_method_overrides_dirs_attr(self):
+        class TestJob(MRJob):
+            ARCHIVES = ['logs.tar.gz']
+            def archives(self):
+                return ['/tmp/dirs.tar.gz']
+
+        job = TestJob()
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['/tmp/dirs.tar.gz'],
+        )
+
+    def test_archives_method_combines_with_cmd_line(self):
+        class TestJob(MRJob):
+            def archives(self):
+                return ['/tmp/dir.tar.gz']
+
+        job = TestJob(['--archive', 'stuff.zip'])
+
+        self.assertEqual(
+            job._runner_kwargs()['upload_archives'],
+            ['stuff.zip', '/tmp/dir.tar.gz'],
+        )
+
+    def test_attrs_with_real_job(self):
+        # MRUploadAttrsJob uses FILES, DIRS, and ARCHIVES to upload
+        # a static set of files
+        self.assertEqual(
+            set(run_job(MRUploadAttrsJob())),
+            {
+                '.',
+                './empty',
+                './empty.tar.gz',
+                './mr_upload_attrs_job',
+                './mr_upload_attrs_job.py',
+                './mr_upload_attrs_job/empty.tar.gz',
+                './mr_upload_attrs_job/README.txt',
+                './README.txt',
+            }
+        )
+
+    def test_use_dirs_to_import_code(self):
+        self.assertEqual(
+            run_job(MRRot13Lib(), b'The quick brown fox'),
+            {None: 'Gur dhvpx oebja sbk\n'}
+        )

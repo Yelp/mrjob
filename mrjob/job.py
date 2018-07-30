@@ -1070,6 +1070,140 @@ class MRJob(MRJobLauncher):
         """
         return self.PARTITIONER
 
+    ### Uploading support files ###
+
+    #: Optional list of archives to upload and unpack in the job's working
+    #: directory. These can be URIs or paths on the local filesystem.
+    #:
+    #: Relative paths will be interpreted as relative to the directory
+    #: containing the script (not the current working directory).
+    #
+    #: Environment variables and ``~`` in paths will be expanded.
+    #:
+    #: By default, the directory will have the same name as the archive
+    #: (e.g. ``foo.tar.gz/``). To change the directory's name, append
+    #: ``#<name>``::
+    #:
+    #:     ARCHIVES = ['data/foo.tar.gz#foo']
+    #:
+    #: If you need to dynamically generate a list of files, override
+    #: :py:meth:`archives` instead.
+    #:
+    #: .. versionadded:: 0.6.4
+    ARCHIVES = []
+
+    #: Optional list of directories to upload to the job's working directory.
+    #: These can be URIs or paths on the local filesystem.
+    #:
+    #: Relative paths will be interpreted as relative to the directory
+    #: containing the script (not the current working directory).
+    #
+    #: Environment variables and ``~`` in paths will be expanded.
+    #:
+    #: If you want a directory to be copied with a name other than it's own,
+    #: append ``#<name>`` (e.g. ``data/foo#bar``).
+    #:
+    #: If you need to dynamically generate a list of files, override
+    #: :py:meth:`dirs` instead.
+    #:
+    #: .. versionadded:: 0.6.4
+    DIRS = []
+
+    #: Optional list of files to upload to the job's working directory.
+    #: These can be URIs or paths on the local filesystem.
+    #:
+    #: Relative paths will be interpreted as relative to the directory
+    #: containing the script (not the current working directory).
+    #
+    #: Environment variables and ``~`` in paths will be expanded.
+    #:
+    #: If you want a file to be uploaded to a filename other than it's own,
+    #: append ``#<name>`` (e.g. ``data/foo.json#bar.json``).
+    #:
+    #: If you need to dynamically generate a list of files, override
+    #: :py:meth:`files` instead.
+    #:
+    #: .. versionadded:: 0.6.4
+    FILES = []
+
+    def archives(self):
+        """Like :py:attr:`ARCHIVES`, except that it can return a dynamically
+        generated list of archives to upload and unpack. Overriding
+        this method disables :py:attr:`ARCHIVES`.
+
+        Paths returned by this method are relative to the working directory
+        (not the script). Note that the job runner will *always* expand
+        environment variables and ``~`` in paths returned by this method.
+
+        You do not have to worry about inadvertently disabling ``--archive``;
+        this switch is handled separately.
+
+        .. versionadded:: 0.6.4
+        """
+        return self._upload_attr('ARCHIVES')
+
+    def dirs(self):
+        """Like :py:attr:`DIRS`, except that it can return a dynamically
+        generated list of directories to upload. Overriding
+        this method disables :py:attr:`DIRS`.
+
+        Paths returned by this method are relative to the working directory
+        (not the script). Note that the job runner will *always* expand
+        environment variables and ``~`` in paths returned by this method.
+
+        You do not have to worry about inadvertently disabling ``--dir``;
+        this switch is handled separately.
+
+        .. versionadded:: 0.6.4
+        """
+        return self._upload_attr('DIRS')
+
+    def files(self):
+        """Like :py:attr:`FILES`, except that it can return a dynamically
+        generated list of files to upload. Overriding
+        this method disables :py:attr:`FILES`.
+
+        Paths returned by this method are relative to the working directory
+        (not the script). Note that the job runner will *always* expand
+        environment variables and ``~`` in paths returned by this method.
+
+        You do not have to worry about inadvertently disabling ``--file``;
+        this switch is handled separately.
+
+        .. versionadded:: 0.6.4
+        """
+        return self._upload_attr('FILES')
+
+    def _upload_attr(self, attr_name):
+        """Helper for :py:meth:`archives`, :py:meth:`dirs`, and
+        :py:meth:`files`"""
+        attr_value = getattr(self, attr_name)
+
+        # catch path instead of a list of paths
+        if isinstance(attr_value, string_types):
+            raise TypeError('%s must be a list or other sequence.' % attr_name)
+
+        script_dir = os.path.dirname(self.mr_job_script())
+        paths = []
+
+        for path in attr_value:
+            expanded_path = expand_path(path)
+
+            if os.path.isabs(expanded_path):
+                paths.append(path)
+            else:
+                # relative subdirs are confusing; people will expect them
+                # to appear in a subdir, not the same directory as the script,
+                # but Hadoop doesn't work that way
+                if os.sep in path.rstrip(os.sep) and '#' not in path:
+                    log.warning(
+                        '%s: %s will appear in same directory as job script,'
+                        ' not a subdirectory' % (attr_name, path))
+
+                paths.append(os.path.join(script_dir, path))
+
+        return paths
+
     ### Jobconf ###
 
     #: Optional jobconf arguments we should always pass to Hadoop. This

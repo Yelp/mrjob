@@ -4,6 +4,32 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.4:
+
+0.6.4
+-----
+
+This release makes it easy to attach static files to your
+:py:class:`~mrjob.job.MRJob`
+with the :py:attr:`~mrjob.job.MRJob.FILES`, :py:attr:`~mrjob.job.MRJob.DIRS`,
+and :py:attr:`~mrjob.job.MRJob.ARCHIVES` attributes.
+
+In most cases, you no longer need :mrjob-opt:`setup` scripts to access other
+python modules or packages from your job because you can use
+:py:attr:`~mrjob.job.MRJob.DIRS` instead. For more details, see
+:ref:`uploading-modules-and-packages`.
+
+For completeness, also
+added :py:meth:`~mrjob.job.MRJob.files`,
+:py:meth:`~mrjob.job.MRJob.dirs`, and :py:meth:`~mrjob.job.MRJob.archives`
+methods.
+
+:ref:`terminate-idle-clusters` now skips termination-protected idle clusters,
+rather than crashing (this is fixed in :ref:`v0.5.12`, but not
+previous 0.6.x versions).
+
+Python 3.3 is no longer supported.
+
 .. _v0.6.3:
 
 0.6.3

@@ -48,6 +48,7 @@ from mrjob.util import log_to_stream
 from tests.job import run_job
 from tests.mr_hadoop_format_job import MRHadoopFormatJob
 from tests.mr_cmd_job import MRCmdJob
+from tests.mr_rot13lib import MRRot13Lib
 from tests.mr_sort_values import MRSortValues
 from tests.mr_tower_of_powers import MRTowerOfPowers
 from tests.mr_two_step_job import MRTwoStepJob
@@ -1704,4 +1705,10 @@ class UploadAttrsTestCase(SandboxedTestCase):
                 './mr_upload_attrs_job/README.txt',
                 './README.txt',
             }
+        )
+
+    def test_use_dirs_to_import_code(self):
+        self.assertEqual(
+            run_job(MRRot13Lib(), 'The quick brown fox'),
+            {None: 'Gur dhvpx oebja sbk\n'}
         )

@@ -544,6 +544,16 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    ebs_root_volume_gb=dict(
+        cloud_role='launch',
+        switches=[
+            (['--ebs-root-volume-gb'], dict(
+                help=('Size of root EBS volume, in GiB. Set to 0 to use'
+                      ' the default'),
+                type=float,
+            )),
+        ],
+    ),
     ec2_key_pair=dict(
         cloud_role='launch',
         switches=[

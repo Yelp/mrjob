@@ -23,6 +23,10 @@ Suggested usage: run this as a cron job with the ``-q`` option::
 
     */30 * * * * mrjob terminate-idle-clusters -q
 
+.. versionchanged:: 0.6.4
+
+   Skips termination-protected idle clusters, rather than crashing.
+
 Options::
 
   -c CONF_PATHS, --conf-path CONF_PATHS

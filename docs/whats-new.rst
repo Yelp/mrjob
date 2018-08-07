@@ -30,6 +30,9 @@ previous 0.6.x versions).
 
 Python 3.3 is no longer supported.
 
+mrjob now requires :mod:`google-cloud-dataproc` 0.2.0+ (this
+library used to be vendored).
+
 .. _v0.6.3:
 
 0.6.3

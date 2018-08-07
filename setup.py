@@ -29,8 +29,7 @@ try:
             'boto3>=1.4.6',
             'botocore>=1.6.0',
             'PyYAML>=3.08',
-            #'google-cloud-dataproc>=0.11.0',  # vendored because not out yet
-            # google-cloud-dataproc's deps are implied by google-cloud-logging
+            'google-cloud-dataproc>=0.20.0',
             'google-cloud-logging>=1.5.0',
             'google-cloud-storage>=1.9.0',
         ],

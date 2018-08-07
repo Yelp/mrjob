@@ -29,8 +29,7 @@ try:
             'boto3>=1.4.6',
             'botocore>=1.6.0',
             'PyYAML>=3.08',
-            #'google-cloud-dataproc>=0.11.0',  # vendored because not out yet
-            # google-cloud-dataproc's deps are implied by google-cloud-logging
+            'google-cloud-dataproc>=0.2.0',
             'google-cloud-logging>=1.5.0',
             'google-cloud-storage>=1.9.0',
         ],
@@ -48,11 +47,6 @@ try:
     if sys.version_info >= (3, 0):
         setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
         setuptools_kwargs['tests_require'].append('rapidjson')
-
-    # grpc requires enum, which is a builtin starting in Python 3.4
-    if sys.version_info >= (3, 0) and sys.version_info < (3, 4):
-        setuptools_kwargs['install_requires'].append('enum34')
-
 
 except ImportError:
     from distutils.core import setup

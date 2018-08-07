@@ -48,11 +48,6 @@ try:
         setuptools_kwargs['extras_require']['rapidjson'] = ['rapidjson']
         setuptools_kwargs['tests_require'].append('rapidjson')
 
-    # grpc requires enum, which is a builtin starting in Python 3.4
-    if sys.version_info >= (3, 0) and sys.version_info < (3, 4):
-        setuptools_kwargs['install_requires'].append('enum34')
-
-
 except ImportError:
     from distutils.core import setup
     setuptools_kwargs = {}

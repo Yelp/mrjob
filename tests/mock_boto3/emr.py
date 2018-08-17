@@ -382,6 +382,13 @@ class MockEMRClient(object):
             _validate_param(kwargs, 'VisibleToAllUsers', bool)
             cluster['VisibleToAllUsers'] = kwargs.pop('VisibleToAllUsers')
 
+        # EbsRootVolumeSize
+        if 'EbsRootVolumeSize' in kwargs:
+            # whatever the default EbsRootVolumeSize is, the API doesn't
+            # report it if you don't set it
+            _validate_param(kwargs, 'EbsRootVolumeSize', integer_types)
+            cluster['EbsRootVolumeSize'] = kwargs.pop('EbsRootVolumeSize')
+
         # pass BootstrapActions off to helper
         if 'BootstrapActions' in kwargs:
             self._add_bootstrap_actions(

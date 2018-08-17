@@ -23,8 +23,8 @@ from os import environ
 
 try:
     import google.auth
-    import mrjob._vendor.dataproc_v1beta2
-    import mrjob._vendor.dataproc_v1beta2.types
+    import google.cloud.dataproc_v1beta2
+    import google.cloud.dataproc_v1beta2.types
     import google.cloud.logging
     import google.api_core.exceptions
     import google.api_core.grpc_helpers
@@ -130,12 +130,12 @@ _FULL_SCOPE = 'https://www.googleapis.com/auth/cloud-platform'
 # convert enum values to strings (e.g. 'RUNNING')
 
 def _cluster_state_name(state_value):
-    return mrjob._vendor.dataproc_v1beta2.types.ClusterStatus.State.Name(
+    return google.cloud.dataproc_v1beta2.types.ClusterStatus.State.Name(
         state_value)
 
 
 def _job_state_name(state_value):
-    return mrjob._vendor.dataproc_v1beta2.types.JobStatus.State.Name(
+    return google.cloud.dataproc_v1beta2.types.JobStatus.State.Name(
         state_value)
 
 
@@ -362,12 +362,12 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     @property
     def cluster_client(self):
-        return mrjob._vendor.dataproc_v1beta2.ClusterControllerClient(
+        return google.cloud.dataproc_v1beta2.ClusterControllerClient(
             **self._client_create_kwargs())
 
     @property
     def job_client(self):
-        return mrjob._vendor.dataproc_v1beta2.JobControllerClient(
+        return google.cloud.dataproc_v1beta2.JobControllerClient(
             **self._client_create_kwargs())
 
     @property

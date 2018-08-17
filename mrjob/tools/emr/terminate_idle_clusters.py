@@ -25,7 +25,8 @@ Suggested usage: run this as a cron job with the ``-q`` option::
 
 .. versionchanged:: 0.6.4
 
-   Skips termination-protected idle clusters, rather than crashing.
+   Skips termination-protected idle clusters, rather than crashing. (This was
+   also backported to mrjob v0.5.12.)
 
 Options::
 

@@ -439,6 +439,21 @@ class ExistingClusterTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['Status']['State'], 'WAITING')
 
 
+class EbsRootVolumeGBTestCase(MockBoto3TestCase):
+
+    def test_defaults(self):
+        cluster = self.run_and_get_cluster()
+        self.assertNotIn('EbsRootVolumeSize', cluster)
+
+    def test_set_to_integer(self):
+        cluster = self.run_and_get_cluster('--ebs-root-volume-gb', '999')
+        self.assertEqual(cluster['EbsRootVolumeSize'], 999)
+
+    def test_zero_means_default(self):
+        cluster = self.run_and_get_cluster('--ebs-root-volume-gb', '0')
+        self.assertNotIn('EbsRootVolumeSize', cluster)
+
+
 class VisibleToAllUsersTestCase(MockBoto3TestCase):
 
     def test_defaults(self):

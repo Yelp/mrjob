@@ -548,9 +548,9 @@ _RUNNER_OPTS = dict(
         cloud_role='launch',
         switches=[
             (['--ebs-root-volume-gb'], dict(
-                help=('Size of root EBS volume, in GiB. Set to 0 to use'
-                      ' the default'),
-                type=float,
+                help=('Size of root EBS volume, in GiB. Must be an integer.'
+                      'Set to 0 to use the default'),
+                type=int,
             )),
         ],
     ),

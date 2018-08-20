@@ -13,10 +13,16 @@ additional jobs, and eventually shut itself down after it has been idle
 for a certain amount of time (by default, ten minutes; see
 :mrjob-opt:`max_mins_idle`).
 
-.. note::
+.. warning::
 
    When using cluster pooling prior to v0.6.0, make sure to set
    :mrjob-opt:`max_hours_idle`, or your cluster will never shut down.
+
+.. note::
+
+   Pooling is a way to reduce latency, not to save money. Though
+   pooling was originally created to optimize AWS's practice of billing by
+   the full hour, this `ended in October 2017 <https://aws.amazon.com/about-aws/whats-new/2017/10/amazon-emr-now-supports-per-second-billing/>`_.
 
 Pooling is designed so that jobs run against the same :py:mod:`mrjob.conf` can
 share the same clusters. This means that the version of :py:mod:`mrjob` and

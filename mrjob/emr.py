@@ -152,7 +152,7 @@ _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 # for new (since October 10, 2012) accounts (see #1025)
 _DEFAULT_EMR_REGION = 'us-west-2'
 
-# default AMI to use on EMR. This will be updated with each version
+# default AMI to use on EMR. This may be updated with each version
 _DEFAULT_IMAGE_VERSION = '5.8.0'
 
 # first AMI version that we can't run bash -e on (see #1548)
@@ -315,6 +315,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'iam_endpoint',
         'iam_instance_profile',
         'iam_service_role',
+        'image_id',
         'instance_fleets',
         'instance_groups',
         'master_instance_bid_price',
@@ -1151,6 +1152,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             kwargs['ReleaseLabel'] = self._opts['release_label']
         else:
             kwargs['AmiVersion'] = self._opts['image_version']
+
+        if self._opts['image_id']:
+            kwargs['CustomAmiId'] = self._opts['image_id']
 
         # capitalizing Instances because it's just an API parameter
         kwargs['Instances'] = Instances = {}

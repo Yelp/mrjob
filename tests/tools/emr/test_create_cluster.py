@@ -46,6 +46,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'conf_paths': None,
                 'core_instance_bid_price': None,
                 'core_instance_type': None,
+                'ebs_root_volume_gb': None,
                 'ec2_key_pair': None,
                 'emr_api_params': None,
                 'emr_configurations': None,

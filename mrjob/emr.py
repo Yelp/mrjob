@@ -303,6 +303,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'bootstrap_spark',
         'cloud_log_dir',
         'core_instance_bid_price',
+        'ebs_root_volume_gb',
         'ec2_key_pair',
         'ec2_key_pair_file',
         'emr_action_on_failure',
@@ -1161,6 +1162,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             Instances['InstanceFleets'] = self._opts['instance_fleets']
         else:
             Instances['InstanceGroups'] = self._instance_groups()
+
+        # EBS Root volume size
+        if self._opts['ebs_root_volume_gb']:
+            kwargs['EbsRootVolumeSize'] = self._opts['ebs_root_volume_gb']
 
         # bootstrap actions
         kwargs['BootstrapActions'] = BootstrapActions = []
@@ -2385,6 +2390,19 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 max_steps = map_version(
                     image_version, _IMAGE_VERSION_TO_MAX_STEPS)
+
+            if self._opts['ebs_root_volume_gb']:
+                if 'EbsRootVolumeSize' not in cluster:
+                    log.debug('    EBS root volume size not set')
+                    return
+                elif (cluster['EbsRootVolumeSize'] <
+                        self._opts['ebs_root_volume_gb']):
+                    log.debug('    EBS root volume size too small')
+                    return
+            else:
+                if 'EbsRootVolumeSize' in cluster:
+                    log.debug('    uses non-default EBS root volume size')
+                    return
 
             applications = self._applications()
             if applications:

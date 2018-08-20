@@ -117,6 +117,10 @@ files takes precedence, and the command line beats config files. In
 the case of a tie, `instance_fleets` beats `instance_groups` beats
 other instance options.
 
+You may set :mrjob-opt:`ebs_root_volume_gb` regardless of which style
+of instance configuration you use.
+
+
 .. mrjob-opt::
     :config: instance_fleets
     :switch: --instance-fleet
@@ -161,7 +165,8 @@ other instance options.
     string on the command line or use data structures in the config file
     (which is itself basically JSON).
 
-    This is the primary way to configure EBS volumes. For example:
+    This allows for more fine-tuned EBS volume configuration than
+    :mrjob-opt:`ebs_root_volume_gb`. For example:
 
     .. code-block:: yaml
 
@@ -229,6 +234,19 @@ other instance options.
     .. versionchanged:: 0.5.4
 
        This option used to be named *ec2_task_instance_bid_price*.
+
+.. mrjob-opt::
+    :config: ebs_root_volume_gb
+    :switch: --ebs-root-volume-gb
+    :type: integer
+    :set: emr
+    :default: ``None``
+
+    When specified (and not zero), sets the size of the root EBS volume,
+    in GiB.
+
+    .. versionadded:: 0.6.5
+
 
 Cluster software configuration
 ------------------------------

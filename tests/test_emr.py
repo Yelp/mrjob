@@ -439,6 +439,32 @@ class ExistingClusterTestCase(MockBoto3TestCase):
         self.assertEqual(cluster['Status']['State'], 'WAITING')
 
 
+class EbsRootVolumeGBTestCase(MockBoto3TestCase):
+
+    def test_defaults(self):
+        cluster = self.run_and_get_cluster()
+        self.assertNotIn('EbsRootVolumeSize', cluster)
+
+    def test_set_to_integer(self):
+        cluster = self.run_and_get_cluster('--ebs-root-volume-gb', '999')
+        self.assertEqual(cluster['EbsRootVolumeSize'], 999)
+
+    def test_zero_means_default(self):
+        cluster = self.run_and_get_cluster('--ebs-root-volume-gb', '0')
+        self.assertNotIn('EbsRootVolumeSize', cluster)
+
+    def test_must_be_integer_on_cmd_line(self):
+        self.assertRaises(
+            ValueError,
+            self.run_and_get_cluster, '--ebs-root-volume-gb', '99.99')
+
+    def test_must_be_integer_in_config(self):
+        BAD_MRJOB_CONF = {'runners': {'emr': {'ebs_root_volume_gb': 99.99}}}
+
+        with mrjob_conf_patcher(BAD_MRJOB_CONF):
+            self.assertRaises(ParamValidationError, self.run_and_get_cluster)
+
+
 class VisibleToAllUsersTestCase(MockBoto3TestCase):
 
     def test_defaults(self):

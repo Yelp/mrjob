@@ -655,6 +655,46 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--instance-type', 'a1.sauce',
             '--num-core-instances', '2'])
 
+    # note that ebs_root_volume_gb is independent from EBS config on
+    # instance fleets and instance groups
+
+    def test_join_cluster_with_same_ebs_root_volume_gb(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ebs_root_volume_gb=123)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ebs-root-volume-gb', '123'])
+
+    def test_join_cluster_with_larger_ebs_root_volume_gb(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ebs_root_volume_gb=456)
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ebs-root-volume-gb', '123'])
+
+    def test_dont_join_cluster_with_smaller_ebs_root_volume_gb(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ebs_root_volume_gb=11)
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ebs-root-volume-gb', '123'])
+
+    def test_dont_join_cluster_with_default_ebs_root_volume_gb(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--ebs-root-volume-gb', '123'])
+
+    def test_dont_join_cluster_with_non_default_ebs_root_volume_gb(self):
+        _, cluster_id = self.make_pooled_cluster(
+            ebs_root_volume_gb=123)
+
+        self.assertDoesNotJoin(cluster_id, ['-r', 'emr', '--pool-clusters'])
+
     def _ig_with_ebs_config(
             self, device_configs=(), iops=None,
             num_volumes=None,

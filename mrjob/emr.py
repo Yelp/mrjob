@@ -2398,6 +2398,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 elif (cluster['EbsRootVolumeSize'] <
                         self._opts['ebs_root_volume_gb']):
                     log.debug('    EBS root volume size too small')
+                    return
             else:
                 if 'EbsRootVolumeSize' in cluster:
                     log.debug('    uses non-default EBS root volume size')

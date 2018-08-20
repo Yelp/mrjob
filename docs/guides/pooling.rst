@@ -46,6 +46,10 @@ Pooling is also somewhat flexible about EBS volumes (see
 but larger volumes or volumes with more I/O ops per second are acceptable,
 as are additional volumes of any type.
 
+Pooling cannot match configurations with explicitly set
+:mrjob-opt:`ebs_root_volume_gb` against clusters that use the default (or vice
+versa) because the EMR API does not report what the default value is.
+
 If you are using :mrjob-opt:`instance_fleets`, your jobs will only join other
 clusters which use instance fleets. The rules are similar, but jobs will
 only join clusters whose fleets use the same set of instances or a subset;

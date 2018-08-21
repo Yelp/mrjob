@@ -756,6 +756,32 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
                 self.assertEqual(runner.get_hadoop_version(), '2.7.3')
 
 
+class CustomAmiTestCase(MockBoto3TestCase):
+
+    def test_default(self):
+        with self.make_runner() as runner:
+            runner.run()
+
+            cluster = runner._describe_cluster()
+            self.assertNotIn('CustomAmiId', cluster)
+
+    def test_custom_ami(self):
+        with self.make_runner('--image-id', 'ami-blanchin') as runner:
+            runner.run()
+
+            cluster = runner._describe_cluster()
+            self.assertEqual(cluster['CustomAmiId'], 'ami-blanchin')
+
+    def test_ami_must_be_at_least_5_7_0(self):
+        log = self.start(patch('mrjob.emr.log'))
+
+        with self.make_runner('--image-id', 'ami-blanchin',
+                              '--image-version', '5.6.0') as runner:
+            self.assertTrue(log.warning.called)
+
+            self.assertRaises(ClientError, runner.run)
+
+
 class AvailabilityZoneTestCase(MockBoto3TestCase):
 
     MRJOB_CONF_CONTENTS = {'runners': {'emr': {

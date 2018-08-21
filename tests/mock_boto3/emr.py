@@ -321,6 +321,12 @@ class MockEMRClient(object):
                 'Must specify exactly one of the following:'
                 ' release label, AMI version, or Hadoop version.')
 
+        # CustomAmiId
+        if kwargs.get('CustomAmiId'):
+            if not version_gte(running_ami_version, '5.7.0'):
+                raise _error('Custom AMI is not allowed')
+            cluster['CustomAmiId'] = kwargs.pop('CustomAmiId')
+
         # Applications
         hadoop_version = map_version(
             running_ami_version, AMI_HADOOP_VERSION_UPDATES)

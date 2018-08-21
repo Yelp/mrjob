@@ -379,7 +379,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             log.warning("AMIs prior to 2.4.3 probably will not work because"
                         " they don't support Python 2.7. Use a later AMI"
                         " version or mrjob v0.5.11")
-        elif not version_gte(self._opts['image_version'], '5.7.0'):
+        elif not self._image_version_gte('5.7.0'):
             if self._opts['image_id']:
                 log.warning('AMIs prior to 5.7.0 will probably not work'
                             ' with custom machine images')

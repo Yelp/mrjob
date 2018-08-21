@@ -772,11 +772,22 @@ class CustomAmiTestCase(MockBoto3TestCase):
             cluster = runner._describe_cluster()
             self.assertEqual(cluster['CustomAmiId'], 'ami-blanchin')
 
-    def test_ami_must_be_at_least_5_7_0(self):
+    def test_image_version_too_low(self):
         log = self.start(patch('mrjob.emr.log'))
 
+        # must be at least 5.7.0
         with self.make_runner('--image-id', 'ami-blanchin',
                               '--image-version', '5.6.0') as runner:
+            self.assertTrue(log.warning.called)
+
+            self.assertRaises(ClientError, runner.run)
+
+    def test_release_label_too_low(self):
+        log = self.start(patch('mrjob.emr.log'))
+
+        # must be at least 5.7.0
+        with self.make_runner('--image-id', 'ami-blanchin',
+                              '--release-label', 'emr-5.6.0') as runner:
             self.assertTrue(log.warning.called)
 
             self.assertRaises(ClientError, runner.run)

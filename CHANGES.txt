@@ -1,3 +1,6 @@
+v0.6.5, 2018-09-?? -- AMI pooling
+ * RetryWrapper now passes through docstring of wrapped functions
+
 v0.6.4, 2018-07-31 -- FILES, DIRS, ARCHIVES
  * drop support for Python 3.3
  * unvendored google-cloud-dataproc, version 0.2.0+ required (#1796)

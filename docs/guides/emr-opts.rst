@@ -251,7 +251,8 @@ of instance configuration you use.
 Cluster software configuration
 ------------------------------
 
-See also :mrjob-opt:`image_version` and :mrjob-opt:`bootstrap`.
+See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
+:mrjob-opt:`image_version`.
 
 .. mrjob-opt::
    :config: applications

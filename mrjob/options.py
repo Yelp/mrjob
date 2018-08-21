@@ -727,11 +727,19 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    image_id=dict(
+        cloud_role='launch',
+        switches=[
+            (['--image-id'], dict(
+                help='ID of custom AWS machine image (AMI) to use',
+            )),
+        ],
+    ),
     image_version=dict(
         cloud_role='launch',
         switches=[
             (['--image-version'], dict(
-                help='EMR/Dataproc machine image to launch clusters with',
+                help='version of EMR/Dataproc machine image to run',
             )),
         ],
     ),

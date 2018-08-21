@@ -254,6 +254,11 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             raise DataprocException(
                 'Dataproc v1 expects core/task instance types to be identical')
 
+        # see #1820
+        if self._opts['image_id']:
+            log.warning('mrjob does not yet support custom machine images'
+                        ' on Dataproc')
+
         # load credentials and project ID
         self._credentials, auth_project_id = google.auth.default(
             scopes=[_FULL_SCOPE])  # needed for $GOOGLE_APPLICATION_CREDENTIALS

@@ -152,7 +152,7 @@ _MAX_MINS_IDLE_BOOTSTRAP_ACTION_PATH = os.path.join(
 # for new (since October 10, 2012) accounts (see #1025)
 _DEFAULT_EMR_REGION = 'us-west-2'
 
-# default AMI to use on EMR. This will be updated with each version
+# default AMI to use on EMR. This may be updated with each version
 _DEFAULT_IMAGE_VERSION = '5.8.0'
 
 # first AMI version that we can't run bash -e on (see #1548)
@@ -373,12 +373,16 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
         # check AMI version
         if self._opts['image_version'].startswith('1.'):
-            log.warning('1.x AMIs will probably not work because they use'
+            log.warning('1.x AMIs will not work because they use'
                         ' Python 2.5. Use a later AMI version or mrjob v0.4.2')
         elif not version_gte(self._opts['image_version'], '2.4.3'):
             log.warning("AMIs prior to 2.4.3 probably will not work because"
                         " they don't support Python 2.7. Use a later AMI"
                         " version or mrjob v0.5.11")
+        elif not self._image_version_gte('5.7.0'):
+            if self._opts['image_id']:
+                log.warning('AMIs prior to 5.7.0 will probably not work'
+                            ' with custom machine images')
 
         if self._opts['emr_api_params'] is not None:
             log.warning('emr_api_params is deprecated and does nothing.'
@@ -1151,6 +1155,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             kwargs['ReleaseLabel'] = self._opts['release_label']
         else:
             kwargs['AmiVersion'] = self._opts['image_version']
+
+        if self._opts['image_id']:
+            kwargs['CustomAmiId'] = self._opts['image_id']
 
         # capitalizing Instances because it's just an API parameter
         kwargs['Instances'] = Instances = {}
@@ -2281,7 +2288,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         same setup as our own, that is:
 
         - same bootstrap setup (including mrjob version)
-        - have the same AMI version
+        - have the same AMI version and custom AMI ID (if any)
         - install the same applications (if we requested any)
         - same number and type of instances
 
@@ -2390,6 +2397,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 max_steps = map_version(
                     image_version, _IMAGE_VERSION_TO_MAX_STEPS)
+
+            if self._opts['image_id'] != cluster.get('CustomAmiId'):
+                log.debug('    custom image ID mismatch')
+                return
 
             if self._opts['ebs_root_volume_gb']:
                 if 'EbsRootVolumeSize' not in cluster:

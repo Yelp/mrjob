@@ -223,6 +223,30 @@ Cluster software configuration
 ------------------------------
 
 .. mrjob-opt::
+    :config: image_id
+    :switch: --image-id
+    :type: :ref:`string <data-type-string>`
+    :set: cloud
+    :default: None
+
+    ID of a custom machine image.
+
+    On EMR, this is complimentary with :mrjob-opt:`image_version`; you
+    can install packages and libraries on your custom AMI, but it's up to
+    EMR to install Hadoop, create the ``hadoop`` user, etc.
+    :mrjob-opt:`image_version` may not be less than 5.7.0.
+
+    For more details about how to create a custom AMI that works with EMR, see
+    `Best Practices and Considerations
+    <https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-custom-ami.html#emr-custom-ami-considerations>`_.
+
+    .. note::
+
+       This is not yet implemented in the Dataproc runner.
+
+    .. versionadded:: 0.6.5
+
+.. mrjob-opt::
     :config: image_version
     :switch: --image-version
     :type: :ref:`string <data-type-string>`

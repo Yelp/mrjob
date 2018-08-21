@@ -33,6 +33,9 @@ Sample command line:
 To find the latest crawl:
 
 ``aws s3 ls s3://commoncrawl/crawl-data/ | grep CC-MAIN``
+
+WET data is often added after a release; usually the second-most recent
+release is a safe bet.
 """
 import re
 from itertools import islice

@@ -254,6 +254,49 @@ class PoolMatchingTestCase(MockBoto3TestCase):
             '--release-label', 'emr-4.0.0',
             '--image-version', '1.0.0'])
 
+    def test_pooling_with_custom_ami(self):
+        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--image-id', 'ami-blanchin'])
+
+    def test_dont_join_pool_with_wrong_custom_ami(self):
+        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--image-id', 'ami-awake'])
+
+    def test_dont_join_pool_with_non_custom_ami(self):
+        _, cluster_id = self.make_pooled_cluster()
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--image-id', 'ami-blanchin'])
+
+    def test_dont_join_pool_with_custom_ami_if_not_set(self):
+        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters'])
+
+    def test_join_pool_with_matching_custom_ami_and_ami_version(self):
+        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin',
+                                                 image_version='5.10.0')
+
+        self.assertJoins(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--image-id', 'ami-blanchin', '--release-label', 'emr-5.10.0'])
+
+    def test_dont_join_pool_with_right_custom_ami_but_wrong_version(self):
+        _, cluster_id = self.make_pooled_cluster(image_id='ami-blanchin',
+                                                 image_version='5.9.0')
+
+        self.assertDoesNotJoin(cluster_id, [
+            '-r', 'emr', '--pool-clusters',
+            '--image-id', 'ami-blanchin', '--image-version', '5.10.0'])
+
     def test_matching_applications(self):
         _, cluster_id = self.make_pooled_cluster(
             image_version='4.0.0', applications=['Mahout'])

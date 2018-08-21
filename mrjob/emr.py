@@ -2289,7 +2289,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         same setup as our own, that is:
 
         - same bootstrap setup (including mrjob version)
-        - have the same AMI version
+        - have the same AMI version and custom AMI ID (if any)
         - install the same applications (if we requested any)
         - same number and type of instances
 
@@ -2398,6 +2398,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
                 max_steps = map_version(
                     image_version, _IMAGE_VERSION_TO_MAX_STEPS)
+
+            if self._opts['image_id'] != cluster.get('CustomAmiId'):
+                log.debug('    custom image ID mismatch')
+                return
 
             if self._opts['ebs_root_volume_gb']:
                 if 'EbsRootVolumeSize' not in cluster:

@@ -67,6 +67,7 @@ class HadoopInTheCloudJobRunner(MRJobBinRunner):
         'core_instance_type',
         'extra_cluster_params',
         'hadoop_streaming_jar',
+        'image_id',
         'image_version',
         'instance_type',
         'master_instance_type',

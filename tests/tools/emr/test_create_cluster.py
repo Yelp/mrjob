@@ -56,6 +56,7 @@ class ClusterInspectionTestCase(ToolTestCase):
                 'iam_endpoint': None,
                 'iam_instance_profile': None,
                 'iam_service_role': None,
+                'image_id': None,
                 'image_version': None,
                 'instance_fleets': None,
                 'instance_groups': None,

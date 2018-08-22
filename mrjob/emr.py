@@ -2734,6 +2734,27 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if master_private_ip:  # may not have been assigned yet
             cache['master_private_ip'] = master_private_ip
 
+    def make_ec2_client(self):
+        """Create a :py:mod:`boto3` EC2 client.
+
+        :return: a :py:class:`botocore.client.EC2` wrapped in a
+                :py:class:`mrjob.retry.RetryWrapper`
+        """
+        if boto3 is None:
+            raise ImportError('You must install boto3 to connect to EC2')
+
+        raw_ec2_client = boto3.client(
+            'ec2',
+            aws_access_key_id=self._opts['aws_access_key_id'],
+            aws_secret_access_key=self._opts['aws_secret_access_key'],
+            aws_session_token=self._opts['aws_session_token'],
+            # TODO: add ec2_endpoint option
+            #endpoint_url=_endpoint_url(self._opts['ec2_endpoint']),
+            region_name=self._opts['region'],
+        )
+
+        return _wrap_aws_client(raw_ec2_client)
+
     def make_iam_client(self):
         """Create a :py:mod:`boto3` IAM client.
 

@@ -2010,6 +2010,25 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
 
+    def test_launch_new_multi_node_cluster_after_self_termination(self):
+        # the error message is different when a multi-node cluster
+        # self-terminates
+        cluster_id = self.make_pooled_cluster(num_core_instances=1)
+        self.mock_emr_self_termination.add(cluster_id)
+
+        job = MRTwoStepJob(['-r', 'emr', '--num-core-instances', '1'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            runner.run()
+
+            # tried to add steps to pooled cluster, had to try again
+            self.assertEqual(self.num_steps(cluster_id), 2)
+
+            self.assertNotEqual(runner.get_cluster_id(), cluster_id)
+            self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
+
+
     def test_restart_ssh_tunnel_on_launch(self):
         # regression test for #1549
         ssh_tunnel_cluster_ids = []

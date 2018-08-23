@@ -98,7 +98,7 @@ do
             if expr $SECS_IDLE '>' $MAX_SECS_IDLE > /dev/null
             then
                 sudo shutdown -h now
-                exit
+                # continue looping in case something went wrong (see #1819)
             fi
         fi
     fi

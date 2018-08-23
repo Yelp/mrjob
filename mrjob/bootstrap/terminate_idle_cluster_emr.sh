@@ -37,21 +37,29 @@
 # pending in EMR, or ones that you're about to submit, or jobs that started
 # running since the last time we called `hadoop job -list`.
 
-# This script will leave the cluster in the FAILED (not TERMINATED) state,
+# This script will leave the cluster in the TERMINATED_WITH_ERRORS state,
 # with LastStateChangeReason "The master node was terminated. ". It can
 # take EMR a minute or so to realize that master node has been shut down.
 
 # full usage:
 #
-# ./terminate_idle_cluster_emr.sh [ max_secs_idle  ]
+# ./terminate_idle_cluster_emr.sh [max_secs_idle [grace_period [log_path]]]
 #
 # Both arguments must be integers
+
+set -x  # enable echo
 
 MAX_SECS_IDLE=$1
 if [ -z "$MAX_SECS_IDLE" ]; then MAX_SECS_IDLE=300; fi
 
 GRACE_PERIOD_SECS=$2
 if [ -z "$GRACE_PERIOD_SECS" ]; then GRACE_PERIOD_SECS=600; fi
+
+LOG_PATH=$3
+if [ -z "$LOG_PATH" ]
+then
+    LOG_PATH=/var/log/bootstrap-actions/mrjob-idle-termination.log
+fi
 
 # exit if this isn't the master node
 grep -q 'isMaster.*false' /mnt/var/lib/info/instance.json && exit 0
@@ -98,6 +106,6 @@ do
     # sleep so we don't peg the CPU
     sleep 5
 done
-# close file handles to daemonize the script; otherwise bootstrapping
+# close stdin to daemonize the script; otherwise bootstrapping
 # never finishes
-) 0<&- &> /dev/null &
+) 0<&- &> $LOG_PATH &

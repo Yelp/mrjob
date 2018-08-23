@@ -224,7 +224,7 @@ class _PooledClusterSelfTerminatedException(Exception):
 # mildly flexible regex to detect cluster self-termination. Termination of
 # non-master nodes won't shut down the cluster, so don't need to match that.
 _CLUSTER_SELF_TERMINATED_RE = re.compile(
-    '^.*The master node was terminated.*$', re.I)
+    '^.*(node|instances) .* terminated.*$', re.I)
 
 
 def _make_lock_uri(cloud_tmp_dir, cluster_id, step_num):

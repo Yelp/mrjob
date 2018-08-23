@@ -1563,9 +1563,17 @@ class MockEMRClient(object):
         # simulate self-termination
         if cluster_id in self.mock_emr_self_termination:
             cluster['Status']['State'] = 'TERMINATING'
+
+            if (len(cluster.get('_InstanceFleets') or ()) == 1 or
+                    len(cluster.get('_InstanceGroups') or ()) == 1):
+                # single master node
+                message = 'All instances in the job flow are terminated'
+            else:
+                message = 'The master node was terminated'
+
             cluster['Status']['StateChangeReason'] = dict(
                 Code='INSTANCE_FAILURE',
-                Message='The master node was terminated. ',  # sic
+                Message=message,
             )
 
             for step in cluster['_Steps']:

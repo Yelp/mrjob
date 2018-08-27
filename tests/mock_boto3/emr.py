@@ -71,6 +71,8 @@ AMI_HADOOP_VERSION_UPDATES = {
     '4.8.2': '2.7.3',
     '5.0.0': '2.7.2',
     '5.0.3': '2.7.3',
+    '5.12.0': '2.8.3',
+    '5.16.0': '2.8.4',
 }
 
 # does the AMI have a limit on the *total* number of steps?

@@ -699,7 +699,7 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
             runner.run()
             self.assertEqual(runner.get_image_version(),
                              _DEFAULT_IMAGE_VERSION)
-            self.assertEqual(runner.get_hadoop_version(), '2.7.3')
+            self.assertEqual(runner.get_hadoop_version(), '2.8.4')
 
     def test_ami_version_1_0_no_longer_supported(self):
         with self.make_runner('--image-version', '1.0') as runner:
@@ -753,7 +753,7 @@ class AMIAndHadoopVersionTestCase(MockBoto3TestCase):
                 runner.run()
                 self.assertEqual(runner.get_image_version(),
                                  _DEFAULT_IMAGE_VERSION)
-                self.assertEqual(runner.get_hadoop_version(), '2.7.3')
+                self.assertEqual(runner.get_hadoop_version(), '2.8.4')
 
 
 class CustomAmiTestCase(MockBoto3TestCase):

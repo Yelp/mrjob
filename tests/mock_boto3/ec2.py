@@ -12,6 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Mock boto3 EC2 support."""
+from copy import deepcopy
+
+from botocore.exceptions import ParamValidationError
 
 from mrjob.aws import _DEFAULT_AWS_REGION
 
@@ -41,3 +44,29 @@ class MockEC2Client(object):
         self.meta = MockClientMeta(
             endpoint_url=endpoint_url,
             region_name=region_name)
+
+    def describe_images(self, Filters=None, Owners=None):
+        images = []
+
+        for image in self.mock_ec2_images:
+            if not (Owners is None or image.get('ImageOwnerAlias') in Owners):
+                continue
+
+            if Filters:
+                for Filter in Filters:
+                    if set(Filter) != {'Name', 'Values'}:
+                        raise ParamValidationError(
+                            report='Unknown parameter in Filters')
+
+                    field = _hyphen_to_camel(Filter['Name'])
+                    if not image.get(field) in Filter['Values']:
+                        continue
+
+            images.append(deepcopy(image))
+
+        return dict(Images=images)
+
+
+def _hyphen_to_camel(s):
+    """Convert a string like ``root-device-type`` to ``RootDeviceType``"""
+    return ''.join(part[0].upper() + part[1:] for part in s.split('-'))

@@ -101,7 +101,7 @@ class MockBoto3TestCase(SandboxedTestCase):
         * ``BlockDeviceMappings`` (e.g. ``[{'DeviceName': '/dev/sda1'}]``)
         * ``ImageOwnerAlias`` (e.g. ``'amazon'``, ``'aws-marketplace'``)
         * ``Name`` (e.g. ``amzn-ami-hvm-2017.09.1.20171120-x86_64-s3``)
-        * ``RootDeviceType`` (e.g. ``'ebs'``)
+        * ``RootDeviceType`` (e.g. ``'ebs'``, ``'instance-store'``)
         * ``VirtualizationType (e.g. ``'hvm'``, ``'paravirtual'``)
         """
         image = dict(image)

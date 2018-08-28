@@ -304,6 +304,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         'cloud_log_dir',
         'core_instance_bid_price',
         'ebs_root_volume_gb',
+        'ec2_endpoint',
         'ec2_key_pair',
         'ec2_key_pair_file',
         'emr_action_on_failure',
@@ -2748,8 +2749,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             aws_access_key_id=self._opts['aws_access_key_id'],
             aws_secret_access_key=self._opts['aws_secret_access_key'],
             aws_session_token=self._opts['aws_session_token'],
-            # TODO: add ec2_endpoint option
-            #endpoint_url=_endpoint_url(self._opts['ec2_endpoint']),
+            endpoint_url=_endpoint_url(self._opts['ec2_endpoint']),
             region_name=self._opts['region'],
         )
 

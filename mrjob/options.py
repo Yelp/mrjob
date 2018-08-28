@@ -554,6 +554,16 @@ _RUNNER_OPTS = dict(
             )),
         ],
     ),
+    ec2_endpoint=dict(
+        cloud_role='connect',
+        switches=[
+            (['--ec2-endpoint'], dict(
+                help=('Force mrjob to connect to EC2 on this endpoint'
+                      ' (e.g. ec2.us-west-1.amazonaws.com).'
+                      ' Default is to infer this from region.'),
+            )),
+        ],
+    ),
     ec2_key_pair=dict(
         cloud_role='launch',
         switches=[

@@ -22,6 +22,7 @@ from io import BytesIO
 
 import boto3
 
+from mrjob.aws import _boto3_now
 from mrjob.emr import _EMR_LOG_DIR
 from mrjob.emr import EMRJobRunner
 
@@ -32,6 +33,7 @@ from tests.py2 import MagicMock
 from tests.py2 import patch
 from tests.sandbox import SandboxedTestCase
 
+from .ec2 import MockEC2Client
 from .emr import MockEMRClient
 from .iam import MockIAMClient
 from .s3 import MockS3Client
@@ -47,6 +49,7 @@ class MockBoto3TestCase(SandboxedTestCase):
 
     def setUp(self):
         # patch boto3
+        self.mock_ec2_images = []
         self.mock_emr_failures = set()
         self.mock_emr_self_termination = set()
         self.mock_emr_clusters = {}
@@ -86,6 +89,31 @@ class MockBoto3TestCase(SandboxedTestCase):
         """Update self.mock_s3_fs with a map from bucket name
         to key name to data."""
         add_mock_s3_data(self.mock_s3_fs, data, age, location)
+
+    def add_mock_ec2_image(self, image):
+        """Add information about a mock EC2 Image (AMI) to be returned by
+        mock :py:meth:`~tests.mock_boto3.ec2.MockEC2Client.describe_images`.
+
+        This will automatically fill `CreationDate`. Other fields you
+        might want to fill include:
+
+        * ``Architecture`` (e.g. ``'i386'``, ``'x86_64'``)
+        * ``BlockDeviceMappings`` (e.g. ``[{'DeviceName': '/dev/sda1'}]``)
+        * ``ImageOwnerAlias`` (e.g. ``'amazon'``, ``'aws-marketplace'``)
+        * ``Name`` (e.g. ``amzn-ami-hvm-2017.09.1.20171120-x86_64-s3``)
+        * ``RootDeviceType`` (e.g. ``'ebs'``)
+        * ``VirtualizationType (e.g. ``'hvm'``, ``'paravirtual'``)
+        """
+        image = dict(image)
+
+        # TODO: will eventually need to add a mock user ID to support
+        # filtering by owner == 'self'
+
+        if not image.get('CreationDate'):
+            image['CreationDate'] = _boto3_now().strftime(
+                '%Y-%m-%dT%H:%M:%S.%f')[:-3] + 'Z'
+
+        self.mock_ec2_images.append(image)
 
     def add_mock_emr_cluster(self, cluster):
         if cluster['Id'] in self.mock_emr_clusters:
@@ -187,7 +215,11 @@ class MockBoto3TestCase(SandboxedTestCase):
 
     # mock boto3.client()
     def client(self, service_name, **kwargs):
-        if service_name == 'emr':
+        if service_name == 'ec2':
+            kwargs['mock_ec2_images'] = self.mock_ec2_images
+            return MockEC2Client(**kwargs)
+
+        elif service_name == 'emr':
             try:
                 next(self.emr_client_counter)
             except StopIteration:

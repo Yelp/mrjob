@@ -52,6 +52,8 @@ def get_latest_emr_base_ami(ec2_client):
         ],
     )['Images']
 
+    # TODO: only allow single EBS volume
+
     # perform further filtering by name
     images = [img for img in images
               if _EMR_BASE_AMI_NAME_RE.match(img['Name'])]

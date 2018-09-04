@@ -22,9 +22,9 @@ log = logging.getLogger(__name__)
 _EMR_BASE_AMI_NAME_RE = re.compile(r'^amzn-ami-hvm-[\d\.]*-x86_64-ebs$')
 
 
-def get_latest_emr_base_ami(ec2_client):
-    """Fetch the latest Amazon Linux AMI image that's usable as a base
-    image for EMR. This can take several seconds.
+def describe_base_emr_images(ec2_client):
+    """Fetch a list of Amazon Linux AMI images that are usable with EMR,
+    with the most recent first. This can take several seconds.
 
     For the sake of consistency, we have somewhat stricter requirements
     than `the AWS documentation <https://docs.aws.amazon.com/emr/latest/\
@@ -38,7 +38,11 @@ def get_latest_emr_base_ami(ec2_client):
       * standard volume type (not GP2)
     * stable version (no "testing" or "rc", only numbers and dots)
 
-    This returns the entire dictionary representing the image. The
+    This only returns images going back to September 2016 (prior to that,
+    EC2 used a different naming convention).
+
+    This returns a dictionary for each image, in the same format as
+    ``ec2_client.describe_images()``. The
     *ImageId* field contains the AMI ID, and *Description* contains
     a human-readable description.
     """
@@ -59,6 +63,6 @@ def get_latest_emr_base_ami(ec2_client):
               if _EMR_BASE_AMI_NAME_RE.match(img['Name'])]
 
     # sort by creation datetime
-    images.sort(key=lambda img: img['CreationDate'])
+    images.sort(key=lambda img: img['CreationDate'], reverse=True)
 
-    return images[-1]
+    return images

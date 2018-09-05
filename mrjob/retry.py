@@ -96,6 +96,9 @@ class RetryWrapper(object):
                         raise
 
         # pretend to be the original function
+        call_and_maybe_retry.__doc__ = f.__doc__
+
         if hasattr(f, '__name__'):
             call_and_maybe_retry.__name__ = f.__name__
+
         return call_and_maybe_retry

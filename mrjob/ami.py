@@ -51,19 +51,22 @@ def describe_base_emr_images(ec2_client):
         Owners=['amazon'],
         Filters=[
             dict(Name='architecture', Values=['x86_64']),
-            dict(Name='virtualization-type',Values=['hvm']),
             dict(Name='root-device-type',Values=['ebs']),
+            dict(Name='virtualization-type',Values=['hvm']),
         ],
     )['Images']
 
     # perform further filtering by name to pick out Amazon Linux
     images = [img for img in images
-              if _EMR_BASE_AMI_NAME_RE.match(img['Name'])]
+              if _EMR_BASE_AMI_NAME_RE.match(img.get('Name') or '')]
 
     # filter out any images that have multiple volumes
     # (this is implied by the naming convention, but just in case)
     images = [img for img in images
-              if len(img['BlockDeviceMappings']) == 1]
+              if len(img.get('BlockDeviceMappings') or []) == 1]
+
+    # require a CreationDate
+    images = [img for img in images if img['CreationDate']]
 
     # put most recent images first
     images.sort(key=lambda img: img['CreationDate'], reverse=True)

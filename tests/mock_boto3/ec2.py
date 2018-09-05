@@ -52,19 +52,25 @@ class MockEC2Client(object):
             if not (Owners is None or image.get('ImageOwnerAlias') in Owners):
                 continue
 
-            if Filters:
-                for Filter in Filters:
-                    if set(Filter) != {'Name', 'Values'}:
-                        raise ParamValidationError(
-                            report='Unknown parameter in Filters')
-
-                    field = _hyphen_to_camel(Filter['Name'])
-                    if not image.get(field) in Filter['Values']:
-                        continue
+            if Filters and not _matches_image_filters(image, Filters):
+                continue
 
             images.append(deepcopy(image))
 
         return dict(Images=images)
+
+
+def _matches_image_filters(image, Filters):
+    for Filter in Filters:
+        if set(Filter) != {'Name', 'Values'}:
+            raise ParamValidationError(
+                report='Unknown parameter in Filters')
+
+        field = _hyphen_to_camel(Filter['Name'])
+        if not image.get(field) in Filter['Values']:
+            return False
+
+    return True
 
 
 def _hyphen_to_camel(s):

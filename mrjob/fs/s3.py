@@ -32,6 +32,13 @@ try:
 except ImportError:
     boto3 = None
 
+# ssl is a built-in package, but isn't available if no SSL library is installed
+try:
+    from ssl import SSLError
+except ImportError:
+    SSLError = None
+
+
 from mrjob.aws import _S3_REGION_WITH_NO_LOCATION_CONSTRAINT
 from mrjob.cat import decompress
 from mrjob.fs.base import Filesystem
@@ -95,6 +102,12 @@ def _is_retriable_client_error(ex):
             return True
         # spurious 505s thought to be part of an AWS load balancer issue
         return _client_error_status(ex) == 505
+    # in Python 2.7, SSLError is a subclass of socket.error, so catch
+    # SSLError first
+    elif isinstance(ex, SSLError):
+        # catch ssl.SSLError: ('The read operation timed out',). See #1827
+        return any(isinstance(arg, str) and 'timed out' in arg
+                   for arg in ex.args)
     elif isinstance(ex, socket.error):
         return ex.args in ((104, 'Connection reset by peer'),
                            (110, 'Connection timed out'))

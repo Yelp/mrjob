@@ -106,7 +106,8 @@ def _is_retriable_client_error(ex):
     # in Python 2.7, SSLError is a subclass of socket.error, so catch
     # SSLError first
     elif isinstance(ex, SSLError):
-        # catch ssl.SSLError: ('The read operation timed out',). See #1827
+        # catch ssl.SSLError: ('The read operation timed out',). See #1827.
+        # also catches 'The write operation timed out'
         return any(isinstance(arg, str) and 'timed out' in arg
                    for arg in ex.args)
     elif isinstance(ex, socket.error):

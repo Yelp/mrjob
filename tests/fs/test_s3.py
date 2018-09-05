@@ -458,6 +458,9 @@ class WrapAWSClientTestCase(MockBoto3TestCase):
     def test_ssl_read_op_timed_out_error(self):
         self.assert_retry(SSLError('The read operation timed out'))
 
+    def test_ssl_write_op_timed_out_error(self):
+        self.assert_retry(SSLError('The write operation timed out'))
+
     def test_other_ssl_error(self):
         self.assert_no_retry(SSLError('certificate verify failed'))
 

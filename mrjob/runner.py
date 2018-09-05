@@ -250,8 +250,7 @@ class MRJobRunner(object):
             self._working_dir_mgr.add('file', self._script_path)
 
         # give this job a unique name
-        self._job_key = self._make_unique_job_key(
-            label=self._opts['label'], owner=self._opts['owner'])
+        self._job_key = self._make_unique_job_key()
 
         # extra args to our job
         self._extra_args = list(extra_args) if extra_args else []
@@ -752,25 +751,41 @@ class MRJobRunner(object):
         return self._local_tmp_dir
 
     def _make_unique_job_key(self, label=None, owner=None):
-        """Come up with a useful unique ID for this job.
+        """Come up with a useful unique ID for this job. Optionally,
+        you can specify a custom label or owner (otherwise we use
+        :py:meth:`_label` and :py:meth:`_owner`.
 
         We use this to choose the output directory, etc. for the job.
         """
-        # use the name of the script if one wasn't explicitly
-        # specified
-        if not label:
-            if self._script_path:
-                label = os.path.basename(self._script_path).split('.')[0]
-            else:
-                label = 'no_script'
+        if label is None:
+            label = self._label()
 
-        if not owner:
-            owner = 'no_user'
+        if owner is None:
+            owner = self._owner()
 
         now = datetime.datetime.utcnow()
         return '%s.%s.%s.%06d' % (
             label, owner,
             now.strftime('%Y%m%d.%H%M%S'), now.microsecond)
+
+    def _label(self):
+        """Return *label* opt, or if not set, the name of the file
+        containing the MRJob, minus extension, or if none, ``'no_script'``"""
+        if self._opts['label']:
+            return self._opts['label']
+        elif self._script_path:
+            return os.path.basename(self._script_path).split('.')[0]
+        else:
+            return 'no_script'
+
+    def _owner(self):
+        """Return *owner* opt (which defaults to :py:func:`getpass.getuser`),
+        or ``'no_user'`` if not set."""
+        if self._opts['owner']:
+            # owner opt defaults to getpass.getuser()
+            return self._opts['owner']
+        else:
+            return 'no_user'
 
     def _get_steps(self):
         """Call the job script to find out how many steps it has, and whether

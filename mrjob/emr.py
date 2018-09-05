@@ -1118,6 +1118,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # patch in version
         tags['__mrjob_version'] = mrjob.__version__
 
+        # patch in cluster label and owner
+        tags['__mrjob_label'] = self._opts['label']
+        tags['__mrjob_owner'] = self._opts['owner']
+
         # add pooling tags
         if self._opts['pool_clusters']:
             tags['__mrjob_pool_hash'] = self._pool_hash()

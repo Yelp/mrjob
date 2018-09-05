@@ -18,7 +18,7 @@ from mrjob.ami import describe_base_emr_images
 from tests.mock_boto3 import MockBoto3TestCase
 
 
-class DescribeBaseImagesTestCase(MockBoto3TestCase):
+class DescribeBaseEMRImagesTestCase(MockBoto3TestCase):
 
     # a valid base EMR image. we can make variants of this for testing
     BASE_EMR_IMAGE = {

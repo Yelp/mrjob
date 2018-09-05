@@ -1361,6 +1361,35 @@ def make_input_uri_line(input_uri):
             " Opening '%s' for reading\n" % input_uri).encode('utf_8')
 
 
+class EC2EndpointTestCase(MockBoto3TestCase):
+
+    def make_client(self, **kwargs):
+        runner = EMRJobRunner(conf_paths=[], **kwargs)
+        return runner.make_ec2_client()
+
+    def test_default_region(self):
+        client = self.make_client()
+
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://ec2.us-west-2.amazonaws.com')
+        self.assertEqual(client.meta.region_name, 'us-west-2')
+
+    def test_set_region(self):
+        client = self.make_client(region='us-west-1')
+
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://ec2.us-west-1.amazonaws.com')
+        self.assertEqual(client.meta.region_name, 'us-west-1')
+
+    def test_set_endpoint(self):
+        client = self.make_client(region='eu-west-2',
+                                  ec2_endpoint='ec2-proxy')
+
+        self.assertEqual(client.meta.endpoint_url,
+                         'https://ec2-proxy')
+        self.assertEqual(client.meta.region_name, 'eu-west-2')
+
+
 class EMREndpointTestCase(MockBoto3TestCase):
 
     # back when we used boto 2, mrjob used to figure out endpoints itself

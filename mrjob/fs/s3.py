@@ -54,10 +54,10 @@ log = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 8192
 
-# if EMR throttles us, how long to wait (in seconds) before trying again?
-_EMR_BACKOFF = 20
-_EMR_BACKOFF_MULTIPLIER = 1.5
-_EMR_MAX_TRIES = 20  # this takes about a day before we run out of tries
+# if AWS throttles us, how long to wait (in seconds) before trying again?
+_AWS_BACKOFF = 20
+_AWS_BACKOFF_MULTIPLIER = 1.5
+_AWS_MAX_TRIES = 20  # this takes about a day before we run out of tries
 
 
 def _client_error_code(ex):
@@ -122,9 +122,9 @@ def _wrap_aws_client(raw_client):
     throttled."""
     return RetryWrapper(raw_client,
                         retry_if=_is_retriable_client_error,
-                        backoff=_EMR_BACKOFF,
-                        multiplier=_EMR_BACKOFF_MULTIPLIER,
-                        max_tries=_EMR_MAX_TRIES)
+                        backoff=_AWS_BACKOFF,
+                        multiplier=_AWS_BACKOFF_MULTIPLIER,
+                        max_tries=_AWS_MAX_TRIES)
 
 
 class S3Filesystem(Filesystem):

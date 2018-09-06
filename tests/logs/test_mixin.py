@@ -531,6 +531,22 @@ class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertRaises(StopIteration, next, results)
 
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self._ls_history_logs.return_value = [
+            dict(path='hdfs:///history/history.jhist'),
+        ]
+
+        results = self.runner._ls_history_logs(
+            job_id='job_1', output_dir='hdfs:///output/')
+
+        self.assertRaises(StopIteration, next, results)
+
+        self.assertFalse(self.log.info.called)
+        self.assertFalse(self.runner._stream_history_log_dirs.called)
+        self.assertFalse(self._ls_history_logs.called)
+
 
 class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
 
@@ -625,6 +641,26 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
         # unlike most of the _ls_*() methods, logging is handled elsewhere
         # with a callback
         self.assertFalse(self.log.info.called)
+
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self._ls_task_logs.return_value = [
+            dict(path='hdfs:///userlogs/1/syslog'),
+            dict(path='hdfs:///userlogs/2/syslog'),
+        ]
+
+        results = self.runner._ls_task_logs(
+            'streaming',
+            application_id='app_1',
+            job_id='job_1', output_dir='hdfs:///output/')
+
+        self.assertRaises(StopIteration, results.next)
+
+        self.assertFalse(self.log.info.called)
+        self.assertFalse(self._ls_task_logs.called)
+        self.assertFalse(self._ls_spark_task_logs.called)
+        self.assertFalse(self.runner._stream_task_log_dirs.called)
 
 
 class PickErrorTestCase(LogInterpretationMixinTestCase):

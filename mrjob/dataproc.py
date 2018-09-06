@@ -832,6 +832,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         Unlike with most runners, you may call this multiple times and it
         will continue to parse the step log incrementally, which is useful
         for getting job progress."""
+        # don't turn this off even if read_logs opt is false; it's
+        # the only way this runner can track job progress
+
         driver_output_uri = log_interpretation.get(
             'step', {}).get('driver_output_uri')
 

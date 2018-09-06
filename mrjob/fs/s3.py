@@ -117,12 +117,16 @@ def _is_retriable_client_error(ex):
         return False
 
 
-def _wrap_aws_client(raw_client):
+def _wrap_aws_client(raw_client, min_backoff=None):
     """Wrap a given boto3 Client object so that it can retry when
     throttled."""
+    backoff=_AWS_BACKOFF
+    if min_backoff:
+        backoff = max(min_backoff, backoff)
+
     return RetryWrapper(raw_client,
                         retry_if=_is_retriable_client_error,
-                        backoff=_AWS_BACKOFF,
+                        backoff=backoff,
                         multiplier=_AWS_BACKOFF_MULTIPLIER,
                         max_tries=_AWS_MAX_TRIES)
 

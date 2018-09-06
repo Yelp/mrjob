@@ -408,7 +408,7 @@ class WrapAWSClientTestCase(MockBoto3TestCase):
         super(WrapAWSClientTestCase, self).setUp()
 
         # don't actually wait between retries
-        self.start(patch('time.sleep'))
+        self.sleep = self.start(patch('time.sleep'))
 
         self.log = self.start(patch('mrjob.retry.log'))
 
@@ -519,4 +519,15 @@ class WrapAWSClientTestCase(MockBoto3TestCase):
             self.add_transient_error(socket.error(110, 'Connection timed out'))
 
         self.assertRaises(socket.error, self.wrapped_client.list_buckets)
+        self.assertTrue(self.log.info.called)
+
+    def test_min_backoff(self):
+        self.wrapped_client = _wrap_aws_client(self.client, min_backoff=1000)
+
+        self.add_transient_error(socket.error(110, 'Connection timed out'))
+
+        self.assertEqual(self.wrapped_client.list_buckets(), dict(Buckets=[]))
+
+        self.sleep.assert_called_with(1000)
+
         self.assertTrue(self.log.info.called)

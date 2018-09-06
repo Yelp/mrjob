@@ -1825,7 +1825,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _ls_bootstrap_stderr_logs(self, action_num=None, node_id=None):
         """_ls_bootstrap_stderr_logs(), with logging for each log we parse."""
         if not self._read_logs():
-            return ()
+            return
 
         for match in _ls_emr_bootstrap_stderr_logs(
                 self.fs,
@@ -1969,7 +1969,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         will trigger copying logs over).
         """
         if not self._read_logs():
-            return ()
+            return
 
         if dir_name and self.fs.can_handle_path('ssh:///'):
             ssh_host = self._address_of_master()

@@ -575,7 +575,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
     def _stream_history_log_dirs(self, output_dir=None):
         """Yield lists of directories to look for the history log in."""
         if not self._read_logs():
-            return ()
+            return
 
         for log_dir in unique(self._hadoop_log_dirs(output_dir=output_dir)):
             if _logs_exist(self.fs, log_dir):
@@ -589,7 +589,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         # pre-YARN Hadoop because task logs aren't generally shipped to a
         # local directory. It's a start, anyways. See #1201.
         if not self._read_logs():
-            return ()
+            return
 
         for log_dir in unique(self._hadoop_log_dirs(output_dir=output_dir)):
             if application_id:

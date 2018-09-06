@@ -159,7 +159,7 @@ class LogInterpretationMixin(object):
     def _ls_history_logs(self, job_id=None, output_dir=None):
         """Yield history log matches, logging a message for each one."""
         if not self._read_logs():
-            return ()
+            return
 
         for match in _ls_history_logs(
                 self.fs,
@@ -238,7 +238,7 @@ class LogInterpretationMixin(object):
                       error_attempt_ids=None, attempt_to_container_id=None):
         """Yield task log matches."""
         if not self._read_logs():
-            return ()
+            return
 
         if _is_spark_step_type(step_type):
             ls_func = _ls_spark_task_logs

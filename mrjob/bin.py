@@ -51,6 +51,7 @@ class MRJobBinRunner(MRJobRunner):
     OPT_NAMES = MRJobRunner.OPT_NAMES | {
         'interpreter',
         'python_bin',
+        'read_logs',
         'sh_bin',
         'spark_args',
         'spark_submit_bin',
@@ -73,6 +74,7 @@ class MRJobBinRunner(MRJobRunner):
         return combine_dicts(
             super(MRJobBinRunner, self)._default_opts(),
             dict(
+                read_logs=True,
                 sh_bin=['sh', '-ex'],
             )
         )

@@ -54,7 +54,8 @@ EMPTY_MRJOB_CONF = {'runners': {
 
 def mrjob_conf_patcher(substitute_conf=EMPTY_MRJOB_CONF):
     def mock_load_opts_from_mrjob_confs(runner_alias, conf_paths=None):
-        return [(None, substitute_conf['runners'][runner_alias])]
+        return [(None,
+                 substitute_conf.get('runners', {}).get(runner_alias, {}))]
 
     return patch.object(runner, 'load_opts_from_mrjob_confs',
                         mock_load_opts_from_mrjob_confs)

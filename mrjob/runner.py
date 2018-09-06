@@ -101,6 +101,7 @@ class MRJobRunner(object):
         'local_tmp_dir',
         'owner',
         'py_files',
+        'read_logs',
         'setup',
         'upload_archives',
         'upload_dirs',

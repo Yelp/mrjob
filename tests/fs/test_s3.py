@@ -21,6 +21,7 @@ from botocore.exceptions import ClientError
 
 from mrjob.fs.s3 import S3Filesystem
 from mrjob.fs.s3 import _wrap_aws_client
+from mrjob.fs.s3 import _EMR_MAX_TRIES
 
 from tests.compress import gzip_compress
 from tests.mock_boto3 import MockBoto3TestCase
@@ -511,4 +512,11 @@ class WrapAWSClientTestCase(MockBoto3TestCase):
         self.add_transient_error(socket.error(110, 'Connection timed out'))
 
         self.assertRaises(ValueError, self.wrapped_client.list_buckets)
+        self.assertTrue(self.log.info.called)
+
+    def test_eventually_give_up(self):
+        for _ in range(_EMR_MAX_TRIES + 1):
+            self.add_transient_error(socket.error(110, 'Connection timed out'))
+
+        self.assertRaises(socket.error, self.wrapped_client.list_buckets)
         self.assertTrue(self.log.info.called)

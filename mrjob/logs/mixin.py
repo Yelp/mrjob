@@ -104,21 +104,23 @@ class LogInterpretationMixin(object):
 
         counters = _pick_counters(log_interpretation)
 
-        if not counters:
-            log.info('Attempting to fetch counters from logs...')
-            self._interpret_step_logs(log_interpretation, step_type)
-            counters = _pick_counters(log_interpretation)
+        if self._read_logs():
+            if not counters:
+                log.info('Attempting to fetch counters from logs...')
+                self._interpret_step_logs(log_interpretation, step_type)
+                counters = _pick_counters(log_interpretation)
 
-        if not counters:
-            self._interpret_history_log(log_interpretation)
-            counters = _pick_counters(log_interpretation)
+            if not counters:
+                self._interpret_history_log(log_interpretation)
+                counters = _pick_counters(log_interpretation)
 
         return counters
 
     def _pick_error(self, log_interpretation, step_type):
         """Pick probable cause of failure (only call this if job fails)."""
-        if not all(log_type in log_interpretation for
-                   log_type in ('step', 'history', 'task')):
+        if self._read_logs() and not all(
+                log_type in log_interpretation for
+                log_type in ('step', 'history', 'task')):
             log.info('Scanning logs for probable cause of failure...')
             self._interpret_step_logs(log_interpretation, step_type)
             self._interpret_history_log(log_interpretation)
@@ -137,6 +139,9 @@ class LogInterpretationMixin(object):
         if 'history' in log_interpretation:
             return   # already interpreted
 
+        if not self._read_logs():
+            return  # nothing to do
+
         step_interpretation = log_interpretation.get('step') or {}
 
         job_id = step_interpretation.get('job_id')
@@ -153,6 +158,9 @@ class LogInterpretationMixin(object):
 
     def _ls_history_logs(self, job_id=None, output_dir=None):
         """Yield history log matches, logging a message for each one."""
+        if not self._read_logs():
+            return ()
+
         for match in _ls_history_logs(
                 self.fs,
                 self._stream_history_log_dirs(output_dir=output_dir),
@@ -163,6 +171,9 @@ class LogInterpretationMixin(object):
     def _interpret_step_logs(self, log_interpretation, step_type):
         """Add *step* to the log interpretation, if it's not already there."""
         if 'step' in log_interpretation:
+            return
+
+        if not self._read_logs():
             return
 
         step_interpretation = self._get_step_log_interpretation(
@@ -177,6 +188,9 @@ class LogInterpretationMixin(object):
         if 'task' in log_interpretation and (
                 partial or not log_interpretation['task'].get('partial')):
             return   # already interpreted
+
+        if not self._read_logs():
+            return
 
         step_interpretation = log_interpretation.get('step') or {}
 
@@ -223,6 +237,9 @@ class LogInterpretationMixin(object):
                       application_id=None, job_id=None, output_dir=None,
                       error_attempt_ids=None, attempt_to_container_id=None):
         """Yield task log matches."""
+        if not self._read_logs():
+            return ()
+
         if _is_spark_step_type(step_type):
             ls_func = _ls_spark_task_logs
         else:
@@ -253,3 +270,7 @@ class LogInterpretationMixin(object):
                 log.info(_format_counters(counters))
             else:
                 log.warning('No counters found')
+
+    def _read_logs(self):
+        """If this is false, we shouldn't attempt to list or cat logs."""
+        return self._opts.get('read_logs', True)

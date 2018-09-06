@@ -1808,6 +1808,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if not action_num_and_node_id:
             return
 
+        if not self._read_logs():
+            return
+
         # this doesn't really correspond to a step, so
         # don't bother storing it in self._log_interpretations
         bootstrap_interpretation = _interpret_emr_bootstrap_stderr(
@@ -1821,6 +1824,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
 
     def _ls_bootstrap_stderr_logs(self, action_num=None, node_id=None):
         """_ls_bootstrap_stderr_logs(), with logging for each log we parse."""
+        if not self._read_logs():
+            return ()
+
         for match in _ls_emr_bootstrap_stderr_logs(
                 self.fs,
                 self._stream_bootstrap_log_dirs(
@@ -1904,6 +1910,10 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _get_step_log_interpretation(self, log_interpretation, step_type):
         """Fetch and interpret the step log."""
         step_id = log_interpretation.get('step_id')
+
+        if not self._read_logs():
+            return
+
         if not step_id:
             log.warning("Can't fetch step log; missing step ID")
             return
@@ -1920,6 +1930,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
                 _interpret_emr_step_stderr(
                     self.fs, self._ls_step_stderr_logs(step_id=step_id))
             )
+
+    # _ls_step_*() methods are just helpers for _get_step_log_interpretation,
+    # so not disabling them if self._read_logs() is false
 
     def _ls_step_syslogs(self, step_id):
         """Yield step log matches, logging a message for each one."""
@@ -1955,6 +1968,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         TERMINATING, we first wait for it to terminate (since that
         will trigger copying logs over).
         """
+        if not self._read_logs():
+            return ()
+
         if dir_name and self.fs.can_handle_path('ssh:///'):
             ssh_host = self._address_of_master()
             if ssh_host:

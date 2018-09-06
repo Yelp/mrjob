@@ -185,6 +185,20 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
         self.runner._get_step_log_interpretation.assert_called_once_with(
             log_interpretation, 'streaming')
 
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self.runner._get_step_log_interpretation.return_value = dict(
+            job_id='job_1')
+
+        log_interpretation = {}
+
+        self.runner._interpret_step_logs(log_interpretation, 'streaming')
+
+        self.assertFalse(self.runner._get_step_log_interpretation.called)
+
+        self.assertEqual(log_interpretation, {})
+
 
 class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
 

@@ -907,6 +907,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _interpret_history_log(self, log_interpretation):
         """Does nothing. We can't get the history logs, and we don't need
         them."""
+        if not self._read_logs():
+            return
+
         log_interpretation.setdefault('history', {})
 
     # task
@@ -918,6 +921,9 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         if 'task' in log_interpretation and (
                 partial or not log_interpretation['task'].get('partial')):
             return   # already interpreted
+
+        if not self._read_logs():
+            return
 
         step_interpretation = log_interpretation.get('step') or {}
 
@@ -933,6 +939,7 @@ class DataprocJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
     def _task_log_interpretation(
             self, application_id, step_type, partial=True):
         """Helper for :py:meth:`_interpret_task_logs`"""
+        # not bothering with _read_logs() since this is a helper method
         result = {}
 
         for container_id in self._failed_task_container_ids(application_id):

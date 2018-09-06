@@ -3883,6 +3883,25 @@ class GetStepLogInterpretationTestCase(MockBoto3TestCase):
         self.assertFalse(self._ls_step_stderr_logs.called)
         self.assertFalse(self._interpret_emr_step_stderr.called)
 
+    def test_no_read_logs(self):
+        # setting read_logs to False should turn off step log interpretation
+        runner = EMRJobRunner(read_logs=False)
+
+        log_interpretation = dict(step_id='s-STEPID')
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(
+                log_interpretation, 'streaming'),
+            None)
+
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._ls_step_syslogs.called)
+        self.assertFalse(self._interpret_emr_step_syslog.called)
+        self.assertFalse(self._ls_step_stderr_logs.called)
+        self.assertFalse(self._interpret_emr_step_stderr.called)
+
     def test_no_step_id(self):
         runner = EMRJobRunner()
 

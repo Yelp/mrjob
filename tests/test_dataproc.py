@@ -1999,6 +1999,10 @@ class CauseOfErrorTestCase(MockLogEntriesTestCase):
 
     def test_no_read_logs(self):
         # similar to end-to-end test, but does nothing
+
+        # TODO: in practice, there will be an error in the mock driver output,
+        # which *will* be returned
+
         # use LOGGING_CLUSTER_NAME so we can generage fake logging entries
         job = MRBoom(['-r', 'dataproc', '--cluster-id', LOGGING_CLUSTER_NAME,
                       '--no-read-logs'])

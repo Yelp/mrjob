@@ -362,21 +362,7 @@ See also :mrjob-opt:`bootstrap`, :mrjob-opt:`image_id`, and
 Monitoring your job
 -------------------
 
-See also :mrjob-opt:`ssh_tunnel`.
-
-.. mrjob-opt::
-    :config: check_cluster_every
-    :switch: --check-cluster-every
-    :type: :ref:`string <data-type-string>`
-    :set: emr
-    :default: 30
-
-    How often to check on the status of EMR jobs in seconds. If you set this
-    too low, AWS will throttle you.
-
-    .. versionchanged:: 0.5.4
-
-       This used to be called *check_emr_status_every*
+See also :mrjob-opt:`check_cluster_every`, :mrjob-opt:`ssh_tunnel`.
 
 .. mrjob-opt::
     :config: enable_emr_debugging

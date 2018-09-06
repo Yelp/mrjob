@@ -407,7 +407,10 @@ Monitoring your job
 
     How often to check on the status of your job, in seconds.
 
-    (Higher on EMR to keep the API from throttling you.)
+    .. versionchanged:: 0.6.5
+
+       When the EMR client encounters a transient error, it will wait at
+       least this many seconds before trying again.
 
     .. versionchanged:: 0.5.4
 

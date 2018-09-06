@@ -24,6 +24,7 @@ import json
 import os
 import os.path
 import posixpath
+import socket
 import sys
 import time
 from io import BytesIO
@@ -5586,3 +5587,42 @@ class EMRInputManifestTestCase(InlineInputManifestTestCase, MockBoto3TestCase):
 
         # verify that the input manfiest was used
         self.assertIn('input-manifest.txt', first_step_cmd)
+
+
+class EMRClientBackoffTest(MockBoto3TestCase):
+    """Test backoff behavior of EMR client on transient errors."""
+    # this tests #1799
+
+    # don't set check_cluster_every to 0; we mock out time.sleep() instead
+    MRJOB_CONF_CONTENTS = {}
+
+    def setUp(self):
+        super(EMRClientBackoffTest, self).setUp()
+
+        # don't actually wait between retries
+        self.sleep = self.start(patch('time.sleep'))
+
+        # make list_clusters give one transient error before returning
+        self.list_clusters = self.start(patch(
+            'tests.mock_boto3.emr.MockEMRClient.list_clusters',
+            side_effect=[
+                socket.error(104, 'Connection reset by peer'),
+                dict(Clusters=[])
+            ]))
+
+    def _test_backoff(self, expected_backoff, **runner_kwargs):
+        runner = EMRJobRunner(**runner_kwargs)
+        emr_client = runner.make_emr_client()
+
+        self.assertEqual(emr_client.list_clusters()['Clusters'], [])
+        self.sleep.assert_called_with(expected_backoff)
+
+    def test_default_backoff(self):
+        self._test_backoff(30)  # default value of check_cluster_every
+
+    def test_large_check_cluster_every(self):
+        self._test_backoff(1000, check_cluster_every=1000)
+
+    def test_small_check_cluster_every(self):
+        # minimum backoff is always 20
+        self._test_backoff(20, check_cluster_every=1)

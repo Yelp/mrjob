@@ -2634,7 +2634,9 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
             region_name=self._opts['region'],
         )
 
-        return _wrap_aws_client(raw_emr_client)
+        # #1799: don't retry faster than EMR checks the API
+        return _wrap_aws_client(raw_emr_client,
+                                min_backoff=self._opts['check_cluster_every'])
 
     def _describe_cluster(self):
         emr_client = self.make_emr_client()

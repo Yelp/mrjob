@@ -453,6 +453,25 @@ Other
 
         python my_job.py -c left.conf --no-conf -c right.conf
 
+.. mrjob-opt::
+   :config: read_logs
+   :switch: --read-logs, --no-read-logs
+   :type: boolean
+   :set: all
+   :default: ``True``
+
+   .. versionadded:: 0.6.5
+
+   If set to false, don't list or read the contents of log files generated
+   in the course of running your job.
+
+   The main impact of turning off *read_logs* is that if your job fails,
+   mrjob won't spend any time or effort determining why it failed. On EMR, this
+   effectively disables counter fetching as well.
+
+   This option does not stop the Hadoop and Dataproc runners from reading
+   the output of the job driver (i.e. ``hadoop jar ...``), so you will continue
+   to get counters and high-level Java errors on these platforms.
 
 Options ignored by the local and inline runners
 ===============================================
@@ -472,6 +491,8 @@ These options are ignored because the ``inline`` runner does not invoke the job
 as a subprocess:
 
 * :mrjob-opt:`bootstrap_mrjob`
+* :mrjob-opt:`py_files`
 * :mrjob-opt:`python_bin`
+* :mrjob-opt:`read_logs`
 * :mrjob-opt:`setup`
 * :mrjob-opt:`steps_python_bin`

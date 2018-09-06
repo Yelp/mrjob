@@ -3273,6 +3273,23 @@ class EMRTagsTestCase(MockBoto3TestCase):
         self.assertNotIn('__mrjob_pool_hash', tags)
         self.assertNotIn('__mrjob_pool_name', tags)
         self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
+        # MRTwoStepJob is used by run_and_get_cluster()
+        self.assertEqual(tags['__mrjob_label'], 'mr_two_step_job')
+        self.assertEqual(tags['__mrjob_owner'], getpass.getuser())
+
+    def test_explicit_label(self):
+        cluster = self.run_and_get_cluster('--label', 'drink_me')
+
+        tags = _extract_tags(cluster)
+
+        self.assertEqual(tags['__mrjob_label'], 'drink_me')
+
+    def test_explicit_owner(self):
+        cluster = self.run_and_get_cluster('--owner', 'jeremy')
+
+        tags = _extract_tags(cluster)
+
+        self.assertEqual(tags['__mrjob_owner'], 'jeremy')
 
     def test_pooling(self):
         cluster = self.run_and_get_cluster('--pool-clusters')
@@ -3280,8 +3297,11 @@ class EMRTagsTestCase(MockBoto3TestCase):
         tags = _extract_tags(cluster)
 
         self.assertEqual(tags['__mrjob_pool_name'], 'default')
-        self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
         self.assertIn('__mrjob_pool_hash', tags)
+
+        self.assertEqual(tags['__mrjob_version'], mrjob.__version__)
+        self.assertIn('__mrjob_label', tags)
+        self.assertIn('__mrjob_owner', tags)
 
     def test_tags_option_dict(self):
         job = MRWordCount([

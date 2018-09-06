@@ -4460,8 +4460,6 @@ class CheckForFailedBootstrapActionTestCase(MockBoto3TestCase):
     def setUp(self):
         super(CheckForFailedBootstrapActionTestCase, self).setUp()
 
-        self.runner = EMRJobRunner()
-
         self.start(patch('mrjob.emr._get_reason'))
         self._check_for_nonzero_return_code = self.start(
             patch('mrjob.emr._check_for_nonzero_return_code',
@@ -4472,6 +4470,8 @@ class CheckForFailedBootstrapActionTestCase(MockBoto3TestCase):
         self._interpret_emr_bootstrap_stderr = self.start(
             patch('mrjob.emr._interpret_emr_bootstrap_stderr',
                   return_value={}))
+
+        self.runner = EMRJobRunner()
 
     def test_failed_for_wrong_reason(self):
         self.runner._check_for_failed_bootstrap_action(cluster=Mock())
@@ -4521,6 +4521,18 @@ class CheckForFailedBootstrapActionTestCase(MockBoto3TestCase):
         self.assertTrue(self.log.error.called)
         self.assertIn('BOOM!', self.log.error.call_args[0][0])
         self.assertIn(stderr_path, self.log.error.call_args[0][0])
+
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        # add a real error to investigate
+        self._check_for_nonzero_return_code.return_value = dict(
+            action_num=0, node_id='i-e647eb49')
+
+        self.runner._check_for_failed_bootstrap_action(cluster=Mock())
+
+        # should bail out before we call _interpret_emr_bootstrap_stderr()
+        self.assertFalse(self._interpret_emr_bootstrap_stderr.called)
 
 
 class UseSudoOverSshTestCase(MockBoto3TestCase):

@@ -29,6 +29,8 @@ class LogInterpretationMixinTestCase(PatcherTestCase):
 
     def setUp(self):
         self.runner = self.MockRunner()
+        self.runner._opts = {}
+
         self.log = self.start(patch('mrjob.logs.mixin.log'))
 
 
@@ -103,6 +105,25 @@ class InterpretHistoryLogTestCase(LogInterpretationMixinTestCase):
             job_id='job_1', output_dir='hdfs:///path/')
         self._interpret_history_log.assert_called_once_with(
             self.runner.fs, self.runner._ls_history_logs.return_value)
+
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self._interpret_history_log.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(
+            step=dict(job_id='job_1', output_dir='hdfs:///path/'))
+
+        self.runner._interpret_history_log(log_interpretation)
+
+        # should do nothing
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._interpret_history_log.called)
+        self.assertFalse(self.runner._ls_history_logs.called)
+
+        self.assertEqual(log_interpretation, dict(
+            step=dict(job_id='job_1', output_dir='hdfs:///path/')))
 
 
 class InterpretStepLogTestCase(LogInterpretationMixinTestCase):

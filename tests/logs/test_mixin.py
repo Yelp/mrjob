@@ -400,6 +400,24 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self._interpret_task_logs.called)
         self.assertFalse(self.runner._ls_task_logs.called)
 
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self._interpret_task_logs.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(step=dict(application_id='app_1'))
+
+        # should do nothing
+        self.runner._interpret_task_logs(log_interpretation, 'streaming')
+
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._interpret_task_logs.called)
+        self.assertFalse(self.runner._ls_task_logs.called)
+
+        self.assertEqual(log_interpretation,
+                         dict(step=dict(application_id='app_1')))
+
 
 class PickCountersTestCase(LogInterpretationMixinTestCase):
 

@@ -655,7 +655,7 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
             application_id='app_1',
             job_id='job_1', output_dir='hdfs:///output/')
 
-        self.assertRaises(StopIteration, results.next)
+        self.assertRaises(StopIteration, next, results)
 
         self.assertFalse(self.log.info.called)
         self.assertFalse(self._ls_task_logs.called)

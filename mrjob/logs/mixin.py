@@ -268,7 +268,8 @@ class LogInterpretationMixin(object):
                 log_interpretation, step_type)
             if counters:
                 log.info(_format_counters(counters))
-            else:
+            elif self._read_logs():
+                # should only log this if we actually looked for counters
                 log.warning('No counters found')
 
     def _read_logs(self):

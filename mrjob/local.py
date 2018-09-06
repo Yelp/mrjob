@@ -130,6 +130,9 @@ class LocalMRJobRunner(SimMRJobRunner, MRJobBinRunner):
 
         # not using LogInterpretationMixin because it would be overkill
 
+        if not self._opts['read_logs']:
+            return
+
         input_path = self._task_input_path(
             ex.task_type, ex.step_num, ex.task_num)
         stderr_path = self._task_stderr_path(

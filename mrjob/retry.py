@@ -21,6 +21,11 @@ import time
 log = logging.getLogger(__name__)
 
 
+_DEFAULT_BACKOFF = 15
+_DEFAULT_MULTIPLIER = 1.5
+_DEFAULT_MAX_TRIES = 10
+
+
 class RetryWrapper(object):
     """Handle transient errors, with configurable backoff.
 
@@ -32,8 +37,10 @@ class RetryWrapper(object):
     """
     # TODO: this doesn't correctly handle object properties or wrapping
     # functions.
-    def __init__(self, wrapped, retry_if, backoff=15, multiplier=1.5,
-                 max_tries=10):
+    def __init__(self, wrapped, retry_if,
+                 backoff=_DEFAULT_BACKOFF,
+                 multiplier=_DEFAULT_MULTIPLIER,
+                 max_tries=_DEFAULT_MAX_TRIES):
         """
         Wrap the given object
 

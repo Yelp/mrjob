@@ -3556,77 +3556,95 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
     def _test_stream_bootstrap_log_dirs(
             self, ssh=False,
             action_num=0, node_id='i-b659f519',
-            expected_s3_dir_name='node/i-b659f519/bootstrap-actions/1'):
+            expected_s3_dir_name='node/i-b659f519/bootstrap-actions/1',
+            read_logs=True):
 
         # ssh doesn't matter, but let's test it
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
-        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file,
+                              read_logs=read_logs)
 
         results = runner._stream_bootstrap_log_dirs(
             action_num=action_num, node_id=node_id)
 
         self.log.info.reset_mock()
 
-        self.assertEqual(next(results), [
-            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
-        ])
-        self.assertTrue(
-            self._wait_for_logs_on_s3.called)
-        self.log.info.assert_called_once_with(
-            'Looking for bootstrap logs in'
-            ' s3://bucket/logs/j-CLUSTERID/' +
-            expected_s3_dir_name + '...')
+        if read_logs:
+            self.assertEqual(next(results), [
+                's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
+            ])
+            self.assertTrue(
+                self._wait_for_logs_on_s3.called)
+            self.log.info.assert_called_once_with(
+                'Looking for bootstrap logs in'
+                ' s3://bucket/logs/j-CLUSTERID/' +
+                expected_s3_dir_name + '...')
+        else:
+            self.assertFalse(self._wait_for_logs_on_s3.called)
+            self.assertFalse(self.log.info.called)
 
         self.assertRaises(StopIteration, next, results)
 
-    def test_stream_history_log_dirs_without_ssh(self):
+    def test_stream_bootstrap_log_dirs_without_ssh(self):
         self._test_stream_bootstrap_log_dirs()
 
-    def test_stream_history_log_dirs_with_ssh(self):
+    def test_stream_bootstrap_log_dirs_with_ssh(self):
         # shouldn't make a difference
         self._test_stream_bootstrap_log_dirs(ssh=True)
 
-    def test_stream_history_log_dirs_without_action_num(self):
+    def test_stream_bootstrap_log_dirs_without_action_num(self):
         self._test_stream_bootstrap_log_dirs(
             action_num=None, expected_s3_dir_name='node')
 
-    def test_stream_history_log_dirs_without_node_id(self):
+    def test_stream_bootstrap_log_dirs_without_node_id(self):
         self._test_stream_bootstrap_log_dirs(
             action_num=None, expected_s3_dir_name='node')
+
+    def test_stream_boostrap_log_dirs_with_no_read_logs(self):
+        self._test_stream_bootstrap_log_dirs(read_logs=False)
 
     def _test_stream_history_log_dirs(
             self, ssh, image_version=_DEFAULT_IMAGE_VERSION,
             expected_dir_name='hadoop/history',
-            expected_s3_dir_name='jobs'):
+            expected_s3_dir_name='jobs',
+            read_logs=True):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
-        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file,
+                              read_logs=read_logs)
         self.get_image_version.return_value = image_version
-
-        results = runner._stream_history_log_dirs()
-
-        if ssh:
-            self.log.info.reset_mock()
-
-            self.assertEqual(next(results), [
-                'ssh://master/mnt/var/log/' + expected_dir_name,
-            ])
-            self.assertFalse(
-                self._wait_for_logs_on_s3.called)
-            self.log.info.assert_called_once_with(
-                'Looking for history log in /mnt/var/log/' +
-                expected_dir_name + ' on master...')
 
         self.log.info.reset_mock()
 
-        self.assertEqual(next(results), [
-            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
-        ])
-        self.assertTrue(
-            self._wait_for_logs_on_s3.called)
-        self.log.info.assert_called_once_with(
-            'Looking for history log in'
-            ' s3://bucket/logs/j-CLUSTERID/' +
-            expected_s3_dir_name + '...')
+        results = runner._stream_history_log_dirs()
+
+        if read_logs:
+            if ssh:
+                self.log.info.reset_mock()
+
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/' + expected_dir_name,
+                ])
+                self.assertFalse(
+                    self._wait_for_logs_on_s3.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for history log in /mnt/var/log/' +
+                    expected_dir_name + ' on master...')
+
+            self.log.info.reset_mock()
+
+            self.assertEqual(next(results), [
+                's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
+            ])
+            self.assertTrue(
+                self._wait_for_logs_on_s3.called)
+            self.log.info.assert_called_once_with(
+                'Looking for history log in'
+                ' s3://bucket/logs/j-CLUSTERID/' +
+                expected_s3_dir_name + '...')
+        else:
+            self.assertFalse(self._wait_for_logs_on_s3.called)
+            self.assertFalse(self.log.info.called)
 
         self.assertRaises(StopIteration, next, results)
 
@@ -3650,35 +3668,50 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
             expected_dir_name='hadoop-mapreduce/history',
             expected_s3_dir_name='hadoop-mapreduce/history')
 
-    def _test_stream_step_log_dirs(self, ssh):
+    def test_stream_history_log_dirs_no_read_logs(self):
+        self._test_stream_history_log_dirs(
+            ssh=True, image_version='4.3.0',
+            expected_dir_name='hadoop-mapreduce/history',
+            expected_s3_dir_name='hadoop-mapreduce/history',
+            read_logs=False)
+
+    def _test_stream_step_log_dirs(self, ssh, read_logs=True):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
-        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file,
+                              read_logs=read_logs)
         self.get_hadoop_version.return_value = '1.0.3'
-
-        results = runner._stream_step_log_dirs('s-STEPID')
-
-        if ssh:
-            self.log.info.reset_mock()
-
-            self.assertEqual(next(results), [
-                'ssh://master/mnt/var/log/hadoop/steps/s-STEPID',
-            ])
-            self.assertFalse(
-                self._wait_for_logs_on_s3.called)
-            self.log.info.assert_called_once_with(
-                'Looking for step log in /mnt/var/log/hadoop/steps/s-STEPID'
-                ' on master...')
 
         self.log.info.reset_mock()
 
-        self.assertEqual(next(results), [
-            's3://bucket/logs/j-CLUSTERID/steps/s-STEPID',
-        ])
-        self.assertTrue(
-            self._wait_for_logs_on_s3.called)
-        self.log.info.assert_called_once_with(
-            'Looking for step log in'
-            ' s3://bucket/logs/j-CLUSTERID/steps/s-STEPID...')
+        results = runner._stream_step_log_dirs('s-STEPID')
+
+        if read_logs:
+            if ssh:
+                self.log.info.reset_mock()
+
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/hadoop/steps/s-STEPID',
+                ])
+                self.assertFalse(
+                    self._wait_for_logs_on_s3.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for step log in /mnt/var/log/hadoop/steps/s-STEPID'
+                    ' on master...')
+
+            self.log.info.reset_mock()
+
+            self.assertEqual(next(results), [
+                's3://bucket/logs/j-CLUSTERID/steps/s-STEPID',
+            ])
+            self.assertTrue(
+                self._wait_for_logs_on_s3.called)
+            self.log.info.assert_called_once_with(
+                'Looking for step log in'
+                ' s3://bucket/logs/j-CLUSTERID/steps/s-STEPID...')
+        else:
+            self.assertFalse(self._wait_for_logs_on_s3.called)
+            self.assertFalse(self.log.info.called)
 
         self.assertRaises(StopIteration, next, results)
 
@@ -3694,46 +3727,56 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
         expected_local_path='/mnt/var/log/hadoop/userlogs',
         expected_dir_name='hadoop-yarn/containers',
         expected_s3_dir_name='containers',
+        read_logs=True,
     ):
         ec2_key_pair_file = '/path/to/EMR.pem' if ssh else None
-        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file)
+
+        runner = EMRJobRunner(ec2_key_pair_file=ec2_key_pair_file,
+                              read_logs=read_logs)
+
+        self.log.info.reset_mock()
+
         self.get_hadoop_version.return_value = '1.0.3'
         self.get_image_version.return_value = image_version
 
         results = runner._stream_task_log_dirs(application_id=application_id)
 
-        if ssh:
+        if read_logs:
+            if ssh:
+                self.log.reset_mock()
+
+                local_path = '/mnt/var/log/hadoop/userlogs'
+                if application_id:
+                    local_path = posixpath.join(local_path, application_id)
+
+                self.assertEqual(next(results), [
+                    'ssh://master/mnt/var/log/' + expected_dir_name,
+                    'ssh://master!core1/mnt/var/log/' + expected_dir_name,
+                    'ssh://master!core2/mnt/var/log/' + expected_dir_name,
+                    'ssh://master!task1/mnt/var/log/' + expected_dir_name,
+                ])
+                self.assertFalse(self.log.warning.called)
+                self.log.info.assert_called_once_with(
+                    'Looking for task logs in /mnt/var/log/' +
+                    expected_dir_name + ' on master and task/core nodes...')
+
+                self.assertFalse(
+                    self._wait_for_logs_on_s3.called)
+
             self.log.reset_mock()
 
-            local_path = '/mnt/var/log/hadoop/userlogs'
-            if application_id:
-                local_path = posixpath.join(local_path, application_id)
-
             self.assertEqual(next(results), [
-                'ssh://master/mnt/var/log/' + expected_dir_name,
-                'ssh://master!core1/mnt/var/log/' + expected_dir_name,
-                'ssh://master!core2/mnt/var/log/' + expected_dir_name,
-                'ssh://master!task1/mnt/var/log/' + expected_dir_name,
+                's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
             ])
-            self.assertFalse(self.log.warning.called)
-            self.log.info.assert_called_once_with(
-                'Looking for task logs in /mnt/var/log/' +
-                expected_dir_name + ' on master and task/core nodes...')
-
-            self.assertFalse(
+            self.assertTrue(
                 self._wait_for_logs_on_s3.called)
-
-        self.log.reset_mock()
-
-        self.assertEqual(next(results), [
-            's3://bucket/logs/j-CLUSTERID/' + expected_s3_dir_name,
-        ])
-        self.assertTrue(
-            self._wait_for_logs_on_s3.called)
-        self.log.info.assert_called_once_with(
-            'Looking for task logs in'
-            ' s3://bucket/logs/j-CLUSTERID/' +
-            expected_s3_dir_name + '...')
+            self.log.info.assert_called_once_with(
+                'Looking for task logs in'
+                ' s3://bucket/logs/j-CLUSTERID/' +
+                expected_s3_dir_name + '...')
+        else:
+            self.assertFalse(self._wait_for_logs_on_s3.called)
+            self.assertFalse(self.log.info.called)
 
         self.assertRaises(StopIteration, next, results)
 
@@ -3755,6 +3798,13 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
             image_version='3.11.0',
             expected_dir_name='hadoop/userlogs',
             expected_s3_dir_name='task-attempts')
+
+    def test_stream_task_log_dirs_no_read_logs(self):
+        self._test_stream_task_log_dirs(
+            ssh=True, application_id='application_1',
+            expected_dir_name='hadoop-yarn/containers/application_1',
+            expected_s3_dir_name='containers/application_1',
+            read_logs=False)
 
 
 class LsStepSyslogsTestCase(MockBoto3TestCase):
@@ -3880,6 +3930,25 @@ class GetStepLogInterpretationTestCase(MockBoto3TestCase):
         self._ls_step_syslogs.assert_called_once_with(step_id='s-STEPID')
         self._interpret_emr_step_syslog.assert_called_once_with(
             runner.fs, self._ls_step_syslogs.return_value)
+        self.assertFalse(self._ls_step_stderr_logs.called)
+        self.assertFalse(self._interpret_emr_step_stderr.called)
+
+    def test_no_read_logs(self):
+        # setting read_logs to False should turn off step log interpretation
+        runner = EMRJobRunner(read_logs=False)
+
+        log_interpretation = dict(step_id='s-STEPID')
+
+        self.log.reset_mock()
+
+        self.assertEqual(
+            runner._get_step_log_interpretation(
+                log_interpretation, 'streaming'),
+            None)
+
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._ls_step_syslogs.called)
+        self.assertFalse(self._interpret_emr_step_syslog.called)
         self.assertFalse(self._ls_step_stderr_logs.called)
         self.assertFalse(self._interpret_emr_step_stderr.called)
 
@@ -4460,8 +4529,6 @@ class CheckForFailedBootstrapActionTestCase(MockBoto3TestCase):
     def setUp(self):
         super(CheckForFailedBootstrapActionTestCase, self).setUp()
 
-        self.runner = EMRJobRunner()
-
         self.start(patch('mrjob.emr._get_reason'))
         self._check_for_nonzero_return_code = self.start(
             patch('mrjob.emr._check_for_nonzero_return_code',
@@ -4472,6 +4539,8 @@ class CheckForFailedBootstrapActionTestCase(MockBoto3TestCase):
         self._interpret_emr_bootstrap_stderr = self.start(
             patch('mrjob.emr._interpret_emr_bootstrap_stderr',
                   return_value={}))
+
+        self.runner = EMRJobRunner()
 
     def test_failed_for_wrong_reason(self):
         self.runner._check_for_failed_bootstrap_action(cluster=Mock())
@@ -4521,6 +4590,18 @@ class CheckForFailedBootstrapActionTestCase(MockBoto3TestCase):
         self.assertTrue(self.log.error.called)
         self.assertIn('BOOM!', self.log.error.call_args[0][0])
         self.assertIn(stderr_path, self.log.error.call_args[0][0])
+
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        # add a real error to investigate
+        self._check_for_nonzero_return_code.return_value = dict(
+            action_num=0, node_id='i-e647eb49')
+
+        self.runner._check_for_failed_bootstrap_action(cluster=Mock())
+
+        # should bail out before we call _interpret_emr_bootstrap_stderr()
+        self.assertFalse(self._interpret_emr_bootstrap_stderr.called)
 
 
 class UseSudoOverSshTestCase(MockBoto3TestCase):

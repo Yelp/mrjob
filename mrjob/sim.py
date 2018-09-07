@@ -192,6 +192,8 @@ class SimMRJobRunner(MRJobRunner):
 
     def _parse_task_counters(self, task_type, step_num):
         """Parse all stderr files from the given task (if any)."""
+        # don't disable if read_logs=False; parsing counters is
+        # internal to Hadoop, not something that happens in log files
         stderr_paths = self.fs.ls(self._task_stderr_paths_glob(
             task_type, step_num))
 

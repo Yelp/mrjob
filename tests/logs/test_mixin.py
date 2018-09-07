@@ -29,6 +29,8 @@ class LogInterpretationMixinTestCase(PatcherTestCase):
 
     def setUp(self):
         self.runner = self.MockRunner()
+        self.runner._opts = {}
+
         self.log = self.start(patch('mrjob.logs.mixin.log'))
 
 
@@ -104,6 +106,25 @@ class InterpretHistoryLogTestCase(LogInterpretationMixinTestCase):
         self._interpret_history_log.assert_called_once_with(
             self.runner.fs, self.runner._ls_history_logs.return_value)
 
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self._interpret_history_log.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(
+            step=dict(job_id='job_1', output_dir='hdfs:///path/'))
+
+        self.runner._interpret_history_log(log_interpretation)
+
+        # should do nothing
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._interpret_history_log.called)
+        self.assertFalse(self.runner._ls_history_logs.called)
+
+        self.assertEqual(log_interpretation, dict(
+            step=dict(job_id='job_1', output_dir='hdfs:///path/')))
+
 
 class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
 
@@ -163,6 +184,20 @@ class InterpretStepLogTestCase(LogInterpretationMixinTestCase):
 
         self.runner._get_step_log_interpretation.assert_called_once_with(
             log_interpretation, 'streaming')
+
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self.runner._get_step_log_interpretation.return_value = dict(
+            job_id='job_1')
+
+        log_interpretation = {}
+
+        self.runner._interpret_step_logs(log_interpretation, 'streaming')
+
+        self.assertFalse(self.runner._get_step_log_interpretation.called)
+
+        self.assertEqual(log_interpretation, {})
 
 
 class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
@@ -365,6 +400,24 @@ class InterpretTaskLogsTestCase(LogInterpretationMixinTestCase):
         self.assertFalse(self._interpret_task_logs.called)
         self.assertFalse(self.runner._ls_task_logs.called)
 
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self._interpret_task_logs.return_value = dict(
+            counters={'foo': {'bar': 1}})
+
+        log_interpretation = dict(step=dict(application_id='app_1'))
+
+        # should do nothing
+        self.runner._interpret_task_logs(log_interpretation, 'streaming')
+
+        self.assertFalse(self.log.warning.called)
+        self.assertFalse(self._interpret_task_logs.called)
+        self.assertFalse(self.runner._ls_task_logs.called)
+
+        self.assertEqual(log_interpretation,
+                         dict(step=dict(application_id='app_1')))
+
 
 class PickCountersTestCase(LogInterpretationMixinTestCase):
 
@@ -478,6 +531,22 @@ class LsHistoryLogsTestCase(LogInterpretationMixinTestCase):
 
         self.assertRaises(StopIteration, next, results)
 
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self._ls_history_logs.return_value = [
+            dict(path='hdfs:///history/history.jhist'),
+        ]
+
+        results = self.runner._ls_history_logs(
+            job_id='job_1', output_dir='hdfs:///output/')
+
+        self.assertRaises(StopIteration, next, results)
+
+        self.assertFalse(self.log.info.called)
+        self.assertFalse(self.runner._stream_history_log_dirs.called)
+        self.assertFalse(self._ls_history_logs.called)
+
 
 class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
 
@@ -572,6 +641,26 @@ class LsTaskLogsTestCase(LogInterpretationMixinTestCase):
         # unlike most of the _ls_*() methods, logging is handled elsewhere
         # with a callback
         self.assertFalse(self.log.info.called)
+
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self._ls_task_logs.return_value = [
+            dict(path='hdfs:///userlogs/1/syslog'),
+            dict(path='hdfs:///userlogs/2/syslog'),
+        ]
+
+        results = self.runner._ls_task_logs(
+            'streaming',
+            application_id='app_1',
+            job_id='job_1', output_dir='hdfs:///output/')
+
+        self.assertRaises(StopIteration, next, results)
+
+        self.assertFalse(self.log.info.called)
+        self.assertFalse(self._ls_task_logs.called)
+        self.assertFalse(self._ls_spark_task_logs.called)
+        self.assertFalse(self.runner._stream_task_log_dirs.called)
 
 
 class PickErrorTestCase(LogInterpretationMixinTestCase):

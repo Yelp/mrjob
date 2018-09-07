@@ -73,6 +73,7 @@ class MRJobBinRunner(MRJobRunner):
         return combine_dicts(
             super(MRJobBinRunner, self)._default_opts(),
             dict(
+                read_logs=True,
                 sh_bin=['sh', '-ex'],
             )
         )

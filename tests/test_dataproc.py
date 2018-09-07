@@ -1530,6 +1530,16 @@ class UpdateStepInterpretationTestCase(MockGoogleTestCase):
             },
         )
 
+    # read_logs=False shouldn't turn off step interpretation
+
+    def test_progress_with_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+        self.test_progress()
+
+    def test_counters_with_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+        self.test_counters()
+
 
 class ProgressAndCounterLoggingTestCase(MockGoogleTestCase):
 
@@ -1986,6 +1996,46 @@ class CauseOfErrorTestCase(MockLogEntriesTestCase):
             self.assertEqual(error['split'], SPLIT)
             self.assertEqual(error['hadoop_error']['message'], STACK_TRACE)
             self.assertEqual(error['task_error']['message'], TRACEBACK)
+
+    def test_no_read_logs(self):
+        # similar to end-to-end test, but does nothing
+
+        # TODO: in practice, there will be an error in the mock driver output,
+        # which *will* be returned
+
+        # use LOGGING_CLUSTER_NAME so we can generage fake logging entries
+        job = MRBoom(['-r', 'dataproc', '--cluster-id', LOGGING_CLUSTER_NAME,
+                      '--no-read-logs'])
+        job.sandbox()
+
+        self.mock_jobs_succeed = False
+
+        # feed application_id into mock driver output
+        self.get_lines.side_effect = [
+            ['15/12/11 13:32:45 INFO impl.YarnClientImpl:'
+             ' Submitted application %s' % APPLICATION_ID],
+            [],
+            [],
+            [],
+        ]
+
+        self.add_container_exit(CONTAINER_ID_1)
+        self.add_split(CONTAINER_ID_1)
+        self.add_stack_trace(CONTAINER_ID_1)
+        self.add_traceback(CONTAINER_ID_1)
+
+        with job.make_runner() as runner:
+            self.assertRaises(StepFailedException, runner.run)
+
+            self.assertEqual(len(runner._log_interpretations), 1)
+            interp = runner._log_interpretations[0]
+
+            self.assertIn('step', interp)
+            self.assertNotIn('history', interp)
+            self.assertNotIn('task', interp)
+
+            error = _pick_error(interp)
+            self.assertIsNone(error)
 
 
 class CloudPartSizeTestCase(MockGoogleTestCase):

@@ -531,6 +531,19 @@ class StreamHistoryLogDirsTestCase(StreamingLogDirsTestCase):
 
         self.assertRaises(StopIteration, next, results)
 
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self.runner._hadoop_log_dirs.return_value = [
+            '/mnt/var/logs/hadoop', 'hdfs:///logs']
+
+        results = self.runner._stream_history_log_dirs()
+
+        self.assertRaises(StopIteration, next, results)
+
+        self.assertFalse(self.log.info.called)
+        self.assertFalse(self.runner._hadoop_log_dirs.called)
+
 
 class StreamTaskLogDirsTestCase(StreamingLogDirsTestCase):
 
@@ -599,6 +612,19 @@ class StreamTaskLogDirsTestCase(StreamingLogDirsTestCase):
         results = self.runner._stream_task_log_dirs()
 
         self.assertRaises(StopIteration, next, results)
+
+    def test_no_read_logs(self):
+        self.runner._opts['read_logs'] = False
+
+        self.runner._hadoop_log_dirs.return_value = [
+            '/mnt/var/logs/hadoop', 'hdfs:///logs']
+
+        results = self.runner._stream_task_log_dirs()
+
+        self.assertRaises(StopIteration, next, results)
+
+        self.assertFalse(self.log.info.called)
+        self.assertFalse(self.runner._hadoop_log_dirs.called)
 
 
 class GetHadoopVersionTestCase(MockHadoopTestCase):

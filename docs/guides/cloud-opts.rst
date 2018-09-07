@@ -236,6 +236,9 @@ Cluster software configuration
     EMR to install Hadoop, create the ``hadoop`` user, etc.
     :mrjob-opt:`image_version` may not be less than 5.7.0.
 
+    You can use :py:func:`~mrjob.ami.describe_base_emr_images` to identify
+    Amazon Linux images that are compatible with EMR.
+
     For more details about how to create a custom AMI that works with EMR, see
     `Best Practices and Considerations
     <https://docs.aws.amazon.com/emr/latest/ManagementGuide/emr-custom-ami.html#emr-custom-ami-considerations>`_.

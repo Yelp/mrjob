@@ -26,3 +26,9 @@ S3 Utilities
 .. automethod:: S3Filesystem.get_bucket
 .. automethod:: S3Filesystem.make_s3_client
 .. automethod:: S3Filesystem.make_s3_resource
+
+Other AWS clients
+-----------------
+
+.. automethod:: EMRJobRunner.make_ec2_client
+.. automethod:: EMRJobRunner.make_iam_client

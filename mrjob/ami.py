@@ -26,6 +26,10 @@ def describe_base_emr_images(ec2_client):
     """Fetch a list of Amazon Linux AMI images that are usable with EMR,
     with the most recent first. This can take several seconds.
 
+    :param ec2_client: a boto3 EC2 client, which can be obtained from
+                       :py:meth:`mrjob.emr.EMRJobRunner.make_ec2_client()`
+                       or ``boto3.client('ec2')``
+
     For the sake of consistency, we have somewhat stricter requirements
     than `the AWS documentation <https://docs.aws.amazon.com/emr/latest/\
     ManagementGuide/emr-custom-ami.html#emr-custom-ami-considerations>`_.

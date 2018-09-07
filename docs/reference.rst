@@ -4,6 +4,7 @@ Reference
 .. toctree::
     :maxdepth: 1
 
+    utils-ami.rst
     utils-cat.rst
     utils-compat.rst
     configs.rst

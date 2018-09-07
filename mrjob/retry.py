@@ -35,8 +35,6 @@ class RetryWrapper(object):
     and call the function again, until it succeeds or we get a non-retriable
     exception.
     """
-    # TODO: this doesn't correctly handle object properties or wrapping
-    # functions.
     def __init__(self, wrapped, retry_if,
                  backoff=_DEFAULT_BACKOFF,
                  multiplier=_DEFAULT_MULTIPLIER,

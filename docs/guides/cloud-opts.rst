@@ -566,6 +566,13 @@ Auto-termination
     terminate it as soon as your job finishes. This acts as an additional
     safeguard, as well as affecting :ref:`cluster-pooling` on EMR.
 
+    .. versionchanged:: 0.6.5
+
+       EMR's idle termination script is more robust against
+       :command:`sudo shutdown -h now` being ignored, and logs
+       the script's stdout and stderr to
+       ``/var/log/bootstrap-actions/mrjob-idle-termination.log``.
+
     .. versionchanged:: 0.6.3
 
        Uses Dataproc's built-in cluster termination feature rather than

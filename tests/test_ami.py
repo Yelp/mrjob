@@ -122,6 +122,11 @@ class DescribeBaseEMRImagesTestCase(MockBoto3TestCase):
         self.assert_rejects_image(
             Name='amzn2-ami-hvm-2017.12.0.20180109-x86_64-ebs')
 
+    def test_stable_amazon_linux_versions_only(self):
+        # no "testing" or "rc," only dots and numbers, please
+        self.assert_rejects_image(
+            Name='amzn-ami-hvm-2017.03.rc-1.20170327-x86_64-ebs')
+
     def test_one_volume_only(self):
         self.assert_rejects_image(
             BlockDeviceMappings=[

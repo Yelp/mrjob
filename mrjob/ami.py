@@ -51,8 +51,8 @@ def describe_base_emr_images(ec2_client):
         Owners=['amazon'],
         Filters=[
             dict(Name='architecture', Values=['x86_64']),
-            dict(Name='root-device-type',Values=['ebs']),
-            dict(Name='virtualization-type',Values=['hvm']),
+            dict(Name='root-device-type', Values=['ebs']),
+            dict(Name='virtualization-type', Values=['hvm']),
         ],
     )['Images']
 

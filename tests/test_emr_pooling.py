@@ -2028,7 +2028,6 @@ class PoolingRecoveryTestCase(MockBoto3TestCase):
             self.assertNotEqual(runner.get_cluster_id(), cluster_id)
             self.assertEqual(self.num_steps(runner.get_cluster_id()), 2)
 
-
     def test_restart_ssh_tunnel_on_launch(self):
         # regression test for #1549
         ssh_tunnel_cluster_ids = []

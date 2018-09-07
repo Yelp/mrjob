@@ -3696,8 +3696,8 @@ class StreamLogDirsTestCase(MockBoto3TestCase):
                 self.assertFalse(
                     self._wait_for_logs_on_s3.called)
                 self.log.info.assert_called_once_with(
-                    'Looking for step log in /mnt/var/log/hadoop/steps/s-STEPID'
-                    ' on master...')
+                    'Looking for step log in'
+                    ' /mnt/var/log/hadoop/steps/s-STEPID on master...')
 
             self.log.info.reset_mock()
 

@@ -107,7 +107,7 @@ class DescribeBaseEMRImagesTestCase(MockBoto3TestCase):
 
     def test_owner_must_be_amazon(self):
         self.assert_rejects_image(ImageOwnerAlias='aws-marketplace',
-                                   OwnerId='679593333241')
+                                  OwnerId='679593333241')
 
     def test_architecture_must_be_x86_64(self):
         self.assert_rejects_image(Architecture='i386')

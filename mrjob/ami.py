@@ -45,8 +45,10 @@ def describe_base_emr_images(ec2_client):
     This only returns images going back to September 2016 (prior to that,
     EC2 used a different naming convention).
 
-    This returns a dictionary for each image, in the same format as
-    ``ec2_client.describe_images()``. The
+    This returns a dictionary for each image, in the same response format as
+    `ec2_client.describe_images() <https://boto3.amazonaws.com/v1/\
+    documentation/api/latest/reference/services/ec2.html#EC2.Client\
+    .describe_images>`_. The
     *ImageId* field contains the AMI ID, and *Description* contains
     a human-readable description.
     """

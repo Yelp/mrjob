@@ -4,6 +4,50 @@ What's New
 For a complete list of changes, see `CHANGES.txt
 <https://github.com/Yelp/mrjob/blob/master/CHANGES.txt>`_
 
+.. _v0.6.5:
+
+0.6.5
+-----
+
+This release fixes an issue with self-termination of idle clusters on EMR
+(see :mrjob-opt:`max_mins_idle`) where the master node sometimes
+simply ignored ``sudo shutdown -h now``. The idle self termination script
+now logs to ``bootstrap-actions/mrjob-idle-termination.log``.
+
+.. note::
+
+   If you are using :ref:`cluster-pooling`, it's highly recommended you upgrade
+   to this version to fix the self-termination issue.
+
+You can now turn off log parsing (on all runners) by setting
+:mrjob-opt:`read_logs` to false. This can speed up cases where you don't care
+why a job failed (e.g. integration tests) or where you'd rather use the
+:ref:`diagnose-tool` tool after the fact.
+
+You may specify custom AMIs with the :mrjob-opt:`image_id` option. To find
+Amazon Linux AMIs compatible with EMR that you can use as a base for your
+custom image, use :py:func:`~mrjob.ami.describe_base_emr_images`.
+
+The default AMI on EMR is now 5.16.0.
+
+New EMR clusters launched by mrjob will be automatically tagged with
+``__mrjob_label`` (filename of your mrjob script) and ``__mrjob_owner``
+(your username), to make it easier to understand your mrjob usage in
+`CloudWatch <https://aws.amazon.com/cloudwatch/>`_ etc. You can change the
+value of these tags with the :mrjob-opt:`label` and :mrjob-opt:`owner` options.
+
+You may now set the root EBS volume size for EMR clusters directly with
+:mrjob-opt:`ebs_root_volume_gb` (you used to have to use
+:mrjob-opt:`instance_groups` or :mrjob-opt:`instance_fleets`).
+
+API clients returned by :py:class:`~mrjob.emr.EMRJobRunner` now retry on
+SSL timeouts. EMR clients returned by
+:py:meth:`mrjob.emr.EMRJobRunner.make_emr_client` won't retry faster than
+:mrjob-opt:`check_cluster_every`, to prevent throttling.
+
+Cluster pooling recovery (relaunching a job when your pooled cluster
+self-terminates) now works correctly on single-node clusters.
+
 .. _v0.6.4:
 
 0.6.4

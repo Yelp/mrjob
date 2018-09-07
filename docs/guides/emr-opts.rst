@@ -443,8 +443,23 @@ See also :mrjob-opt:`cloud_tmp_dir`, :mrjob-opt:`cloud_part_size_mb`
 API Endpoints
 -------------
 
-You usually don't want to set these unless you have a challenging network
-situation (e.g. you have to use a proxy).
+.. note ::
+
+   You usually don't want to set ``*_endpoint`` options unless you have a
+   challenging network situation (e.g. you have to use a proxy to get around
+   a firewall).
+
+.. mrjob-opt::
+    :config: ec2_endpoint
+    :switch: --ec2-endpoint
+    :type: :ref:`string <data-type-string>`
+    :set: emr
+    :default: (automatic)
+
+    .. versionadded:: 0.6.5
+
+    Force mrjob to connect to EC2 on this endpoint (e.g.
+    ``ec2.us-gov-west-1.amazonaws.com``).
 
 .. mrjob-opt::
     :config: emr_endpoint
@@ -466,8 +481,6 @@ situation (e.g. you have to use a proxy).
     Force mrjob to connect to IAM on this endpoint (e.g.
     ``iam.us-gov.amazonaws.com``).
 
-    Mostly exists as a workaround for network issues.
-
 .. mrjob-opt::
     :config: s3_endpoint
     :switch: --s3-endpoint
@@ -479,7 +492,7 @@ situation (e.g. you have to use a proxy).
     choose the appropriate endpoint for each S3 bucket.
 
     .. warning:: If you set this to a region-specific endpoint
-                 (e.g. ``'s3-us-west-1.amazonaws.com'``) mrjob will not
+                 (e.g. ``'s3-us-west-1.amazonaws.com'``) mrjob may not
                  be able to access buckets located in other regions.
 
 Other rarely used options

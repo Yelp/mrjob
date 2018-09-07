@@ -122,7 +122,7 @@ def _wrap_aws_client(raw_client, min_backoff=None):
     throttled."""
     return RetryWrapper(raw_client,
                         retry_if=_is_retriable_client_error,
-                        backoff=max(_AWS_BACKOFF, min_backoff),
+                        backoff=max(_AWS_BACKOFF, min_backoff or 0),
                         multiplier=_AWS_BACKOFF_MULTIPLIER,
                         max_tries=_AWS_MAX_TRIES)
 

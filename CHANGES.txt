@@ -1,6 +1,22 @@
-v0.6.5, 2018-09-?? -- AMI pooling
- * EMR idle termination script logs its output to mrjob-idle-termination.log
- * RetryWrapper now passes through docstring of wrapped functions
+v0.6.5, 2018-09-07 -- custom AMIs
+ * all runners:
+   * can turn off log parsing with --no-read-logs (#1825)
+ * EMR Runner:
+   * transient API errors:
+      * EMR client won't retry faster than check_cluster_every option (#1799)
+      * all AWS clients will retry on SSL timeouts (#1827)
+      * RetryWrapper now passes through docstring of wrapped methods
+   * AMIs:
+      * default AMI is now 5.16.0 (#1818)
+      * choose custom AMIs with image_id option (#1805)
+      * find base AMIs with mrjob.ami.describe_base_emr_images() (#1829)
+   * added make_ec2_client() method and ec2_endpoint option
+   * choose EBS root volume size with ebs_root_volume_gb option (#1812)
+   * new clusters are tagged with __mrjob_label and __mrjob_owner (#1828)
+   * idle self-termination script (max_hours_idle):
+     * retries if shutdown fails (#1819)
+     * logs its output to mrjob-idle-termination.log
+   * cluster pooling recover now works on single-node clusters (#1822)
 
 v0.6.4, 2018-07-31 -- FILES, DIRS, ARCHIVES
  * drop support for Python 3.3

@@ -86,7 +86,7 @@ instances (1 master and 11 core), taking all other options from
     j-CLUSTERID
 
 You can then add jobs to the cluster with the :option:`--cluster-id`
-switch or the `emr_cluster_id` variable in `mrjob.conf` (see
+switch or the :mrjob-opt:`cluster_id` option in `mrjob.conf` (see
 :py:meth:`EMRJobRunner.__init__`)::
 
     $ python mr_my_job.py -r emr --cluster-id=j-CLUSTERID input_file.txt > out

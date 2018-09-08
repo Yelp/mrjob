@@ -15,7 +15,7 @@ You can specify spot market bid prices using the *core_instance_bid_price*,
 *master_instance_bid_price*, and *task_instance_bid_price* options to
 specify a price in US dollars. For example, on the command line::
 
-    --ec2-task-instance-bid-price 0.42
+    --task-instance-bid-price 0.42
 
 or in :py:mod:`mrjob.conf`::
 

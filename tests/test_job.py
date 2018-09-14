@@ -626,7 +626,8 @@ class JobConfTestCase(TestCase):
         mr_job = MRJob([
             '-D', 'mapred.foo=bar',
             '-D', 'mapred.foo=baz',
-            '-D', 'mapred.qux=quux',
+            # --jobconf is the long name for -D
+            '--jobconf', 'mapred.qux=quux',
         ])
 
         self.assertEqual(mr_job._runner_kwargs()['jobconf'],

@@ -172,8 +172,8 @@ class TestsToPort:
         input_gz.close()
 
         mr_job = MRTwoStepJob(['-r', 'local',
-                               '--jobconf=mapred.map.tasks=2',
-                               '--jobconf=mapred.reduce.tasks=2',
+                               '-D=mapred.map.tasks=2',
+                               '-D=mapred.reduce.tasks=2',
                                '-', input_path, input_gz_path])
         mr_job.sandbox(stdin=stdin)
 

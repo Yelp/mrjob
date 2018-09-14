@@ -624,9 +624,9 @@ class JobConfTestCase(TestCase):
 
     def test_cmd_line_options(self):
         mr_job = MRJob([
-            '--jobconf', 'mapred.foo=bar',
-            '--jobconf', 'mapred.foo=baz',
-            '--jobconf', 'mapred.qux=quux',
+            '-D', 'mapred.foo=bar',
+            '-D', 'mapred.foo=baz',
+            '-D', 'mapred.qux=quux',
         ])
 
         self.assertEqual(mr_job._runner_kwargs()['jobconf'],
@@ -647,9 +647,9 @@ class JobConfTestCase(TestCase):
 
     def test_jobconf_attr_and_cmd_line_options(self):
         mr_job = self.MRJobConfJob([
-            '--jobconf', 'mapred.foo=bar',
-            '--jobconf', 'mapred.foo=baz',
-            '--jobconf', 'mapred.qux=quux',
+            '-D', 'mapred.foo=bar',
+            '-D', 'mapred.foo=baz',
+            '-D', 'mapred.qux=quux',
         ])
 
         self.assertEqual(mr_job._runner_kwargs()['jobconf'],
@@ -665,11 +665,11 @@ class JobConfTestCase(TestCase):
 
     def test_redefined_jobconf_method_overrides_cmd_line(self):
         mr_job = self.MRJobConfMethodJob([
-            '--jobconf', 'mapred.foo=bar',
-            '--jobconf', 'mapred.baz=foo',
+            '-D', 'mapred.foo=bar',
+            '-D', 'mapred.baz=foo',
         ])
 
-        # --jobconf is ignored because that's the way we defined jobconf()
+        # -D is ignored because that's the way we defined jobconf()
         self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.baz': 'bar'})
 

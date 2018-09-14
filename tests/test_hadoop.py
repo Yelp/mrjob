@@ -671,7 +671,7 @@ class HadoopJobRunnerEndToEndTestCase(MockHadoopTestCase):
                                '--no-conf', '--libjar', 'containsJars.jar',
                                '--hadoop-arg=-verbose'] + list(args)
                               + ['-', local_input_path, remote_input_path]
-                              + ['--jobconf', 'x=y'])
+                              + ['-D', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None
@@ -984,7 +984,7 @@ class ArgsForJarStepTestCase(MockHadoopTestCase):
         fake_jar = self.makefile('fake.jar')
 
         job = MRJustAJar(
-            ['-r', 'hadoop', '--jobconf', 'foo=bar', '--jar', fake_jar])
+            ['-r', 'hadoop', '-D', 'foo=bar', '--jar', fake_jar])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1337,7 +1337,7 @@ class HadoopExtraArgsTestCase(MockHadoopTestCase):
             ['-r', self.RUNNER,
              '--cmdenv', 'FOO=bar',
              '--hadoop-arg=-libjar', '--hadoop-arg', 'qux.jar',
-             '--jobconf', 'baz=qux'])
+             '-D', 'baz=qux'])
         job.HADOOP_INPUT_FORMAT = 'FooInputFormat'
         job.HADOOP_OUTPUT_FORMAT = 'BarOutputFormat'
 

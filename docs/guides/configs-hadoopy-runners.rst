@@ -48,7 +48,7 @@ and ``inline`` runners to some degree.
 
 .. mrjob-opt::
     :config: jobconf
-    :switch: --jobconf
+    :switch: -D, --jobconf
     :type: :ref:`dict <data-type-plain-dict>`
     :set: all
     :default: ``{}``
@@ -57,6 +57,10 @@ and ``inline`` runners to some degree.
     property name to value.  Equivalent to passing ``['-D',
     'KEY1=VALUE1', '-D', 'KEY2=VALUE2', ...]`` to
     :mrjob-opt:`hadoop_extra_args`
+
+    .. versionchanged:: 0.6.6
+
+       added the ``-D`` switch on the command line, to match Hadoop.
 
 
 Options available to hadoop and emr runners

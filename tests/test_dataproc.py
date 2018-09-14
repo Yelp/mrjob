@@ -163,7 +163,7 @@ class DataprocJobRunnerEndToEndTestCase(MockGoogleTestCase):
 
         mr_job = MRHadoopFormatJob(['-r', 'dataproc', '-v',
                                     '-', local_input_path, remote_input_path,
-                                    '--jobconf', 'x=y'])
+                                    '-D', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
         results = []

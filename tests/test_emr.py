@@ -188,7 +188,7 @@ class EMRJobRunnerEndToEndTestCase(MockBoto3TestCase):
 
         mr_job = MRHadoopFormatJob(['-r', 'emr', '-v',
                                     '-', local_input_path, remote_input_path,
-                                    '--jobconf', 'x=y'])
+                                    '-D', 'x=y'])
         mr_job.sandbox(stdin=stdin)
 
         local_tmp_dir = None

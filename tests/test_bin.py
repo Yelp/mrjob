@@ -207,9 +207,9 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
 
     def test_jobconf(self):
         job = MRWordCount(['-r', 'local',
-                           '--jobconf', 'FOO=bar',
-                           '--jobconf', 'BAZ=qux',
-                           '--jobconf', 'BAX=Arnold'])
+                           '-D', 'FOO=bar',
+                           '-D', 'BAZ=qux',
+                           '-D', 'BAX=Arnold'])
 
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0),
@@ -231,7 +231,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
     def test_configuration_translation(self):
         job = MRWordCount(
             ['-r', 'local',
-             '--jobconf', 'mapred.jobtracker.maxtasks.per.job=1'])
+             '-D', 'mapred.jobtracker.maxtasks.per.job=1'])
 
         with job.make_runner() as runner:
             with no_handlers_for_logger('mrjob.runner'):
@@ -937,7 +937,7 @@ class SortValuesTestCase(SandboxedTestCase):
         mr_job = MRSortValues([
             '-r', 'local',
             '--hadoop-version', '2.0.0',
-            '--jobconf', 'stream.num.map.output.key.fields=3',
+            '-D', 'stream.num.map.output.key.fields=3',
         ])
         mr_job.sandbox()
 
@@ -1226,7 +1226,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
     def test_jobconf(self):
         job = MRNullSpark(['-r', 'local',
-                           '--jobconf', 'spark.executor.memory=10g'])
+                           '-D', 'spark.executor.memory=10g'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1257,8 +1257,8 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         job = MRNullSpark(
             ['-r', 'local',
              '--cmdenv', 'FOO=bar',
-             '--jobconf', 'spark.executorEnv.FOO=baz',
-             '--jobconf', 'spark.yarn.appMasterEnv.PYSPARK_PYTHON=ourpy'])
+             '-D', 'spark.executorEnv.FOO=baz',
+             '-D', 'spark.yarn.appMasterEnv.PYSPARK_PYTHON=ourpy'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1440,7 +1440,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         job = MRSparkJar(['-r', 'local',
                           '--jar-main-class', 'foo.Bar',
                           '--cmdenv', 'BAZ=qux',
-                          '--jobconf', 'QUX=baz'])
+                          '-D', 'QUX=baz'])
         job.sandbox()
 
         with job.make_runner() as runner:

@@ -225,7 +225,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
         self.add_mrjob_to_pythonpath()
         mr_job = MRTestJobConf(['-r', self.RUNNER,
                                 '--no-bootstrap-mrjob',
-                                '--jobconf=user.defined=something',
+                                '-D=user.defined=something',
                                 '--file', upload_path,
                                input_gz_path])
 
@@ -291,7 +291,7 @@ class SimRunnerJobConfTestCase(SandboxedTestCase):
 
     def test_per_step_jobconf(self):
         mr_job = MRTestPerStepJobConf([
-            '-r', self.RUNNER, '--jobconf', 'user.defined=something'])
+            '-r', self.RUNNER, '-D', 'user.defined=something'])
         mr_job.sandbox()
 
         results = {}

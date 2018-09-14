@@ -801,10 +801,10 @@ _RUNNER_OPTS = dict(
     jobconf=dict(
         combiner=combine_dicts,
         switches=[
-            (['--jobconf'], dict(
+            (['-D', '--jobconf'], dict(
                 action=_KeyValueAction,
                 help=('-D arg to pass through to hadoop streaming; should'
-                      ' take the form KEY=VALUE. You can use --jobconf'
+                      ' take the form KEY=VALUE. You can use -D'
                       ' multiple times.'),
             )),
         ],

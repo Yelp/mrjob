@@ -648,7 +648,7 @@ def _chmod_u_rx(path, recursive=False):
             for file_name in file_names:
                 _chmod_u_rx(join(dir_name, file_name))
     else:
-        if hasattr(os, 'chmod') and platform.system() != "Windows":  # only available on Unix, Windows
+        if hasattr(os, 'chmod') and platform.system() != "Windows":  # only available on Unix
             os.chmod(path, stat.S_IRUSR | stat.S_IXUSR)
 
 

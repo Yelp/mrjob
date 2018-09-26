@@ -648,7 +648,8 @@ def _chmod_u_rx(path, recursive=False):
             for file_name in file_names:
                 _chmod_u_rx(join(dir_name, file_name))
     else:
-        if hasattr(os, 'chmod') and platform.system() != "Windows":  # only available on Unix
+		# only available on Unix, causes rmtree() to fail on Windows; see #1847
+        if hasattr(os, 'chmod') and platform.system() != "Windows": 
             os.chmod(path, stat.S_IRUSR | stat.S_IXUSR)
 
 

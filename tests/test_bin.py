@@ -903,7 +903,7 @@ class SortValuesTestCase(SandboxedTestCase):
             self.assertEqual(runner._jobconf_for_step(0), {
                 'mapred.text.key.partitioner.options': '-k1,1',
                 'mapreduce.partition.keypartitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
+                'stream.num.map.output.key.fields': '2',
             })
 
     def test_sort_values_jobconf_hadoop_1(self):
@@ -913,7 +913,7 @@ class SortValuesTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             self.assertEqual(runner._jobconf_for_step(0), {
                 'mapred.text.key.partitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
+                'stream.num.map.output.key.fields': '2',
             })
 
     def test_sort_values_jobconf_hadoop_2(self):
@@ -923,7 +923,7 @@ class SortValuesTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             self.assertEqual(runner._jobconf_for_step(0), {
                 'mapreduce.partition.keypartitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
+                'stream.num.map.output.key.fields': '2',
             })
 
     def test_job_can_override_jobconf(self):
@@ -936,7 +936,7 @@ class SortValuesTestCase(SandboxedTestCase):
                 runner._jobconf_for_step(0), {
                     'mapreduce.partition.keycomparator.options': '-k1 -k2nr',
                     'mapreduce.partition.keypartitioner.options': '-k1,1',
-                    'stream.num.map.output.key.fields': 3,
+                    'stream.num.map.output.key.fields': '3',
                 }
             )
 
@@ -952,7 +952,7 @@ class SortValuesTestCase(SandboxedTestCase):
                     'org.apache.hadoop.mapred.lib.KeyFieldBasedComparator',
                     'mapreduce.partition.keycomparator.options': '-k1 -k2nr',
                     'mapreduce.partition.keypartitioner.options': '-k1,1',
-                    'stream.num.map.output.key.fields': 3,
+                    'stream.num.map.output.key.fields': '3',
                 }
             )
 

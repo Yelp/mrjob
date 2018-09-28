@@ -33,6 +33,7 @@ from mrjob.compat import translate_jobconf
 from mrjob.compat import translate_jobconf_dict
 from mrjob.compat import translate_jobconf_for_all_versions
 from mrjob.conf import combine_dicts
+from mrjob.conf import combine_jobconfs
 from mrjob.conf import combine_opts
 from mrjob.conf import load_opts_from_mrjob_confs
 from mrjob.fs.composite import CompositeFilesystem
@@ -1097,9 +1098,9 @@ class MRJobRunner(object):
         # _sort_values_jobconf() isn't relevant to Spark,
         # but it doesn't do any harm either
 
-        jobconf = combine_dicts(self._sort_values_jobconf(),
-                                self._opts['jobconf'],
-                                step.get('jobconf'))
+        jobconf = combine_jobconfs(self._sort_values_jobconf(),
+                                   self._opts['jobconf'],
+                                   step.get('jobconf'))
 
         # if user is using the wrong jobconfs, add in the correct ones
         # and log a warning

@@ -336,8 +336,7 @@ class MRJobBinRunner(MRJobRunner):
         jobconf = self._jobconf_for_step(step_num)
 
         for key, value in sorted(jobconf.items()):
-            if value is not None:
-                args.extend(['-D', '%s=%s' % (key, _to_java_str(value))])
+            args.extend(['-D', '%s=%s' % (key, value)])
 
         return args
 
@@ -724,8 +723,7 @@ class MRJobBinRunner(MRJobRunner):
         jobconf.update(self._jobconf_for_step(step_num))
 
         for key, value in sorted(jobconf.items()):
-            if value is not None:
-                args.extend(['--conf', '%s=%s' % (key, _to_java_str(value))])
+            args.extend(['--conf', '%s=%s' % (key, value)])
 
         # --files and --archives
         args.extend(self._spark_upload_args())
@@ -814,19 +812,3 @@ def _hadoop_escape_arg(arg):
         return arg
     else:
         return "'%s'" % arg.replace("'", r"'\''")
-
-
-def _to_java_str(x):
-    """Convert a value (usually for a configuration property) into its
-    Java string representation, falling back to the Python representation
-    if None is available."""
-    # e.g. True -> 'true', None -> 'null'. See #323
-    if isinstance(x, string_types):
-        return x
-    elif x is None:
-        # Note: currently, None values are blanked out
-        return 'null'
-    elif isinstance(x, bool):
-        return 'true' if x else 'false'
-    else:
-        return str(x)

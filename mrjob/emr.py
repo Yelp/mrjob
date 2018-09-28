@@ -793,7 +793,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
 
-        for path in self._opts['py_files']:
+        for path in self._py_files():
             self._upload_mgr.add(path)
 
         if self._opts['hadoop_streaming_jar']:
@@ -1376,7 +1376,7 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         # don't use hash paths with --py-files; see #1375
         return [
             self._upload_mgr.uri(path)
-            for path in sorted(self._opts['py_files'])
+            for path in sorted(self._py_files())
         ]
 
     def _step_name(self, step_num):

@@ -823,8 +823,9 @@ def _to_java_str(x):
     # e.g. True -> 'true', None -> 'null'. See #323
     if isinstance(x, string_types):
         return x
+    elif x is None:
+        return 'null'
+    elif isinstance(x, boolean):
+        return 'true' if x else 'false'
     else:
-        try:
-            return json.dumps(x)
-        except:
-            return str(x)
+        return str(x)

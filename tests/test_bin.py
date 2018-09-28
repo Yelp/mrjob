@@ -268,12 +268,13 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
 
         with mrjob_conf_patcher(MRJOB_CONF):
             job = MRWordCount(['-r', 'local'])
+            job.sandbox()
 
             with job.make_runner() as runner:
+                # FOO is blanked out because it's None (use "null")
                 self.assertEqual(runner._hadoop_args_for_step(0),
                                  ['-D', 'BAX=true',
                                   '-D', 'BAZ=false',
-                                  #'-D', FOO=null,  # None keys are blanked out
                                   '-D', 'QUX=null',
                                   ])
 
@@ -1295,6 +1296,32 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     }
                 )
             )
+
+    def test_non_string_jobconf_values_in_mrjob_conf(self):
+        # regression test for #323
+        MRJOB_CONF = dict(runners=dict(local=dict(jobconf=dict(
+            BAX=True,
+            BAZ=False,
+            FOO=None,
+            QUX='null',
+        ))))
+
+        with mrjob_conf_patcher(MRJOB_CONF):
+            job = MRNullSpark(['-r', 'local'])
+            job.sandbox()
+
+            with job.make_runner() as runner:
+                # FOO is blanked out because it's None (use "null")
+                self.assertEqual(
+                    runner._spark_submit_args(0),
+                    self._expected_conf_args(
+                        jobconf=dict(
+                            BAX='true',
+                            BAZ='false',
+                            QUX='null',
+                        )
+                    )
+                )
 
     def test_libjars_option(self):
         fake_libjar = self.makefile('fake_lib.jar')

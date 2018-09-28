@@ -73,7 +73,8 @@ class MRJobBinRunner(MRJobRunner):
 
         # self._setup is a list of shell commands with path dicts
         # interleaved; see mrjob.setup.parse_setup_cmd() for details
-        self._setup = self._parse_setup_and_py_files()
+        self._setup = [parse_setup_cmd(cmd) for cmd in self._opts['setup']]
+
         for cmd in self._setup:
             for token in cmd:
                 if isinstance(token, dict):
@@ -84,6 +85,10 @@ class MRJobBinRunner(MRJobRunner):
                         token['type'] = 'archive'
 
                     self._working_dir_mgr.add(**token)
+
+        # --py-files on Spark doesn't allow '#' (see #1375)
+        if any('#' in path for path in self._opts['py_files']):
+            raise ValueError("py_files cannot contain '#'")
 
     def _default_opts(self):
         return combine_dicts(
@@ -366,27 +371,6 @@ class MRJobBinRunner(MRJobRunner):
 
     ### setup scripts ###
 
-    def _parse_setup_and_py_files(self):
-        """Parse the *setup* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`, and patch in *py_files*.
-        """
-        setup = []
-
-        # py_files
-        for path in self._py_files():
-            # Spark (at least v1.3.1) doesn't work with # and --py-files,
-            # see #1375
-            if '#' in path:
-                raise ValueError("py_files cannot contain '#'")
-            path_dict = parse_legacy_hash_path('file', path)
-            setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
-
-        # setup
-        for cmd in self._opts['setup']:
-            setup.append(parse_setup_cmd(cmd))
-
-        return setup
-
     def _py_files(self):
         """Everything in the *py_files* opt, plus a .zip of the mrjob
         library if needed.
@@ -413,6 +397,12 @@ class MRJobBinRunner(MRJobRunner):
         use UNIX line endings (see #1071).
         """
         setup = self._setup
+
+        # add py_files
+        for py_file in self._py_files():
+            path_dict = {'type': 'file', 'name': None, 'path': py_file}
+            self._working_dir_mgr.add(**path_dict)
+            setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
 
         if setup and not self._setup_wrapper_script_path:
 

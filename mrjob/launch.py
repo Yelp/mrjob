@@ -534,7 +534,8 @@ class MRJobLauncher(object):
         # TODO: this method should take responsibility for combining
         # self.options with method result for jobconf and libjars. See #1453.
         return dict(
-            jobconf=self.jobconf(),
+            jobconf=combine_dicts(
+                self.options.jobconf, self.jobconf()),
             libjars=self.libjars(),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),

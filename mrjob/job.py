@@ -1252,14 +1252,7 @@ class MRJob(MRJobLauncher):
 
                 return mrjob.conf.combine_dicts(orig_jobconf, custom_jobconf)
         """
-        # combine job and runner jobconf
-        unfiltered_jobconf = combine_dicts(self.JOBCONF, self.options.jobconf)
-
-        # turn booleans into the Java equivalent ("false", not "False")
-        return {
-            k: json.dumps(v) if not isinstance(v, string_types) else v
-            for k, v in unfiltered_jobconf.items() if v is not None
-        }
+        return self.JOBCONF
 
     ### Secondary Sort ###
 

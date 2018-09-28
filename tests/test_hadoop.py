@@ -1222,6 +1222,7 @@ class SparkPyFilesTestCase(MockHadoopTestCase):
         job.sandbox()
 
         with job.make_runner() as runner:
+            runner._create_setup_wrapper_scripts()
             runner._add_job_files_for_upload()
 
             self.assertEqual(
@@ -1230,7 +1231,7 @@ class SparkPyFilesTestCase(MockHadoopTestCase):
             )
 
             # the py_files get uploaded anyway since they appear in
-            # _upload_dir_mgr.
+            # _upload_mgr.
             self.assertIn(egg1_path, runner._upload_mgr.path_to_uri())
             self.assertIn(egg2_path, runner._upload_mgr.path_to_uri())
 

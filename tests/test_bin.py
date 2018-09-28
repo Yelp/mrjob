@@ -51,6 +51,7 @@ from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import mrjob_conf_patcher
 
 
 # used to match command lines
@@ -160,6 +161,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
                            '--cmdenv', 'FOO=bar',
                            '--cmdenv', 'BAZ=qux',
                            '--cmdenv', 'BAX=Arnold'])
+
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-cmdenv', 'BAX=Arnold',
@@ -254,6 +256,26 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
                           '-D', 'BAZ=quux',
                           '-D', 'FOO=bar',
                           ])
+
+    def test_non_string_jobconf_values_in_mrjob_conf(self):
+        # regression test for #323
+        MRJOB_CONF = dict(runners=dict(local=dict(jobconf=dict(
+            BAX=True,
+            BAZ=False,
+            FOO=None,
+            QUX='null',
+        ))))
+
+        with mrjob_conf_patcher(MRJOB_CONF):
+            job = MRWordCount(['-r', 'local'])
+
+            with job.make_runner() as runner:
+                self.assertEqual(runner._hadoop_args_for_step(0),
+                                 ['-D', 'BAX=true',
+                                  '-D', 'BAZ=false',
+                                  #'-D', FOO=null,  # None keys are blanked out
+                                  '-D', 'QUX=null',
+                                  ])
 
     def test_partitioner(self):
         job = MRPartitioner(['-r', 'local'])

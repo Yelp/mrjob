@@ -253,7 +253,7 @@ class MRJobBinRunner(MRJobRunner):
         # cmdenv
         for key, value in sorted(self._opts['cmdenv'].items()):
             args.append('-cmdenv')
-            args.append('%s=%s' % (key, _to_java_str(value)))
+            args.append('%s=%s' % (key, value))
 
         # hadoop_input_format
         if step_num == 0:
@@ -824,8 +824,9 @@ def _to_java_str(x):
     if isinstance(x, string_types):
         return x
     elif x is None:
+        # Note: currently, None values are blanked out
         return 'null'
-    elif isinstance(x, boolean):
+    elif isinstance(x, bool):
         return 'true' if x else 'false'
     else:
         return str(x)

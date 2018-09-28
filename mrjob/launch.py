@@ -532,7 +532,7 @@ class MRJobLauncher(object):
         """Keyword arguments to the runner class that can be specified
         by the job/launcher itself."""
         # TODO: this method should take responsibility for combining
-        # self.options with method result for jobconf and libjars
+        # self.options with method result for jobconf and libjars. See #1453.
         return dict(
             jobconf=self.jobconf(),
             libjars=self.libjars(),

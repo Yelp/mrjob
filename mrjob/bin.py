@@ -725,7 +725,7 @@ class MRJobBinRunner(MRJobRunner):
 
         for key, value in sorted(jobconf.items()):
             if value is not None:
-                args.extend(['--conf', '%s=%s' % (key, value)])
+                args.extend(['--conf', '%s=%s' % (key, _to_java_str(value))])
 
         # --files and --archives
         args.extend(self._spark_upload_args())

@@ -1315,6 +1315,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 self.assertEqual(
                     runner._spark_submit_args(0),
                     self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy'),
                         jobconf=dict(
                             BAX='true',
                             BAZ='false',

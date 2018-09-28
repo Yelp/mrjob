@@ -785,7 +785,7 @@ class MRJobBinRunner(MRJobRunner):
     def _spark_py_files(self):
         """The list of files to pass to spark-submit with --py-files.
 
-        By default (cluster mode), Spark only accepts local files, so
+        By default (client mode), Spark only accepts local files, so
         we pass these as-is.
         """
         py_files = []

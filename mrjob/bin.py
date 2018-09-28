@@ -253,7 +253,7 @@ class MRJobBinRunner(MRJobRunner):
         # cmdenv
         for key, value in sorted(self._opts['cmdenv'].items()):
             args.append('-cmdenv')
-            args.append('%s=%s' % (key, value))
+            args.append('%s=%s' % (key, _to_java_str(value)))
 
         # hadoop_input_format
         if step_num == 0:
@@ -337,7 +337,7 @@ class MRJobBinRunner(MRJobRunner):
 
         for key, value in sorted(jobconf.items()):
             if value is not None:
-                args.extend(['-D', '%s=%s' % (key, value)])
+                args.extend(['-D', '%s=%s' % (key, _to_java_str(value))])
 
         return args
 
@@ -814,3 +814,17 @@ def _hadoop_escape_arg(arg):
         return arg
     else:
         return "'%s'" % arg.replace("'", r"'\''")
+
+
+def _to_java_str(x):
+    """Convert a value (usually for a configuration property) into its
+    Java string representation, falling back to the Python representation
+    if None is available."""
+    # e.g. True -> 'true', None -> 'null'. See #323
+    if isinstance(x, string_types):
+        return x
+    else:
+        try:
+            return json.dumps(x)
+        except:
+            return str(x)

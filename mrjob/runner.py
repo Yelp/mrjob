@@ -46,7 +46,6 @@ from mrjob.py2 import string_types
 from mrjob.setup import WorkingDirManager
 from mrjob.setup import name_uniquely
 from mrjob.setup import parse_legacy_hash_path
-from mrjob.setup import parse_setup_cmd
 from mrjob.step import STEP_TYPES
 from mrjob.step import _is_spark_step_type
 from mrjob.util import to_lines
@@ -108,9 +107,9 @@ class MRJobRunner(object):
         'upload_files'
     }
 
-    # if this is true, when bootstrap_mrjob is true, add it through the
-    # setup script
-    _BOOTSTRAP_MRJOB_IN_SETUP = True
+    # if this is true, when bootstrap_mrjob is true, create a mrjob.zip
+    # and patch it into the *py_files* option
+    _BOOTSTRAP_MRJOB_IN_PY_FILES = True
 
     ### methods to call from your batch script ###
 
@@ -295,22 +294,6 @@ class MRJobRunner(object):
             self._working_dir_mgr.add(
                 'archive', archive_path, name=ud['name'])
             self._spark_archives.append((ud['name'], archive_path))
-
-        # py_files
-
-        # self._setup is a list of shell commands with path dicts
-        # interleaved; see mrjob.setup.parse_setup_cmd() for details
-        self._setup = self._parse_setup_and_py_files()
-        for cmd in self._setup:
-            for token in cmd:
-                if isinstance(token, dict):
-                    # convert dir archives tokens to archives
-                    if token['type'] == 'dir':
-                        # feed the archive's path to self._working_dir_mgr
-                        token['path'] = self._dir_archive_path(token['path'])
-                        token['type'] = 'archive'
-
-                    self._working_dir_mgr.add(**token)
 
         # Where to read input from (log files, etc.)
         self._input_paths = input_paths or ['-']  # by default read from stdin
@@ -1135,27 +1118,6 @@ class MRJobRunner(object):
             return _SORT_VALUES_PARTITIONER
         else:
             return None
-
-    def _parse_setup_and_py_files(self):
-        """Parse the *setup* option with
-        :py:func:`mrjob.setup.parse_setup_cmd()`, and patch in *py_files*.
-        """
-        setup = []
-
-        # py_files
-        for path in self._opts['py_files']:
-            # Spark (at least v1.3.1) doesn't work with # and --py-files,
-            # see #1375
-            if '#' in path:
-                raise ValueError("py_files cannot contain '#'")
-            path_dict = parse_legacy_hash_path('file', path)
-            setup.append(['export PYTHONPATH=', path_dict, ':$PYTHONPATH'])
-
-        # setup
-        for cmd in self._opts['setup']:
-            setup.append(parse_setup_cmd(cmd))
-
-        return setup
 
     def _upload_args(self):
         # just upload every file and archive in the working dir manager

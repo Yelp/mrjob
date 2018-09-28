@@ -836,13 +836,13 @@ class SparkPyFilesTestCase(SandboxedTestCase):
             self.assertEqual(runner._spark_py_files(),
                              [])
 
-    def test_no_bootstrap_mrjob_in_setup(self):
+    def test_no_bootstrap_mrjob_in_py_files(self):
         job = MRNullSpark(['-r', 'local'])
         job.sandbox()
 
         with job.make_runner() as runner:
             # this happens in runners that run on a cluster
-            runner._BOOTSTRAP_MRJOB_IN_SETUP = False
+            runner._BOOTSTRAP_MRJOB_IN_PY_FILES = False
             self.assertEqual(runner._spark_py_files(),
                              [])
 

@@ -32,6 +32,8 @@ from mrjob.conf import combine_local_envs
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
+from mrjob.setup import parse_legacy_hash_path
+from mrjob.setup import parse_setup_cmd
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line
 from mrjob.util import shlex_split
@@ -68,6 +70,25 @@ class MRJobBinRunner(MRJobRunner):
         # we'll create the setup wrapper scripts later
         self._setup_wrapper_script_path = None
         self._manifest_setup_script_path = None
+
+        # self._setup is a list of shell commands with path dicts
+        # interleaved; see mrjob.setup.parse_setup_cmd() for details
+        self._setup = [parse_setup_cmd(cmd) for cmd in self._opts['setup']]
+
+        for cmd in self._setup:
+            for token in cmd:
+                if isinstance(token, dict):
+                    # convert dir archives tokens to archives
+                    if token['type'] == 'dir':
+                        # feed the archive's path to self._working_dir_mgr
+                        token['path'] = self._dir_archive_path(token['path'])
+                        token['type'] = 'archive'
+
+                    self._working_dir_mgr.add(**token)
+
+        # --py-files on Spark doesn't allow '#' (see #1375)
+        if any('#' in path for path in self._opts['py_files']):
+            raise ValueError("py_files cannot contain '#'")
 
     def _default_opts(self):
         return combine_dicts(
@@ -350,6 +371,17 @@ class MRJobBinRunner(MRJobRunner):
 
     ### setup scripts ###
 
+    def _py_files(self):
+        """Everything in the *py_files* opt, plus a .zip of the mrjob
+        library if needed.
+        """
+        py_files = list(self._opts['py_files'])
+
+        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_PY_FILES:
+            py_files.append(self._create_mrjob_zip())
+
+        return py_files
+
     # TODO: rename to _setup_wrapper_scripts()
     def _create_setup_wrapper_scripts(self):
         """Create the setup wrapper script, and write it into our local temp
@@ -366,12 +398,9 @@ class MRJobBinRunner(MRJobRunner):
         """
         setup = self._setup
 
-        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_SETUP:
-            # patch setup to add mrjob.zip to PYTHONPATH
-            mrjob_zip = self._create_mrjob_zip()
-            # this is a file, not an archive, since Python can import directly
-            # from .zip files
-            path_dict = {'type': 'file', 'name': None, 'path': mrjob_zip}
+        # add py_files
+        for py_file in self._py_files():
+            path_dict = {'type': 'file', 'name': None, 'path': py_file}
             self._working_dir_mgr.add(**path_dict)
             setup = [['export PYTHONPATH=', path_dict, ':$PYTHONPATH']] + setup
 
@@ -785,19 +814,10 @@ class MRJobBinRunner(MRJobRunner):
     def _spark_py_files(self):
         """The list of files to pass to spark-submit with --py-files.
 
-        By default (cluster mode), Spark only accepts local files, so
+        By default (client mode), Spark only accepts local files, so
         we pass these as-is.
         """
-        py_files = []
-
-        py_files.extend(self._opts['py_files'])
-
-        # Spark doesn't have setup scripts; instead, we need to add
-        # mrjob to py_files
-        if self._bootstrap_mrjob() and self._BOOTSTRAP_MRJOB_IN_SETUP:
-            py_files.append(self._create_mrjob_zip())
-
-        return py_files
+        return self._py_files()
 
 
 # these don't need to be methods

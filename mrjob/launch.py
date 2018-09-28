@@ -536,7 +536,8 @@ class MRJobLauncher(object):
         return dict(
             jobconf=combine_dicts(
                 self.options.jobconf, self.jobconf()),
-            libjars=self.libjars(),
+            libjars=combine_lists(
+                self.options.libjars, self.libjars()),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),
             upload_archives=combine_lists(

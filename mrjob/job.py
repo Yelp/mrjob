@@ -1020,12 +1020,8 @@ class MRJob(MRJobLauncher):
     def libjars(self):
         """Optional list of paths of jar files to run our job with using
         Hadoop's ``-libjar`` option. Normally setting :py:attr:`LIBJARS`
-        is sufficient.
-
-        By default, this combines :option:`libjars` options from the command
-        lines with :py:attr:`LIBJARS`, with command line arguments taking
-        precedence. Paths from :py:attr:`LIBJARS` are interpreted as relative
-        to the the directory containing the script (paths from the
+        is sufficient. Paths from :py:attr:`LIBJARS` are interpreted as
+        relative to the the directory containing the script (paths from the
         command-line are relative to the current working directory).
 
         Note that ``~`` and environment variables in paths will always be
@@ -1035,7 +1031,7 @@ class MRJob(MRJobLauncher):
         """
         script_dir = os.path.dirname(self.mr_job_script())
 
-        paths_from_libjars = []
+        paths = []
 
         # libjar paths will eventually be combined with combine_path_lists,
         # which will expand environment variables. We don't want to assume
@@ -1044,11 +1040,11 @@ class MRJob(MRJobLauncher):
         # prematurely.
         for path in self.LIBJARS or []:
             if os.path.isabs(expand_path(path)):
-                paths_from_libjars.append(path)
+                paths.append(path)
             else:
-                paths_from_libjars.append(os.path.join(script_dir, path))
+                paths.append(os.path.join(script_dir, path))
 
-        return combine_lists(paths_from_libjars, self.options.libjars)
+        return paths
 
     ### Partitioning ###
 

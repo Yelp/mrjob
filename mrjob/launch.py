@@ -473,7 +473,8 @@ class MRJobLauncher(object):
             return LocalMRJobRunner
 
     def _runner_kwargs(self):
-        # TODO: why combine_dicts() and not combine_options()?
+        # just use combine_dicts() and not combine_confs(); leave the
+        # magic to the runner
         return combine_dicts(
             self._non_option_kwargs(),
             self._kwargs_from_switches(self._runner_opt_names()),
@@ -531,13 +532,17 @@ class MRJobLauncher(object):
     def _job_kwargs(self):
         """Keyword arguments to the runner class that can be specified
         by the job/launcher itself."""
-        # TODO: this method should take responsibility for combining
-        # self.options with method result for jobconf and libjars
+        # use the most basic combiners; leave magic like resolving paths
+        # and blanking out jobconf values to the runner
         return dict(
-            jobconf=self.jobconf(),
-            libjars=self.libjars(),
+            # command-line has the final say on jobconf and libjars
+            jobconf=combine_dicts(
+                self.jobconf(), self.options.jobconf),
+            libjars=combine_lists(
+                self.libjars(), self.options.libjars),
             partitioner=self.partitioner(),
             sort_values=self.sort_values(),
+            # TODO: should probably put self.options last below for consistency
             upload_archives=combine_lists(
                 self.options.upload_archives, self.archives()),
             upload_dirs=combine_lists(

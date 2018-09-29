@@ -715,7 +715,7 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
     BASE_CONFIG_LEFT = {
         'runners': {
             'inline': {
-                'jobconf': dict(from_left=1, from_both=1),
+                'jobconf': dict(from_left='one', from_both='one'),
                 'label': 'i_dont_like_to_be_labelled',
             }
         }
@@ -724,7 +724,7 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
     BASE_CONFIG_RIGHT = {
         'runners': {
             'inline': {
-                'jobconf': dict(from_right=2, from_both=2),
+                'jobconf': dict(from_right='two', from_both='two'),
                 'owner': 'ownership_is_against_my_principles'
             }
         }
@@ -736,12 +736,15 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
         opts_both = self.opts_for_conf('both.conf',
                                        dict(include=[path_left, path_right]))
 
-        self.assertEqual(opts_both['jobconf'],
-                         dict(from_left=1, from_both=2, from_right=2))
-        self.assertEqual(opts_both['label'],
-                         'i_dont_like_to_be_labelled')
-        self.assertEqual(opts_both['owner'],
-                         'ownership_is_against_my_principles')
+        self.assertEqual(
+            opts_both['jobconf'],
+            dict(from_left='one', from_both='two', from_right='two'))
+        self.assertEqual(
+            opts_both['label'],
+            'i_dont_like_to_be_labelled')
+        self.assertEqual(
+            opts_both['owner'],
+            'ownership_is_against_my_principles')
 
     def test_multiple_configs_via_runner_args(self):
         path_left = self.save_conf('left.conf', self.BASE_CONFIG_LEFT)
@@ -749,8 +752,9 @@ class MultipleMultipleConfigFilesTestCase(ConfigFilesTestCase):
 
         runner = InlineMRJobRunner(conf_paths=[path_left, path_right])
 
-        self.assertEqual(runner._opts['jobconf'],
-                         dict(from_left=1, from_both=2, from_right=2))
+        self.assertEqual(
+            runner._opts['jobconf'],
+            dict(from_left='one', from_both='two', from_right='two'))
 
 
 @skipIf(mrjob.conf.yaml is None, 'no yaml module')

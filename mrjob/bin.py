@@ -357,8 +357,7 @@ class MRJobBinRunner(MRJobRunner):
         jobconf = self._jobconf_for_step(step_num)
 
         for key, value in sorted(jobconf.items()):
-            if value is not None:
-                args.extend(['-D', '%s=%s' % (key, value)])
+            args.extend(['-D', '%s=%s' % (key, value)])
 
         return args
 
@@ -753,8 +752,7 @@ class MRJobBinRunner(MRJobRunner):
         jobconf.update(self._jobconf_for_step(step_num))
 
         for key, value in sorted(jobconf.items()):
-            if value is not None:
-                args.extend(['--conf', '%s=%s' % (key, value)])
+            args.extend(['--conf', '%s=%s' % (key, value)])
 
         # --files and --archives
         args.extend(self._spark_upload_args())

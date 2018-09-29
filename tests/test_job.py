@@ -634,10 +634,11 @@ class JobConfTestCase(TestCase):
                          {'mapred.foo': 'baz',  # second option takes priority
                           'mapred.qux': 'quux'})
 
-    def test_bool_options(self):
+    def test_bool_options_are_unchanged(self):
+        # translating True to 'true' is now handled in the runner
         mr_job = self.MRBoolJobConfJob()
-        self.assertEqual(mr_job.jobconf()['true_value'], 'true')
-        self.assertEqual(mr_job.jobconf()['false_value'], 'false')
+        self.assertEqual(mr_job.jobconf()['true_value'], True)
+        self.assertEqual(mr_job.jobconf()['false_value'], False)
 
     def test_jobconf_method(self):
         mr_job = self.MRJobConfJob()
@@ -664,7 +665,7 @@ class JobConfTestCase(TestCase):
         self.assertEqual(mr_job._runner_kwargs()['jobconf'],
                          {'mapred.baz': 'bar'})
 
-    def test_redefined_jobconf_method_overrides_cmd_line(self):
+    def test_redefined_jobconf_method_doesnt_override_cmd_line(self):
         mr_job = self.MRJobConfMethodJob([
             '-D', 'mapred.foo=bar',
             '-D', 'mapred.baz=foo',
@@ -672,7 +673,8 @@ class JobConfTestCase(TestCase):
 
         # -D is ignored because that's the way we defined jobconf()
         self.assertEqual(mr_job._runner_kwargs()['jobconf'],
-                         {'mapred.baz': 'bar'})
+                         {'mapred.foo': 'bar',
+                          'mapred.baz': 'foo'})
 
 
 class LibjarsTestCase(TestCase):
@@ -725,12 +727,13 @@ class LibjarsTestCase(TestCase):
                     job._runner_kwargs()['libjars'],
                     ['$A/cookie.jar', join(job_dir, '$B/honey.jar')])
 
-    def test_override_libjars(self):
+    def test_cant_override_libjars_on_command_line(self):
         with patch.object(MRJob, 'libjars', return_value=['honey.jar']):
             job = MRJob(['--libjar', 'cookie.jar'])
 
             # ignore switch, don't resolve relative path
-            self.assertEqual(job._runner_kwargs()['libjars'], ['honey.jar'])
+            self.assertEqual(job._runner_kwargs()['libjars'],
+                             ['honey.jar', 'cookie.jar'])
 
 
 class MRSortValuesAndMore(MRSortValues):

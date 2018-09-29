@@ -514,6 +514,15 @@ def _combine_envs_helper(envs, local):
     return result
 
 
+def combine_jobconfs(*jobconfs):
+    """Like combine_dicts(), but non-string values are converted to
+    Java-readable string (e.g. True becomes 'true'). Keys whose
+    value is None are blanked out."""
+    j = combine_dicts(*jobconfs)
+
+    return {k: _to_java_str(v) for k, v in j.items() if v is not None}
+
+
 def combine_paths(*paths):
     """Returns the last value in *paths* that is not ``None``.
     Resolve ``~`` (home dir) and environment variables."""
@@ -570,3 +579,19 @@ def combine_opts(combiners, *opts_list):
         final_opts[key] = combine_func(*values)
 
     return final_opts
+
+
+def _to_java_str(x):
+    """Convert a value (usually for a configuration property) into its
+    Java string representation, falling back to the Python representation
+    if None is available."""
+    # e.g. True -> 'true', None -> 'null'. See #323
+    if isinstance(x, string_types):
+        return x
+    elif x is None:
+        # Note: combine_jobconfs() blanks out keys with None values
+        return 'null'
+    elif isinstance(x, bool):
+        return 'true' if x else 'false'
+    else:
+        return str(x)

@@ -1,7 +1,7 @@
 # Copyright 2009-2012 Yelp
 # Copyright 2013 David Marin
-# Copyright 2015-2016 Yelp
-# Copyright 2017 Yelp
+# Copyright 2015-2017 Yelp
+# Copyright 2018 Yelp
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,6 +30,7 @@ from mrjob.conf import _load_yaml_with_clear_tag
 from mrjob.conf import combine_cmds
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_envs
+from mrjob.conf import combine_jobconfs
 from mrjob.conf import combine_lists
 from mrjob.conf import combine_local_envs
 from mrjob.conf import combine_opts
@@ -539,6 +540,74 @@ class CombineEnvsTestCase(TestCase):
             {'PATH': '/home/dave/bin',
              'CLASSPATH': '/home/dave/java',
              'PS1': '\w> '})
+
+
+class CombineJobconfsTestCase(TestCase):
+
+    def test_empty(self):
+        self.assertEqual(combine_jobconfs(), {})
+
+    def test_later_values_take_precedence(self):
+        self.assertEqual(
+            combine_jobconfs(
+                dict(foo='bar', bar='baz'),
+                dict(foo='baz'),
+            ),
+            dict(foo='baz', bar='baz'),
+        )
+
+    def test_skip_None(self):
+        self.assertEqual(
+            combine_jobconfs(
+                None,
+                dict(foo='bar', bar='baz'),
+                None,
+                dict(foo='baz'),
+                None,
+            ),
+            dict(foo='baz', bar='baz'),
+        )
+
+    def test_blank_out_None_values(self):
+        self.assertEqual(
+            combine_jobconfs(
+                dict(foo='bar', bar='baz'),
+                dict(bar=None),
+            ),
+            dict(foo='bar'),
+        )
+
+    def test_convert_non_string_values(self):
+        self.assertEqual(
+            combine_jobconfs(
+                dict(foo=True, bar=False, baz=None, qux=1),
+                dict(qux=2),
+            ),
+            # None is blanked out
+            dict(foo='true', bar='false', qux='2'),
+        )
+
+    def test_cleared_value(self):
+        self.assertEqual(
+            combine_jobconfs(
+                dict(foo='bar', bar='baz'),
+                dict(bar=ClearedValue('qux')),
+            ),
+            dict(foo='bar', bar='qux'),
+        )
+
+    def test_deleted_value(self):
+        self.assertEqual(
+            combine_jobconfs(
+                dict(foo='bar', bar='baz'),
+                dict(bar=ClearedValue(None)),
+            ),
+            dict(foo='bar'),
+        )
+
+    def test_dont_accept_wrapped_dicts(self):
+        self.assertRaises(AttributeError,
+                          combine_jobconfs, ClearedValue(dict(foo='bar')))
 
 
 class CombineLocalEnvsTestCase(TestCase):

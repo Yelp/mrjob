@@ -51,6 +51,7 @@ from tests.py2 import patch
 from tests.quiet import no_handlers_for_logger
 from tests.sandbox import EmptyMrjobConfTestCase
 from tests.sandbox import SandboxedTestCase
+from tests.sandbox import mrjob_conf_patcher
 
 
 # used to match command lines
@@ -160,6 +161,7 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
                            '--cmdenv', 'FOO=bar',
                            '--cmdenv', 'BAZ=qux',
                            '--cmdenv', 'BAX=Arnold'])
+
         with job.make_runner() as runner:
             self.assertEqual(runner._hadoop_args_for_step(0),
                              ['-cmdenv', 'BAX=Arnold',
@@ -254,6 +256,27 @@ class HadoopArgsForStepTestCase(EmptyMrjobConfTestCase):
                           '-D', 'BAZ=quux',
                           '-D', 'FOO=bar',
                           ])
+
+    def test_non_string_jobconf_values_in_mrjob_conf(self):
+        # regression test for #323
+        MRJOB_CONF = dict(runners=dict(local=dict(jobconf=dict(
+            BAX=True,
+            BAZ=False,
+            FOO=None,
+            QUX='null',
+        ))))
+
+        with mrjob_conf_patcher(MRJOB_CONF):
+            job = MRWordCount(['-r', 'local'])
+            job.sandbox()
+
+            with job.make_runner() as runner:
+                # FOO is blanked out because it's None (use "null")
+                self.assertEqual(runner._hadoop_args_for_step(0),
+                                 ['-D', 'BAX=true',
+                                  '-D', 'BAZ=false',
+                                  '-D', 'QUX=null',
+                                  ])
 
     def test_partitioner(self):
         job = MRPartitioner(['-r', 'local'])
@@ -880,7 +903,7 @@ class SortValuesTestCase(SandboxedTestCase):
             self.assertEqual(runner._jobconf_for_step(0), {
                 'mapred.text.key.partitioner.options': '-k1,1',
                 'mapreduce.partition.keypartitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
+                'stream.num.map.output.key.fields': '2',
             })
 
     def test_sort_values_jobconf_hadoop_1(self):
@@ -890,7 +913,7 @@ class SortValuesTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             self.assertEqual(runner._jobconf_for_step(0), {
                 'mapred.text.key.partitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
+                'stream.num.map.output.key.fields': '2',
             })
 
     def test_sort_values_jobconf_hadoop_2(self):
@@ -900,7 +923,7 @@ class SortValuesTestCase(SandboxedTestCase):
         with mr_job.make_runner() as runner:
             self.assertEqual(runner._jobconf_for_step(0), {
                 'mapreduce.partition.keypartitioner.options': '-k1,1',
-                'stream.num.map.output.key.fields': 2,
+                'stream.num.map.output.key.fields': '2',
             })
 
     def test_job_can_override_jobconf(self):
@@ -1273,6 +1296,33 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                     }
                 )
             )
+
+    def test_non_string_jobconf_values_in_mrjob_conf(self):
+        # regression test for #323
+        MRJOB_CONF = dict(runners=dict(local=dict(jobconf=dict(
+            BAX=True,
+            BAZ=False,
+            FOO=None,
+            QUX='null',
+        ))))
+
+        with mrjob_conf_patcher(MRJOB_CONF):
+            job = MRNullSpark(['-r', 'local'])
+            job.sandbox()
+
+            with job.make_runner() as runner:
+                # FOO is blanked out because it's None (use "null")
+                self.assertEqual(
+                    runner._spark_submit_args(0),
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy'),
+                        jobconf=dict(
+                            BAX='true',
+                            BAZ='false',
+                            QUX='null',
+                        )
+                    )
+                )
 
     def test_libjars_option(self):
         fake_libjar = self.makefile('fake_lib.jar')

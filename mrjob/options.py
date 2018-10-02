@@ -77,6 +77,7 @@ _OPTPARSE_TYPES = dict(
     float=float,
     int=int,
     long=int,
+    str=str,  # undocumented alias for 'string', see #1857
     string=str,
 )
 

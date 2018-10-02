@@ -74,7 +74,6 @@ class MRCustomJobLauncher(MRJobLauncher):
         self.add_file_arg('--accordian-file', dest='accordian_files',
                           action='append', default=[])
 
-
 # used to test old options() hooks
 class MRDeprecatedCustomJobLauncher(MRJobLauncher):
 
@@ -88,10 +87,16 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
             '--pill-type', '-T', type='choice', choices=(['red', 'blue']),
             default='blue')
 
+        # test 'str' alias for 'string' type (see #1857)
+        self.add_passthrough_option('--word', '-w', type='str', default=None)
+
         self.pass_through_option('--runner')
 
         self.add_file_option('--accordian-file', dest='accordian_files',
                              action='append', default=[])
+
+        # regression test for #1858
+        self.add_file_option('--foo-db', dest='foo_db', type='string')
 
     def load_options(self, args):
         super(MRDeprecatedCustomJobLauncher, self).load_options(args)
@@ -345,6 +350,19 @@ class CommandLineArgsTestCase(TestCase):
                 path='/home/dave/JohnLinnell.ogg', name=None, type='file')
         ])
 
+    def test_str_type_with_file_arg(self):
+        # regression test for #1858
+        class MRGoodFileArgTypeLauncher(MRJobLauncher):
+            def configure_args(self):
+                super(MRGoodFileArgTypeLauncher, self).configure_args()
+                self.add_file_arg(
+                    '--bibliophile', dest='bibliophiles', type=str)
+
+        mr_job = MRGoodFileArgTypeLauncher(
+            args=['', '--bibliophile', '/var/bookworm'])
+
+        self.assertEqual(mr_job.options.bibliophiles, '/var/bookworm')
+
     def test_no_conf_overrides(self):
         mr_job = MRCustomJobLauncher(args=['', '-c', 'blah.conf', '--no-conf'])
         self.assertEqual(mr_job.options.conf_paths, [])
@@ -451,29 +469,37 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
 
     def test_add_passthrough_option(self):
         mr_job = MRDeprecatedCustomJobLauncher(
-            args=['', '-F', '6', '-T', 'red'])
+            args=['', '-F', '6', '-T', 'red', '--word', 'bird'])
 
         self.assertEqual(mr_job.options.foo_size, 6)
         self.assertEqual(mr_job.options.pill_type, 'red')
+        self.assertEqual(mr_job.options.word, 'bird')
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'],
-                         ['-F', '6', '-T', 'red'])
+                         ['-F', '6', '-T', 'red', '--word', 'bird'])
 
     def test_add_file_option(self):
         mr_job = MRDeprecatedCustomJobLauncher(
             args=['',
                   '--accordian-file', 'WeirdAl.mp3',
-                  '--accordian-file', '/home/dave/JohnLinnell.ogg'])
+                  '--accordian-file', '/home/dave/JohnLinnell.ogg',
+                  '--foo-db', '/var/foo.db',
+                  ])
 
         self.assertEqual(
             mr_job.options.accordian_files, [
                 'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
+
+        self.assertEqual(
+            mr_job.options.foo_db, '/var/foo.db')
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
             '--accordian-file', dict(
                 path='WeirdAl.mp3', name=None, type='file'),
             '--accordian-file', dict(
                 path='/home/dave/JohnLinnell.ogg', name=None, type='file'),
+            '--foo-db', dict(
+                path='/var/foo.db', name=None, type='file'),
         ])
 
     def test_pass_through_option_method(self):

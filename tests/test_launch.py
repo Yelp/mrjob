@@ -88,6 +88,9 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
             '--pill-type', '-T', type='choice', choices=(['red', 'blue']),
             default='blue')
 
+        # test 'str' alias for 'string' type (see #1857)
+        self.add_passthrough_option('--word', '-w', type='str', default=None)
+
         self.pass_through_option('--runner')
 
         self.add_file_option('--accordian-file', dest='accordian_files',
@@ -451,13 +454,14 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
 
     def test_add_passthrough_option(self):
         mr_job = MRDeprecatedCustomJobLauncher(
-            args=['', '-F', '6', '-T', 'red'])
+            args=['', '-F', '6', '-T', 'red', '--word', 'bird'])
 
         self.assertEqual(mr_job.options.foo_size, 6)
         self.assertEqual(mr_job.options.pill_type, 'red')
+        self.assertEqual(mr_job.options.word, 'bird')
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'],
-                         ['-F', '6', '-T', 'red'])
+                         ['-F', '6', '-T', 'red', '--word', 'bird'])
 
     def test_add_file_option(self):
         mr_job = MRDeprecatedCustomJobLauncher(

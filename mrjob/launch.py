@@ -22,7 +22,7 @@ import sys
 import time
 from io import BytesIO
 from argparse import ArgumentParser
-from argparse import ArgumentError
+from argparse import ArgumentTypeError
 
 from mrjob.conf import combine_dicts
 from mrjob.conf import combine_lists
@@ -329,11 +329,11 @@ class MRJobLauncher(object):
         hash table, try out the :py:mod:`sqlite3dbm` module.
         """
         if kwargs.get('type') not in (None, 'string'):
-            raise ArgumentError(
+            raise ArgumentTypeError(
                 'file options must take strings')
 
         if kwargs.get('action') not in (None, 'append', 'store'):
-            raise ArgumentError(
+            raise ArgumentTypeError(
                 "file options must use the actions 'store' or 'append'")
 
         pass_opt = self.arg_parser.add_argument(*args, **kwargs)

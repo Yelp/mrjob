@@ -95,6 +95,9 @@ class MRDeprecatedCustomJobLauncher(MRJobLauncher):
         self.add_file_option('--accordian-file', dest='accordian_files',
                              action='append', default=[])
 
+        # regression test for #1858
+        self.add_file_option('--foo-db', dest='foo_db', type='string')
+
     def load_options(self, args):
         super(MRDeprecatedCustomJobLauncher, self).load_options(args)
 
@@ -479,17 +482,24 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
         mr_job = MRDeprecatedCustomJobLauncher(
             args=['',
                   '--accordian-file', 'WeirdAl.mp3',
-                  '--accordian-file', '/home/dave/JohnLinnell.ogg'])
+                  '--accordian-file', '/home/dave/JohnLinnell.ogg',
+                  '--foo-db', '/var/foo.db',
+                  ])
 
         self.assertEqual(
             mr_job.options.accordian_files, [
                 'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
+
+        self.assertEqual(
+            mrjob.options.foo_db, '/var/foo.db')
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
             '--accordian-file', dict(
                 path='WeirdAl.mp3', name=None, type='file'),
             '--accordian-file', dict(
                 path='/home/dave/JohnLinnell.ogg', name=None, type='file'),
+            '--foo-db', dict(
+                path='/var/foo.db', name=None, type='file'),
         ])
 
     def test_pass_through_option_method(self):

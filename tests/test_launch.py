@@ -74,7 +74,6 @@ class MRCustomJobLauncher(MRJobLauncher):
         self.add_file_arg('--accordian-file', dest='accordian_files',
                           action='append', default=[])
 
-
 # used to test old options() hooks
 class MRDeprecatedCustomJobLauncher(MRJobLauncher):
 
@@ -347,6 +346,19 @@ class CommandLineArgsTestCase(TestCase):
             '--accordian-file', dict(
                 path='/home/dave/JohnLinnell.ogg', name=None, type='file')
         ])
+
+    def test_str_type_with_file_arg(self):
+        # regression test for #1858
+        class MRGoodFileArgTypeLauncher(MRJobLauncher):
+            def configure_args(self):
+                super(MRGoodFileArgTypeLauncher, self).configure_args()
+                self.add_file_arg(
+                    '--bibliophile', dest='bibliophiles', type='str')
+
+        mr_job = MRGoodFileArgTypeLauncher(
+            args=['', '--bibliophile', '/var/bookworm'])
+
+        self.assertEqual(mr_job.options.bibliophiles, '/var/bookworm')
 
     def test_no_conf_overrides(self):
         mr_job = MRCustomJobLauncher(args=['', '-c', 'blah.conf', '--no-conf'])

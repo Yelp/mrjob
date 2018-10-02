@@ -356,7 +356,7 @@ class CommandLineArgsTestCase(TestCase):
             def configure_args(self):
                 super(MRGoodFileArgTypeLauncher, self).configure_args()
                 self.add_file_arg(
-                    '--bibliophile', dest='bibliophiles', type='str')
+                    '--bibliophile', dest='bibliophiles', type=str)
 
         mr_job = MRGoodFileArgTypeLauncher(
             args=['', '--bibliophile', '/var/bookworm'])
@@ -491,7 +491,7 @@ class DeprecatedOptionHooksTestCase(SandboxedTestCase):
                 'WeirdAl.mp3', '/home/dave/JohnLinnell.ogg'])
 
         self.assertEqual(
-            mrjob.options.foo_db, '/var/foo.db')
+            mr_job.options.foo_db, '/var/foo.db')
 
         self.assertEqual(mr_job._non_option_kwargs()['extra_args'], [
             '--accordian-file', dict(

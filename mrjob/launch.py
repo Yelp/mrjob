@@ -328,7 +328,7 @@ class MRJobLauncher(object):
         Hadoop). Use SQLite databases instead. If all you need is an on-disk
         hash table, try out the :py:mod:`sqlite3dbm` module.
         """
-        if kwargs.get('type') not in (None, 'string'):
+        if kwargs.get('type') not in (None, str):
             raise ArgumentTypeError(
                 'file options must take strings')
 

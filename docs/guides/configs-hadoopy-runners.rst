@@ -68,12 +68,16 @@ Options available to hadoop and emr runners
 
 .. mrjob-opt::
     :config: hadoop_extra_args
-    :switch: --hadoop-arg
+    :switch: --hadoop-args
     :type: :ref:`string list <data-type-string-list>`
     :set: all
     :default: ``[]``
 
     Extra arguments to pass to hadoop streaming.
+
+    .. versionchanged:: 0.6.6
+
+       Deprecated the `--hadoop-arg` switch in favor of `--hadoop-args`
 
 .. mrjob-opt::
     :config: hadoop_streaming_jar
@@ -152,7 +156,7 @@ Options available to hadoop and emr runners
 
 .. mrjob-opt::
     :config: spark_args
-    :switch: --spark-arg
+    :switch: --spark-args
     :type: :ref:`string list <data-type-string-list>`
     :set: all
     :default: ``[]``
@@ -160,6 +164,10 @@ Options available to hadoop and emr runners
     Extra arguments to pass to :command:`spark-submit`.
 
     .. versionadded:: 0.5.7
+
+    .. versionchanged:: 0.6.6
+
+       Deprecated the `--spark-arg` switch in favor of `--spark-args`
 
 
 Options available to hadoop runner only

@@ -1355,7 +1355,22 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
 
     def test_option_spark_args(self):
         job = MRNullSpark(['-r', 'local',
-                           '--spark-arg=--name', '--spark-arg', 'Dave'])
+                           '--spark-args=--name Dave'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0), (
+                    self._expected_conf_args(
+                        cmdenv=dict(PYSPARK_PYTHON='mypy')) +
+                    ['--name', 'Dave']
+                )
+            )
+
+    def test_deprecated_spark_arg_switch(self):
+        job = MRNullSpark(['-r', 'local',
+                           '--spark-arg=--name',
+                           '--spark-arg=Dave'])
         job.sandbox()
 
         with job.make_runner() as runner:
@@ -1386,7 +1401,7 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         job = MRNullSpark(
             ['-r', 'local',
              '--extra-spark-arg=-v',
-             '--spark-arg=--name', '--spark-arg', 'Dave'])
+             '--spark-args=--name Dave'])
         job.sandbox()
 
         with job.make_runner() as runner:

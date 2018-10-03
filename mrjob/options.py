@@ -607,10 +607,10 @@ _RUNNER_OPTS = dict(
         deprecated=True,
         switches=[
             (['--emr-api-param'], dict(
-                help=('deprecated. Use --extra-cluster-param instead'),
+                help=('Does nothing. Use --extra-cluster-param instead'),
             )),
             (['--no-emr-api-param'], dict(
-                help=('deprecated. Use --extra-cluster-param instead'),
+                help=('Does nothing. Use --extra-cluster-param instead'),
             )),
         ],
     ),

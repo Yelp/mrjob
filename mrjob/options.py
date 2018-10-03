@@ -680,13 +680,18 @@ _RUNNER_OPTS = dict(
     hadoop_extra_args=dict(
         combiner=combine_lists,
         switches=[
+            (['--hadoop-args'], dict(
+                action=_AppendArgsAction,
+                help=('One or more arguments to pass to the hadoop binary.'
+                      ' (e.g. --hadoop-args="-fs file:///").'),
+            )),
             (['--hadoop-arg'], dict(
                 action='append',
-                help=('Argument of any type to pass to hadoop '
-                      'streaming. Use an equals sign to avoid confusing the'
-                      ' parser (e.g. --hadoop-arg=-verbose).'
-                      ' You can use --hadoop-arg multiple times.'),
+                deprecated=True,
+                help=('Deprecated. Like --hadoop-args, but only takes one'
+                      ' argument at a time.'),
             )),
+
         ],
     ),
     hadoop_log_dirs=dict(

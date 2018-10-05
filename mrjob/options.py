@@ -34,6 +34,7 @@ from mrjob.conf import combine_lists
 from mrjob.conf import combine_paths
 from mrjob.conf import combine_path_lists
 from mrjob.parse import _parse_port_range_list
+from mrjob.util import shlex_split
 
 log = getLogger(__name__)
 
@@ -149,6 +150,16 @@ class _CommaSeparatedListAction(Action):
         items = [s.strip() for s in value.split(',') if s]
 
         setattr(namespace, self.dest, items)
+
+
+class _AppendArgsAction(Action):
+    """action to parse one or more arguments and append them to a list."""
+    def __call__(self, parser, namespace, value, option_string=None):
+        _default_to(namespace, self.dest, [])
+
+        args = shlex_split(value)
+
+        getattr(namespace, self.dest).extend(args)
 
 
 class _AppendJSONAction(Action):
@@ -285,6 +296,7 @@ _DEPRECATED_NON_RUNNER_OPTS = {'deprecated'}
 #   have the format (['--switch-names', ...], dict(**kwargs)), where kwargs
 #   can be:
 #     action: action to pass to add_argument() (e.g. 'store_true')
+#     deprecated: if True, this switch is deprecated and slated for removal
 #     deprecated_aliases: list of old '--switch-names' slated for removal
 #     help: help string to pass to add_argument()
 #     type: option type for add_argument() to enforce (e.g. float).
@@ -595,10 +607,10 @@ _RUNNER_OPTS = dict(
         deprecated=True,
         switches=[
             (['--emr-api-param'], dict(
-                help=('deprecated. Use --extra-cluster-param instead'),
+                help=('Does nothing. Use --extra-cluster-param instead'),
             )),
             (['--no-emr-api-param'], dict(
-                help=('deprecated. Use --extra-cluster-param instead'),
+                help=('Does nothing. Use --extra-cluster-param instead'),
             )),
         ],
     ),
@@ -668,13 +680,18 @@ _RUNNER_OPTS = dict(
     hadoop_extra_args=dict(
         combiner=combine_lists,
         switches=[
+            (['--hadoop-args'], dict(
+                action=_AppendArgsAction,
+                help=('One or more arguments to pass to the hadoop binary.'
+                      ' (e.g. --hadoop-args="-fs file:///").'),
+            )),
             (['--hadoop-arg'], dict(
                 action='append',
-                help=('Argument of any type to pass to hadoop '
-                      'streaming. Use an equals sign to avoid confusing the'
-                      ' parser (e.g. --hadoop-arg=-verbose).'
-                      ' You can use --hadoop-arg multiple times.'),
+                deprecated=True,
+                help=('Deprecated. Like --hadoop-args, but only takes one'
+                      ' argument at a time.'),
             )),
+
         ],
     ),
     hadoop_log_dirs=dict(
@@ -1101,12 +1118,16 @@ _RUNNER_OPTS = dict(
     spark_args=dict(
         combiner=combine_lists,
         switches=[
+            (['--spark-args'], dict(
+                action=_AppendArgsAction,
+                help=('One or more arguments to pass to spark-submit'
+                      ' (e.g. --spark-args="--deploy-mode cluster").'),
+            )),
             (['--spark-arg'], dict(
                 action='append',
-                help=('Argument of any type to pass to spark-submit.'
-                      ' Use an equals sign to avoid confusing the parser'
-                      ' (e.g. --spark-arg=--verbose).'
-                      ' You can use --spark-arg multiple times.'),
+                deprecated=True,
+                help=('Deprecated. Like --spark-args, but only takes one'
+                      ' argument at a time.'),
             )),
         ],
     ),
@@ -1377,15 +1398,18 @@ def _add_runner_args_for_opt(parser, opt_name, include_deprecated=True):
         kwargs = dict(kwargs)
 
         deprecated_aliases = kwargs.pop('deprecated_aliases', None)
+        deprecated = kwargs.pop('deprecated', False)
 
-        kwargs['dest'] = opt_name
+        # add this switch
+        if include_deprecated or not deprecated:
+            kwargs['dest'] = opt_name
 
-        if kwargs.get('action') == 'append':
-            kwargs['default'] = []
-        else:
-            kwargs['default'] = None
+            if kwargs.get('action') == 'append':
+                kwargs['default'] = []
+            else:
+                kwargs['default'] = None
 
-        parser.add_argument(*args, **kwargs)
+            parser.add_argument(*args, **kwargs)
 
         # add a switch for deprecated aliases
         if deprecated_aliases and include_deprecated:

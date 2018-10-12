@@ -133,10 +133,6 @@ def _infer_step_type(step):
     else:
         return 'streaming'
 
-    # every spark step on EMR must include these args
-    return any(args[i:i + len(_EMR_SPARK_ARGS)] == _EMR_SPARK_ARGS
-               for i in range(len(_EMR_SPARK_ARGS)))
-
 
 def _make_arg_parser():
     usage = '%(prog)s [opts] [--step-id STEP_ID] CLUSTER_ID'

@@ -32,7 +32,6 @@ from mrjob.conf import combine_local_envs
 from mrjob.py2 import PY2
 from mrjob.py2 import string_types
 from mrjob.runner import MRJobRunner
-from mrjob.setup import parse_legacy_hash_path
 from mrjob.setup import parse_setup_cmd
 from mrjob.step import _is_spark_step_type
 from mrjob.util import cmd_line

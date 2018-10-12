@@ -26,8 +26,6 @@ import sys
 
 # don't use relative imports, to allow this script to be invoked as __main__
 from mrjob.cat import decompress
-from mrjob.conf import combine_dicts
-from mrjob.conf import combine_lists
 from mrjob.launch import MRJobLauncher
 from mrjob.launch import _im_func
 from mrjob.launch import _READ_ARGS_FROM_SYS_ARGV

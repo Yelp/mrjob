@@ -5238,8 +5238,7 @@ class ImageVersionGteTestCase(MockBoto3TestCase):
 
 class SparkMasterAndDeployModeTestCase(MockBoto3TestCase):
 
-    def test_hard_coded(self):
-        # these are hard-coded and always the same
+    def test_default(self):
         mr_job = MRNullSpark(['-r', 'emr'])
         mr_job.sandbox()
 
@@ -5253,9 +5252,12 @@ class SparkMasterAndDeployModeTestCase(MockBoto3TestCase):
                 ['--master', 'yarn', '--deploy-mode', 'cluster']
             )
 
-            # these can't be configured
-            self.assertNotIn('spark_master', runner._opts)
-            self.assertNotIn('spark_deploy_mode', runner._opts)
+    def test_spark_master_and_deploy_mode_are_hard_coded(self):
+        runner = EMRJobRunner()
+
+        # these can't be configured
+        self.assertNotIn('spark_master', runner._opts)
+        self.assertNotIn('spark_deploy_mode', runner._opts)
 
 
 class SSHWorkerHostsTestCase(MockBoto3TestCase):

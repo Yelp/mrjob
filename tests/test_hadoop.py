@@ -1537,21 +1537,52 @@ class FindBinariesAndJARsTestCase(SandboxedTestCase):
             self.assertTrue(self.get_spark_submit_bin.called)
 
 
-class SparkSubmitArgPrefixTestCase(MockHadoopTestCase):
+class SparkMasterAndDeployModeTestCase(MockHadoopTestCase):
 
     def test_default(self):
-        runner = HadoopJobRunner()
+        mr_job = MRNullSpark(['-r', 'hadoop'])
+        mr_job.sandbox()
 
-        self.assertEqual(
-            runner._spark_submit_arg_prefix(),
-            ['--master', 'yarn'])
+        with mr_job.make_runner() as runner:
+            # patch this so we don't have to start a (mock) cluster
+            self.start(patch('mrjob.emr.EMRJobRunner.get_hadoop_version',
+                             return_value='2'))
 
-    def test_spark_master(self):
-        runner = HadoopJobRunner(spark_master='local')
+            self.assertEqual(
+                runner._spark_submit_args(0)[:4],
+                ['--master', 'yarn', '--deploy-mode', 'client']
+            )
 
-        self.assertEqual(
-            runner._spark_submit_arg_prefix(),
-            ['--master', 'local'])
+    def test_spark_master_opt(self):
+        # these are hard-coded and always the same
+        mr_job = MRNullSpark(['-r', 'hadoop', '--spark-master', 'local'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            # patch this so we don't have to start a (mock) cluster
+            self.start(patch('mrjob.emr.EMRJobRunner.get_hadoop_version',
+                             return_value='2'))
+
+            self.assertEqual(
+                runner._spark_submit_args(0)[:4],
+                ['--master', 'local', '--deploy-mode', 'client']
+            )
+
+    def test_spark_deploy_mode_opt(self):
+        # these are hard-coded and always the same
+        mr_job = MRNullSpark(['-r', 'hadoop',
+                              '--spark-deploy-mode', 'cluster'])
+        mr_job.sandbox()
+
+        with mr_job.make_runner() as runner:
+            # patch this so we don't have to start a (mock) cluster
+            self.start(patch('mrjob.emr.EMRJobRunner.get_hadoop_version',
+                             return_value='2'))
+
+            self.assertEqual(
+                runner._spark_submit_args(0)[:4],
+                ['--master', 'yarn', '--deploy-mode', 'cluster']
+            )
 
 
 class WarnAboutSparkArchivesTestCase(MockHadoopTestCase):

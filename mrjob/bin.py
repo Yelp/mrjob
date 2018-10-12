@@ -716,10 +716,6 @@ class MRJobBinRunner(MRJobRunner):
         """
         return self._opts['spark_submit_bin'] or ['spark-submit']
 
-    def _spark_submit_arg_prefix(self):
-        """Runner-specific args to spark submit (e.g. ['--master', 'yarn'])"""
-        return []
-
     def _spark_submit_args(self, step_num):
         """Build a list of extra args to the spark-submit binary for
         the given spark or spark_script step."""
@@ -730,8 +726,13 @@ class MRJobBinRunner(MRJobRunner):
 
         args = []
 
-        # add runner-specific args
-        args.extend(self._spark_submit_arg_prefix())
+        # add --master
+        if self._spark_master():
+            args.extend(['--master', self._spark_master()])
+
+        # add --deploy-mode
+        if self._spark_deploy_mode():
+            args.extend(['--deploy-mode', self._spark_deploy_mode()])
 
         # add --class (JAR steps)
         if step.get('main_class'):
@@ -770,6 +771,12 @@ class MRJobBinRunner(MRJobRunner):
         args.extend(step['spark_args'])
 
         return args
+
+    def _spark_master(self):
+        return self._opts.get('spark_master') or None
+
+    def _spark_deploy_mode(self):
+        return self._opts.get('spark_deploy_mode') or None
 
     def _spark_upload_args(self):
         return self._upload_args_helper('--files', self._spark_files,

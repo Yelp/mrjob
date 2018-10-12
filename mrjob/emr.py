@@ -184,9 +184,6 @@ _MIN_SPARK_AMI_VERSION = '3.8.0'
 # first AMI version with Spark that supports Python 3
 _MIN_SPARK_PY3_AMI_VERSION = '4.0.0'
 
-# always use these args with spark-submit
-_EMR_SPARK_ARGS = ['--master', 'yarn', '--deploy-mode', 'cluster']
-
 # we have to wait this many minutes for logs to transfer to S3 (or wait
 # for the cluster to terminate). Docs say logs are transferred every 5
 # minutes, but I've seen it take longer on the 4.3.0 AMI. Probably it's
@@ -1361,8 +1358,13 @@ class EMRJobRunner(HadoopInTheCloudJobRunner, LogInterpretationMixin):
         else:
             return [_3_X_SPARK_SUBMIT]
 
-    def _spark_submit_arg_prefix(self):
-        return _EMR_SPARK_ARGS
+    def _spark_master(self):
+        # hard-coded for EMR
+        return 'yarn'
+
+    def _spark_deploy_mode(self):
+        # hard-coded for EMR; otherwise it can't access S3
+        return 'cluster'
 
     def _spark_jar(self):
         if version_gte(self.get_image_version(), '4'):

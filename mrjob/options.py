@@ -1121,7 +1121,7 @@ _RUNNER_OPTS = dict(
             (['--spark-args'], dict(
                 action=_AppendArgsAction,
                 help=('One or more arguments to pass to spark-submit'
-                      ' (e.g. --spark-args="--deploy-mode cluster").'),
+                      ' (e.g. --spark-args="--properties-file my.conf").'),
             )),
             (['--spark-arg'], dict(
                 action='append',
@@ -1130,6 +1130,14 @@ _RUNNER_OPTS = dict(
                       ' argument at a time.'),
             )),
         ],
+    ),
+    spark_deploy_mode=dict(
+        switches=[
+            (['--spark-deploy-mode'], dict(
+                help=('--deploy-mode argument to spark-submit (e.g.'
+                      ' "cluster". Default is "client"'),
+            )),
+        ]
     ),
     spark_master=dict(
         switches=[

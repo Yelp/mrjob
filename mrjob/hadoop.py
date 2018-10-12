@@ -127,6 +127,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         'hadoop_log_dirs',
         'hadoop_streaming_jar',
         'hadoop_tmp_dir',
+        'spark_deploy_mode',
         'spark_master',
     }
 
@@ -178,6 +179,7 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
             super(HadoopJobRunner, self)._default_opts(),
             dict(
                 hadoop_tmp_dir='tmp/mrjob',
+                spark_deploy_mode='client',
                 spark_master='yarn',
             )
         )
@@ -536,9 +538,6 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
                 self._interpolate_input_and_output(step['args'], step_num))
 
         return args
-
-    def _spark_submit_arg_prefix(self):
-        return ['--master', self._opts['spark_master']]
 
     def _env_for_step(self, step_num):
         step = self._get_step(step_num)

@@ -760,9 +760,9 @@ class MRJobBinRunner(MRJobRunner):
 
         # --py-files (Python only)
         if step['type'] in ('spark', 'spark_script'):
-            py_files_arg = ','.join(self._spark_py_files())
-            if py_files_arg:
-                args.extend(['--py-files', py_files_arg])
+            py_file_uris = self._upload_uris(self._py_files())
+            if py_file_uris:
+                args.extend(['--py-files', ','.join(py_file_uris)])
 
         # spark_args option
         args.extend(self._opts['spark_args'])
@@ -815,14 +815,6 @@ class MRJobBinRunner(MRJobRunner):
             cmdenv = dict(PYSPARK_PYTHON=cmd_line(self._python_bin()))
         cmdenv.update(self._opts['cmdenv'])
         return cmdenv
-
-    def _spark_py_files(self):
-        """The list of files to pass to spark-submit with --py-files.
-
-        By default (client mode), Spark only accepts local files, so
-        we pass these as-is.
-        """
-        return self._py_files()
 
 
 # these don't need to be methods

@@ -372,6 +372,8 @@ class HadoopJobRunner(MRJobBinRunner, LogInterpretationMixin):
         to self._upload_mgr."""
         for path in self._working_dir_mgr.paths():
             self._upload_mgr.add(path)
+        for path in self._py_files():
+            self._upload_mgr.add(path)
 
     def _upload_local_files_to_hdfs(self):
         """Copy files managed by self._upload_mgr to HDFS

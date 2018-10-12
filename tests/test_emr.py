@@ -5236,15 +5236,26 @@ class ImageVersionGteTestCase(MockBoto3TestCase):
         self.assertFalse(runner._image_version_gte('5'))
 
 
-class SparkSubmitArgPrefixTestCase(MockBoto3TestCase):
+class SparkMasterAndDeployModeTestCase(MockBoto3TestCase):
 
-    def test_default(self):
+    def test_hard_coded(self):
         # these are hard-coded and always the same
-        runner = EMRJobRunner()
+        mr_job = MRNullSpark(['-r', 'emr'])
+        mr_job.sandbox()
 
-        self.assertEqual(
-            runner._spark_submit_arg_prefix(),
-            ['--master', 'yarn', '--deploy-mode', 'cluster'])
+        with mr_job.make_runner() as runner:
+            # patch this so we don't have to start a (mock) cluster
+            self.start(patch('mrjob.emr.EMRJobRunner.get_hadoop_version',
+                             return_value='2'))
+
+            self.assertEqual(
+                runner._spark_submit_args(0)[:4],
+                ['--master', 'yarn', '--deploy-mode', 'cluster']
+            )
+
+            # these can't be configured
+            self.assertNotIn('spark_master', runner._opts)
+            self.assertNotIn('spark_deploy_mode', runner._opts)
 
 
 class SSHWorkerHostsTestCase(MockBoto3TestCase):

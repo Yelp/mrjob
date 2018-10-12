@@ -45,7 +45,6 @@ from argparse import ArgumentParser
 from logging import getLogger
 
 from mrjob.aws import _boto3_paginate
-from mrjob.emr import _EMR_SPARK_ARGS
 from mrjob.emr import EMRJobRunner
 from mrjob.job import MRJob
 from mrjob.logs.errors import _format_error
@@ -129,9 +128,8 @@ def _infer_step_type(step):
     #
     # and of course we don't know the logging habits of jar steps,
     # so we might as well use streaming's logic
-    for i in range(len(_EMR_SPARK_ARGS)):
-        if list(args[i:i + len(_EMR_SPARK_ARGS)]) == _EMR_SPARK_ARGS:
-            return 'spark'
+    if '--master' in args and '--deploy-mode' in args:
+        return 'spark'
     else:
         return 'streaming'
 

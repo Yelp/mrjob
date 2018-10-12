@@ -1212,9 +1212,11 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
 
-    def test_spark_submit_arg_prefix(self):
-        self.start(patch('mrjob.bin.MRJobBinRunner._spark_submit_arg_prefix',
-                         return_value=['<arg prefix>']))
+    def test_spark_master_and_deploy_mode(self):
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_master',
+                         return_value='yoda'))
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_deploy_mode',
+                         return_value='the-force'))
 
         job = MRNullSpark(['-r', 'local'])
         job.sandbox()
@@ -1222,7 +1224,22 @@ class SparkSubmitArgsTestCase(SandboxedTestCase):
         with job.make_runner() as runner:
             self.assertEqual(
                 runner._spark_submit_args(0),
-                ['<arg prefix>'] +
+                ['--master', 'yoda', '--deploy-mode', 'the-force'] +
+                self._expected_conf_args(
+                    cmdenv=dict(PYSPARK_PYTHON='mypy')))
+
+    def test_empty_string_spark_master_and_deploy_mode(self):
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_master',
+                         return_value=''))
+        self.start(patch('mrjob.bin.MRJobBinRunner._spark_deploy_mode',
+                         return_value=''))
+
+        job = MRNullSpark(['-r', 'local'])
+        job.sandbox()
+
+        with job.make_runner() as runner:
+            self.assertEqual(
+                runner._spark_submit_args(0),
                 self._expected_conf_args(
                     cmdenv=dict(PYSPARK_PYTHON='mypy')))
 
